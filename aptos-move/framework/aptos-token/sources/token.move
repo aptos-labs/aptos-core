@@ -8,6 +8,7 @@ module aptos_token::token {
 
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
+    friend aptos_token::bid;
 
     const TOKEN_MAX_MUTABLE_IND: u64 = 0;
     const TOKEN_URI_MUTABLE_IND: u64 = 1;
@@ -393,7 +394,7 @@ module aptos_token::token {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+    public(friend) fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         event::emit_event<DepositEvent>(
@@ -500,7 +501,7 @@ module aptos_token::token {
         withdraw_with_event_internal(account_addr, id, amount)
     }
 
-    fun withdraw_with_event_internal(
+    public(friend) fun withdraw_with_event_internal(
         account_addr: address,
         id: TokenId,
         amount: u64,
