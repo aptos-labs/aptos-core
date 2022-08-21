@@ -194,7 +194,15 @@ You can check the details about node liveness definition [here](https://aptos.de
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
     ```
 
-3. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
+3. Check if your node is state syncing
+
+    ```
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version"
+    ```
+    
+    You should expect to see the "committed" version keeps increasing.
+
+4. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
 
     ```
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
@@ -203,6 +211,18 @@ You can check the details about node liveness definition [here](https://aptos.de
     ```
 
     You should expect to see this number keep increasing.
+    
+5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=ait3`
+
+    ```
+    0x1::stake::StakePool
+
+    "active": {
+      "value": "100009129447462"
+    }
+    ```
+    
+    You should expect the active value for your StakePool to keep increasing. It's updated at every epoch, so it will be every two hours.
 
 
 ## Leaving Validator Set
