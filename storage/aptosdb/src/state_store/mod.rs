@@ -3,6 +3,16 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::epoch_by_version::EpochByVersionSchema;
+use crate::{
+    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
+    schema::state_value::StateValueSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
+    state_store::buffered_state::BufferedState,
+    version_data::{VersionData, VersionDataSchema},
+    AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -29,16 +39,6 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 use storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
-};
-
-use crate::{
-    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    schema::state_value::StateValueSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
-    state_merkle_db::StateMerkleDb,
-    state_store::buffered_state::BufferedState,
-    version_data::{VersionData, VersionDataSchema},
-    AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 
 pub(crate) mod buffered_state;
@@ -168,6 +168,22 @@ impl StateDb {
             .next()
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
+    /// ends an epoch, return one epoch early than that.
+    pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
+        if version == 0 {
+            return Ok(None);
+        }
+        let prev_version = version - 1;
+
+        let mut iter = self
+            .ledger_db
+            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
+        // Search for the end of the previous epoch.
+        iter.seek_for_prev(&prev_version)?;
+        iter.next().transpose()
     }
 }
 
@@ -573,6 +589,7 @@ impl StateStore {
             node_hashes,
             version,
             base_version,
+            None, // previous epoch ending version
         )?;
         self.state_merkle_db.write_schemas(batch)?;
         Ok(hash)
