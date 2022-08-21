@@ -15,7 +15,8 @@ pub(crate) enum PrunerMetadata {
 #[derive(Clone, Debug, Deserialize, FromPrimitive, PartialEq, ToPrimitive, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 #[repr(u8)]
-pub(crate) enum PrunerTag {
-    StateMerklePruner = 0,
-    LedgerPruner = 1,
+pub enum PrunerTag {
+    LedgerPruner = 0,
+    StateMerklePruner = 1,
+    EpochEndingStateMerklePruner = 2,
 }

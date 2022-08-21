@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::{sync::Arc, time::Duration};
 
 use aptos_config::config::{
-    LedgerPrunerConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+    EpochEndingStateMerklePrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
 };
 use proptest::prelude::*;
 
@@ -17,7 +17,7 @@ use crate::{
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, PrunerManager, ROCKSDB_PROPERTIES,
+    AptosDB, PrunerManager, StaleNodeIndexSchema, ROCKSDB_PROPERTIES,
 };
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -94,13 +94,12 @@ fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
-        let state_pruner = StatePrunerManager::new(
+        let state_pruner = StatePrunerManager::<StaleNodeIndexSchema>::new(
             Arc::clone(&aptos_db.state_merkle_db),
             StateMerklePrunerConfig {
                 enable,
                 prune_window: 20,
                 batch_size: 1,
-                user_pruning_window_offset: 0,
             },
         );
         assert_eq!(state_pruner.is_pruner_enabled(), enable);
@@ -219,7 +218,11 @@ pub fn test_state_merkle_pruning_impl(
                 enable: true,
                 prune_window: 5,
                 batch_size: 1,
-                user_pruning_window_offset: 0,
+            },
+            epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
+                enable: true,
+                prune_window: 5,
+                batch_size: 1,
             },
         },
         RocksdbConfigs::default(),

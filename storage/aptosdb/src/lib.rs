@@ -109,6 +109,8 @@ use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
     state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
 };
+use crate::stale_node_index::StaleNodeIndexSchema;
+use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
@@ -266,10 +268,15 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
+        let epoch_ending_state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            pruner_config.epoch_ending_state_merkle_pruner_config.into(),
+        );
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             state_pruner,
+            epoch_ending_state_pruner,
             target_snapshot_size,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
