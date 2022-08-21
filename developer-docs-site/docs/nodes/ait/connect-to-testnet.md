@@ -48,7 +48,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
+- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
 - Pull the latest changes on `testnet` branch
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
@@ -85,7 +85,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
     ```
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
 - Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-0-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
@@ -99,7 +99,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ## Joining Validator Set
 
-All the selected participant will get Aptos coin airdrop into their owner account, once received the token you should initialize a staking pool and set your operator account. The step below is to setup the validator node, and join the validator set.
+At this point you already used your owner account to initialized a validator staking pool, and assigned the operator to your operator account. The step below is to setup the validator node using operator account, and join the validator set.
 
 1. Initialize Aptos CLI
 
@@ -110,7 +110,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     --skip-faucet
     ```
     
-    Note: `account_private_key` can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
+    Note: `account_private_key` for operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
 
 2. Check your validator account balance, make sure you have some coins to pay gas. (If not, transfer some coin to this account from your owner account) 
 
