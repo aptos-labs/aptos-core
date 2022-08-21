@@ -113,7 +113,7 @@ pub struct Account {
     context: Arc<Context>,
     address: Address,
     ledger_version: u64,
-    latest_ledger_info: LedgerInfo,
+    pub latest_ledger_info: LedgerInfo,
 }
 
 impl Account {
@@ -264,7 +264,7 @@ impl Account {
 
     // Helpers for processing account state.
 
-    fn account_state(&self) -> Result<AccountState, BasicErrorWith404> {
+    pub fn account_state(&self) -> Result<AccountState, BasicErrorWith404> {
         let state = self
             .context
             .get_account_state(self.address.into(), self.ledger_version)

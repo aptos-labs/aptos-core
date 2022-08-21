@@ -13,7 +13,9 @@ use crate::response::{
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, AptosErrorCode, EventKey, IdentifierWrapper, MoveStructTag, U64};
+use aptos_api_types::{
+    Address, AptosErrorCode, EventKey, IdentifierWrapper, LedgerInfo, MoveStructTag, U64,
+};
 use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -34,7 +36,6 @@ impl EventsApi {
         operation_id = "get_events_by_event_key",
         tag = "ApiTags::Events"
     )]
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2284
     async fn get_events_by_event_key(
         &self,
         accept_type: AcceptType,
@@ -45,7 +46,15 @@ impl EventsApi {
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
-        self.list(accept_type, page, event_key.0)
+
+        // Ensure that account exists
+        let account = Account::new(
+            self.context.clone(),
+            event_key.0 .0.get_creator_address().into(),
+            None,
+        )?;
+        account.account_state()?;
+        self.list(account.latest_ledger_info, accept_type, page, event_key.0)
     }
 
     /// Get events by event handle
@@ -75,18 +84,18 @@ impl EventsApi {
         let key = account
             .find_event_key(event_handle.0, field_name.0.into())?
             .into();
-        self.list(accept_type, page, key)
+        self.list(account.latest_ledger_info, accept_type, page, key)
     }
 }
 
 impl EventsApi {
     fn list(
         &self,
+        latest_ledger_info: LedgerInfo,
         accept_type: AcceptType,
         page: Page,
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
         let ledger_version = latest_ledger_info.version();
         let events = self
             .context
