@@ -101,4 +101,5 @@ pub enum AptosErrorCode {
     InvalidTransactionUpdate = 23,
     SequenceNumberTooOld = 24,
     MempoolIsFullForAccount = 25,
+    BcsNotSupported = 26,
 }
