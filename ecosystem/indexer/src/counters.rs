@@ -71,3 +71,21 @@ pub static FETCHED_TRANSACTION: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Number of times the indexer has been unable to fetch a block. Ideally zero.
+pub static UNABLE_TO_FETCH_BLOCK: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_unable_to_fetch_block_count",
+        "Number of times the indexer has been unable to fetch a block"
+    )
+    .unwrap()
+});
+
+/// Number of times the indexer has been able to fetch a block
+pub static FETCHED_BLOCK: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "indexer_fetched_block_count",
+        "Number of times the indexer has been able to fetch a block"
+    )
+    .unwrap()
+});

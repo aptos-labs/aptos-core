@@ -708,6 +708,7 @@ dependencies = [
  "clap 3.2.16",
  "diesel",
  "diesel_migrations",
+ "field_count",
  "futures",
  "once_cell",
  "reqwest 0.11.11",
@@ -3671,6 +3672,25 @@ name = "fiat-crypto"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35354cf6bf9d259374646f419a25c7dd0bb208d291e44dc73db557542fe017fc"
+
+[[package]]
+name = "field_count"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284d5f85dd574cf01094bca24aefa69a43539dbfc72b1326f038d540b2daadc7"
+dependencies = [
+ "field_count_derive",
+]
+
+[[package]]
+name = "field_count_derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1320970ff3b1c1cacc6a38e8cdb1aced955f29627697cd992c5ded82eb646a8"
+dependencies = [
+ "quote 1.0.20",
+ "syn 1.0.98",
+]
 
 [[package]]
 name = "fixedbitset"

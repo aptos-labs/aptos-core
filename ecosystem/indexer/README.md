@@ -11,7 +11,7 @@ result in an error if some or all of the processing had previously been complete
 Example invocation:
 
 ```bash
-cargo run -- --pg-uri "postgresql://localhost/postgres" --node-url "https://fullnode.devnet.aptoslabs.com" --emit-every 25 --batch-size 100
+cargo run -- --pg-uri "postgresql://localhost/devnet_old_indexer" --node-url "https://fullnode.devnet.aptoslabs.com" --emit-every 10
 ```
 
 Try running the indexer with `--help` to get more details

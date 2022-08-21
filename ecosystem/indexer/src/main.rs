@@ -31,10 +31,6 @@ struct IndexerArgs {
     #[clap(long)]
     skip_migrations: bool,
 
-    /// If set, don't try to re-run all previous failed versions before tailing new ones
-    #[clap(long)]
-    skip_previous_errors: bool,
-
     /// If set, will exit after migrations/repairs instead of starting indexing loop
     #[clap(long)]
     dont_index: bool,
@@ -44,12 +40,7 @@ struct IndexerArgs {
     #[clap(long)]
     start_from_version: Option<u64>,
 
-    /// How many versions to fetch and process from a node in parallel
-    #[clap(long, default_value_t = 10)]
-    batch_size: u8,
-
-    /// How many versions to process before logging a "processed X versions" message.
-    /// This will only be checked every `--batch-size` number of versions.
+    /// How many blocks to process before logging a "processed X versions" message.
     /// Set to 0 to disable.
     #[clap(long, default_value_t = 1000)]
     emit_every: usize,
@@ -89,14 +80,14 @@ async fn main() -> std::io::Result<()> {
         tailer.add_processor(Arc::new(token_transaction_processor));
     }
 
-    let starting_version = match args.start_from_version {
-        None => tailer.set_fetcher_to_lowest_processor_version().await,
-        Some(version) => tailer.set_fetcher_version(version).await,
+    let starting_block = match args.start_from_version {
+        None => tailer.set_fetcher_to_lowest_processor_block().await,
+        Some(version) => {
+            tailer
+                .set_fetcher_to_block_from_input_version(version)
+                .await
+        }
     };
-
-    if !args.skip_previous_errors {
-        tailer.handle_previous_errors().await;
-    }
 
     if args.dont_index {
         info!("All pre-index tasks complete, exiting!");
@@ -104,16 +95,18 @@ async fn main() -> std::io::Result<()> {
     }
 
     info!("Indexing loop started!");
-    let mut processed: usize = starting_version as usize;
+    let mut processed: usize = starting_block as usize;
     let mut base: usize = 0;
     loop {
-        let res = tailer.process_next_batch(args.batch_size).await;
-        processed += res.len();
+        if tailer.process_next_block().await.is_ok() {
+            processed += 1;
+            tailer.increment_block_height().await;
+        }
         if args.emit_every != 0 {
             let new_base: usize = processed / args.emit_every;
             if base != new_base {
                 base = new_base;
-                aptos_logger::info!("Indexer has processed {} versions", processed);
+                aptos_logger::info!("Indexer has processed {} blocks", processed);
             }
         }
     }
