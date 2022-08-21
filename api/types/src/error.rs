@@ -4,6 +4,7 @@
 use aptos_types::vm_status::StatusCode;
 use poem_openapi::{Enum, Object};
 use serde::Deserialize;
+use std::fmt::Formatter;
 
 /// This is the generic struct we use for all API errors, it contains a string
 /// message and an Aptos API specific error code.
@@ -17,6 +18,14 @@ pub struct AptosError {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_error_code: Option<u64>,
 }
+
+impl std::fmt::Display for AptosError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for AptosError {}
 
 impl AptosError {
     pub fn new_with_error_code<ErrorType: std::fmt::Display>(
