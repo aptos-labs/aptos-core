@@ -519,6 +519,8 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
+        // When the start is not provided, it goes backwards from the newest events
+        // This allows people to poll the events endpoint and get the new events
         if let Some(start) = start {
             self.db.get_events(
                 event_key,

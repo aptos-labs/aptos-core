@@ -91,7 +91,7 @@ impl TransactionsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_transactions")?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(start.0, limit.0);
         self.list(&accept_type, page)
     }
 
@@ -162,7 +162,7 @@ impl TransactionsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_accounts_transactions")?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(start.0, limit.0);
         self.list_by_account(&accept_type, page, address.0)
     }
 
@@ -270,9 +270,7 @@ impl TransactionsApi {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
         let ledger_version = latest_ledger_info.version();
 
-        let limit = page.limit(&latest_ledger_info)?;
-        // TODO: https://github.com/aptos-labs/aptos-core/issues/2286
-        let start_version = page.compute_start(limit, ledger_version, &latest_ledger_info)?;
+        let (start_version, limit) = page.get_version_params(&latest_ledger_info)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
@@ -452,11 +450,13 @@ impl TransactionsApi {
         account.account_state()?;
 
         let latest_ledger_info = account.latest_ledger_info;
+        let (start_version, limit) = page.get_version_params(&latest_ledger_info)?;
+
         // TODO: Return more specific errors from within this function.
         let data = self.context.get_account_transactions(
             address.into(),
-            page.start(0, u64::MAX, &latest_ledger_info)?,
-            page.limit(&latest_ledger_info)?,
+            start_version,
+            limit,
             latest_ledger_info.version(),
             &latest_ledger_info,
         )?;

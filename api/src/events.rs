@@ -45,7 +45,7 @@ impl EventsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(start.0, limit.0);
 
         // Ensure that account exists
         let account = Account::new(
@@ -79,7 +79,7 @@ impl EventsApi {
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         // TODO: Assert that Event represents u64s as strings.
         fail_point_poem("endpoint_get_events_by_event_handle")?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(start.0, limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
             .find_event_key(event_handle.0, field_name.0.into())?
@@ -97,14 +97,12 @@ impl EventsApi {
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         let ledger_version = latest_ledger_info.version();
+        let start = page.start();
+        let limit = page.get_limit_param(&latest_ledger_info)?;
+
         let events = self
             .context
-            .get_events(
-                &event_key.into(),
-                page.start_option(),
-                page.limit(&latest_ledger_info)?,
-                ledger_version,
-            )
+            .get_events(&event_key.into(), start, limit, ledger_version)
             .context(format!("Failed to find events by key {}", event_key))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
