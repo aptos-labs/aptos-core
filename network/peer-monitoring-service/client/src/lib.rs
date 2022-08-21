@@ -11,7 +11,6 @@ use network::{
         interface::{MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
     },
-    error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{
         AppConfig, ApplicationNetworkSender, NetworkSender, NewNetworkSender, RpcError,
@@ -126,14 +125,6 @@ impl NewNetworkSender for PeerMonitoringServiceNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<PeerMonitoringServiceMessage> for PeerMonitoringServiceNetworkSender {
-    fn send_to(
-        &self,
-        _recipient: PeerId,
-        _message: PeerMonitoringServiceMessage,
-    ) -> Result<(), NetworkError> {
-        unreachable!("The network sender should not be using direct send messages!")
-    }
-
     async fn send_rpc(
         &self,
         recipient: PeerId,

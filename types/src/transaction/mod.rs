@@ -406,7 +406,7 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
@@ -414,8 +414,18 @@ pub struct SignedTransaction {
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
 
+    /// A cached serialization of the raw transaction bytes.
+    /// Prevents serializing the same transaction multiple times.
     #[serde(skip)]
     bytes: OnceCell<Vec<u8>>,
+}
+
+/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
+/// may not be initialized during runtime comparison.
+impl PartialEq for SignedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
+    }
 }
 
 /// A transaction for which the signature has been verified. Created by

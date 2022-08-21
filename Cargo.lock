@@ -796,6 +796,7 @@ name = "aptos-mempool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-compression",
  "aptos-config",
  "aptos-crypto",
  "aptos-id-generator",

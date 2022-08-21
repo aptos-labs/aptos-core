@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::shared_mempool::types::BatchId;
+use crate::tests::common;
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
@@ -12,7 +14,7 @@ use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_id_generator::{IdGenerator, U32IdGenerator};
+use aptos_id_generator::U32IdGenerator;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatusCode,
@@ -229,11 +231,9 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let request_id = self.request_id_generator.next();
-        let request_id = bcs::to_bytes(&request_id).unwrap();
-
+        let batch_id = BatchId(1, 10);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: request_id.clone(),
+            request_id: batch_id,
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap().into();
@@ -280,12 +280,12 @@ impl MempoolNode {
             }
         };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id: response_request_id,
+            request_id,
             retry,
             backoff,
         } = response
         {
-            assert_eq!(response_request_id, request_id);
+            assert_eq!(batch_id, request_id);
             assert!(!retry);
             assert!(!backoff);
         } else {
@@ -343,7 +343,8 @@ impl MempoolNode {
             }
         };
         assert_eq!(peer_id, expected_peer_id);
-        let request_id = match bcs::from_bytes(&data).unwrap() {
+        let mempool_message = common::decompress_and_deserialize(&data.to_vec());
+        let request_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
                 request_id,
                 transactions,
