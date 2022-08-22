@@ -114,6 +114,6 @@ where
         >::new(num_cpus::get())
         .execute_transactions_parallel((), self.transactions.clone());
 
-        assert!(self.expected_output.check_output(&output));
+        self.expected_output.assert_output(&output);
     }
 }

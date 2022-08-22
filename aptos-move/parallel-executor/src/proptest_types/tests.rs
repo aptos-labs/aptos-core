@@ -26,8 +26,7 @@ fn run_transactions<K, V>(
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
     module_access: (bool, bool),
-) -> bool
-where
+) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
     Vec<u8>: From<V>,
@@ -45,7 +44,6 @@ where
         *transactions.get_mut(i.index(length)).unwrap() = Transaction::SkipRest;
     }
 
-    let mut ret = true;
     for _ in 0..num_repeat {
         let output = ParallelTransactionExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
@@ -60,9 +58,8 @@ where
 
         let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-        ret = ret && baseline.check_output(&output);
+        baseline.assert_output(&output);
     }
-    ret
 }
 
 proptest! {
@@ -74,7 +71,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -84,7 +81,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -94,7 +91,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -104,7 +101,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -114,7 +111,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 }
 
@@ -134,14 +131,14 @@ fn dynamic_read_writes() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen,
         vec![],
         vec![],
         100,
         (false, false),
-    ));
+    );
 }
 
 #[test]
@@ -172,7 +169,7 @@ fn deltas_writes_mixed() {
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-    assert!(baseline.check_output(&output));
+    baseline.assert_output(&output);
 }
 
 #[test]
@@ -192,14 +189,14 @@ fn dynamic_read_writes_contended() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen,
         vec![],
         vec![],
         100,
         (false, false),
-    ));
+    );
 }
 
 #[test]
@@ -218,30 +215,23 @@ fn module_publishing_fallback() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen.clone(),
         vec![],
         vec![],
         2,
         (false, true),
-    ));
-    assert!(run_transactions(
+    );
+    run_transactions(
         &universe,
         transaction_gen.clone(),
         vec![],
         vec![],
         2,
         (false, true),
-    ));
-    assert!(run_transactions(
-        &universe,
-        transaction_gen,
-        vec![],
-        vec![],
-        2,
-        (true, true),
-    ));
+    );
+    run_transactions(&universe, transaction_gen, vec![], vec![], 2, (true, true));
 }
 
 fn publishing_fixed_params() {

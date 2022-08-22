@@ -39,6 +39,7 @@ pub struct MVHashMapView<'a, K, V> {
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
+#[derive(Debug)]
 pub enum ReadResult<V> {
     // Successful read of a value.
     Value(Arc<V>),

@@ -353,18 +353,7 @@ where
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
-                    reads_result.push(match view.read(k) {
-                        ReadResult::Value(v) => (Some((*v).clone()), None),
-                        ReadResult::U128(v) => (None, Some(v)),
-                        ReadResult::Unresolved(delta) => {
-                            let delta_val = match delta.apply_to(STORAGE_DELTA_VAL) {
-                                Ok(res) => res,
-                                Err(_) => FAILURE_DELTA_VAL,
-                            };
-                            (None, Some(delta_val))
-                        }
-                        ReadResult::None => (None, None),
-                    });
+                    reads_result.push(view.read(k));
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
@@ -379,11 +368,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct Output<K, V>(
-    Vec<(K, V)>,
-    Vec<(K, DeltaOp)>,
-    Vec<(Option<V>, Option<u128>)>,
-);
+pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<ReadResult<V>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
@@ -454,19 +439,28 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     for k in read_set.iter() {
                         result.push((current_world.get(k).cloned(), delta_world.get(k).cloned()));
                     }
+
+                    // We ensure that the latest state is always reflected in exactly one of
+                    // the hashmaps, by possibly removing an element from the other Hashmap.
                     for (k, v) in write_set.iter() {
                         delta_world.remove(k);
                         current_world.insert(k.clone(), v.clone());
                     }
 
                     for (k, delta) in delta_set.iter() {
+                        let latest_write = current_world.remove(k);
+
+                        // Get the base value either from the latest write or latest resolved
+                        // delta value. Storage always gets resolved to a default constant.
                         let base = match delta_world.remove(k) {
-                            None => match current_world.remove(k) {
+                            None => match latest_write {
                                 None => STORAGE_DELTA_VAL,
                                 Some(w_value) => AggregatorValue::from_write(&w_value).into(),
                             },
                             Some(value) => value,
                         };
+
+                        // Apply delta to the base value, errors get resolved to a default value.
                         let new_v = match delta.apply_to(base) {
                             Ok(res) => res,
                             Err(_) => FAILURE_DELTA_VAL,
@@ -484,55 +478,67 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
     fn check_result(
         expected_results: &Vec<(Option<V>, Option<u128>)>,
-        results: &Vec<(Option<V>, Option<u128>)>,
-    ) -> bool {
+        results: &Vec<ReadResult<V>>,
+    ) {
         expected_results
             .iter()
             .zip(results.iter())
-            .all(|(expected_result, result)| {
-                match expected_result.1 {
-                    Some(expected_value) => {
-                        // u128 value of the aggregator is known, check it matches.
-                        match result {
-                            (_, Some(value)) => expected_value == value.clone(),
-                            (Some(v), None) => {
-                                expected_value == AggregatorValue::from_write(v).into()
-                            }
-                            _ => false,
-                        }
+            .for_each(|(expected_result, result)| match result {
+                ReadResult::Value(v) => {
+                    assert_eq!(**v, expected_result.0.clone().unwrap());
+                    assert_eq!(expected_result.1, None);
+                }
+                ReadResult::U128(v) => {
+                    assert_eq!(expected_result.0, None);
+                    assert_eq!(*v, expected_result.1.unwrap());
+                }
+                ReadResult::Unresolved(delta) => {
+                    assert_eq!(expected_result.0, None);
+                    let resolved_val = match delta.apply_to(STORAGE_DELTA_VAL) {
+                        Ok(res) => res,
+                        Err(_) => FAILURE_DELTA_VAL,
+                    };
+                    if resolved_val != expected_result.1.unwrap() {
+                        println!("{:?}", delta);
                     }
-                    None => match result {
-                        (Some(v), None) => expected_result.clone().0.unwrap() == v.clone(),
-                        (None, None) => expected_result.0 == None,
-                        _ => false,
-                    },
+                    assert_eq!(resolved_val, expected_result.1.unwrap());
+                }
+                ReadResult::None => {
+                    assert_eq!(expected_result.0, None);
+                    assert_eq!(expected_result.1, None);
                 }
             })
     }
 
-    pub fn check_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) -> bool {
+    // Used for testing, hence the function asserts the correctness conditions within
+    // itself to be easily traceable in case of an error.
+    pub fn assert_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) {
         match (self, results) {
-            (Self::Aborted(i), Err(Error::UserError(idx))) => i == idx,
+            (Self::Aborted(i), Err(Error::UserError(idx))) => {
+                assert_eq!(i, idx);
+            }
             (Self::SkipRest(skip_at, expected_results), Ok(results)) => {
+                // Check_result asserts internally, so no need to return a bool.
                 results
                     .iter()
                     .take(*skip_at)
                     .zip(expected_results.iter())
-                    .all(|(Output(_, _, result), expected_results)| {
+                    .for_each(|(Output(_, _, result), expected_results)| {
                         Self::check_result(expected_results, result)
-                    })
-                    && results
-                        .iter()
-                        .skip(*skip_at)
-                        .all(|Output(_, _, result)| result.is_empty())
+                    });
+
+                results
+                    .iter()
+                    .skip(*skip_at)
+                    .for_each(|Output(_, _, result)| assert!(result.is_empty()))
             }
-            (Self::Success(expected_results), Ok(results)) => expected_results
+            (Self::Success(expected_results), Ok(results)) => results
                 .iter()
-                .zip(results.iter())
-                .all(|(expected_result, Output(_, _, result))| {
-                    Self::check_result(expected_result, result)
+                .zip(expected_results.iter())
+                .for_each(|(Output(_, _, result), expected_result)| {
+                    Self::check_result(expected_result, result);
                 }),
-            _ => false,
+            _ => panic!("Incomparable execution outcomes"),
         }
     }
 }

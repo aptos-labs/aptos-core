@@ -26,7 +26,7 @@ where
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-    assert!(baseline.check_output(&output))
+    baseline.assert_output(&output);
 }
 
 fn random_value() -> ValueType<Vec<u8>> {
