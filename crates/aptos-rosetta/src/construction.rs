@@ -316,15 +316,19 @@ async fn construction_parse(
             {
                 parse_set_operator_operation(sender, &type_args, &args)?
             } else {
-                return Err(ApiError::TransactionParseError(Some(
-                    "Unsupported operation type",
-                )));
+                return Err(ApiError::TransactionParseError(Some(format!(
+                    "Unsupported entry function type {:x}::{}::{}",
+                    module.address(),
+                    module_name,
+                    function_name
+                ))));
             }
         }
-        _ => {
-            return Err(ApiError::TransactionParseError(Some(
-                "Unsupported transaction type",
-            )))
+        payload => {
+            return Err(ApiError::TransactionParseError(Some(format!(
+                "Unsupported transaction payload type {:?}",
+                payload
+            ))))
         }
     };
 
@@ -341,9 +345,10 @@ fn parse_create_account_operation(
 ) -> ApiResult<Vec<Operation>> {
     // There are no typeargs for create account
     if !type_args.is_empty() {
-        return Err(ApiError::TransactionParseError(Some(
-            "Create account should not have type arguments",
-        )));
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Create account should not have type arguments: {:?}",
+            type_args
+        ))));
     }
 
     // Create account
@@ -382,13 +387,14 @@ fn parse_transfer_operation(
             || *name != aptos_coin_resource_identifier()
             || !type_params.is_empty()
         {
-            return Err(ApiError::TransactionParseError(Some(
-                "Invalid coin for transfer",
-            )));
+            return Err(ApiError::TransactionParseError(Some(format!(
+                "Invalid coin for transfer {:x}::{}::{}",
+                address, module, name
+            ))));
         }
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No coin type in transfer",
+            "No coin type in transfer".to_string(),
         )));
     };
 
@@ -398,14 +404,14 @@ fn parse_transfer_operation(
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No receiver in transfer",
+            "No receiver in transfer".to_string(),
         )));
     };
     let amount: u64 = if let Some(amount) = args.get(1) {
         bcs::from_bytes(amount)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No amount in transfer",
+            "No amount in transfer".to_string(),
         )));
     };
 
@@ -421,9 +427,10 @@ fn parse_set_operator_operation(
 ) -> ApiResult<Vec<Operation>> {
     // There are no typeargs for create account
     if !type_args.is_empty() {
-        return Err(ApiError::TransactionParseError(Some(
-            "Set operator should not have type arguments",
-        )));
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Set operator should not have type arguments: {:?}",
+            type_args
+        ))));
     }
 
     // Set operator
