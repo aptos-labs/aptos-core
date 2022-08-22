@@ -50,6 +50,12 @@ pub struct StatePrunerManager {
 }
 
 impl PrunerManager for StatePrunerManager {
+    type Pruner = StateMerklePruner;
+
+    fn pruner(&self) -> &Self::Pruner {
+        &self.pruner
+    }
+
     fn is_pruner_enabled(&self) -> bool {
         self.pruner_enabled
     }
@@ -91,36 +97,6 @@ impl PrunerManager for StatePrunerManager {
         self.pruner_worker
             .as_ref()
             .set_target_db_version(latest_version.saturating_sub(self.prune_window));
-    }
-
-    /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling
-    /// an internal counter.
-    #[cfg(test)]
-    fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()> {
-        use std::{
-            thread::sleep,
-            time::{Duration, Instant},
-        };
-
-        *self.latest_version.lock() = latest_version;
-        self.set_pruner_target_db_version(latest_version);
-
-        if self.pruner_enabled && latest_version > self.prune_window {
-            let min_readable_state_store_version = latest_version - self.prune_window;
-
-            // Assuming no big pruning chunks will be issued by a test.
-            const TIMEOUT: Duration = Duration::from_secs(10);
-            let end = Instant::now() + TIMEOUT;
-
-            while Instant::now() < end {
-                if self.get_min_readable_version() >= min_readable_state_store_version {
-                    return Ok(());
-                }
-                sleep(Duration::from_millis(1));
-            }
-            anyhow::bail!("Timeout waiting for pruner worker.");
-        }
-        Ok(())
     }
 }
 
