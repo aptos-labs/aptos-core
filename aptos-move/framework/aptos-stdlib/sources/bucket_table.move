@@ -2,7 +2,7 @@
 /// Compare to Table, it uses less storage slots but has higher chance of collision, it's a trade-off between space and time.
 /// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
 /// BucketTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since it tolerates collisions.
-module aptos_framework::bucket_table {
+module aptos_std::bucket_table {
     use std::error;
     use std::vector;
     use aptos_std::aptos_hash::sip_hash_from_value;
