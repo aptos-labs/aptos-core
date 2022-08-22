@@ -53,17 +53,11 @@ module aptos_framework::genesis {
         // Initialize account configs on aptos framework account.
         account::initialize(
             &aptos_framework_account,
-            @aptos_framework,
-            b"account",
             b"script_prologue",
             b"module_prologue",
-            b"writeset_prologue",
             b"multi_agent_script_prologue",
             b"epilogue",
-            b"writeset_epilogue",
         );
-
-        account::create_address_map(&aptos_framework_account);
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
@@ -202,8 +196,6 @@ module aptos_framework::genesis {
 
     #[test]
     fun test_setup() {
-        use aptos_framework::account;
-
         setup();
         assert!(account::exists_at(@aptos_framework), 0);
     }
