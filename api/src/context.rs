@@ -3,7 +3,7 @@
 
 use crate::response::{
     block_not_found_by_height, block_not_found_by_version, block_pruned_by_height,
-    version_not_found, version_pruned, InternalError, StdApiError,
+    version_not_found, version_pruned, InternalError, ServiceUnavailableError, StdApiError,
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
@@ -67,9 +67,7 @@ impl Context {
     ) -> Result<RemoteStorageOwned<DbStateView>, E> {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
-            .map_err(|e| {
-                E::internal_with_code(e, AptosErrorCode::ReadFromStorageError, ledger_info)
-            })
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -109,22 +107,34 @@ impl Context {
             .map_err(|e| e.into())
     }
 
-    pub fn get_latest_ledger_info<E: InternalError>(&self) -> Result<LedgerInfo, E> {
+    pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
         let maybe_oldest_version = self
             .db
             .get_first_viable_txn_version()
-            .map_err(|e| E::internal_with_code_no_info(e, AptosErrorCode::ReadFromStorageError))?;
+            .context("Failed to retrieve oldest version in DB")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
-            .map_err(|e| E::internal_with_code_no_info(e, AptosErrorCode::ReadFromStorageError))?;
+            .context("Failed to retrieve latest ledger info")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
         let (oldest_version, oldest_block_event) = self
             .db
             .get_next_block_event(maybe_oldest_version)
-            .map_err(|e| E::internal_with_code_no_info(e, AptosErrorCode::ReadFromStorageError))?;
+            .context("Failed to retrieve oldest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info_by_version(ledger_info.ledger_info().version())
-            .map_err(|e| E::internal_with_code_no_info(e, AptosErrorCode::ReadFromStorageError))?;
+            .context("Failed to retrieve latest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
 
         Ok(LedgerInfo::new(
             &self.chain_id(),
@@ -178,9 +188,7 @@ impl Context {
     ) -> Result<Option<Vec<u8>>, E> {
         self.get_state_value(state_key, version)
             .context("Failed to retrieve state value")
-            .map_err(|e| {
-                E::internal_with_code(e, AptosErrorCode::ReadFromStorageError, ledger_info)
-            })
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
 
     pub fn get_state_values(
@@ -210,10 +218,8 @@ impl Context {
     ) -> Result<u64, E> {
         self.db
             .get_block_timestamp(version)
-            .context("Failed to retrieve timestamp")
-            .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::ReadFromStorageError, ledger_info)
-            })
+            .context("Failed to retrieve block timestamp")
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))
     }
 
     pub fn get_block_by_height<E: StdApiError>(
@@ -290,11 +296,7 @@ impl Context {
             .hash()
             .context("Failed to parse block hash")
             .map_err(|err| {
-                E::internal_with_code(
-                    err,
-                    AptosErrorCode::InvalidBcsInStorageError,
-                    latest_ledger_info,
-                )
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
             })?;
         let block_timestamp = new_block_event.proposed_time();
         let txns = if with_transactions {
@@ -306,11 +308,7 @@ impl Context {
                 )
                 .context("Failed to read raw transactions from storage")
                 .map_err(|err| {
-                    E::internal_with_code(
-                        err,
-                        AptosErrorCode::InvalidBcsInStorageError,
-                        latest_ledger_info,
-                    )
+                    E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
                 })?,
             )
         } else {
@@ -352,7 +350,7 @@ impl Context {
             .collect::<Result<_, anyhow::Error>>()
             .context("Failed to convert transaction data from storage")
             .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError, ledger_info)
+                E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
             })?;
 
         Ok(txns)
@@ -379,7 +377,7 @@ impl Context {
             .collect::<Result<_, anyhow::Error>>()
             .context("Failed to convert transaction data from storage")
             .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError, ledger_info)
+                E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
             })?;
 
         Ok(txns)
@@ -445,16 +443,16 @@ impl Context {
                 true,
                 ledger_version,
             )
+            .context("Failed to retrieve account transactions")
             .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::ReadFromStorageError, ledger_info)
+                E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
             })?;
         txns.into_inner()
             .into_iter()
             .map(|t| self.convert_into_transaction_on_chain_data(t))
             .collect::<Result<Vec<_>>>()
-            .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError, ledger_info)
-            })
+            .context("Failed to parse account transactions")
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))
     }
 
     pub fn get_transaction_by_hash(

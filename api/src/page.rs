@@ -44,7 +44,7 @@ impl Page {
                 "Given start value ({}) is higher than the current ledger version, it must be < {}",
                 start, max
             ),
-                AptosErrorCode::InvalidStartParam,
+                AptosErrorCode::InvalidInput,
                 ledger_info,
             ));
         }
@@ -60,7 +60,7 @@ impl Page {
         if limit == 0 {
             return Err(E::bad_request_with_code(
                 &format!("Given limit value ({}) must not be zero", limit),
-                AptosErrorCode::InvalidLimitParam,
+                AptosErrorCode::InvalidInput,
                 ledger_info,
             ));
         }
@@ -70,7 +70,7 @@ impl Page {
                     "Given limit value ({}) is too large, it must be < {}",
                     limit, MAX_PAGE_SIZE
                 ),
-                AptosErrorCode::InvalidLimitParam,
+                AptosErrorCode::InvalidInput,
                 ledger_info,
             ));
         }

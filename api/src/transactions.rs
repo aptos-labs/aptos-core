@@ -15,7 +15,7 @@ use crate::page::Page;
 use crate::response::{
     transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError, BasicError,
     BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-    InsufficientStorageError, InternalError,
+    InsufficientStorageError, InternalError, ServiceUnavailableError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
@@ -42,6 +42,7 @@ generate_error_response!(
     (400, BadRequest),
     (413, PayloadTooLarge),
     (500, Internal),
+    (503, ServiceUnavailable),
     (507, InsufficientStorage)
 );
 
@@ -280,7 +281,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InvalidBcsInStorageError,
+                    AptosErrorCode::InternalError,
                     &latest_ledger_info,
                 )
             })?;
@@ -319,7 +320,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -342,7 +343,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -376,7 +377,7 @@ impl TransactionsApi {
                             .map_err(|err| {
                                 BasicErrorWith404::internal_with_code(
                                     err,
-                                    AptosErrorCode::InvalidBcsInStorageError,
+                                    AptosErrorCode::InternalError,
                                     ledger_info,
                                 )
                             })?
@@ -388,7 +389,7 @@ impl TransactionsApi {
                         .map_err(|err| {
                             BasicErrorWith404::internal_with_code(
                                 err,
-                                AptosErrorCode::InvalidBcsInStorageError,
+                                AptosErrorCode::InternalError,
                                 ledger_info,
                             )
                         })?,
@@ -521,7 +522,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 SubmitTransactionError::internal_with_code(
                     err,
-                    AptosErrorCode::TransactionSubmissionFailed,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?;
@@ -550,7 +551,7 @@ impl TransactionsApi {
                     SubmitTransactionResponseStatus::Accepted,
                 )),
             },
-            MempoolStatusCode::MempoolIsFull => {
+            MempoolStatusCode::MempoolIsFull | MempoolStatusCode::TooManyTransactions => {
                 Err(SubmitTransactionError::insufficient_storage_with_code(
                     &mempool_status.message,
                     AptosErrorCode::MempoolIsFull,
@@ -565,14 +566,14 @@ impl TransactionsApi {
                             status.status_type(),
                             status
                         ),
-                        AptosErrorCode::InvalidSubmittedTransaction,
+                        AptosErrorCode::VmError,
                         status,
                         &ledger_info,
                     ))
                 } else {
                     Err(SubmitTransactionError::bad_request_with_vm_status(
                         "Invalid transaction: unknown",
-                        AptosErrorCode::InvalidSubmittedTransaction,
+                        AptosErrorCode::VmError,
                         StatusCode::UNKNOWN_STATUS,
                         &ledger_info,
                     ))
@@ -590,18 +591,13 @@ impl TransactionsApi {
                 AptosErrorCode::InvalidTransactionUpdate,
                 &ledger_info,
             )),
-            MempoolStatusCode::TooManyTransactions => {
-                Err(SubmitTransactionError::insufficient_storage_with_code(
-                    &mempool_status.message,
-                    AptosErrorCode::MempoolIsFullForAccount,
+            MempoolStatusCode::UnknownStatus => {
+                Err(SubmitTransactionError::service_unavailable_with_code(
+                    format!("Transaction was rejected with status {}", mempool_status),
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 ))
             }
-            MempoolStatusCode::UnknownStatus => Err(SubmitTransactionError::internal_with_code(
-                format!("Transaction was rejected with status {}", mempool_status,),
-                AptosErrorCode::InternalError,
-                &ledger_info,
-            )),
         }
     }
 
