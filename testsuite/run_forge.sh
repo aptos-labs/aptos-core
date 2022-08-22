@@ -40,7 +40,6 @@ LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
 AWS_REGION=${AWS_REGION:-us-west-2}
-K8S_CONTEXT_PATTERN="arn:aws:eks:${AWS_REGION}:${AWS_ACCOUNT_NUM}:cluster/CLUSTERNAME"
 
 # o11y resources
 INTERN_ES_DEFAULT_INDEX="90037930-aafc-11ec-acce-2d961187411f"
@@ -183,11 +182,12 @@ print_output_files
 if [ -z "$FORGE_CLUSTER_NAME" ]; then
     FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
 fi
-KUBE_CONTEXT=${K8S_CONTEXT_PATTERN/CLUSTERNAME/$FORGE_CLUSTER_NAME}
+
+aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
 
 # determine cluster name from kubectl context and set o11y resources
-echo "Using cluster ${FORGE_CLUSTER_NAME} from kubectl context: ${KUBE_CONTEXT}"
-echo "If you want to change your kube context: kubectl config use-context ${KUBE_CONTEXT}"
+echo "Using cluster ${FORGE_CLUSTER_NAME}"
+echo "Note: the current kubectl context has changed"
 # remove the "aptos-" prefix and add "net" suffix to get the chain name
 # as used by the deployment setup and as reported to o11y systems
 FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
@@ -252,7 +252,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     ulimit -n 1048576
 
     # port-forward prometheus
-    kubectl --context=$KUBE_CONTEXT port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
+    kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
     prometheus_port_forward_pid=$!
 
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
@@ -276,8 +276,8 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     # this will pre-empt the existing forge test and ensures we do not have any dangling test runners
     FORGE_POD_NAME="${FORGE_NAMESPACE}-$(date '+%s')-${IMAGE_TAG}"
     FORGE_POD_NAME=${FORGE_POD_NAME:0:64}
-    kubectl --context=$KUBE_CONTEXT delete pod -n default -l "forge-namespace=${FORGE_NAMESPACE}" --force || true
-    kubectl --context=$KUBE_CONTEXT wait -n default --for=delete pod -l "forge-namespace=${FORGE_NAMESPACE}" || true
+    kubectl delete pod -n default -l "forge-namespace=${FORGE_NAMESPACE}" --force || true
+    kubectl wait -n default --for=delete pod -l "forge-namespace=${FORGE_NAMESPACE}" || true
 
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
@@ -300,22 +300,22 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{FORGE_TRIGGERED_BY}/${FORGE_TRIGGERED_BY}/g" \
         testsuite/forge-test-runner-template.yaml >${specfile}
 
-    kubectl --context=$KUBE_CONTEXT apply -n default -f $specfile
+    kubectl apply -n default -f $specfile
 
     # wait for enough time for the pod to start and potentially new nodes to come online
-    kubectl --context=$KUBE_CONTEXT wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
+    kubectl wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
 
     # tail the logs and tee them for further parsing
     echo "=====START FORGE LOGS====="
-    kubectl --context=$KUBE_CONTEXT logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+    kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
     echo "=====END FORGE COMMENT====="
 
     # wait for the pod status to change potentially
     sleep 10
-    while [[ $(kubectl --context=$KUBE_CONTEXT get pods $FORGE_POD_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == "True" ]]; do echo "waiting for pod to complete: $FORGE_POD_NAME" && sleep 1; done
+    while [[ $(kubectl get pods $FORGE_POD_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == "True" ]]; do echo "waiting for pod to complete: $FORGE_POD_NAME" && sleep 1; done
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-    forge_pod_status=$(kubectl --context=$KUBE_CONTEXT get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
+    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
     echo "Forge pod status: ${forge_pod_status}"
 
     if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
