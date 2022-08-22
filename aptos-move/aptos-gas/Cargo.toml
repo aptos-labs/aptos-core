@@ -10,12 +10,14 @@ publish = false
 edition = "2021"
 
 [dependencies]
-move-binary-format = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }
 
 framework = { path = "../framework" }
+gas-algebra-ext = { path = "../gas-algebra-ext" }
 
 [features]
 testing = ["move-stdlib/testing"]

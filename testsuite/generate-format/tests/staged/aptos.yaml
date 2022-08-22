@@ -160,7 +160,8 @@ StructTag:
         SEQ:
           TYPENAME: TypeTag
 TableHandle:
-  NEWTYPESTRUCT: U128
+  NEWTYPESTRUCT:
+    TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:

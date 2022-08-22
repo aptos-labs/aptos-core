@@ -20,7 +20,7 @@ fn string_args() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::package_path("string_args.data/pack"),));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 

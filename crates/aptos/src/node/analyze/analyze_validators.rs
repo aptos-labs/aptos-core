@@ -142,7 +142,7 @@ impl Add for EpochStats {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        let mut validator_stats = self.validator_stats.clone();
+        let mut validator_stats = self.validator_stats;
         for (key, other_validator_stats) in other.validator_stats.into_iter() {
             validator_stats.insert(
                 key,

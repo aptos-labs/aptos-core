@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    AptosDB, ChangeSet, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore,
-};
+use crate::{AptosDB, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore};
 use aptos_temppath::TempPath;
 use proptest::proptest;
 use std::sync::Arc;
@@ -22,6 +20,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use proptest::{collection::vec, prelude::*};
+use schemadb::SchemaBatch;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -65,13 +64,13 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     );
 
     // write sets
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     for (ver, ws) in write_sets.iter().enumerate() {
         transaction_store
-            .put_write_set(ver as Version, ws, &mut cs)
+            .put_write_set(ver as Version, ws, &mut batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
     // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_write_sets).step_by(2) {
         pruner
@@ -229,16 +228,16 @@ fn put_txn_in_store(
     txn_infos: &[TransactionInfo],
     txns: &[Transaction],
 ) {
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &mut cs)
+            .put_transaction(i as u64, txns.get(i).unwrap(), &mut batch)
             .unwrap();
     }
     ledger_store
-        .put_transaction_infos(0, txn_infos, &mut cs)
+        .put_transaction_infos(0, txn_infos, &mut batch)
         .unwrap();
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
 }
 
 fn verify_transaction_in_transaction_store(

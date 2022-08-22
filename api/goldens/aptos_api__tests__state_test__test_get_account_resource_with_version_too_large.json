@@ -1,5 +1,5 @@
 {
-  "message": "ledger not found by version(100000000)",
-  "error_code": null,
-  "aptos_ledger_version": "0"
+  "message": "Ledger version not found by Ledger version(100000000)",
+  "error_code": "version_not_found",
+  "vm_error_code": null
 }

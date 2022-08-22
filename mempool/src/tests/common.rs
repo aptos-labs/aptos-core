@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::core_mempool::{CoreMempool, TimelineState, TxnPointer};
+use crate::network::MempoolSyncMsg;
 use anyhow::{format_err, Result};
+use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
@@ -14,6 +16,7 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
@@ -32,7 +35,7 @@ static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {
     ]
 });
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TestTransaction {
     pub(crate) address: usize,
     pub(crate) sequence_number: u64,
@@ -188,4 +191,12 @@ pub(crate) fn exist_in_metrics_cache(mempool: &CoreMempool, txn: &SignedTransact
         .metrics_cache
         .get(&(txn.sender(), txn.sequence_number()))
         .is_some()
+}
+
+/// Decompresses and deserializes the raw message bytes into a message struct
+pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
+    bcs::from_bytes(
+        &aptos_compression::decompress(message_bytes, CompressionClient::Mempool).unwrap(),
+    )
+    .unwrap()
 }

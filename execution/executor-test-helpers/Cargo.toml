@@ -19,10 +19,10 @@ aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-sdk = { path = "../../sdk" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus-types = { path = "../../consensus/consensus-types" }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }

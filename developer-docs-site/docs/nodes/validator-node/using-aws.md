@@ -14,7 +14,7 @@ Make sure you complete these pre-requisite steps before you proceed:
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
 
-   * **Aptos CLI 0.3.1**: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
+   * **Aptos CLI 0.3.1**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * **Terraform 1.2.4**: https://www.terraform.io/downloads.html
    * **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
    * **AWS CLI**: https://aws.amazon.com/cli/
@@ -184,7 +184,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
 
 14. Compile the genesis blob and waypoint.

@@ -31,7 +31,6 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-rosetta = { path = "../../crates/aptos-rosetta" }
 aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["fuzzing"] }
 aptosdb = { path = "../../storage/aptosdb" }
@@ -56,7 +55,6 @@ aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
 backup-cli = { path = "../../storage/backup/backup-cli" }

@@ -11,9 +11,9 @@ from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
 from .transactions import (
+    EntryFunction,
     MultiAgentRawTransaction,
     RawTransaction,
-    EntryFunction,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload,
@@ -246,6 +246,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
+    #:!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -266,13 +267,17 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+    # <:!:bcs_transfer
+
     #
     # Token transaction wrappers
     #
 
+#:!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:
+#<:!:create_collection
         """Creates a new collection within the specified account"""
 
         transaction_arguments = [
@@ -297,6 +302,7 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+#:!:>create_token
     def create_token(
         self,
         account: Account,
@@ -307,6 +313,7 @@ class RestClient:
         uri: str,
         royalty_points_per_million: int,
     ) -> str:
+#<:!:create_token
         transaction_arguments = [
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
@@ -459,6 +466,7 @@ class RestClient:
             token_id,
         )["amount"]
 
+        #:!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -482,6 +490,7 @@ class RestClient:
             "0x3::token::TokenData",
             token_data_id,
         )
+        #<:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][

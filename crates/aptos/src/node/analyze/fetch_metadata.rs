@@ -56,7 +56,7 @@ impl FetchMetadata {
         if let Ok(info) = transaction.transaction_info() {
             for change in &info.changes {
                 if let WriteSetChange::WriteResource(resource) = change {
-                    if resource.data.typ.name.0.clone().into_string() == "ValidatorSet" {
+                    if resource.data.typ.name.0.as_str() == "ValidatorSet" {
                         // No pending at epoch change
                         assert_eq!(
                             Vec::<AccountAddress>::new(),

@@ -72,13 +72,13 @@ impl From<Transaction> for TransferSummary {
             let balance_changes = txn
                 .info
                 .changes
-                .iter()
+                .into_iter()
                 .filter_map(|change| match change {
                     WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
                         if SUPPORTED_COINS.contains(&data.typ.to_string().as_str()) {
                             Some((
                                 *address.inner(),
-                                serde_json::to_value(data.data.clone()).unwrap_or_default(),
+                                serde_json::to_value(data.data).unwrap_or_default(),
                             ))
                         } else {
                             None

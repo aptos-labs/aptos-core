@@ -18,8 +18,8 @@ const NUMBER_MAX: number = 9007199254740991;
 const client = new AptosClient(NODE_URL);
 /** Creates a new collection within the specified account */
 async function createCollection(account: AptosAccount, name: string, description: string, uri: string) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token",
       "create_collection_script",
       [],
@@ -41,7 +41,7 @@ async function createCollection(account: AptosAccount, name: string, description
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(account.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -67,8 +67,8 @@ async function createToken(
   const serializer = new BCS.Serializer();
   serializer.serializeU32AsUleb128(0);
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token",
       "create_token_script",
       [],
@@ -98,7 +98,7 @@ async function createToken(
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(account.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -120,8 +120,8 @@ async function offerToken(
   token_name: string,
   amount: number,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "offer_script",
       [],
@@ -144,7 +144,7 @@ async function offerToken(
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(account.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -165,8 +165,8 @@ async function claimToken(
   collection_name: string,
   token_name: string,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "claim_script",
       [],
@@ -188,7 +188,7 @@ async function claimToken(
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(account.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -207,8 +207,8 @@ async function cancelTokenOffer(
   creator: HexString,
   token_creation_num: number,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "cancel_offer_script",
       [],
@@ -228,7 +228,7 @@ async function cancelTokenOffer(
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(account.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -307,10 +307,8 @@ async function main() {
   const token_name = "Alice's tabby";
 
   console.log("\n=== Addresses ===");
-  console.log(
-    `Alice: ${alice.address()}. Key Seed: ${Buffer.from(alice.signingKey.secretKey).toString("hex").slice(0, 64)}`,
-  );
-  console.log(`Bob: ${bob.address()}. Key Seed: ${Buffer.from(bob.signingKey.secretKey).toString("hex").slice(0, 64)}`);
+  console.log(`Alice: ${alice.address()}`);
+  console.log(`Bob: ${bob.address()}`);
 
   await faucet_client.fundAccount(alice.address(), 5_000);
   await faucet_client.fundAccount(bob.address(), 5_000);
@@ -347,5 +345,5 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().then((resp) => console.log(resp));
+  main();
 }

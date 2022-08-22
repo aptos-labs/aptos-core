@@ -52,11 +52,7 @@
         "state_key_hash": "",
         "data": {
           "type": "0x1::state_storage::StateStorageUsage",
-          "data": {
-            "bytes": "281904",
-            "epoch": "1",
-            "items": "99"
-          }
+          "data": "state storage omitted"
         },
         "type": "write_resource"
       },

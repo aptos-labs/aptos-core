@@ -42,7 +42,6 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-retrier = { path = "../../crates/aptos-retrier" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 
 framework = { path = "../../aptos-move/framework" }

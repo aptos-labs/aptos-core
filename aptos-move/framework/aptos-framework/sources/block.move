@@ -165,6 +165,11 @@ module aptos_framework::block {
         );
     }
 
+    #[test_only]
+    public fun initialize_for_test(account: &signer, epoch_interval_microsecs: u64) {
+        initialize(account, epoch_interval_microsecs);
+    }
+
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
         initialize(&aptos_framework, 1);

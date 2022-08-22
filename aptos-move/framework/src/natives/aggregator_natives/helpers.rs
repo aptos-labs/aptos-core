@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorID};
+use aptos_types::account_address::AccountAddress;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_table_extension::TableHandle,
     move_vm_types::values::{Reference, Struct, StructRef, Value},
 };
 
@@ -22,14 +24,16 @@ const LIMIT_FIELD_INDEX: usize = 2;
 
 /// Given a reference to `AggregatorFactory` Move struct, returns the value of
 /// `handle` field (from underlying `Table` struct).
-pub(crate) fn get_handle(aggregator_table: &StructRef) -> PartialVMResult<u128> {
-    aggregator_table
-        .borrow_field(PHANTOM_TABLE_FIELD_INDEX)?
-        .value_as::<StructRef>()?
-        .borrow_field(TABLE_HANDLE_FIELD_INDEX)?
-        .value_as::<Reference>()?
-        .read_ref()?
-        .value_as::<u128>()
+pub(crate) fn get_handle(aggregator_table: &StructRef) -> PartialVMResult<TableHandle> {
+    Ok(TableHandle(
+        aggregator_table
+            .borrow_field(PHANTOM_TABLE_FIELD_INDEX)?
+            .value_as::<StructRef>()?
+            .borrow_field(TABLE_HANDLE_FIELD_INDEX)?
+            .value_as::<Reference>()?
+            .read_ref()?
+            .value_as::<AccountAddress>()?,
+    ))
 }
 
 /// Given a reference to `Aggregator` Move struct returns a field value at `index`.
@@ -46,17 +50,18 @@ pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(Aggreg
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
 /// fields: (`handle`, `key`, `limit`).
-pub fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(u128, u128, u128)> {
-    let handle = get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<u128>()?;
+pub fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(TableHandle, u128, u128)> {
+    let handle =
+        get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<u128>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
-    Ok((handle, key, limit))
+    Ok((TableHandle(handle), key, limit))
 }
 
 /// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
 pub(crate) fn unpack_aggregator_struct(
     aggregator_struct: Struct,
-) -> PartialVMResult<(u128, u128, u128)> {
+) -> PartialVMResult<(TableHandle, u128, u128)> {
     let mut fields: Vec<Value> = aggregator_struct.unpack()?.collect();
     assert!(fields.len() == 3);
 
@@ -67,6 +72,10 @@ pub(crate) fn unpack_aggregator_struct(
 
     let limit = pop_with_err(&mut fields, "unable to pop 'limit' field")?;
     let key = pop_with_err(&mut fields, "unable to pop 'key' field")?;
-    let handle = pop_with_err(&mut fields, "unable to pop 'handle' field")?;
-    Ok((handle, key, limit))
+    let handle = fields
+        .pop()
+        .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
+            v.value_as::<AccountAddress>()
+        })?;
+    Ok((TableHandle(handle), key, limit))
 }

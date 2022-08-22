@@ -25,7 +25,6 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-openapi = { path = "../../crates/aptos-openapi" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 

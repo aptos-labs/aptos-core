@@ -30,6 +30,7 @@ mod gas_meter;
 mod instr;
 mod misc;
 mod move_stdlib;
+mod table;
 mod transaction;
 
 pub use algebra::*;
@@ -38,7 +39,7 @@ pub use gas_meter::{
     NativeGasParameters, ToOnChainGasSchedule,
 };
 pub use instr::InstructionGasParameters;
-pub use misc::{AbstractMemorySizeGasParameters, MiscGasParameters};
+pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};
 pub use move_core_types::gas_algebra::{
     Arg, Byte, GasQuantity, InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit,
     NumArgs, NumBytes, UnitDiv,

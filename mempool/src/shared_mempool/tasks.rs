@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
+use crate::shared_mempool::types::BatchId;
 use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
@@ -155,7 +156,7 @@ pub(crate) async fn process_client_get_transaction<V>(
 pub(crate) async fn process_transaction_broadcast<V>(
     smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
-    request_id: Vec<u8>,
+    request_id: BatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
@@ -169,6 +170,10 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
     let ack_response = gen_ack_response(request_id, results, &peer);
     let network_sender = smp.network_interface.sender();
+
+    // Respond to the peer with an ack. Note: ack response messages should be
+    // small enough that they always fit within the maximum network message
+    // size, so there's no need to check them here.
     if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         error!(
@@ -183,7 +188,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: Vec<u8>,
+    request_id: BatchId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {

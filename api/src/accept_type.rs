@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::mime_types::BCS;
-use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
 #[derive(PartialEq)]
@@ -25,7 +24,7 @@ impl<'a> FromRequest<'a> for AcceptType {
 /// overriding explicit accept type, default to JSON.
 fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
-        if matches!(mime.as_ref(), BCS_OUTPUT_NEW | BCS) {
+        if matches!(mime.as_ref(), BCS) {
             return Ok(AcceptType::Bcs);
         }
     }

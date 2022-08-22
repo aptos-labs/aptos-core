@@ -406,7 +406,7 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
@@ -414,8 +414,18 @@ pub struct SignedTransaction {
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
 
+    /// A cached serialization of the raw transaction bytes.
+    /// Prevents serializing the same transaction multiple times.
     #[serde(skip)]
     bytes: OnceCell<Vec<u8>>,
+}
+
+/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
+/// may not be initialized during runtime comparison.
+impl PartialEq for SignedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
+    }
 }
 
 /// A transaction for which the signature has been verified. Created by
@@ -563,6 +573,12 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
+    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
+    /// the signature is valid.
+    pub fn signature_is_valid(&self) -> bool {
+        self.authenticator.verify(&self.raw_txn).is_ok()
+    }
+
     pub fn contains_duplicate_signers(&self) -> bool {
         let mut all_signer_addresses = self.authenticator.secondary_signer_addreses();
         all_signer_addresses.push(self.sender());
@@ -689,6 +705,7 @@ pub enum ExecutionStatus {
     MoveAbort {
         location: AbortLocation,
         code: u64,
+        info: Option<AbortInfo>,
     },
     ExecutionFailure {
         location: AbortLocation,
@@ -698,14 +715,24 @@ pub enum ExecutionStatus {
     MiscellaneousError(Option<StatusCode>),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub struct AbortInfo {
+    pub reason_name: String,
+    pub description: String,
+}
+
 impl From<KeptVMStatus> for ExecutionStatus {
     fn from(kept_status: KeptVMStatus) -> Self {
         match kept_status {
             KeptVMStatus::Executed => ExecutionStatus::Success,
             KeptVMStatus::OutOfGas => ExecutionStatus::OutOfGas,
-            KeptVMStatus::MoveAbort(location, code) => {
-                ExecutionStatus::MoveAbort { location, code }
-            }
+            KeptVMStatus::MoveAbort(location, code) => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: None,
+            },
             KeptVMStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -725,6 +752,7 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 }
+
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
 /// transaction output or `Discard` it based upon the execution of the transaction. We wrap these
 /// decisions around a `VMStatus` that provides more detail on the final execution state of the VM.

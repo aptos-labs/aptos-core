@@ -58,8 +58,8 @@ export async function accountBalance(accountAddress: MaybeHexString): Promise<nu
 async function transfer(accountFrom: AptosAccount, recipient: MaybeHexString, amount: number): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x1::coin",
       "transfer",
       [token],
@@ -75,7 +75,7 @@ async function transfer(accountFrom: AptosAccount, recipient: MaybeHexString, am
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -102,10 +102,8 @@ async function main() {
   const bob = new AptosAccount();
 
   console.log("\n=== Addresses ===");
-  console.log(
-    `Alice: ${alice.address()}. Key Seed: ${Buffer.from(alice.signingKey.secretKey).toString("hex").slice(0, 64)}`,
-  );
-  console.log(`Bob: ${bob.address()}. Key Seed: ${Buffer.from(bob.signingKey.secretKey).toString("hex").slice(0, 64)}`);
+  console.log(`Alice: ${alice.address()}`);
+  console.log(`Bob: ${bob.address()}`);
 
   await faucetClient.fundAccount(alice.address(), 5_000);
   await faucetClient.fundAccount(bob.address(), 0);
@@ -124,6 +122,6 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().then((resp) => console.log(resp));
+  main();
 }
 //<:!:section_7

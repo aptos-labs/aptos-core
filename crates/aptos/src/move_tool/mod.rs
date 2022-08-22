@@ -28,7 +28,7 @@ use crate::{
     },
     CliCommand, CliResult,
 };
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
@@ -47,11 +47,8 @@ use move_deps::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
-    move_package::{
-        compilation::compiled_package::CompiledPackage,
-        source_package::layout::SourcePackageLayout, BuildConfig,
-    },
-    move_prover,
+    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
+    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 use std::fmt::{Display, Formatter};
@@ -106,16 +103,19 @@ pub struct InitPackage {
     /// Name of the new move package
     #[clap(long)]
     pub(crate) name: String,
+
     /// Path to create the new move package
     #[clap(long, parse(from_os_str))]
     pub(crate) package_dir: Option<PathBuf>,
+
     /// Named addresses for the move binary
     ///
-    /// Example: alice=0x1234, bob=0x5678
+    /// Example: alice=0x1234,bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
+
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 }
@@ -130,7 +130,6 @@ impl CliCommand<()> for InitPackage {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
         let addresses = self
             .named_addresses
-            .clone()
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
@@ -205,19 +204,18 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
-        let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            generate_abis: true,
-            generate_docs: true,
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: true,
+            with_source_maps: true,
+            with_error_map: true,
             install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
+            named_addresses: self.move_options.named_addresses(),
         };
-        let compiled_package = compile_move(
-            build_config,
-            self.move_options.get_package_path()?.as_path(),
-        )?;
+        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let mut ids = Vec::new();
-        for &module in compiled_package.root_modules_map().iter_modules().iter() {
+        for module in pack.modules() {
             verify_module_init_function(module)
                 .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
             ids.push(module.self_id().to_string());
@@ -226,15 +224,18 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 }
 
-/// Run Move unit tests against a package path
+/// Runs Move unit tests for a package
+///
+/// This will run Move unit tests against a package with debug mode
+/// turned on.  Note, that move code warnings currently block tests from running.
 #[derive(Parser)]
 pub struct TestPackage {
-    #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
-
     /// A filter string to determine which unit tests to run
     #[clap(long)]
     pub filter: Option<String>,
+
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -258,13 +259,15 @@ impl CliCommand<&'static str> for TestPackage {
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
-            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
+            aptos_debug_natives::aptos_debug_natives(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            ),
             false,
             &mut std::io::stdout(),
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
-        // TODO: commit back up to the move repo
         match result {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
@@ -292,15 +295,18 @@ impl CliCommand<()> for TransactionalTestOpts {
     }
 }
 
-/// Prove the Move package at the package path
+/// Proves the Move package
+///
+/// This is a tool for formal verification of a Move package using
+/// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
-    #[clap(flatten)]
-    move_options: MovePackageDir,
-
     /// A filter string to determine which files to verify
     #[clap(long)]
     pub filter: Option<String>,
+
+    #[clap(flatten)]
+    move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -316,6 +322,16 @@ impl CliCommand<&'static str> for ProvePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
+
+        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
+
+        let mut options = move_prover::cli::Options::default();
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
+                module_instance_names: vec![],
+            });
+
         let result = task::spawn_blocking(move || {
             move_cli::base::prove::run_move_prover(
                 config,
@@ -335,30 +351,17 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 }
 
-/// Compiles a Move package dir, and returns the compiled modules.
-pub(crate) fn compile_move(
-    build_config: BuildConfig,
-    package_dir: &Path,
-) -> CliTypedResult<CompiledPackage> {
-    // TODO: Add caching
-    build_config
-        .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| CliError::MoveCompilationError(format!("{:#}", err)))
-}
-
-/// Publishes the modules in a Move package
+/// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
 pub struct PublishPackage {
-    #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
     pub(crate) legacy_flow: bool,
+
     /// Whether to override the check for maximal size of published data.
     #[clap(long)]
     pub(crate) override_size_check: bool,
+
     /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
     /// `all`. `none` is the most compact form and does not allow to reconstruct a source
     /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
@@ -368,6 +371,11 @@ pub struct PublishPackage {
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
+
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
@@ -403,22 +411,28 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+    pub(crate) fn build_options(
+        self,
+        named_addresses: BTreeMap<String, AccountAddress>,
+    ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
             None => BuildOptions {
                 with_srcs: false,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                // Always enable error map bytecode injection
+                with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
             Sparse => BuildOptions {
                 with_srcs: true,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -426,6 +440,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
         }
     }
@@ -462,18 +477,18 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
             let metadata = package.extract_metadata()?;
-            let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
+            let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
             );
             let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
             if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
                 return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {}k ({}k)! To lower the size \
+                    "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included_artifacts`. \
                 You can also override this check with `--override-size-check",
-                    MAX_PUBLISH_PACKAGE_SIZE / 1000,
-                    size / 1000
+                    MAX_PUBLISH_PACKAGE_SIZE, size
                 )));
             }
             txn_options
@@ -484,22 +499,28 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 }
 
-/// Downloads a package and stores it in a directory named after the package.
+/// Downloads a package and stores it in a directory named after the package
+///
+/// This lets you retrieve packages directly from the blockchain for inspection
+/// and use as a local dependency in testing.
 #[derive(Parser)]
 pub struct DownloadPackage {
-    #[clap(flatten)]
-    pub rest_options: RestOptions,
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
-    /// Address of the account.
+    /// Address of the account containing the package
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
-    /// Name of the package.
+
+    /// Name of the package
     #[clap(long)]
     pub package: String,
-    /// Where to store the downloaded packages. Defaults to the current directory.
-    #[clap(long)]
-    pub target: Option<String>,
+
+    /// Directory to store downloaded package. Defaults to the current directory.
+    #[clap(long, parse(from_os_str))]
+    pub output_dir: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -511,11 +532,8 @@ impl CliCommand<&'static str> for DownloadPackage {
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options.profile)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
-        let path = if let Some(p) = self.target {
-            PathBuf::from(p)
-        } else {
-            PathBuf::from(".")
-        };
+        let output_dir = dir_default_to_current(self.output_dir)?;
+
         let package = registry
             .get_package(self.package)
             .await
@@ -527,31 +545,34 @@ impl CliCommand<&'static str> for DownloadPackage {
                     .to_owned(),
             ));
         }
-        let package_path = path.join(package.name());
+        let package_path = output_dir.join(package.name());
         package
-            .save_package_to_disk(package_path.clone(), true)
-            .map_err(|e| CliError::UnexpectedError(format!("cannot save package: {}", e)))?;
+            .save_package_to_disk(package_path.as_path())
+            .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
         println!(
-            "saved package with {} module(s) to `{}`",
+            "Saved package with {} module(s) to `{}`",
             package.module_names().len(),
             package_path.display()
         );
-        Ok("download succeeded")
+        Ok("Download succeeded")
     }
 }
 
-/// Lists information about packages and modules.
+/// Lists information about packages and modules on-chain
 #[derive(Parser)]
 pub struct ListPackage {
+    /// Address of the account for which to list packages.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+
+    /// Type of resources to query
+    #[clap(long, default_value_t = ListQuery::Packages)]
+    query: ListQuery,
+
     #[clap(flatten)]
     rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
-    /// Address of the account.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    pub(crate) account: AccountAddress,
-    #[clap(long, default_value_t = ListQuery::Packages)]
-    query: ListQuery,
 }
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
@@ -561,10 +582,9 @@ pub enum ListQuery {
 
 impl Display for ListQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
+        f.write_str(match self {
             ListQuery::Packages => "packages",
-        };
-        write!(f, "{}", str)
+        })
     }
 }
 
@@ -595,11 +615,8 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
                     println!("  upgrade_number: {}", data.upgrade_number());
+                    println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
-                    println!(
-                        "  build_info:\n    {}",
-                        data.build_info().replace('\n', "\n    ")
-                    );
                 }
             }
         }
@@ -647,13 +664,12 @@ impl CliCommand<&'static str> for CleanPackage {
 /// Run a Move function
 #[derive(Parser)]
 pub struct RunFunction {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
     pub(crate) function_id: MemberId,
+
     /// Arguments combined with their type separated by spaces.
     ///
     /// Supported types [u8, u64, u128, bool, hex, string, address]
@@ -661,11 +677,15 @@ pub struct RunFunction {
     /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
+
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u64 u128 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -677,13 +697,13 @@ impl CliCommand<TransactionSummary> for RunFunction {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let args: Vec<Vec<u8>> = self
             .args
-            .iter()
-            .map(|arg_with_type| arg_with_type.arg.clone())
+            .into_iter()
+            .map(|arg_with_type| arg_with_type.arg)
             .collect();
         let mut type_args: Vec<TypeTag> = Vec::new();
 
         // These TypeArgs are used for generics
-        for type_arg in self.type_args.iter().cloned() {
+        for type_arg in self.type_args.into_iter() {
             let type_tag = TypeTag::try_from(type_arg)
                 .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
             type_args.push(type_tag)
@@ -691,8 +711,8 @@ impl CliCommand<TransactionSummary> for RunFunction {
 
         self.txn_options
             .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id.clone(),
-                self.function_id.member_id.clone(),
+                self.function_id.module_id,
+                self.function_id.member_id,
                 type_args,
                 args,
             )))

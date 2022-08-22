@@ -4,13 +4,6 @@
 use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
 use serde::{Deserialize, Serialize};
 
-/// We allow a buffer in case network messages get slightly larger after they
-/// are checked against the max frame size but before they are actually sent to
-/// the networking stack. This can occur in specific cases, e.g., if the
-/// message is wrapped in an another type before being sent down the wire. We
-/// should rarely see this in practice (if ever), but let's play it safe.
-const MESSAGE_PADDING_SIZE: usize = 128 * 1024; // 128 KB
-
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncConfig {
@@ -115,7 +108,7 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_lru_cache_size: 100,
             max_network_channel_size: 4000,
-            max_network_chunk_bytes: (MAX_APPLICATION_MESSAGE_SIZE - MESSAGE_PADDING_SIZE) as u64,
+            max_network_chunk_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
             max_state_chunk_size: 2000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 1000,

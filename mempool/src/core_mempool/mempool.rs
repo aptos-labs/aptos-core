@@ -275,7 +275,6 @@ impl Mempool {
             .gc_by_expiration_time(block_time, &self.metrics_cache);
     }
 
-    /// Read `count` transactions from timeline since `timeline_id`.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,

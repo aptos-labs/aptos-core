@@ -99,11 +99,9 @@ impl<'a> NativeAggregatorContext<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_types::account_address::AccountAddress;
     use claim::assert_matches;
-    use move_deps::{
-        move_core_types::gas_algebra::InternalGas,
-        move_table_extension::{TableHandle, TableOperation},
-    };
+    use move_deps::move_table_extension::TableHandle;
 
     struct EmptyStorage;
 
@@ -115,19 +113,10 @@ mod test {
         ) -> Result<Option<Vec<u8>>, anyhow::Error> {
             Ok(None)
         }
-
-        fn operation_cost(
-            &self,
-            _op: TableOperation,
-            _key_size: usize,
-            _val_size: usize,
-        ) -> InternalGas {
-            1.into()
-        }
     }
 
     fn test_id(key: u128) -> AggregatorID {
-        AggregatorID::new(0, key)
+        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 
     // All aggregators are initialized deterministically based on their ID,

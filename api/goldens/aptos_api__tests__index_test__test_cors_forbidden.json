@@ -1,20 +1,20 @@
 {
   "message": "unauthorized",
-  "error_code": null,
-  "aptos_ledger_version": null
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
   "message": "unauthorized",
-  "error_code": null,
-  "aptos_ledger_version": null
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
   "message": "unauthorized",
-  "error_code": null,
-  "aptos_ledger_version": null
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }
 {
   "message": "unauthorized",
-  "error_code": null,
-  "aptos_ledger_version": null
+  "error_code": "web_framework_error",
+  "vm_error_code": null
 }

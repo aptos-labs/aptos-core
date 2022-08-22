@@ -132,6 +132,7 @@ impl FirehoseStreamer {
         let ledger_info = self.context.get_latest_ledger_info_wrapped().unwrap();
         let block_timestamp = self
             .context
+            .db
             .get_block_timestamp(block_start_version)
             .unwrap_or_else(|_| {
                 panic!(

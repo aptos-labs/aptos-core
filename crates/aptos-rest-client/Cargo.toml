@@ -22,12 +22,12 @@ poem-openapi = { git = "https://github.com/poem-web/poem", rev = "f39eba95cbfb52
 reqwest = { version = "0.11.10", features = ["json", "cookies", "blocking"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
+thiserror = "1.0.32"
 tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 
 aptos-api-types = { path = "../../api/types" }
 aptos-crypto = { path = "../aptos-crypto" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }

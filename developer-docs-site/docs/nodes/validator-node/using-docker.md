@@ -6,7 +6,7 @@ sidebar_position: 12
 
 # Using Docker
 
-1. Install Docker and Docker-Compose, [Aptos CLI 0.3.1](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+1. Install Docker and Docker-Compose, [Aptos CLI 0.3.1](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli).
 
 :::caution Note on Apple M1
 
@@ -117,7 +117,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 7. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
 
 8. Compile genesis blob and waypoint

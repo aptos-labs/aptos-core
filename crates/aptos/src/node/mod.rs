@@ -3,7 +3,9 @@
 
 pub mod analyze;
 
-use crate::common::types::{ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions};
+use crate::common::types::{
+    ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions, TransactionSummary,
+};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
 use crate::node::analyze::analyze_validators::AnalyzeValidators;
@@ -22,11 +24,10 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
-use aptos_rest_client::Transaction;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
@@ -105,15 +106,15 @@ pub struct ValidatorConsensusKeyArgs {
 }
 
 impl ValidatorConsensusKeyArgs {
-    fn get_consensus_public_key(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
-    ) -> CliTypedResult<bls12381::PublicKey> {
+    fn get_consensus_public_key<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
+    ) -> CliTypedResult<&'a bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
-            consensus_public_key.clone()
+            consensus_public_key
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.consensus_public_key.clone()
+            &operator_config.consensus_public_key
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --consensus-public-key".to_string(),
@@ -122,14 +123,14 @@ impl ValidatorConsensusKeyArgs {
         Ok(consensus_public_key)
     }
 
-    fn get_consensus_proof_of_possession(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
-    ) -> CliTypedResult<bls12381::ProofOfPossession> {
+    fn get_consensus_proof_of_possession<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
+    ) -> CliTypedResult<&'a bls12381::ProofOfPossession> {
         let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
-            proof_of_possession.clone()
+            proof_of_possession
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.consensus_proof_of_possession.clone()
+            &operator_config.consensus_proof_of_possession
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --proof-of-possession".to_string(),
@@ -159,14 +160,14 @@ pub struct ValidatorNetworkAddressesArgs {
 }
 
 impl ValidatorNetworkAddressesArgs {
-    fn get_network_configs(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
+    fn get_network_configs<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
     ) -> CliTypedResult<(
         x25519::PublicKey,
         Option<x25519::PublicKey>,
-        HostAndPort,
-        Option<HostAndPort>,
+        &'a HostAndPort,
+        Option<&'a HostAndPort>,
     )> {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
@@ -190,9 +191,9 @@ impl ValidatorNetworkAddressesArgs {
             };
 
         let validator_host = if let Some(ref host) = self.validator_host {
-            host.clone()
+            host
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.validator_host.clone()
+            &operator_config.validator_host
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --validator-host".to_string(),
@@ -200,9 +201,9 @@ impl ValidatorNetworkAddressesArgs {
         };
 
         let full_node_host = if let Some(ref host) = self.full_node_host {
-            Some(host.clone())
+            Some(host)
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.full_node_host.clone()
+            operator_config.full_node_host.as_ref()
         } else {
             None
         };
@@ -233,12 +234,12 @@ pub struct InitializeValidator {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for InitializeValidator {
+impl CliCommand<TransactionSummary> for InitializeValidator {
     fn command_name(&self) -> &'static str {
         "InitializeValidator"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let operator_config = self.operator_config_file_args.load()?;
         let consensus_public_key = self
             .validator_consensus_key_args
@@ -277,6 +278,7 @@ impl CliCommand<Transaction> for InitializeValidator {
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -321,12 +323,12 @@ pub struct JoinValidatorSet {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for JoinValidatorSet {
+impl CliCommand<TransactionSummary> for JoinValidatorSet {
     fn command_name(&self) -> &'static str {
         "JoinValidatorSet"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let address = self
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
@@ -334,6 +336,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -347,12 +350,12 @@ pub struct LeaveValidatorSet {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for LeaveValidatorSet {
+impl CliCommand<TransactionSummary> for LeaveValidatorSet {
     fn command_name(&self) -> &'static str {
         "LeaveValidatorSet"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let address = self
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
@@ -360,6 +363,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -622,12 +626,12 @@ pub struct UpdateConsensusKey {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for UpdateConsensusKey {
+impl CliCommand<TransactionSummary> for UpdateConsensusKey {
     fn command_name(&self) -> &'static str {
         "UpdateConsensusKey"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let address = self
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
@@ -646,6 +650,7 @@ impl CliCommand<Transaction> for UpdateConsensusKey {
                 consensus_proof_of_possession.to_bytes().to_vec(),
             ))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -663,12 +668,12 @@ pub struct UpdateValidatorNetworkAddresses {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
+impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
     fn command_name(&self) -> &'static str {
         "UpdateValidatorNetworkAddresses"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let address = self
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
@@ -704,6 +709,7 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
             .await
+            .map(|inner| inner.into())
     }
 }
 
