@@ -170,8 +170,8 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
-fn error_if_version_is_pruned(
-    pruner: &(dyn PrunerManager),
+fn error_if_version_is_pruned<P: PrunerManager>(
+    pruner: &P,
     data_type: &str,
     version: Version,
 ) -> Result<()> {
