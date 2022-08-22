@@ -6,7 +6,7 @@ sidebar_position: 12
 
 # Using Docker
 
-1. Install Docker and Docker-Compose, [Aptos CLI 0.3.1](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+1. Install Docker and Docker-Compose, [Aptos CLI 0.3.1](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli).
 
 :::caution Note on Apple M1
 

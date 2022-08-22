@@ -41,7 +41,13 @@ With your development environment ready, now you can start to setup your Validat
     mkdir ~/$WORKSPACE
     ```
 
-7. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
+:::tip Install Aptos CLI
+
+Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli 
+
+:::
+
+1. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
     ```
     aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
@@ -58,7 +64,7 @@ With your development environment ready, now you can start to setup your Validat
        Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
-8. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections.
+2. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections.
 
     You will need this information to register on Aptos community website later.
 
@@ -101,7 +107,7 @@ With your development environment ready, now you can start to setup your Validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
+3. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
 
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
