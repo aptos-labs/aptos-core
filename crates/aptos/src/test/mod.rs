@@ -597,9 +597,9 @@ impl CliTestFramework {
         let sources_dir = move_dir.join("sources");
 
         let hello_blockchain_contents = include_str!(
-            "../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchain.move"
+            "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
         );
-        let source_path = sources_dir.join("HelloBlockchain.move");
+        let source_path = sources_dir.join("hello_blockchain.move");
         write_to_file(
             source_path.as_path(),
             &source_path.as_display().to_string(),
@@ -607,8 +607,8 @@ impl CliTestFramework {
         )
         .unwrap();
 
-        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchainTest.move");
-        let test_path = sources_dir.join("HelloBlockchainTest.move");
+        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
+        let test_path = sources_dir.join("hello_blockchain_test.move");
         write_to_file(
             test_path.as_path(),
             &test_path.as_display().to_string(),

@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 
 const PACKAGE_NAME: &str = "AwesomePackage";
-const HELLO_BLOCKCHAIN: &str = "HelloBlockchain";
+const HELLO_BLOCKCHAIN: &str = "hello_blockchain";
 
 #[tokio::test]
 async fn test_move_compile_flow() {

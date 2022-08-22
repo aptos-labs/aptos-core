@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-This example depends on the HelloBlockchain.move module having already been published to the destination blockchain.
+This example depends on the hello_blockchain.move module having already been published to the destination blockchain.
 
 One method to do so is to use the CLI:
     * Acquire the Aptos CLI
     * `cd ~`
     * `aptos init`
     * `cd ~/aptos-core/aptos-move/
-    * `aptos move publish --named-address HelloBlockchain=${your_address_from_aptos_init}`
+    * `aptos move publish --named-address hello_blockchain=${your_address_from_aptos_init}`
     * `python -m examples.hello-blockhain ${your_address_from_aptos_init}`
 """
 

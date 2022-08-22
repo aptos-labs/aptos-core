@@ -46,7 +46,7 @@ pub fn run_tests_for_pkg(
 #[test]
 fn test_hello_blockchain() {
     let named_address = BTreeMap::from([(
-        String::from("HelloBlockchain"),
+        String::from("hello_blockchain"),
         AccountAddress::from_hex_literal("0x1").unwrap(),
     )]);
     run_tests_for_pkg("hello_blockchain", named_address);
