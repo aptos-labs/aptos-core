@@ -637,6 +637,7 @@ name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
  "framework",
+ "gas-algebra-ext",
  "move-binary-format",
  "move-core-types",
  "move-stdlib",
@@ -3852,6 +3853,7 @@ dependencies = [
  "clap 3.2.17",
  "curve25519-dalek",
  "flate2",
+ "gas-algebra-ext",
  "include_dir 0.7.2",
  "itertools",
  "libsecp256k1",
@@ -3986,6 +3988,13 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "gas-algebra-ext"
+version = "0.0.1"
+dependencies = [
+ "move-core-types",
 ]
 
 [[package]]

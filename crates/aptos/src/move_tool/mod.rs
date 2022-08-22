@@ -28,7 +28,7 @@ use crate::{
     },
     CliCommand, CliResult,
 };
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
@@ -259,7 +259,10 @@ impl CliCommand<&'static str> for TestPackage {
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
-            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
+            aptos_debug_natives::aptos_debug_natives(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            ),
             false,
             &mut std::io::stdout(),
         )

@@ -19,7 +19,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -515,7 +515,11 @@ impl FakeExecutor {
     ) {
         let write_set = {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            )
+            .unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
@@ -554,7 +558,11 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
-        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+        )
+        .unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session

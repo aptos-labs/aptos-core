@@ -42,6 +42,7 @@ aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
+gas-algebra-ext =  { path = "../gas-algebra-ext" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]

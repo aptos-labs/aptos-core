@@ -11,7 +11,10 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, Gas, NativeGasParameters};
+use aptos_gas::{
+    AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
+    NativeGasParameters,
+};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::transaction::AbortInfo;
@@ -59,12 +62,15 @@ impl AptosVMImpl {
         });
 
         // TODO(Gas): this doesn't look right.
-        let native_gas_params = match &gas_params {
-            Some(gas_params) => gas_params.natives.clone(),
-            None => NativeGasParameters::zeros(),
+        let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
+            Some(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
+            None => (
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            ),
         };
 
-        let inner = MoveVmExt::new(native_gas_params)
+        let inner = MoveVmExt::new(native_gas_params, abs_val_size_gas_params)
             .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
@@ -85,7 +91,7 @@ impl AptosVMImpl {
             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
                 .expect("failed to get gas parameters");
 
-        let inner = MoveVmExt::new(gas_params.natives.clone())
+        let inner = MoveVmExt::new(gas_params.natives.clone(), gas_params.misc.abs_val.clone())
             .expect("should be able to create Move VM; check if there are duplicated natives");
 
         Self {
