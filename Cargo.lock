@@ -2541,6 +2541,7 @@ dependencies = [
  "fail 0.5.0",
  "fallible",
  "futures",
+ "futures-channel",
  "itertools",
  "mirai-annotations",
  "move-deps",
