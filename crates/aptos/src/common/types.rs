@@ -22,15 +22,11 @@ use aptos_keygen::KeyGen;
 use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{
-    move_types::{
-        ident_str,
-        language_storage::{ModuleId, TypeTag},
-    },
     transaction_builder::TransactionFactory,
     types::LocalAccount,
 };
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, EntryFunction, TransactionPayload,
+    authenticator::AuthenticationKey, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -1097,24 +1093,6 @@ impl TransactionOptions {
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
         let sender_key = self.private_key()?;
         Ok(account_address_from_public_key(&sender_key.public_key()))
-    }
-
-    /// Submits an entry function based on module name and function inputs
-    pub async fn submit_entry_function(
-        &self,
-        address: AccountAddress,
-        module: &'static str,
-        function: &'static str,
-        type_args: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-    ) -> CliTypedResult<Transaction> {
-        let txn = TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(address, ident_str!(module).to_owned()),
-            ident_str!(function).to_owned(),
-            type_args,
-            args,
-        ));
-        self.submit_transaction(txn).await
     }
 
     /// Submit a transaction
