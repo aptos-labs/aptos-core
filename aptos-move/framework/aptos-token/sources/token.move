@@ -593,8 +593,8 @@ module aptos_token::token {
             error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
         );
 
-        let collections = borrow_global<Collections>(creator).collections;
-        table::contains(collections, name)
+        let collection_data = &borrow_global<Collections>(creator).collection_data;
+        table::contains(collection_data, name)
     }
 
     public fun create_tokendata(
