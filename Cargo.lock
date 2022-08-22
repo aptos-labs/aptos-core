@@ -144,6 +144,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-build-info",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",
@@ -363,6 +364,13 @@ dependencies = [
  "serde 1.0.143",
  "serde_bytes",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-build-info"
+version = "0.1.0"
+dependencies = [
+ "shadow-rs",
 ]
 
 [[package]]
@@ -856,6 +864,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api",
+ "aptos-build-info",
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
@@ -4659,6 +4668,7 @@ name = "inspection-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-build-info",
  "aptos-config",
  "aptos-infallible",
  "aptos-logger",

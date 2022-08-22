@@ -20,6 +20,7 @@ serde_json = "1.0.81"
 sysinfo = "0.24.2"
 tokio = { version = "1.18.2", features = ["full"] }
 
+aptos-build-info = { path = "../../crates/aptos-build-info" }
 aptos-config = { path = "../../config" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
