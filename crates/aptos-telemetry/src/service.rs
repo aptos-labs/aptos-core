@@ -92,17 +92,24 @@ pub fn start_telemetry_service(
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");
 
+    let telemetry_svc_url =
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
+
+    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
+
     if let Some(rx) = remote_log_rx {
-        let telemetry_log_sender =
-            TelemetryLogSender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
+        let telemetry_log_sender = TelemetryLogSender::new(telemetry_sender.clone());
         telemetry_runtime.spawn(telemetry_log_sender.start(rx));
     }
 
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);
-    telemetry_runtime
-        .handle()
-        .spawn(spawn_telemetry_service(peer_id, chain_id, node_config));
+    telemetry_runtime.handle().spawn(spawn_telemetry_service(
+        telemetry_sender,
+        peer_id,
+        chain_id,
+        node_config,
+    ));
 
     Some(telemetry_runtime)
 }
@@ -128,12 +135,12 @@ where
 }
 
 /// Spawns the dedicated telemetry service that operates periodically
-async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
-    let telemetry_svc_url =
-        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
-
-    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
-
+async fn spawn_telemetry_service(
+    telemetry_sender: TelemetrySender,
+    peer_id: String,
+    chain_id: ChainId,
+    node_config: NodeConfig,
+) {
     // Send build information once (only on startup)
     send_build_information(
         peer_id.clone(),

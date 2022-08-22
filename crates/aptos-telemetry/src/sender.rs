@@ -134,9 +134,16 @@ impl TelemetrySender {
 
     pub async fn send_logs(&self, batch: Vec<String>) {
         if let Ok(json) = serde_json::to_string(&batch) {
-            // TODO: retry
             let len = json.len();
-            let result = self.post_logs(json.as_bytes()).await;
+
+            let retry_strategy = ExponentialBackoff::from_millis(10)
+                .map(jitter) // add jitter to delays
+                .take(4); // limit to 4 retries
+
+            let result = Retry::spawn(retry_strategy, || async {
+                self.post_logs(json.as_bytes()).await
+            })
+            .await;
             match result {
                 Ok(_) => {
                     increment_log_ingest_successes_by(batch.len() as u64);
@@ -520,5 +527,35 @@ mod tests {
 
         mock.assert();
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_post_logs() {
+        let batch = vec!["log1".to_string(), "log2".to_string()];
+        let json = serde_json::to_string(&batch);
+        assert!(json.is_ok());
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(json.unwrap().as_bytes()).unwrap();
+        let expected_compressed_bytes = gzip_encoder.finish().unwrap();
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST")
+                .header("Authorization", "Bearer SECRET_JWT_TOKEN")
+                .path("/log_ingest")
+                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+            then.status(200);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        client.send_logs(batch).await;
+
+        mock.assert();
     }
 }

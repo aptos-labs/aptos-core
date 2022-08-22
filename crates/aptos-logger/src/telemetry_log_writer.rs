@@ -30,8 +30,9 @@ impl TelemetryLogWriter {
         }
     }
 
+    #[allow(dead_code)]
+    // TODO: hook up flush when it is implemented in LoggerService
     pub fn flush(&mut self) -> std::io::Result<()> {
-        // TODO: actually flush!
         Ok(())
     }
 }

@@ -3,9 +3,7 @@
 
 use crate::metrics::increment_log_ingest_too_large_by;
 use crate::sender::TelemetrySender;
-use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
-use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::time::Duration;
@@ -24,10 +22,10 @@ pub(crate) struct TelemetryLogSender {
 }
 
 impl TelemetryLogSender {
-    pub fn new(base_url: &str, chain_id: ChainId, node_config: &NodeConfig) -> Self {
+    pub fn new(sender: TelemetrySender) -> Self {
         Self {
             // TODO: use an existing sender?
-            sender: TelemetrySender::new(base_url.to_string(), chain_id, node_config),
+            sender,
             batch: Vec::new(),
             max_bytes: MAX_BYTES,
             current_bytes: 0,
@@ -87,13 +85,16 @@ impl TelemetryLogSender {
 
 #[cfg(test)]
 mod tests {
+    use crate::sender::TelemetrySender;
     use crate::telemetry_log_sender::{TelemetryLogSender, MAX_BYTES};
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
 
     #[tokio::test]
     async fn test_add_to_batch() {
-        let mut sender = TelemetryLogSender::new("test", ChainId::test(), &NodeConfig::default());
+        let telemetry_sender =
+            TelemetrySender::new("test".to_string(), ChainId::test(), &NodeConfig::default());
+        let mut sender = TelemetryLogSender::new(telemetry_sender);
 
         for _i in 0..2 {
             // Large batch should not be allowed
