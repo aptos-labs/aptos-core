@@ -3,7 +3,6 @@
 
 use crate::generate_traffic;
 use forge::{NetworkContext, NetworkTest, Result, Test};
-use tokio::runtime::Runtime;
 
 pub struct PerformanceBenchmarkWithFN;
 
@@ -29,10 +28,11 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
         ctx.check_for_success(&txn_stat, &duration)?;
-        let runtime = Runtime::new().unwrap();
 
-        runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
-        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
+        // This is currently flaky in main, turn off to mitigate impact on devs
+        // let runtime = Runtime::new().unwrap();
+        // runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
+        // runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
 
         // TODO(skedia) enable them after resolving failure in
         // https://github.com/aptos-labs/aptos-core/runs/7904217460?check_suite_focus=true
