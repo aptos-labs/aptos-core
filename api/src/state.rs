@@ -139,11 +139,7 @@ impl StateApi {
             .context
             .state_view_at_version(requested_ledger_version)
             .map_err(|err| {
-                E::internal_with_code(
-                    err,
-                    AptosErrorCode::ReadFromStorageError,
-                    &latest_ledger_info,
-                )
+                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
             })?;
 
         Ok((latest_ledger_info, requested_ledger_version, state_view))
@@ -172,7 +168,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -190,7 +186,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InvalidBcsInStorageError,
+                            AptosErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;
@@ -221,7 +217,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -237,7 +233,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InvalidBcsInStorageError,
+                            AptosErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;
@@ -306,7 +302,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &ledger_info,
                 )
             })?
@@ -322,7 +318,7 @@ impl StateApi {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InvalidBcsInStorageError,
+                            AptosErrorCode::InternalError,
                             &ledger_info,
                         )
                     })?;

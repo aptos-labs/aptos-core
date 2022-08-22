@@ -109,7 +109,7 @@ impl EventsApi {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &latest_ledger_info,
                 )
             })?;
@@ -120,11 +120,11 @@ impl EventsApi {
                 let events = resolver
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)
-                    .context("Failed to convert events from storage into response {}")
+                    .context("Failed to convert events from storage into response")
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InvalidBcsInStorageError,
+                            AptosErrorCode::InternalError,
                             &latest_ledger_info,
                         )
                     })?;
