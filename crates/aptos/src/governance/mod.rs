@@ -6,33 +6,26 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use crate::move_tool::{init_move_dir, ArgWithType, FunctionArgType, IncludedArtifacts};
+use crate::move_tool::{init_move_dir, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::U64;
-use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
+use aptos_rest_client::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
-use move_deps::move_core_types::{
-    language_storage::TypeTag, transaction_argument::TransactionArgument,
-};
+use move_deps::move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    fmt::Formatter,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fmt::Formatter, fs, path::PathBuf};
 use tempfile::TempDir;
 
 /// Tool for on-chain governance
@@ -66,7 +59,6 @@ pub struct SubmitProposal {
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
-
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -98,18 +90,12 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         let txn = self
             .txn_options
-            .submit_entry_function(
-                AccountAddress::ONE,
-                "aptos_governance",
-                "create_proposal",
-                vec![],
-                vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&script_hash)?,
-                    bcs::to_bytes(&self.metadata_url.to_string())?,
-                    bcs::to_bytes(&metadata_hash.to_hex())?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                self.pool_address_args.pool_address,
+                script_hash.to_vec(),
+                self.metadata_url.to_string().as_bytes().to_vec(),
+                metadata_hash.to_hex().as_bytes().to_vec(),
+            ))
             .await?;
 
         if let Transaction::UserTransaction(inner) = txn {
@@ -254,17 +240,11 @@ impl CliCommand<Transaction> for SubmitVote {
         )?;
 
         self.txn_options
-            .submit_entry_function(
-                AccountAddress::ONE,
-                "aptos_governance",
-                "vote",
-                vec![],
-                vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&self.proposal_id)?,
-                    bcs::to_bytes(&vote)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::aptos_governance_vote(
+                self.pool_address_args.pool_address,
+                self.proposal_id,
+                vote,
+            ))
             .await
     }
 }
@@ -360,63 +340,12 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u64, u128, bool, hex, string, address]
-    ///
-    /// Example: `address:0x1 bool:true u8:0`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u64 u128 bool address vector true false signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileProposalArgs,
-}
-
-impl TryFrom<&ArgWithType> for TransactionArgument {
-    type Error = CliError;
-
-    fn try_from(arg: &ArgWithType) -> Result<Self, Self::Error> {
-        let txn_arg = match arg._ty {
-            FunctionArgType::Address => TransactionArgument::Address(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("address", err.to_string()))?,
-            ),
-            FunctionArgType::Bool => TransactionArgument::Bool(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("bool", err.to_string()))?,
-            ),
-            FunctionArgType::Hex => TransactionArgument::U8Vector(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
-            ),
-            FunctionArgType::String => TransactionArgument::U8Vector(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("string", err.to_string()))?,
-            ),
-            FunctionArgType::U128 => TransactionArgument::U128(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
-            ),
-            FunctionArgType::U64 => TransactionArgument::U64(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u64", err.to_string()))?,
-            ),
-            FunctionArgType::U8 => TransactionArgument::U8(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
-            ),
-        };
-
-        Ok(txn_arg)
-    }
 }
 
 #[async_trait]
@@ -429,23 +358,8 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
-        // TODO: Clean these up to be common with the run function in move
-        let args = self
-            .args
-            .iter()
-            .map(|arg_with_type| arg_with_type.try_into())
-            .collect::<Result<Vec<TransactionArgument>, CliError>>()?;
-
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        let txn = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+        let args = vec![TransactionArgument::U64(self.proposal_id)];
+        let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
             .submit_transaction(txn)
