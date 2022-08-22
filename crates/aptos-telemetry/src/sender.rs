@@ -41,7 +41,7 @@ impl AuthContext {
 }
 
 #[derive(Clone)]
-pub struct TelemetrySender {
+pub(crate) struct TelemetrySender {
     base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,

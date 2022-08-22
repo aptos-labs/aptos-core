@@ -29,7 +29,7 @@ impl Default for LoggerConfig {
             is_async: true,
             level: Level::Info,
             console_port: Some(6669),
-            enable_telemetry_remote_log: true,
+            enable_telemetry_remote_log: false,
         }
     }
 }

@@ -68,6 +68,7 @@ use tokio::runtime::{Builder, Runtime};
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
+const TELEMETRY_LOG_INGEST_BUFFER_SIZE: usize = 128;
 
 /// Runs an aptos fullnode or validator
 #[derive(Clone, Debug, Parser)]
@@ -177,7 +178,7 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
     }
     let mut remote_log_rx = None;
     if config.logger.enable_telemetry_remote_log {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(TELEMETRY_REMOTE_LOG_BUFFER_SIZE);
         logger.remote_log_tx(tx);
         remote_log_rx = Some(rx);
     }
