@@ -18,7 +18,8 @@ use substreams::{errors::Error, store};
 #[substreams::handlers::map]
 fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
     let mut transactions: Vec<TransactionOutput> = vec![];
-    let mut block_height: Option<u64> = None;
+    let block_height = input_block.height;
+    let chain_id = input_block.chain_id;
 
     for input_txn in input_block.transactions {
         let transaction_info;
@@ -34,7 +35,6 @@ fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
                     transaction_converter::get_transaction_info_output(&input_txn, info);
                 write_set_changes =
                     transaction_converter::get_write_set_changes_output(info, input_txn.version);
-                block_height = Some(transaction_info.block_height);
             }
         }
         let mut txn_data: Option<TxnDataOutput> = None;
@@ -78,14 +78,11 @@ fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
             txn_data,
         });
     }
-    if let Some(height) = block_height {
-        Ok(BlockOutput {
-            transactions,
-            height,
-        })
-    } else {
-        Err(Error::Unexpected(String::from("block must have height")))
-    }
+    Ok(BlockOutput {
+        transactions,
+        height: block_height,
+        chain_id,
+    })
 }
 
 #[substreams::handlers::store]
