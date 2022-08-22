@@ -4,7 +4,9 @@ resolver = "2"
 members = [
     "api",
     "api/openapi-spec-generator",
+    "api/test-context",
     "api/types",
+    "aptos-move/aptos-aggregator",
     "aptos-move/aptos-gas",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -17,20 +19,16 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
-    "aptos-move/genesis-viewer",
+    "aptos-move/gas-algebra-ext",
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
-    "aptos-move/transaction-replay",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "config",
     "config/global-constants",
-    "config/management",
-    "config/management/operational",
-    "config/seed-peer-generator",
     "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
@@ -59,6 +57,7 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
@@ -76,6 +75,7 @@ members = [
     "execution/executor-benchmark",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "fh-stream",
     "mempool",
     "network",
     "network/builder",
@@ -86,13 +86,10 @@ members = [
     "network/peer-monitoring-service/server",
     "network/peer-monitoring-service/types",
     "sdk",
-    "sdk/transaction-builder",
     "secure/net",
-    "secure/push-metrics",
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
-    "sf-stream",
     "state-sync/aptos-data-client",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
@@ -108,6 +105,7 @@ members = [
     "storage/backup/backup-service",
     "storage/indexer",
     "storage/jellyfish-merkle",
+    "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
     "storage/state-view",
@@ -123,17 +121,17 @@ members = [
     "vm-validator",
 ]
 
+exclude =[
+    "ecosystem/sf-indexer/aptos-substreams",
+]
+
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/genesis-viewer",
-    "aptos-move/transaction-replay",
     "aptos-node",
-    "config/management/operational",
-    "config/seed-peer-generator",
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-faucet",
@@ -179,4 +177,4 @@ debug = true
 lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x" }

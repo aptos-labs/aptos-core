@@ -22,6 +22,8 @@ use crate::{
 use anyhow::{bail, Result};
 use std::collections::HashSet;
 
+use super::system_information::HardwareEvaluator;
+
 type ApiEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
 type MetricsEvaluatorType =
     Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
@@ -114,6 +116,11 @@ pub fn build_evaluators(
         evaluator_args,
     )?;
     ConsensusTimeoutsEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    HardwareEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,

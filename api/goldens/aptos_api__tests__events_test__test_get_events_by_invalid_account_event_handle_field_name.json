@@ -1,0 +1,5 @@
+{
+  "message": "Struct Field not found by Address(0x1), Struct tag(0x1::reconfiguration::Configuration), Field name(not_found) and Ledger version(0)",
+  "error_code": "struct_field_not_found",
+  "vm_error_code": null
+}

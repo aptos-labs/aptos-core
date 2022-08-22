@@ -17,7 +17,7 @@ const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
 /** Publish a new module to the blockchain within the specified account */
 export async function publishModule(accountFrom: AptosAccount, moduleHex: string): Promise<string> {
-  const moudleBundlePayload = new TxnBuilderTypes.TransactionPayloadModuleBundle(
+  const moduleBundlePayload = new TxnBuilderTypes.TransactionPayloadModuleBundle(
     new TxnBuilderTypes.ModuleBundle([new TxnBuilderTypes.Module(new HexString(moduleHex).toUint8Array())]),
   );
 
@@ -29,7 +29,7 @@ export async function publishModule(accountFrom: AptosAccount, moduleHex: string
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
-    moudleBundlePayload,
+    moduleBundlePayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -60,8 +60,8 @@ async function getMessage(contractAddress: HexString, accountAddress: MaybeHexSt
 //:!:>section_3
 /**  Potentially initialize and set the resource Message::MessageHolder::message */
 async function setMessage(contractAddress: HexString, accountFrom: AptosAccount, message: string): Promise<string> {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       `${contractAddress.toString()}::message`,
       "set_message",
       [],
@@ -77,7 +77,7 @@ async function setMessage(contractAddress: HexString, accountFrom: AptosAccount,
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),

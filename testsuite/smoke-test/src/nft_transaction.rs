@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use cached_framework_packages::aptos_stdlib::aptos_token_stdlib;
+use cached_packages::aptos_stdlib::aptos_token_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct NFTTransaction;
@@ -91,8 +91,8 @@ impl AptosTest for NFTTransaction {
                     creator.address(),
                     collection_name.clone(),
                     token_name.clone(),
-                    1,
                     0,
+                    1,
                 ));
         let transfer_txn =
             owner.sign_multi_agent_with_transaction_builder(vec![&creator], transfer_builder);

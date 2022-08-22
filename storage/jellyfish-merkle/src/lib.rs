@@ -81,14 +81,16 @@ pub mod test_helper;
 
 use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
 use anyhow::{bail, ensure, format_err, Result};
+use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
+use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey};
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
@@ -144,14 +146,19 @@ pub trait TreeWriter<K>: Send + Sync {
 
 pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
-    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()>;
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()>;
+
+    fn write_usage(&self, version: Version, items: usize, total_bytes: usize) -> Result<()>;
 }
 
-/// `Key` defines the types of data key that can be stored in a Jellyfish Merkle tree.
-pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {}
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
+    fn key_size(&self) -> usize;
+}
 
 /// `Value` defines the types of data that can be stored in a Jellyfish Merkle tree.
-pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {}
+pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {
+    fn value_size(&self) -> usize;
+}
 
 /// `TestKey` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
@@ -166,9 +173,17 @@ pub trait TestKey:
 #[cfg(any(test, feature = "fuzzing"))]
 pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
 
-impl Key for StateKey {}
+impl Key for StateKey {
+    fn key_size(&self) -> usize {
+        self.size()
+    }
+}
 
-impl Value for StateValue {}
+impl Value for StateValue {
+    fn value_size(&self) -> usize {
+        self.size()
+    }
+}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestKey for StateKey {}
@@ -209,7 +224,10 @@ pub struct TreeUpdateBatch<K> {
     pub num_stale_leaves: usize,
 }
 
-impl<K> TreeUpdateBatch<K> {
+impl<K> TreeUpdateBatch<K>
+where
+    K: Key,
+{
     pub fn new() -> Self {
         Self {
             node_batch: vec![vec![]],
@@ -233,19 +251,35 @@ impl<K> TreeUpdateBatch<K> {
         self.num_stale_leaves += num_stale_leaves;
     }
 
-    pub fn inc_num_new_leaves(&mut self) {
+    #[cfg(test)]
+    pub fn num_stale_node(&self) -> usize {
+        self.stale_node_index_batch.iter().map(Vec::len).sum()
+    }
+
+    fn inc_num_new_leaves(&mut self) {
         self.num_new_leaves += 1;
     }
 
-    pub fn inc_num_stale_leaves(&mut self) {
+    fn inc_num_stale_leaves(&mut self) {
         self.num_stale_leaves += 1;
     }
 
     pub fn put_node(&mut self, node_key: NodeKey, node: Node<K>) {
+        if node.is_leaf() {
+            self.inc_num_new_leaves();
+        }
         self.node_batch[0].push((node_key, node))
     }
 
-    pub fn put_stale_node(&mut self, node_key: NodeKey, stale_since_version: Version) {
+    pub fn put_stale_node(
+        &mut self,
+        node_key: NodeKey,
+        stale_since_version: Version,
+        node: &Node<K>,
+    ) {
+        if node.is_leaf() {
+            self.inc_num_stale_leaves();
+        }
         self.stale_node_index_batch[0].push(StaleNodeIndex {
             node_key,
             stale_since_version,
@@ -376,7 +410,7 @@ where
     /// the batch is not reachable from public interfaces before being committed.
     pub fn batch_put_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, K))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
@@ -388,50 +422,58 @@ where
             .collect::<Vec<_>>();
 
         let mut batch = TreeUpdateBatch::new();
-        let (_root_node_key, root_node) = if let Some(persisted_version) = persisted_version {
+        let root_node_opt = if let Some(persisted_version) = persisted_version {
             IO_POOL.install(|| {
                 self.batch_insert_at(
-                    NodeKey::new_empty_path(persisted_version),
+                    &NodeKey::new_empty_path(persisted_version),
                     version,
-                    &deduped_and_sorted_kvs,
+                    deduped_and_sorted_kvs.as_slice(),
                     0,
                     &node_hashes,
                     &mut batch,
                 )
             })?
         } else {
-            self.batch_create_subtree(
-                NodeKey::new_empty_path(version),
+            self.batch_update_subtree(
+                &NodeKey::new_empty_path(version),
                 version,
-                &deduped_and_sorted_kvs,
+                deduped_and_sorted_kvs.as_slice(),
                 0,
                 &node_hashes,
                 &mut batch,
             )?
         };
 
-        APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
+        let node_key = NodeKey::new_empty_path(version);
+        let root_hash = if let Some(root_node) = root_node_opt {
+            APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
+            let hash = root_node.hash();
+            batch.put_node(node_key, root_node);
+            hash
+        } else {
+            APTOS_JELLYFISH_LEAF_COUNT.set(0);
+            batch.put_node(node_key, Node::Null);
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
 
-        Ok((root_node.hash(), batch))
+        Ok((root_hash, batch))
     }
 
     fn batch_insert_at(
         &self,
-        mut node_key: NodeKey,
+        node_key: &NodeKey,
         version: Version,
-        kvs: &[(HashValue, &(HashValue, K))],
+        kvs: &[(HashValue, Option<&(HashValue, K)>)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
-    ) -> Result<(NodeKey, Node<K>)> {
-        let node = self.reader.get_node(&node_key)?;
-        batch.put_stale_node(node_key.clone(), version);
+    ) -> Result<Option<Node<K>>> {
+        let node = self.reader.get_node(node_key)?;
+        batch.put_stale_node(node_key.clone(), version, &node);
 
-        Ok(match node {
+        match node {
             Node::Internal(internal_node) => {
-                // Reuse the current `InternalNode` in memory to create a new internal node.
-                let mut children: Children = internal_node.clone().into();
-
+                // There is a small possibility that the old internal node is intact.
                 // Traverse all the path touched by `kvs` from this internal node.
                 let range_iter = NibbleRangeIterator::new(kvs, depth);
                 let new_children: Vec<_> = if depth <= MAX_PARALLELIZABLE_DEPTH {
@@ -442,7 +484,7 @@ where
                             let mut sub_batch = TreeUpdateBatch::new();
                             Ok((
                                 self.insert_at_child(
-                                    &node_key,
+                                    node_key,
                                     &internal_node,
                                     version,
                                     kvs,
@@ -466,7 +508,7 @@ where
                     range_iter
                         .map(|(left, right)| {
                             self.insert_at_child(
-                                &node_key,
+                                node_key,
                                 &internal_node,
                                 version,
                                 kvs,
@@ -479,22 +521,66 @@ where
                         })
                         .collect::<Result<_>>()?
                 };
-                children.extend(new_children.into_iter());
 
-                let new_internal_node = InternalNode::new(children);
-                node_key.set_version(version);
-                batch.put_node(node_key.clone(), new_internal_node.clone().into());
+                // Reuse the current `InternalNode` in memory to create a new internal node.
+                let mut old_children: Children = internal_node.into();
+                let mut new_created_children = HashMap::new();
+                for (child_nibble, child_option) in new_children {
+                    if let Some(child) = child_option {
+                        new_created_children.insert(child_nibble, child);
+                    } else {
+                        old_children.remove(&child_nibble);
+                    }
+                }
 
-                (node_key, new_internal_node.into())
+                if old_children.is_empty() && new_created_children.is_empty() {
+                    return Ok(None);
+                } else if old_children.len() <= 1 && new_created_children.len() <= 1 {
+                    if let Some((new_nibble, new_child)) = new_created_children.iter().next() {
+                        if let Some((old_nibble, _old_child)) = old_children.iter().next() {
+                            if old_nibble == new_nibble && new_child.is_leaf() {
+                                return Ok(Some(new_child.clone()));
+                            }
+                        } else if new_child.is_leaf() {
+                            return Ok(Some(new_child.clone()));
+                        }
+                    } else {
+                        let (old_child_nibble, old_child) =
+                            old_children.iter().next().expect("must exist");
+                        if old_child.is_leaf() {
+                            let old_child_node_key =
+                                node_key.gen_child_node_key(old_child.version, *old_child_nibble);
+                            let old_child_node = self.reader.get_node(&old_child_node_key)?;
+                            batch.put_stale_node(old_child_node_key, version, &old_child_node);
+                            return Ok(Some(old_child_node));
+                        }
+                    }
+                }
+
+                let mut new_children = old_children;
+                for (child_index, new_child_node) in new_created_children {
+                    let new_child_node_key = node_key.gen_child_node_key(version, child_index);
+                    new_children.insert(
+                        child_index,
+                        Child::new(
+                            Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                            version,
+                            new_child_node.node_type(),
+                        ),
+                    );
+                    batch.put_node(new_child_node_key, new_child_node);
+                }
+                let new_internal_node = InternalNode::new(new_children);
+                Ok(Some(new_internal_node.into()))
             }
-            Node::Leaf(leaf_node) => {
-                batch.inc_num_stale_leaves();
-                node_key.set_version(version);
-                self.batch_create_subtree_with_existing_leaf(
-                    node_key, version, leaf_node, kvs, depth, hash_cache, batch,
-                )?
+            Node::Leaf(leaf_node) => self.batch_update_subtree_with_existing_leaf(
+                node_key, version, leaf_node, kvs, depth, hash_cache, batch,
+            ),
+            Node::Null => {
+                ensure!(depth == 0, "Null node can only exist at depth 0");
+                self.batch_update_subtree(node_key, version, kvs, 0, hash_cache, batch)
             }
-        })
+        }
     }
 
     fn insert_at_child(
@@ -502,27 +588,27 @@ where
         node_key: &NodeKey,
         internal_node: &InternalNode,
         version: Version,
-        kvs: &[(HashValue, &(HashValue, K))],
+        kvs: &[(HashValue, Option<&(HashValue, K)>)],
         left: usize,
         right: usize,
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
-    ) -> Result<(Nibble, Child)> {
+    ) -> Result<(Nibble, Option<Node<K>>)> {
         let child_index = kvs[left].0.get_nibble(depth);
         let child = internal_node.child(child_index);
 
-        let (node_key, node) = match child {
+        let new_child_node_option = match child {
             Some(child) => self.batch_insert_at(
-                node_key.gen_child_node_key(child.version, child_index),
+                &node_key.gen_child_node_key(child.version, child_index),
                 version,
                 &kvs[left..=right],
                 depth + 1,
                 hash_cache,
                 batch,
             )?,
-            None => self.batch_create_subtree(
-                node_key.gen_child_node_key(version, child_index),
+            None => self.batch_update_subtree(
+                &node_key.gen_child_node_key(version, child_index),
                 version,
                 &kvs[left..=right],
                 depth + 1,
@@ -531,49 +617,40 @@ where
             )?,
         };
 
-        Ok((
-            child_index,
-            Child::new(
-                Self::get_hash(&node_key, &node, hash_cache),
-                version,
-                node.node_type(),
-            ),
-        ))
+        Ok((child_index, new_child_node_option))
     }
 
-    fn batch_create_subtree_with_existing_leaf(
+    fn batch_update_subtree_with_existing_leaf(
         &self,
-        node_key: NodeKey,
+        node_key: &NodeKey,
         version: Version,
         existing_leaf_node: LeafNode<K>,
-        kvs: &[(HashValue, &(HashValue, K))],
+        kvs: &[(HashValue, Option<&(HashValue, K)>)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
-    ) -> Result<(NodeKey, Node<K>)> {
+    ) -> Result<Option<Node<K>>> {
         let existing_leaf_key = existing_leaf_node.account_key();
 
         if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
-            let new_leaf_node = Node::new_leaf(
-                existing_leaf_key,
-                kvs[0].1 .0,
-                (kvs[0].1 .1.clone(), version),
-            );
-            batch.put_node(node_key.clone(), new_leaf_node.clone());
-            batch.inc_num_new_leaves();
             // TODO(lightmark): Add the purge logic the value here.
-            Ok((node_key, new_leaf_node))
+            if let (key, Some((value_hash, state_key))) = kvs[0] {
+                let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
+                Ok(Some(new_leaf_node))
+            } else {
+                Ok(None)
+            }
         } else {
             let existing_leaf_bucket = existing_leaf_key.get_nibble(depth);
             let mut isolated_existing_leaf = true;
-            let mut children = Children::new();
+            let mut children = vec![];
             for (left, right) in NibbleRangeIterator::new(kvs, depth) {
                 let child_index = kvs[left].0.get_nibble(depth);
                 let child_node_key = node_key.gen_child_node_key(version, child_index);
-                let (new_child_node_key, new_child_node) = if existing_leaf_bucket == child_index {
+                if let Some(new_child_node) = if existing_leaf_bucket == child_index {
                     isolated_existing_leaf = false;
-                    self.batch_create_subtree_with_existing_leaf(
-                        child_node_key,
+                    self.batch_update_subtree_with_existing_leaf(
+                        &child_node_key,
                         version,
                         existing_leaf_node.clone(),
                         &kvs[left..=right],
@@ -582,83 +659,119 @@ where
                         batch,
                     )?
                 } else {
-                    self.batch_create_subtree(
-                        child_node_key,
+                    self.batch_update_subtree(
+                        &child_node_key,
                         version,
                         &kvs[left..=right],
                         depth + 1,
                         hash_cache,
                         batch,
                     )?
-                };
-                children.insert(
-                    child_index,
-                    Child::new(
-                        Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                        version,
-                        new_child_node.node_type(),
-                    ),
-                );
+                } {
+                    children.push((child_index, new_child_node));
+                }
             }
             if isolated_existing_leaf {
-                let existing_leaf_node_key =
-                    node_key.gen_child_node_key(version, existing_leaf_bucket);
-                children.insert(
-                    existing_leaf_bucket,
-                    Child::new(existing_leaf_node.hash(), version, NodeType::Leaf),
-                );
-                batch.inc_num_new_leaves();
-                batch.put_node(existing_leaf_node_key, existing_leaf_node.into());
+                children.push((existing_leaf_bucket, existing_leaf_node.into()));
             }
 
-            let new_internal_node = InternalNode::new(children);
-            batch.put_node(node_key.clone(), new_internal_node.clone().into());
-
-            Ok((node_key, new_internal_node.into()))
+            if children.is_empty() {
+                Ok(None)
+            } else if children.len() == 1 && children[0].1.is_leaf() {
+                let (_, child) = children.pop().expect("Must exist");
+                Ok(Some(child))
+            } else {
+                let new_internal_node = InternalNode::new(
+                    children
+                        .into_iter()
+                        .map(|(child_index, new_child_node)| {
+                            let new_child_node_key =
+                                node_key.gen_child_node_key(version, child_index);
+                            let result = (
+                                child_index,
+                                Child::new(
+                                    Self::get_hash(
+                                        &new_child_node_key,
+                                        &new_child_node,
+                                        hash_cache,
+                                    ),
+                                    version,
+                                    new_child_node.node_type(),
+                                ),
+                            );
+                            batch.put_node(new_child_node_key, new_child_node);
+                            result
+                        })
+                        .collect(),
+                );
+                Ok(Some(new_internal_node.into()))
+            }
         }
     }
 
-    fn batch_create_subtree(
+    fn batch_update_subtree(
         &self,
-        node_key: NodeKey,
+        node_key: &NodeKey,
         version: Version,
-        kvs: &[(HashValue, &(HashValue, K))],
+        kvs: &[(HashValue, Option<&(HashValue, K)>)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
-    ) -> Result<(NodeKey, Node<K>)> {
+    ) -> Result<Option<Node<K>>> {
         if kvs.len() == 1 {
-            let new_leaf_node =
-                Node::new_leaf(kvs[0].0, kvs[0].1 .0, (kvs[0].1 .1.clone(), version));
-            batch.put_node(node_key.clone(), new_leaf_node.clone());
-            batch.inc_num_new_leaves();
-            Ok((node_key, new_leaf_node))
+            if let (key, Some((value_hash, state_key))) = kvs[0] {
+                let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
+                Ok(Some(new_leaf_node))
+            } else {
+                Ok(None)
+            }
         } else {
-            let mut children = Children::new();
+            let mut children = vec![];
             for (left, right) in NibbleRangeIterator::new(kvs, depth) {
                 let child_index = kvs[left].0.get_nibble(depth);
                 let child_node_key = node_key.gen_child_node_key(version, child_index);
-                let (new_child_node_key, new_child_node) = self.batch_create_subtree(
-                    child_node_key,
+                if let Some(new_child_node) = self.batch_update_subtree(
+                    &child_node_key,
                     version,
                     &kvs[left..=right],
                     depth + 1,
                     hash_cache,
                     batch,
-                )?;
-                children.insert(
-                    child_index,
-                    Child::new(
-                        Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                        version,
-                        new_child_node.node_type(),
-                    ),
-                );
+                )? {
+                    children.push((child_index, new_child_node))
+                }
             }
-            let new_internal_node = InternalNode::new(children);
-
-            batch.put_node(node_key.clone(), new_internal_node.clone().into());
-            Ok((node_key, new_internal_node.into()))
+            if children.is_empty() {
+                Ok(None)
+            } else if children.len() == 1 && children[0].1.is_leaf() {
+                let (_, child) = children.pop().expect("Must exist");
+                Ok(Some(child))
+            } else {
+                let new_internal_node = InternalNode::new(
+                    children
+                        .into_iter()
+                        .map(|(child_index, new_child_node)| {
+                            let new_child_node_key =
+                                node_key.gen_child_node_key(version, child_index);
+                            let result = (
+                                child_index,
+                                Child::new(
+                                    Self::get_hash(
+                                        &new_child_node_key,
+                                        &new_child_node,
+                                        hash_cache,
+                                    ),
+                                    version,
+                                    new_child_node.node_type(),
+                                ),
+                            );
+                            batch.put_node(new_child_node_key, new_child_node);
+                            result
+                        })
+                        .collect(),
+                );
+                Ok(Some(new_internal_node.into()))
+            }
         }
     }
 
@@ -669,10 +782,15 @@ where
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set_test(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, K))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
-        self.batch_put_value_set(value_set, None, version.checked_sub(1), version)
+        self.batch_put_value_set(
+            value_set.into_iter().map(|(k, v)| (k, v)).collect(),
+            None,
+            version.checked_sub(1),
+            version,
+        )
     }
 
     /// Returns the value (if applicable) and the corresponding merkle proof.
@@ -681,6 +799,15 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
+        self.get_with_proof_ext(key, version)
+            .map(|(value, proof_ext)| (value, proof_ext.into()))
+    }
+
+    pub fn get_with_proof_ext(
+        &self,
+        key: HashValue,
+        version: Version,
+    ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
         let mut siblings = vec![];
@@ -702,15 +829,19 @@ where
                     let queried_child_index = nibble_iter
                         .next()
                         .ok_or_else(|| format_err!("ran out of nibbles"))?;
-                    let (child_node_key, mut siblings_in_internal) =
-                        internal_node.get_child_with_siblings(&next_node_key, queried_child_index);
+                    let (child_node_key, mut siblings_in_internal) = internal_node
+                        .get_child_with_siblings(
+                            &next_node_key,
+                            queried_child_index,
+                            Some(self.reader),
+                        )?;
                     siblings.append(&mut siblings_in_internal);
                     next_node_key = match child_node_key {
                         Some(node_key) => node_key,
                         None => {
                             return Ok((
                                 None,
-                                SparseMerkleProof::new(None, {
+                                SparseMerkleProofExt::new(None, {
                                     siblings.reverse();
                                     siblings
                                 }),
@@ -725,11 +856,14 @@ where
                         } else {
                             None
                         },
-                        SparseMerkleProof::new(Some(leaf_node.into()), {
+                        SparseMerkleProofExt::new(Some(leaf_node.into()), {
                             siblings.reverse();
                             siblings
                         }),
                     ));
+                }
+                Node::Null => {
+                    return Ok((None, SparseMerkleProofExt::new(None, vec![])));
                 }
             }
         }

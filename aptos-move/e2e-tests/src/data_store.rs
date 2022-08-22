@@ -5,6 +5,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -16,7 +17,10 @@ use move_deps::move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
+use vm_genesis::{
+    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
+    GenesisOptions,
+};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
@@ -24,6 +28,9 @@ pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
 
 pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Fresh));
+
+pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Fresh));
 
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///
@@ -44,7 +51,7 @@ impl FakeDataStore {
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.set(state_key.clone(), blob.clone());
                 }
                 WriteOp::Deletion => {
@@ -89,7 +96,6 @@ impl FakeDataStore {
 }
 
 // This is used by the `execute_block` API.
-// TODO: only the "sync" get is implemented
 impl StateView for FakeDataStore {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(self.state_data.get(state_key).cloned())
@@ -97,5 +103,13 @@ impl StateView for FakeDataStore {
 
     fn is_genesis(&self) -> bool {
         self.state_data.is_empty()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        let mut usage = StateStorageUsage::new_untracked();
+        for (k, v) in self.state_data.iter() {
+            usage.add_item(k.size() + v.len())
+        }
+        Ok(usage)
     }
 }

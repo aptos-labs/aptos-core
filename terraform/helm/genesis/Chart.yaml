@@ -2,7 +2,7 @@ apiVersion: v2
 name: aptos-genesis
 version: 0.1.0
 appVersion: 0.1.0
-description: Aptos blockchain genesis ceremony
+description: Aptos blockchain automated genesis ceremony for testnets
 home: https://aptoslabs.com/
 sources:
 - https://github.com/aptos-labs/aptos-core

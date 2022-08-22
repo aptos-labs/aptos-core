@@ -30,6 +30,7 @@ aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
+aptos-warp-webserver = { path = "../../crates/aptos-warp-webserver" }
 
 [dev-dependencies]
 serde_json = "1.0.81"

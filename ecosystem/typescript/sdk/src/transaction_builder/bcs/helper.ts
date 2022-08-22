@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Deserializer } from "./deserializer";
 import { Serializer } from "./serializer";
 import { AnyNumber, Bytes, Seq, Uint16, Uint32, Uint8 } from "./types";

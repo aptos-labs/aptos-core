@@ -3,6 +3,7 @@
 
 use crate::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use aptos_parallel_executor::executor::MVHashMapView;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 
@@ -33,7 +34,7 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
         match self.hashmap_view.read(state_key) {
             Some(v) => Ok(match v.as_ref() {
-                WriteOp::Value(w) => Some(w.clone()),
+                WriteOp::Modification(w) | WriteOp::Creation(w) => Some(w.clone()),
                 WriteOp::Deletion => None,
             }),
             None => self.base_view.get_state_value(state_key),
@@ -42,5 +43,9 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
 
     fn is_genesis(&self) -> bool {
         self.base_view.is_genesis()
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.base_view.get_usage()
     }
 }

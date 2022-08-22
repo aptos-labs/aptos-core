@@ -11,13 +11,16 @@ export const $GenesisTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
-        state_root_hash: {
+        state_change_hash: {
             type: 'HashValue',
             isRequired: true,
         },
         event_root_hash: {
             type: 'HashValue',
             isRequired: true,
+        },
+        state_checkpoint_hash: {
+            type: 'HashValue',
         },
         gas_used: {
             type: 'U64',

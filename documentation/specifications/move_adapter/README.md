@@ -109,10 +109,6 @@ pub struct RawTransaction {
     /// Price to be paid per gas unit.
     gas_unit_price: u64,
 
-    /// The currency code, e.g., "XDX", used to pay for gas. The `max_gas_amount`
-    /// and `gas_unit_price` values refer to units of this currency.
-    gas_currency_code: String,
-
     /// Expiration timestamp for this transaction, represented
     /// as seconds from the Unix Epoch. If the current blockchain timestamp
     /// is greater than or equal to this time, then the transaction is
@@ -132,8 +128,8 @@ pub enum TransactionPayload {
     Script(Script),
     /// A transaction that publishes code.
     Module(Module),
-    /// A transaction that executes an existing script function published on-chain.
-    ScriptFunction(ScriptFunction),
+    /// A transaction that executes an existing entry function published on-chain.
+    EntryFunction(EntryFunction),
 }
 
 /// Two different kinds of WriteSet transactions.
@@ -162,8 +158,8 @@ pub struct Script {
     args: Vec<TransactionArgument>,
 }
 
-/// Call a Move script function.
-pub struct ScriptFunction {
+/// Call a Move entry function.
+pub struct EntryFunction {
     module: ModuleId,
     function: Identifier,
     ty_args: Vec<TypeTag>,
@@ -177,7 +173,7 @@ pub struct Module {
 ```
 
 There are several different kinds of transactions that can be stored in the
-transaction payload: executing a script or script function,
+transaction payload: executing a script or entry function,
 publishing a module, and applying a
 WriteSet for system maintenance or updates. The payload is stored inside a
 `RawTransaction` structure that includes the various fields that are common to
@@ -248,28 +244,14 @@ successful, this value is returned as the `governance_role` field of the
 `VMValidatorResult` so that the client can choose to prioritize governance
 transactions.
 
-* Check that the `gas_currency_code` in the `RawTransaction` is a name composed
-of uppercase ASCII alphanumeric characters where the first character is a letter. If
-not, validation will fail with an `INVALID_GAS_SPECIFIER` status code. Note
-that this check does not ensure that the name corresponds to a currency
-recognized by the Aptos Framework.
-
-* Normalize the `gas_unit_price` from the `RawTransaction` to the Aptos (XDX)
-currency. If the validation is successful, the normalized gas price is
-returned as the `score` field of the `VMValidatorResult` for use in
-prioritizing the transaction. The normalization is calculated using the
-`to_xdx_exchange_rate` field of the on-chain `CurrencyInfo` for the specified
-gas currency. This can fail with a status code of
-`CURRENCY_INFO_DOES_NOT_EXIST` if the exchange rate cannot be retrieved.
-
-* If the transaction payload is a `ScriptFunction`, check if the on-chain
+* If the transaction payload is a `EntryFunction`, check if the on-chain
 Aptos Version number is 2 or later. For version 1, validation will fail with
 a `FEATURE_UNDER_GATING` status code.
 
 ### Gas and Size Checks
 
 Next, there are a series of checks related to the transaction size and gas
-parameters. These checks are performed for `Script`, `ScriptFunction`,
+parameters. These checks are performed for `Script`, `EntryFunction`,
 and `Module` payloads, but
 not for `WriteSet` transactions. The constraints for these checks are defined
 by the `GasConstants` structure in the `VMConfig` module.
@@ -310,18 +292,18 @@ Move VM with gas metering disabled. Each kind of transaction payload has a
 corresponding prologue function that is used for validation. These prologue
 functions are defined in the `AptosAccount` module of the Aptos Framework:
 
-* Single-agent `ScriptFunction` and `Script`: The prologue function is `script_prologue`.
+* Single-agent `EntryFunction` and `Script`: The prologue function is `script_prologue`.
 In addition to the common checks listed below, it also calls the `is_script_allowed`
 function in the `TransactionPublishingOption` module to determine if the script
 should be allowed. A script sent by an account with `has_aptos_root_role` is always
 allowed. Otherwise, a `Script` payload is allowed if the hash of the
 script bytecode is on the list of allowed scripts published at
 `0x1::TransactionPublishingOption::TransactionPublishingOption.script_allowlist`.
-`ScriptFunction` payloads, for which the adapter uses an empty vector in place
+`EntryFunction` payloads, for which the adapter uses an empty vector in place
 of the script hash, are always allowed. If the script is not allowed, validation
 fails with an `UNKNOWN_SCRIPT` status code.
 
-* Multi-agent `ScriptFunction` and `Script`: The prologue function is `multi_agent_script_prologue`.
+* Multi-agent `EntryFunction` and `Script`: The prologue function is `multi_agent_script_prologue`.
 In addition to the common checks listed below, it also performs the following checks:
     * Check that the number of secondary signer addresses provided is the same
       as the number of secondary signer public key hashes provided. If not,
@@ -363,11 +345,8 @@ account. If not, validation fails with an `INVALID_AUTH_KEY` status code.
 
 * The transaction sender must be able to pay the maximum transaction fee. The
 maximum fee is the product of the transaction's `max_gas_amount` and
-`gas_unit_price` fields. If the maximum fee is non-zero, the coin specified
-by the transaction's `gas_currency_code` must have been registered as a valid
-gas currency (via the `TransactionFee` module), or else validation will fail
-with a `BAD_TRANSACTION_FEE_CURRENCY` status. If the sender's account balance
-for the gas currency is less than the maximum fee, validation fails with an
+`gas_unit_price` fields. If the sender's account balance
+for the Aptos coin is less than the maximum fee, validation fails with an
 `INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE` status code. For `WriteSet`
 transactions, the maximum fee is treated as zero, regardless of the gas
 parameters specified in the transaction.
@@ -509,7 +488,6 @@ pub struct BlockMetadata {
     epoch: u64,
     round: u64,
     proposer: AccountAddress,
-    proposer_index: Option<u32>,
     previous_block_votes: Vec<bool>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
@@ -695,18 +673,18 @@ depending on its contents.
 
 Aptos version 1 had a fixed set of script transactions for general user
 transactions, with the script hash values stored in the on-chain allowlist,
-that are now implemented as script functions in Aptos version 2 and later.
+that are now implemented as entry functions in Aptos version 2 and later.
 If the on-chain Aptos Version number is 2 or later, the adapter first checks
 if the script is one of those special scripts, and if so, remaps it to the
-corresponding script function. Because this remapping is fixed to Aptos
-version 1 and is never expected to change, the remapping to script functions
+corresponding entry function. Because this remapping is fixed to Aptos
+version 1 and is never expected to change, the remapping to entry functions
 is hardcoded in the adapter.
 
 In the common case, the payload is either a script
 function, script, or a module:
 
-* `ScriptFunction`: The Move VM is used to [execute](#Script-Function-Execution)
-the script function with the types and arguments specified in the transaction.
+* `EntryFunction`: The Move VM is used to [execute](#Script-Function-Execution)
+the entry function with the types and arguments specified in the transaction.
 
 * `Script`: The Move VM is used to [execute](#Script-Execution) the script with
 the types and arguments specified in the transaction.
@@ -973,15 +951,15 @@ script](#Interpreter). Any error during execution is returned, and the
 transaction aborted. The VM returns whether execution succeeded or
 failed.
 
-## Script Function Execution
+## Entry Function Execution
 
-Script functions (in version 2 and later of the Move VM) are similar to scripts
+Entry functions (in version 2 and later of the Move VM) are similar to scripts
 except that the Move bytecode comes from a Move function with `script` visibility
-in an on-chain module. The script function is specified by the module and function
+in an on-chain module. The entry function is specified by the module and function
 name:
 
 ```rust
-pub fn execute_script_function(
+pub fn execute_entry_function(
     &mut self,
     module: &ModuleId,
     function_name: &IdentStr,
@@ -992,9 +970,9 @@ pub fn execute_script_function(
 ) -> VMResult<()>;
 ```
 
-Execution of script functions is similar to scripts. Instead of using the Move bytecodes
-from a script, the script function is loaded from the on-chain module, and the Move VM
-checks that it has `script` visibility. The rest of the script function execution is
+Execution of entry functions is similar to scripts. Instead of using the Move bytecodes
+from a script, the entry function is loaded from the on-chain module, and the Move VM
+checks that it has `script` visibility. The rest of the entry function execution is
 the same as for scripts. If the function does not exist, execution fails with a
 `FUNCTION_RESOLUTION_FAILURE` status code. If the function does not have `script` visibility,
 it will fail with the `EXECUTE_SCRIPT_FUNCTION_CALLED_ON_NON_SCRIPT_VISIBLE` status code.

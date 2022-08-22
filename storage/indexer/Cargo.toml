@@ -27,6 +27,7 @@ aptos-jellyfish-merkle = { path = "../jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
+aptos-rocksdb-options = { path = "../rocksdb-options" }
 aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }

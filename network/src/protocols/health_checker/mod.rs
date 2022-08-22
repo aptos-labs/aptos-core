@@ -311,6 +311,20 @@ impl HealthChecker {
             peer_id.short_str(),
             ping.0,
         );
+        // Record Ingress HC here and reset failures.
+        let _ = self.network_interface.app_data().write(peer_id, |entry| {
+            match entry {
+                Entry::Vacant(..) => {
+                    // Don't do anything if there isn't an entry
+                }
+                Entry::Occupied(inner) => {
+                    let data = inner.get_mut();
+                    data.failures = 0;
+                }
+            };
+            Ok(())
+        });
+
         let _ = res_tx.send(Ok(message.into()));
     }
 

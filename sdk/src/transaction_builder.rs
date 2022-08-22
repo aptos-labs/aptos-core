@@ -10,11 +10,10 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 
-pub use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{
-    authenticator::AuthenticationKeyPreimage, ChangeSet, ModuleBundle, Script, ScriptFunction,
-    WriteSetPayload,
+    authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
+pub use cached_packages::aptos_stdlib;
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -82,8 +81,8 @@ pub struct TransactionFactory {
 impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
-            // TODO: double check if this right
-            max_gas_amount: 4_000_000,
+            // TODO(Gas): double check if this right
+            max_gas_amount: 2_000,
             gas_unit_price: 0,
             transaction_expiration_time: 30,
             chain_id,
@@ -120,14 +119,8 @@ impl TransactionFactory {
         )))
     }
 
-    pub fn change_set(&self, change_set: ChangeSet) -> TransactionBuilder {
-        self.payload(TransactionPayload::WriteSet(WriteSetPayload::Direct(
-            change_set,
-        )))
-    }
-
-    pub fn script_function(&self, func: ScriptFunction) -> TransactionBuilder {
-        self.payload(TransactionPayload::ScriptFunction(func))
+    pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
+        self.payload(TransactionPayload::EntryFunction(func))
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {

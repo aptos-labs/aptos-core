@@ -726,7 +726,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::XUS::XUS"
+      example: "0x1::aptos_coin::AptosCoin"
     MoveTypeId:
       title: Move Type ID
       type: string
@@ -793,7 +793,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
     MoveStructTagId:
       title: Move Struct Tag ID
       type: string
@@ -816,7 +816,7 @@ components:
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::AptosAccount::Balance<0x1::aptos_coin::AptosCoin>"
     MoveModule:
       title: Move Module
       type: object
@@ -1003,7 +1003,6 @@ components:
         - sequence_number
         - max_gas_amount
         - gas_unit_price
-        - gas_currency_code
         - expiration_timestamp_secs
         - payload
       properties:
@@ -1015,9 +1014,6 @@ components:
           $ref: '#/components/schemas/Uint64'
         gas_unit_price:
           $ref: '#/components/schemas/Uint64'
-        gas_currency_code:
-          type: string
-          example: "XDX"
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:
@@ -1179,14 +1175,14 @@ components:
     TransactionPayload:
       title: Transaction Payload
       oneOf:
-        - $ref: '#/components/schemas/ScriptFunctionPayload'
+        - $ref: '#/components/schemas/EntryFunctionPayload'
         - $ref: '#/components/schemas/ScriptPayload'
         - $ref: '#/components/schemas/ModuleBundlePayload'
         - $ref: '#/components/schemas/WriteSetPayload'
       discriminator:
         propertyName: type
-    ScriptFunctionPayload:
-      title: Script Function Payload
+    EntryFunctionPayload:
+      title: Entry Function Payload
       type: object
       required:
         - type
@@ -1197,19 +1193,19 @@ components:
         type:
           type: string
         function:
-          $ref: '#/components/schemas/ScriptFunctionId'
+          $ref: '#/components/schemas/EntryFunctionId'
         type_arguments:
           type: array
-          description: Generic type arguments required by the script function.
+          description: Generic type arguments required by the entry function.
           items:
             $ref: '#/components/schemas/MoveTypeTagId'
         arguments:
           type: array
-          description: The script function arguments.
+          description: The entry function arguments.
           items:
             $ref: '#/components/schemas/MoveValue'
       example:
-        type: "script_function_payload"
+        type: "entry_function_payload"
         function: "0x1::PaymentScripts::peer_to_peer_with_metadata"
         type_arguments:
           - "0x1::XDX::XDX"
@@ -1218,11 +1214,11 @@ components:
           - "2021000000"
           - "0x"
           - "0x"
-    ScriptFunctionId:
-      title: Script Function ID
+    EntryFunctionId:
+      title: Entry Function ID
       type: string
       description: |
-        Script function id is string representation of a script function defined on-chain.
+        Entry function id is string representation of a entry function defined on-chain.
 
         Format: `{address}::{module name}::{function name}`
 

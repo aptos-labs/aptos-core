@@ -8,13 +8,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
-pub struct RestError {
-    pub code: u32,
-    pub message: String,
-    pub aptos_ledger_version: Option<U64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct Resource {
     #[serde(rename = "type", deserialize_with = "deserialize_resource_type")]
     pub resource_type: StructTag,

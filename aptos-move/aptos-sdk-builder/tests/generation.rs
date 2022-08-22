@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk_builder as buildgen;
-use aptos_types::transaction::ScriptABI;
-use cached_framework_packages::abis;
+use aptos_types::transaction::EntryABI;
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller as _;
 use serde_reflection::Registry;
@@ -16,13 +15,9 @@ fn get_aptos_registry() -> Registry {
     serde_yaml::from_str::<Registry>(content.as_str()).unwrap()
 }
 
-fn get_script_fun_abis() -> Vec<ScriptABI> {
-    abis()
-}
-
 const EXPECTED_SCRIPT_FUN_OUTPUT: &str = "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 8 84 101 115 116 67 111 105 110 8 116 114 97 110 115 102 101 114 0 2 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 \n";
 
-fn test_rust(abis: &[ScriptABI], demo_file: &str, expected_output: &str) {
+fn test_rust(abis: &[EntryABI], demo_file: &str, expected_output: &str) {
     let mut registry = get_aptos_registry();
     buildgen::rust::replace_keywords(&mut registry);
     let dir = tempdir().unwrap();
@@ -88,9 +83,9 @@ test = false
 // Ignored because transactions require minting/transfering Coin<AptosCoin>, which the
 // transaction builder does not support (it doesn't supported typed functions yet).
 #[ignore]
-fn test_that_rust_script_fun_code_compiles() {
+fn test_that_rust_entry_fun_code_compiles() {
     test_rust(
-        &get_script_fun_abis(),
+        &cached_packages::head_release_bundle().abis(),
         "examples/rust/script_fun_demo.rs",
         EXPECTED_SCRIPT_FUN_OUTPUT,
     );

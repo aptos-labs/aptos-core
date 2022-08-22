@@ -1,4 +1,0 @@
-{
-  "code": 400,
-  "message": "transaction is rejected: InvalidUpdate - Transaction already in mempool with different payload"
-}

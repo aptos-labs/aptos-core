@@ -1,0 +1,5 @@
+{
+  "message": "Transaction already in mempool with a different payload",
+  "error_code": "invalid_transaction_update",
+  "vm_error_code": null
+}

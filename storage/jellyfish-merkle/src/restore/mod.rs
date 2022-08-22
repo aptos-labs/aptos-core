@@ -258,6 +258,7 @@ where
                             leaf_count: Some(internal_node.leaf_count()),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf(leaf_node),
+                        Node::Null => unreachable!("Child cannot be Null"),
                     };
                     internal_info.set_child(i, child_info);
                 }
@@ -677,7 +678,7 @@ where
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
     fn finish_impl(mut self) -> Result<()> {
-        // Deal with the special case when the entire tree has a single leaf.
+        // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
             let mut leaf = None;
@@ -690,14 +691,24 @@ where
                 }
             }
 
-            if num_children == 1 {
-                if let Some(node) = leaf {
+            match num_children {
+                0 => {
                     let node_key = NodeKey::new_empty_path(self.version);
                     assert!(self.frozen_nodes.is_empty());
-                    self.frozen_nodes.insert(node_key, node.into());
+                    self.frozen_nodes.insert(node_key, Node::Null);
                     self.store.write_node_batch(&self.frozen_nodes)?;
                     return Ok(());
                 }
+                1 => {
+                    if let Some(node) = leaf {
+                        let node_key = NodeKey::new_empty_path(self.version);
+                        assert!(self.frozen_nodes.is_empty());
+                        self.frozen_nodes.insert(node_key, node.into());
+                        self.store.write_node_batch(&self.frozen_nodes)?;
+                        return Ok(());
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -710,19 +721,35 @@ where
 struct StateValueRestore<K, V> {
     version: Version,
     db: Arc<dyn StateValueWriter<K, V>>,
+    num_items: usize,
+    total_bytes: usize,
 }
 
 impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
     pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self { version, db }
+        Self {
+            version,
+            db,
+            num_items: 0,
+            total_bytes: 0,
+        }
     }
 
     pub fn add_chunk(&mut self, chunk: Vec<(K, V)>) -> Result<()> {
         let kv_batch = chunk
             .into_iter()
-            .map(|(k, v)| ((k, self.version), v))
+            .map(|(k, v)| {
+                self.num_items += 1;
+                self.total_bytes += k.key_size() + v.value_size();
+                ((k, self.version), Some(v))
+            })
             .collect();
         self.db.write_kv_batch(&kv_batch)
+    }
+
+    pub fn finish(self) -> Result<()> {
+        self.db
+            .write_usage(self.version, self.num_items, self.total_bytes)
     }
 }
 
@@ -778,10 +805,12 @@ impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRecei
     }
 
     fn finish(self) -> Result<()> {
+        self.kv_restore.finish()?;
         self.tree_restore.finish_impl()
     }
 
     fn finish_box(self: Box<Self>) -> Result<()> {
+        self.kv_restore.finish()?;
         self.tree_restore.finish_impl()
     }
 }

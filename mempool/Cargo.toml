@@ -50,6 +50,7 @@ vm-validator = { path = "../vm-validator" }
 enum_dispatch = "0.3.8"
 proptest = "1.0.0"
 
+aptos-compression = { path = "../crates/aptos-compression" }
 aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-id-generator = { path = "../crates/aptos-id-generator" }
 network = { path = "../network", features = ["fuzzing"] }

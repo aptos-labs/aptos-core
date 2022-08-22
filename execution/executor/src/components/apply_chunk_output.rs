@@ -140,7 +140,7 @@ impl ApplyChunkOutput {
 
     fn assemble_ledger_diff(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        state_updates_vec: Vec<HashMap<StateKey, StateValue>>,
+        state_updates_vec: Vec<HashMap<StateKey, Option<StateValue>>>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (Vec<(Transaction, TransactionData)>, Vec<HashValue>) {
         let mut to_commit = vec![];

@@ -29,7 +29,12 @@ use std::{io::Write, mem::size_of};
 
 type Key = (StateKey, Version);
 
-define_schema!(StateValueSchema, Key, StateValue, STATE_VALUE_CF_NAME);
+define_schema!(
+    StateValueSchema,
+    Key,
+    Option<StateValue>,
+    STATE_VALUE_CF_NAME
+);
 
 impl KeyCodec<StateValueSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
@@ -50,7 +55,7 @@ impl KeyCodec<StateValueSchema> for Key {
     }
 }
 
-impl ValueCodec<StateValueSchema> for StateValue {
+impl ValueCodec<StateValueSchema> for Option<StateValue> {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }

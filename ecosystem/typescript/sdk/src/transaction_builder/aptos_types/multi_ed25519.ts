@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable no-bitwise */
 import { Bytes, Deserializer, Seq, Serializer, Uint8 } from "../bcs";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";

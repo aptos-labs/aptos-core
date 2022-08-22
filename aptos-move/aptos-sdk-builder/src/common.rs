@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::CamelCase;
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use once_cell::sync::Lazy;
 use serde_reflection::{ContainerFormat, Format, Named, VariantFormat};
 use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 /// Useful error message.
 pub(crate) fn type_not_allowed(type_tag: &TypeTag) -> ! {
@@ -24,28 +26,20 @@ pub(crate) fn prepare_doc_string(doc: &str) -> String {
 
 fn quote_type_as_format(type_tag: &TypeTag) -> Format {
     use TypeTag::*;
+    let str_tag: Lazy<StructTag> =
+        Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
     match type_tag {
         Bool => Format::Bool,
         U8 => Format::U8,
         U64 => Format::U64,
         U128 => Format::U128,
         Address => Format::TypeName("AccountAddress".into()),
-        Vector(type_tag) => match type_tag.as_ref() {
-            U8 => Format::Bytes,
-            Vector(type_tag) => {
-                if type_tag.as_ref() == &U8 {
-                    Format::Seq(Box::new(Format::Bytes))
-                } else {
-                    type_not_allowed(type_tag)
-                }
-            }
-            Bool => Format::Seq(Box::new(Format::Bool)),
-            U64 => Format::Seq(Box::new(Format::U64)),
-            U128 => Format::Seq(Box::new(Format::U128)),
-            Address => Format::Seq(Box::new(Format::TypeName("AccountAddress".into()))),
+        Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
+        Struct(tag) => match tag {
+            tag if tag == Lazy::force(&str_tag) => Format::Seq(Box::new(Format::U8)),
             _ => type_not_allowed(type_tag),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Signer => type_not_allowed(type_tag),
     }
 }
 
@@ -63,7 +57,7 @@ fn quote_parameter_as_field(arg: &ArgumentABI) -> Named<Format> {
     }
 }
 
-pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
+pub(crate) fn make_abi_enum_container(abis: &[EntryABI]) -> ContainerFormat {
     let mut variants = BTreeMap::new();
     for (index, abi) in abis.iter().enumerate() {
         let mut fields = Vec::new();
@@ -75,7 +69,7 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
         }
 
         let name = match abi {
-            ScriptABI::ScriptFunction(sf) => {
+            EntryABI::EntryFunction(sf) => {
                 format!(
                     "{}{}",
                     sf.module_name().name().to_string().to_camel_case(),
@@ -98,6 +92,9 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
 
 pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
     use TypeTag::*;
+    let str_tag: Lazy<StructTag> =
+        Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
+
     match type_tag {
         Bool => "bool".into(),
         U8 => "u8".into(),
@@ -115,7 +112,11 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             }
             _ => format!("vec{}", mangle_type(type_tag)),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Struct(tag) => match tag {
+            tag if tag == Lazy::force(&str_tag) => "u8vector".into(),
+            _ => type_not_allowed(type_tag),
+        },
+        Signer => type_not_allowed(type_tag),
     }
 }
 
@@ -135,7 +136,7 @@ pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::Ext
         .collect()
 }
 
-pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag> {
+pub(crate) fn get_required_helper_types(abis: &[EntryABI]) -> BTreeSet<&TypeTag> {
     let mut required_types = BTreeSet::new();
     for abi in abis {
         for arg in abi.args() {
@@ -146,29 +147,29 @@ pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag
     required_types
 }
 
-pub(crate) fn filter_transaction_scripts(abis: &[ScriptABI]) -> Vec<ScriptABI> {
+pub(crate) fn filter_transaction_scripts(abis: &[EntryABI]) -> Vec<EntryABI> {
     abis.iter()
         .cloned()
         .filter(|abi| abi.is_transaction_script_abi())
         .collect()
 }
 
-pub(crate) fn transaction_script_abis(abis: &[ScriptABI]) -> Vec<TransactionScriptABI> {
+pub(crate) fn transaction_script_abis(abis: &[EntryABI]) -> Vec<TransactionScriptABI> {
     abis.iter()
         .cloned()
         .filter_map(|abi| match abi {
-            ScriptABI::TransactionScript(abi) => Some(abi),
-            ScriptABI::ScriptFunction(_) => None,
+            EntryABI::TransactionScript(abi) => Some(abi),
+            EntryABI::EntryFunction(_) => None,
         })
         .collect::<Vec<_>>()
 }
 
-pub(crate) fn script_function_abis(abis: &[ScriptABI]) -> Vec<ScriptFunctionABI> {
+pub(crate) fn entry_function_abis(abis: &[EntryABI]) -> Vec<EntryFunctionABI> {
     abis.iter()
         .cloned()
         .filter_map(|abi| match abi {
-            ScriptABI::ScriptFunction(abi) => Some(abi),
-            ScriptABI::TransactionScript(_) => None,
+            EntryABI::EntryFunction(abi) => Some(abi),
+            EntryABI::TransactionScript(_) => None,
         })
         .collect::<Vec<_>>()
 }

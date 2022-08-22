@@ -46,8 +46,7 @@ impl NetworkTest for NetworkLatencyTest {
         ctx.swarm().remove_chaos(delay)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

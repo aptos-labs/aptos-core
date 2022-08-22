@@ -1,0 +1,66 @@
+{
+  "version": "2",
+  "hash": "",
+  "state_change_hash": "",
+  "event_root_hash": "",
+  "state_checkpoint_hash": null,
+  "gas_used": "1",
+  "success": false,
+  "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",
+  "accumulator_root_hash": "",
+  "changes": [
+    {
+      "address": "0xa550c18",
+      "state_key_hash": "",
+      "data": {
+        "type": "0x1::account::Account",
+        "data": {
+          "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
+          "coin_register_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "0"
+              }
+            }
+          },
+          "rotation_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          },
+          "sequence_number": "1",
+          "signer_capability_offer": {
+            "for": {
+              "vec": []
+            }
+          }
+        }
+      },
+      "type": "write_resource"
+    }
+  ],
+  "sender": "0xa550c18",
+  "sequence_number": "0",
+  "max_gas_amount": "2000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "18446744073709551615",
+  "payload": {
+    "code": {
+      "bytecode": "0xa11ceb0b030000",
+      "abi": null
+    },
+    "type_arguments": [],
+    "arguments": [],
+    "type": "script_payload"
+  },
+  "signature": {
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "0xd4c6e21c199229d6524acef25a4a0c9b1062ccab62276d53009f27b3835452ed6db33afc6b19ef10396583166b21755464a611d6517e7c1ce8af25cfb7cfb004",
+    "type": "ed25519_signature"
+  },
+  "events": [],
+  "timestamp": "500000",
+  "type": "user_transaction"
+}

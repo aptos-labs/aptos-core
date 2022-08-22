@@ -12,15 +12,17 @@ pub(crate) mod event_accumulator;
 pub(crate) mod event_by_key;
 pub(crate) mod event_by_version;
 pub(crate) mod jellyfish_merkle_node;
-pub(crate) mod ledger_counters;
 pub(crate) mod ledger_info;
+pub(crate) mod pruner_metadata;
 pub(crate) mod stale_node_index;
+pub(crate) mod stale_state_value_index;
 pub(crate) mod state_value;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
+pub(crate) mod version_data;
 pub(crate) mod write_set;
 
 use anyhow::{ensure, Result};
@@ -33,9 +35,9 @@ pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";
 pub const EVENT_CF_NAME: ColumnFamilyName = "event";
 pub const INDEXER_METADATA_CF_NAME: ColumnFamilyName = "indexer_metadata";
 pub const JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "jellyfish_merkle_node";
-pub const LEDGER_COUNTERS_CF_NAME: ColumnFamilyName = "ledger_counters";
 pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";
 pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
+pub const STALE_STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "stale_state_value_index";
 pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
 pub const TABLE_INFO_CF_NAME: ColumnFamilyName = "table_info";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
@@ -43,7 +45,9 @@ pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accum
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
+pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";
 pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
+pub const DB_METADATA_CF_NAME: ColumnFamilyName = "db_metadata";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     ensure!(
@@ -80,9 +84,11 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
                 data,
             );
-            assert_no_panic_decoding::<super::ledger_counters::LedgerCountersSchema>(data);
             assert_no_panic_decoding::<super::ledger_info::LedgerInfoSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
+            assert_no_panic_decoding::<super::stale_state_value_index::StaleStateValueIndexSchema>(
+                data,
+            );
             assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
@@ -93,7 +99,9 @@ pub mod fuzzing {
             );
             assert_no_panic_decoding::<super::transaction_by_hash::TransactionByHashSchema>(data);
             assert_no_panic_decoding::<super::transaction_info::TransactionInfoSchema>(data);
+            assert_no_panic_decoding::<super::version_data::VersionDataSchema>(data);
             assert_no_panic_decoding::<super::write_set::WriteSetSchema>(data);
+            assert_no_panic_decoding::<super::pruner_metadata::PrunerMetadataSchema>(data);
         }
     }
 }

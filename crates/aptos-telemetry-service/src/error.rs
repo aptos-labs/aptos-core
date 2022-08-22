@@ -1,49 +1,66 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::Serialize;
-use std::convert::Infallible;
-use thiserror::Error;
-use warp::{http::StatusCode, Rejection, Reply};
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Display};
+use warp::{http::StatusCode, reject::Reject};
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("wrong public key")]
-    WrongPublicKey,
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ServiceError {
+    pub code: u16,
+    pub message: String,
 }
 
-#[derive(Serialize, Debug)]
-struct ErrorResponse {
-    message: String,
-    status: String,
-}
-
-impl warp::reject::Reject for Error {}
-
-pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply, Infallible> {
-    let (code, message) = if err.is_not_found() {
-        (StatusCode::NOT_FOUND, "Not Found".to_string())
-    } else if let Some(e) = err.find::<Error>() {
-        match e {
-            Error::WrongPublicKey => (StatusCode::BAD_REQUEST, e.to_string()),
+impl ServiceError {
+    pub fn new(code: StatusCode, message: String) -> Self {
+        Self {
+            code: code.as_u16(),
+            message,
         }
-    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
-        (
-            StatusCode::METHOD_NOT_ALLOWED,
-            "Method Not Allowed".to_string(),
-        )
-    } else {
-        eprintln!("unhandled error: {:?}", err);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Internal Server Error".to_string(),
-        )
-    };
+    }
 
-    let json = warp::reply::json(&ErrorResponse {
-        status: code.to_string(),
-        message,
-    });
+    pub fn from_anyhow_error(code: StatusCode, err: anyhow::Error) -> Self {
+        Self::new(code, err.to_string())
+    }
 
-    Ok(warp::reply::with_status(json, code))
+    pub fn bad_request<S: Display>(msg: S) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, msg.to_string())
+    }
+
+    pub fn invalid_request_body<S: Display>(msg: S) -> Self {
+        Self::bad_request(format!("invalid request body: {}", msg))
+    }
+
+    pub fn unauthorized<S: Display>(msg: S) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, msg.to_string())
+    }
+
+    pub fn internal(err: anyhow::Error) -> Self {
+        Self::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, err)
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+impl fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.status_code(), &self.message)?;
+        Ok(())
+    }
+}
+
+impl Reject for ServiceError {}
+
+impl From<anyhow::Error> for ServiceError {
+    fn from(e: anyhow::Error) -> Self {
+        Self::internal(e)
+    }
+}
+
+impl From<serde_json::error::Error> for ServiceError {
+    fn from(err: serde_json::error::Error) -> Self {
+        Self::internal(err.into())
+    }
 }

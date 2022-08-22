@@ -15,6 +15,7 @@ criterion-cpu-time = "0.1.0"
 num_cpus = "1.13.1"
 proptest = "1.0.0"
 
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-vm" }

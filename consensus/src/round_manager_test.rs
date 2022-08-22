@@ -25,6 +25,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
+use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -35,6 +36,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
+use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
@@ -44,7 +46,7 @@ use consensus_types::{
     common::{Author, Payload, Round},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::TwoChainTimeout,
     vote_msg::VoteMsg,
 };
 use futures::{
@@ -327,7 +329,7 @@ fn vote_on_successful_proposal() {
         node.next_proposal().await;
 
         let proposal = Block::new_proposal(
-            Payload::new_empty(),
+            Payload::empty(),
             1,
             1,
             genesis_qc.clone(),
@@ -359,7 +361,7 @@ fn no_vote_on_old_proposal() {
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -367,14 +369,8 @@ fn no_vote_on_old_proposal() {
         Vec::new(),
     );
     let new_block_id = new_block.id();
-    let old_block = Block::new_proposal(
-        Payload::new_empty(),
-        1,
-        2,
-        genesis_qc,
-        &node.signer,
-        Vec::new(),
-    );
+    let old_block =
+        Block::new_proposal(Payload::empty(), 1, 2, genesis_qc, &node.signer, Vec::new());
     timed_block_on(&mut runtime, async {
         // clear the message queue
         node.next_proposal().await;
@@ -407,7 +403,7 @@ fn no_vote_on_mismatch_round() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -415,7 +411,7 @@ fn no_vote_on_mismatch_round() {
         Vec::new(),
     );
     let block_skip_round = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         2,
         2,
         genesis_qc.clone(),
@@ -509,7 +505,7 @@ fn no_vote_on_invalid_proposer() {
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -517,7 +513,7 @@ fn no_vote_on_invalid_proposer() {
         Vec::new(),
     );
     let block_incorrect_proposer = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -558,7 +554,7 @@ fn new_round_on_timeout_certificate() {
         .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -566,7 +562,7 @@ fn new_round_on_timeout_certificate() {
         Vec::new(),
     );
     let block_skip_round = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         2,
         2,
         genesis_qc.clone(),
@@ -576,9 +572,12 @@ fn new_round_on_timeout_certificate() {
     let timeout = TwoChainTimeout::new(1, 1, genesis_qc.clone());
     let timeout_signature = timeout.sign(&node.signer);
 
-    let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
-    tc.add(node.signer.author(), timeout, timeout_signature);
+    let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
+    tc_partial.add(node.signer.author(), timeout, timeout_signature);
 
+    let tc = tc_partial
+        .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+        .unwrap();
     timed_block_on(&mut runtime, async {
         let skip_round_proposal = ProposalMsg::new(
             block_skip_round,
@@ -615,14 +614,17 @@ fn reject_invalid_failed_authors() {
     let create_timeout = |round: Round| {
         let timeout = TwoChainTimeout::new(1, round, genesis_qc.clone());
         let timeout_signature = timeout.sign(&node.signer);
-        let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
-        tc.add(node.signer.author(), timeout, timeout_signature);
-        tc
+        let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
+        tc_partial.add(node.signer.author(), timeout, timeout_signature);
+
+        tc_partial
+            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+            .unwrap()
     };
 
     let create_proposal = |round: Round, failed_authors: Vec<(Round, Author)>| {
         let block = Block::new_proposal(
-            Payload::new_empty(),
+            Payload::empty(),
             round,
             2,
             genesis_qc.clone(),
@@ -664,7 +666,9 @@ fn reject_invalid_failed_authors() {
             .process_proposal_msg(missing_failed_authors_proposal)
             .await
             .is_err());
+    });
 
+    timed_block_on(&mut runtime, async {
         assert!(node
             .round_manager
             .process_proposal_msg(wrong_failed_authors_proposal)
@@ -694,7 +698,7 @@ fn response_on_block_retrieval() {
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         1,
         1,
         genesis_qc.clone(),
@@ -805,18 +809,23 @@ fn recover_on_restart() {
             genesis_qc.clone(),
             i,
             i,
-            Payload::new_empty(),
+            Payload::empty(),
             (std::cmp::max(1, i.saturating_sub(10))..i)
                 .map(|i| (i, inserter.signer().author()))
                 .collect(),
         );
         let timeout = TwoChainTimeout::new(1, i - 1, genesis_qc.clone());
-        let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
-        tc.add(
+        let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
+        tc_partial.add(
             inserter.signer().author(),
             timeout.clone(),
             timeout.sign(inserter.signer()),
         );
+
+        let tc = tc_partial
+            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+            .unwrap();
+
         data.push((proposal, tc));
     }
 
@@ -915,6 +924,7 @@ fn vote_resent_on_timeout() {
     });
 }
 
+#[test]
 fn sync_on_partial_newer_sync_info() {
     let mut runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

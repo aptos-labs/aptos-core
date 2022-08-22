@@ -16,7 +16,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::{
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
@@ -152,7 +152,7 @@ impl Display for LedgerInfoWithSignatures {
 
 // proxy to create LedgerInfoWithbls12381::
 impl LedgerInfoWithSignatures {
-    pub fn new(ledger_info: LedgerInfo, signatures: MultiSignature) -> Self {
+    pub fn new(ledger_info: LedgerInfo, signatures: AggregateSignature) -> Self {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
     }
 
@@ -182,9 +182,8 @@ pub fn generate_ledger_info_with_sig(
     LedgerInfoWithSignatures::new(
         ledger_info,
         validator_verifier
-            .aggregate_multi_signature(&partial_sig)
-            .unwrap()
-            .0,
+            .aggregate_signatures(&partial_sig)
+            .unwrap(),
     )
 }
 
@@ -218,7 +217,7 @@ pub struct LedgerInfoWithV0 {
     ledger_info: LedgerInfo,
     /// Aggregated BLS signature of all the validators that signed the message. The bitmask in the
     /// aggregated signature can be used to find out the individual validators signing the message
-    signatures: MultiSignature,
+    signatures: AggregateSignature,
 }
 
 impl Display for LedgerInfoWithV0 {
@@ -228,7 +227,7 @@ impl Display for LedgerInfoWithV0 {
 }
 
 impl LedgerInfoWithV0 {
-    pub fn new(ledger_info: LedgerInfo, signatures: MultiSignature) -> Self {
+    pub fn new(ledger_info: LedgerInfo, signatures: AggregateSignature) -> Self {
         LedgerInfoWithV0 {
             ledger_info,
             signatures,
@@ -245,7 +244,7 @@ impl LedgerInfoWithV0 {
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         Self::new(
             LedgerInfo::genesis(genesis_state_root_hash, validator_set),
-            MultiSignature::empty(),
+            AggregateSignature::empty(),
         )
     }
 
@@ -257,7 +256,7 @@ impl LedgerInfoWithV0 {
         self.ledger_info.commit_info()
     }
 
-    pub fn get_voters(&self, validator_addresses: &Vec<AccountAddress>) -> Vec<AccountAddress> {
+    pub fn get_voters(&self, validator_addresses: &[AccountAddress]) -> Vec<AccountAddress> {
         self.signatures.get_voter_addresses(validator_addresses)
     }
 
@@ -265,8 +264,8 @@ impl LedgerInfoWithV0 {
         self.signatures.get_num_voters()
     }
 
-    pub fn get_voters_bitmap(&self) -> &Vec<bool> {
-        self.signatures.get_voters_bitmap()
+    pub fn get_voters_bitvec(&self) -> &BitVec {
+        self.signatures.get_voters_bitvec()
     }
 
     pub fn verify_signatures(
@@ -285,7 +284,7 @@ impl LedgerInfoWithV0 {
                 .iter(),
         )
     }
-    pub fn signatures(&self) -> &MultiSignature {
+    pub fn signatures(&self) -> &AggregateSignature {
         &self.signatures
     }
 }
@@ -324,7 +323,7 @@ impl LedgerInfoWithPartialSignatures {
         self.partial_sigs.add_signature(validator, signature);
     }
 
-    pub fn signatures(&self) -> &HashMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
         self.partial_sigs.signatures()
     }
 
@@ -332,8 +331,7 @@ impl LedgerInfoWithPartialSignatures {
         &self,
         verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig =
-            verifier.aggregate_and_verify_multi_signature(&self.partial_sigs, &self.ledger_info)?;
+        let aggregated_sig = verifier.aggregate_signatures(&self.partial_sigs)?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -353,13 +351,14 @@ impl LedgerInfoWithPartialSignatures {
 // Arbitrary implementation of LedgerInfoWithV0 (for fuzzing)
 //
 
-use crate::multi_signature::{MultiSignature, PartialSignatures};
+use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::generate_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::random_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use ::proptest::prelude::*;
+use aptos_bitvec::BitVec;
 use itertools::Itertools;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -370,12 +369,12 @@ impl Arbitrary for LedgerInfoWithV0 {
         (any::<LedgerInfo>(), (1usize..100))
             .prop_map(move |(ledger_info, num_validators)| {
                 let (signers, verifier) = random_validator_verifier(num_validators, None, true);
-                let mut partial_sig = PartialSignatures::new(HashMap::new());
+                let mut partial_sig = PartialSignatures::empty();
                 for signer in signers {
                     let signature = dummy_signature.clone();
                     partial_sig.add_signature(signer.author(), signature);
                 }
-                let aggregated_sig = verifier.aggregate_multi_signature(&partial_sig).unwrap().0;
+                let aggregated_sig = verifier.aggregate_signatures(&partial_sig).unwrap();
                 Self {
                     ledger_info,
                     signatures: aggregated_sig,
@@ -390,9 +389,7 @@ impl Arbitrary for LedgerInfoWithV0 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validator_signer::ValidatorSigner;
-    use crate::validator_verifier::ValidatorConsensusInfo;
-    use std::collections::BTreeMap;
+    use crate::{validator_signer::ValidatorSigner, validator_verifier::ValidatorConsensusInfo};
 
     #[test]
     fn test_signatures_hash() {
@@ -403,37 +400,38 @@ mod tests {
         let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
-        let mut partial_sig = PartialSignatures::new(HashMap::new());
-        let mut author_to_public_key_map = BTreeMap::new();
+        let mut partial_sig = PartialSignatures::empty();
+        let mut validator_infos = vec![];
 
         for validator in validator_signers.iter() {
-            author_to_public_key_map.insert(
+            validator_infos.push(ValidatorConsensusInfo::new(
                 validator.author(),
-                ValidatorConsensusInfo::new(validator.public_key(), 1),
-            );
+                validator.public_key(),
+                1,
+            ));
             partial_sig.add_signature(validator.author(), validator.sign(&ledger_info));
         }
 
         // Let's assume our verifier needs to satisfy at least 5 quorum voting power
         let validator_verifier =
-            ValidatorVerifier::new_with_quorum_voting_power(author_to_public_key_map, 5)
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_and_verify_multi_signature(&partial_sig, &ledger_info)
+            .aggregate_signatures(&partial_sig)
             .unwrap();
 
         let ledger_info_with_signatures =
             LedgerInfoWithV0::new(ledger_info.clone(), aggregated_signature);
 
         // Add the signatures in reverse order and ensure the serialization matches
-        partial_sig = PartialSignatures::new(HashMap::new());
+        partial_sig = PartialSignatures::empty();
         for validator in validator_signers.iter().rev() {
             partial_sig.add_signature(validator.author(), validator.sign(&ledger_info));
         }
 
         aggregated_signature = validator_verifier
-            .aggregate_and_verify_multi_signature(&partial_sig, &ledger_info)
+            .aggregate_signatures(&partial_sig)
             .unwrap();
 
         let ledger_info_with_signatures_reversed =

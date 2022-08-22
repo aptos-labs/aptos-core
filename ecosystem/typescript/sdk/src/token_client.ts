@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";

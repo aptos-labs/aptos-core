@@ -7,9 +7,7 @@
 
 use super::AptosDB;
 use crate::{
-    change_set::ChangeSet,
     errors::AptosDbError,
-    ledger_counters::{LedgerCounter, LedgerCounterBumps},
     schema::{
         event::EventSchema, event_accumulator::EventAccumulatorSchema,
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
@@ -235,6 +233,34 @@ impl EventStore {
         }
     }
 
+    pub fn lookup_event_at_or_after_version(
+        &self,
+        event_key: &EventKey,
+        version: Version,
+    ) -> Result<
+        Option<(
+            Version, // version
+            u64,     // index
+            u64,     // sequence number
+        )>,
+    > {
+        let mut iter = self
+            .db
+            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        iter.seek(&(*event_key, version, 0))?;
+
+        match iter.next().transpose()? {
+            None => Ok(None),
+            Some(((key, ver, seq_num), idx)) => {
+                if key == *event_key {
+                    Ok(Some((ver, idx, seq_num)))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
     pub fn lookup_event_after_version(
         &self,
         event_key: &EventKey,
@@ -279,22 +305,19 @@ impl EventStore {
         &self,
         version: u64,
         events: &[ContractEvent],
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<HashValue> {
-        cs.counter_bumps(version)
-            .bump(LedgerCounter::EventsCreated, events.len());
-
         // Event table and indices updates
         events
             .iter()
             .enumerate()
             .try_for_each::<_, Result<_>>(|(idx, event)| {
-                cs.batch.put::<EventSchema>(&(version, idx as u64), event)?;
-                cs.batch.put::<EventByKeySchema>(
+                batch.put::<EventSchema>(&(version, idx as u64), event)?;
+                batch.put::<EventByKeySchema>(
                     &(*event.key(), event.sequence_number()),
                     &(version, idx as u64),
                 )?;
-                cs.batch.put::<EventByVersionSchema>(
+                batch.put::<EventByVersionSchema>(
                     &(*event.key(), version, event.sequence_number()),
                     &(idx as u64),
                 )?;
@@ -305,8 +328,7 @@ impl EventStore {
         let event_hashes: Vec<HashValue> = events.iter().map(ContractEvent::hash).collect();
         let (root_hash, writes) = EmptyAccumulator::append(&EmptyReader, 0, &event_hashes)?;
         writes.into_iter().try_for_each(|(pos, hash)| {
-            cs.batch
-                .put::<EventAccumulatorSchema>(&(version, pos), &hash)
+            batch.put::<EventAccumulatorSchema>(&(version, pos), &hash)
         })?;
 
         Ok(root_hash)
@@ -316,7 +338,7 @@ impl EventStore {
         &self,
         first_version: u64,
         event_vecs: &[Vec<ContractEvent>],
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<Vec<HashValue>> {
         event_vecs
             .iter()
@@ -325,7 +347,7 @@ impl EventStore {
                 let version = first_version
                     .checked_add(idx as Version)
                     .ok_or_else(|| format_err!("version overflow"))?;
-                self.put_events(version, events, cs)
+                self.put_events(version, events, batch)
             })
             .collect::<Result<Vec<_>>>()
     }

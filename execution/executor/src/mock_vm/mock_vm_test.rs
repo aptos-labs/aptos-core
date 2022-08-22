@@ -3,6 +3,7 @@
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress, state_store::state_key::StateKey, write_set::WriteOp,
@@ -22,6 +23,10 @@ impl StateView for MockStateView {
 
     fn is_genesis(&self) -> bool {
         false
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        Ok(StateStorageUsage::new_untracked())
     }
 }
 
@@ -43,11 +48,11 @@ fn test_mock_vm_different_senders() {
             vec![
                 (
                     StateKey::AccessPath(balance_ap(sender)),
-                    WriteOp::Value(amount.to_le_bytes().to_vec())
+                    WriteOp::Modification(amount.to_le_bytes().to_vec())
                 ),
                 (
                     StateKey::AccessPath(seqnum_ap(sender)),
-                    WriteOp::Value(1u64.to_le_bytes().to_vec())
+                    WriteOp::Modification(1u64.to_le_bytes().to_vec())
                 ),
             ]
         );
@@ -72,11 +77,11 @@ fn test_mock_vm_same_sender() {
             vec![
                 (
                     StateKey::AccessPath(balance_ap(sender)),
-                    WriteOp::Value((amount * (i as u64 + 1)).to_le_bytes().to_vec())
+                    WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
                 ),
                 (
                     StateKey::AccessPath(seqnum_ap(sender)),
-                    WriteOp::Value((i as u64 + 1).to_le_bytes().to_vec())
+                    WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
                 ),
             ]
         );
@@ -108,15 +113,15 @@ fn test_mock_vm_payment() {
         vec![
             (
                 StateKey::AccessPath(balance_ap(gen_address(0))),
-                WriteOp::Value(50u64.to_le_bytes().to_vec())
+                WriteOp::Modification(50u64.to_le_bytes().to_vec())
             ),
             (
                 StateKey::AccessPath(seqnum_ap(gen_address(0))),
-                WriteOp::Value(2u64.to_le_bytes().to_vec())
+                WriteOp::Modification(2u64.to_le_bytes().to_vec())
             ),
             (
                 StateKey::AccessPath(balance_ap(gen_address(1))),
-                WriteOp::Value(150u64.to_le_bytes().to_vec())
+                WriteOp::Modification(150u64.to_le_bytes().to_vec())
             ),
         ]
     );

@@ -1,0 +1,5 @@
+{
+  "message": "Deserialization error, field(epoch) type is not a EventHandle struct",
+  "error_code": "bcs_serialization_error",
+  "vm_error_code": null
+}

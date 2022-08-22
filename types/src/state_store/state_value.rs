@@ -1,30 +1,46 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::transaction::Version;
 use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, CryptoHasher, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct StateValue {
-    pub maybe_bytes: Option<Vec<u8>>,
-    #[serde(skip)]
+    inner: StateValueInner,
     hash: HashValue,
+}
+
+#[derive(
+    BCSCryptoHash,
+    Clone,
+    CryptoHasher,
+    Debug,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Serialize,
+    Ord,
+    PartialOrd,
+    Hash,
+)]
+#[serde(rename = "StateValue")]
+pub enum StateValueInner {
+    V0(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>()
-            .prop_map(|maybe_bytes| StateValue::new(Some(maybe_bytes)))
-            .boxed()
+        any::<Vec<u8>>().prop_map(StateValue::new).boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -35,37 +51,50 @@ impl<'de> Deserialize<'de> for StateValue {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(rename = "StateValue")]
-        struct MaybeBytes {
-            maybe_bytes: Option<Vec<u8>>,
-        }
-        let bytes = MaybeBytes::deserialize(deserializer)?;
+        let inner = StateValueInner::deserialize(deserializer)?;
+        let hash = CryptoHash::hash(&inner);
+        Ok(Self { inner, hash })
+    }
+}
 
-        Ok(Self::new(bytes.maybe_bytes))
+impl Serialize for StateValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.inner.serialize(serializer)
     }
 }
 
 impl StateValue {
-    fn new(maybe_bytes: Option<Vec<u8>>) -> Self {
-        let mut hasher = StateValueHasher::default();
-        let hash = if let Some(bytes) = &maybe_bytes {
-            hasher.update(bytes);
-            hasher.finish()
-        } else {
-            HashValue::zero()
-        };
-        Self { maybe_bytes, hash }
+    pub fn new(bytes: Vec<u8>) -> Self {
+        let inner = StateValueInner::V0(bytes);
+        let hash = CryptoHash::hash(&inner);
+        Self { inner, hash }
     }
 
-    pub fn empty() -> Self {
-        StateValue::new(None)
+    pub fn size(&self) -> usize {
+        match &self.inner {
+            StateValueInner::V0(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        match &self.inner {
+            StateValueInner::V0(bytes) => bytes,
+        }
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        match self.inner {
+            StateValueInner::V0(bytes) => bytes,
+        }
     }
 }
 
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new(Some(bytes))
+        StateValue::new(bytes)
     }
 }
 
@@ -106,12 +135,14 @@ impl StateValueChunkWithProof {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::state_store::state_value::StateValue;
-
-    #[test]
-    fn test_empty_state_value() {
-        StateValue::new(None);
-    }
+/// Indicates a state value becomes stale since `stale_since_version`.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StaleStateValueIndex {
+    /// The version since when the node is overwritten and becomes stale.
+    pub stale_since_version: Version,
+    /// The version identifying the value associated with this record.
+    pub version: Version,
+    /// The `StateKey` identifying the value associated with this record.
+    pub state_key: StateKey,
 }

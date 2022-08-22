@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U64,
+    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
+    MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
 use anyhow::{bail, Context as AnyhowContext};
@@ -34,7 +34,7 @@ use std::{
 // TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
 // TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TransactionData {
     OnChain(TransactionOnChainData),
     Pending(Box<SignedTransaction>),
@@ -265,7 +265,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             epoch: txn.epoch().into(),
             round: txn.round().into(),
             events,
-            previous_block_votes: txn.previous_block_votes().clone(),
+            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
             proposer: txn.proposer().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
@@ -291,8 +291,9 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
 pub struct TransactionInfo {
     pub version: U64,
     pub hash: HashValue,
-    pub state_root_hash: HashValue,
+    pub state_change_hash: HashValue,
     pub event_root_hash: HashValue,
+    pub state_checkpoint_hash: Option<HashValue>,
     pub gas_used: U64,
     pub success: bool,
     pub vm_status: String,
@@ -406,7 +407,7 @@ pub struct BlockMetadataTransaction {
     pub epoch: U64,
     pub round: U64,
     pub events: Vec<Event>,
-    pub previous_block_votes: Vec<bool>,
+    pub previous_block_votes_bitvec: Vec<u8>,
     pub proposer: Address,
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
@@ -473,10 +474,9 @@ pub enum GenesisPayload {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionPayload {
-    ScriptFunctionPayload(ScriptFunctionPayload),
+    EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
     ModuleBundlePayload(ModuleBundlePayload),
-    WriteSetPayload(WriteSetPayload),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
@@ -485,8 +485,8 @@ pub struct ModuleBundlePayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
-pub struct ScriptFunctionPayload {
-    pub function: ScriptFunctionId,
+pub struct EntryFunctionPayload {
+    pub function: EntryFunctionId,
     pub type_arguments: Vec<MoveType>,
     // TODO: Use the real data here, not a JSON representation.
     pub arguments: Vec<serde_json::Value>,

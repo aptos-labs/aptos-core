@@ -11,9 +11,9 @@ from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
 from .transactions import (
+    EntryFunction,
     MultiAgentRawTransaction,
     RawTransaction,
-    ScriptFunction,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload,
@@ -132,7 +132,7 @@ class RestClient:
         to_sign = bytes.fromhex(res.json()[2:])
         signature = sender.sign(to_sign)
         txn_request["signature"] = {
-            "type": "ed_25519_signature",
+            "type": "ed25519_signature",
             "public_key": f"{sender.public_key()}",
             "signature": f"{signature}",
         }
@@ -236,7 +236,7 @@ class RestClient:
         Returns the sequence number of the transaction used to transfer."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
@@ -246,6 +246,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
+    #:!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -254,7 +255,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -266,13 +267,17 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+    # <:!:bcs_transfer
+
     #
     # Token transaction wrappers
     #
 
+#:!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:
+#<:!:create_collection
         """Creates a new collection within the specified account"""
 
         transaction_arguments = [
@@ -285,7 +290,7 @@ class RestClient:
             ),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_collection_script",
             [],
@@ -297,6 +302,7 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+#:!:>create_token
     def create_token(
         self,
         account: Account,
@@ -307,6 +313,7 @@ class RestClient:
         uri: str,
         royalty_points_per_million: int,
     ) -> str:
+#<:!:create_token
         transaction_arguments = [
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
@@ -326,7 +333,7 @@ class RestClient:
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_token_script",
             [],
@@ -356,7 +363,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "offer_script",
             [],
@@ -384,7 +391,7 @@ class RestClient:
             TransactionArgument(property_version, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "claim_script",
             [],
@@ -409,11 +416,11 @@ class RestClient:
             TransactionArgument(creators_address, Serializer.struct),
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(amount, Serializer.u64),
             TransactionArgument(property_version, Serializer.u64),
+            TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "direct_transfer_script",
             [],
@@ -459,6 +466,7 @@ class RestClient:
             token_id,
         )["amount"]
 
+        #:!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -482,6 +490,7 @@ class RestClient:
             "0x3::token::TokenData",
             token_data_id,
         )
+        #<:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][

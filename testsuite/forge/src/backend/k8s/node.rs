@@ -3,7 +3,8 @@
 
 use crate::{
     get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
-    Validator, Version, KUBECTL_BIN,
+    Validator, Version, KUBECTL_BIN, LOCALHOST, NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT,
+    REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
@@ -19,15 +20,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-
-const NODE_METRIC_PORT: u32 = 9101;
-
-// this is the port on the validator service itself, as opposed to 80 on the validator haproxy service
-pub const REST_API_SERVICE_PORT: u32 = 8080;
-pub const REST_API_HAPROXY_SERVICE_PORT: u32 = 80;
-
-// when we interact with the node over port-forward
-const LOCALHOST: &str = "127.0.0.1";
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -129,39 +121,12 @@ impl K8sNode {
 
 #[async_trait::async_trait]
 impl Node for K8sNode {
-    fn peer_id(&self) -> PeerId {
-        self.peer_id
-    }
-
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn version(&self) -> Version {
-        self.version.clone()
-    }
-
-    fn rest_api_endpoint(&self) -> Url {
-        let host = if self.port_forward_enabled {
-            LOCALHOST
-        } else {
-            &self.service_name
-        };
-        Url::from_str(&format!("http://{}:{}", host, self.rest_api_port())).expect("Invalid URL.")
-    }
-
-    // TODO: verify this still works
-    fn inspection_service_endpoint(&self) -> Url {
-        Url::parse(&format!(
-            "http://{}:{}",
-            &self.service_name(),
-            self.rest_api_port()
-        ))
-        .unwrap()
-    }
-
-    fn config(&self) -> &NodeConfig {
-        todo!()
+    fn peer_id(&self) -> PeerId {
+        self.peer_id
     }
 
     async fn start(&mut self) -> Result<()> {
@@ -181,6 +146,20 @@ impl Node for K8sNode {
         scale_stateful_set_replicas(self.stateful_set_name(), self.namespace(), 0).await
     }
 
+    fn version(&self) -> Version {
+        self.version.clone()
+    }
+
+    fn rest_api_endpoint(&self) -> Url {
+        let host = if self.port_forward_enabled {
+            LOCALHOST
+        } else {
+            &self.service_name
+        };
+        Url::from_str(&format!("http://{}:{}/v1", host, self.rest_api_port()))
+            .expect("Invalid URL.")
+    }
+
     fn clear_storage(&mut self) -> Result<()> {
         let sts_name = self.stateful_set_name.clone();
         let pvc_name = if sts_name.contains("fullnode") {
@@ -190,7 +169,7 @@ impl Node for K8sNode {
         };
         let delete_pvc_args = ["delete", "pvc", &pvc_name];
         info!("{:?}", delete_pvc_args);
-        let cleanup_output = Command::new("kubectl")
+        let cleanup_output = Command::new(KUBECTL_BIN)
             .stdout(Stdio::inherit())
             .args(&delete_pvc_args)
             .output()
@@ -204,14 +183,8 @@ impl Node for K8sNode {
         Ok(())
     }
 
-    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        self.rest_client()
-            .get_ledger_information()
-            .await
-            .map(|_| ())
-            .map_err(|e| {
-                HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
-            })
+    fn config(&self) -> &NodeConfig {
+        todo!()
     }
 
     // TODO: replace this with prometheus query?
@@ -243,6 +216,26 @@ impl Node for K8sNode {
         self.port_forward(port, NODE_METRIC_PORT)?;
 
         Ok(port as u64)
+    }
+
+    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
+        self.rest_client()
+            .get_ledger_information()
+            .await
+            .map(|_| ())
+            .map_err(|e| {
+                HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
+            })
+    }
+
+    // TODO: verify this still works
+    fn inspection_service_endpoint(&self) -> Url {
+        Url::parse(&format!(
+            "http://{}:{}",
+            &self.service_name(),
+            self.rest_api_port()
+        ))
+        .unwrap()
     }
 }
 

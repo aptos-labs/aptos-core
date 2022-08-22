@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::StoragePrunerConfig;
-use aptos_secure_push_metrics::MetricsPusher;
+use aptos_config::config::{LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig};
+use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -32,14 +32,20 @@ struct PrunerOpt {
 }
 
 impl PrunerOpt {
-    fn pruner_config(&self) -> StoragePrunerConfig {
-        StoragePrunerConfig {
-            enable_state_store_pruner: self.enable_state_store_pruner,
-            enable_ledger_pruner: self.enable_ledger_pruner,
-            state_store_prune_window: self.state_prune_window,
-            ledger_prune_window: self.ledger_prune_window,
-            ledger_pruning_batch_size: self.ledger_pruning_batch_size,
-            state_store_pruning_batch_size: self.state_store_pruning_batch_size,
+    fn pruner_config(&self) -> PrunerConfig {
+        PrunerConfig {
+            state_merkle_pruner_config: StateMerklePrunerConfig {
+                enable: self.enable_state_store_pruner,
+                prune_window: self.state_prune_window,
+                batch_size: self.state_store_pruning_batch_size,
+                user_pruning_window_offset: 0,
+            },
+            ledger_pruner_config: LedgerPrunerConfig {
+                enable: self.enable_ledger_pruner,
+                prune_window: self.ledger_prune_window,
+                batch_size: self.ledger_pruning_batch_size,
+                user_pruning_window_offset: 0,
+            },
         }
     }
 }
@@ -123,6 +129,7 @@ enum Command {
 }
 
 fn main() {
+    #[allow(deprecated)]
     let _mp = MetricsPusher::start();
     let opt = Opt::from_args();
 

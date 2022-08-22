@@ -18,7 +18,10 @@ pub fn get_prometheus_client() -> Result<PrometheusClient> {
     }
 }
 
-fn construct_query_with_extra_labels(query: &str, labels_map: BTreeMap<String, String>) -> String {
+pub fn construct_query_with_extra_labels(
+    query: &str,
+    labels_map: BTreeMap<String, String>,
+) -> String {
     // edit the query string to insert swarm metadata
     let mut new_query = query.to_string();
     let mut label_start_idx = query.find('{').unwrap_or(query.len());

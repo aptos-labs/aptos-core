@@ -30,7 +30,7 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npm.js.
   test-sdk-confirm-client-generated-publish:
-    runs-on: ubuntu-latest
+    runs-on: high-perf-docker
     permissions:
       contents: read
       id-token: write
@@ -52,16 +52,37 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
+      # Self hosted runners don't have yarn preinstalled.
+      # https://github.com/actions/setup-node/issues/182
+      - run: npm install -g yarn
+
+      # When using high-perf-docker, the CI is actually run with two containers
+      # in a k8s pod, one for docker commands run in the CI steps (docker), and
+      # one for everything else (runner). These containers share some volume
+      # mounts, ${{ runner.temp }} is one of them. Writing the specs here ensures
+      # the docker run step writes to a same place that the runner can read from.
+      - run: mkdir -p ${{ runner.temp }}/specs
+
       # Build the API specs.
-      - run: docker run --mount=type=bind,source=/tmp,target=/specs --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
-      - run: docker run --mount=type=bind,source=/tmp,target=/specs --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
+      - uses: nick-fields/retry@v2
+        name: generate-yaml-spec
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+      - uses: nick-fields/retry@v2
+        name: generate-json-spec
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
-      - run: echo "If this lint fails, run the following commands locally to fix it:"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.yaml api/doc/v1/spec.yaml
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.json api/doc/v1/spec.json
+      - run: echo "If this step fails, run the following commands locally to fix it:"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
@@ -75,24 +96,41 @@ jobs:
 
       # Ensure any changes to the generated client were checked in.
       - run: cd ./ecosystem/typescript/sdk && yarn generate-client -o /tmp/generated_client
+      - run: echo "If this step fails, run the following command locally to fix it:"
+      - run: echo "cd ecosystem/typescript/sdk && yarn generate-client"
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
       - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
 
       # Wait for the API and faucet to startup.
-      - run: npm install -g wait-port
-      - run: wait-port -t 60000 http://127.0.0.1:8080/v1
-      - run: wait-port -t 60000 http://127.0.0.1:8081/health
+      - run: npm install -g wait-on
+      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
+      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
 
       # Test and build.
-      - run: cd ./ecosystem/typescript/sdk && yarn test
+      - uses: nick-fields/retry@v2
+        name: sdk-yarn-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
 
       # Run example code in typescript.
-      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+      - uses: nick-fields/retry@v2
+        name: ts-example-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
       # Run example code in javascript.
-      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
+      - uses: nick-fields/retry@v2
+        name: js-example-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
 
       # Ensure the version, changelog, etc. are valid.
       - run: cd ./ecosystem/typescript/sdk && ./check.sh
@@ -107,14 +145,6 @@ jobs:
         if: github.event_name == 'push' && github.ref_name == 'devnet'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
-
-      - name: Print spec generation logs on failure (YAML)
-        if: ${{ failure() }}
-        run: docker logs yaml-spec
-
-      - name: Print spec generation logs on failure (JSON)
-        if: ${{ failure() }}
-        run: docker logs json-spec
 
       - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}

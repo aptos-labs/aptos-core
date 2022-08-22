@@ -3,10 +3,9 @@
 
 use aptos_crypto::{hash::CryptoHash, PrivateKey};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CORE_CODE_ADDRESS},
+    account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
@@ -14,6 +13,7 @@ use aptos_types::{
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
+use cached_packages::aptos_stdlib;
 use executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
     integration_test_impl::{
@@ -74,7 +74,7 @@ fn test_reconfiguration() {
     let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
     let parent_block_id = executor.committed_block_id();
     let signer = ValidatorSigner::new(
-        validators[0].data.address,
+        validators[0].data.owner_address,
         validators[0].consensus_key.clone(),
     );
     let validator_account = signer.author();
@@ -108,7 +108,7 @@ fn test_reconfiguration() {
 
     // txn1 = give the validator some money so they can send a tx
     let txn1 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -120,15 +120,14 @@ fn test_reconfiguration() {
         0,
         1,
         validator_account,
-        Some(0),
-        vec![false],
+        vec![0],
         vec![],
         300000001,
     ));
 
     // txn3 = set the aptos version
     let txn3 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -156,7 +155,7 @@ fn test_reconfiguration() {
 
     let t3 = db
         .reader
-        .get_account_transaction(aptos_root_address(), 1, true, current_version)
+        .get_account_transaction(aptos_test_root_address(), 1, true, current_version)
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &txn_block[2]).unwrap();
 

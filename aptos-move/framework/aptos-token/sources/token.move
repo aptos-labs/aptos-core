@@ -40,6 +40,8 @@ module aptos_token::token {
     const ENO_MUTATE_CAPABILITY: u64 = 17;
     const ETOEKN_PROPERTY_EXISTED: u64 = 18;
     const ENO_TOKEN_IN_TOKEN_STORE: u64 = 19;
+    const ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE: u64 = 20;
+    const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 21;
 
 
     //
@@ -124,6 +126,7 @@ module aptos_token::token {
     struct TokenStore has key {
         // the tokens owned by a token owner
         tokens: Table<TokenId, Token>,
+        direct_transfer: bool,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
         burn_events: EventHandle<BurnTokenEvent>,
@@ -224,7 +227,7 @@ module aptos_token::token {
     }
 
     //
-    // Creator Script functions
+    // Creator Entry functions
     //
 
     /// create a empty token collection with parameters
@@ -269,7 +272,7 @@ module aptos_token::token {
     }
 
     //
-    // Transaction Script functions
+    // Transaction Entry functions
     //
 
     public entry fun direct_transfer_script(
@@ -278,8 +281,8 @@ module aptos_token::token {
         creators_address: address,
         collection: String,
         name: String,
+        property_version: u64,
         amount: u64,
-        property_version: u64
     ) acquires TokenStore {
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         direct_transfer(sender, receiver, token_id, amount);
@@ -288,6 +291,15 @@ module aptos_token::token {
     public entry fun initialize_token_script(account: &signer) {
         initialize_token_store(account);
     }
+
+    public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
+        let addr = signer::address_of(account);
+        assert!(exists<TokenStore>(addr), ETOKEN_STORE_NOT_PUBLISHED);
+        let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
+        *opt_in_flag = opt_in;
+    }
+
+
 
     /// mutate the token property and save the new property in TokenStore
     /// if the token property_version is 0, we will create a new property_version per token and store the properties
@@ -316,10 +328,9 @@ module aptos_token::token {
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
-        let addr = signer::address_of(account);
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
-            let token = withdraw_with_event_internal(addr, token_id, amount);
+            let token = withdraw_with_event_internal(token_owner, token_id, amount);
             let i = 0;
             let largest_property_version = token_data.largest_property_version;
             // give a new property_version for each token
@@ -340,6 +351,7 @@ module aptos_token::token {
             // burn the orignial property_version 0 token after mutation
             let Token {id: _, amount: _, token_properties: _} = token;
         } else {
+            assert!(amount == 1, ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE);
             update_token_property_internal(token_owner, token_id, keys, values, types);
         };
     }
@@ -381,7 +393,7 @@ module aptos_token::token {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         event::emit_event<DepositEvent>(
@@ -389,11 +401,6 @@ module aptos_token::token {
             DepositEvent { id: token.id, amount: token.amount },
         );
 
-        direct_deposit_without_event_internal(account_addr, token);
-    }
-
-    /// Deposit the token balance into the recipients account without emitting an event.
-    fun direct_deposit_without_event_internal(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
@@ -440,6 +447,7 @@ module aptos_token::token {
                 account,
                 TokenStore {
                     tokens: table::new(),
+                    direct_transfer: false,
                     deposit_events: event::new_event_handle<DepositEvent>(account),
                     withdraw_events: event::new_event_handle<WithdrawEvent>(account),
                     burn_events: event::new_event_handle<BurnTokenEvent>(account),
@@ -471,12 +479,14 @@ module aptos_token::token {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    fun transfer(
+    public fun transfer(
         from: &signer,
         id: TokenId,
         to: address,
         amount: u64,
     ) acquires TokenStore {
+        let opt_in_transfer = borrow_global<TokenStore>(to).direct_transfer;
+        assert!(opt_in_transfer, EUSER_NOT_OPT_IN_DIRECT_TRANSFER);
         let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
     }
@@ -764,9 +774,13 @@ module aptos_token::token {
 
     public entry fun burn(
         owner: &signer,
-        token_id: TokenId,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
         amount: u64
     ) acquires Collections, TokenStore {
+        let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         let owner_addr = signer::address_of(owner);
         assert!(balance_of(owner_addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
         let creator_addr = token_id.token_data_id.creator;
@@ -913,7 +927,7 @@ module aptos_token::token {
         );
     }
 
-    #[test(creator = @0x1, owner = @0x2)]
+    #[test(creator = @0xFA, owner = @0xAF)]
     public entry fun direct_transfer_test(
         creator: signer,
         owner: signer,
@@ -1058,6 +1072,7 @@ module aptos_token::token {
         assert!(balance_of(signer::address_of(creator), new_id_3) == 0, 1);
         // transfer token with property_version > 0 also transfer the token properties
         initialize_token_store(owner);
+        opt_in_direct_transfer(owner, true);
         transfer(creator, new_id_1, signer::address_of(owner), 1);
 
         let props = &borrow_global<TokenStore>(signer::address_of(owner)).tokens;

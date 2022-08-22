@@ -1,0 +1,5 @@
+{
+  "message": "failed to parse path `resource_type`: failed to parse \"string(MoveStructTag)\": invalid struct tag: 0x1::GUID_Generator, expected token ColonColon, got EOF",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

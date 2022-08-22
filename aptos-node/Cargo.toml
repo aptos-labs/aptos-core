@@ -25,12 +25,12 @@ aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
+aptos-fh-stream = { path = "../fh-stream" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
 aptos-secure-storage = { path = "../secure/storage" }
-aptos-sf-stream = { path = "../sf-stream" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-telemetry = { path = "../crates/aptos-telemetry" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
@@ -40,7 +40,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 
 aptosdb = { path = "../storage/aptosdb" }
 backup-service = { path = "../storage/backup/backup-service" }
-cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
+cached-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }

@@ -16,7 +16,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
@@ -33,8 +33,6 @@ mod error;
 mod executed_chunk;
 pub mod in_memory_state_calculator;
 mod parsed_transaction_output;
-
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -297,11 +295,11 @@ impl StateComputeResult {
 }
 
 pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProof>,
+    proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
 impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProof>) -> Self {
+    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
         ProofReader { proofs }
     }
 
@@ -311,7 +309,7 @@ impl ProofReader {
 }
 
 impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
 }
@@ -322,7 +320,7 @@ impl ProofRead for ProofReader {
 pub struct TransactionData {
     /// Each entry in this map represents the new value of a store store object touched by this
     /// transaction.
-    state_updates: HashMap<StateKey, StateValue>,
+    state_updates: HashMap<StateKey, Option<StateValue>>,
 
     /// The writeset generated from this transaction.
     write_set: WriteSet,
@@ -351,7 +349,7 @@ pub struct TransactionData {
 
 impl TransactionData {
     pub fn new(
-        state_updates: HashMap<StateKey, StateValue>,
+        state_updates: HashMap<StateKey, Option<StateValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         reconfig_events: Vec<ContractEvent>,
@@ -374,7 +372,7 @@ impl TransactionData {
         }
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
         &self.state_updates
     }
 

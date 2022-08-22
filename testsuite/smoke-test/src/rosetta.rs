@@ -6,25 +6,30 @@ use anyhow::anyhow;
 use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
 use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
+use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::HashValue;
 use aptos_rest_client::aptos_api_types::UserTransaction;
 use aptos_rest_client::Transaction;
 use aptos_rosetta::types::{
-    AccountIdentifier, Operation, OperationStatusType, OperationType, TransactionType,
+    AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
+    TransactionType,
 };
 use aptos_rosetta::{
     client::RosettaClient,
     common::{native_coin, BLOCKCHAIN, Y2K_MS},
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, Block, BlockIdentifier, BlockRequest,
+        AccountBalanceRequest, AccountBalanceResponse, BlockIdentifier, BlockRequest,
         NetworkIdentifier, NetworkRequest, PartialBlockIdentifier,
     },
     ROSETTA_VERSION,
 };
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use forge::{LocalSwarm, Node, NodeExt};
+use std::collections::BTreeMap;
 use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
 
@@ -103,9 +108,10 @@ async fn test_network() {
     let request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
-    let status = rosetta_client.network_status(&request).await.unwrap();
-    assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_MS);
+    let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+        .await
+        .unwrap();
+    assert!(status.current_block_timestamp >= Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,
@@ -261,243 +267,561 @@ async fn get_balance(
     try_until_ok_default(|| rosetta_client.account_balance(&request)).await
 }
 
+/// This test tests all of Rosetta's functionality from the read side in one go.  Since
+/// it's block based and it needs time to run, we do all the checks in a single test.
 #[tokio::test]
 async fn test_block() {
-    let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 2).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
     let chain_id = swarm.chain_id();
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
 
-    // Genesis by version
-    let genesis_block = get_block(&rosetta_client, chain_id, 0).await;
-    assert_genesis_block(&genesis_block);
+    // Mapping of account to block and balance mappings
+    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, u64>>::new();
 
-    // Get genesis txn by hash
-    let genesis_block_by_hash = get_block_by_hash(
-        &rosetta_client,
-        chain_id,
-        genesis_block.block_identifier.hash.clone(),
-    )
-    .await;
-
-    // Both blocks should be the same
-    assert_eq!(
-        genesis_block, genesis_block_by_hash,
-        "Genesis by hash or by index should be the same"
-    );
-
-    // Responses should be idempotent
-    let idempotent_block = get_block(&rosetta_client, chain_id, 0).await;
-    assert_eq!(
-        idempotent_block, genesis_block_by_hash,
-        "Blocks should be idempotent"
-    );
-
-    // Block 1 is always a reconfig with exactly 1 txn
-    let block_1 = get_block(&rosetta_client, chain_id, 1).await;
-    assert_eq!(1, block_1.transactions.len());
-    // Block metadata won't have operations
-    assert!(block_1.transactions.first().unwrap().operations.is_empty());
-    assert!(block_1.timestamp > genesis_block.timestamp);
-
-    // Block 2 is always a standard block with 2 or more txns
-    let block_2 = get_block(&rosetta_client, chain_id, 2).await;
-    assert!(block_2.transactions.len() >= 2);
-    // Block metadata won't have operations
-    assert!(block_2.transactions.first().unwrap().operations.is_empty());
-    // StateCheckpoint won't have operations
-    assert!(block_2.transactions.last().unwrap().operations.is_empty());
-    assert!(block_2.timestamp >= block_1.timestamp);
-
-    // No input should give the latest version, not the genesis txn
-    let request_latest = BlockRequest::latest(chain_id);
-    let latest_block = rosetta_client
-        .block(&request_latest)
-        .await
-        .unwrap()
-        .block
-        .unwrap();
-
-    // The latest block should always come after genesis
-    assert!(latest_block.block_identifier.index >= block_2.block_identifier.index);
-    assert!(latest_block.timestamp >= block_2.timestamp);
-
-    // The parent should always be exactly one version before
-    assert_eq!(
-        latest_block.parent_block_identifier.index,
-        latest_block.block_identifier.index - 1
-    );
-
-    // There should be at least 1 txn
-    assert!(!latest_block.transactions.is_empty());
-
-    // We should be able to query it again by hash or by version and it is the same
-    let latest_block_by_version = get_block(
-        &rosetta_client,
-        chain_id,
-        latest_block.block_identifier.index,
-    )
-    .await;
-    let latest_block_by_hash = get_block_by_hash(
-        &rosetta_client,
-        chain_id,
-        latest_block.block_identifier.hash.clone(),
-    )
-    .await;
-
-    assert_eq!(latest_block, latest_block_by_version);
-    assert_eq!(latest_block_by_hash, latest_block_by_version);
-
-    // Wait until we get a new block processed
-    let network_request = NetworkRequest {
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
 
-    let start = Instant::now();
-    let max_wait = Duration::from_secs(5);
-    let mut successful = false;
-    while start.elapsed() < max_wait {
-        if rosetta_client
-            .network_status(&network_request)
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
             .await
-            .unwrap()
-            .current_block_identifier
-            .index
-            >= latest_block.block_identifier.index
-        {
-            successful = true;
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
             break;
         }
-        tokio::time::sleep(Duration::from_micros(50)).await
     }
 
-    assert!(successful, "Failed to get the next block");
+    // Do some transfers
+    let account_id_0 = cli.account_id(0);
+    let account_id_1 = cli.account_id(1);
+    let account_id_3 = cli.account_id(3);
 
-    // And querying latest again should get yet another transaction in the future
-    let newer_block = rosetta_client
-        .block(&request_latest)
+    cli.fund_account(0, Some(10000000)).await.unwrap();
+    cli.fund_account(1, Some(10000000)).await.unwrap();
+    cli.fund_account(2, Some(10000000)).await.unwrap();
+    cli.fund_account(3, Some(10000000)).await.unwrap();
+
+    let private_key_0 = cli.private_key(0);
+    let private_key_1 = cli.private_key(1);
+    let private_key_2 = cli.private_key(2);
+    let private_key_3 = cli.private_key(3);
+    let network_identifier = chain_id.into();
+    let seq_no_0 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_1,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap();
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        Some(seq_no_0 + 1),
+    )
+    .await
+    .unwrap();
+    // Create a new account via transfer
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap();
+    let seq_no_3 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+
+    // Create another account via command
+    create_account_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::from_hex_literal("0x99").unwrap(),
+        Duration::from_secs(5),
+        Some(seq_no_3 + 1),
+    )
+    .await
+    .unwrap();
+
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_3,
+        20,
+        Duration::from_secs(5),
+        // Test the default behavior
+        None,
+    )
+    .await
+    .unwrap();
+
+    // This one will fail
+    let final_txn = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap_err();
+
+    let final_block_to_check = rest_client
+        .get_block_by_version(final_txn.info.version.0, false)
         .await
-        .unwrap()
-        .block
-        .unwrap();
-    assert!(newer_block.block_identifier.index >= latest_block.block_identifier.index);
-    assert!(newer_block.timestamp >= latest_block.timestamp);
-}
+        .expect("Should be able to get block info for completed txns");
 
-#[tokio::test]
-async fn test_block_transactions() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
-    let chain_id = swarm.chain_id();
+    // Check a couple blocks past the final transaction to check more txns
+    let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
 
-    // Make sure first that there's money to transfer
-    cli.assert_account_balance_now(0, DEFAULT_FUNDED_COINS)
-        .await;
-    cli.assert_account_balance_now(1, DEFAULT_FUNDED_COINS)
-        .await;
+    // TODO: Track total supply?
+    // TODO: Check no repeated block hashes
+    // TODO: Check no repeated txn hashes (in a block)
+    // TODO: Check account balance block hashes?
+    // TODO: Handle multiple coin types
 
-    // Now let's see some transfers
-    const TRANSFER_AMOUNT: u64 = 5000;
-    let response = cli
-        .transfer_coins(
-            0,
-            1,
-            TRANSFER_AMOUNT,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
-        .await
-        .unwrap();
-    let sender = cli.account_id(0);
-    let receiver = cli.account_id(1);
+    eprintln!("Checking blocks 0..{}", final_block_height);
 
-    let transfer_version = response.version;
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
 
-    let validator = swarm.validators().next().unwrap();
-    let rest_client = validator.rest_client();
-    let block_info = rest_client
-        .get_block_info(transfer_version)
-        .await
-        .unwrap()
-        .into_inner();
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= final_block_height {
+            break;
+        }
+    }
 
-    let block_with_transfer = rosetta_client
-        .block(&BlockRequest::by_index(chain_id, block_info.block_height))
-        .await
-        .unwrap();
-    let block_with_transfer = block_with_transfer.block.unwrap();
+    // Now we have to watch all the changes
+    let mut current_version = 0;
+    let mut previous_block_index = 0;
+    let mut previous_block_hash = format!("{:x}", HashValue::zero());
+    for block_height in 0..final_block_height {
+        let request = BlockRequest::by_index(chain_id, block_height);
+        let response: BlockResponse = rosetta_client
+            .block(&request)
+            .await
+            .expect("Should be able to get blocks that are already known");
+        let block = response.block.expect("Every response should have a block");
+        let actual_block = rest_client
+            .get_block_by_height(block_height, true)
+            .await
+            .expect("Should be able to get block for a known block")
+            .into_inner();
 
-    // Ensure the block is all good
-    assert_eq!(
-        block_with_transfer.timestamp,
-        block_info.block_timestamp.saturating_div(1000)
-    );
-    assert_eq!(
-        block_with_transfer.block_identifier.index,
-        block_info.block_height
-    );
-    assert_eq!(
-        block_with_transfer.block_identifier.hash,
-        format!("{:x}", block_info.block_hash)
-    );
-    assert_eq!(
-        block_with_transfer.parent_block_identifier.index,
-        block_info.block_height.saturating_sub(1)
-    );
-
-    // Verify individual txns
-    let num_txns = block_info
-        .end_version
-        .saturating_sub(block_info.start_version) as usize;
-    let actual_txns = rest_client
-        .get_transactions(Some(block_info.start_version), Some(num_txns as u16))
-        .await
-        .unwrap()
-        .into_inner();
-    for i in 0..num_txns {
-        let expected_version = block_info.start_version.saturating_add(i as u64);
-        let actual_txn = actual_txns.get(i).unwrap();
-        let block_txn = block_with_transfer.transactions.get(i).unwrap();
-
-        // Identifiers should match the txn
-        let block_txn_metadata = block_txn.metadata.unwrap();
-        assert_eq!(block_txn_metadata.version.0, expected_version);
         assert_eq!(
-            block_txn.transaction_identifier.hash,
-            format!("{:x}", actual_txn.transaction_info().unwrap().hash)
+            block.block_identifier.index, block_height,
+            "The block should match the requested block"
+        );
+        assert_eq!(
+            block.block_identifier.hash,
+            format!("{:x}", actual_block.block_hash),
+            "Block hash should match the actual block"
+        );
+        assert_eq!(
+            block.parent_block_identifier.index, previous_block_index,
+            "Parent block index should be previous block"
+        );
+        assert_eq!(
+            block.parent_block_identifier.hash, previous_block_hash,
+            "Parent block hash should be previous block"
         );
 
-        // first transaction has to be block metadata
-        if expected_version == block_info.start_version {
+        // It's only greater or equal because microseconds are cut off
+        let expected_timestamp = if block_height == 0 {
+            Y2K_MS
+        } else {
+            actual_block.block_timestamp.0.saturating_div(1000)
+        };
+        assert_eq!(
+            expected_timestamp, block.timestamp,
+            "Block timestamp should match actual timestamp but in ms"
+        );
+
+        // First transaction should be first in block
+        assert_eq!(
+            current_version, actual_block.first_version.0,
+            "First transaction in block should be the current version"
+        );
+
+        let actual_txns = actual_block
+            .transactions
+            .as_ref()
+            .expect("Every actual block should have transactions");
+        parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
+
+        // The full block must have been processed
+        assert_eq!(current_version - 1, actual_block.last_version.0);
+
+        // Keep track of the previous
+        previous_block_hash = block.block_identifier.hash;
+        previous_block_index = block_height;
+    }
+
+    // Reconcile and ensure all balances are calculated correctly
+    check_balances(&rosetta_client, chain_id, balances).await;
+}
+
+/// Parse the transactions in each block
+async fn parse_block_transactions(
+    block: &aptos_rosetta::types::Block,
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    actual_txns: &[Transaction],
+    current_version: &mut u64,
+) {
+    for (txn_number, transaction) in block.transactions.iter().enumerate() {
+        let actual_txn = actual_txns
+            .get(txn_number)
+            .expect("There should be the same number of transactions in the actual block");
+        let actual_txn_info = actual_txn
+            .transaction_info()
+            .expect("Actual transaction should not be pending and have transaction info");
+        let txn_metadata = transaction
+            .metadata
+            .as_ref()
+            .expect("Metadata must always be present in a block");
+
+        // Ensure transaction identifier is correct
+        assert_eq!(
+            *current_version, txn_metadata.version.0,
+            "There should be no gaps in transaction versions"
+        );
+        assert_eq!(
+            format!("{:x}", actual_txn_info.hash.0),
+            transaction.transaction_identifier.hash,
+            "Transaction hash should match the actual hash"
+        );
+
+        // Type specific checks
+        match txn_metadata.transaction_type {
+            TransactionType::Genesis => {
+                assert_eq!(0, *current_version);
+            }
+            TransactionType::User => {}
+            TransactionType::BlockMetadata | TransactionType::StateCheckpoint => {
+                assert!(transaction.operations.is_empty());
+            }
+        }
+
+        parse_operations(
+            block.block_identifier.index,
+            balances,
+            transaction,
+            actual_txn,
+        )
+        .await;
+
+        // Increment to next version
+        *current_version += 1;
+    }
+}
+
+/// Parse the individual operations in a transaction
+async fn parse_operations(
+    block_height: u64,
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    transaction: &aptos_rosetta::types::Transaction,
+    actual_txn: &Transaction,
+) {
+    // If there are no operations, then there is no gas operation
+    let mut has_gas_op = false;
+    for (expected_index, operation) in transaction.operations.iter().enumerate() {
+        assert_eq!(expected_index as u64, operation.operation_identifier.index);
+
+        // Gas transaction is always last
+        let status = OperationStatusType::from_str(
+            operation
+                .status
+                .as_ref()
+                .expect("Should have an operation status"),
+        )
+        .expect("Operation status should be known");
+        let operation_type = OperationType::from_str(&operation.operation_type)
+            .expect("Operation type should be known");
+
+        // Iterate through every operation, keeping track of balances
+        match operation_type {
+            OperationType::CreateAccount => {
+                // Initialize state for a new account
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a create account operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                if actual_txn.success() {
+                    assert_eq!(OperationStatusType::Success, status);
+                    let account_balances = balances.entry(account).or_default();
+
+                    if account_balances.is_empty() {
+                        account_balances.insert(block_height, 0u64);
+                    } else {
+                        panic!("Account already has a balance when being created!");
+                    }
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed create account operation"
+                    );
+                }
+            }
+            OperationType::Deposit => {
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a deposit operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                if actual_txn.success() {
+                    assert_eq!(OperationStatusType::Success, status);
+                    let account_balances = balances.entry(account).or_insert_with(|| {
+                        let mut map = BTreeMap::new();
+                        map.insert(block_height, 0);
+                        map
+                    });
+                    let (_, latest_balance) = account_balances.iter().last().unwrap();
+                    let amount = operation
+                        .amount
+                        .as_ref()
+                        .expect("Should have an amount in a deposit operation");
+                    assert_eq!(
+                        amount.currency,
+                        native_coin(),
+                        "Balance should be the native coin"
+                    );
+                    let delta =
+                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+
+                    // Add with panic on overflow in case of too high of a balance
+                    let new_balance = *latest_balance + delta;
+                    account_balances.insert(block_height, new_balance);
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed deposit operation"
+                    );
+                }
+            }
+            OperationType::Withdraw => {
+                // Gas is always successful
+                if actual_txn.success() {
+                    assert_eq!(OperationStatusType::Success, status);
+                    let account = operation
+                        .account
+                        .as_ref()
+                        .expect("There should be an account in a withdraw operation")
+                        .account_address()
+                        .expect("Account address should be parsable");
+
+                    let account_balances = balances.entry(account).or_insert_with(|| {
+                        let mut map = BTreeMap::new();
+                        map.insert(block_height, 0);
+                        map
+                    });
+                    let (_, latest_balance) = account_balances.iter().last().unwrap();
+                    let amount = operation
+                        .amount
+                        .as_ref()
+                        .expect("Should have an amount in a deposit operation");
+                    assert_eq!(
+                        amount.currency,
+                        native_coin(),
+                        "Balance should be the native coin"
+                    );
+                    let delta = u64::parse(
+                        amount
+                            .value
+                            .strip_prefix('-')
+                            .expect("Should have a negative number"),
+                    )
+                    .expect("Should be able to parse amount value");
+
+                    // Subtract with panic on overflow in case of a negative balance
+                    let new_balance = *latest_balance - delta;
+                    account_balances.insert(block_height, new_balance);
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed withdraw operation"
+                    );
+                }
+            }
+            OperationType::SetOperator => {
+                if actual_txn.success() {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful set operator operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed set operator operation"
+                    );
+                }
+            }
+            OperationType::Fee => {
+                has_gas_op = true;
+                assert_eq!(OperationStatusType::Success, status);
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a fee operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                let account_balances = balances.entry(account).or_insert_with(|| {
+                    let mut map = BTreeMap::new();
+                    map.insert(block_height, 0);
+                    map
+                });
+                let (_, latest_balance) = account_balances.iter().last().unwrap();
+                let amount = operation
+                    .amount
+                    .as_ref()
+                    .expect("Should have an amount in a fee operation");
+                assert_eq!(
+                    amount.currency,
+                    native_coin(),
+                    "Balance should be the native coin"
+                );
+                let delta = u64::parse(
+                    amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number"),
+                )
+                .expect("Should be able to parse amount value");
+
+                // Subtract with panic on overflow in case of a negative balance
+                let new_balance = *latest_balance - delta;
+                account_balances.insert(block_height, new_balance);
+
+                match actual_txn {
+                    Transaction::UserTransaction(txn) => {
+                        assert_eq!(
+                            txn.info
+                                .gas_used
+                                .0
+                                .saturating_mul(txn.request.gas_unit_price.0),
+                            delta,
+                            "Gas operation should always match gas used * gas unit price"
+                        )
+                    }
+                    _ => {
+                        panic!("Gas transactions should be user transactions!")
+                    }
+                };
+            }
+        }
+    }
+
+    assert!(
+        has_gas_op
+            || transaction.metadata.unwrap().transaction_type == TransactionType::Genesis
+            || transaction.operations.is_empty(),
+        "Must have a gas operation at least in a transaction except for Genesis",
+    );
+}
+
+/// Check that all balances are correct with the account balance command from the blocks
+async fn check_balances(
+    rosetta_client: &RosettaClient,
+    chain_id: ChainId,
+    balances: BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+) {
+    // TODO: Check some random times that arent on changes?
+    for (account, account_balances) in balances {
+        for (block_height, expected_balance) in account_balances {
+            // Block should match it's calculated balance
+            let response = rosetta_client
+                .account_balance(&AccountBalanceRequest {
+                    network_identifier: NetworkIdentifier::from(chain_id),
+                    account_identifier: account.into(),
+                    block_identifier: Some(PartialBlockIdentifier {
+                        index: Some(block_height),
+                        hash: None,
+                    }),
+                    currencies: Some(vec![native_coin()]),
+                })
+                .await
+                .unwrap();
             assert_eq!(
-                TransactionType::BlockMetadata,
-                block_txn_metadata.transaction_type
+                block_height, response.block_identifier.index,
+                "Block should be the one expected"
             );
 
-            // No operations occur in block metadata txn
-            assert!(block_txn.operations.is_empty());
-        } else if expected_version == transfer_version {
-            if let Transaction::UserTransaction(actual_txn) = actual_txn {
-                assert_transfer_transaction(
-                    sender,
-                    receiver,
-                    TRANSFER_AMOUNT,
-                    actual_txn,
-                    block_txn,
-                )
-            } else {
-                panic!("Must be a user txn");
-            }
-        } else if let Transaction::StateCheckpointTransaction(actual_txn) = actual_txn {
-            // If we have a state checkpoint it should be at the end of the block and have no operations
+            let balance = response.balances.first().unwrap();
             assert_eq!(
-                TransactionType::StateCheckpoint,
-                block_txn_metadata.transaction_type
+                balance.currency,
+                native_coin(),
+                "Balance should be the native coin"
             );
-            assert_eq!(block_txn_metadata.version.0, block_info.end_version);
-            assert!(block_txn.operations.is_empty());
             assert_eq!(
-                actual_txn.info.hash.to_string(),
-                block_txn.transaction_identifier.hash
+                expected_balance,
+                u64::parse(&balance.value).expect("Should have a balance from account balance")
             );
         }
     }
@@ -545,20 +869,20 @@ async fn test_invalid_transaction_gas_charged() {
     let txn_version = actual_txn.info.version.0;
 
     let block_info = rest_client
-        .get_block_info(txn_version)
+        .get_block_by_version(txn_version, false)
         .await
         .unwrap()
         .into_inner();
 
     let block_with_transfer = rosetta_client
-        .block(&BlockRequest::by_index(chain_id, block_info.block_height))
+        .block(&BlockRequest::by_index(chain_id, block_info.block_height.0))
         .await
         .unwrap();
     let block_with_transfer = block_with_transfer.block.unwrap();
     // Verify failed txn
     let rosetta_txn = block_with_transfer
         .transactions
-        .get(txn_version.saturating_sub(block_info.start_version) as usize)
+        .get(txn_version.saturating_sub(block_info.first_version.0) as usize)
         .unwrap();
 
     assert_transfer_transaction(
@@ -623,7 +947,7 @@ fn assert_transfer_transaction(
             assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
         } else {
             // Gas is always last
-            assert_withdraw(
+            assert_gas(
                 operation,
                 actual_txn.request.gas_unit_price.0 * actual_txn.info.gas_used.0,
                 sender,
@@ -663,6 +987,16 @@ fn assert_withdraw(
     );
 }
 
+fn assert_gas(operation: &Operation, expected_amount: u64, account: AccountAddress, success: bool) {
+    assert_transfer(
+        operation,
+        OperationType::Fee,
+        format!("-{}", expected_amount),
+        account,
+        success,
+    );
+}
+
 fn assert_transfer(
     operation: &Operation,
     expected_type: OperationType,
@@ -685,73 +1019,6 @@ fn assert_transfer(
     }
     .to_string();
     assert_eq!(&expected_status, operation.status.as_ref().unwrap());
-}
-
-fn assert_genesis_block(block: &Block) {
-    assert_eq!(
-        block.block_identifier, block.parent_block_identifier,
-        "The genesis block is also it's own parent"
-    );
-    assert_eq!(
-        HashValue::zero().to_hex(),
-        block.block_identifier.hash,
-        "The genesis block hash is always 0s"
-    );
-    assert_eq!(
-        0, block.block_identifier.index,
-        "The genesis block index is always 0"
-    );
-
-    assert_eq!(
-        Y2K_MS, block.timestamp,
-        "The genesis timestamp should be Y2K seconds"
-    );
-    assert_eq!(
-        1,
-        block.transactions.len(),
-        "The genesis block should be exactly 1 transaction"
-    );
-
-    let genesis_txn = block.transactions.first().unwrap();
-    assert_eq!(
-        0,
-        genesis_txn.metadata.unwrap().version.0,
-        "Genesis version should be 0"
-    );
-    assert_ne!(
-        HashValue::zero().to_hex(),
-        genesis_txn.transaction_identifier.hash,
-        "Genesis should have a txn hash"
-    );
-
-    assert!(
-        !genesis_txn.operations.is_empty(),
-        "There should be at least one operation in genesis"
-    );
-}
-
-async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64) -> Block {
-    let rosetta_client = (*rosetta_client).clone();
-    let request = BlockRequest::by_index(chain_id, index);
-    try_until_ok_default(|| rosetta_client.block(&request))
-        .await
-        .unwrap()
-        .block
-        .unwrap()
-}
-
-async fn get_block_by_hash(
-    rosetta_client: &RosettaClient,
-    chain_id: ChainId,
-    hash: String,
-) -> Block {
-    let rosetta_client = (*rosetta_client).clone();
-    let request = BlockRequest::by_hash(chain_id, hash);
-    try_until_ok_default(|| rosetta_client.block(&request))
-        .await
-        .unwrap()
-        .block
-        .unwrap()
 }
 
 /// Try for 2 seconds to get a response.  This handles the fact that it's starting async
@@ -788,4 +1055,93 @@ where
     }
 
     result
+}
+
+async fn create_account_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_account: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .create_account(
+            network_identifier,
+            sender_key,
+            new_account,
+            expiry_time.as_secs(),
+            sequence_number,
+        )
+        .await
+        .expect("Expect transfer to successfully submit to mempool")
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+}
+
+async fn transfer_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    receiver: AccountAddress,
+    amount: u64,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .transfer(
+            network_identifier,
+            sender_key,
+            receiver,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+        )
+        .await
+        .expect("Expect transfer to successfully submit to mempool")
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+}
+
+async fn wait_for_transaction(
+    rest_client: &aptos_rest_client::Client,
+    expiry_time: Duration,
+    txn_hash: String,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let hash_value = HashValue::from_str(&txn_hash).unwrap();
+    let response = rest_client
+        .wait_for_transaction_by_hash(hash_value, expiry_time.as_secs())
+        .await;
+    match response {
+        Ok(response) => {
+            if let Transaction::UserTransaction(txn) = response.into_inner() {
+                Ok(txn)
+            } else {
+                panic!("Transaction is supposed to be a UserTransaction!")
+            }
+        }
+        Err(_) => {
+            if let Transaction::UserTransaction(txn) = rest_client
+                .get_transaction_by_hash(hash_value)
+                .await
+                .unwrap()
+                .into_inner()
+            {
+                Err(txn)
+            } else {
+                panic!("Failed transaction is supposed to be a UserTransaction!");
+            }
+        }
+    }
+}
+
+fn expiry_time(txn_expiry_duration: Duration) -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .saturating_add(txn_expiry_duration)
 }

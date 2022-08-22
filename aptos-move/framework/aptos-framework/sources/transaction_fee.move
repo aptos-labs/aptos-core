@@ -4,6 +4,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::account;
+    friend aptos_framework::genesis;
 
     struct AptosCoinCapabilities has key {
         burn_cap: BurnCapability<AptosCoin>,
@@ -18,7 +19,8 @@ module aptos_framework::transaction_fee {
         );
     }
 
-    public fun store_aptos_coin_burn_cap(account: &signer, burn_cap: BurnCapability<AptosCoin>) {
+    /// Only called during genesis.
+    public(friend) fun store_aptos_coin_burn_cap(account: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(account);
         move_to(account, AptosCoinCapabilities { burn_cap })
     }

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -64,6 +65,7 @@ pub struct StateSyncDriverConfig {
     pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
     pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
+    pub num_versions_to_skip_snapshot_sync: u64, // The version lag we'll tolerate before snapshot syncing
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -79,6 +81,7 @@ impl Default for StateSyncDriverConfig {
             max_consecutive_stream_notifications: 10,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
+            num_versions_to_skip_snapshot_sync: 10_000_000, // At 1k TPS, this allows a node to fail for about 3 hours.
         }
     }
 }
@@ -90,6 +93,7 @@ pub struct StorageServiceConfig {
     pub max_epoch_chunk_size: u64,    // Max num of epoch ending ledger infos per chunk
     pub max_lru_cache_size: u64,      // Max num of items in the lru cache before eviction
     pub max_network_channel_size: u64, // Max num of pending network messages
+    pub max_network_chunk_bytes: u64, // Max num of bytes to send per network message
     pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
     pub max_subscription_period_ms: u64, // Max period (ms) of pending subscription requests
     pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
@@ -104,8 +108,9 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_lru_cache_size: 100,
             max_network_channel_size: 4000,
-            max_state_chunk_size: 1000,
-            max_subscription_period_ms: 10000,
+            max_network_chunk_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
+            max_state_chunk_size: 2000,
+            max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
@@ -121,6 +126,9 @@ pub struct DataStreamingServiceConfig {
 
     // Maximum number of concurrent data client requests (per stream).
     pub max_concurrent_requests: u64,
+
+    // Maximum number of concurrent data client requests (per stream) for state keys/values.
+    pub max_concurrent_state_requests: u64,
 
     // Maximum channel sizes for each data stream listener. If messages are not
     // consumed, they will be dropped (oldest messages first). The remaining
@@ -144,6 +152,7 @@ impl Default for DataStreamingServiceConfig {
         Self {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 2,
+            max_concurrent_state_requests: 4,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,
             max_notification_id_mappings: 2000,

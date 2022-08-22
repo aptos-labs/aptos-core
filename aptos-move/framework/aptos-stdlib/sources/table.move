@@ -8,14 +8,9 @@
 module aptos_std::table {
     friend aptos_std::table_with_length;
 
-    // native code raises this with error::invalid_arguments()
-    const EALREADY_EXISTS: u64 = 100;
-    // native code raises this with error::invalid_arguments()
-    const ENOT_FOUND: u64 = 101;
-
     /// Type of tables
     struct Table<phantom K: copy + drop, phantom V> has store {
-        handle: u128,
+        handle: address,
     }
 
     /// Create a new Table.
@@ -53,6 +48,17 @@ module aptos_std::table {
         borrow_mut(table, key)
     }
 
+    /// Insert the pair (`key`, `value`) if there is no entry for `key`.
+    /// update the value of the entry for `key` to `value` otherwise
+    public fun upsert<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, value: V) {
+        if (!contains(table, copy key)) {
+            add(table, copy key, value)
+        } else {
+            let ref = borrow_mut(table, key);
+            *ref = value;
+        };
+    }
+
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V {
@@ -76,6 +82,25 @@ module aptos_std::table {
         drop_unchecked_box<K, V, Box<V>>(table)
     }
 
+    #[test_only]
+    struct TableHolder<phantom K: copy + drop, phantom V: drop> has key{
+        t: Table<K, V>
+    }
+
+    #[test(account = @0x1)]
+    fun test_upsert(account: signer) {
+        let t = new<u64, u8>();
+        let key: u64 = 111;
+        let error_code: u64 = 1;
+        assert!(!contains(&t, key), error_code);
+        upsert(&mut t, key, 12);
+        assert!(*borrow(&t, key) == 12, error_code);
+        upsert(&mut t, key, 23);
+        assert!(*borrow(&t, key) == 23, error_code);
+
+        move_to(&account, TableHolder{ t });
+    }
+
     // ======================================================================================================
     // Internal API
 
@@ -86,7 +111,7 @@ module aptos_std::table {
 
     // Primitives which take as an additional type parameter `Box<V>`, so the implementation
     // can use this to determine serialization layout.
-    native fun new_table_handle<K, V>(): u128;
+    native fun new_table_handle<K, V>(): address;
     native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
     native fun borrow_box_mut<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K): &mut Box<V>;

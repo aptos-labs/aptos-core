@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
     SwarmExt, Validator, Version,
@@ -10,6 +11,7 @@ use aptos_config::config::NetworkConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -17,6 +19,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -101,12 +104,12 @@ impl LocalSwarm {
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        println!("Building a new swarm");
+        info!("Building a new swarm");
         let dir_actual = if let Some(dir_) = dir {
             if dir_.exists() {
                 fs::remove_dir_all(&dir_)?;
@@ -120,8 +123,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
@@ -131,6 +133,10 @@ impl LocalSwarm {
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
                         config.consensus.quorum_store_poll_count = 30;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .max_connection_deadline_secs = 1;
                     }
 
                     if let Some(init_config) = &init_config {
@@ -189,7 +195,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_root_address(),
+            aptos_sdk::types::account_config::aptos_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
@@ -222,7 +228,7 @@ impl LocalSwarm {
         }
 
         self.wait_all_alive(Duration::from_secs(60)).await?;
-        println!("Swarm launched successfully.");
+        info!("Swarm launched successfully.");
         Ok(())
     }
 
@@ -232,15 +238,15 @@ impl LocalSwarm {
         self.wait_for_startup().await?;
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
-        println!("Swarm alive.");
+        info!("Swarm alive.");
         Ok(())
     }
 
     async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 10;
+        let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
-            println!("Wait for startup attempt: {} of {}", i, num_attempts);
+            info!("Wait for startup attempt: {} of {}", i, num_attempts);
             for (node, done) in self.validators.values_mut().zip(done.iter_mut()) {
                 if *done {
                     continue;
@@ -263,7 +269,7 @@ impl LocalSwarm {
                         ));
                     }
                     Err(HealthCheckError::Failure(e)) => {
-                        println!("health check failure: {}", e);
+                        warn!("health check failure: {}", e);
                         break;
                     }
                 }
@@ -428,7 +434,7 @@ impl Swarm for LocalSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
             .get(version)
@@ -519,12 +525,29 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
+    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+        todo!()
+    }
+
     async fn query_metrics(
         &self,
         _query: &str,
         _time: Option<i64>,
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
+        todo!()
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        _start_time: i64,
+        _end_time: i64,
+        _threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
         todo!()
     }
 }

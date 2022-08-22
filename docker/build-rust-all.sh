@@ -11,6 +11,7 @@ RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos-node \
         -p aptos-node-checker \
         -p aptos-openapi-spec-generator \
+        -p aptos-telemetry-service \
         -p backup-cli \
         -p db-bootstrapper \
         -p forge-cli \
@@ -25,6 +26,7 @@ BINS=(
     aptos-node
     aptos-node-checker
     aptos-openapi-spec-generator
+    aptos-telemetry-service
     db-backup
     db-backup-verify
     db-bootstrapper
@@ -40,6 +42,5 @@ do
     cp target/release/$BIN dist/$BIN
 done
 
-# Build the Aptos Move framework
-cargo run --package framework -- --package aptos-framework --output current
-cargo run --package framework -- --package aptos-token --output current
+# Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
+( cd dist && cargo run --package framework -- release )

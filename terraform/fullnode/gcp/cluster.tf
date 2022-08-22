@@ -63,12 +63,12 @@ resource "google_container_node_pool" "fullnodes" {
   name       = "fullnodes"
   location   = local.zone
   cluster    = google_container_cluster.aptos.name
-  node_count = var.num_fullnodes
+  node_count = var.num_fullnodes + var.num_extra_instance
 
   node_config {
     machine_type    = var.machine_type
     image_type      = "COS_CONTAINERD"
-    disk_size_gb    = 20
+    disk_size_gb    = 100
     service_account = google_service_account.gke.email
     tags            = ["fullnodes"]
 

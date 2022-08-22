@@ -11,8 +11,18 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.57"
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto", features = ["sign-arbitrary-message"] }
+aptos-logger = { path = "../aptos-logger" }
+aptos-metrics-core = { path = "../aptos-metrics-core" }
+aptos-node = { path = "../../aptos-node" }
+aptos-rest-client = { path = "../aptos-rest-client" }
+aptos-sdk = { path = "../../sdk" }
+aptos-types = { path = "../../types" }
+aptos-warp-webserver = { path = "../aptos-warp-webserver" }
 async-trait = "0.1.53"
 bcs = "0.1.3"
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 clap = "3.1.18"
 futures = "0.3.17"
 hex = "0.4.3"
@@ -25,17 +35,6 @@ thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full", "time"] }
 url = "2.2.2"
 warp = "0.3.2"
-
-aptos-api = { path = "../../api" }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto" }
-aptos-logger = { path = "../aptos-logger" }
-aptos-metrics-core = { path = "../aptos-metrics-core" }
-aptos-node = { path = "../../aptos-node" }
-aptos-rest-client = { path = "../aptos-rest-client" }
-aptos-sdk = { path = "../../sdk" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
-aptos-types = { path = "../../types" }
 
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }

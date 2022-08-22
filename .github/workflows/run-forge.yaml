@@ -32,7 +32,11 @@ on:
         type: string
         default: land_blocking
         description: Test suite to run
-
+      POST_TO_SLACK:
+        required: false
+        type: boolean
+        default: false
+        description: Whether to post the test results comment to Slack
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -51,6 +55,8 @@ env:
   FORGE_RUNNER_TPS_THRESHOLD: ${{ inputs.FORGE_RUNNER_TPS_THRESHOLD }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
+  POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
+  WRAPPER_KILLSWITCH: ${{ secrets.FORGE_WRAPPER_KILLSWITCH }}
 
 jobs:
   forge:
@@ -65,6 +71,13 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if IMAGE_TAG is not specified
           fetch-depth: env.IMAGE_TAG != null && 0 || 10
+      - uses: actions/setup-python@v4
+        if: env.FORGE_ENABLED == 'true'
+        with:
+          python-version: '3.9'
+      - name: Install python deps
+        if: ${{ env.FORGE_ENABLED == 'true' && env.WRAPPER_KILLSWITCH == 'false' }}
+        run: pip3 install click==8.1.3 psutil==5.9.1
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'
         run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
@@ -78,21 +91,18 @@ jobs:
 
           source testsuite/run_forge.sh
 
-          # export env vars for next step
-          echo "FORGE_PRE_COMMENT=$FORGE_PRE_COMMENT" >> $GITHUB_ENV
-
           # append some GHA-specific content to the comment
           cat << EOF >> $FORGE_PRE_COMMENT
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           * Pending test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
+          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
       - name: Post pre-Forge comment
         if: env.FORGE_ENABLED == 'true' && github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          recreate: true
-          header: forge-comment-${{ github.run_attempt }}
+          append: true
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
@@ -112,6 +122,7 @@ jobs:
           cat << EOF >> $FORGE_COMMENT
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           * Test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
+          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
           # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
@@ -122,9 +133,23 @@ jobs:
           fi
 
       - name: Post forge result comment
+        # Post a Github comment if the run has not been cancelled and if we're running on a PR
         if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
+          append: true
           recreate: true
           path: ${{ env.FORGE_COMMENT }}
-          header: forge-comment-${{ github.run_attempt }}
+      - name: Post to a Slack channel
+        # Post a Slack comment if the run has not been cancelled and the envs are set
+        if: env.FORGE_ENABLED == 'true' && env.POST_TO_SLACK == 'true' && !cancelled()
+        id: slack
+        uses: slackapi/slack-github-action@v1.21.0
+        with:
+          # For posting a rich message using Block Kit
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

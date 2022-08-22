@@ -3,24 +3,37 @@
 
 use anyhow::bail;
 use serde::Serialize;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use transaction_emitter_lib::emitter::stats::TxnStats;
+
+use crate::{Swarm, SwarmExt};
 
 #[derive(Default, Clone, Debug, Serialize)]
 pub struct SuccessCriteria {
     avg_tps: usize,
     max_latency_ms: usize,
+    wait_for_all_nodes_to_catchup: Option<Duration>,
 }
 
 impl SuccessCriteria {
-    pub fn new(tps: usize, max_latency_ms: usize) -> Self {
+    pub fn new(
+        tps: usize,
+        max_latency_ms: usize,
+        wait_for_all_nodes_to_catchup: Option<Duration>,
+    ) -> Self {
         Self {
             avg_tps: tps,
             max_latency_ms,
+            wait_for_all_nodes_to_catchup,
         }
     }
 
-    pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> anyhow::Result<()> {
+    pub fn check_for_success(
+        &self,
+        stats: &TxnStats,
+        window: &Duration,
+        swarm: &dyn Swarm,
+    ) -> anyhow::Result<()> {
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
         let avg_tps = stats.committed / window.as_secs();
         let is_triggerd_by_github_actions =
@@ -36,6 +49,15 @@ impl SuccessCriteria {
             }
             bail!(error_message)
         }
+
+        if let Some(duration) = self.wait_for_all_nodes_to_catchup {
+            futures::executor::block_on(async {
+                swarm
+                    .wait_for_all_nodes_to_catchup(Instant::now() + duration)
+                    .await
+            })?;
+        }
+
         // TODO(skedia) Add latency success criteria after we have support for querying prometheus
         // latency
         Ok(())

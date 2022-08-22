@@ -11,12 +11,12 @@ use crate::{
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
 };
-use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_rest_client::aptos_api_types::Error;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
+use aptos_warp_webserver::WebServer;
+use aptos_warp_webserver::{logger, Error};
 use std::collections::BTreeMap;
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::Mutex;
@@ -103,13 +103,9 @@ pub async fn bootstrap_async(
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
-        let block_cache = if let Some(ref rest_client) = rest_client {
-            Some(Arc::new(
-                BlockCache::new(rest_client.clone()).await.unwrap(),
-            ))
-        } else {
-            None
-        };
+        let block_cache = rest_client
+            .as_ref()
+            .map(|rest_client| Arc::new(BlockCache::new(rest_client.clone())));
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),
@@ -147,7 +143,7 @@ pub fn routes(
                 .allow_methods(vec![Method::GET, Method::POST])
                 .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
         )
-        .with(aptos_api::log::logger())
+        .with(logger())
         .recover(handle_rejection)
 }
 

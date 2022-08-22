@@ -9,10 +9,9 @@ use std::{
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use hex::ToHex;
 use rand::{rngs::OsRng, Rng, RngCore, SeedableRng};
-use reqwest;
 use tiny_keccak::{Hasher, Sha3};
 
-pub const TESTNET_URL: &str = "https://fullnode.devnet.aptoslabs.com";
+pub const TESTNET_URL: &str = "https://fullnode.devnet.aptoslabs.com/v1";
 pub const FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
 
 //:!:>section_1
@@ -44,7 +43,7 @@ impl Account {
     pub fn auth_key(&self) -> String {
         let mut sha3 = Sha3::v256();
         sha3.update(PublicKey::from(&self.signing_key).as_bytes());
-        sha3.update(&vec![0u8]);
+        sha3.update(&[0u8]);
 
         let mut output = [0u8; 32];
         sha3.finalize(&mut output);
@@ -81,7 +80,7 @@ impl RestClient {
                 res.status(),
                 200,
                 "{} - {}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
                 account_address,
             );
         }
@@ -108,7 +107,7 @@ impl RestClient {
                 res.status(),
                 200,
                 "{} - {}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
                 account_address,
             );
             unreachable!()
@@ -146,7 +145,6 @@ impl RestClient {
             "sequence_number": seq_num.to_string(),
             "max_gas_amount": "1000",
             "gas_unit_price": "1",
-            "gas_currency_code": "XUS",
             "expiration_timestamp_secs": expiration_time_secs.to_string(),
             "payload": payload,
         })
@@ -159,8 +157,8 @@ impl RestClient {
         mut txn_request: serde_json::Value,
     ) -> serde_json::Value {
         let res = reqwest::blocking::Client::new()
-            .post(format!("{}/transactions/signing_message", self.url))
-            .body(txn_request.to_string())
+            .post(format!("{}/transactions/encode_submission", self.url))
+            .json(&txn_request)
             .send()
             .unwrap();
 
@@ -169,12 +167,12 @@ impl RestClient {
                 res.status(),
                 200,
                 "{} - {}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
                 txn_request.as_str().unwrap_or(""),
             );
         }
-        let body: serde_json::Value = res.json().unwrap();
-        let to_sign_hex = Box::new(body.get("message").unwrap().as_str()).unwrap();
+
+        let to_sign_hex = serde_json::from_value::<String>(res.json().unwrap()).unwrap();
         let to_sign = hex::decode(&to_sign_hex[2..]).unwrap();
         let signature: String = ExpandedSecretKey::from(&account_from.signing_key)
             .sign(&to_sign, &PublicKey::from(&account_from.signing_key))
@@ -206,7 +204,7 @@ impl RestClient {
                 res.status(),
                 202,
                 "{} - {}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
                 txn_request.as_str().unwrap_or(""),
             );
         }
@@ -226,8 +224,11 @@ impl RestClient {
     }
 
     pub fn transaction_pending(&self, transaction_hash: &str) -> bool {
-        let res = reqwest::blocking::get(format!("{}/transactions/{}", self.url, transaction_hash))
-            .unwrap();
+        let res = reqwest::blocking::get(format!(
+            "{}/transactions/by_hash/{}",
+            self.url, transaction_hash
+        ))
+        .unwrap();
 
         if res.status() == 404 {
             return true;
@@ -238,7 +239,7 @@ impl RestClient {
                 res.status(),
                 200,
                 "{} - {}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
                 transaction_hash,
             );
         }
@@ -278,7 +279,7 @@ impl RestClient {
     /// Returns the sequence number of the transaction used to transfer
     pub fn transfer(&self, account_from: &mut Account, recipient: &str, amount: u64) -> String {
         let payload = serde_json::json!({
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [format!("0x{}", recipient), amount.to_string()]
@@ -319,7 +320,7 @@ impl FaucetClient {
                 res.status(),
                 200,
                 "{}",
-                res.text().unwrap_or("".to_string()),
+                res.text().unwrap_or_else(|_| "".to_string()),
             );
         }
         for txn_hash in res.json::<serde_json::Value>().unwrap().as_array().unwrap() {

@@ -33,18 +33,15 @@ const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 /// A notification for new data that has been committed to storage
 #[derive(Clone, Debug)]
 pub enum CommitNotification {
-    CommittedStates(CommittedStates),
+    CommittedStateSnapshot(CommittedStateSnapshot),
 }
 
-/// A commit notification for new state values
+/// A commit notification for the new state snapshot
 #[derive(Clone, Debug)]
-pub struct CommittedStates {
-    pub all_states_synced: bool,
+pub struct CommittedStateSnapshot {
+    pub committed_transaction: CommittedTransactions,
     pub last_committed_state_index: u64,
-
-    /// If `all_states_synced` is true, we expect a single committed
-    /// transaction (as the node should have all required state at this version).
-    pub committed_transaction: Option<CommittedTransactions>,
+    pub version: Version,
 }
 
 /// A commit notification for new transactions
@@ -55,17 +52,22 @@ pub struct CommittedTransactions {
 }
 
 impl CommitNotification {
-    pub fn new_committed_states(
-        all_states_synced: bool,
+    pub fn new_committed_state_snapshot(
+        events: Vec<ContractEvent>,
+        transactions: Vec<Transaction>,
         last_committed_state_index: u64,
-        committed_transaction: Option<CommittedTransactions>,
+        version: Version,
     ) -> Self {
-        let committed_states = CommittedStates {
-            all_states_synced,
-            last_committed_state_index,
-            committed_transaction,
+        let committed_transaction = CommittedTransactions {
+            events,
+            transactions,
         };
-        CommitNotification::CommittedStates(committed_states)
+        let committed_states = CommittedStateSnapshot {
+            committed_transaction,
+            last_committed_state_index,
+            version,
+        };
+        CommitNotification::CommittedStateSnapshot(committed_states)
     }
 
     /// Handles the commit notification by notifying mempool and the event

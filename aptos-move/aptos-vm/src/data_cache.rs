@@ -7,6 +7,7 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 use anyhow::format_err;
 use anyhow::Error;
 use aptos_logger::prelude::*;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
@@ -16,6 +17,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use fail::fail_point;
+use framework::natives::state_storage::StateStorageUsageResolver;
 use move_deps::{
     move_binary_format::errors::*,
     move_core_types::{
@@ -23,7 +25,7 @@ use move_deps::{
         language_storage::{ModuleId, StructTag},
         resolver::{ModuleResolver, ResourceResolver},
     },
-    move_table_extension::{TableHandle, TableOperation, TableResolver},
+    move_table_extension::{TableHandle, TableResolver},
 };
 use std::{
     collections::btree_map::BTreeMap,
@@ -64,7 +66,7 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
     pub(crate) fn push_write_set(&mut self, write_set: &WriteSet) {
         for (ref ap, ref write_op) in write_set.iter() {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.data_map.insert(ap.clone(), Some(blob.clone()));
                 }
                 WriteOp::Deletion => {
@@ -112,6 +114,10 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
 
     fn id(&self) -> StateViewId {
         self.data_view.id()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, Error> {
+        self.data_view.get_usage()
     }
 }
 
@@ -161,15 +167,17 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
-
-    fn operation_cost(&self, _op: TableOperation, _key_size: usize, _val_size: usize) -> u64 {
-        1
-    }
 }
 
 impl<'a, S: StateView> ConfigStorage for RemoteStorage<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
+    }
+}
+
+impl<'a, S: StateView> StateStorageUsageResolver for RemoteStorage<'a, S> {
+    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
+        self.get_usage()
     }
 }
 
@@ -237,16 +245,17 @@ impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
     ) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().resolve_table_entry(handle, key)
     }
-
-    fn operation_cost(&self, op: TableOperation, key_size: usize, val_size: usize) -> u64 {
-        self.as_move_resolver()
-            .operation_cost(op, key_size, val_size)
-    }
 }
 
 impl<S: StateView> ConfigStorage for RemoteStorageOwned<S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.as_move_resolver().fetch_config(access_path)
+    }
+}
+
+impl<S: StateView> StateStorageUsageResolver for RemoteStorageOwned<S> {
+    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, anyhow::Error> {
+        self.as_move_resolver().get_usage()
     }
 }
 

@@ -77,6 +77,41 @@ pub async fn to_common_result<T: Serialize>(
     }
 }
 
+pub fn cli_build_information() -> BTreeMap<String, String> {
+    shadow_rs::shadow!(build);
+
+    let mut build_information = collect_build_information!();
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_BRANCH.into(),
+        build::BRANCH.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_CARGO_VERSION.into(),
+        build::CARGO_VERSION.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
+        build::COMMIT_HASH.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_OS.into(),
+        build::BUILD_OS.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_PKG_VERSION.into(),
+        build::PKG_VERSION.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_RUST_CHANNEL.into(),
+        build::RUST_CHANNEL.into(),
+    );
+    build_information.insert(
+        aptos_telemetry::build_information::BUILD_RUST_VERSION.into(),
+        build::RUST_VERSION.into(),
+    );
+    build_information
+}
+
 /// Sends a telemetry event about the CLI build, command and result
 async fn send_telemetry_event(
     command: &str,
@@ -85,7 +120,7 @@ async fn send_telemetry_event(
     error: Option<String>,
 ) {
     // Collect the build information
-    let build_information = collect_build_information!();
+    let build_information = cli_build_information();
 
     // Send the event
     aptos_telemetry::cli_metrics::send_cli_telemetry_event(

@@ -1,0 +1,5 @@
+{
+  "message": "Transaction not found by Ledger version(10000)",
+  "error_code": "transaction_not_found",
+  "vm_error_code": null
+}

@@ -7,6 +7,7 @@ use crate::{
     SparseMerkleTree,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::state_value::StateValue;
 use proptest::{
     collection::{hash_set, vec},
@@ -15,7 +16,7 @@ use proptest::{
 };
 use std::{collections::VecDeque, sync::Arc};
 
-type TxnOutput = Vec<(HashValue, StateValue)>;
+type TxnOutput = Vec<(HashValue, Option<StateValue>)>;
 type BlockOutput = Vec<TxnOutput>;
 
 #[derive(Debug)]
@@ -33,14 +34,14 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                     // txns
                     vec(
                         // txn updates
-                        (any::<Index>(), any::<Vec<u8>>()),
-                        1..4,
+                        (any::<Index>(), any::<Option<Vec<u8>>>()),
+                        1..20,
                     ),
                     1..10,
                 ),
                 Just(vec![]),
             ],
-            1..10,
+            1..20,
         ),
     )
         .prop_map(|(keys, commit_or_execute)| {
@@ -56,7 +57,10 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                                 .map(|updates| {
                                     updates
                                         .into_iter()
-                                        .map(|(k_idx, v)| (*k_idx.get(&keys), v.to_vec().into()))
+                                        .map(|(k_idx, v)| {
+                                            let key = *k_idx.get(&keys);
+                                            (key, v.map(|v| v.into()))
+                                        })
                                         .collect()
                                 })
                                 .collect::<Vec<_>>(),
@@ -70,26 +74,31 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
 pub fn test_smt_correctness_impl(input: Vec<Action>) {
     let mut naive_q = VecDeque::new();
     naive_q.push_back(NaiveSmt::new::<StateValue>(&[]));
-    let mut serial_q = VecDeque::new();
-    serial_q.push_back(SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH));
     let mut updater_q = VecDeque::new();
-    updater_q.push_back(SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+    updater_q.push_back(SparseMerkleTree::new(
+        *SPARSE_MERKLE_PLACEHOLDER_HASH,
+        StateStorageUsage::zero(),
+    ));
 
     for action in input {
         match action {
             Action::Commit => {
                 if naive_q.len() > 1 {
                     naive_q.pop_front();
-                    serial_q.pop_front();
                     updater_q.pop_front();
                 }
             }
             Action::Execute(block) => {
                 let updates = block
                     .iter()
-                    .map(|txn_updates| txn_updates.iter().map(|(k, v)| (*k, v)).collect())
+                    .map(|txn_updates| {
+                        txn_updates
+                            .iter()
+                            .map(|(k, v)| (*k, v.as_ref()))
+                            .collect::<Vec<_>>()
+                    })
                     .collect::<Vec<_>>();
-                let updates_flat_batch = updates.iter().flatten().cloned().collect::<Vec<_>>();
+                let updates_flat_batch = updates.into_iter().flatten().collect::<Vec<_>>();
 
                 let committed = naive_q.front_mut().unwrap();
                 let proofs = updates_flat_batch
@@ -100,14 +109,6 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
 
                 let mut naive_smt = naive_q.back().unwrap().clone().update(&updates_flat_batch);
 
-                let serial_smt = serial_q
-                    .back()
-                    .unwrap()
-                    .serial_update(updates.clone(), &proof_reader)
-                    .unwrap()
-                    .1;
-                serial_q.back().unwrap().assert_no_external_strong_ref();
-
                 let updater_smt = updater_q
                     .back()
                     .unwrap()
@@ -115,11 +116,9 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                     .unwrap();
                 updater_q.back().unwrap().assert_no_external_strong_ref();
 
-                assert_eq!(serial_smt.root_hash(), naive_smt.get_root_hash());
                 assert_eq!(updater_smt.root_hash(), naive_smt.get_root_hash());
 
                 naive_q.push_back(naive_smt);
-                serial_q.push_back(serial_smt);
                 updater_q.push_back(updater_smt);
             }
         }

@@ -15,7 +15,8 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use aptos_transaction_builder::aptos_stdlib;
+use cached_packages::aptos_stdlib;
+use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 
 #[async_trait::async_trait]
@@ -83,13 +84,6 @@ impl<'t> AptosContext<'t> {
         self.public_info.mint(addr, amount).await
     }
 
-    pub async fn create_and_fund_user_account(&mut self, amount: u64) -> Result<LocalAccount> {
-        let account = self.random_account();
-        self.create_user_account(account.public_key()).await?;
-        self.mint(account.address(), amount).await?;
-        Ok(account)
-    }
-
     pub async fn transfer(
         &self,
         from_account: &mut LocalAccount,
@@ -115,6 +109,7 @@ pub struct AptosPublicInfo<'t> {
     rest_api_url: Url,
     rest_client: RestClient,
     root_account: &'t mut LocalAccount,
+    rng: ::rand::rngs::StdRng,
 }
 
 impl<'t> AptosPublicInfo<'t> {
@@ -129,7 +124,20 @@ impl<'t> AptosPublicInfo<'t> {
             rest_api_url,
             chain_id,
             root_account,
+            rng: ::rand::rngs::StdRng::from_seed(OsRng.gen()),
         }
+    }
+
+    pub fn client(&self) -> &RestClient {
+        &self.rest_client
+    }
+
+    pub fn url(&self) -> &str {
+        self.rest_api_url.as_str()
+    }
+
+    pub fn root_account(&mut self) -> &mut LocalAccount {
+        &mut self.root_account
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
@@ -173,7 +181,7 @@ impl<'t> AptosPublicInfo<'t> {
         TransactionFactory::new(self.chain_id)
             .with_gas_unit_price(1)
             // TODO(Gas): double check if this is correct
-            .with_max_gas_amount(4_000_000)
+            .with_max_gas_amount(1_000)
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
@@ -195,5 +203,16 @@ impl<'t> AptosPublicInfo<'t> {
                     .as_str()
                     .and_then(|s| s.parse::<u64>().ok())
             })
+    }
+
+    pub fn random_account(&mut self) -> LocalAccount {
+        LocalAccount::generate(&mut self.rng)
+    }
+
+    pub async fn create_and_fund_user_account(&mut self, amount: u64) -> Result<LocalAccount> {
+        let account = self.random_account();
+        self.create_user_account(account.public_key()).await?;
+        self.mint(account.address(), amount).await?;
+        Ok(account)
     }
 }

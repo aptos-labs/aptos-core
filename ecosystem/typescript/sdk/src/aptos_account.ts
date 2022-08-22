@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { Buffer } from "buffer/"; // the trailing slash is important!

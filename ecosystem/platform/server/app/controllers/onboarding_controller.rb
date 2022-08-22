@@ -11,16 +11,14 @@ class OnboardingController < ApplicationController
   before_action :set_oauth_data, except: %i[kyc_callback]
   protect_from_forgery except: :kyc_callback
 
-  layout 'it3'
-
   def email
-    redirect_to it2_path if current_user.registration_completed?
+    redirect_to community_path if current_user.registration_completed?
   end
 
   def email_success; end
 
   def email_update
-    return redirect_to it2_path if current_user.registration_completed?
+    return redirect_to community_path if current_user.registration_completed?
 
     recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
@@ -36,7 +34,7 @@ class OnboardingController < ApplicationController
       if forum_sso?
         redirect_to discourse_sso_path
       elsif current_user.email_confirmed?
-        redirect_to it2_path
+        redirect_to community_path
       else
         redirect_to onboarding_email_success_path
       end

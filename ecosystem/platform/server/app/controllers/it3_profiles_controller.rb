@@ -17,7 +17,7 @@ class It3ProfilesController < ApplicationController
   # GET /it3_profiles/new
   def new
     redirect_to edit_it3_profile_path(current_user.it3_profile) if current_user.it3_profile.present?
-    @it3_profile = It3Profile.new
+    @it3_profile = It3Profile.new(owner_key: session[:it3_owner_key])
   end
 
   # GET /it3_profiles/1/edit
@@ -44,6 +44,8 @@ class It3ProfilesController < ApplicationController
 
     if @it3_profile.save
       log @it3_profile, 'created'
+
+      session.delete(:it3_owner_key)
 
       if Flipper.enabled?(:node_health_checker)
         @it3_profile.enqueue_nhc_job(true)
@@ -162,9 +164,10 @@ class It3ProfilesController < ApplicationController
   # Only allow a list of trusted parameters through.
   def it3_profile_params
     params.fetch(:it3_profile, {}).permit(:owner_key,
-                                          :consensus_key, :account_key, :network_key, :validator_address,
-                                          :validator_port, :validator_api_port, :validator_metrics_port,
-                                          :fullnode_address, :fullnode_port, :fullnode_network_key, :terms_accepted)
+                                          :consensus_key, :consensus_pop, :account_key, :network_key,
+                                          :validator_address, :validator_port, :validator_api_port,
+                                          :validator_metrics_port, :fullnode_address, :fullnode_port,
+                                          :fullnode_network_key, :terms_accepted)
   end
 
   def ensure_registration_enabled!

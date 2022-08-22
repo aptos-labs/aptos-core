@@ -16,5 +16,7 @@ export type IndexResponse = {
     oldest_ledger_version: U64;
     ledger_timestamp: U64;
     node_role: RoleType;
+    oldest_block_height: U64;
+    block_height: U64;
 };
 

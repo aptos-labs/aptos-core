@@ -9,11 +9,12 @@
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
-use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
+    aggregate_signature::PartialSignatures,
     ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
+use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
@@ -29,7 +30,7 @@ use std::{
 pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.
-    VoteAdded(u64),
+    VoteAdded(u128),
     /// The very same vote message has been processed in past.
     DuplicateVote,
     /// The very same author has already voted for another proposal in this round (equivocation).
@@ -42,10 +43,12 @@ pub enum VoteReceptionResult {
     ErrorAddingVote(VerifyError),
     /// Error happens when aggregating signature
     ErrorAggregatingSignature(VerifyError),
+    /// Error happens when aggregating timeout certificated
+    ErrorAggregatingTimeoutCertificate(VerifyError),
     /// The vote is not for the current round.
     UnexpectedRound(u64, u64),
     /// Receive f+1 timeout to trigger a local timeout, return the amount of voting power TC currently has.
-    EchoTimeout(u64),
+    EchoTimeout(u128),
 }
 
 /// A PendingVotes structure keep track of votes
@@ -56,7 +59,7 @@ pub struct PendingVotes {
     li_digest_to_votes:
         HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithPartialSignatures>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
-    maybe_partial_2chain_tc: Option<TwoChainTimeoutCertificate>,
+    maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
     /// Map of Author to vote. This is useful to discard multiple votes.
     author_to_vote: HashMap<Author, Vote>,
     /// Whether we have echoed timeout for this round.
@@ -168,14 +171,17 @@ impl PendingVotes {
         if let Some((timeout, signature)) = vote.two_chain_timeout() {
             let partial_tc = self
                 .maybe_partial_2chain_tc
-                .get_or_insert_with(|| TwoChainTimeoutCertificate::new(timeout.clone()));
+                .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
             let tc_voting_power = match validator_verifier.check_voting_power(partial_tc.signers())
             {
                 Ok(_) => {
-                    return VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(
-                        partial_tc.clone(),
-                    ))
+                    return match partial_tc.aggregate_signatures(validator_verifier) {
+                        Ok(tc_with_sig) => {
+                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
+                        }
+                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                    };
                 }
                 Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
                 Err(error) => {
@@ -256,6 +262,7 @@ mod tests {
     use consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
+    use itertools::Itertools;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -396,7 +403,15 @@ mod tests {
 
         match pending_votes.insert_vote(&vote2_author_2, &validator) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
-                assert!(validator.check_voting_power(tc.signers()).is_ok());
+                assert!(validator
+                    .check_voting_power(
+                        tc.signatures_with_rounds()
+                            .get_voters(
+                                &validator.get_ordered_account_addresses_iter().collect_vec()
+                            )
+                            .iter()
+                    )
+                    .is_ok());
             }
             _ => {
                 panic!("Should form TC");

@@ -1,0 +1,5 @@
+{
+  "message": "Resource not found by Address(0xa550c19), Struct tag(0x1::guid::GeneratorX) and Ledger version(0)",
+  "error_code": "resource_not_found",
+  "vm_error_code": null
+}

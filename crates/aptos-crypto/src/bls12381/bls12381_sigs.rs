@@ -13,7 +13,7 @@
 //!
 //! The signature verification APIs in `Signature::verify`, `Signature::verify_arbitrary_msg`,
 //! `Signature::verify_aggregate` and `Signature::verify_aggregate_arbitrary_msg` do NOT
-//! assume the signature to be a valid group element and will implicitly "group-check" it. This
+//! assume the signature to be a valid group element and will implicitly "subgroup-check" it. This
 //! makes the caller's job easier and, more importantly, makes the library safer to use.
 
 use crate::{
@@ -53,19 +53,19 @@ impl Signature {
         self.sig.to_bytes()
     }
 
-    /// Group-checks the signature (i.e., verifies the signature is a valid group element).
+    /// Subgroup-checks the signature (i.e., verifies the signature is a valid group element).
     ///
-    /// WARNING: Group-checking is done implicitly when verifying signatures via
+    /// WARNING: Subgroup-checking is done implicitly when verifying signatures via
     /// `Signature::verify_arbitrary_msg`. Therefore, this function should not be called separately
     /// for most use-cases. We leave it here just in case.
-    pub fn group_check(&self) -> Result<()> {
+    pub fn subgroup_check(&self) -> Result<()> {
         self.sig.validate(true).map_err(|e| anyhow!("{:?}", e))
     }
 
     /// Optimistically-aggregate signatures shares into either (1) a multisignature or (2) an aggregate
     /// signature. The individual signature shares could be adversarial. Nonetheless, for performance
-    /// reasons, we do not group-check the signature shares here, since the verification of the
-    /// returned multi-or-aggregate signature includes such a group check. As a result, adversarial
+    /// reasons, we do not subgroup-check the signature shares here, since the verification of the
+    /// returned multi-or-aggregate signature includes such a subgroup check. As a result, adversarial
     /// signature shares cannot lead to forgeries.
     pub fn aggregate(sigs: Vec<Self>) -> Result<Signature> {
         let sigs: Vec<_> = sigs.iter().map(|s| &s.sig).collect();
@@ -81,7 +81,7 @@ impl Signature {
     /// do *not* have to be all different, since we use proofs-of-possession (PoPs) to prevent rogue
     /// key attacks.
     ///
-    /// WARNING: This function assumes that the public keys have been group-checked by the caller
+    /// WARNING: This function assumes that the public keys have been subgroup-checked by the caller
     /// implicitly when verifying their proof-of-possession (PoP) in `ProofOfPossession::verify`.
     pub fn verify_aggregate_arbitrary_msg(&self, msgs: &[&[u8]], pks: &[&PublicKey]) -> Result<()> {
         let pks = pks
@@ -140,12 +140,12 @@ impl traits::Signature for Signature {
     }
 
     /// Verifies a BLS signature share or multisignature. Does not assume the signature to be
-    /// group-checked. (For verifying aggregate signatures on different messages, a different
+    /// subgroup-checked. (For verifying aggregate signatures on different messages, a different
     /// `verify_aggregate_arbitray_msg` function can be used.)
     ///
-    /// WARNING: This function does assume the public key has been group-checked by the caller
-    /// implicitly when verifying the public key's proof-of-possession (PoP) in
-    /// `ProofOfPossession::verify`.
+    /// WARNING: This function does assume the public key has been subgroup-checked by the caller,
+    /// either (1) implicitly when verifying the public key's proof-of-possession (PoP) in
+    /// `ProofOfPossession::verify` or (2) via `Validatable::<PublicKey>::validate()`.
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &PublicKey) -> Result<()> {
         let result = self.sig.verify(
             true,
@@ -195,7 +195,7 @@ impl TryFrom<&[u8]> for Signature {
 
     /// Deserializes a Signature from a sequence of bytes.
     ///
-    /// WARNING: Does NOT group-check the signature! Instead, this will be done implicitly when
+    /// WARNING: Does NOT subgroup-check the signature! Instead, this will be done implicitly when
     /// verifying the signature.
     fn try_from(bytes: &[u8]) -> std::result::Result<Signature, CryptoMaterialError> {
         Ok(Self {

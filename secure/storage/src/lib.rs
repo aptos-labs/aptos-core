@@ -12,6 +12,7 @@ mod kv_storage;
 mod namespaced;
 mod on_disk;
 mod policy;
+mod rocks_db;
 mod storage;
 mod vault;
 
@@ -25,6 +26,7 @@ pub use crate::{
     namespaced::Namespaced,
     on_disk::OnDiskStorage,
     policy::{Capability, Identity, Permission, Policy},
+    rocks_db::{RocksDbStorage, SECURE_STORAGE_DB_NAME},
     storage::Storage,
     vault::VaultStorage,
 };

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
 
 import { ModuleId } from "./transaction";
@@ -50,7 +53,7 @@ export abstract class ScriptABI {
       case 0:
         return TransactionScriptABI.load(deserializer);
       case 1:
-        return ScriptFunctionABI.load(deserializer);
+        return EntryFunctionABI.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
@@ -77,6 +80,7 @@ export class TransactionScriptABI extends ScriptABI {
   }
 
   serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(0);
     serializer.serializeStr(this.name);
     serializer.serializeStr(this.doc);
     serializer.serializeBytes(this.code);
@@ -94,9 +98,9 @@ export class TransactionScriptABI extends ScriptABI {
   }
 }
 
-export class ScriptFunctionABI extends ScriptABI {
+export class EntryFunctionABI extends ScriptABI {
   /**
-   * Constructs a ScriptFunctionABI instance
+   * Constructs a EntryFunctionABI instance
    * @param name
    * @param module_name Fully qualified module id
    * @param doc
@@ -114,6 +118,7 @@ export class ScriptFunctionABI extends ScriptABI {
   }
 
   serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(1);
     serializer.serializeStr(this.name);
     this.module_name.serialize(serializer);
     serializer.serializeStr(this.doc);
@@ -121,12 +126,12 @@ export class ScriptFunctionABI extends ScriptABI {
     serializeVector<ArgumentABI>(this.args, serializer);
   }
 
-  static load(deserializer: Deserializer): ScriptFunctionABI {
+  static load(deserializer: Deserializer): EntryFunctionABI {
     const name = deserializer.deserializeStr();
     const moduleName = ModuleId.deserialize(deserializer);
     const doc = deserializer.deserializeStr();
     const tyArgs = deserializeVector(deserializer, TypeArgumentABI);
     const args = deserializeVector(deserializer, ArgumentABI);
-    return new ScriptFunctionABI(name, moduleName, doc, tyArgs, args);
+    return new EntryFunctionABI(name, moduleName, doc, tyArgs, args);
   }
 }

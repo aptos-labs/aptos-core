@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -22,7 +23,7 @@ pub struct StateDelta {
     pub base_version: Option<Version>,
     pub current: SparseMerkleTree<StateValue>,
     pub current_version: Option<Version>,
-    pub updates_since_base: HashMap<StateKey, StateValue>,
+    pub updates_since_base: HashMap<StateKey, Option<StateValue>>,
 }
 
 impl StateDelta {
@@ -31,7 +32,7 @@ impl StateDelta {
         base_version: Option<Version>,
         current: SparseMerkleTree<StateValue>,
         current_version: Option<Version>,
-        updates_since_base: HashMap<StateKey, StateValue>,
+        updates_since_base: HashMap<StateKey, Option<StateValue>>,
     ) -> Self {
         assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
@@ -48,8 +49,12 @@ impl StateDelta {
         Self::new(smt.clone(), None, smt, None, HashMap::new())
     }
 
-    pub fn new_at_checkpoint(root_hash: HashValue, checkpoint_version: Option<Version>) -> Self {
-        let smt = SparseMerkleTree::new(root_hash);
+    pub fn new_at_checkpoint(
+        root_hash: HashValue,
+        usage: StateStorageUsage,
+        checkpoint_version: Option<Version>,
+    ) -> Self {
+        let smt = SparseMerkleTree::new(root_hash, usage);
         Self::new(
             smt.clone(),
             checkpoint_version,

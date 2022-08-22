@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -30,7 +33,7 @@ export class RawTransaction {
    * @param sequence_number Sequence number of this transaction. This must match the sequence number stored in
    *   the sender's account at the time the transaction executes.
    * @param payload Instructions for the Aptos Blockchain, including publishing a module,
-   *   execute a script function or execute a script payload.
+   *   execute a entry function or execute a script payload.
    * @param max_gas_amount Maximum total gas to spend for this transaction. The account must have more
    *   than this gas or the transaction will be discarded during validation.
    * @param gas_unit_price Price to be paid per gas unit.
@@ -116,7 +119,7 @@ export class Script {
   }
 }
 
-export class ScriptFunction {
+export class EntryFunction {
   /**
    * Contains the payload to run a function within a module.
    * @param module_name Fullly qualified module name. ModuleId consists of account address and module name.
@@ -163,8 +166,8 @@ export class ScriptFunction {
    * ```
    * @returns
    */
-  static natural(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
-    return new ScriptFunction(ModuleId.fromStr(module), new Identifier(func), ty_args, args);
+  static natural(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): EntryFunction {
+    return new EntryFunction(ModuleId.fromStr(module), new Identifier(func), ty_args, args);
   }
 
   /**
@@ -172,8 +175,8 @@ export class ScriptFunction {
    *
    * @deprecated.
    */
-  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
-    return ScriptFunction.natural(module, func, ty_args, args);
+  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): EntryFunction {
+    return EntryFunction.natural(module, func, ty_args, args);
   }
 
   serialize(serializer: Serializer): void {
@@ -187,7 +190,7 @@ export class ScriptFunction {
     });
   }
 
-  static deserialize(deserializer: Deserializer): ScriptFunction {
+  static deserialize(deserializer: Deserializer): EntryFunction {
     const module_name = ModuleId.deserialize(deserializer);
     const function_name = Identifier.deserialize(deserializer);
     const ty_args = deserializeVector(deserializer, TypeTag);
@@ -199,7 +202,7 @@ export class ScriptFunction {
     }
 
     const args = list;
-    return new ScriptFunction(module_name, function_name, ty_args, args);
+    return new EntryFunction(module_name, function_name, ty_args, args);
   }
 }
 
@@ -361,26 +364,14 @@ export abstract class TransactionPayload {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TransactionPayloadWriteSet.load(deserializer);
-      case 1:
         return TransactionPayloadScript.load(deserializer);
-      case 2:
+      case 1:
         return TransactionPayloadModuleBundle.load(deserializer);
-      case 3:
-        return TransactionPayloadScriptFunction.load(deserializer);
+      case 2:
+        return TransactionPayloadEntryFunction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
-  }
-}
-
-export class TransactionPayloadWriteSet extends TransactionPayload {
-  serialize(serializer: Serializer): void {
-    throw new Error("Not implemented");
-  }
-
-  static load(deserializer: Deserializer): TransactionPayloadWriteSet {
-    throw new Error("Not implemented");
   }
 }
 
@@ -390,7 +381,7 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(0);
     this.value.serialize(serializer);
   }
 
@@ -406,7 +397,7 @@ export class TransactionPayloadModuleBundle extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(2);
+    serializer.serializeU32AsUleb128(1);
     this.value.serialize(serializer);
   }
 
@@ -416,19 +407,19 @@ export class TransactionPayloadModuleBundle extends TransactionPayload {
   }
 }
 
-export class TransactionPayloadScriptFunction extends TransactionPayload {
-  constructor(public readonly value: ScriptFunction) {
+export class TransactionPayloadEntryFunction extends TransactionPayload {
+  constructor(public readonly value: EntryFunction) {
     super();
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(3);
+    serializer.serializeU32AsUleb128(2);
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionPayloadScriptFunction {
-    const value = ScriptFunction.deserialize(deserializer);
-    return new TransactionPayloadScriptFunction(value);
+  static load(deserializer: Deserializer): TransactionPayloadEntryFunction {
+    const value = EntryFunction.deserialize(deserializer);
+    return new TransactionPayloadEntryFunction(value);
   }
 }
 

@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_address::AccountAddress;
 use crate::{
+    account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use move_deps::move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -19,16 +20,21 @@ use serde::{Deserialize, Serialize};
 /// Should be kept in-sync with NewBlockEvent move struct in block.move.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
+    hash: AccountAddress,
     epoch: u64,
     round: u64,
     height: u64,
-    previous_block_votes: Vec<bool>,
+    previous_block_votes_bitvec: Vec<u8>,
     proposer: AccountAddress,
     failed_proposer_indices: Vec<u64>,
     timestamp: u64,
 }
 
 impl NewBlockEvent {
+    pub fn hash(&self) -> Result<HashValue> {
+        Ok(HashValue::from_slice(self.hash.to_vec())?)
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -41,8 +47,8 @@ impl NewBlockEvent {
         self.height
     }
 
-    pub fn previous_block_votes(&self) -> &Vec<bool> {
-        &self.previous_block_votes
+    pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
+        &self.previous_block_votes_bitvec
     }
 
     pub fn proposer(&self) -> AccountAddress {
@@ -65,19 +71,21 @@ impl NewBlockEvent {
     }
 
     pub fn new(
+        hash: AccountAddress,
         epoch: u64,
         round: u64,
         height: u64,
-        previous_block_votes: Vec<bool>,
+        previous_block_votes_bitvec: Vec<u8>,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u64>,
         timestamp: u64,
     ) -> Self {
         Self {
+            hash,
             epoch,
             round,
             height,
-            previous_block_votes,
+            previous_block_votes_bitvec,
             proposer,
             failed_proposer_indices,
             timestamp,

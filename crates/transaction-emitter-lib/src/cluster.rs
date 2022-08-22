@@ -12,7 +12,7 @@ use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
+    types::{account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
@@ -142,12 +142,12 @@ impl Cluster {
     }
 
     pub async fn load_aptos_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
+        self.load_account_with_mint_key(client, aptos_test_root_address())
             .await
     }
 
     pub async fn load_faucet_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
+        self.load_account_with_mint_key(client, aptos_test_root_address())
             .await
     }
 

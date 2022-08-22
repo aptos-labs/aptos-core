@@ -4,10 +4,11 @@
 use crate::{
     errors::*,
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
 use aptos_infallible::Mutex;
+use aptos_types::write_set::TransactionWrite;
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -35,7 +36,12 @@ pub struct MVHashMapView<'a, K, V> {
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
 }
 
-impl<'a, K: PartialOrd + Send + Clone + Hash + Eq, V: Send + Sync> MVHashMapView<'a, K, V> {
+impl<
+        'a,
+        K: ModulePath + PartialOrd + Send + Clone + Hash + Eq,
+        V: TransactionWrite + Send + Sync,
+    > MVHashMapView<'a, K, V>
+{
     /// Drains the captured reads.
     pub fn take_reads(&self) -> Vec<ReadDescriptor<K>> {
         let mut reads = self.captured_reads.lock();
@@ -313,22 +319,28 @@ where
         });
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let mut maybe_err = None;
-        let mut final_results = Vec::with_capacity(num_txns);
         let num_txns = scheduler.num_txn_to_execute();
-        for idx in 0..num_txns {
-            match last_input_output.take_output(idx) {
-                ExecutionStatus::Success(t) => final_results.push(t),
-                ExecutionStatus::SkipRest(t) => {
-                    final_results.push(t);
-                    break;
-                }
-                ExecutionStatus::Abort(err) => {
-                    maybe_err = Some(err);
-                    break;
-                }
-            };
-        }
+        let mut final_results = Vec::with_capacity(num_txns);
+
+        let maybe_err = if last_input_output.module_publishing_may_race() {
+            Some(Error::ModulePathReadWrite)
+        } else {
+            let mut ret = None;
+            for idx in 0..num_txns {
+                match last_input_output.take_output(idx) {
+                    ExecutionStatus::Success(t) => final_results.push(t),
+                    ExecutionStatus::SkipRest(t) => {
+                        final_results.push(t);
+                        break;
+                    }
+                    ExecutionStatus::Abort(err) => {
+                        ret = Some(err);
+                        break;
+                    }
+                };
+            }
+            ret
+        };
 
         spawn(move || {
             // Explicit async drops.

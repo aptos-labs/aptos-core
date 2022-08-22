@@ -17,6 +17,7 @@
       </h2>
     <% end %>
 
+    <%= turbo_frame_tag 'it3_steps', target: '_top' do %>
     <div class="flex flex-wrap flex-col gap-8 max-w-prose" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
         <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-25' : '' %>">
@@ -26,6 +27,8 @@
               <h4 class="text-white font-mono uppercase text-2xl mb-4">
                 <% if step.name == :connect_discord %>
                   Connect Discord
+                <% elsif step.name == :connect_wallet %>
+                  Connect Wallet
                 <% elsif step.name == :survey %>
                   Complete Survey
                 <% elsif step.name == :node_registration %>
@@ -40,12 +43,14 @@
               <p class="mb-8 lg:mb-0 font-light">
               <% if step.name == :connect_discord %>
                 Sign in to your Discord to continue node verification.
+              <% elsif step.name == :connect_wallet %>
+                Connect your Aptos wallet to be eligible for governance voting.
               <% elsif step.name == :survey %>
                 Please tell us a bit more about yourself and your experience with Aptos.
               <% elsif step.name == :node_registration %>
                 Register your node, and automatically verify that it is set up correctly.
               <% elsif step.name == :identity_verification %>
-                Identity must be verified by noon (PST) July 11 to get into the selection process.
+                Identity must be verified by noon (PST) August 27 to get into the selection process.
               <% end %>
               </p>
 
@@ -54,11 +59,17 @@
                   <%= dialog.with_title do %>
                     <% if step.name == :connect_discord %>
                       Connect Discord
+                    <% elsif step.name == :connect_wallet %>
+                      Install Wallet
                     <% end %>
                   <% end %>
                   <%= dialog.with_body do %>
                     <% if step.name == :connect_discord %>
                       <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
+                    <% elsif step.name == :connect_wallet %>
+                      <p class="font-light">
+                      An Aptos wallet must be installed to continue.
+                      <%= render(LinkComponent.new(href: 'https://aptos.dev/guides/building-wallet-extension#step-1-install-the-wallet-on-chrome', target: '_blank')) { 'Learn more' } %></p>
                     <% end %>
                   <% end %>
                 <% end %>
@@ -66,17 +77,30 @@
             </div>
 
             <div class="w-full lg:flex-1">
-              <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
-                <% if step.completed %>
-                  <%= render IconComponent.new(:check_circle, size: :medium) %>
-                <% elsif step.name == :connect_discord %>
-                  Sign in
-                <% elsif step.name == :survey %>
-                  Continue
-                <% elsif step.name == :node_registration %>
-                  Register
-                <% elsif step.name == :identity_verification %>
-                  Verify
+              <% if step.name == :connect_wallet %>
+                <%= form_with url: it3_path, method: :put, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit:capture', connect_wallet_dialog_value: step.dialog&.id, turbo_frame: 'it3-steps' } do |form| %>
+                  <%= form.hidden_field :owner_key, data: { connect_wallet_target: 'ownerKey' } %>
+                  <%= render ButtonComponent.new(type: :submit, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled, data: { connect_wallet_target: 'button' }) do %>
+                    <% if step.completed %>
+                      <%= render IconComponent.new(:check_circle, size: :medium) %>
+                    <% else %>
+                      Connect
+                    <% end %>
+                  <% end %>
+                <% end %>
+              <% else %>
+                <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
+                  <% if step.completed %>
+                    <%= render IconComponent.new(:check_circle, size: :medium) %>
+                  <% elsif step.name == :connect_discord %>
+                    Sign in
+                  <% elsif step.name == :survey %>
+                    Continue
+                  <% elsif step.name == :node_registration %>
+                    Register
+                  <% elsif step.name == :identity_verification %>
+                    Verify
+                  <% end %>
                 <% end %>
               <% end %>
             </div>
@@ -84,5 +108,6 @@
         </div>
       <% end %>
     </div>
+    <% end %>
   </div>
 </div>

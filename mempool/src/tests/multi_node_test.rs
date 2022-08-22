@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::common;
 use crate::{
     network::MempoolSyncMsg,
     shared_mempool::types::SharedMempoolNotification,
@@ -29,6 +30,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Clone, Copy)]
 struct MempoolOverrideConfig {
     broadcast_batch_size: Option<usize>,
+    max_broadcast_batch_bytes: Option<usize>,
     mempool_size: Option<usize>,
     max_broadcasts_per_peer: Option<usize>,
     ack_timeout_ms: Option<u64>,
@@ -40,6 +42,7 @@ impl MempoolOverrideConfig {
     fn new() -> MempoolOverrideConfig {
         MempoolOverrideConfig {
             broadcast_batch_size: Some(1),
+            max_broadcast_batch_bytes: None,
             mempool_size: None,
             max_broadcasts_per_peer: None,
             ack_timeout_ms: None,
@@ -171,6 +174,9 @@ impl TestHarness {
             if let Some(batch_size) = mempool_config.broadcast_batch_size {
                 config.mempool.shared_mempool_batch_size = batch_size;
             }
+            if let Some(max_batch_bytes) = mempool_config.max_broadcast_batch_bytes {
+                config.mempool.shared_mempool_max_batch_bytes = max_batch_bytes as u64;
+            }
             if let Some(mempool_size) = mempool_config.mempool_size {
                 config.mempool.capacity = mempool_size;
             }
@@ -285,8 +291,18 @@ impl TestHarness {
         sender: &NodeId,
         network_id: NetworkId,
         num_messages: usize,
+        num_transactions_in_message: usize,
     ) -> (Vec<SignedTransaction>, PeerId) {
-        self.broadcast_txns(sender, network_id, num_messages, true, true, false)
+        self.broadcast_txns(
+            sender,
+            network_id,
+            num_messages,
+            Some(num_transactions_in_message),
+            None,
+            true,
+            true,
+            false,
+        )
     }
 
     /// Broadcast Transactions queued up in the local mempool of the sender
@@ -295,6 +311,8 @@ impl TestHarness {
         sender_id: &NodeId,
         network_id: NetworkId,
         num_messages: usize,
+        num_transactions_in_message: Option<usize>, // If specified, checks the number of txns in the message
+        max_num_transactions_in_message: Option<usize>, // If specified, checks the max number of txns in the message
         check_txns_in_mempool: bool, // Check whether all txns in this broadcast are accepted into recipient's mempool
         execute_send: bool, // If true, actually delivers msg to remote peer; else, drop the message (useful for testing unreliable msg delivery)
         drop_ack: bool,     // If true, drop ack from remote peer to this peer
@@ -314,12 +332,24 @@ impl TestHarness {
         // Handle outgoing message
         match network_req {
             PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let decoded_msg = bcs::from_bytes(&msg.mdata).unwrap();
-                match decoded_msg {
+                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+                match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
                         request_id: _request_id,
                     } => {
+                        // Check that the number of received transactions exactly matches
+                        if let Some(num_transactions_in_message) = num_transactions_in_message {
+                            assert_eq!(num_transactions_in_message, transactions.len());
+                        }
+
+                        // Check that the number of transactions in the message is within than the max
+                        if let Some(max_num_transactions_in_message) =
+                            max_num_transactions_in_message
+                        {
+                            assert!(transactions.len() <= max_num_transactions_in_message);
+                        }
+
                         // If we don't want to forward the request, let's just drop it
                         if !execute_send {
                             return (transactions, remote_peer_id);
@@ -392,8 +422,8 @@ impl TestHarness {
 
         match network_req {
             PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let decoded_msg = bcs::from_bytes(&msg.mdata).unwrap();
-                match decoded_msg {
+                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+                match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                         // send it to peer
                         let lookup_peer_network_id = match network_id {
@@ -448,6 +478,28 @@ fn test_transactions(start: u64, num: u64) -> Vec<TestTransaction> {
     txns
 }
 
+fn test_transactions_with_byte_limit(
+    starting_sequence_number: u64,
+    byte_limit: usize,
+) -> Vec<TestTransaction> {
+    let mut transactions = vec![];
+    let mut sequence_number = starting_sequence_number;
+    let mut byte_count = 0;
+
+    // Continue to add transactions to the batch until we hit the byte limit
+    loop {
+        let transaction = test_transaction(sequence_number);
+        let transaction_bytes = bcs::to_bytes(&transaction).unwrap().len();
+        if (byte_count + transaction_bytes) < byte_limit {
+            transactions.push(transaction);
+            byte_count += transaction_bytes;
+            sequence_number += 1;
+        } else {
+            return transactions;
+        }
+    }
+}
+
 fn test_transaction(seq_num: u64) -> TestTransaction {
     TestTransaction::new(1, seq_num, 1)
 }
@@ -480,7 +532,7 @@ fn test_metric_cache_ignore_shared_txns() {
     // TODO: Why not use the information that comes back from the broadcast?
     for txn in txns.iter().take(3) {
         // Let peer_a share txns with peer_b
-        let _ = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1);
+        let _ = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1, 1);
         // Check if txns's creation timestamp exist in peer_b's metrics_cache.
         assert_eq!(harness.exist_in_metrics_cache(v_b, txn), false);
     }
@@ -504,11 +556,29 @@ fn test_max_broadcast_limit() {
     harness.connect(v_b, v_a);
 
     // Test that for mempool broadcasts txns up till max broadcast, even if they are not ACK'ed
-    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, true, true);
+    let (txns, _) = harness.broadcast_txns(
+        v_a,
+        NetworkId::Validator,
+        1,
+        Some(1),
+        None,
+        true,
+        true,
+        true,
+    );
     assert_eq!(0, txns.get(0).unwrap().sequence_number());
 
     for seq_num in 1..3 {
-        let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, false, false);
+        let (txns, _) = harness.broadcast_txns(
+            v_a,
+            NetworkId::Validator,
+            1,
+            Some(1),
+            None,
+            true,
+            false,
+            false,
+        );
         assert_eq!(seq_num, txns.get(0).unwrap().sequence_number());
     }
 
@@ -521,12 +591,103 @@ fn test_max_broadcast_limit() {
     // Deliver ACK from B to A.
     // This should unblock A to send more broadcasts.
     harness.deliver_response(v_b, NetworkId::Validator);
-    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, false, true, true);
+    let (txns, _) = harness.broadcast_txns(
+        v_a,
+        NetworkId::Validator,
+        1,
+        Some(1),
+        None,
+        false,
+        true,
+        true,
+    );
     assert_eq!(3, txns.get(0).unwrap().sequence_number());
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
     for _ in 0..10 {
         harness.assert_no_message_sent(v_a, NetworkId::Validator);
+    }
+}
+
+#[test]
+fn test_max_batch_size() {
+    // Test different max batch sizes
+    for broadcast_batch_size in [5, 10, 20, 30] {
+        let mut validator_mempool_config = MempoolOverrideConfig::new();
+        validator_mempool_config.broadcast_batch_size = Some(broadcast_batch_size);
+        validator_mempool_config.ack_timeout_ms = Some(u64::MAX);
+
+        let (mut harness, validators) =
+            TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
+        let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+
+        let num_batch_sends = 3;
+        let pool_txns = test_transactions(0, (broadcast_batch_size * num_batch_sends * 10) as u64); // Add more than enough txns
+        harness.add_txns(v_a, pool_txns);
+
+        // A and B discover each other
+        harness.connect(v_b, v_a);
+
+        // Verify the batches are sent
+        for _ in 0..num_batch_sends {
+            // Verify that mempool broadcasts the transactions from A to B
+            // with the expected batch size.
+            let _ = harness.broadcast_txns(
+                v_a,
+                NetworkId::Validator,
+                1,
+                Some(broadcast_batch_size),
+                None,
+                true,
+                true,
+                true,
+            );
+            harness.deliver_response(v_b, NetworkId::Validator);
+        }
+    }
+}
+
+#[test]
+fn test_max_network_byte_size() {
+    // Test different max network batch sizes
+    for max_broadcast_batch_bytes in [512, 1024, 3 * 1024] {
+        let mut validator_mempool_config = MempoolOverrideConfig::new();
+        validator_mempool_config.broadcast_batch_size = Some(10000000); // Large max. batch sizes to test chunking
+        validator_mempool_config.max_broadcast_batch_bytes = Some(max_broadcast_batch_bytes);
+        validator_mempool_config.ack_timeout_ms = Some(u64::MAX);
+
+        // Calculate the expected size of each batch (based on the byte limit)
+        let max_broadcast_batch_size =
+            test_transactions_with_byte_limit(0, max_broadcast_batch_bytes).len();
+
+        let (mut harness, validators) =
+            TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
+        let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+
+        let num_batch_sends = 3;
+        let pool_txns =
+            test_transactions(0, (max_broadcast_batch_size * num_batch_sends * 10) as u64); // Add more than enough txns
+        harness.add_txns(v_a, pool_txns);
+
+        // A and B discover each other
+        harness.connect(v_b, v_a);
+
+        // Verify the batches are sent
+        for _ in 0..num_batch_sends {
+            // Verify that mempool broadcasts the transactions from A to B
+            // with the max broadcast batch size.
+            let _ = harness.broadcast_txns(
+                v_a,
+                NetworkId::Validator,
+                1,
+                None,
+                Some(max_broadcast_batch_size),
+                true,
+                true,
+                true,
+            );
+            harness.deliver_response(v_b, NetworkId::Validator);
+        }
     }
 }

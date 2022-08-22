@@ -148,6 +148,82 @@ pub struct SparseMerkleProof {
     siblings: Vec<HashValue>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum NodeInProof {
+    Leaf(SparseMerkleLeafNode),
+    Other(HashValue),
+}
+
+impl From<HashValue> for NodeInProof {
+    fn from(hash: HashValue) -> Self {
+        Self::Other(hash)
+    }
+}
+
+impl From<SparseMerkleLeafNode> for NodeInProof {
+    fn from(leaf: SparseMerkleLeafNode) -> Self {
+        Self::Leaf(leaf)
+    }
+}
+
+impl NodeInProof {
+    pub fn hash(&self) -> HashValue {
+        match self {
+            Self::Leaf(leaf) => leaf.hash(),
+            Self::Other(hash) => *hash,
+        }
+    }
+}
+
+/// A more detailed version of `SparseMerkleProof` with the only difference that all the leaf
+/// siblings are explicitly set as `SparseMerkleLeafNode` instead of its hash value.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SparseMerkleProofExt {
+    leaf: Option<SparseMerkleLeafNode>,
+    /// All siblings in this proof, including the default ones. Siblings are ordered from the bottom
+    /// level to the root level.
+    siblings: Vec<NodeInProof>,
+}
+
+impl SparseMerkleProofExt {
+    /// Constructs a new `SparseMerkleProofExt` using leaf and a list of sibling nodes.
+    pub fn new(leaf: Option<SparseMerkleLeafNode>, siblings: Vec<NodeInProof>) -> Self {
+        Self { leaf, siblings }
+    }
+
+    /// Returns the leaf node in this proof.
+    pub fn leaf(&self) -> Option<SparseMerkleLeafNode> {
+        self.leaf
+    }
+
+    /// Returns the list of siblings in this proof.
+    pub fn siblings(&self) -> &[NodeInProof] {
+        &self.siblings
+    }
+
+    pub fn verify<V: CryptoHash>(
+        &self,
+        expected_root_hash: HashValue,
+        element_key: HashValue,
+        element_value: Option<&V>,
+    ) -> Result<()> {
+        SparseMerkleProof::from(self.clone()).verify(expected_root_hash, element_key, element_value)
+    }
+}
+
+impl From<SparseMerkleProofExt> for SparseMerkleProof {
+    fn from(proof_ext: SparseMerkleProofExt) -> Self {
+        Self::new(
+            proof_ext.leaf,
+            proof_ext
+                .siblings
+                .into_iter()
+                .map(|node| node.hash())
+                .collect(),
+        )
+    }
+}
+
 impl SparseMerkleProof {
     /// Constructs a new `SparseMerkleProof` using leaf and a list of siblings.
     pub fn new(leaf: Option<SparseMerkleLeafNode>, siblings: Vec<HashValue>) -> Self {

@@ -3,34 +3,35 @@
 module aptos_framework::consensus_config {
     use std::error;
     use std::vector;
+
     use aptos_framework::reconfiguration;
-    use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
 
-    /// Error with config
-    const ECONFIG: u64 = 1;
+    friend aptos_framework::genesis;
 
     struct ConsensusConfig has key {
         config: vector<u8>,
     }
 
-    /// Publishes the ConsensusConfig config.
-    public fun initialize(account: &signer) {
-        timestamp::assert_genesis();
-        system_addresses::assert_aptos_framework(account);
+    /// The provided on chain config bytes are empty or invalid
+    const EINVALID_CONFIG: u64 = 1;
 
-        assert!(
-            !exists<ConsensusConfig>(@aptos_framework),
-            error::already_exists(ECONFIG)
-        );
-        move_to(account, ConsensusConfig { config: vector::empty() });
+    /// Publishes the ConsensusConfig config.
+    public(friend) fun initialize(account: &signer, config: vector<u8>) {
+        system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        move_to(account, ConsensusConfig { config });
     }
 
-    /// Update the config.
+    /// This can be called by on-chain governance to update on-chain consensus configs.
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+
         let config_ref = &mut borrow_global_mut<ConsensusConfig>(@aptos_framework).config;
         *config_ref = config;
+
+        // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
     }
 }

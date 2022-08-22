@@ -19,9 +19,10 @@ url = "2.2.2"
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-
-cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
+
+framework = { path = "../../aptos-move/framework" }
 testcases = { path = "../testcases" }
 
 [[bin]]

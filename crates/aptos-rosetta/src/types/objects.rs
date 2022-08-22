@@ -8,7 +8,9 @@
 use crate::common::native_coin_tag;
 use crate::types::{
     account_module_identifier, aptos_coin_module_identifier, aptos_coin_resource_identifier,
-    coin_module_identifier, create_account_function_identifier, transfer_function_identifier,
+    coin_module_identifier, create_account_function_identifier,
+    set_operator_events_field_identifier, set_operator_function_identifier,
+    stake_module_identifier, stake_pool_resource_identifier, transfer_function_identifier,
 };
 use crate::{
     common::{is_native_coin, native_coin},
@@ -268,11 +270,13 @@ pub struct Operation {
 }
 
 impl Operation {
-    pub fn create_account(
+    fn new(
+        operation_type: OperationType,
         operation_index: u64,
         status: Option<OperationStatusType>,
         address: AccountAddress,
-        sender: AccountAddress,
+        amount: Option<Amount>,
+        metadata: Option<OperationSpecificMetadata>,
     ) -> Operation {
         Operation {
             operation_identifier: OperationIdentifier {
@@ -280,14 +284,28 @@ impl Operation {
                 network_index: None,
             },
             related_operations: None,
-            operation_type: OperationType::CreateAccount.to_string(),
+            operation_type: operation_type.to_string(),
             status: status.map(|inner| inner.to_string()),
             account: Some(address.into()),
-            amount: None,
-            metadata: Some(OperationSpecificMetadata {
-                sender: sender.into(),
-            }),
+            amount,
+            metadata,
         }
+    }
+
+    pub fn create_account(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        sender: AccountAddress,
+    ) -> Operation {
+        Operation::new(
+            OperationType::CreateAccount,
+            operation_index,
+            status,
+            address,
+            None,
+            Some(OperationSpecificMetadata::create_account(sender)),
+        )
     }
 
     pub fn deposit(
@@ -297,21 +315,17 @@ impl Operation {
         currency: Currency,
         amount: u64,
     ) -> Operation {
-        Operation {
-            operation_identifier: OperationIdentifier {
-                index: operation_index,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::Deposit.to_string(),
-            status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
-            amount: Some(Amount {
+        Operation::new(
+            OperationType::Deposit,
+            operation_index,
+            status,
+            address,
+            Some(Amount {
                 value: amount.to_string(),
                 currency,
             }),
-            metadata: None,
-        }
+            None,
+        )
     }
 
     pub fn withdraw(
@@ -321,28 +335,84 @@ impl Operation {
         currency: Currency,
         amount: u64,
     ) -> Operation {
-        Operation {
-            operation_identifier: OperationIdentifier {
-                index: operation_index,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::Withdraw.to_string(),
-            status: status.map(|inner| inner.to_string()),
-            account: Some(address.into()),
-            amount: Some(Amount {
+        Operation::new(
+            OperationType::Withdraw,
+            operation_index,
+            status,
+            address,
+            Some(Amount {
                 value: format!("-{}", amount),
                 currency,
             }),
-            metadata: None,
-        }
+            None,
+        )
+    }
+
+    pub fn gas_fee(
+        operation_index: u64,
+        address: AccountAddress,
+        gas_used: u64,
+        gas_price_per_unit: u64,
+    ) -> Operation {
+        Operation::new(
+            OperationType::Fee,
+            operation_index,
+            Some(OperationStatusType::Success),
+            address,
+            Some(Amount {
+                value: format!("-{}", gas_used.saturating_mul(gas_price_per_unit)),
+                currency: native_coin(),
+            }),
+            None,
+        )
+    }
+
+    pub fn set_operator(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        operator: AccountAddress,
+    ) -> Operation {
+        Operation::new(
+            OperationType::Withdraw,
+            operation_index,
+            status,
+            address,
+            None,
+            Some(OperationSpecificMetadata::set_operator(operator)),
+        )
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct OperationSpecificMetadata {
+pub enum OperationSpecificMetadata {
+    CreateAccount(CreateAccountArguments),
+    SetOperator(SetOperatorArguments),
+}
+
+impl OperationSpecificMetadata {
+    pub fn create_account(sender: AccountAddress) -> OperationSpecificMetadata {
+        OperationSpecificMetadata::CreateAccount(CreateAccountArguments {
+            sender: sender.into(),
+        })
+    }
+
+    pub fn set_operator(operator: AccountAddress) -> OperationSpecificMetadata {
+        OperationSpecificMetadata::SetOperator(SetOperatorArguments {
+            operator: operator.into(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CreateAccountArguments {
     /// Sender for operations that affect accounts other than the sender
     pub sender: AccountIdentifier,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SetOperatorArguments {
+    operator: AccountIdentifier,
 }
 
 /// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
@@ -556,13 +626,11 @@ impl Transaction {
 
         // Everything committed costs gas
         if let Some(ref request) = maybe_user_transaction_request {
-            operations.push(Operation::withdraw(
+            operations.push(Operation::gas_fee(
                 operation_index,
-                // Gas charging is always successful if it's been committed
-                Some(OperationStatusType::Success),
                 *request.sender.inner(),
-                native_coin(),
-                txn_info.gas_used.0.saturating_mul(request.gas_unit_price.0),
+                txn_info.gas_used.0,
+                request.gas_unit_price.0,
             ));
         }
 
@@ -588,7 +656,7 @@ fn parse_operations_from_txn_payload(
     payload: &TransactionPayload,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
+    if let TransactionPayload::EntryFunctionPayload(inner) = payload {
         if AccountAddress::ONE == *inner.function.module.address.inner()
             && coin_module_identifier() == inner.function.module.name.0
             && transfer_function_identifier() == inner.function.name.0
@@ -640,6 +708,19 @@ fn parse_operations_from_txn_payload(
                 address.into(),
                 sender,
             ));
+        } else if AccountAddress::ONE == *inner.function.module.address.inner()
+            && stake_module_identifier() == inner.function.module.name.0
+            && set_operator_function_identifier() == inner.function.name.0
+        {
+            let operator =
+                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                    .unwrap();
+            operations.push(Operation::set_operator(
+                operation_index,
+                Some(OperationStatusType::Failure),
+                operator.into(),
+                sender,
+            ));
         }
     }
     operations
@@ -672,6 +753,13 @@ fn parse_operations_from_write_set(
             vec![native_coin_tag().into()],
         );
 
+        let stake_pool_tag = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            stake_module_identifier().into(),
+            stake_pool_resource_identifier().into(),
+            vec![],
+        );
+
         if data.typ == account_tag {
             // Account sequence number increase (possibly creation)
             // Find out if it's the 0th sequence number (creation)
@@ -691,12 +779,35 @@ fn parse_operations_from_write_set(
                     }
                 }
             }
+        } else if data.typ == stake_pool_tag {
+            // Account sequence number increase (possibly creation)
+            // Find out if it's the 0th sequence number (creation)
+            for (id, value) in data.data.0.iter() {
+                if id.0 == set_operator_events_field_identifier() {
+                    serde_json::from_value::<EventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<EventId>(value.clone()) {
+                        let set_operator_event =
+                            EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
+                        if let Some(operator) =
+                            get_set_operator_from_event(events, set_operator_event)
+                        {
+                            operations.push(Operation::set_operator(
+                                operation_index,
+                                Some(OperationStatusType::Success),
+                                address,
+                                operator,
+                            ));
+                            operation_index += 1;
+                        }
+                    }
+                }
+            }
         } else if data.typ == coin_store_tag {
             // Account balance change
             for (id, value) in data.data.0.iter() {
                 if id.0 == withdraw_events_field_identifier() {
-                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
-                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                    serde_json::from_value::<EventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<EventId>(value.clone()) {
                         let withdraw_event =
                             EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
                         if let Some(amount) = get_amount_from_event(events, withdraw_event) {
@@ -711,8 +822,8 @@ fn parse_operations_from_write_set(
                         }
                     }
                 } else if id.0 == deposit_events_field_identifier() {
-                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
-                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                    serde_json::from_value::<EventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<EventId>(value.clone()) {
                         let withdraw_event =
                             EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
                         if let Some(amount) = get_amount_from_event(events, withdraw_event) {
@@ -748,6 +859,21 @@ fn get_amount_from_event(events: &[Event], event_key: EventKey) -> Option<u64> {
     None
 }
 
+fn get_set_operator_from_event(events: &[Event], event_key: EventKey) -> Option<AccountAddress> {
+    if let Some(event) = events
+        .iter()
+        .find(|event| EventKey::from(event.key) == event_key)
+    {
+        if let Ok(SetOperatorEvent { new_operator, .. }) =
+            serde_json::from_value::<SetOperatorEvent>(event.data.clone())
+        {
+            return Some(*new_operator.inner());
+        }
+    }
+
+    None
+}
+
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
@@ -764,6 +890,7 @@ pub enum OperationDetails {
 pub enum InternalOperation {
     CreateAccount(CreateAccount),
     Transfer(Transfer),
+    SetOperator(SetOperator),
 }
 
 impl InternalOperation {
@@ -772,18 +899,40 @@ impl InternalOperation {
         match operations.len() {
             1 => {
                 if let Some(operation) = operations.first() {
-                    if operation.operation_type == OperationType::CreateAccount.to_string() {
-                        if let (Some(OperationSpecificMetadata { sender }), Some(account)) =
-                            (&operation.metadata, &operation.account)
-                        {
-                            return Ok(Self::CreateAccount(CreateAccount {
-                                sender: sender.account_address()?,
-                                new_account: account.account_address()?,
-                            }));
+                    match OperationType::from_str(&operation.operation_type) {
+                        Ok(OperationType::CreateAccount) => {
+                            if let (
+                                Some(OperationSpecificMetadata::CreateAccount(
+                                    CreateAccountArguments { sender },
+                                )),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::CreateAccount(CreateAccount {
+                                    sender: sender.account_address()?,
+                                    new_account: account.account_address()?,
+                                }));
+                            }
                         }
+                        Ok(OperationType::SetOperator) => {
+                            if let (
+                                Some(OperationSpecificMetadata::SetOperator(
+                                    SetOperatorArguments { operator },
+                                )),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::SetOperator(SetOperator {
+                                    owner: account.account_address()?,
+                                    operator: operator.account_address()?,
+                                }));
+                            }
+                        }
+                        _ => {}
                     }
                 }
 
+                // Return invalid operations if for any reason parsing fails
                 Err(ApiError::InvalidOperations)
             }
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
@@ -796,6 +945,7 @@ impl InternalOperation {
         match self {
             Self::CreateAccount(inner) => inner.sender,
             Self::Transfer(inner) => inner.sender,
+            Self::SetOperator(inner) => inner.owner,
         }
     }
 }
@@ -907,23 +1057,37 @@ impl Transfer {
     }
 }
 
+/// Set operator
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SetOperator {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct CoinEvent {
     amount: U64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CoinEventId {
+pub struct SetOperatorEvent {
+    _pool_address: Address,
+    _old_operator: Address,
+    new_operator: Address,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct EventId {
     guid: Id,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Id {
-    id: EventId,
+    id: EventKeyId,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct EventId {
+pub struct EventKeyId {
     #[serde(deserialize_with = "deserialize_account_address")]
     addr: AccountAddress,
     creation_num: U64,

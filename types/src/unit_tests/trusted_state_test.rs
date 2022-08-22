@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::multi_signature::{MultiSignature, PartialSignatures};
+use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 use crate::{
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
@@ -59,9 +59,10 @@ fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
             signers
                 .iter()
                 .map(|signer| {
-                    (
+                    ValidatorConsensusInfo::new(
                         signer.author(),
-                        ValidatorConsensusInfo::new(signer.public_key(), 1 /* voting power */),
+                        signer.public_key(),
+                        1, /* voting power */
                     )
                 })
                 .collect(),
@@ -75,14 +76,14 @@ fn sign_ledger_info(
     signers: &[ValidatorSigner],
     verifier: &ValidatorVerifier,
     ledger_info: &LedgerInfo,
-) -> MultiSignature {
+) -> AggregateSignature {
     let partial_sig = PartialSignatures::new(
         signers
             .iter()
             .map(|s| (s.author(), s.sign(ledger_info)))
             .collect(),
     );
-    verifier.aggregate_multi_signature(&partial_sig).unwrap().0
+    verifier.aggregate_signatures(&partial_sig).unwrap()
 }
 
 fn mock_ledger_info(
@@ -428,7 +429,7 @@ proptest! {
         let li_with_sigs = bad_li_idx.get(&lis_with_sigs);
         let bad_li_with_sigs = LedgerInfoWithSignatures::new(
             li_with_sigs.ledger_info().clone(),
-            MultiSignature::empty(), /* empty signatures */
+            AggregateSignature::empty(), /* empty signatures */
         );
         *bad_li_idx.get_mut(&mut lis_with_sigs) = bad_li_with_sigs;
 
@@ -487,7 +488,7 @@ proptest! {
             mock_ledger_info(good_li.epoch(), 999, good_li.transaction_accumulator_hash(), None),
             sigs.clone(),
         );
-        let bad_li_5 = LedgerInfoWithSignatures::new(good_li.clone(), MultiSignature::empty());
+        let bad_li_5 = LedgerInfoWithSignatures::new(good_li.clone(), AggregateSignature::empty());
 
         trusted_state.verify_and_ratchet_inner(&bad_li_1, &change_proof).unwrap_err();
         trusted_state.verify_and_ratchet_inner(&bad_li_2, &change_proof).unwrap_err();

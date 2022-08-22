@@ -34,6 +34,8 @@ env:
   # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
+# These tests are being run against devnet. To combat flakiness resulting from
+# chatting with a remote service, each test is run with retries.
 jobs:
   # Note: We do not check first_coin or hello_blockchain yet.
   test-ts-examples:
@@ -48,12 +50,21 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
-      # Run package install. If install fails, it probably means the lockfile
-      # was not included in the commit.
-      - run: cd ./developer-docs-site/static/examples/typescript && yarn install --frozen-lockfile
+      - run: cd ./developer-docs-site/static/examples/typescript && yarn install
 
-      - run: cd ./developer-docs-site/static/examples/typescript && yarn first_transaction
-      - run: cd ./developer-docs-site/static/examples/typescript && yarn first_nft
+      - uses: nick-fields/retry@v2
+        name: first_transaction
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./developer-docs-site/static/examples/typescript && yarn first_transaction
+
+      - uses: nick-fields/retry@v2
+        name: first_nft
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./developer-docs-site/static/examples/typescript && yarn first_nft
 
   # Note: We do not check first-coin yet.
   test-rust-examples:
@@ -65,7 +76,12 @@ jobs:
 
       - uses: ./.github/actions/rust-setup
 
-      - run: cd ./developer-docs-site/static/examples/rust && cargo run -p first-transaction
+      - uses: nick-fields/retry@v2
+        name: first-transaction
+        with:
+          max_attempts: 3
+          timeout_minutes: 30
+          command: cd ./developer-docs-site/static/examples/rust && cargo run -p first-transaction
 
   # Note: We do not check first_coin.py or hello_blockchain.py yet.
   test-python-examples:
@@ -83,5 +99,16 @@ jobs:
 
       - run: cd ./developer-docs-site/static/examples/python && ${{ steps.install.outputs.python-path }} -m pip install -r requirements.txt
 
-      - run: cd ./developer-docs-site/static/examples/python && ${{ steps.install.outputs.python-path }} first_transaction.py
-      - run: cd ./developer-docs-site/static/examples/python && ${{ steps.install.outputs.python-path }} first_nft.py
+      - uses: nick-fields/retry@v2
+        name: first-transaction
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./developer-docs-site/static/examples/python && ${{ steps.install.outputs.python-path }} first_transaction.py
+
+      - uses: nick-fields/retry@v2
+        name: first-nft
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./developer-docs-site/static/examples/python && ${{ steps.install.outputs.python-path }} first_nft.py

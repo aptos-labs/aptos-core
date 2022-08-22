@@ -6,7 +6,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::{mint, mint::MintParams, Service};
 use aptos_sdk::types::{
-    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+    account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
     LocalAccount,
 };
 use clap::Parser;
@@ -59,7 +59,9 @@ pub struct FaucetCliArgs {
 
 impl FaucetCliArgs {
     async fn execute(self) {
-        let mint_account_address = self.mint_account_address.unwrap_or_else(aptos_root_address);
+        let mint_account_address = self
+            .mint_account_address
+            .unwrap_or_else(aptos_test_root_address);
         let mint_key = if let Some(ref key) = self.mint_key {
             key.private_key()
         } else {

@@ -1,93 +1,75 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::{db_pruner, db_pruner::DBPruner};
-use aptos_config::config::StoragePrunerConfig;
-use std::sync::{mpsc::Receiver, Arc};
+use aptos_config::config::LedgerPrunerConfig;
+use aptos_logger::{
+    error,
+    prelude::{sample, SampleRate},
+    sample::Sampling,
+};
+use aptos_types::transaction::Version;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 
 /// Maintains the ledger pruner and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
+#[derive(Debug)]
 pub struct LedgerPrunerWorker {
-    command_receiver: Receiver<db_pruner::Command>,
+    /// The worker will sleep for this period of time after pruning each batch.
+    pruning_time_interval_in_ms: u64,
     /// Ledger pruner.
     pruner: Arc<LedgerPruner>,
-    /// Indicates if there's NOT any pending work to do currently, to hint
-    /// `Self::receive_commands()` to `recv()` blocking-ly.
-    blocking_recv: bool,
     /// Max items to prune per batch. For the ledger pruner, this means the max versions to prune
     /// and for the state pruner, this means the max stale nodes to prune.
-    ledger_store_max_versions_to_prune_per_batch: u64,
+    max_versions_to_prune_per_batch: u64,
+    /// Indicates whether the pruning loop should be running. Will only be set to true on pruner
+    /// destruction.
+    quit_worker: AtomicBool,
 }
 
 impl LedgerPrunerWorker {
     pub(crate) fn new(
         ledger_pruner: Arc<LedgerPruner>,
-        command_receiver: Receiver<db_pruner::Command>,
-        storage_pruner_config: StoragePrunerConfig,
+        ledger_pruner_config: LedgerPrunerConfig,
     ) -> Self {
         Self {
+            pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },
             pruner: ledger_pruner,
-            command_receiver,
-            blocking_recv: true,
-            ledger_store_max_versions_to_prune_per_batch: storage_pruner_config
-                .ledger_pruning_batch_size
-                as u64,
+            max_versions_to_prune_per_batch: ledger_pruner_config.batch_size as u64,
+            quit_worker: AtomicBool::new(false),
         }
     }
 
-    pub(crate) fn work(mut self) {
-        while self.receive_commands() {
-            // Process a reasonably small batch of work before trying to receive commands again,
-            // in case `Command::Quit` is received (that's when we should quit.)
-            let mut error_in_pruning = false;
-
-            self.pruner
-                .prune(self.ledger_store_max_versions_to_prune_per_batch as usize)
-                .map_err(|_| error_in_pruning = true)
-                .ok();
-
-            if !self.pruner.is_pruning_pending() || error_in_pruning {
-                self.blocking_recv = true;
-            } else {
-                self.blocking_recv = false;
+    // Loop that does the real pruning job.
+    pub(crate) fn work(&self) {
+        while !self.quit_worker.load(Ordering::Relaxed) {
+            let pruner_result = self
+                .pruner
+                .prune(self.max_versions_to_prune_per_batch as usize);
+            if pruner_result.is_err() {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(1)),
+                    error!(error = ?pruner_result.err().unwrap(),
+                        "Ledger pruner has error.")
+                );
+                sleep(Duration::from_millis(self.pruning_time_interval_in_ms));
+                return;
+            }
+            if !self.pruner.is_pruning_pending() {
+                sleep(Duration::from_millis(self.pruning_time_interval_in_ms));
             }
         }
     }
 
-    /// Tries to receive all pending commands, blocking waits for the next command if no work needs
-    /// to be done, otherwise quits with `true` to allow the outer loop to do some work before
-    /// getting back here.
-    ///
-    /// Returns `false` if `Command::Quit` is received, to break the outer loop and let
-    /// `work_loop()` return.
-    fn receive_commands(&mut self) -> bool {
-        loop {
-            let command = if self.blocking_recv {
-                // LedgerPrunerWorker has nothing to do, blocking wait for the next command.
-                self.command_receiver
-                    .recv()
-                    .expect("Sender should not destruct prematurely.")
-            } else {
-                // LedgerPrunerWorker has pending work to do, non-blocking recv.
-                match self.command_receiver.try_recv() {
-                    Ok(command) => command,
-                    // Channel has drained, yield control to the outer loop.
-                    Err(_) => return true,
-                }
-            };
+    pub fn set_target_db_version(&self, target_db_version: Version) {
+        assert!(target_db_version >= self.pruner.target_version());
+        self.pruner.set_target_version(target_db_version);
+    }
 
-            match command {
-                // On `Command::Quit` inform the outer loop to quit by returning `false`.
-                db_pruner::Command::Quit => return false,
-                db_pruner::Command::Prune { target_db_version } => {
-                    if target_db_version > self.pruner.target_version() {
-                        // Switch to non-blocking to allow some work to be done after the
-                        // channel has drained.
-                        self.blocking_recv = false;
-                    }
-                    self.pruner.set_target_version(target_db_version);
-                }
-            }
-        }
+    pub fn stop_pruning(&self) {
+        self.quit_worker.store(true, Ordering::Relaxed);
     }
 }

@@ -1,68 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use framework::ReleaseTarget;
 use std::path::PathBuf;
 
-use framework::release::CORE_FRAMEWORK_RELEASE_SUFFIX;
-use framework::release::TOKEN_RELEASE_SUFFIX;
-
 fn main() {
-    println!("cargo:rerun-if-changed=../aptos-framework/sources");
-    println!("cargo:rerun-if-changed=../aptos-stdlib/sources");
-    println!("cargo:rerun-if-changed=../move-stdlib/sources");
-    let release = framework::release::ReleaseOptions {
-        no_check_layout_compatibility: false,
-        no_build_docs: false,
-        with_diagram: false,
-        no_script_builder: false,
-        no_script_abis: false,
-        no_errmap: false,
-        package: PathBuf::from("aptos-framework"),
-        output: PathBuf::from(format!(
-            "{}/{}",
-            std::env::var("OUT_DIR").unwrap(),
-            CORE_FRAMEWORK_RELEASE_SUFFIX
-        )),
-    };
-    release.create_release();
-
-    std::fs::copy(
-        PathBuf::from(std::env::var("OUT_DIR").unwrap())
-            .join("framework")
-            .join("aptos_sdk_builder.rs"),
-        std::env::current_dir()
-            .unwrap()
-            .join("src")
-            .join("aptos_framework_sdk_builder.rs"),
-    )
-    .unwrap();
-
-    println!("cargo:rerun-if-changed=../aptos-token/sources");
-    println!("cargo:rerun-if-changed=../aptos-token/Move.toml");
-    let token_release = framework::release::ReleaseOptions {
-        no_check_layout_compatibility: false,
-        no_build_docs: false,
-        with_diagram: false,
-        no_script_builder: false,
-        no_script_abis: false,
-        no_errmap: false,
-        package: PathBuf::from("aptos-token"),
-        output: PathBuf::from(format!(
-            "{}/{}",
-            std::env::var("OUT_DIR").unwrap(),
-            TOKEN_RELEASE_SUFFIX
-        )),
-    };
-    token_release.create_release();
-    // TODO: re-enable file copy after abigen works for string type
-    /* std::fs::copy(
-        PathBuf::from(std::env::var("OUT_DIR").unwrap())
-            .join("token")
-            .join("aptos_sdk_builder.rs"),
-        std::env::current_dir()
-            .unwrap()
-            .join("src")
-            .join("aptos_token_sdk_builder.rs"),
-    )
-    .unwrap();*/
+    // Set the below variable to skip the building step. This might be useful if the build
+    // is broken so it can be debugged with the old outdated artifacts.
+    if std::env::var("SKIP_FRAMEWORK_BUILD").is_err() {
+        println!("cargo:rerun-if-changed=../aptos-token/sources");
+        println!("cargo:rerun-if-changed=../aptos-token/Move.toml");
+        println!("cargo:rerun-if-changed=../aptos-framework/sources");
+        println!("cargo:rerun-if-changed=../aptos-framework/Move.toml");
+        println!("cargo:rerun-if-changed=../aptos-stdlib/sources");
+        println!("cargo:rerun-if-changed=../aptos-stdlib/Move.toml");
+        println!("cargo:rerun-if-changed=../move-stdlib/sources");
+        println!("cargo:rerun-if-changed=../move-stdlib/Move.toml");
+        ReleaseTarget::Head
+            .create_release(
+                true,
+                Some(
+                    PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"))
+                        .join("head.mrb"),
+                ),
+            )
+            .expect("release build failed");
+    }
 }

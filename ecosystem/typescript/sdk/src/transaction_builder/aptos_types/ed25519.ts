@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Bytes, Deserializer, Serializer } from "../bcs";
 
 export class Ed25519PublicKey {

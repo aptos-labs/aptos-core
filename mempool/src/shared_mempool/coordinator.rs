@@ -357,6 +357,6 @@ pub(crate) async fn snapshot_job(mempool: Arc<Mutex<CoreMempool>>, snapshot_inte
     let mut interval = IntervalStream::new(interval(Duration::from_secs(snapshot_interval_secs)));
     while let Some(_interval) = interval.next().await {
         let snapshot = mempool.lock().gen_snapshot();
-        debug!(LogSchema::new(LogEntry::MempoolSnapshot).txns(snapshot));
+        trace!(LogSchema::new(LogEntry::MempoolSnapshot).txns(snapshot));
     }
 }

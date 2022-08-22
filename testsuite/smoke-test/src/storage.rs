@@ -23,6 +23,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const MAX_WAIT_SECS: u64 = 60;
+
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools
@@ -41,6 +43,17 @@ async fn test_db_restore() {
     // set up: two accounts, a lot of money
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
+
+    // we need to wait for all nodes to see it, as client_1 is different node from the
+    // one creating accounts above
+    swarm
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    assert_balance(&client_1, &account_0, 1000000).await;
+    assert_balance(&client_1, &account_1, 1000000).await;
+
     let mut expected_balance_0 = 999999;
     let mut expected_balance_1 = 1000001;
 
@@ -133,12 +146,12 @@ async fn test_db_restore() {
     swarm
         .validator_mut(node_to_restart)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 

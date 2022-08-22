@@ -1,17 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
-use crate::config::GlobalConfig;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
-            chain_id, check_if_file_exists, get_sequence_number, read_from_file, to_common_result,
+            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            get_sequence_number, read_from_file, start_logger, to_common_result,
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
+    config::GlobalConfig,
     genesis::git::from_yaml,
 };
 use aptos_crypto::{
@@ -19,10 +19,9 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{
-    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteTableItem,
-};
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
+use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_rest_client::error::RestError;
+use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{
     move_types::{
         ident_str,
@@ -32,7 +31,7 @@ use aptos_sdk::{
     types::LocalAccount,
 };
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, ScriptFunction, TransactionPayload,
+    authenticator::AuthenticationKey, EntryFunction, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -42,7 +41,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -78,8 +77,8 @@ pub enum CliError {
     MoveCompilationError(String),
     #[error("Move unit tests failed")]
     MoveTestError,
-    #[error("Move Prover failed")]
-    MoveProverError,
+    #[error("Move Prover failed: {0}")]
+    MoveProverError(String),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -100,11 +99,17 @@ impl CliError {
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
-            CliError::MoveProverError => "MoveProverError",
+            CliError::MoveProverError(_) => "MoveProverError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
         }
+    }
+}
+
+impl From<RestError> for CliError {
+    fn from(e: RestError) -> Self {
+        CliError::ApiError(e.to_string())
     }
 }
 
@@ -167,7 +172,7 @@ impl From<bcs::Error> for CliError {
 pub struct CliConfig {
     /// Map of profile configs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profiles: Option<HashMap<String, ProfileConfig>>,
+    pub profiles: Option<BTreeMap<String, ProfileConfig>>,
 }
 
 const CONFIG_FILE: &str = "config.yaml";
@@ -194,18 +199,50 @@ pub struct ProfileConfig {
     pub faucet_url: Option<String>,
 }
 
-impl Default for CliConfig {
-    fn default() -> Self {
-        CliConfig {
-            profiles: Some(HashMap::new()),
+/// ProfileConfig but without the private parts
+#[derive(Debug, Serialize)]
+pub struct ProfileSummary {
+    pub has_private_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<Ed25519PublicKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rest_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faucet_url: Option<String>,
+}
+
+impl From<&ProfileConfig> for ProfileSummary {
+    fn from(config: &ProfileConfig) -> Self {
+        ProfileSummary {
+            has_private_key: config.private_key.is_some(),
+            public_key: config.public_key.clone(),
+            account: config.account,
+            rest_url: config.rest_url.clone(),
+            faucet_url: config.faucet_url.clone(),
         }
     }
 }
 
+impl Default for CliConfig {
+    fn default() -> Self {
+        CliConfig {
+            profiles: Some(BTreeMap::new()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+pub enum ConfigSearchMode {
+    CurrentDir,
+    CurrentDirAndParents,
+}
+
 impl CliConfig {
     /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> bool {
-        if let Ok(folder) = Self::aptos_folder() {
+    pub fn config_exists(mode: ConfigSearchMode) -> bool {
+        if let Ok(folder) = Self::aptos_folder(mode) {
             let config_file = folder.join(CONFIG_FILE);
             let old_config_file = folder.join(LEGACY_CONFIG_FILE);
             config_file.exists() || old_config_file.exists()
@@ -214,9 +251,9 @@ impl CliConfig {
         }
     }
 
-    /// Loads the config from the current working directory
-    pub fn load() -> CliTypedResult<Self> {
-        let folder = Self::aptos_folder()?;
+    /// Loads the config from the current working directory or one of its parents.
+    pub fn load(mode: ConfigSearchMode) -> CliTypedResult<Self> {
+        let folder = Self::aptos_folder(mode)?;
 
         let config_file = folder.join(CONFIG_FILE);
         let old_config_file = folder.join(LEGACY_CONFIG_FILE);
@@ -238,8 +275,11 @@ impl CliConfig {
         }
     }
 
-    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
-        let mut config = Self::load()?;
+    pub fn load_profile(
+        profile: &str,
+        mode: ConfigSearchMode,
+    ) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load(mode)?;
         Ok(config.remove_profile(profile))
     }
 
@@ -253,7 +293,7 @@ impl CliConfig {
 
     /// Saves the config to ./.aptos/config.yaml
     pub fn save(&self) -> CliTypedResult<()> {
-        let aptos_folder = Self::aptos_folder()?;
+        let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
         create_dir_if_not_exist(aptos_folder.as_path())?;
@@ -275,9 +315,9 @@ impl CliConfig {
     }
 
     /// Finds the current directory's .aptos folder
-    fn aptos_folder() -> CliTypedResult<PathBuf> {
+    fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         let global_config = GlobalConfig::load()?;
-        global_config.get_config_location()
+        global_config.get_config_location(mode)
     }
 }
 
@@ -307,21 +347,26 @@ impl FromStr for KeyType {
         match s.to_lowercase().as_str() {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
-            _ => Err("Invalid key type"),
+            _ => Err("Invalid key type: Must be one of [ed25519, x25519]"),
         }
     }
 }
 
 #[derive(Debug, Parser)]
 pub struct ProfileOptions {
-    /// Profile to use from config
+    /// Profile to use from the CLI config
+    ///
+    /// This will be used to override associated settings such as
+    /// the REST URL, the Faucet URL, and the private key arguments
     #[clap(long, default_value = "default")]
     pub profile: String,
 }
 
 impl ProfileOptions {
     pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
-        if let Some(profile) = CliConfig::load_profile(&self.profile)? {
+        if let Some(profile) =
+            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+        {
             if let Some(account) = profile.account {
                 return Ok(account);
             }
@@ -400,10 +445,12 @@ impl EncodingType {
 
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
-    /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
+    /// The seed used for key generation, should be a 64 character hex string and only used for testing
     ///
-    /// This field is hidden from the CLI input for now
-    #[clap(skip)]
+    /// If a predictable random seed is used, the key that is produced will be insecure and easy
+    /// to reproduce.  Please do not use this unless sufficient randomness is put into the random
+    /// seed.
+    #[clap(long)]
     random_seed: Option<String>,
 }
 
@@ -482,7 +529,7 @@ impl PromptOptions {
 /// An insertable option for use with encodings.
 #[derive(Debug, Default, Parser)]
 pub struct EncodingOptions {
-    /// Encoding of data as `base64`, `bcs`, or `hex`
+    /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
     pub encoding: EncodingType,
 }
@@ -538,6 +585,24 @@ impl PrivateKeyInputOptions {
         })
     }
 
+    pub fn from_x25519_private_key(private_key: &x25519::PrivateKey) -> CliTypedResult<Self> {
+        Ok(PrivateKeyInputOptions {
+            private_key: Some(
+                private_key
+                    .to_encoded_string()
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            ),
+            private_key_file: None,
+        })
+    }
+
+    pub fn from_file(file: PathBuf) -> Self {
+        PrivateKeyInputOptions {
+            private_key: None,
+            private_key_file: Some(file),
+        }
+    }
+
     /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
@@ -547,7 +612,8 @@ impl PrivateKeyInputOptions {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
         } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(profile)?.map(|p| p.private_key)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.private_key)
         {
             Ok(private_key)
         } else {
@@ -600,7 +666,10 @@ pub trait ExtractPublicKey {
     ) -> CliTypedResult<x25519::PublicKey> {
         let key = self.extract_public_key(encoding, profile)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+            CliError::UnexpectedError(format!(
+                "Failed to convert ed25519 key to x25519 key {:?}",
+                err
+            ))
         })
     }
 }
@@ -645,8 +714,8 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to <https://fullnode.devnet.aptoslabs.com>
-    #[clap(long, parse(try_from_str))]
+    /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
+    #[clap(long)]
     url: Option<reqwest::Url>,
 }
 
@@ -659,7 +728,10 @@ impl RestOptions {
     pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(profile)?.map(|p| p.rest_url) {
+        } else if let Some(Some(url)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.rest_url)
+        {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
@@ -741,13 +813,14 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
-    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account-address' or '--profile' after using aptos init must be provided"
-                .to_string(),
+            "'--account' or '--profile' after using aptos init must be provided".to_string(),
         ))
     }
 }
@@ -780,12 +853,14 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
             })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
-    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
         let public_key = private_key.public_key();
         Ok(Some(account_address_from_public_key(&public_key)))
     } else {
         Err(CliError::CommandArgumentError(
-            "Invalid manifest account address".to_string(),
+            "Invalid Move manifest account address".to_string(),
         ))
     }
 }
@@ -824,79 +899,89 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 }
 
 /// A shortened transaction output
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct TransactionSummary {
-    changes: Vec<ChangeSummary>,
-    gas_used: Option<u64>,
-    success: bool,
-    version: Option<u64>,
-    vm_status: String,
+    pub transaction_hash: HashValue,
+    pub gas_used: Option<u64>,
+    pub gas_unit_price: Option<u64>,
+    pub pending: Option<bool>,
+    pub sender: Option<AccountAddress>,
+    pub sequence_number: Option<u64>,
+    pub success: Option<bool>,
+    pub timestamp_us: Option<u64>,
+    pub version: Option<u64>,
+    pub vm_status: Option<String>,
 }
 
 impl From<Transaction> for TransactionSummary {
     fn from(transaction: Transaction) -> Self {
-        let mut summary = TransactionSummary {
-            success: transaction.success(),
-            version: transaction.version(),
-            vm_status: transaction.vm_status(),
-            ..Default::default()
-        };
-
-        if let Ok(info) = transaction.transaction_info() {
-            summary.gas_used = Some(info.gas_used.0);
-            summary.changes = info
-                .changes
-                .iter()
-                .map(|change| match change {
-                    WriteSetChange::DeleteModule(DeleteModule { module, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        module: Some(module.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteResource(DeleteResource {
-                        address, resource, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        resource: Some(resource.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteTableItem(DeleteTableItem { handle, key, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            handle: Some(handle.to_string()),
-                            key: Some(key.to_string()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteModule(WriteModule { address, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            address: Some(*address.inner()),
-                            resource: Some(data.typ.to_string()),
-                            data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteTableItem(WriteTableItem {
-                        handle, key, value, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        handle: Some(handle.to_string()),
-                        key: Some(key.to_string()),
-                        value: Some(value.to_string()),
-                        ..Default::default()
-                    },
-                })
-                .collect();
+        TransactionSummary::from(&transaction)
+    }
+}
+impl From<&Transaction> for TransactionSummary {
+    fn from(transaction: &Transaction) -> Self {
+        match transaction {
+            Transaction::PendingTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.hash,
+                pending: Some(true),
+                sender: Some(*txn.request.sender.inner()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                gas_used: None,
+                gas_unit_price: None,
+                success: None,
+                version: None,
+                vm_status: None,
+                timestamp_us: None,
+            },
+            Transaction::UserTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                sender: Some(*txn.request.sender.inner()),
+                gas_used: Some(txn.info.gas_used.0),
+                gas_unit_price: Some(txn.request.gas_unit_price.0),
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                timestamp_us: Some(txn.timestamp.0),
+                pending: None,
+            },
+            Transaction::GenesisTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+                timestamp_us: None,
+            },
+            Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
         }
-
-        summary
     }
 }
 
@@ -922,7 +1007,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet
+    /// URL for the faucet endpoint e.g. https://faucet.devnet.aptoslabs.com
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
 }
@@ -936,7 +1021,8 @@ impl FaucetOptions {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
         } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile)?.map(|profile| profile.faucet_url)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|profile| profile.faucet_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
@@ -949,20 +1035,30 @@ impl FaucetOptions {
 }
 
 // TODO(Gas): double check if this is correct
-pub const DEFAULT_MAX_GAS: u64 = 4_000_000;
+pub const DEFAULT_MAX_GAS: u64 = 1_000;
 pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 
 /// Gas price options for manipulating how to prioritize transactions
 #[derive(Debug, Eq, Parser, PartialEq)]
 pub struct GasOptions {
-    /// Amount to increase gas bid by for a transaction
+    /// Gas multiplier per unit of gas
     ///
-    /// Defaults to 1 coin per gas unit
+    /// The amount of coins used for a transaction is equal
+    /// to (gas unit price * gas used).  The gas_unit_price can
+    /// be used as a multiplier for the amount of coins willing
+    /// to be paid for a transaction.  This will prioritize the
+    /// transaction with a higher gas unit price.
     #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
     pub gas_unit_price: u64,
-    /// Maximum gas to be used to send a transaction
+    /// Maximum amount of gas units to be used to send this transaction
     ///
-    /// Defaults to 1000 gas units
+    /// The maximum amount of gas units willing to pay for the transaction.
+    /// This is the (max gas in coins / gas unit price).
+    ///
+    /// For example if I wanted to pay a maximum of 100 coins, I may have the
+    /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
+    /// gas unit price of 2, the max gas would need to be 50 to still only have
+    /// a maximum price of 100 coins.
     #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
     pub max_gas: u64,
 }
@@ -1005,8 +1101,13 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options.profile)
     }
 
-    /// Submits a script function based on module name and function inputs
-    pub async fn submit_script_function(
+    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
+        let sender_key = self.private_key()?;
+        Ok(account_address_from_public_key(&sender_key.public_key()))
+    }
+
+    /// Submits an entry function based on module name and function inputs
+    pub async fn submit_entry_function(
         &self,
         address: AccountAddress,
         module: &'static str,
@@ -1014,7 +1115,7 @@ impl TransactionOptions {
         type_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> CliTypedResult<Transaction> {
-        let txn = TransactionPayload::ScriptFunction(ScriptFunction::new(
+        let txn = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(address, ident_str!(module).to_owned()),
             ident_str!(function).to_owned(),
             type_args,
@@ -1032,8 +1133,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+        let sender_address = self.sender_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
@@ -1052,4 +1152,18 @@ impl TransactionOptions {
 
         Ok(response.into_inner())
     }
+}
+
+#[derive(Parser)]
+pub struct OptionalPoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: Option<AccountAddress>,
+}
+
+#[derive(Parser)]
+pub struct PoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: AccountAddress,
 }

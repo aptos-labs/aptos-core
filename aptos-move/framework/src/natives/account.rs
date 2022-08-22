@@ -3,7 +3,7 @@
 
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
-    move_core_types::account_address::AccountAddress,
+    move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -21,7 +21,7 @@ use std::sync::Arc;
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct CreateAddressGasParameters {
-    pub base_cost: u64,
+    pub base: InternalGas,
 }
 
 fn native_create_address(
@@ -33,7 +33,7 @@ fn native_create_address(
     debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let cost = gas_params.base_cost;
+    let cost = gas_params.base;
 
     let bytes = pop_arg!(arguments, Vec<u8>);
     let address = AccountAddress::from_bytes(bytes);
@@ -61,7 +61,7 @@ pub fn make_native_create_address(gas_params: CreateAddressGasParameters) -> Nat
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct CreateSignerGasParameters {
-    pub base_cost: u64,
+    pub base: InternalGas,
 }
 
 fn native_create_signer(
@@ -75,7 +75,7 @@ fn native_create_signer(
 
     let address = pop_arg!(arguments, AccountAddress);
     Ok(NativeResult::ok(
-        gas_params.base_cost,
+        gas_params.base,
         smallvec![Value::signer(address)],
     ))
 }

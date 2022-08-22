@@ -27,8 +27,8 @@ use aptos_rest_client::Client;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
-        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
-        LocalAccount,
+        account_address::AccountAddress, account_config::aptos_test_root_address,
+        chain_id::ChainId, LocalAccount,
     },
 };
 use clap::Parser;
@@ -108,8 +108,9 @@ impl FaucetArgs {
             .expect("Failed to deserialize mint key file")
         };
 
-        let faucet_address: AccountAddress =
-            self.mint_account_address.unwrap_or_else(aptos_root_address);
+        let faucet_address: AccountAddress = self
+            .mint_account_address
+            .unwrap_or_else(aptos_test_root_address);
         let faucet_account = LocalAccount::new(faucet_address, key, 0);
 
         // Do not use maximum amount on delegation, this allows the new delegated faucet to
@@ -170,6 +171,14 @@ impl Service {
             endpoint,
             maximum_amount,
         }
+    }
+
+    // By default the path is prefixed with the version, e.g. `v1/`. The fake
+    // API used in the faucet tests doesn't have a versioned API however, so
+    // we just set it to `/`.
+    pub fn configure_for_testing(mut self) -> Self {
+        self.client = self.client.version_path_base("/".to_string()).unwrap();
+        self
     }
 
     pub fn endpoint(&self) -> &Url {
@@ -274,7 +283,7 @@ pub async fn delegate_mint_account(
         },
     )
     .await
-    .unwrap();
+    .expect("Failed to create new account");
 
     match response {
         mint::Response::SubmittedTxns(txns) => {
@@ -300,7 +309,7 @@ pub async fn delegate_mint_account(
                 ),
             ))
             .await
-            .unwrap();
+            .expect("Failed to delegate minting to the new account");
     }
 
     // claim the capability!

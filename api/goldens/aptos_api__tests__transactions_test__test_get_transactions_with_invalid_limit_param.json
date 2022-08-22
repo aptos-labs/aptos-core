@@ -1,0 +1,5 @@
+{
+  "message": "failed to parse parameter `limit`: failed to parse \"integer(uint16)\": invalid digit found in string (occurred while parsing \"optional<integer(uint16)>\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

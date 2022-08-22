@@ -1,0 +1,18 @@
+[package]
+name = "aptos-rocksdb-options"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos RocksDb Options"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+aptos-config = { path = "../../config" }
+
+[dependencies.rocksdb]
+version = "0.18.0"
+default-features = false
+features = ["lz4"]

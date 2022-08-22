@@ -7,23 +7,21 @@ use crate::{
         ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
         WriteResource, WriteTableItem,
     },
-    Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
-    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
+    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveValue,
+    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
     TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest,
     VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_transaction_builder::error_explain;
-use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
+        EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -40,11 +38,11 @@ use move_deps::{
     move_resource_viewer::MoveValueAnnotator,
 };
 use serde_json::Value;
-use std::sync::Arc;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
+    sync::Arc,
 };
 use storage_interface::DbReader;
 
@@ -136,8 +134,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         TransactionInfo {
             version: version.into(),
             hash: info.transaction_hash().into(),
-            state_root_hash: info.state_change_hash().into(),
+            state_change_hash: info.state_change_hash().into(),
             event_root_hash: info.event_root_hash().into(),
+            state_checkpoint_hash: info.state_checkpoint_hash().map(|h| h.into()),
             gas_used: info.gas_used().into(),
             success: info.status().is_success(),
             vm_status: self.explain_vm_status(info.status()),
@@ -156,7 +155,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<TransactionPayload> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
             ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
                 modules: modules
@@ -164,7 +162,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
                     .collect::<Result<Vec<_>>>()?,
             }),
-            ScriptFunction(fun) => {
+            EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
                     .inner
@@ -180,9 +178,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                         .collect::<Result<_>>()?,
                 };
 
-                TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
+                TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
                     arguments: json_args,
-                    function: ScriptFunctionId {
+                    function: EntryFunctionId {
                         module: module.into(),
                         name: function.into(),
                     },
@@ -262,7 +260,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     resource: typ.into(),
                 }),
             },
-            WriteOp::Value(val) => match access_path.get_path() {
+            WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
@@ -285,7 +283,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let hex_handle = handle.0.to_be_bytes().to_vec().into();
+        let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
         let ret = match op {
             WriteOp::Deletion => {
@@ -298,7 +296,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             }
-            WriteOp::Value(value) => {
+            WriteOp::Modification(value) | WriteOp::Creation(value) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
 
@@ -463,21 +461,21 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         use aptos_types::transaction::TransactionPayload as Target;
 
         let ret = match payload {
-            TransactionPayload::ScriptFunctionPayload(script_func_payload) => {
-                let ScriptFunctionPayload {
+            TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
+                let EntryFunctionPayload {
                     function,
                     type_arguments,
                     arguments,
-                } = script_func_payload;
+                } = entry_func_payload;
 
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.name.0.as_ident_str())
-                    .ok_or_else(|| format_err!("could not find script function by {}", function))?;
+                    .find_entry_function(function.name.0.as_ident_str())
+                    .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
-                    "expect {} type arguments for script function {}, but got {}",
+                    "expect {} type arguments for entry function {}, but got {}",
                     func.generic_type_params.len(),
                     function,
                     type_arguments.len()
@@ -488,7 +486,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
 
-                Target::ScriptFunction(ScriptFunction::new(
+                Target::EntryFunction(EntryFunction::new(
                     module.into(),
                     function.name.into(),
                     type_arguments
@@ -531,11 +529,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     }
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
-            }
-            TransactionPayload::WriteSetPayload(_) => {
-                return Err(anyhow::anyhow!(
-                    "write set transaction payload is not supported yet",
-                ))
             }
         };
         Ok(ret)
@@ -683,23 +676,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
     fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            ExecutionStatus::MoveAbort { location, code} => match &location {
-                AbortLocation::Module(module_id) => {
-                    let explanation = error_explain::get_explanation(module_id, *code);
-                    explanation
-                        .map(|ec| {
-                            // TODO(wrwg): category and reason where removed from Move apis,
-                            //   instead we have only single code_name/description. Need to
-                            //   verify whether error reporting in the api is still reasonable.
-                            format!(
-                                "Move abort by {}\n{}",
-                                ec.code_name,
-                                ec.code_description,
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            format!("Move abort: code {:#x} at {}", code, location)
-                        })
+            ExecutionStatus::MoveAbort { location, code, info } => match &location {
+                AbortLocation::Module(_) => {
+                    info.as_ref().map(|i| {
+                        format!("Move abort by {}\n{}", i.reason_name, i.description)
+                    }).unwrap_or_else(|| {
+                        format!("Move abort: code {:#x} at {}", code, location)
+                    })
                 }
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
@@ -722,12 +705,12 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     func_name, code_offset
                 )
             }
-            ExecutionStatus::MiscellaneousError( code ) => {
+            ExecutionStatus::MiscellaneousError(code) => {
                 code.map_or(
-                    "Move bytecode deserialization / verification failed, including script function not found or invalid arguments".to_owned(),
+                    "Move bytecode deserialization / verification failed, including entry function not found or invalid arguments".to_owned(),
                     |e| format!(
                         "Transaction Executed and Committed with Error {:#?}", e
-                    )
+                    ),
                 )
             }
         }

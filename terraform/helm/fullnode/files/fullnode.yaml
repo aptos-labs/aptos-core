@@ -27,6 +27,17 @@ full_node_networks:
   max_inbound_connections: {{ .Values.fullnode_max_inbound_connections }}
 storage:
   backup_service_address: "0.0.0.0:6186"
+  storage_pruner_config:
+    ledger_pruner_config:
+      enable: {{ .Values.enable_ledger_pruner }}
+      {{- if .Values.ledger_prune_window }}
+      prune_window: {{ .Values.ledger_prune_window }}
+      {{- end }}
+
+state_sync:
+  state_sync_driver:
+    bootstrapping_mode: {{ .Values.bootstrapping_mode }}
+    continuous_syncing_mode: {{ .Values.continuous_syncing_mode }}
 
 api:
   address: "0.0.0.0:8080"

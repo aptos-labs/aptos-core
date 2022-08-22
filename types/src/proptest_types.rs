@@ -1,21 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ledger_info::generate_ledger_info_with_sig;
-use crate::multi_signature::PartialSignatures;
-use crate::validator_verifier::ValidatorVerifier;
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
     account_state::AccountState,
+    aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -27,7 +25,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorConsensusInfo,
+    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -55,7 +53,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Value)
+        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -70,24 +68,6 @@ impl Arbitrary for WriteOp {
     }
 
     type Strategy = BoxedStrategy<Self>;
-}
-
-impl WriteSet {
-    fn genesis_strategy() -> impl Strategy<Value = Self> {
-        vec((any::<AccessPath>(), WriteOp::value_strategy()), 0..64).prop_map(|write_set| {
-            let write_set_mut = WriteSetMut::new(
-                write_set
-                    .iter()
-                    .map(|(access_path, write_op)| {
-                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
-                    })
-                    .collect(),
-            );
-            write_set_mut
-                .freeze()
-                .expect("generated write sets should always be valid")
-        })
-    }
 }
 
 impl Arbitrary for WriteSetPayload {
@@ -401,7 +381,7 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::ScriptFunction(script_fn) => RawTransaction::new_script_function(
+        TransactionPayload::EntryFunction(script_fn) => RawTransaction::new_entry_function(
             sender,
             sequence_number,
             script_fn,
@@ -410,17 +390,6 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::WriteSet(WriteSetPayload::Direct(write_set)) => {
-            // It's a bit unfortunate that max_gas_amount etc is generated but
-            // not used, but it isn't a huge deal.
-            RawTransaction::new_change_set(sender, sequence_number, write_set, chain_id)
-        }
-        TransactionPayload::WriteSet(WriteSetPayload::Script {
-            execute_as: signer,
-            script,
-        }) => {
-            RawTransaction::new_writeset_script(sender, sequence_number, script, signer, chain_id)
-        }
     }
 }
 
@@ -446,18 +415,6 @@ impl SignatureCheckedTransaction {
         keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
     ) -> impl Strategy<Value = Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::module_strategy())
-    }
-
-    pub fn write_set_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::write_set_strategy())
-    }
-
-    pub fn genesis_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::genesis_strategy())
     }
 
     fn strategy_impl(
@@ -539,19 +496,6 @@ impl TransactionPayload {
         any::<Module>()
             .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
     }
-
-    pub fn write_set_strategy() -> impl Strategy<Value = Self> {
-        any::<WriteSet>().prop_map(|ws| {
-            TransactionPayload::WriteSet(WriteSetPayload::Direct(ChangeSet::new(ws, vec![])))
-        })
-    }
-
-    /// Similar to `write_set_strategy` except generates a valid write set for the genesis block.
-    pub fn genesis_strategy() -> impl Strategy<Value = Self> {
-        WriteSet::genesis_strategy().prop_map(|ws| {
-            TransactionPayload::WriteSet(WriteSetPayload::Direct(ChangeSet::new(ws, vec![])))
-        })
-    }
 }
 
 prop_compose! {
@@ -584,7 +528,6 @@ impl Arbitrary for TransactionPayload {
         prop_oneof![
             4 => Self::script_strategy(),
             1 => Self::module_strategy(),
-            1 => Self::write_set_strategy(),
         ]
         .boxed()
     }
@@ -627,9 +570,8 @@ prop_compose! {
         consensus_keypair in bls12381_keys::keypair_strategy(),
     ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
         let signature = consensus_keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&account_keypair.public_key),
-                            ValidatorConsensusInfo::new(consensus_keypair.public_key, 1),
-signature)
+        let address = account_address::from_public_key(&account_keypair.public_key);
+        (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }
 }
 
@@ -648,8 +590,8 @@ impl Arbitrary for LedgerInfoWithSignatures {
             })
             .prop_map(|(ledger_info, validator_infos)| {
                 let validator_verifier = ValidatorVerifier::new_with_quorum_voting_power(
-                    validator_infos.iter().map(|x| (x.0, x.1.clone())).collect(),
-                    validator_infos.len() as u64 / 2,
+                    validator_infos.iter().map(|x| x.1.clone()).collect(),
+                    validator_infos.len() as u128 / 2,
                 )
                 .unwrap();
                 let partial_sig = PartialSignatures::new(
@@ -658,9 +600,8 @@ impl Arbitrary for LedgerInfoWithSignatures {
                 LedgerInfoWithSignatures::new(
                     ledger_info,
                     validator_verifier
-                        .aggregate_multi_signature(&partial_sig)
-                        .unwrap()
-                        .0,
+                        .aggregate_signatures(&partial_sig)
+                        .unwrap(),
                 )
             })
             .boxed()
@@ -721,7 +662,12 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
+        CoinStoreResource::new(
+            self.coin,
+            false,
+            EventHandle::random(0),
+            EventHandle::random(0),
+        )
     }
 }
 
@@ -845,8 +791,8 @@ impl TransactionToCommitGen {
                     .map(move |(key, value)| {
                         let state_key = StateKey::AccessPath(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), StateValue::from(value.clone())),
-                            (state_key, WriteOp::Value(value)),
+                            (state_key.clone(), Some(StateValue::from(value.clone()))),
+                            (state_key, WriteOp::Modification(value)),
                         )
                     })
             })
@@ -973,8 +919,7 @@ impl Arbitrary for BlockMetadata {
             any::<u64>(),
             any::<u64>(),
             any::<AccountAddress>(),
-            any::<u32>(),
-            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
             prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )
@@ -984,7 +929,6 @@ impl Arbitrary for BlockMetadata {
                     epoch,
                     round,
                     proposer,
-                    proposer_index,
                     previous_block_votes,
                     failed_proposer_indices,
                     timestamp,
@@ -994,7 +938,6 @@ impl Arbitrary for BlockMetadata {
                         epoch,
                         round,
                         proposer,
-                        Some(proposer_index),
                         previous_block_votes,
                         failed_proposer_indices,
                         timestamp,
@@ -1054,11 +997,13 @@ impl BlockInfoGen {
             let next_validator_set = self.validator_set_gen.materialize(universe);
             let next_validator_infos = next_validator_set
                 .iter()
-                .map(|signer| {
+                .enumerate()
+                .map(|(index, signer)| {
                     ValidatorInfo::new_with_test_network_keys(
                         signer.author(),
                         signer.public_key(),
                         1, /* consensus_voting_power */
+                        index as u64,
                     )
                 })
                 .collect();
@@ -1233,4 +1178,16 @@ pub fn arb_json_value() -> impl Strategy<Value = Value> {
             ]
         },
     )
+}
+
+impl Arbitrary for ValidatorVerifier {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        vec(any::<ValidatorConsensusInfo>(), 1..1000)
+            .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
 }

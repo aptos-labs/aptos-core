@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /** Faucet creates and funds accounts. This is a thin wrapper around that. */
 import { AptosClient } from "./aptos_client";
 import { OpenAPIConfig } from "./generated";
@@ -19,6 +22,10 @@ export class FaucetClient extends AptosClient {
    */
   constructor(nodeUrl: string, faucetUrl: string, config?: OpenAPIConfig) {
     super(nodeUrl, config);
+
+    if (!faucetUrl) {
+      throw new Error("Faucet URL cannot be empty.");
+    }
     // Build a requester configured to talk to the faucet.
     this.faucetRequester = new AxiosHttpRequest({
       BASE: faucetUrl,

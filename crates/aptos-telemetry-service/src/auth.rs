@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::Context;
-use crate::error;
+use crate::error::ServiceError;
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
+use anyhow::{anyhow, Result};
 use aptos_config::config::PeerRole;
 use aptos_crypto::{noise, x25519};
-use aptos_logger::warn;
+use aptos_logger::{debug, error, warn};
 use aptos_types::PeerId;
 use warp::filters::BoxedFilter;
 use warp::{
@@ -26,10 +27,7 @@ pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
-pub async fn handle_auth(
-    context: Context,
-    body: AuthRequest,
-) -> anyhow::Result<impl Reply, Rejection> {
+pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Reply, Rejection> {
     let client_init_message = &body.handshake_msg;
 
     // Check whether the client (validator) is using the correct server's public key, which the
@@ -37,7 +35,9 @@ pub async fn handle_auth(
     // This is useful for returning a refined error response to the client if it is using an
     // invalid server public key.
     if body.server_public_key != context.noise_config().public_key() {
-        return Err(reject::custom(error::Error::WrongPublicKey));
+        return Err(reject::custom(ServiceError::bad_request(
+            "invalid public key",
+        )));
     }
 
     // build the prologue (chain_id | peer_id | public_key)
@@ -52,7 +52,12 @@ pub async fn handle_auth(
     let (remote_public_key, handshake_state, _payload) = context
         .noise_config()
         .parse_client_init_message(&prologue, client_init_message)
-        .map_err(|_| reject::reject())?;
+        .map_err(|e| {
+            debug!("error performing noise handshake: {}", e);
+            reject::custom(ServiceError::invalid_request_body(
+                "error performing handshake",
+            ))
+        })?;
 
     let (epoch, peer_role) = match context.validator_cache().read().get(&body.chain_id) {
         Some((epoch, peer_set)) => {
@@ -60,7 +65,9 @@ pub async fn handle_auth(
                 Some(peer) => {
                     let remote_public_key = &remote_public_key;
                     if !peer.keys.contains(remote_public_key) {
-                        return Err(reject::reject());
+                        return Err(reject::custom(ServiceError::bad_request(
+                            "public key not found in peer keys",
+                        )));
                     }
                     Ok((*epoch, peer.role))
                 }
@@ -69,7 +76,9 @@ pub async fn handle_auth(
                     let derived_remote_peer_id =
                         aptos_types::account_address::from_identity_public_key(remote_public_key);
                     if derived_remote_peer_id != body.peer_id {
-                        Err(reject::reject())
+                        return Err(reject::custom(ServiceError::bad_request(
+                            "public key does not match identity",
+                        )));
                     } else {
                         Ok((*epoch, PeerRole::Unknown))
                     }
@@ -81,7 +90,10 @@ pub async fn handle_auth(
                 "Validator set unavailable for Chain ID {}. Rejecting request.",
                 body.chain_id
             );
-            Err(reject::reject())
+            Err(reject::custom(ServiceError::unauthorized(format!(
+                "unable to authenticate: validator set unavailable for supplied chain id {}",
+                body.chain_id
+            ))))
         }
     }?;
 
@@ -105,14 +117,16 @@ pub async fn handle_auth(
             Some(response_payload),
             &mut server_response,
         )
-        .map_err(|_| reject::reject())?;
+        .map_err(|e| {
+            error!("unable to complete handshake {}", e);
+            ServiceError::internal(anyhow!("error during authentication"))
+        })?;
 
     Ok(reply::json(&AuthResponse {
-        handshake_msg: Some(server_response.to_owned()),
+        handshake_msg: server_response,
     }))
 }
 
-#[allow(dead_code)]
 pub fn with_auth(
     context: Context,
     roles: Vec<PeerRole>,

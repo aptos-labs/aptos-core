@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     driver_factory::DriverFactory,
     tests::utils::{
@@ -274,6 +275,9 @@ async fn create_driver_for_tests(
         None,
     );
 
+    // Create the metadata storage
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+
     // Create and spawn the driver
     let driver_factory = DriverFactory::create_and_spawn_driver(
         false,
@@ -282,6 +286,7 @@ async fn create_driver_for_tests(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        metadata_storage,
         consensus_listener,
         event_subscription_service,
         aptos_data_client,

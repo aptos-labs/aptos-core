@@ -46,6 +46,8 @@ impl SafetyRulesConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         if let SecureBackend::OnDiskStorage(backend) = &mut self.backend {
             backend.set_data_dir(data_dir);
+        } else if let SecureBackend::RocksDbStorage(backend) = &mut self.backend {
+            backend.set_data_dir(data_dir);
         }
     }
 }

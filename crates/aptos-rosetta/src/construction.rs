@@ -46,7 +46,6 @@ use aptos_sdk::{
     },
     transaction_builder::TransactionFactory,
 };
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
@@ -54,6 +53,7 @@ use aptos_types::{
         Transaction::UserTransaction, TransactionPayload,
     },
 };
+use cached_packages::aptos_stdlib;
 use std::str::FromStr;
 use warp::Filter;
 
@@ -246,23 +246,11 @@ async fn construction_metadata(
         return Err(ApiError::ChainIdMismatch);
     }
 
-    // Retrieve the sequence number, always increment after taking the sequence number
-    let sequence_number = {
-        let response_account = response.inner();
-        let mut accounts = server_context.accounts.lock().await;
-        if let Some(stored_sequence_number) = accounts.get_mut(&address) {
-            // If we missed a sequence number update, we should update
-            if response_account.sequence_number > *stored_sequence_number {
-                *stored_sequence_number = response_account.sequence_number;
-            }
-            let seq_num = *stored_sequence_number;
-            *stored_sequence_number += 1;
-            seq_num
-        } else {
-            // Otherwise, let's update the local version
-            accounts.insert(address, response_account.sequence_number + 1);
-            response_account.sequence_number
-        }
+    let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
+        sequence_number
+    } else {
+        // Retrieve the sequence number from the rest server if one wasn't provided
+        response.inner().sequence_number
     };
 
     Ok(ConstructionMetadataResponse {
@@ -270,6 +258,7 @@ async fn construction_metadata(
             sequence_number,
             max_gas: request.options.max_gas,
             gas_price_per_unit: request.options.gas_price_per_unit,
+            expiry_time_secs: request.options.expiry_time_secs,
         },
         suggested_fee: None,
     })
@@ -307,7 +296,7 @@ async fn construction_parse(
 
     // This is messy, but all we can do
     let operations = match unsigned_txn.into_payload() {
-        TransactionPayload::ScriptFunction(inner) => {
+        TransactionPayload::EntryFunction(inner) => {
             let (module, function_name, type_args, args) = inner.into_inner();
 
             let module_name = Identifier::from(module.name());
@@ -318,19 +307,33 @@ async fn construction_parse(
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
                 && account_module_identifier() == module_name
+                && transfer_function_identifier() == function_name
+            {
+                parse_account_transfer_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && account_module_identifier() == module_name
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && stake_module_identifier() == module_name
+                && set_operator_function_identifier() == function_name
+            {
+                parse_set_operator_operation(sender, &type_args, &args)?
             } else {
-                return Err(ApiError::TransactionParseError(Some(
-                    "Unsupported operation type",
-                )));
+                return Err(ApiError::TransactionParseError(Some(format!(
+                    "Unsupported entry function type {:x}::{}::{}",
+                    module.address(),
+                    module_name,
+                    function_name
+                ))));
             }
         }
-        _ => {
-            return Err(ApiError::TransactionParseError(Some(
-                "Unsupported transaction type",
-            )))
+        payload => {
+            return Err(ApiError::TransactionParseError(Some(format!(
+                "Unsupported transaction payload type {:?}",
+                payload
+            ))))
         }
     };
 
@@ -347,9 +350,10 @@ fn parse_create_account_operation(
 ) -> ApiResult<Vec<Operation>> {
     // There are no typeargs for create account
     if !type_args.is_empty() {
-        return Err(ApiError::TransactionParseError(Some(
-            "Create account should not have type arguments",
-        )));
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Create account should not have type arguments: {:?}",
+            type_args
+        ))));
     }
 
     // Create account
@@ -388,13 +392,14 @@ fn parse_transfer_operation(
             || *name != aptos_coin_resource_identifier()
             || !type_params.is_empty()
         {
-            return Err(ApiError::TransactionParseError(Some(
-                "Invalid coin for transfer",
-            )));
+            return Err(ApiError::TransactionParseError(Some(format!(
+                "Invalid coin for transfer {:x}::{}::{}",
+                address, module, name
+            ))));
         }
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No coin type in transfer",
+            "No coin type in transfer".to_string(),
         )));
     };
 
@@ -404,20 +409,79 @@ fn parse_transfer_operation(
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No receiver in transfer",
+            "No receiver in transfer".to_string(),
         )));
     };
     let amount: u64 = if let Some(amount) = args.get(1) {
         bcs::from_bytes(amount)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
-            "No amount in transfer",
+            "No amount in transfer".to_string(),
         )));
     };
 
     operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
     operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
     Ok(operations)
+}
+
+fn parse_account_transfer_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for account transfer
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Account transfer should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+    let mut operations = Vec::new();
+
+    // Retrieve the args for the operations
+
+    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver in account transfer".to_string(),
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(1) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in account transfer".to_string(),
+        )));
+    };
+
+    operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
+    operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
+    Ok(operations)
+}
+
+fn parse_set_operator_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for create account
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Set operator should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    // Set operator
+    if let Some(encoded_operator) = args.first() {
+        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
+
+        Ok(vec![Operation::set_operator(0, None, sender, operator)])
+    } else {
+        Err(ApiError::InvalidOperations)
+    }
 }
 
 /// Construction payloads command (OFFLINE)
@@ -449,16 +513,25 @@ async fn construction_payloads(
         InternalOperation::Transfer(transfer) => {
             is_native_coin(&transfer.currency)?;
             (
-                aptos_stdlib::aptos_coin_transfer(transfer.receiver, transfer.amount),
+                aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
                 transfer.sender,
             )
         }
+        InternalOperation::SetOperator(set_operator) => (
+            aptos_stdlib::stake_set_operator(set_operator.operator),
+            set_operator.owner,
+        ),
     };
 
     // Build the transaction and make it ready for signing
-    let transaction_factory = TransactionFactory::new(server_context.chain_id)
+    let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
         .with_max_gas_amount(metadata.max_gas);
+    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
+        transaction_factory =
+            transaction_factory.with_transaction_expiration_time(expiry_time_secs);
+    }
+
     let sequence_number = metadata.sequence_number;
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
@@ -527,6 +600,14 @@ async fn construction_preprocess(
             internal_operation,
             max_gas,
             gas_price_per_unit,
+            expiry_time_secs: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.expiry_time_secs),
+            sequence_number: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.sequence_number),
         }),
         required_public_keys: Some(required_public_keys),
     })

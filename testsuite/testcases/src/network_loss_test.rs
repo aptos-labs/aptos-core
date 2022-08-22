@@ -46,8 +46,7 @@ impl NetworkTest for NetworkLossTest {
         ctx.swarm().remove_chaos(loss)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

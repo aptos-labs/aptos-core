@@ -1,6 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::OptionalPoolAddressArgs;
+use crate::common::utils::read_from_file;
+use crate::genesis::git::from_yaml;
+use crate::genesis::git::FRAMEWORK_NAME;
+use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
         types::{PromptOptions, RngArgs},
@@ -21,7 +26,6 @@ use aptos_genesis::config::{HostAndPort, Layout};
 use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::chain_id::ChainId;
-use move_deps::move_binary_format::access::ModuleAccess;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -87,11 +91,14 @@ async fn setup_git_dir(
     chain_id: ChainId,
 ) -> GitOptions {
     let git_options = git_options();
-    let layout_file = create_layout_file(root_private_key.public_key(), users, chain_id);
-    let layout_file = PathBuf::from(layout_file.path());
+    let layout_file = TempPath::new();
+    layout_file.create_as_file().unwrap();
+    let layout_file = layout_file.path();
+
+    create_layout_file(layout_file, root_private_key.public_key(), users, chain_id).await;
     let setup_command = SetupGit {
         git_options: git_options.clone(),
-        layout_file,
+        layout_file: PathBuf::from(layout_file),
     };
 
     setup_command
@@ -104,14 +111,11 @@ async fn setup_git_dir(
     git_options
 }
 
-/// Add framework modules to git directory
+/// Add framework to git directory
 fn add_framework_to_dir(git_dir: &Path) {
-    let framework_dir = git_dir.join("framework");
-    cached_framework_packages::modules_with_blobs().for_each(|(blob, module)| {
-        let module_name = module.name();
-        let file = framework_dir.join(format!("{}.mv", module_name));
-        write_to_file(file.as_path(), module_name.as_str(), blob).unwrap();
-    });
+    cached_packages::head_release_bundle()
+        .write(git_dir.join(FRAMEWORK_NAME))
+        .unwrap()
 }
 
 /// Local git options for testing
@@ -125,41 +129,41 @@ fn git_options() -> GitOptions {
 }
 
 /// Create a layout file for the repo
-fn create_layout_file(
+async fn create_layout_file(
+    file: &Path,
     root_public_key: Ed25519PublicKey,
     users: Vec<String>,
     chain_id: ChainId,
-) -> TempPath {
-    let layout = Layout {
-        root_key: root_public_key,
-        users,
-        chain_id,
-        allow_new_validators: false,
-        epoch_duration_secs: 86400,
-        min_stake: 0,
-        min_voting_threshold: 0,
-        max_stake: u64::MAX,
-        recurring_lockup_duration_secs: 86400,
-        required_proposer_stake: 0,
-        rewards_apy_percentage: 1,
-        voting_duration_secs: 1,
-    };
-    let file = TempPath::new();
-    file.create_as_file().unwrap();
+) {
+    GenerateLayoutTemplate {
+        output_file: PathBuf::from(file),
+        prompt_options: PromptOptions::yes(),
+    }
+    .execute()
+    .await
+    .expect("Expected to create layout template");
+
+    // Update layout file
+    let mut layout: Layout =
+        from_yaml(&String::from_utf8(read_from_file(file).unwrap()).unwrap()).unwrap();
+    layout.root_key = Some(root_public_key);
+    layout.users = users;
+    layout.chain_id = chain_id;
+    layout.is_test = true;
 
     write_to_file(
-        file.path(),
+        file,
         "Layout file",
         serde_yaml::to_string(&layout).unwrap().as_bytes(),
     )
     .unwrap();
-    file
 }
 
 /// Generate keys for a "user"
 async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
     let output_dir = dir.join(index.to_string());
     let command = GenerateKeys {
+        pool_address_args: OptionalPoolAddressArgs { pool_address: None },
         rng_args: RngArgs::from_seed([index; 32]),
         prompt_options: PromptOptions::yes(),
         output_dir: Some(output_dir.clone()),
@@ -174,10 +178,12 @@ async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &P
     let command = SetValidatorConfiguration {
         username,
         git_options,
-        keys_dir: Some(PathBuf::from(keys_dir)),
+        owner_public_identity_file: Some(PathBuf::from(keys_dir).join(PUBLIC_KEYS_FILE)),
         validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
+        stake_amount: 100_000_000_000_000,
         full_node_host: None,
-        stake_amount: 1,
+        operator_public_identity_file: None,
+        voter_public_identity_file: None,
     };
 
     command.execute().await.unwrap()

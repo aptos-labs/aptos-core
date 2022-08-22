@@ -7,20 +7,20 @@ use crate::{
 };
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
-use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
-use aptos_types::multi_signature::{MultiSignature, PartialSignatures};
-use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
+    aggregate_signature::{AggregateSignature, PartialSignatures},
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::AccumulatorExtensionProof,
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_verifier::generate_validator_verifier,
     waypoint::Waypoint,
 };
+use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::Block,
     common::{Payload, Round},
@@ -39,12 +39,12 @@ pub fn empty_proof() -> Proof {
 
 pub fn make_genesis(signer: &ValidatorSigner) -> (EpochChangeProof, QuorumCert) {
     let validator_info =
-        ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1);
+        ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1, 0);
     let validator_set = ValidatorSet::new(vec![validator_info]);
     let li = LedgerInfo::mock_genesis(Some(validator_set));
     let block = Block::make_genesis_block_from_ledger_info(&li);
     let qc = QuorumCert::certificate_for_genesis_from_ledger_info(&li, block.id());
-    let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
+    let lis = LedgerInfoWithSignatures::new(li, AggregateSignature::empty());
     let proof = EpochChangeProof::new(vec![lis], false);
     (proof, qc)
 }
@@ -76,13 +76,7 @@ pub fn make_proposal_with_qc(
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
 ) -> VoteProposal {
-    make_proposal_with_qc_and_proof(
-        Payload::new_empty(),
-        round,
-        empty_proof(),
-        qc,
-        validator_signer,
-    )
+    make_proposal_with_qc_and_proof(Payload::empty(), round, empty_proof(), qc, validator_signer)
 }
 
 pub fn make_proposal_with_parent_and_overrides(
@@ -205,16 +199,18 @@ pub fn make_timeout_cert(
     signer: &ValidatorSigner,
 ) -> TwoChainTimeoutCertificate {
     let timeout = TwoChainTimeout::new(1, round, hqc.clone());
-    let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
+    let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
     let signature = timeout.sign(signer);
-    tc.add(signer.author(), timeout, signature);
-    tc
+    tc_partial.add(signer.author(), timeout, signature);
+    tc_partial
+        .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]))
+        .unwrap()
 }
 
 pub fn validator_signers_to_ledger_info(signers: &[&ValidatorSigner]) -> LedgerInfo {
-    let infos = signers
-        .iter()
-        .map(|v| ValidatorInfo::new_with_test_network_keys(v.author(), v.public_key(), 1));
+    let infos = signers.iter().enumerate().map(|(index, v)| {
+        ValidatorInfo::new_with_test_network_keys(v.author(), v.public_key(), 1, index as u64)
+    });
     let validator_set = ValidatorSet::new(infos.collect());
     LedgerInfo::mock_genesis(Some(validator_set))
 }

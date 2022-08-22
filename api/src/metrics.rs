@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{register_histogram_vec, HistogramVec};
-
 use once_cell::sync::Lazy;
-use warp::log::{custom, Info, Log};
 
 pub static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -23,31 +21,3 @@ pub static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-// Record metrics by method, operation_id and status.
-// The operation_id is the id for the request handler.
-// Should use same `operationId` defined in `openapi.yaml` whenever possible.
-pub fn metrics(operation_id: &'static str) -> Log<impl Fn(Info) + Copy> {
-    let func = move |info: Info| {
-        HISTOGRAM
-            .with_label_values(&[
-                info.method().to_string().as_str(),
-                operation_id,
-                info.status().as_u16().to_string().as_str(),
-            ])
-            .observe(info.elapsed().as_secs_f64());
-    };
-    custom(func)
-}
-
-// Record metrics by response status.
-// This is for understanding the overview of responses in case server
-// is overloaded by unknown reason.
-pub fn status_metrics() -> Log<impl Fn(Info) + Copy> {
-    let func = move |info: Info| {
-        RESPONSE_STATUS
-            .with_label_values(&[info.status().as_u16().to_string().as_str()])
-            .observe(info.elapsed().as_secs_f64());
-    };
-    custom(func)
-}

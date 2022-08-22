@@ -183,6 +183,12 @@ pub struct MetadataOptions {
     pub max_gas: u64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
     pub gas_price_per_unit: u64,
+    /// Expiry time of the transaction in unix epoch seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<u64>,
+    /// Sequence number of the request
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<u64>,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -208,6 +214,9 @@ pub struct ConstructionMetadata {
     pub max_gas: u64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
     pub gas_price_per_unit: u64,
+    /// Expiry time of the transaction in unix epoch seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<u64>,
 }
 
 /// Request to parse a signed or unsigned transaction into operations
@@ -287,6 +296,17 @@ pub struct ConstructionPreprocessRequest {
     /// Gas price per unit, must be an integer
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggested_fee_multiplier: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<PreprocessMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct PreprocessMetadata {
+    /// Expiry time of the transaction in unix epoch seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<u64>,
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]

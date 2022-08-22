@@ -10,12 +10,13 @@ This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI]
 
 ## Install precompiled binary (easy mode)
 
-* Navigate to the [release page](https://github.com/aptos-labs/aptos-core/releases) for Aptos CLI.
-* Download the latest release for your platform.
-* Place this at a location for you to run it e.g. `~/bin/aptos` in Linux.
-* On Linux and Mac, make this executable `chmod +x ~/bin/aptos`.
-* Now type `~/bin/aptos help` to read help instructions.
-* If you want you can add `~/bin` to your path in your appropriate `.bashrc` or `.zshrc` for future use.
+1. Navigate to the [release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true) for Aptos CLI.
+2. From the latest release section, download the binary zip file for your platform. The binary zip files contain the platform name in the filename.
+3. Unzip the downloaded file. This will extract the `aptos` CLI tool.
+4. Place this extracted `aptos` file at a location for you to run it. For example, place it in `~/bin/aptos` in Linux.
+5. On Linux and Mac, make this `~/bin/aptos` as an executable by running this command: `chmod +x ~/bin/aptos`.
+6. Type `~/bin/aptos help` to read help instructions.
+7. Add `~/bin` to your path in your appropriate `.bashrc` or `.zshrc` for future use.
 
 ## Install with cargo
 
@@ -35,7 +36,7 @@ source $HOME/.cargo/env
 1. Install dependencies before compiling:
    1. For Debian or Ubuntu: `sudo apt install build-essential pkg-config openssl libssl-dev libclang-dev`.
    2. For RHEL or Centos: `sudo yum install pkgconfig openssl openssl-devel clang`.
-   3. For others: please manually install `pkg-config` `openssl`, `libssl` and `libclang`:
+   3. For others: Manually install `pkg-config` `openssl`, `libssl` and `libclang`:
       - `pkg-config`:
          - Download and unzip the source code at https://pkgconfig.freedesktop.org/releases/
          - `./configure --prefix=/usr/local/pkg_config/0_29_2 --with-internal-glib`
@@ -44,8 +45,7 @@ source $HOME/.cargo/env
          - Check https://wiki.openssl.org/index.php/Compilation_and_Installation for full instructions.
       - `libclang`:
          - Check https://clang.llvm.org/get_started.html for full instructions.
-2. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
-   CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
+2. Install the `aptos` CLI tool by running the below command.  **For AIT-3 use `testnet` instead of `devnet`.** You can run this command from any directory.  The `aptos` CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --branch devnet
 ```

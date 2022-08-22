@@ -23,12 +23,13 @@ executor-types = { path = "../execution/executor-types" }
 scratchpad = { path = "../storage/scratchpad" }
 storage-interface = { path = "../storage/storage-interface" }
 
+cached-packages = { path = "../aptos-move/framework/cached-packages" }
+
 [dev-dependencies]
 rand = "0.7.3"
 
 aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-temppath = { path = "../crates/aptos-temppath" }
-aptos-transaction-builder = { path = "../sdk/transaction-builder" }
 aptos-types = { path = "../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }

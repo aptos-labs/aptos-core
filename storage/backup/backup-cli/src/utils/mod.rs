@@ -12,7 +12,8 @@ pub mod test_utils;
 
 use anyhow::{anyhow, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    RocksdbConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
@@ -71,16 +72,19 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_open_files: opt.ledger_db_max_open_files,
                 max_total_wal_size: opt.ledger_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
             index_db_config: RocksdbConfig {
                 max_open_files: opt.index_db_max_open_files,
                 max_total_wal_size: opt.index_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
         }
     }
@@ -136,7 +140,14 @@ impl TreeWriter<StateKey> for MockStore {
 }
 
 impl StateValueWriter<StateKey, StateValue> for MockStore {
-    fn write_kv_batch(&self, _kv_batch: &StateValueBatch<StateKey, StateValue>) -> Result<()> {
+    fn write_kv_batch(
+        &self,
+        _kv_batch: &StateValueBatch<StateKey, Option<StateValue>>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn write_usage(&self, _version: Version, _items: usize, _total_bytes: usize) -> Result<()> {
         Ok(())
     }
 }
@@ -209,6 +220,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 opt.rocksdb_opt.into(),
                 false,
                 TARGET_SNAPSHOT_SIZE,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }

@@ -28,11 +28,11 @@ func demo_coin_transfer() {
 	amount := uint64(1_234_567)
 	payload := stdlib.EncodeCoinTransfer(token, to, amount)
 
-	call, err := stdlib.DecodeScriptFunctionPayload(payload)
+	call, err := stdlib.DecodeEntryFunctionPayload(payload)
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode script: %v", err))
 	}
-	payment := call.(*stdlib.ScriptFunctionCall__CoinTransfer)
+	payment := call.(*stdlib.EntryFunctionCall__CoinTransfer)
 	if payment.Amount != amount || payment.To != to {
 		panic("wrong script content")
 	}

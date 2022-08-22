@@ -34,6 +34,9 @@ fn random_message(rng: &mut ThreadRng) -> TestAptosCrypto {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("bls12381");
 
+    pk_subgroup_membership(&mut group);
+    sig_subgroup_membership(&mut group);
+
     pop_create(&mut group);
     pop_create_with_pubkey(&mut group);
     pop_verify(&mut group);
@@ -51,6 +54,39 @@ fn bench_group(c: &mut Criterion) {
     }
 
     group.finish();
+}
+
+fn pk_subgroup_membership<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+    g.bench_function("pk_prime_order_subgroup_check", move |b| {
+        b.iter_with_setup(
+            || {
+                let kp = KeyPair::<bls12381::PrivateKey, bls12381::PublicKey>::generate(&mut rng);
+                kp.public_key
+            },
+            |pk| pk.subgroup_check(),
+        )
+    });
+}
+
+fn sig_subgroup_membership<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+    g.bench_function("sig_prime_order_subgroup_check", move |b| {
+        b.iter_with_setup(
+            || {
+                let kp = KeyPair::<bls12381::PrivateKey, bls12381::PublicKey>::generate(&mut rng);
+
+                // Currently, there's no better way of sampling a group element here
+                kp.private_key
+                    .sign(&TestAptosCrypto("Hello Aptos!".to_owned()))
+            },
+            |sig| sig.subgroup_check(),
+        )
+    });
 }
 
 fn pop_create<M: Measurement>(g: &mut BenchmarkGroup<M>) {

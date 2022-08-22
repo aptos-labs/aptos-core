@@ -6,9 +6,11 @@ use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
-use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
+use aptos_logger::info;
+use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
+use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
@@ -17,7 +19,7 @@ use tokio::task::JoinHandle;
 pub struct SwarmBuilder {
     local: bool,
     num_validators: NonZeroUsize,
-    genesis_modules: Option<Vec<Vec<u8>>>,
+    genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
@@ -27,7 +29,7 @@ impl SwarmBuilder {
         Self {
             local,
             num_validators: NonZeroUsize::new(num_validators).unwrap(),
-            genesis_modules: None,
+            genesis_framework: None,
             init_config: None,
             init_genesis_config: None,
         }
@@ -38,7 +40,7 @@ impl SwarmBuilder {
     }
 
     pub fn with_aptos(mut self) -> Self {
-        self.genesis_modules = Some(cached_framework_packages::module_blobs().to_vec());
+        self.genesis_framework = Some(cached_packages::head_release_bundle().clone());
         self
     }
 
@@ -54,13 +56,16 @@ impl SwarmBuilder {
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build(self) -> LocalSwarm {
+        ::aptos_logger::Logger::new().init();
+        info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
         // Add support for forge
         assert!(self.local);
         static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
-        ::aptos_logger::Logger::new().init();
         let version = FACTORY.versions().max().unwrap();
+
+        info!("Node finished compiling");
 
         let init_genesis_config = self.init_genesis_config;
 
@@ -69,7 +74,7 @@ impl SwarmBuilder {
                 OsRng,
                 self.num_validators,
                 &version,
-                self.genesis_modules,
+                self.genesis_framework,
                 self.init_config,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
@@ -146,7 +151,7 @@ pub fn launch_faucet(
         server_url: endpoint,
         mint_key_file_path: PathBuf::new(),
         mint_key: Some(ConfigKey::new(mint_key)),
-        mint_account_address: Some(aptos_root_address()),
+        mint_account_address: Some(aptos_test_root_address()),
         chain_id,
         maximum_amount: None,
         do_not_delegate: true,

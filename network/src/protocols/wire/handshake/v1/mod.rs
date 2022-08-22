@@ -107,10 +107,24 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
-            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
-                Encoding::CompressedBcs
-            }
+            ProtocolId::ConsensusDirectSendCompressed
+            | ProtocolId::ConsensusRpcCompressed
+            | ProtocolId::MempoolDirectSend => Encoding::CompressedBcs,
             _ => Encoding::Bcs,
+        }
+    }
+
+    /// Returns the compression client label based on the current protocol id
+    fn get_compression_client(self) -> CompressionClient {
+        match self {
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                CompressionClient::Consensus
+            }
+            ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
+            protocol_id => unreachable!(
+                "The given protocol ({:?}) should not be using compression!",
+                protocol_id
+            ),
         }
     }
 
@@ -123,8 +137,9 @@ impl ProtocolId {
         match self.encoding() {
             Encoding::Bcs => self.bcs_encode(value),
             Encoding::CompressedBcs => {
+                let compression_client = self.get_compression_client();
                 let bcs_bytes = self.bcs_encode(value)?;
-                aptos_compression::compress(bcs_bytes, CompressionClient::Consensus)
+                aptos_compression::compress(bcs_bytes, compression_client)
                     .map_err(|e| anyhow!("{:?}", e))
             }
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
@@ -135,9 +150,9 @@ impl ProtocolId {
         match self.encoding() {
             Encoding::Bcs => self.bcs_decode(bytes),
             Encoding::CompressedBcs => {
-                let raw_bytes =
-                    aptos_compression::decompress(&bytes.to_vec(), CompressionClient::Consensus)
-                        .map_err(|e| anyhow! {"{:?}", e})?;
+                let compression_client = self.get_compression_client();
+                let raw_bytes = aptos_compression::decompress(&bytes.to_vec(), compression_client)
+                    .map_err(|e| anyhow! {"{:?}", e})?;
                 self.bcs_decode(&raw_bytes)
             }
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
@@ -202,7 +217,7 @@ impl ProtocolIdSet {
     pub fn iter(&self) -> impl Iterator<Item = ProtocolId> + '_ {
         self.0
             .iter_ones()
-            .filter_map(|idx| bcs::from_bytes(&[idx]).ok())
+            .filter_map(|idx| bcs::from_bytes(&[idx as u8]).ok())
     }
 
     /// Find the intersection between two sets of protocols.
@@ -217,12 +232,12 @@ impl ProtocolIdSet {
 
     /// Returns if the protocol is set.
     pub fn contains(&self, protocol: ProtocolId) -> bool {
-        self.0.is_set(protocol as u8)
+        self.0.is_set(protocol as u16)
     }
 
     /// Insert a new protocol into the set.
     pub fn insert(&mut self, protocol: ProtocolId) {
-        self.0.set(protocol as u8)
+        self.0.set(protocol as u16)
     }
 }
 

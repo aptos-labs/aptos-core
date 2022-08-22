@@ -1,9 +1,18 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
+import {
+  TxnBuilderTypes,
+  TransactionBuilderMultiEd25519,
+  BCS,
+  TransactionBuilder,
+  TransactionBuilderRemoteABI,
+} from "./transaction_builder";
 import { TokenClient } from "./token_client";
 
 const account = "0x1::account::Account";
@@ -11,6 +20,13 @@ const account = "0x1::account::Account";
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 const coinTransferFunction = "0x1::coin::transfer";
+
+test("node url empty", () => {
+  expect(() => {
+    const client = new AptosClient("");
+    client.getAccount("0x1");
+  }).toThrow("Node URL cannot be empty.");
+});
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -28,7 +44,7 @@ test("gets transactions", async () => {
 test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
-  const accountResource = resources.find((r) => r.type == account);
+  const accountResource = resources.find((r) => r.type === account);
   expect(accountResource).toBeDefined();
 });
 
@@ -78,8 +94,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -87,20 +103,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      10000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -110,6 +113,43 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
+  },
+  30 * 1000,
+);
+
+test(
+  "submits transaction with remote ABI",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 50000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("50000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("0");
+
+    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
+    const rawTxn = await builder.build(
+      "0x1::coin::transfer",
+      ["0x1::aptos_coin::AptosCoin"],
+      [account2.address(), 400],
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("400");
   },
   30 * 1000,
 );
@@ -149,8 +189,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -158,20 +198,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(mutisigAccountAddress),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      1000000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -226,7 +253,7 @@ test(
     await checkAptosCoin();
 
     const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "100000"],
@@ -278,8 +305,8 @@ test(
     await checkAptosCoin();
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -287,20 +314,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      10000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -324,8 +338,7 @@ test(
   30 * 1000,
 );
 
-// TODO: Delete this or fix it pending response in https://github.com/aptos-labs/aptos-core/pull/2164/.
-test.skip(
+test(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -334,76 +347,77 @@ test.skip(
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
-    const aliceAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
-    const bobAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(bob.address());
 
-    await faucetClient.fundAccount(alice.address(), 50000);
-
-    let resources = await client.getAccountResources(alice.address());
-    let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("50000");
-
-    await faucetClient.fundAccount(bob.address(), 60000);
-    resources = await client.getAccountResources(bob.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("60000");
+    // Fund both Alice's and Bob's Account
+    await faucetClient.fundAccount(alice.address(), 10000000);
+    await faucetClient.fundAccount(bob.address(), 10000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
-    // Create collection and token on Alice's account
-    // eslint-disable-next-line quotes
-    await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev");
+    async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
+      const txnHash = await txnHashPromise;
+      const txn = await client.waitForTransactionWithResult(txnHash);
+      expect((txn as any)?.success).toBe(true);
+    }
 
-    await tokenClient.createToken(
-      alice,
-      collectionName,
-      tokenName,
-      "Alice's simple token",
-      1,
-      "https://aptos.dev/img/nyan.jpeg",
-      1000,
-      alice.address(),
-      0,
-      0,
-      ["key"],
-      ["2"],
-      ["int"],
+    // Create collection and token on Alice's account
+    await ensureTxnSuccess(
+      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
     );
 
-    let aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName, "0");
+    await ensureTxnSuccess(
+      tokenClient.createToken(
+        alice,
+        collectionName,
+        tokenName,
+        "Alice's simple token",
+        1,
+        "https://aptos.dev/img/nyan.jpeg",
+        1000,
+        alice.address(),
+        0,
+        0,
+        ["key"],
+        ["2"],
+        ["int"],
+      ),
+    );
+
+    const propertyVersion = 0;
+    const tokenId = {
+      token_data_id: {
+        creator: alice.address().hex(),
+        collection: collectionName,
+        name: tokenName,
+      },
+      property_version: `${propertyVersion}`,
+    };
+
+    // Transfer Token from Alice's Account to Bob's Account
+    await tokenClient.getCollectionData(alice.address().hex(), collectionName);
+    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x1::token",
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x3::token",
         "direct_transfer_script",
         [],
         [
-          BCS.bcsToBytes(aliceAccountAddress),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
           BCS.bcsSerializeStr(collectionName),
           BCS.bcsSerializeStr(tokenName),
+          BCS.bcsSerializeUint64(propertyVersion),
           BCS.bcsSerializeUint64(1),
         ],
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(alice.address()),
-      client.getChainId(),
+    const rawTxn = await client.generateRawTransaction(alice.address(), entryFunctionPayload);
+    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
+      TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
     ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      aliceAccountAddress,
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
-
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [bobAccountAddress]);
 
     const aliceSignature = new TxnBuilderTypes.Ed25519Signature(
       alice.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
@@ -425,7 +439,7 @@ test.skip(
 
     const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
       aliceAuthenticator, // sender authenticator
-      [bobAccountAddress], // secondary signer addresses
+      [TxnBuilderTypes.AccountAddress.fromHex(bob.address())], // secondary signer addresses
       [bobAuthenticator], // secondary signer authenticators
     );
 
@@ -438,26 +452,11 @@ test.skip(
     const transaction = await client.getTransactionByHash(transactionRes.hash);
     expect((transaction as any)?.success).toBe(true);
 
-    aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName, "0");
-
+    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    const bobTokenStore = await client.getAccountResource(bob.address(), "0x1::token::TokenStore");
-
-    const handle = (bobTokenStore.data as any).tokens?.handle;
-
-    const getTokenTableItemRequest = {
-      key_type: "0x1::token::TokenId",
-      value_type: "0x1::token::Token",
-      key: {
-        creator: alice.address().hex(),
-        collection: collectionName,
-        name: tokenName,
-      },
-    };
-
-    const bobTokenTableItem = await client.getTableItem(handle, getTokenTableItemRequest);
-    expect(bobTokenTableItem?.value).toBe("1");
+    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,
 );

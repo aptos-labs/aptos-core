@@ -21,6 +21,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Bound,
 };
+use storage_interface::jmt_update_refs;
 
 #[derive(
     Arbitrary,
@@ -45,8 +46,16 @@ impl From<Vec<u8>> for ValueBlob {
     }
 }
 
-impl crate::Key for ValueBlob {}
-impl crate::Value for ValueBlob {}
+impl crate::Key for ValueBlob {
+    fn key_size(&self) -> usize {
+        self.0.len()
+    }
+}
+impl crate::Value for ValueBlob {
+    fn value_size(&self) -> usize {
+        self.0.len()
+    }
+}
 impl crate::TestKey for ValueBlob {}
 impl crate::TestValue for ValueBlob {}
 
@@ -85,7 +94,7 @@ where
 
     for (i, (key, value)) in kvs.iter().enumerate() {
         let (_root_hash, write_batch) = tree
-            .put_value_set_test(vec![(*key, value)], i as Version)
+            .put_value_set_test(vec![(*key, Some(value))], i as Version)
             .unwrap();
         db.write_tree_update_batch(write_batch).unwrap();
     }
@@ -374,8 +383,23 @@ fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
 }
 
 pub fn test_get_leaf_count(keys: HashSet<HashValue>) {
-    let kvs = keys.into_iter().map(|k| (k, gen_value())).collect();
+    let keys = keys.into_iter().collect::<Vec<_>>();
+    let idx1 = keys.len() / 3;
+    let idx2 = keys.len() / 3 * 2;
+    let kvs = keys[0..idx2].iter().map(|k| (*k, gen_value())).collect();
     let (db, version) = init_mock_db(&kvs);
+    let updates = keys[idx1..idx2]
+        .iter()
+        .map(|k| (*k, None))
+        .chain(keys[idx2..].iter().map(|k| (*k, Some(gen_value()))))
+        .collect::<Vec<_>>();
     let tree = JellyfishMerkleTree::new(&db);
-    assert_eq!(tree.get_leaf_count(version).unwrap(), kvs.len())
+    let (_, batch) = tree
+        .put_value_set_test(jmt_update_refs(updates.as_slice()), version + 1)
+        .unwrap();
+    db.write_tree_update_batch(batch).unwrap();
+    assert_eq!(
+        tree.get_leaf_count(version + 1).unwrap(),
+        keys.len() - (idx2 - idx1)
+    )
 }

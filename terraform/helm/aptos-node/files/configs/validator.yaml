@@ -29,12 +29,14 @@ consensus:
 
 storage:
   storage_pruner_config:
-    enable_state_store_pruner: {{ $.Values.validator.config.enable_state_store_pruner }}
-    enable_ledger_pruner: {{ $.Values.validator.config.enable_ledger_pruner }}
-    ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
-    state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
-    ledger_pruning_batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
-    state_store_pruning_batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
+    ledger_pruner_config:
+      enable: {{ $.Values.validator.config.enable_ledger_pruner }}
+      prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
+      batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
+    state_merkle_pruner_config:
+      enable: {{ $.Values.validator.config.enable_state_store_pruner }}
+      prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
+      batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
 
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob

@@ -2,34 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk::{transaction_builder::TransactionBuilder, types::LocalAccount};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+    account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
 };
-use forge::{AptosContext, AptosTest, Result, Test};
+use cached_packages::aptos_stdlib;
+use forge::{AptosPublicInfo, Swarm};
 
-pub struct ErrorReport;
-
-impl Test for ErrorReport {
-    fn name(&self) -> &'static str {
-        "smoke-test::aptos::error-report"
-    }
-}
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
-    ctx: &mut AptosContext<'_>,
+    info: &mut AptosPublicInfo<'_>,
     f: F,
     expected: &str,
 ) {
-    let payload = ctx
-        .aptos_transaction_factory()
+    let payload = info
+        .transaction_factory()
         .payload(aptos_stdlib::aptos_coin_claim_mint_capability())
         .sequence_number(0);
     let txn = local_account.sign_transaction(f(payload).build());
     let err = format!(
         "{:?}",
-        ctx.client().submit_and_wait(&txn).await.unwrap_err()
+        info.client().submit_and_wait(&txn).await.unwrap_err()
     );
     assert!(
         err.contains(expected),
@@ -39,67 +33,69 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     )
 }
 
-#[async_trait::async_trait]
-impl AptosTest for ErrorReport {
-    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
-        let local_account = ctx.random_account();
-        let address = local_account.address();
-        ctx.create_user_account(local_account.public_key()).await?;
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(address),
-            "INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE",
-        )
-        .await;
-        // TODO(Gas): re-enable this
-        /*submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(address).gas_unit_price(0),
-            "GAS_UNIT_PRICE_BELOW_MIN_BOUND",
-        )
-        .await;*/
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(address).chain_id(ChainId::new(100)),
-            "BAD_CHAIN_ID",
-        )
-        .await;
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(AccountAddress::random()),
-            "SENDING_ACCOUNT_DOES_NOT_EXIST",
-        )
-        .await;
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(aptos_root_address()),
-            "SEQUENCE_NUMBER_TOO_OLD",
-        )
-        .await;
-        let root_account_sequence_number = ctx.root_account().sequence_number();
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| {
-                t.sender(aptos_root_address())
-                    .sequence_number(root_account_sequence_number)
-            },
-            "INVALID_AUTH_KEY",
-        )
-        .await;
-        ctx.mint(address, 100000).await?;
-        submit_and_check_err(
-            &local_account,
-            ctx,
-            |t| t.sender(address).expiration_timestamp_secs(0),
-            "TRANSACTION_EXPIRED",
-        )
-        .await;
-        Ok(())
-    }
+#[tokio::test]
+async fn test_error_report() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
+
+    let local_account = info.random_account();
+    let address = local_account.address();
+    info.create_user_account(local_account.public_key())
+        .await
+        .unwrap();
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| t.sender(address),
+        "INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE",
+    )
+    .await;
+    // TODO(Gas): re-enable this
+    /*submit_and_check_err(
+        &local_account,
+        ctx,
+        |t| t.sender(address).gas_unit_price(0),
+        "GAS_UNIT_PRICE_BELOW_MIN_BOUND",
+    )
+    .await;*/
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| t.sender(address).chain_id(ChainId::new(100)),
+        "BAD_CHAIN_ID",
+    )
+    .await;
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| t.sender(AccountAddress::random()),
+        "SENDING_ACCOUNT_DOES_NOT_EXIST",
+    )
+    .await;
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| t.sender(aptos_test_root_address()),
+        "SEQUENCE_NUMBER_TOO_OLD",
+    )
+    .await;
+    let root_account_sequence_number = info.root_account().sequence_number();
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| {
+            t.sender(aptos_test_root_address())
+                .sequence_number(root_account_sequence_number)
+        },
+        "INVALID_AUTH_KEY",
+    )
+    .await;
+    info.mint(address, 100000).await.unwrap();
+    submit_and_check_err(
+        &local_account,
+        &mut info,
+        |t| t.sender(address).expiration_timestamp_secs(0),
+        "TRANSACTION_EXPIRED",
+    )
+    .await;
 }

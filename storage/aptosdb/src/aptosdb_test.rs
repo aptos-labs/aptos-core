@@ -3,6 +3,7 @@
 
 use std::{sync::Arc, time::Duration};
 
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use proptest::prelude::*;
 
 use crate::{
@@ -12,10 +13,11 @@ use crate::{
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, ROCKSDB_PROPERTIES,
+    AptosDB, PrunerManager, ROCKSDB_PROPERTIES,
 };
-use aptos_config::config::StoragePrunerConfig;
+
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proof::SparseMerkleLeafNode,
@@ -82,30 +84,62 @@ fn test_too_many_requested() {
 }
 
 #[test]
+fn test_storage_config() {
+    let tmp_dir = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    for enable_ledger in [false, true] {
+        for enable_state in [false, true] {
+            let state_pruner = StatePrunerManager::new(
+                Arc::clone(&aptos_db.state_merkle_db),
+                StateMerklePrunerConfig {
+                    enable: enable_state,
+                    prune_window: 20,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+            );
+
+            assert_eq!(state_pruner.is_pruner_enabled(), enable_state);
+            assert_eq!(state_pruner.get_pruner_window(), 20);
+
+            let ledger_pruner = LedgerPrunerManager::new(
+                Arc::clone(&aptos_db.ledger_db),
+                Arc::clone(&aptos_db.state_store),
+                LedgerPrunerConfig {
+                    enable: enable_ledger,
+                    prune_window: 100,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+            );
+            assert_eq!(ledger_pruner.is_pruner_enabled(), enable_ledger);
+            assert_eq!(ledger_pruner.get_pruner_window(), 100);
+        }
+    }
+}
+
+#[test]
 fn test_error_if_version_is_pruned() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 1,
+        StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
 
     let ledger_pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 1,
+        Arc::clone(&aptos_db.state_store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
     state_pruner.testonly_update_min_version(5);
@@ -154,6 +188,7 @@ fn test_get_latest_executed_trees() {
     assert!(
         bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
+            StateStorageUsage::new_untracked(),
             vec![txn_info.hash()],
             1,
         ))

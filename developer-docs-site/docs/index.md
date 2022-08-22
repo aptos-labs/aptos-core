@@ -10,8 +10,8 @@ hide_table_of_contents: true
 
 Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos Blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
-:::tip Looking for the AIT-2 docs?
-  Click [here for Aptos Incentivized Testnet-2 docs](/nodes/ait/ait-2).
+:::tip Looking for the AIT-3 docs?
+  Click [here for Aptos Incentivized Testnet-3 docs](/nodes/ait/ait-3).
 :::
 
 ## Start here
@@ -94,7 +94,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
   <div class="col">
   <div class="card h-100" >
     <div class="card-body d-flex flex-column"  >
-    <a href="/rest-api" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
+    <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
     <p class="card-text">Reference for the REST API to interact with the Aptos Blockchain.</p>
 </div>
 </div>

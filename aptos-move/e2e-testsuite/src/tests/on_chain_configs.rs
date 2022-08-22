@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::{on_chain_config::Version, transaction::TransactionStatus};
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS, on_chain_config::Version, transaction::TransactionStatus,
+};
 use aptos_vm::AptosVM;
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
@@ -21,8 +23,7 @@ fn initial_aptos_version() {
             Version { major: test_env.version_number }
         );
 
-        let account = test_env.dr_account;
-        let txn = account
+        let txn = executor.new_account_at(CORE_CODE_ADDRESS)
             .transaction()
             .payload(aptos_stdlib::version_set_version(test_env.version_number + 1))
             .sequence_number(test_env.dr_sequence_number)
@@ -50,8 +51,7 @@ fn drop_txn_after_reconfiguration() {
             Version { major: test_env.version_number }
         );
 
-        let account = test_env.dr_account;
-        let txn = account
+        let txn = executor.new_account_at(CORE_CODE_ADDRESS)
             .transaction()
             .payload(aptos_stdlib::version_set_version(test_env.version_number + 1))
             .sequence_number(test_env.dr_sequence_number)

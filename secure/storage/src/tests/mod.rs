@@ -4,5 +4,6 @@
 mod github;
 mod in_memory;
 mod on_disk;
+mod rocks_db;
 mod suite;
 mod vault;

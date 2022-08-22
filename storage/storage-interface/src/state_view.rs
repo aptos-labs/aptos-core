@@ -3,6 +3,7 @@
 
 use crate::DbReader;
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use std::sync::Arc;
@@ -14,16 +15,13 @@ pub struct DbStateView {
 
 impl DbStateView {
     fn get(&self, key: &StateKey) -> Result<Option<Vec<u8>>> {
-        if let Some(version) = self.version {
+        Ok(if let Some(version) = self.version {
             self.db
-                .get_state_value_by_version(key, version)
-                .map(|value_opt| {
-                    // Hack: `v.maybe_bytes == None` represents deleted value, deemed non-existent
-                    value_opt.and_then(|value| value.maybe_bytes)
-                })
+                .get_state_value_by_version(key, version)?
+                .map(|value| value.into_bytes())
         } else {
-            Ok(None)
-        }
+            None
+        })
     }
 }
 
@@ -34,6 +32,10 @@ impl StateView for DbStateView {
 
     fn is_genesis(&self) -> bool {
         self.version.is_none()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.db.get_state_storage_usage(self.version)
     }
 }
 

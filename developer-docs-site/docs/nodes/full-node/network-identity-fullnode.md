@@ -97,10 +97,9 @@ Follow the below detailed steps:
   Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
 
   ```
-  aptos-operational-tool generate-key \
-      --encoding hex \
+  aptos key generate \
       --key-type x25519 \
-      --key-file /path/to/private-key.txt
+      --output-file /path/to/private-key.txt
   ```
 
 3. Retrieve the peer identity
@@ -117,9 +116,8 @@ Follow the below detailed steps:
    From inside the `aptoslabs/tools` Docker container:
 
    ```
-   $ aptos-operational-tool extract-peer-from-file \
-       --encoding hex \
-       --key-file /path/to/private-key.txt \
+   $ aptos key extract-peer \
+       --private-key-file /path/to/private-key.txt \
        --output-file /path/to/peer-info.yaml
    ```
 
@@ -166,6 +164,11 @@ full_node_networks:
 ```
 
 ## Allowing other FullNodes to connect
+
+:::tip Ports and port settings
+
+See [Ports and port settings](/nodes/ait/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
+:::
 
 Once you start your FullNode with a static identity you can allow others to connect to devnet through your node.
 

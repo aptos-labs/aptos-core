@@ -11,17 +11,17 @@ pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
+pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult};
-use aptos_telemetry::collect_build_information;
+use crate::common::utils::cli_build_information;
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
 
-/// CLI tool for interacting with the Aptos blockchain and nodes
-///
+/// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
 #[clap(name = "aptos", author, version, propagate_version = true)]
 pub enum Tool {
@@ -41,6 +41,8 @@ pub enum Tool {
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
     Node(node::NodeTool),
+    #[clap(subcommand)]
+    Stake(stake::StakeTool),
 }
 
 impl Tool {
@@ -57,11 +59,12 @@ impl Tool {
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
+            Stake(tool) => tool.execute().await,
         }
     }
 }
 
-/// Show information about the build of the CLI
+/// Show build information about the CLI
 ///
 /// This is useful for debugging as well as determining what versions are compatible with the CLI
 #[derive(Parser)]
@@ -74,8 +77,6 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
-        let build_information = collect_build_information!();
-
-        Ok(build_information)
+        Ok(cli_build_information())
     }
 }

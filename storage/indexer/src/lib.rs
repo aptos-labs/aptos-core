@@ -5,33 +5,42 @@ mod db;
 mod metadata;
 mod schema;
 
-use crate::db::INDEX_DB_NAME;
-use crate::metadata::{Metadata, MetadataTag};
-use crate::schema::column_families;
-use crate::schema::indexer_metadata::IndexerMetadataSchema;
-use crate::schema::table_info::TableInfoSchema;
+use crate::{
+    db::INDEX_DB_NAME,
+    metadata::{Metadata, MetadataTag},
+    schema::{
+        column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
+    },
+};
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
-use aptos_types::access_path::Path;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::table::TableHandle;
-use aptos_types::state_store::table::TableInfo;
-use aptos_types::transaction::{AtomicVersion, Version};
-use aptos_types::write_set::{WriteOp, WriteSet};
+use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_types::{
+    access_path::Path,
+    account_address::AccountAddress,
+    state_store::{
+        state_key::StateKey,
+        table::{TableHandle, TableInfo},
+    },
+    transaction::{AtomicVersion, Version},
+    write_set::{WriteOp, WriteSet},
+};
 use aptos_vm::data_cache::{AsMoveResolver, RemoteStorage};
-use move_deps::move_core_types::identifier::IdentStr;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
-use move_deps::move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
-use schemadb::db_options::gen_rocksdb_options;
+use move_deps::{
+    move_core_types::{
+        identifier::IdentStr,
+        language_storage::{StructTag, TypeTag},
+    },
+    move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator},
+};
 use schemadb::{SchemaBatch, DB};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use storage_interface::state_view::DbStateView;
-use storage_interface::DbReader;
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    sync::{atomic::Ordering, Arc},
+};
+use storage_interface::{state_view::DbStateView, DbReader};
 
 #[derive(Debug)]
 pub struct Indexer {
@@ -40,8 +49,6 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    // FIXME(aldenhu): remove
-
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
@@ -157,7 +164,7 @@ impl<'a> TableInfoParser<'a> {
 
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
         match write_op {
-            WriteOp::Value(bytes) => match state_key {
+            WriteOp::Modification(bytes) | WriteOp::Creation(bytes) => match state_key {
                 StateKey::AccessPath(access_path) => {
                     let path: Path = (&access_path.path).try_into()?;
                     match path {
@@ -212,7 +219,7 @@ impl<'a> TableInfoParser<'a> {
                         value_type: struct_tag.type_params[1].clone(),
                     };
                     let table_handle = match &struct_value.value[0] {
-                        (name, AnnotatedMoveValue::U128(handle)) => {
+                        (name, AnnotatedMoveValue::Address(handle)) => {
                             assert_eq!(name.as_ref(), IdentStr::new("handle").unwrap());
                             TableHandle(*handle)
                         }

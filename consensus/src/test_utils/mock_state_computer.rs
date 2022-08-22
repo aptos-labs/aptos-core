@@ -50,7 +50,7 @@ impl StateComputer for MockStateComputer {
     ) -> Result<StateComputeResult, Error> {
         self.block_cache.lock().insert(
             block.id(),
-            block.payload().unwrap_or(&Payload::new_empty()).clone(),
+            block.payload().unwrap_or(&Payload::empty()).clone(),
         );
         let result = StateComputeResult::new_dummy();
         Ok(result)

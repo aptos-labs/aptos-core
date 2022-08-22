@@ -1,129 +1,136 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
-use std::{
-    convert::From,
-    fmt::{self, Display},
-};
-use warp::{http::StatusCode, reject::Reject};
+use aptos_types::vm_status::StatusCode;
+use poem_openapi::{Enum, Object};
+use serde::Deserialize;
+use std::fmt::Formatter;
 
-use crate::U64;
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Error {
-    pub code: u16,
+/// This is the generic struct we use for all API errors, it contains a string
+/// message and an Aptos API specific error code.
+#[derive(Debug, Deserialize, Object)]
+pub struct AptosError {
+    /// A message describing the error
     pub message: String,
-    /// Aptos blockchain latest onchain ledger version.
+    /// A code providing more granular error information beyond the HTTP status code
+    pub error_code: AptosErrorCode,
+    /// A code providing VM error details when submitting transactions to the VM
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aptos_ledger_version: Option<U64>,
+    pub vm_error_code: Option<u64>,
 }
 
-impl Error {
-    pub fn new(code: StatusCode, message: String) -> Self {
+impl std::fmt::Display for AptosError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error({:?}): {}", self.error_code, self.message)
+    }
+}
+
+impl std::error::Error for AptosError {}
+
+impl AptosError {
+    pub fn new_with_error_code<ErrorType: std::fmt::Display>(
+        error: ErrorType,
+        error_code: AptosErrorCode,
+    ) -> AptosError {
         Self {
-            code: code.as_u16(),
-            message,
-            aptos_ledger_version: None,
+            message: error.to_string(),
+            error_code,
+            vm_error_code: None,
         }
     }
 
-    pub fn from_anyhow_error(code: StatusCode, err: anyhow::Error) -> Self {
-        Self::new(code, err.to_string())
-    }
-
-    pub fn bad_request<S: Display>(msg: S) -> Self {
-        Self::new(StatusCode::BAD_REQUEST, msg.to_string())
-    }
-
-    pub fn not_found<S: Display>(resource: &str, identifier: S, ledger_version: u64) -> Self {
-        Self::new(
-            StatusCode::NOT_FOUND,
-            format!("{} not found by {}", resource, identifier),
-        )
-        .aptos_ledger_version(ledger_version)
-    }
-
-    pub fn invalid_param<S: Display>(name: &str, value: S) -> Self {
-        Self::bad_request(format!("invalid parameter {}: {}", name, value))
-    }
-
-    pub fn invalid_request_body<S: Display>(msg: S) -> Self {
-        Self::bad_request(format!("invalid request body: {}", msg))
-    }
-
-    pub fn insufficient_storage<S: Display>(msg: S) -> Self {
-        Self::new(StatusCode::INSUFFICIENT_STORAGE, msg.to_string())
-    }
-
-    pub fn internal(err: anyhow::Error) -> Self {
-        Self::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, err)
-    }
-
-    pub fn status_code(&self) -> StatusCode {
-        StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-
-    pub fn aptos_ledger_version(mut self, ledger_version: u64) -> Self {
-        self.aptos_ledger_version = Some(ledger_version.into());
-        self
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {}", self.status_code(), &self.message)?;
-        if let Some(val) = &self.aptos_ledger_version {
-            write!(f, "\nAptos ledger version: {}", val)?;
+    pub fn new_with_vm_status<ErrorType: std::fmt::Display>(
+        error: ErrorType,
+        error_code: AptosErrorCode,
+        vm_error_code: StatusCode,
+    ) -> AptosError {
+        Self {
+            message: error.to_string(),
+            error_code,
+            vm_error_code: Some(vm_error_code as u64),
         }
-        Ok(())
     }
 }
 
-impl Reject for Error {}
+/// These codes provide more granular error information beyond just the HTTP
+/// status code of the response.
+#[derive(Copy, Clone, Debug, Deserialize, Enum)]
+#[oai(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[repr(u32)]
+pub enum AptosErrorCode {
+    /// Account not found at the requested version
+    AccountNotFound = 101,
+    /// Resource not found at the requested version
+    ResourceNotFound = 102,
+    /// Module not found at the requested version
+    ModuleNotFound = 103,
+    /// Struct field not found at the requested version
+    StructFieldNotFound = 104,
+    /// Ledger version not found at the requested version
+    ///
+    /// Usually means that the version is ahead of the latest version
+    VersionNotFound = 105,
+    /// Transaction not found at the requested version or with the requested hash
+    TransactionNotFound = 106,
+    /// Table item not found at the requested version
+    TableItemNotFound = 107,
+    /// Block not found at the requested version or height
+    ///
+    /// Usually means the block is fully or partially pruned or the height / version is ahead
+    /// of the latest version
+    BlockNotFound = 108,
 
-impl From<anyhow::Error> for Error {
-    fn from(e: anyhow::Error) -> Self {
-        Self::internal(e)
-    }
+    /// Ledger version is pruned
+    VersionPruned = 200,
+    /// Block is fully or partially pruned
+    BlockPruned = 201,
+
+    /// The API's inputs were invalid
+    InvalidInput = 300,
+    /// The start param given for paging is invalid.
+    InvalidStartParam = 301,
+    /// The limit param given for paging is invalid.
+    InvalidLimitParam = 302,
+    /// The event key for events is invalid.
+    InvalidEventKey = 303,
+
+    /// The transaction submitted was invalid.
+    InvalidSubmittedTransaction = 400,
+    /// The transaction was an invalid update to an already submitted transaction.
+    InvalidTransactionUpdate = 401,
+    /// The sequence number for the transaction is behind the latest sequence number.
+    SequenceNumberTooOld = 402,
+    /// The submitted transaction failed VM checks.
+    VmError = 403,
+    /// The transaction failed to submit.
+    TransactionSubmissionFailed = 404,
+
+    /// Health check failed.
+    HealthCheckFailed = 500,
+    /// The mempool is full, no new transactions can be submitted.
+    MempoolIsFull = 501,
+    /// The mempool is full for this account's quota, no new transactions can be submitted.
+    MempoolIsFullForAccount = 502,
+
+    /// Internal server error
+    InternalError = 600,
+    /// The API failed to read from storage for this request, not because of a
+    /// bad request, but because of some internal error.
+    ReadFromStorageError = 601,
+    /// The data we read from the DB was not valid BCS.
+    InvalidBcsInStorageError = 602,
+    /// We were unexpectedly unable to convert a Rust type to BCS.
+    BcsSerializationError = 603,
+    /// Error from the web framework
+    WebFrameworkError = 604,
+
+    /// BCS format is not supported on this API.
+    BcsNotSupported = 701,
 }
 
-impl From<serde_json::error::Error> for Error {
-    fn from(err: serde_json::error::Error) -> Self {
-        Self::internal(err.into())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::error::Error;
-    use warp::http::StatusCode;
-
-    #[test]
-    fn test_to_string() {
-        let err = Error::new(StatusCode::BAD_REQUEST, "invalid address".to_owned());
-        assert_eq!(err.to_string(), "400 Bad Request: invalid address")
-    }
-
-    #[test]
-    fn test_from_anyhow_error_as_internal_error() {
-        let err = Error::from(anyhow::format_err!("hello"));
-        assert_eq!(err.to_string(), "500 Internal Server Error: hello")
-    }
-
-    #[test]
-    fn test_to_string_with_aptos_ledger_version() {
-        let err = Error::new(StatusCode::BAD_REQUEST, "invalid address".to_owned())
-            .aptos_ledger_version(123);
-        assert_eq!(
-            err.to_string(),
-            "400 Bad Request: invalid address\nAptos ledger version: 123"
-        )
-    }
-
-    #[test]
-    fn test_internal_error() {
-        let err = Error::internal(anyhow::format_err!("hello"));
-        assert_eq!(err.to_string(), "500 Internal Server Error: hello")
+impl AptosErrorCode {
+    pub fn as_u32(&self) -> u32 {
+        *self as u32
     }
 }

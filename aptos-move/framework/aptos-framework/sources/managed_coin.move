@@ -6,15 +6,15 @@ module aptos_framework::managed_coin {
     use std::error;
     use std::signer;
 
-    use aptos_framework::coin::{Self, BurnCapability, MintCapability};
+    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
     use aptos_framework::coins;
 
     //
     // Errors
     //
 
-    /// When no capabilities (burn/mint) found on an account.
-    const ENO_CAPABILITIES: u64 = 0;
+    /// Account has no capabilities (burn/mint).
+    const ENO_CAPABILITIES: u64 = 1;
 
     //
     // Data structures
@@ -23,8 +23,9 @@ module aptos_framework::managed_coin {
     /// Capabilities resource storing mint and burn capabilities.
     /// The resource is stored on the account that initialized coin `CoinType`.
     struct Capabilities<phantom CoinType> has key {
-        mint_cap: MintCapability<CoinType>,
         burn_cap: BurnCapability<CoinType>,
+        freeze_cap: FreezeCapability<CoinType>,
+        mint_cap: MintCapability<CoinType>,
     }
 
     //
@@ -55,10 +56,10 @@ module aptos_framework::managed_coin {
         account: &signer,
         name: vector<u8>,
         symbol: vector<u8>,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     ) {
-        let (mint_cap, burn_cap) = coin::initialize<CoinType>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<CoinType>(
             account,
             string::utf8(name),
             string::utf8(symbol),
@@ -67,8 +68,9 @@ module aptos_framework::managed_coin {
         );
 
         move_to(account, Capabilities<CoinType>{
-            mint_cap,
             burn_cap,
+            freeze_cap,
+            mint_cap,
         });
     }
 
@@ -104,6 +106,9 @@ module aptos_framework::managed_coin {
     use std::option;
 
     #[test_only]
+    use aptos_framework::aggregator_factory;
+
+    #[test_only]
     struct FakeMoney { }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
@@ -116,6 +121,7 @@ module aptos_framework::managed_coin {
         let destination_addr = signer::address_of(&destination);
         aptos_framework::account::create_account(source_addr);
         aptos_framework::account::create_account(destination_addr);
+        aggregator_factory::initialize_aggregator_factory(&mod_account);
 
         initialize<FakeMoney>(
             &mod_account,
@@ -153,7 +159,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 0x60001)]
     public entry fun fail_mint(
         source: signer,
         destination: signer,
@@ -163,6 +169,7 @@ module aptos_framework::managed_coin {
 
         aptos_framework::account::create_account(source_addr);
         aptos_framework::account::create_account(signer::address_of(&destination));
+        aggregator_factory::initialize_aggregator_factory(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register_for_test<FakeMoney>(&mod_account);
@@ -173,7 +180,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 0x60001)]
     public entry fun fail_burn(
         source: signer,
         destination: signer,
@@ -183,6 +190,7 @@ module aptos_framework::managed_coin {
 
         aptos_framework::account::create_account(source_addr);
         aptos_framework::account::create_account(signer::address_of(&destination));
+        aggregator_factory::initialize_aggregator_factory(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register_for_test<FakeMoney>(&mod_account);

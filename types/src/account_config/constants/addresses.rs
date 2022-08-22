@@ -5,8 +5,7 @@ use crate::account_address::AccountAddress;
 
 pub use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
 
-// TODO: Rename to aptos_test_address to be clear this is only used in tests.
-pub fn aptos_root_address() -> AccountAddress {
+pub fn aptos_test_root_address() -> AccountAddress {
     AccountAddress::from_hex_literal("0xA550C18")
         .expect("Parsing valid hex literal should always succeed")
 }

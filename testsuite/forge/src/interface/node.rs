@@ -196,7 +196,7 @@ pub trait NodeExt: Node {
     }
 
     async fn liveness_check(&self, seconds: u64) -> Result<()> {
-        self.rest_client().health_check(seconds).await
+        Ok(self.rest_client().health_check(seconds).await?)
     }
 
     async fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {

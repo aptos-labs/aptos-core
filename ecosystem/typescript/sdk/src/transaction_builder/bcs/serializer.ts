@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable no-bitwise */
 import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from "./consts";
 import { AnyNumber, Bytes, Uint16, Uint32, Uint8 } from "./types";

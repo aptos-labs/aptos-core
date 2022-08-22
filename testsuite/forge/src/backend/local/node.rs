@@ -183,7 +183,7 @@ impl LocalNode {
             .get_ledger_information()
             .await
             .map(|_| ())
-            .map_err(HealthCheckError::Failure)
+            .map_err(|err| HealthCheckError::Failure(err.into()))
     }
 }
 
@@ -204,7 +204,7 @@ impl Node for LocalNode {
     fn rest_api_endpoint(&self) -> Url {
         let ip = self.config().api.address.ip();
         let port = self.config().api.address.port();
-        Url::from_str(&format!("http://{}:{}", ip, port)).expect("Invalid URL.")
+        Url::from_str(&format!("http://{}:{}/v1", ip, port)).expect("Invalid URL.")
     }
 
     fn inspection_service_endpoint(&self) -> Url {

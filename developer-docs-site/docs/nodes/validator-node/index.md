@@ -5,7 +5,11 @@ slug: "validators"
 
 # Validators
 
-Follow these installation guides to set up and deploy your Validator nodes for the Aptos Blockchain.
+Follow these installation guides to set up and deploy your validator nodes for the Aptos blockchain.
+
+:::tip For AIT-3 read this first
+If you are deploying a validator node for AIT-3, then make sure to read the [Node Requirements](/nodes/ait/node-requirements) first.
+:::
 
 - ### [On AWS](using-aws.md)
 - ### [On Azure](using-azure.md)

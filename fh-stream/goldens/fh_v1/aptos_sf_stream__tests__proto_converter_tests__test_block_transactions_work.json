@@ -1,0 +1,234 @@
+[
+  {
+    "timestamp": "1970-01-01T00:00:00.500000000Z",
+    "version": "1",
+    "info": {
+      "hash": "",
+      "stateRootHash": "iYEvhbkSNnNDiXT9ExB4W708VlkI884lDdkE1RxJJIc=",
+      "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
+      "success": true,
+      "vmStatus": "Executed successfully",
+      "accumulatorRootHash": "R6KyDDh+zwSKR3qcY+eTF8Ftio9f074CF6DKCMmxkUc=",
+      "changes": [
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x1",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "block",
+                "name": "BlockResource"
+              },
+              "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
+            }
+          }
+        },
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x1",
+            "stateKeyHash": "gEjJVCIYFLBFM6nwqZRsOo1HKsYt9azLn0fAl+JW6LY=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "stake",
+                "name": "ValidatorPerformance"
+              },
+              "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"1\"}]}"
+            }
+          }
+        },
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x1",
+            "stateKeyHash": "exYVvwEtPJQiPz92KH7i973zHTZAcRKLJWrv8IQbYm0=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "timestamp",
+                "name": "CurrentTimeMicroseconds"
+              },
+              "data": "{\"microseconds\":\"500000\"}"
+            }
+          }
+        }
+      ]
+    },
+    "blockHeight": "1",
+    "type": "BLOCK_METADATA",
+    "blockMetadata": {
+      "id": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121",
+      "round": "1",
+      "events": [
+        {
+          "key": {
+            "creationNumber": "2",
+            "accountAddress": "0000000000000000000000000000000000000000000000000000000000000001"
+          },
+          "sequenceNumber": "1",
+          "type": {
+            "type": "Struct",
+            "struct": {
+              "address": "0x1",
+              "module": "block",
+              "name": "NewBlockEvent"
+            }
+          },
+          "data": "{\"epoch\":\"0\",\"failed_proposer_indices\":[],\"height\":\"1\",\"previous_block_votes\":[false],\"proposer\":\"0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef\",\"round\":\"1\",\"time_microseconds\":\"500000\"}"
+        }
+      ],
+      "previousBlockVotes": [
+        false
+      ],
+      "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef"
+    }
+  },
+  {
+    "timestamp": "1970-01-01T00:00:00.500000000Z",
+    "version": "2",
+    "info": {
+      "hash": "",
+      "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
+      "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
+      "gasUsed": "42",
+      "success": true,
+      "vmStatus": "Executed successfully",
+      "accumulatorRootHash": "f//BcLmRLEdsIqSF8jPbl/sRV0RZV0TiIbRJXWmABgQ=",
+      "changes": [
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0xa550c18",
+            "stateKeyHash": "bk0uO6wH+SxzWVgC6U5PlaMLwZejZvGnB/8dlkwMsxs=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "account",
+                "name": "Account"
+              },
+              "data": "{\"authentication_key\":\"0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa550c18\",\"creation_num\":\"0\"}}},\"sequence_number\":\"1\"}"
+            }
+          }
+        },
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "stateKeyHash": "A3VLTM+ig+PgpLeDq+ZK4BqaXDd4Takk7km2JDhm0p4=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "account",
+                "name": "Account"
+              },
+              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"sequence_number\":\"0\"}"
+            }
+          }
+        },
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "stateKeyHash": "NNGY2W//aZUvdNojOhpsit37akHSWVWW78u5d6pIQHY=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "coin",
+                "name": "CoinStore",
+                "genericTypeParams": [
+                  {
+                    "type": "Struct",
+                    "struct": {
+                      "address": "0x1",
+                      "module": "aptos_coin",
+                      "name": "AptosCoin"
+                    }
+                  }
+                ]
+              },
+              "data": "{\"coin\":{\"value\":\"0\"},\"deposit_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"1\"}}},\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"2\"}}}}"
+            }
+          }
+        },
+        {
+          "type": "WRITE_RESOURCE",
+          "writeResource": {
+            "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "stateKeyHash": "E/AWqpVn+pNBWOdKrPx7zz49GqZpEKPGgx91lgy0jIQ=",
+            "data": {
+              "type": {
+                "address": "0x1",
+                "module": "guid",
+                "name": "Generator"
+              },
+              "data": "{\"counter\":\"3\"}"
+            }
+          }
+        }
+      ]
+    },
+    "blockHeight": "1",
+    "type": "USER",
+    "user": {
+      "request": {
+        "sender": "0xa550c18",
+        "maxGasAmount": "4000000",
+        "expirationTimestampSecs": "1969-12-31T23:59:59.000000000Z",
+        "payload": {
+          "scriptFunctionPayload": {
+            "function": {
+              "module": {
+                "address": "0x1",
+                "name": "account"
+              },
+              "name": "create_account"
+            },
+            "arguments": [
+              "\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\""
+            ]
+          }
+        },
+        "signature": {
+          "ed25519": {
+            "publicKey": "FEGPhnoL1tQquy2qUM1opahpziCCgkgfV1BPYwUQ0NM=",
+            "signature": "BPHZ/DDkp2fqrjdDD4O/mZmfV8WJZ35LrM5vHLo7LUvknlNL1asMUHZqU8UpqO2YYEWu6IS9N2fWHu7eu3noAw=="
+          }
+        }
+      },
+      "events": [
+        {
+          "key": {
+            "accountAddress": "34BF7E2D17674FEB234371A7EA58EFD715F0E56BA20EBF13789480D9D643AFAF"
+          },
+          "type": {
+            "type": "Struct",
+            "struct": {
+              "address": "0x1",
+              "module": "account",
+              "name": "CoinRegisterEvent"
+            }
+          },
+          "data": "{\"type_info\":{\"account_address\":\"0x1\",\"module_name\":\"0x6170746f735f636f696e\",\"struct_name\":\"0x4170746f73436f696e\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "1970-01-01T00:00:00.500000000Z",
+    "version": "3",
+    "info": {
+      "hash": "",
+      "stateRootHash": "NhtSLDC1MUGQU8z0cEnDeS8aULjj+2rT+FXCuSiZEsA=",
+      "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
+      "success": true,
+      "vmStatus": "Executed successfully",
+      "accumulatorRootHash": "hLgWncFBf60gLOi50vJVl0Me8R+290+1iluwNup4Hww="
+    },
+    "blockHeight": "1",
+    "type": "STATE_CHECKPOINT",
+    "stateCheckpoint": {}
+  }
+]

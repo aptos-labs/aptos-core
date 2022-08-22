@@ -1,17 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::keys::PublicIdentity;
 use crate::{
     config::ValidatorConfiguration,
     keys::{generate_key_objects, PrivateIdentity},
     GenesisInfo,
 };
 use anyhow::ensure;
+use aptos_config::config::RocksDbStorageConfig;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, OnDiskStorageConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend,
-        WaypointConfig,
+        NodeConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend, WaypointConfig,
     },
     generator::build_seed_for_network,
     network_id::NetworkId,
@@ -23,6 +24,7 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -37,6 +39,7 @@ use std::{
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
 const PRIVATE_IDENTITY: &str = "private-identity.yaml";
+const PUBLIC_IDENTITY: &str = "public-identity.yaml";
 const CONFIG_FILE: &str = "node.yaml";
 const GENESIS_BLOB: &str = "genesis.blob";
 
@@ -87,21 +90,24 @@ impl ValidatorNodeConfig {
     pub fn get_key_objects(
         &self,
         seed: Option<[u8; 32]>,
-    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity)> {
+    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity, PublicIdentity)> {
         let dir = &self.dir;
         let val_identity_file = dir.join(VALIDATOR_IDENTITY);
         let vfn_identity_file = dir.join(VFN_IDENTITY);
         let private_identity_file = dir.join(PRIVATE_IDENTITY);
+        let public_identity_file = dir.join(PUBLIC_IDENTITY);
 
         // If they all already exist, use them, otherwise generate new ones and overwrite
         if val_identity_file.exists()
             && vfn_identity_file.exists()
             && private_identity_file.exists()
+            && public_identity_file.exists()
         {
             Ok((
                 read_yaml(val_identity_file.as_path())?,
                 read_yaml(vfn_identity_file.as_path())?,
                 read_yaml(private_identity_file.as_path())?,
+                read_yaml(public_identity_file.as_path())?,
             ))
         } else {
             let mut key_generator = if let Some(seed) = seed {
@@ -110,14 +116,20 @@ impl ValidatorNodeConfig {
                 KeyGen::from_os_rng()
             };
 
-            let (validator_identity, vfn_identity, private_identity) =
+            let (validator_identity, vfn_identity, private_identity, public_identity) =
                 generate_key_objects(&mut key_generator)?;
 
             // Write identities in files
             write_yaml(val_identity_file.as_path(), &validator_identity)?;
             write_yaml(vfn_identity_file.as_path(), &vfn_identity)?;
             write_yaml(private_identity_file.as_path(), &private_identity)?;
-            Ok((validator_identity, vfn_identity, private_identity))
+            write_yaml(public_identity_file.as_path(), &public_identity)?;
+            Ok((
+                validator_identity,
+                vfn_identity,
+                private_identity,
+                public_identity,
+            ))
         }
     }
 
@@ -148,7 +160,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
     type Error = anyhow::Error;
 
     fn try_from(config: &ValidatorNodeConfig) -> Result<Self, Self::Error> {
-        let (_, _, private_identity) = config.get_key_objects(None)?;
+        let (_, _, private_identity, _) = config.get_key_objects(None)?;
         let validator_host = (&config
             .config
             .validator_network
@@ -167,12 +179,16 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 .try_into()?,
         );
         Ok(ValidatorConfiguration {
-            account_address: private_identity.account_address,
+            owner_account_address: private_identity.account_address,
+            owner_account_public_key: private_identity.account_private_key.public_key(),
+            operator_account_address: private_identity.account_address,
+            operator_account_public_key: private_identity.account_private_key.public_key(),
+            voter_account_address: private_identity.account_address,
+            voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: private_identity.consensus_private_key.public_key(),
             proof_of_possession: bls12381::ProofOfPossession::create(
                 &private_identity.consensus_private_key,
             ),
-            account_public_key: private_identity.account_private_key.public_key(),
             validator_network_public_key: private_identity
                 .validator_network_private_key
                 .public_key(),
@@ -361,6 +377,7 @@ const ONE_DAY: u64 = 86400;
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
+    pub is_test: bool,
     pub min_stake: u64,
     pub max_stake: u64,
     pub min_voting_threshold: u128,
@@ -368,6 +385,7 @@ pub struct GenesisConfiguration {
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voting_power_increase_limit: u64,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -377,7 +395,7 @@ pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfiguration) + Send + Sy
 #[derive(Clone)]
 pub struct Builder {
     config_dir: PathBuf,
-    move_modules: Vec<Vec<u8>>,
+    framework: ReleaseBundle,
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
     init_config: Option<InitConfigFn>,
@@ -385,13 +403,13 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(config_dir: &Path, move_modules: Vec<Vec<u8>>) -> anyhow::Result<Self> {
+    pub fn new(config_dir: &Path, framework: ReleaseBundle) -> anyhow::Result<Self> {
         let config_dir: PathBuf = config_dir.into();
         let config_dir = config_dir.canonicalize()?;
 
         Ok(Self {
             config_dir,
-            move_modules,
+            framework,
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
             init_config: None,
@@ -522,10 +540,11 @@ impl Builder {
 
         // Ensure safety rules runs in a thread
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
-        let mut storage = OnDiskStorageConfig::default();
-        storage.set_data_dir(validator.dir.clone());
 
-        config.consensus.safety_rules.backend = SecureBackend::OnDiskStorage(storage);
+        // Use a rocksdb storage backend for safety rules
+        let mut storage = RocksDbStorageConfig::default();
+        storage.set_data_dir(validator.dir.clone());
+        config.consensus.safety_rules.backend = SecureBackend::RocksDbStorage(storage);
 
         if index > 0 || self.randomize_first_validator_ports {
             config.randomize_ports();
@@ -549,6 +568,7 @@ impl Builder {
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
             epoch_duration_secs: ONE_DAY,
+            is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,
             max_stake: u64::MAX,
@@ -556,6 +576,7 @@ impl Builder {
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: ONE_DAY / 24,
+            voting_power_increase_limit: 50,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);
@@ -566,16 +587,8 @@ impl Builder {
             ChainId::test(),
             root_key,
             configs,
-            self.move_modules.clone(),
-            genesis_config.allow_new_validators,
-            genesis_config.epoch_duration_secs,
-            genesis_config.min_stake,
-            genesis_config.min_voting_threshold,
-            genesis_config.max_stake,
-            genesis_config.recurring_lockup_duration_secs,
-            genesis_config.required_proposer_stake,
-            genesis_config.rewards_apy_percentage,
-            genesis_config.voting_duration_secs,
+            self.framework.clone(),
+            &genesis_config,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

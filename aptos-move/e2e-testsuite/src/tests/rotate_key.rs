@@ -126,7 +126,7 @@ fn rotate_ed25519_multisig_key() {
         let signature2 =
             MultiEd25519Signature::new(vec![(privkey2.sign(&txn2), pubkey_index)]).unwrap();
         let signed_txn2 = SignedTransaction::new_multisig(txn2, multi_ed_public_key, signature2);
-        signed_txn2.clone().check_signature().unwrap();
+        assert!(signed_txn2.signature_is_valid());
         let output = &executor.execute_transaction(signed_txn2);
         assert_eq!(
             output.status(),

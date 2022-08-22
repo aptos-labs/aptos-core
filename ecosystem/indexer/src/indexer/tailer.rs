@@ -317,7 +317,9 @@ mod test {
                 epoch: 0,
                 version: 0,
                 timestamp_usecs: 0,
-                oldest_ledger_version: None,
+                oldest_ledger_version: 0,
+                oldest_block_height: 0,
+                block_height: 0,
             }
         }
 
@@ -384,7 +386,7 @@ mod test {
                "type":"genesis_transaction",
                "version":"0",
                "hash":"0xa4d0d270d71cf031476dd2674d1e4a247489dfc3521c871ee37f42bd71a0a234",
-               "state_root_hash":"0x27b382a98a32256a9e6403ca1f6e26998273d77afa9e8666e7ee13679af40a7a",
+               "state_change_hash":"0x27b382a98a32256a9e6403ca1f6e26998273d77afa9e8666e7ee13679af40a7a",
                "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
                "gas_used":"0",
                "success":true,
@@ -582,7 +584,7 @@ mod test {
               "type": "block_metadata_transaction",
               "version": "69158",
               "hash": "0x2b7c58ed8524d228f9d0543a82e2793d04e8871df322f976b0e7bb8c5ced4ff5",
-              "state_root_hash": "0x3ead9eb40582fbc7df5e02f72280931dc3e6f1aae45dc832966b4cd972dac4b8",
+              "state_change_hash": "0x3ead9eb40582fbc7df5e02f72280931dc3e6f1aae45dc832966b4cd972dac4b8",
               "event_root_hash": "0x2e481956dea9c59b6fc9f823fe5f4c45efce173e42c551c1fe073b5d76a65504",
               "gas_used": "0",
               "success": true,
@@ -590,15 +592,9 @@ mod test {
               "accumulator_root_hash": "0xb0ad602f805eb20c398f0f29a3504a9ef38bcc52c9c451deb9ec4a2d18807b49",
               "id": "0xeef99391a3fc681f16963a6c03415bc0b1b12b56c00429308fa8bf46ac9eddf0",
               "round": "57600",
-              "previous_block_votes": [],
               "failed_proposer_indices": [],
               "epoch": "1",
-              "previous_block_votes_bitmap": [
-                true,
-                true,
-                false,
-                true
-              ],
+              "previous_block_votes_bitvec": [],
               "proposer": "0x68f04222bd9f8846cda028ea5ba3846a806b04a47e1f1a4f0939f350d713b2eb",
               "timestamp": "1649395495746947",
               "events": [
@@ -609,7 +605,7 @@ mod test {
                     "data": {
                       "epoch": "1",
                       "failed_proposer_indices": [],
-                      "previous_block_votes": [false],
+                      "previous_block_votes_bitvec": [],
                       "proposer": "0xf7c109be515785bba951fc8c51063515d474f78cad150457d6ebd08c4faf2f3b",
                       "round": "1",
                       "time_microseconds": "1656565270489235"
@@ -684,7 +680,7 @@ mod test {
               "type": "user_transaction",
               "version": "691595",
               "hash": "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb",
-              "state_root_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
+              "state_change_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
               "gas_used": "43",
               "success": true,
@@ -696,7 +692,7 @@ mod test {
               "gas_unit_price": "1",
               "expiration_timestamp_secs": "1649713172",
               "payload": {
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": "0x1::aptos_coin::mint",
                 "type_arguments": [],
                 "arguments": [
@@ -802,7 +798,7 @@ mod test {
               "type": "user_transaction",
               "version": "260885",
               "hash": "0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3",
-              "state_root_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
+              "state_change_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
               "gas_used": "143",
               "success": true,
@@ -839,7 +835,7 @@ mod test {
               "gas_unit_price": "1",
               "expiration_timestamp_secs": "1651789617",
               "payload": {
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": "0x2a0e66fde889cebf0401e676bb9bfa073e03caa9c009c66b739c30d24dccad81::Message::set_message",
                 "type_arguments": [],
                 "arguments": [

@@ -5,12 +5,26 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+N/A
+
+## 1.3.7 (2022-08-17)
+
+- Add a transaction builder that is able to serialize transaction arguments with remote ABIs. Remote ABIs are fetchable through REST APIs. With the remote ABI transaction builder, developers can build BCS transactions by only providing the native JS values.
+- Make all functions that accept `BigInt` parameters accept `BigInt | number` instead.
+
+## 1.3.6 (2022-08-10)
+
 - Switch back to representing certain move types (MoveModuleId, MoveStructTag, ScriptFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
+- Represent certain fields with slightly different snake casing, e.g. `ed25519_signature` now instead of `ed_25519_signature`.
+- Add generated types for healthcheck endpoint.
+- If the given URL is missing `/v1`, the `AptosClient` constructor will add it for you. You can opt out of this behavior by setting `doNotFixNodeUrl` to true when calling the constructor.
 
 ## 1.3.5 (2022-08-08)
+
 - Re-expose BCS and items from `transaction_builder/builder` from the root of the module.
 
 ## 1.3.4 (2022-08-07)
+
 - Downscaled default value for `max_gas`.
 
 ## 1.3.3 (2022-08-05)

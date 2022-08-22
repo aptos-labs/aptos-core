@@ -89,7 +89,8 @@ impl AUTransactionGen for P2PTransferGen {
                         CORE_CODE_ADDRESS,
                         ident_str!("coin").to_owned(),
                     )),
-                    code: 65541,
+                    code: 65542,
+                    info: None,
                 });
             }
             (true, false, _) => {
@@ -104,7 +105,8 @@ impl AUTransactionGen for P2PTransferGen {
                         CORE_CODE_ADDRESS,
                         ident_str!("coin").to_owned(),
                     )),
-                    code: 65541,
+                    code: 65542,
+                    info: None,
                 });
             }
             (false, _, _) => {

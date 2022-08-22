@@ -9,7 +9,7 @@ use crate::{
 };
 
 use aptos_crypto::HashValue;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -123,7 +123,7 @@ fn generate_sync_info(
     );
     let ledger_info = LedgerInfoWithSignatures::new(
         LedgerInfo::new(commit_block, HashValue::zero()),
-        MultiSignature::empty(),
+        AggregateSignature::empty(),
     );
     let quorum_cert = QuorumCert::new(
         VoteData::new(

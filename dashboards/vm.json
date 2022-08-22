@@ -912,6 +912,7 @@
         "useTags": false
       },
       {
+        "allValue": ".*",
         "current": {
           "selected": true,
           "text": [

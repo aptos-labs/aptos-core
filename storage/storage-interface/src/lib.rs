@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::account_config::NewBlockEvent;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
@@ -15,11 +16,10 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
-    nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
-        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
-        TransactionAccumulatorSummary,
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
+        SparseMerkleRangeProof, TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -41,7 +41,7 @@ pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
 mod metrics;
-#[cfg(any(feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
 pub mod proof_fetcher;
 pub mod state_delta;
@@ -50,7 +50,6 @@ pub mod sync_proof_fetcher;
 
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
-use scratchpad::SparseMerkleTree;
 
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
@@ -157,6 +156,13 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_first_viable_txn_version].
+    ///
+    /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        unimplemented!()
+    }
+
     /// See [AptosDB::get_first_write_set_version].
     ///
     /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
@@ -207,9 +213,16 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        unimplemented!()
+    }
+
     /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
     /// transaction version.
-    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+    fn get_block_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<(Version, Version, NewBlockEvent)> {
         unimplemented!()
     }
 
@@ -353,11 +366,11 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
+    ) -> Result<SparseMerkleProofExt> {
         unimplemented!()
     }
 
@@ -369,12 +382,21 @@ pub trait DbReader: Send + Sync {
     /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
     ///
     /// This is used by aptos core (executor) internally.
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        unimplemented!()
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        unimplemented!()
+        self.get_state_value_with_proof_by_version_ext(state_key, version)
+            .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
@@ -483,6 +505,11 @@ pub trait DbReader: Send + Sync {
     fn indexer_enabled(&self) -> bool {
         unimplemented!()
     }
+
+    /// Returns state storage usage at the end of an epoch.
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        unimplemented!()
+    }
 }
 
 impl MoveStorage for &dyn DbReader {
@@ -499,9 +526,8 @@ impl MoveStorage for &dyn DbReader {
             self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
-            .ok_or_else(|| format_err!("no value found in DB"))?
-            .maybe_bytes
             .ok_or_else(|| format_err!("no value found in DB"))
+            .map(|value| value.into_bytes())
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
@@ -513,7 +539,7 @@ impl MoveStorage for &dyn DbReader {
             version,
         )?;
         config_value_option
-            .and_then(|x| x.maybe_bytes)
+            .map(|x| x.into_bytes())
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
     }
 
@@ -552,8 +578,8 @@ pub trait DbWriter: Send + Sync {
     }
 
     /// Finalizes a state snapshot that has already been restored to the database through
-    /// a state snapshot receiver. This is required to bootstrap the transaction accumulator
-    /// and populate transaction and event information.
+    /// a state snapshot receiver. This is required to bootstrap the transaction accumulator,
+    /// populate transaction information, save the epoch ending ledger infos and delete genesis.
     ///
     /// Note: this assumes that the output with proof has already been verified and that the
     /// state snapshot was restored at the same version.
@@ -561,14 +587,8 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         output_with_proof: TransactionOutputListWithProof,
+        ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Persists the specified ledger infos.
-    ///
-    /// Note: this assumes that the ledger infos have already been verified.
-    fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         unimplemented!()
     }
 
@@ -586,33 +606,6 @@ pub trait DbWriter: Send + Sync {
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn save_state_snapshot_for_bench(
-        &self,
-        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
-        version: Version,
-        base_version: Option<Version>,
-        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Persists merklized states as authenticated state checkpoint.
-    /// See [`AptosDB::save_state_snapshot`].
-    ///
-    /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
-    fn save_state_snapshot(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Deletes transaction data associated with the genesis transaction. This is useful for
-    /// cleaning up the database after a node has bootstrapped all accounts through state sync.
-    ///
-    /// TODO(joshlind): find a cleaner (long term) solution to avoid us having to expose this...
-    fn delete_genesis(&self) -> Result<()> {
         unimplemented!()
     }
 }
@@ -691,16 +684,16 @@ impl SaveTransactionsRequest {
 }
 
 pub fn jmt_updates(
-    state_updates: &HashMap<StateKey, StateValue>,
-) -> Vec<(HashValue, (HashValue, StateKey))> {
+    state_updates: &HashMap<StateKey, Option<StateValue>>,
+) -> Vec<(HashValue, Option<(HashValue, StateKey)>)> {
     state_updates
         .iter()
-        .map(|(k, v)| (k.hash(), (v.hash(), (*k).clone())))
+        .map(|(k, v_opt)| (k.hash(), v_opt.as_ref().map(|v| (v.hash(), k.clone()))))
         .collect()
 }
 
-pub fn jmt_update_refs(
-    jmt_updates: &[(HashValue, (HashValue, StateKey))],
-) -> Vec<(HashValue, &(HashValue, StateKey))> {
-    jmt_updates.iter().map(|(x, y)| (*x, y)).collect()
+pub fn jmt_update_refs<K>(
+    jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
+) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
+    jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
 }

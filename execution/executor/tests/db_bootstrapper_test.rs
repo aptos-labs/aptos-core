@@ -6,12 +6,11 @@
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
-        aptos_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
     account_view::AccountView,
@@ -28,6 +27,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
@@ -125,7 +125,7 @@ fn get_aptos_coin_mint_transaction(
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -140,7 +140,7 @@ fn get_account_transaction(
     _account_key: &Ed25519PrivateKey,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -194,7 +194,7 @@ fn test_new_genesis() {
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(
-        genesis.1[0].data.address,
+        genesis.1[0].data.owner_address,
         genesis.1[0].consensus_key.clone(),
     );
 
@@ -219,23 +219,24 @@ fn test_new_genesis() {
         WriteSetMut::new(vec![
             (
                 StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     account1,
                     CoinStoreResource::resource_path(),
                 )),
-                WriteOp::Value(
+                WriteOp::Modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
+                        false,
                         EventHandle::random(0),
                         EventHandle::random(0),
                     ))

@@ -19,8 +19,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -41,7 +42,6 @@ enum MockVMTransaction {
         recipient: AccountAddress,
         amount: u64,
     },
-    Reconfiguration,
 }
 
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
@@ -94,6 +94,32 @@ impl VMExecutor for MockVM {
                 ));
                 continue;
             }
+
+            if matches!(txn, Transaction::GenesisTransaction(_)) {
+                read_state_value_from_storage(
+                    state_view,
+                    &access_path_for_config(ValidatorSet::CONFIG_ID),
+                );
+                read_state_value_from_storage(
+                    state_view,
+                    &AccessPath::new(CORE_CODE_ADDRESS, ConfigurationResource::resource_path()),
+                );
+                outputs.push(TransactionOutput::new(
+                    // WriteSet cannot be empty so use genesis writeset only for testing.
+                    gen_genesis_writeset(),
+                    // mock the validator set event
+                    vec![ContractEvent::new(
+                        new_epoch_event_key(),
+                        0,
+                        TypeTag::Bool,
+                        bcs::to_bytes(&0).unwrap(),
+                    )],
+                    0,
+                    KEEP_STATUS.clone(),
+                ));
+                continue;
+            }
+
             match decode_transaction(txn.as_signed_user_txn().unwrap()) {
                 MockVMTransaction::Mint { sender, amount } => {
                     let old_balance = read_balance(&output_cache, state_view, sender);
@@ -152,29 +178,6 @@ impl VMExecutor for MockVM {
                         events,
                         0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
-                    ));
-                }
-                MockVMTransaction::Reconfiguration => {
-                    read_state_value_from_storage(
-                        state_view,
-                        &access_path_for_config(ValidatorSet::CONFIG_ID),
-                    );
-                    read_state_value_from_storage(
-                        state_view,
-                        &AccessPath::new(CORE_CODE_ADDRESS, ConfigurationResource::resource_path()),
-                    );
-                    outputs.push(TransactionOutput::new(
-                        // WriteSet cannot be empty so use genesis writeset only for testing.
-                        gen_genesis_writeset(),
-                        // mock the validator set event
-                        vec![ContractEvent::new(
-                            new_epoch_event_key(),
-                            0,
-                            TypeTag::Bool,
-                            bcs::to_bytes(&0).unwrap(),
-                        )],
-                        0,
-                        KEEP_STATUS.clone(),
                     ));
                 }
             }
@@ -251,14 +254,14 @@ fn gen_genesis_writeset() -> WriteSet {
     let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
     write_set.push((
         StateKey::AccessPath(validator_set_ap),
-        WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+        WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
     write_set.push((
         StateKey::AccessPath(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
-        WriteOp::Value(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
+        WriteOp::Modification(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
     ));
     write_set
         .freeze()
@@ -269,11 +272,11 @@ fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> Write
     let mut write_set = WriteSetMut::default();
     write_set.push((
         StateKey::AccessPath(balance_ap(sender)),
-        WriteOp::Value(balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(seqnum_ap(sender)),
-        WriteOp::Value(seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
 }
@@ -288,15 +291,15 @@ fn gen_payment_writeset(
     let mut write_set = WriteSetMut::default();
     write_set.push((
         StateKey::AccessPath(balance_ap(sender)),
-        WriteOp::Value(sender_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(seqnum_ap(sender)),
-        WriteOp::Value(sender_seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(balance_ap(recipient)),
-        WriteOp::Value(recipient_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
     ));
     write_set
         .freeze()
@@ -347,17 +350,11 @@ fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
     )
 }
 
-pub fn encode_reconfiguration_transaction(sender: AccountAddress) -> Transaction {
-    let raw_transaction =
-        RawTransaction::new_write_set(sender, 0, WriteSet::default(), ChainId::test());
-
-    let privkey = Ed25519PrivateKey::generate_for_testing();
-    Transaction::UserTransaction(
-        raw_transaction
-            .sign(&privkey, privkey.public_key())
-            .expect("Failed to sign raw transaction.")
-            .into_inner(),
-    )
+pub fn encode_reconfiguration_transaction() -> Transaction {
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
+        WriteSet::default(),
+        vec![],
+    )))
 }
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
@@ -388,13 +385,9 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
                 _ => unimplemented!("Transaction must have one or two arguments."),
             }
         }
-        TransactionPayload::ScriptFunction(_) => {
-            // TODO: we need to migrate Script to ScriptFunction later
-            unimplemented!("MockVM does not support script function transaction payload.")
-        }
-        TransactionPayload::WriteSet(_) => {
-            // Use WriteSet for reconfig only for testing.
-            MockVMTransaction::Reconfiguration
+        TransactionPayload::EntryFunction(_) => {
+            // TODO: we need to migrate Script to EntryFunction later
+            unimplemented!("MockVM does not support entry function transaction payload.")
         }
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")

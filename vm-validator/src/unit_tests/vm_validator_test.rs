@@ -4,7 +4,6 @@
 use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -14,12 +13,13 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use move_deps::move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
 use storage_interface::state_view::LatestDbStateCheckpointView;
 use storage_interface::DbReaderWriter;
 
-const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
+const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
 struct TestValidator {
     vm_validator: VMValidator,
@@ -79,7 +79,7 @@ impl std::ops::Deref for TestValidator {
 fn test_validate_transaction() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_mint(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
@@ -100,7 +100,7 @@ fn test_validate_invalid_signature() {
     let other_private_key = Ed25519PrivateKey::generate(&mut rng);
     // Submit with an account using an different private/public keypair
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_unchecked_txn(
         address,
@@ -117,7 +117,7 @@ fn test_validate_invalid_signature() {
 fn test_validate_known_script_too_large_args() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
@@ -147,7 +147,7 @@ fn test_validate_known_script_too_large_args() {
 fn test_validate_max_gas_units_above_max() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
@@ -169,20 +169,22 @@ fn test_validate_max_gas_units_above_max() {
 fn test_validate_max_gas_units_below_min() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     // Calculate a size for the transaction script that will ensure
     // that the minimum transaction gas is at least 1 after scaling to the
     // external gas units.
     let txn_gas_params = TransactionGasParameters::initial();
     let txn_bytes = txn_gas_params.large_transaction_cutoff
-        + (txn_gas_params.gas_unit_scaling_factor / txn_gas_params.intrinsic_gas_per_byte);
+        + (u64::from(txn_gas_params.gas_unit_scaling_factor)
+            / u64::from(txn_gas_params.intrinsic_gas_per_byte))
+        .into();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(TransactionPayload::Script(Script::new(
-            vec![42; txn_bytes as usize],
+            vec![42; u64::from(txn_bytes) as usize],
             vec![],
             vec![],
         ))),
@@ -200,7 +202,7 @@ fn test_validate_max_gas_units_below_min() {
 #[test]
 fn test_get_account_sequence_number() {
     let vm_validator = TestValidator::new();
-    let root_address = account_config::aptos_root_address();
+    let root_address = account_config::aptos_test_root_address();
     let state_view = vm_validator
         .vm_validator
         .db_reader
@@ -227,7 +229,7 @@ fn test_get_account_sequence_number() {
 fn test_validate_max_gas_price_above_bounds() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
@@ -252,7 +254,7 @@ fn test_validate_max_gas_price_above_bounds() {
 fn test_validate_max_gas_price_below_bounds() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
@@ -278,7 +280,7 @@ fn test_validate_max_gas_price_below_bounds() {
 fn test_validate_module_publishing() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_module_publishing_transaction(
         address,
         1,
@@ -294,7 +296,7 @@ fn test_validate_module_publishing() {
 fn test_validate_module_publishing_non_association() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_module_publishing_transaction(
         address,
         1,
@@ -315,7 +317,7 @@ fn test_validate_invalid_auth_key() {
     let other_private_key = Ed25519PrivateKey::generate(&mut rng);
     // Submit with an account using an different private/public keypair
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
@@ -332,7 +334,7 @@ fn test_validate_invalid_auth_key() {
 fn test_validate_account_doesnt_exist() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let random_account_addr = account_address::AccountAddress::random();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
@@ -356,7 +358,7 @@ fn test_validate_account_doesnt_exist() {
 fn test_validate_sequence_number_too_new() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
@@ -373,7 +375,7 @@ fn test_validate_sequence_number_too_new() {
 fn test_validate_invalid_arguments() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
@@ -388,40 +390,10 @@ fn test_validate_invalid_arguments() {
 }
 
 #[test]
-fn test_validate_non_genesis_write_set() {
-    let vm_validator = TestValidator::new();
-
-    // Confirm that a correct transaction is validated successfully.
-    let address = account_config::aptos_root_address();
-    let transaction = transaction_test_helpers::get_write_set_txn(
-        address,
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,
-    )
-    .into_inner();
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::REJECTED_WRITE_SET);
-
-    // A WriteSet txn is only valid when sent from the root account.
-    let bad_transaction = transaction_test_helpers::get_write_set_txn(
-        account_config::aptos_root_address(),
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,
-    )
-    .into_inner();
-    let ret = vm_validator.validate_transaction(bad_transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::REJECTED_WRITE_SET);
-}
-
-#[test]
 fn test_validate_expiration_time() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1, /* sequence_number */
@@ -440,7 +412,7 @@ fn test_validate_expiration_time() {
 fn test_validate_chain_id() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::aptos_root_address();
+    let address = account_config::aptos_test_root_address();
     let transaction = transaction_test_helpers::get_test_txn_with_chain_id(
         address,
         0, /* sequence_number */

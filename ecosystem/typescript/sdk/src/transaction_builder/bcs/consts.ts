@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Uint128, Uint16, Uint32, Uint64, Uint8 } from "./types";
 
 // Upper bound values for uint8, uint16, uint64 and uint128

@@ -11,13 +11,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
     data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
     golden_outputs::GoldenOutputs,
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -41,6 +43,7 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
+use framework::ReleaseBundle;
 use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
@@ -117,6 +120,11 @@ impl FakeExecutor {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
     }
 
+    /// Creates an executor using the mainnet genesis.
+    pub fn from_mainnet_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_MAINNET.clone().write_set())
+    }
+
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
         FakeExecutor {
@@ -182,19 +190,16 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        let blobs = cached_framework_packages::module_blobs();
-        let modules = cached_framework_packages::modules();
-        assert!(blobs.len() == modules.len());
-        for (module, bytes) in modules.iter().zip(blobs) {
+        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
         genesis
     }
 
-    /// Creates fresh genesis from the stdlib modules passed in.
-    pub fn custom_genesis(genesis_modules: &[Vec<u8>], validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(genesis_modules, validator_accounts);
+    /// Creates fresh genesis from the framework passed in.
+    pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
@@ -218,6 +223,17 @@ impl FakeExecutor {
             accounts.push(account_data.into_account());
         }
         accounts
+    }
+
+    /// Creates an account for the given static address. This address needs to be static so
+    /// we can load regular Move code to there without need to rewrite code addresses.
+    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        // The below will use the genesis keypair but that should be fine.
+        let acc = Account::new_genesis_account(addr);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
+        self.add_account_data(&data);
+        data.account().clone()
     }
 
     /// Applies a [`WriteSet`] to this executor's data store.
@@ -434,12 +450,17 @@ impl FakeExecutor {
 
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
-        self.new_block_with_metadata(None, vec![])
+
+        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+            .expect("Unable to retrieve the validator set from storage");
+        let proposer = *validator_set.payload().next().unwrap().account_address();
+        // when updating time, proposer cannot be ZERO.
+        self.new_block_with_metadata(proposer, vec![])
     }
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
@@ -448,9 +469,8 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            *validator_set.payload().next().unwrap().account_address(),
-            proposer_index,
-            vec![false; validator_set.payload().count()],
+            proposer,
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
         );
@@ -495,7 +515,11 @@ impl FakeExecutor {
     ) {
         let write_set = {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            )
+            .unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
@@ -515,10 +539,12 @@ impl FakeExecutor {
                     )
                 });
             let session_out = session.finish().expect("Failed to generate txn effects");
-            let (write_set, _events) = session_out
+            // TODO: Support deltas in fake executor.
+            let (_, change_set) = session_out
                 .into_change_set(&mut ())
                 .expect("Failed to generate writeset")
                 .into_inner();
+            let (write_set, _events) = change_set.into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -532,7 +558,11 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
-        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+        )
+        .unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
@@ -545,10 +575,12 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");
-        let (writeset, _events) = session_out
+        // TODO: Support deltas in fake executor.
+        let (_, change_set) = session_out
             .into_change_set(&mut ())
             .expect("Failed to generate writeset")
             .into_inner();
+        let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }
 }

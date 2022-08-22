@@ -3,13 +3,10 @@
 
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
-    move_core_types::vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+    move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
-        loaded_data::runtime_types::Type,
-        natives::function::NativeResult,
-        pop_arg,
-        values::{values_impl::Reference, Value},
+        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
     },
 };
 use smallvec::smallvec;
@@ -23,44 +20,30 @@ use std::{collections::VecDeque, hash::Hasher, sync::Arc};
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct SipHashGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
 }
 
-/// Serialize the MoveValue with BCS and then feed the bytes into SipHasher. This is not
-/// cryptographically secure.
+/// Feed thes bytes into SipHasher. This is not cryptographically secure.
 fn native_sip_hash(
-    _gas_params: &SipHashGasParameters,
-    context: &mut NativeContext,
-    mut ty_args: Vec<Type>,
+    gas_params: &SipHashGasParameters,
+    _context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 1);
+    debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    // TODO(Gas): proper gas metering
+    let bytes = pop_arg!(args, Vec<u8>);
 
-    let ref_to_val = pop_arg!(args, Reference);
-    let arg_type = ty_args.pop().unwrap();
-
-    // delegate to the BCS serialization for `Value`
-    let serialized_value_opt = match context.type_to_type_layout(&arg_type)? {
-        None => None,
-        Some(layout) => ref_to_val.read_ref()?.simple_serialize(&layout),
-    };
-    let serialized_value = match serialized_value_opt {
-        None => {
-            return Ok(NativeResult::err(0, NFE_BCS_SERIALIZATION_FAILURE));
-        }
-        Some(serialized_value) => serialized_value,
-    };
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
 
     // SipHash of the serialized bytes
     let mut hasher = siphasher::sip::SipHasher::new();
-    hasher.write(&serialized_value);
+    hasher.write(&bytes);
     let hash = hasher.finish();
 
-    Ok(NativeResult::ok(0, smallvec![Value::u64(hash)]))
+    Ok(NativeResult::ok(cost, smallvec![Value::u64(hash)]))
 }
 
 pub fn make_native_sip_hash(gas_params: SipHashGasParameters) -> NativeFunction {

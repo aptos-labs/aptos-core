@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::state_value::StateValue;
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use itertools::zip_eq;
@@ -14,19 +15,19 @@ use std::collections::HashSet;
 
 struct Block {
     smt: SparseMerkleTree<StateValue>,
-    updates: Vec<Vec<(HashValue, StateValue)>>,
+    updates: Vec<Vec<(HashValue, Option<StateValue>)>>,
     proof_reader: ProofReader,
 }
 
 impl Block {
-    fn updates(&self) -> Vec<Vec<(HashValue, &StateValue)>> {
+    fn updates(&self) -> Vec<Vec<(HashValue, Option<&StateValue>)>> {
         self.updates
             .iter()
-            .map(|small_batch| small_batch.iter().map(|(k, v)| (*k, v)).collect())
+            .map(|small_batch| small_batch.iter().map(|(k, v)| (*k, v.as_ref())).collect())
             .collect()
     }
 
-    fn updates_flat_batch(&self) -> Vec<(HashValue, &StateValue)> {
+    fn updates_flat_batch(&self) -> Vec<(HashValue, Option<&StateValue>)> {
         self.updates().iter().flatten().cloned().collect()
     }
 }
@@ -42,25 +43,10 @@ impl Group {
 
         for block in &self.blocks {
             let block_size = block.updates.len();
-            let small_batches = block.updates();
             let one_large_batch = block.updates_flat_batch();
 
             group.throughput(Throughput::Elements(block_size as u64));
 
-            group.bench_function(BenchmarkId::new("serial_update", block_size), |b| {
-                b.iter_batched(
-                    || small_batches.clone(),
-                    // return the resulting smt so the cost of Dropping it is not counted
-                    |small_batches| -> SparseMerkleTree<StateValue> {
-                        block
-                            .smt
-                            .serial_update(small_batches, &block.proof_reader)
-                            .unwrap()
-                            .1
-                    },
-                    BatchSize::LargeInput,
-                )
-            });
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
                     || one_large_batch.clone(),
@@ -102,7 +88,10 @@ impl Benches {
             blocks: block_sizes
                 .iter()
                 .map(|block_size| Block {
-                    smt: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+                    smt: SparseMerkleTree::new(
+                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                        StateStorageUsage::new_untracked(),
+                    ),
                     updates: Self::gen_updates(&mut rng, &keys, *block_size),
                     proof_reader: ProofReader::new(Vec::new()),
                 })
@@ -114,9 +103,9 @@ impl Benches {
             .take(keys.len())
             .collect::<Vec<_>>();
         let existing_state = zip_eq(&keys, &values)
-            .map(|(key, value)| (*key, value))
+            .filter_map(|(key, value)| value.as_ref().map(|v| (*key, v)))
             .collect::<Vec<_>>();
-        let mut naive_base_smt = NaiveSmt::new(existing_state.as_slice());
+        let mut naive_base_smt = NaiveSmt::new(&existing_state);
 
         // group: insert to a committed SMT ("unknown" root)
         let base_committed = Group {
@@ -127,7 +116,10 @@ impl Benches {
                     let updates = Self::gen_updates(&mut rng, &keys, *block_size);
                     let proof_reader = Self::gen_proof_reader(&mut naive_base_smt, &updates);
                     Block {
-                        smt: SparseMerkleTree::new(naive_base_smt.get_root_hash()),
+                        smt: SparseMerkleTree::new(
+                            naive_base_smt.get_root_hash(),
+                            StateStorageUsage::new_untracked(),
+                        ),
                         updates,
                         proof_reader,
                     }
@@ -175,26 +167,28 @@ impl Benches {
         rng: &mut StdRng,
         keys: &[HashValue],
         block_size: usize,
-    ) -> Vec<Vec<(HashValue, StateValue)>> {
+    ) -> Vec<Vec<(HashValue, Option<StateValue>)>> {
         std::iter::repeat_with(|| vec![Self::gen_update(rng, keys), Self::gen_update(rng, keys)])
             .take(block_size)
             .collect()
     }
 
-    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, StateValue) {
+    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, Option<StateValue>) {
         (*keys.iter().choose(rng).unwrap(), Self::gen_value(rng))
     }
 
-    fn gen_value(rng: &mut StdRng) -> StateValue {
-        rng.sample_iter(&Standard)
-            .take(100)
-            .collect::<Vec<u8>>()
-            .into()
+    fn gen_value(rng: &mut StdRng) -> Option<StateValue> {
+        if rng.gen_ratio(1, 10) {
+            None
+        } else {
+            let bytes: Vec<u8> = rng.sample_iter::<u8, _>(Standard).take(100).collect();
+            Some(StateValue::new(bytes))
+        }
     }
 
     fn gen_proof_reader(
         naive_smt: &mut NaiveSmt,
-        updates: &[Vec<(HashValue, StateValue)>],
+        updates: &[Vec<(HashValue, Option<StateValue>)>],
     ) -> ProofReader {
         let proofs = updates
             .iter()

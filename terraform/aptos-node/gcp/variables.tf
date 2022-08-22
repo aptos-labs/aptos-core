@@ -92,7 +92,7 @@ variable "utility_instance_num" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c2-standard-4"
+  default     = "c2-standard-16"
 }
 
 variable "validator_instance_num" {

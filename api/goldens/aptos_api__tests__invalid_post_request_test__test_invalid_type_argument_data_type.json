@@ -1,0 +1,5 @@
+{
+  "message": "parse request payload error: failed to parse \"string(MoveType)\": deserialize Move type failed, invalid type: boolean `true`, expected a string (occurred while parsing \"[string(MoveType)]\") (occurred while parsing \"EntryFunctionPayload\") (occurred while parsing \"TransactionPayload\") (occurred while parsing \"UserTransactionRequestInner\") (occurred while parsing \"EncodeSubmissionRequest\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

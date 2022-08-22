@@ -133,7 +133,7 @@ impl Arbitrary for EpochChangeProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::multi_signature::{MultiSignature, PartialSignatures};
+    use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
     use crate::{block_info::BlockInfo, epoch_state::EpochState, waypoint::Waypoint};
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
             );
 
             let aggregated_signature = current_verifier
-                .aggregate_and_verify_multi_signature(&partial_signatures, &ledger_info)
+                .aggregate_signatures(&partial_signatures)
                 .unwrap();
 
             valid_ledger_info.push(LedgerInfoWithSignatures::new(
@@ -250,7 +250,7 @@ mod tests {
         let proof_6 = EpochChangeProof::new(
             vec![LedgerInfoWithSignatures::new(
                 valid_ledger_info[0].ledger_info().clone(),
-                MultiSignature::empty(),
+                AggregateSignature::empty(),
             )],
             /* more = */ false,
         );

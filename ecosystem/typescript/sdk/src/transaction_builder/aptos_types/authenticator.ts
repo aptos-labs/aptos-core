@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Serializer, Deserializer, Seq, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";

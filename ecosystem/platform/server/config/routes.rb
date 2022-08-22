@@ -27,7 +27,7 @@ Rails.application.routes.draw do
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   namespace :user do
-    root to: redirect('/it2') # creates user_root_path, where users go after confirming email
+    root to: redirect('/community') # creates user_root_path, where users go after confirming email
   end
 
   # CMS
@@ -58,7 +58,7 @@ Rails.application.routes.draw do
   get 'health', to: 'health#health'
 
   # IT3
-  resource :it3, only: %i[show]
+  resource :it3, only: %i[show update]
   resources :it3_profiles, except: %i[index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
@@ -70,8 +70,12 @@ Rails.application.routes.draw do
   get 'it1', to: 'leaderboard#it1'
   get 'it2', to: 'leaderboard#it2'
 
+  # Projects
+  resources :projects
+
   # Static pages
   get 'community', to: 'static_page#community'
+  get 'incentivized-testnet', to: 'static_page#incentivized_testnet'
   get 'terms', to: 'static_page#terms'
   get 'terms-testnet', to: 'static_page#terms_testnet'
   get 'privacy', to: 'static_page#privacy'

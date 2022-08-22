@@ -13,6 +13,7 @@ use crate::{
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
 
+use aptos_logger::Level;
 use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
@@ -78,10 +79,12 @@ pub(crate) fn start_shared_mempool<V>(
         config.mempool.system_transaction_gc_interval_ms,
     ));
 
-    executor.spawn(snapshot_job(
-        mempool,
-        config.mempool.mempool_snapshot_interval_secs,
-    ));
+    if aptos_logger::enabled!(Level::Trace) {
+        executor.spawn(snapshot_job(
+            mempool,
+            config.mempool.mempool_snapshot_interval_secs,
+        ));
+    }
 }
 
 pub fn bootstrap(

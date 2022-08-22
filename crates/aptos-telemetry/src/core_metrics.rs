@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{service::TelemetryEvent, utils, utils::sum_all_histogram_counts};
+use crate::{utils, utils::sum_all_histogram_counts};
 use aptos_config::config::NodeConfig;
+use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use prometheus::core::Collector;
 use state_sync_driver::metrics::StorageSynchronizerOperations;
 use std::collections::BTreeMap;

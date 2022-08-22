@@ -45,10 +45,18 @@ where
     K: TestKey,
     V: TestValue,
 {
-    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()> {
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()> {
         for (k, v) in kv_batch {
-            self.kv_store.write().insert(k.clone(), v.clone());
+            if let Some(v) = v {
+                self.kv_store.write().insert(k.clone(), v.clone());
+            } else {
+                self.kv_store.write().remove(k);
+            }
         }
+        Ok(())
+    }
+
+    fn write_usage(&self, _version: Version, _items: usize, _total_bytes: usize) -> Result<()> {
         Ok(())
     }
 }

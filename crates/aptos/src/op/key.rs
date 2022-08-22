@@ -23,7 +23,10 @@ use std::{
 
 pub const PUBLIC_KEY_EXTENSION: &str = "pub";
 
-/// CLI tool for generating, inspecting, and interacting with keys.
+/// Tool for generating, inspecting, and interacting with keys
+///
+/// This tool allows users to generate and extract related information
+/// with all key types used on the Aptos blockchain.
 #[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),
@@ -47,13 +50,13 @@ impl KeyTool {
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
     #[clap(flatten)]
-    private_key_input_options: PrivateKeyInputOptions,
+    pub(crate) private_key_input_options: PrivateKeyInputOptions,
     #[clap(flatten)]
-    output_file_options: SaveFile,
+    pub(crate) output_file_options: SaveFile,
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -99,13 +102,14 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 /// key encoded with the `encoding`.
 #[derive(Debug, Parser)]
 pub struct GenerateKey {
-    /// Key type: `x25519` or `ed25519`
+    /// Key type to generate. Must be one of [x25519, ed25519]
     #[clap(long, default_value_t = KeyType::Ed25519)]
-    key_type: KeyType,
+    pub(crate) key_type: KeyType,
+
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]
-    save_params: SaveKey,
+    pub(crate) save_params: SaveKey,
 }
 
 #[async_trait]
@@ -185,9 +189,9 @@ impl GenerateKey {
 #[derive(Debug, Parser)]
 pub struct SaveKey {
     #[clap(flatten)]
-    file_options: SaveFile,
+    pub(crate) file_options: SaveFile,
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
 }
 
 impl SaveKey {
@@ -208,7 +212,7 @@ impl SaveKey {
 
     /// Saves a key to a file encoded in a string
     pub fn save_key<Key: PrivateKey + ValidCryptoMaterial>(
-        &self,
+        self,
         key: &Key,
         key_name: &'static str,
     ) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
@@ -225,7 +229,7 @@ impl SaveKey {
         write_to_file(&public_key_file, key_name, &encoded_public_key)?;
 
         let mut map = HashMap::new();
-        map.insert("PrivateKey Path", self.file_options.output_file.clone());
+        map.insert("PrivateKey Path", self.file_options.output_file);
         map.insert("PublicKey Path", public_key_file);
         Ok(map)
     }

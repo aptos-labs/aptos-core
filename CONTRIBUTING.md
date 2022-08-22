@@ -17,7 +17,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 cd aptos-core
 ./scripts/dev_setup.sh
 cargo build
-cargo xtest
+cargo test
 ```
 
 ## Our Development Process
@@ -39,7 +39,7 @@ Changes to the project are proposed through pull requests. The general pull requ
 1. Fork the repo and create a topic branch off of `main`.
 2. If you have added code that should be tested, add unit tests.
 3. If you have changed APIs, update the documentation. Make sure the documentation builds.
-4. Ensure all tests and lints pass on each and every commit that is part of your pull request. `cargo x lint && cargo fmt && cargo xclippy --all-targets`
+4. Ensure all tests and lints pass on each and every commit that is part of your pull request. `cargo fmt && cargo xclippy`
 5. Submit your pull request.
 
 ## Authoring Clean Commits

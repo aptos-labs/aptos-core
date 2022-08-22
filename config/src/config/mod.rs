@@ -34,8 +34,8 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
-mod sf_streamer_config;
-pub use sf_streamer_config::*;
+mod firehose_streamer_config;
+pub use firehose_streamer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -82,7 +82,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]
-    pub sf_stream: SfStreamerConfig,
+    pub firehose_stream: FirehoseStreamerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
@@ -276,6 +276,20 @@ impl NodeConfig {
                 .iter()
                 .find(|config| config.network_id == NetworkId::Public)
                 .map(NetworkConfig::peer_id),
+        }
+    }
+
+    pub fn identity_key(&self) -> Option<x25519::PrivateKey> {
+        match self.base.role {
+            RoleType::Validator => self
+                .validator_network
+                .as_ref()
+                .map(NetworkConfig::identity_key),
+            RoleType::FullNode => self
+                .full_node_networks
+                .iter()
+                .find(|config| config.network_id == NetworkId::Public)
+                .map(NetworkConfig::identity_key),
         }
     }
 

@@ -3,11 +3,11 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{self, aptos_root_address},
+    account_config::{self, aptos_test_root_address},
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -78,7 +78,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "disable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
 
@@ -87,7 +87,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "enable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
     pub fn set_aptos_version(&mut self, version: Version) {
@@ -96,7 +96,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "set_version",
             vec![],
             serialize_values(&vec![
-                MoveValue::Signer(aptos_root_address()),
+                MoveValue::Signer(aptos_test_root_address()),
                 MoveValue::U64(version),
             ]),
         )
@@ -107,7 +107,11 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeS
 where
     F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
 {
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let state_view_storage = RemoteStorage::new(state_view);
     let session_out = {
         // TODO: specify an id by human and pass that in.
@@ -125,8 +129,11 @@ where
             .unwrap()
     };
 
-    session_out
+    // Genesis never produces the delta change set.
+    let (_, change_set) = session_out
         .into_change_set(&mut ())
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
         .unwrap()
+        .into_inner();
+    change_set
 }

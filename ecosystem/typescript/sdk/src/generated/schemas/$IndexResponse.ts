@@ -30,5 +30,13 @@ export const $IndexResponse = {
             type: 'RoleType',
             isRequired: true,
         },
+        oldest_block_height: {
+            type: 'U64',
+            isRequired: true,
+        },
+        block_height: {
+            type: 'U64',
+            isRequired: true,
+        },
     },
 } as const;

@@ -447,8 +447,6 @@ export interface components {
       sequence_number: components["schemas"]["Uint64"];
       max_gas_amount: components["schemas"]["Uint64"];
       gas_unit_price: components["schemas"]["Uint64"];
-      /** @example XDX */
-      gas_currency_code: string;
       expiration_timestamp_secs: components["schemas"]["TimestampSec"];
       payload: components["schemas"]["TransactionPayload"];
     };
@@ -524,14 +522,14 @@ export interface components {
     } & components["schemas"]["OnChainTransactionInfo"];
     /** Transaction Payload */
     TransactionPayload:
-      | components["schemas"]["ScriptFunctionPayload"]
+      | components["schemas"]["EntryFunctionPayload"]
       | components["schemas"]["ScriptPayload"]
       | components["schemas"]["ModuleBundlePayload"]
       | components["schemas"]["WriteSetPayload"];
     /**
-     * Script Function Payload
+     * Entry Function Payload
      * @example {
-     *   "type": "script_function_payload",
+     *   "type": "entry_function_payload",
      *   "function": "0x1::PaymentScripts::peer_to_peer_with_metadata",
      *   "type_arguments": [
      *     "0x1::XDX::XDX"
@@ -544,17 +542,17 @@ export interface components {
      *   ]
      * }
      */
-    ScriptFunctionPayload: {
+    EntryFunctionPayload: {
       type: string;
-      function: components["schemas"]["ScriptFunctionId"];
-      /** @description Generic type arguments required by the script function. */
+      function: components["schemas"]["EntryFunctionId"];
+      /** @description Generic type arguments required by the entry function. */
       type_arguments: components["schemas"]["MoveTypeTagId"][];
-      /** @description The script function arguments. */
+      /** @description The entry function arguments. */
       arguments: components["schemas"]["MoveValue"][];
     };
     /**
-     * Script Function ID
-     * @description Script function id is string representation of a script function defined on-chain.
+     * Entry Function ID
+     * @description Entry function id is string representation of a entry function defined on-chain.
      *
      * Format: `{address}::{module name}::{function name}`
      *
@@ -562,7 +560,7 @@ export interface components {
      *
      * @example 0x1::PaymentScripts::peer_to_peer_with_metadata
      */
-    ScriptFunctionId: string;
+    EntryFunctionId: string;
     /** Script Payload */
     ScriptPayload: {
       /** @example script_payload */

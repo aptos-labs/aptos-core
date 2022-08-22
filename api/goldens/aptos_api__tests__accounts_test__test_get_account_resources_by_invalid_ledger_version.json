@@ -1,0 +1,5 @@
+{
+  "message": "failed to parse parameter `ledger_version`: failed to parse \"string(U64)\": Parsing u64 string \"-1\" failed, caused by error: invalid digit found in string (occurred while parsing \"optional<string(U64)>\")",
+  "error_code": "web_framework_error",
+  "vm_error_code": null
+}

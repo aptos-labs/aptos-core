@@ -1,38 +1,52 @@
 chain:
+  # -- Internal: name of the testnet to connect to
   name: testnet
+  # -- Bump this number to wipe the underlying storage
   era: 1
+  # -- Chain ID
   chain_id: 4
 
-imageTag: testnet
+# -- Default image tag to use for all validator and fullnode images
+imageTag: devnet
 
-# Number of validators to deploy
+# -- Number of validators to deploy
 numValidators: 1
+# -- Total number of fullnode groups to deploy
 numFullnodeGroups: 1
 
 validator:
+  # -- Internal: name of your validator for use in labels
   name:
   image:
+    # -- Image repo to use for validator images
     repo: aptoslabs/validator
+    # -- Image tag to use for validator images. If set, overrides `imageTag`
     tag:
+    # -- Image pull policy to use for validator images
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15.5
+      memory: 30Gi
     requests:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15
+      memory: 26Gi
   storage:
+    # -- Kubernetes storage class to use for validator persistent storage
     class:
-    size: 350Gi
+    # -- Size of validator persistent storage
+    size: 512Gi
+  # -- Log level for the validator
   rust_log: info
+  # -- Remote log level for the validator
   rust_log_remote: debug,hyper=off
+  # -- Address for remote logging. See `logger` helm chart
   remoteLogAddress:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
-    provide_genesis: true
     sync_only: false
     concurrency_level: 8
     round_initial_timeout_ms:
@@ -43,36 +57,51 @@ validator:
     state_store_prune_window: 1000000
     ledger_pruning_batch_size: 10000
     state_store_pruning_batch_size: 10000
+  # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
 
 fullnode:
+  # -- Specify fullnode groups by `name` and number of `replicas`
   groups:
   - name: fullnode
     replicas: 1
   resources:
     limits:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15.5
+      memory: 30Gi
     requests:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15
+      memory: 26Gi
   storage:
+    # -- Kubernetes storage class to use for fullnode persistent storage
     class:
-    size: 350Gi
+    # -- Size of fullnode persistent storage
+    size: 512Gi
+  # -- Log level for the fullnode
   rust_log: info
+  # -- Remote log level for the fullnode
   rust_log_remote: debug,hyper=off
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
     max_inbound_connections: 100
+    shared_mempool_max_concurrent_inbound_syncs: 16
+    max_broadcasts_per_peer: 2
+    default_failovers: 0
 
 haproxy:
+  # -- Enable HAProxy deployment in front of validator and fullnodes
   enabled: true
+  # -- Number of HAProxy replicas
   replicas: 1
   image:
+    # -- Image repo to use for HAProxy images
     repo: haproxy
+    # -- Image tag to use for HAProxy images
     tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
+    # -- Image pull policy to use for HAProxy images
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -86,40 +115,52 @@ haproxy:
   affinity: {}
   limits:
     validator:
+      # -- Limit the number of connections per IP address per minute
       connectionsPerIPPerMin: 2
   config:
+    # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: false
+  # -- Name of the Kubernetes TLS secret to use for HAProxy
   tls_secret:
 
 service:
+  # -- If set, the base domain name to use for External DNS
   domain:
   validator:
     external: 
+      # -- The Kubernetes ServiceType to use for validator
       type: LoadBalancer
+    # -- The externalTrafficPolicy for the validator service
     externalTrafficPolicy: Local
+    # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
     loadBalancerSourceRanges:
+    # -- Enable the REST API on the validator
     enableRestApi: true
+    # -- Enable the metrics port on the validator
     enableMetricsPort: true
-  # NOTE: these values apply for all fullnode groups
   fullnode:
-    external: 
+    external:
+      # -- The Kubernetes ServiceType to use for fullnodes
       type: LoadBalancer
+    # -- The externalTrafficPolicy for the fullnode service
     externalTrafficPolicy: Local
+    # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs
     loadBalancerSourceRanges:
+    # -- Enable the REST API on fullnodes
     enableRestApi: true
+    # -- Enable the metrics port on fullnodes
     enableMetricsPort: true
 
 serviceAccount:
-  # Specifies whether a service account should be created
+  # -- Specifies whether a service account should be created
   create: true
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
 
-# LEGACY: create PodSecurityPolicy, which exists at the cluster-level
+# -- LEGACY: create PodSecurityPolicy, which exists at the cluster-level
 podSecurityPolicy: true
 
-# Load test-data for starting a test network
+# -- Load test-data for starting a test network
 loadTestGenesis: false
 
 # Additional labels

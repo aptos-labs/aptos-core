@@ -41,7 +41,7 @@ impl TransactionAvailabilityEvaluator {
             .map_err(|e| {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
-                    e.context(format!(
+                    anyhow::Error::from(e).context(format!(
                         "The node API failed to return the requested transaction with version: {}",
                         version
                     )),
@@ -75,18 +75,10 @@ impl Evaluator for TransactionAvailabilityEvaluator {
     /// baseline produced after a delay. We confirm that the transactions are
     /// same by looking at the version.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let oldest_baseline_version = input
-            .baseline_index_response
-            .ledger_info
-            .oldest_ledger_version
-            .0;
-        let oldest_target_version = input
-            .target_index_response
-            .ledger_info
-            .oldest_ledger_version
-            .0;
-        let latest_baseline_version = input.baseline_index_response.ledger_info.ledger_version.0;
-        let latest_target_version = input.target_index_response.ledger_info.ledger_version.0;
+        let oldest_baseline_version = input.baseline_index_response.oldest_ledger_version.0;
+        let oldest_target_version = input.target_index_response.oldest_ledger_version.0;
+        let latest_baseline_version = input.baseline_index_response.ledger_version.0;
+        let latest_target_version = input.target_index_response.ledger_version.0;
 
         // Get the oldest ledger version between the two nodes.
         let oldest_shared_version = max(oldest_baseline_version, oldest_target_version);

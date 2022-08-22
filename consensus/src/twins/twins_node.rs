@@ -181,21 +181,23 @@ impl SMRNode {
             peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
         });
 
+        node_configs.sort_by_key(author_from_config);
         let validator_set = ValidatorSet::new(
             node_configs
                 .iter()
-                .map(|config| {
+                .enumerate()
+                .map(|(index, config)| {
                     let sr_test_config = config.consensus.safety_rules.test.as_ref().unwrap();
                     ValidatorInfo::new_with_test_network_keys(
                         sr_test_config.author,
                         sr_test_config.consensus_key.as_ref().unwrap().public_key(),
                         1,
+                        index as u64,
                     )
                 })
                 .collect(),
         );
         // sort by the peer id
-        node_configs.sort_by_key(author_from_config);
 
         let proposer_type = match proposer_type {
             RoundProposer(_) => {

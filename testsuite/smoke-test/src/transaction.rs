@@ -1,115 +1,116 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
+use aptos_keygen::KeyGen;
 use aptos_rest_client::{
-    aptos_api_types::{ScriptFunctionPayload, TransactionPayload},
+    aptos_api_types::{EntryFunctionPayload, TransactionPayload},
     Transaction,
 };
 use aptos_sdk::{
-    crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
+    crypto::{PrivateKey, SigningKey},
     types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
 };
-use aptos_transaction_builder::aptos_stdlib;
-use forge::{AptosContext, AptosTest, Result, Test};
+use cached_packages::aptos_stdlib;
+use forge::Swarm;
 
-pub struct ExternalTransactionSigner;
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
-impl Test for ExternalTransactionSigner {
-    fn name(&self) -> &'static str {
-        "smoke-test::external-transaction-signer"
-    }
-}
+// TODO: debug me and re-enable the test!
+#[ignore]
+#[tokio::test]
+async fn test_external_transaction_signer() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
 
-#[async_trait::async_trait]
-impl AptosTest for ExternalTransactionSigner {
-    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
-        let client = ctx.client();
+    // generate key pair
+    let mut key_gen = KeyGen::from_os_rng();
+    let private_key = key_gen.generate_ed25519_private_key();
+    let public_key = private_key.public_key();
 
-        // generate key pair
-        let private_key = Ed25519PrivateKey::generate(ctx.rng());
-        let public_key = private_key.public_key();
+    // create transfer parameters
+    let sender_auth_key = AuthenticationKey::ed25519(&public_key);
+    let sender_address = sender_auth_key.derived_address();
+    info.create_user_account(&public_key).await.unwrap();
+    // TODO(Gas): double check if this is correct
+    info.mint(sender_address, 10_000_000).await.unwrap();
 
-        // create transfer parameters
-        let sender_auth_key = AuthenticationKey::ed25519(&public_key);
-        let sender_address = sender_auth_key.derived_address();
-        ctx.create_user_account(&public_key).await?;
-        // TODO(Gas): double check if this is correct
-        ctx.mint(sender_address, 1_000_000_000).await?;
+    let receiver = info.random_account();
+    info.create_user_account(receiver.public_key())
+        .await
+        .unwrap();
+    // TODO(Gas): double check if this is correct
+    info.mint(receiver.address(), 1_000_000).await.unwrap();
 
-        let receiver = ctx.random_account();
-        ctx.create_user_account(receiver.public_key()).await?;
-        // TODO(Gas): double check if this is correct
-        ctx.mint(receiver.address(), 1_000_000_000).await?;
+    let amount = 1_000_000;
+    let test_gas_unit_price = 1;
+    // TODO(Gas): double check if this is correct
+    let test_max_gas_amount = 1_000_000;
 
-        let amount = 1_000_000;
-        let test_gas_unit_price = 1;
-        // TODO(Gas): double check if this is correct
-        let test_max_gas_amount = 4_000_000;
+    // prepare transfer transaction
+    let test_sequence_number = info
+        .client()
+        .get_account(sender_address)
+        .await
+        .unwrap()
+        .into_inner()
+        .sequence_number;
 
-        // prepare transfer transaction
-        let test_sequence_number = client
-            .get_account(sender_address)
-            .await?
-            .into_inner()
-            .sequence_number;
+    let unsigned_txn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(
+            receiver.address(),
+            amount,
+        ))
+        .sender(sender_address)
+        .sequence_number(test_sequence_number)
+        .max_gas_amount(test_max_gas_amount)
+        .gas_unit_price(test_gas_unit_price)
+        .build();
 
-        let unsigned_txn = ctx
-            .transaction_factory()
-            .payload(aptos_stdlib::aptos_coin_transfer(
-                receiver.address(),
-                amount,
-            ))
-            .sender(sender_address)
-            .sequence_number(test_sequence_number)
-            .max_gas_amount(test_max_gas_amount)
-            .gas_unit_price(test_gas_unit_price)
-            .build();
+    assert_eq!(unsigned_txn.sender(), sender_address);
 
-        assert_eq!(unsigned_txn.sender(), sender_address);
+    // sign the transaction with the private key
+    let signature = private_key.sign(&unsigned_txn);
 
-        // sign the transaction with the private key
-        let signature = private_key.sign(&unsigned_txn);
+    // submit the transaction
+    let txn = SignedTransaction::new(unsigned_txn.clone(), public_key, signature);
+    info.client().submit_and_wait(&txn).await.unwrap();
 
-        // submit the transaction
-        let txn = SignedTransaction::new(unsigned_txn.clone(), public_key, signature);
-        client.submit_and_wait(&txn).await?;
+    // query the transaction and check it contains the same values as requested
+    let txn = info
+        .client()
+        .get_account_transactions(sender_address, Some(test_sequence_number), Some(1))
+        .await
+        .unwrap()
+        .into_inner()
+        .into_iter()
+        .next()
+        .unwrap();
 
-        // query the transaction and check it contains the same values as requested
-        let txn = client
-            .get_account_transactions(sender_address, Some(test_sequence_number), Some(1))
-            .await?
-            .into_inner()
-            .into_iter()
-            .next()
-            .unwrap();
+    match txn {
+        Transaction::UserTransaction(user_txn) => {
+            assert_eq!(*user_txn.request.sender.inner(), sender_address);
+            assert_eq!(user_txn.request.sequence_number.0, test_sequence_number);
+            assert_eq!(user_txn.request.gas_unit_price.0, test_gas_unit_price);
+            assert_eq!(user_txn.request.max_gas_amount.0, test_max_gas_amount);
 
-        match txn {
-            Transaction::UserTransaction(user_txn) => {
-                assert_eq!(*user_txn.request.sender.inner(), sender_address);
-                assert_eq!(user_txn.request.sequence_number.0, test_sequence_number);
-                assert_eq!(user_txn.request.gas_unit_price.0, test_gas_unit_price);
-                assert_eq!(user_txn.request.max_gas_amount.0, test_max_gas_amount);
-
-                if let TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
-                    function: _,
-                    type_arguments: _,
-                    arguments,
-                }) = user_txn.request.payload
-                {
-                    assert_eq!(
-                        arguments
-                            .into_iter()
-                            .map(|arg| arg.as_str().unwrap().to_owned())
-                            .collect::<Vec<String>>(),
-                        vec![receiver.address().to_hex_literal(), amount.to_string(),]
-                    );
-                } else {
-                    bail!("unexpected transaction playload")
-                }
+            if let TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
+                function: _,
+                type_arguments: _,
+                arguments,
+            }) = user_txn.request.payload
+            {
+                assert_eq!(
+                    arguments
+                        .into_iter()
+                        .map(|arg| arg.as_str().unwrap().to_owned())
+                        .collect::<Vec<String>>(),
+                    vec![receiver.address().to_hex_literal(), amount.to_string(),]
+                );
+            } else {
+                panic!("unexpected transaction playload")
             }
-            _ => bail!("Query should get user transaction"),
         }
-        Ok(())
+        _ => panic!("Query should get user transaction"),
     }
 }

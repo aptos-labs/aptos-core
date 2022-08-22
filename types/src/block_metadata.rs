@@ -22,8 +22,8 @@ pub struct BlockMetadata {
     epoch: u64,
     round: u64,
     proposer: AccountAddress,
-    proposer_index: Option<u32>,
-    previous_block_votes: Vec<bool>,
+    #[serde(with = "serde_bytes")]
+    previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
 }
@@ -34,8 +34,7 @@ impl BlockMetadata {
         epoch: u64,
         round: u64,
         proposer: AccountAddress,
-        proposer_index: Option<u32>,
-        previous_block_votes: Vec<bool>,
+        previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
     ) -> Self {
@@ -44,8 +43,7 @@ impl BlockMetadata {
             epoch,
             round,
             proposer,
-            proposer_index,
-            previous_block_votes,
+            previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
         }
@@ -58,13 +56,10 @@ impl BlockMetadata {
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
         vec![
             MoveValue::Signer(signer),
+            MoveValue::Address(AccountAddress::from_bytes(&self.id.to_vec()).unwrap()),
             MoveValue::U64(self.epoch),
             MoveValue::U64(self.round),
             MoveValue::Address(self.proposer),
-            MoveValue::Vector(
-                self.proposer_index
-                    .map_or_else(Vec::new, |index| vec![MoveValue::U64(u64::from(index))]),
-            ),
             MoveValue::Vector(
                 self.failed_proposer_indices
                     .into_iter()
@@ -73,9 +68,9 @@ impl BlockMetadata {
                     .collect(),
             ),
             MoveValue::Vector(
-                self.previous_block_votes
+                self.previous_block_votes_bitvec
                     .into_iter()
-                    .map(MoveValue::Bool)
+                    .map(MoveValue::U8)
                     .collect(),
             ),
             MoveValue::U64(self.timestamp_usecs),
@@ -90,12 +85,8 @@ impl BlockMetadata {
         self.proposer
     }
 
-    pub fn proposer_index(&self) -> Option<u32> {
-        self.proposer_index
-    }
-
-    pub fn previous_block_votes(&self) -> &Vec<bool> {
-        &self.previous_block_votes
+    pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
+        &self.previous_block_votes_bitvec
     }
 
     pub fn failed_proposer_indices(&self) -> &Vec<u32> {

@@ -3,16 +3,17 @@
 
 //! This file defines state store buffered state that has been committed.
 
-use crate::{
-    state_merkle_db::StateMerkleDb, state_store::state_snapshot_committer::StateSnapshotCommitter,
-};
+use crate::metrics::LATEST_CHECKPOINT_VERSION;
+use crate::state_store::state_snapshot_committer::StateSnapshotCommitter;
+use crate::state_store::StateDb;
 use anyhow::{ensure, Result};
+use aptos_logger::info;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::state_value::StateValue;
 use aptos_types::transaction::Version;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::mem::swap;
-use std::sync::mpsc::{Sender, SyncSender};
+use std::sync::mpsc::{Receiver, Sender, SyncSender};
 use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
 use storage_interface::state_delta::StateDelta;
@@ -34,40 +35,50 @@ pub struct BufferedState {
     state_after_checkpoint: StateDelta,
     state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
     target_snapshot_size: usize,
+    snapshot_ready_receivers: VecDeque<Receiver<()>>,
     join_handle: Option<JoinHandle<()>>,
 }
 
 pub(crate) enum CommitMessage<T> {
-    Data(T),
+    Data {
+        data: T,
+        prev_snapshot_ready_receiver: Option<Receiver<()>>,
+        snapshot_ready_sender: Sender<()>,
+    },
     Sync(Sender<()>),
     Exit,
 }
 
 impl BufferedState {
-    pub fn new(
-        state_merkle_db: &Arc<StateMerkleDb>,
+    pub(crate) fn new(
+        state_db: &Arc<StateDb>,
         state_after_checkpoint: StateDelta,
         target_snapshot_size: usize,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
-        let arc_state_merkle_db = Arc::clone(state_merkle_db);
+        let arc_state_db = Arc::clone(state_db);
+        let (initial_snapshot_ready_sender, initial_snapshot_ready_receiver) = mpsc::channel();
         let join_handle = std::thread::Builder::new()
             .name("state_snapshot_committer".to_string())
             .spawn(move || {
-                let committer =
-                    StateSnapshotCommitter::new(arc_state_merkle_db, state_commit_receiver);
+                let committer = StateSnapshotCommitter::new(arc_state_db, state_commit_receiver);
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
-        Self {
+        // The initial snapshot is always already persisted in db.
+        initial_snapshot_ready_sender.send(()).unwrap();
+        let myself = Self {
             state_until_checkpoint: None,
             state_after_checkpoint,
             state_commit_sender,
             target_snapshot_size,
+            snapshot_ready_receivers: VecDeque::from([initial_snapshot_ready_receiver]),
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
-        }
+        };
+        myself.report_latest_committed_version();
+        myself
     }
 
     pub fn current_state(&self) -> &StateDelta {
@@ -78,13 +89,29 @@ impl BufferedState {
         self.state_after_checkpoint.base_version
     }
 
+    fn send_to_commit(&mut self, to_commit: Arc<StateDelta>) {
+        let prev_snapshot_ready_receiver = self
+            .snapshot_ready_receivers
+            .pop_front()
+            .expect("receivers should never be empty");
+        assert!(self.snapshot_ready_receivers.is_empty());
+        let (snapshot_ready_sender, snapshot_ready_receiver) = mpsc::channel();
+        self.snapshot_ready_receivers
+            .push_back(snapshot_ready_receiver);
+        self.state_commit_sender
+            .send(CommitMessage::Data {
+                data: to_commit,
+                prev_snapshot_ready_receiver: Some(prev_snapshot_ready_receiver),
+                snapshot_ready_sender,
+            })
+            .unwrap();
+    }
+
     fn maybe_commit(&mut self, sync_commit: bool) {
         if sync_commit {
             let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
             if let Some(to_commit) = self.state_until_checkpoint.take().map(Arc::from) {
-                self.state_commit_sender
-                    .send(CommitMessage::Data(to_commit))
-                    .unwrap();
+                self.send_to_commit(to_commit);
             }
             self.state_commit_sender
                 .send(CommitMessage::Sync(commit_sync_sender))
@@ -100,14 +127,17 @@ impl BufferedState {
                         >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
             };
             if take_out_to_commit {
-                let to_commit = self
+                let to_commit: Arc<StateDelta> = self
                     .state_until_checkpoint
                     .take()
                     .map(Arc::from)
                     .expect("Must exist");
-                self.state_commit_sender
-                    .send(CommitMessage::Data(to_commit))
-                    .unwrap();
+                info!(
+                    base_version = to_commit.base_version,
+                    version = to_commit.current_version,
+                    "Sent StateDelta to async commit thread."
+                );
+                self.send_to_commit(to_commit);
             }
         }
     }
@@ -116,9 +146,19 @@ impl BufferedState {
         self.maybe_commit(true /* sync_commit */);
     }
 
+    fn report_latest_committed_version(&self) {
+        LATEST_CHECKPOINT_VERSION.set(
+            self.state_after_checkpoint
+                .base_version
+                .map_or(-1, |v| v as i64),
+        );
+    }
+
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<HashMap<StateKey, StateValue>>,
+        updates_until_next_checkpoint_since_current_option: Option<
+            HashMap<StateKey, Option<StateValue>>,
+        >,
         mut new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
@@ -149,6 +189,7 @@ impl BufferedState {
             self.state_after_checkpoint = new_state_after_checkpoint;
         }
         self.maybe_commit(sync_commit);
+        self.report_latest_committed_version();
         Ok(())
     }
 }

@@ -12,8 +12,10 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_gas::{
-    AptosGasParameters, InitialGasSchedule, NativeGasParameters, ToOnChainGasSchedule,
+    AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
+    ToOnChainGasSchedule,
 };
+use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -25,10 +27,8 @@ use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use move_deps::move_binary_format::access::ModuleAccess;
+use framework::{ReleaseBundle, ReleasePackage};
 use move_deps::{
-    move_binary_format::CompiledModule,
-    move_bytecode_utils::Modules,
     move_core_types::{
         account_address::AccountAddress,
         identifier::Identifier,
@@ -40,20 +40,25 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::*;
-use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
 
 const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
+const CODE_MODULE_NAME: &str = "code";
+const VERSION_MODULE_NAME: &str = "version";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
+const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
 
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
+    // If true, genesis will create a special core resources account that can mint coins.
+    pub is_test: bool,
     pub max_stake: u64,
     pub min_stake: u64,
     pub min_voting_threshold: u128,
@@ -61,6 +66,7 @@ pub struct GenesisConfiguration {
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voting_power_increase_limit: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -73,7 +79,7 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
-    stdlib_module_bytes: &[Vec<u8>],
+    framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: GenesisConfiguration,
 ) -> Transaction {
@@ -82,7 +88,7 @@ pub fn encode_genesis_transaction(
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
         validators,
-        stdlib_module_bytes,
+        framework,
         consensus_config,
         chain_id,
         &genesis_config,
@@ -90,41 +96,41 @@ pub fn encode_genesis_transaction(
 }
 
 pub fn encode_genesis_change_set(
-    aptos_root_key: &Ed25519PublicKey,
+    core_resources_key: &Ed25519PublicKey,
     validators: &[Validator],
-    stdlib_module_bytes: &[Vec<u8>],
+    framework: &ReleaseBundle,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
-    let mut stdlib_modules = Vec::new();
-    // create a data view for move_vm
+    // Create a Move VM session so we can invoke on-chain genesis intializations.
     let mut state_view = GenesisStateView::new();
-    for module_bytes in stdlib_module_bytes {
-        let module = CompiledModule::deserialize(module_bytes).unwrap();
+    for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
-        stdlib_modules.push(module)
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
-
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
-    create_and_initialize_main_accounts(
-        &mut session,
-        aptos_root_key,
-        consensus_config,
-        chain_id,
-        genesis_config,
-    );
-    // generate the genesis WriteSet
-    create_and_initialize_validators(&mut session, validators);
-
-    // Initialize on-chain governance.
+    // On-chain genesis process.
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    if genesis_config.is_test {
+        initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
+    } else {
+        initialize_aptos_coin(&mut session);
+    }
     initialize_on_chain_governance(&mut session, genesis_config);
+    create_and_initialize_validators(&mut session, validators);
+    if genesis_config.is_test {
+        allow_core_resources_to_set_version(&mut session);
+    }
 
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
@@ -134,16 +140,31 @@ pub fn encode_genesis_change_set(
     let state_view = GenesisStateView::new();
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
-    // use a different session id, in case both scripts creates tables
+    // Publish the framework, using a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
-    publish_stdlib(&mut session, stdlib_modules);
+    publish_framework(&mut session, framework);
     let session2_out = session.finish().unwrap();
 
     session1_out.squash(session2_out).unwrap();
-    let change_set = session1_out.into_change_set(&mut ()).unwrap();
+
+    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let (delta_change_set, change_set) = change_set_ext.into_inner();
+
+    // Publishing stdlib should not produce any deltas.
+    // Proof: First session output is obtained during genesis when we initialize
+    // the data. This implies that all values which are aggregators know their
+    // real values, and therefore map to write ops and not deltas. For example,
+    // `create_and_initialize_validators` mints aptos coins which has aggregatable
+    // supply, but since supply is initialized during the same session there will
+    // be no deltas. The second session pusblishes framework module bundle which
+    // does not produce deltas either.
+    debug_assert!(
+        delta_change_set.is_empty(),
+        "non-empty delta change set in genesis"
+    );
 
     assert!(!change_set
         .write_set()
@@ -182,6 +203,11 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
         "Voting duration must be strictly smaller than recurring lockup"
     );
+    assert!(
+        genesis_config.voting_power_increase_limit > 0
+            && genesis_config.voting_power_increase_limit <= 50,
+        "voting_power_increase_limit must be > 0 and <= 50"
+    );
 }
 
 fn exec_function(
@@ -212,16 +238,12 @@ fn exec_function(
         });
 }
 
-/// Create and initialize Association and Core Code accounts.
-fn create_and_initialize_main_accounts(
+fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
-    aptos_root_key: &Ed25519PublicKey,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
 ) {
-    let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
-
     let genesis_gas_params = AptosGasParameters::initial();
     let gas_schedule_blob = bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
         .expect("Failure serializing genesis gas schedule");
@@ -247,8 +269,6 @@ fn create_and_initialize_main_accounts(
         "initialize",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_root_address()),
-            MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
             MoveValue::vector_u8(gas_schedule_blob),
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
@@ -260,6 +280,34 @@ fn create_and_initialize_main_accounts(
             MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+            MoveValue::U64(genesis_config.voting_power_increase_limit),
+        ]),
+    );
+}
+
+fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_core_resources_and_aptos_coin(
+    session: &mut SessionExt<impl MoveResolver>,
+    core_resources_key: &Ed25519PublicKey,
+) {
+    let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_core_resources_and_aptos_coin",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::vector_u8(core_resources_auth_key.to_vec()),
         ]),
     );
 }
@@ -290,132 +338,67 @@ fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
 ) {
-    let mut owners = vec![];
-    let mut consensus_pubkeys = vec![];
-    let mut proof_of_possession = vec![];
-    let mut validator_network_addresses = vec![];
-    let mut full_node_network_addresses = vec![];
-    let mut staking_distribution = vec![];
-
-    for v in validators {
-        owners.push(MoveValue::Address(v.address));
-        consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
-        proof_of_possession.push(MoveValue::vector_u8(v.proof_of_possession.clone()));
-        validator_network_addresses.push(MoveValue::vector_u8(v.network_addresses.clone()));
-        full_node_network_addresses
-            .push(MoveValue::vector_u8(v.full_node_network_addresses.clone()));
-        staking_distribution.push(MoveValue::U64(v.stake_amount));
-    }
+    let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(validators_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::Vector(owners),
-            MoveValue::Vector(consensus_pubkeys),
-            MoveValue::Vector(proof_of_possession),
-            MoveValue::Vector(validator_network_addresses),
-            MoveValue::Vector(full_node_network_addresses),
-            MoveValue::Vector(staking_distribution),
-        ]),
+        serialized_values,
     );
 }
 
-/// Collect compiledModule based on account address, dedup modules for each address
-fn construct_module_map(
-    modules: Vec<CompiledModule>,
-) -> HashMap<AccountAddress, Vec<CompiledModule>> {
-    let mut module_ids = HashSet::new();
-    let mut map = HashMap::new();
-    for m in modules {
-        if module_ids.insert(m.self_id()) {
-            map.entry(*m.address())
-                .or_insert_with(Vec::new)
-                .push(m.clone());
-        }
-    }
-    map
+fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        VERSION_MODULE_NAME,
+        "initialize_for_test",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
+    );
 }
 
-/// Publish all modules that should be available after genesis.
-fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Vec<CompiledModule>) {
-    let map = construct_module_map(stdlib);
-    let root_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let token_address = AccountAddress::from_hex_literal("0x3").unwrap();
-
-    let framework_modules = map.get(&root_address).unwrap();
-    let token_modules = map.get(&token_address).unwrap();
-
-    // publish core-framework
-    publish_module_bundle(session, Modules::new(framework_modules));
-    // publish non-core-framework modules
-    publish_token_modules(session, token_modules.clone());
-}
-
-/// publish modules that are not core-framework. assuming core-framework published
-/// the modules has to be sorted by topological order PropertyMap -> TokenV1 -> TokenCoinSwap
-fn publish_token_modules(
-    session: &mut SessionExt<impl MoveResolver>,
-    mut lib: Vec<CompiledModule>,
-) {
-    // module topological order
-    let x: HashMap<&str, u32> = HashMap::from([
-        ("property_map", 0u32),
-        ("token", 1u32),
-        ("token_coin_swap", 2u32),
-        ("token_transfers", 3u32),
-    ])
-    .into_iter()
-    .collect();
-
-    lib.sort_by_key(|m| x.get(m.name().as_str()).unwrap());
-
-    for m in lib {
-        let module_id = m.self_id();
-        if module_id.name().as_str() == GENESIS_MODULE_NAME {
-            // Do not publish the Genesis module
-            continue;
-        }
-        let mut bytes = vec![];
-        m.serialize(&mut bytes).unwrap();
-        session
-            .publish_module(bytes, *module_id.address(), &mut UnmeteredGasMeter)
-            .unwrap_or_else(|e| panic!("Failure publishing module {:?}, {:?}", module_id, e));
+/// Publish the framework release bundle.
+fn publish_framework(session: &mut SessionExt<impl MoveResolver>, framework: &ReleaseBundle) {
+    for pack in &framework.packages {
+        publish_package(session, pack)
     }
 }
 
-/// publish the core-framework with stdlib
-fn publish_module_bundle(session: &mut SessionExt<impl MoveResolver>, lib: Modules) {
-    let dep_graph = lib.compute_dependency_graph();
-    let mut addr_opt: Option<AccountAddress> = None;
-    let modules = dep_graph
-        .compute_topological_order()
-        .unwrap()
-        .map(|m| {
-            let addr = *m.self_id().address();
-            if let Some(a) = addr_opt {
-                assert_eq!(
-                    a,
-                    addr,
-                    "All genesis modules must be published under the same address, but found modules under both {} and {}",
-                    a.short_str_lossless(),
-                    addr.short_str_lossless(),
-                );
-            } else {
-                addr_opt = Some(addr)
-            }
-            let mut bytes = vec![];
-            m.serialize(&mut bytes).unwrap();
-            bytes
-        })
-        .collect::<Vec<Vec<u8>>>();
-    // TODO: allow genesis modules published under different addresses. supporting this while
-    // maintaining the topological order is challenging.
+/// Publish the given package.
+fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePackage) {
+    let modules = pack.sorted_code_and_modules();
+    let addr = *modules.get(0).unwrap().1.self_id().address();
+    let code = modules
+        .into_iter()
+        .map(|(c, _)| c.to_vec())
+        .collect::<Vec<_>>();
     session
-        .publish_module_bundle(modules, addr_opt.unwrap(), &mut UnmeteredGasMeter)
-        .unwrap_or_else(|e| panic!("Failure publishing modules {:?}", e));
+        .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failure publishing package `{}`: {:?}",
+                pack.package_metadata().name,
+                e
+            )
+        });
+
+    // Call the initialize function with the metadata.
+    exec_function(
+        session,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(pack.package_metadata()).unwrap(),
+        ],
+    );
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -462,12 +445,22 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    let modules = match genesis_options {
-        GenesisOptions::Compiled => cached_framework_packages::module_blobs().to_vec(),
-        GenesisOptions::Fresh => framework::aptos::module_blobs(),
+    let framework = match genesis_options {
+        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
+        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
     };
 
-    generate_test_genesis(&modules, None).0
+    generate_test_genesis(framework, Some(1)).0
+}
+
+/// Generate a genesis `ChangeSet` for mainnet
+pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
+    let framework = match genesis_options {
+        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
+        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
+    };
+
+    generate_mainnet_genesis(framework, Some(1)).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -478,26 +471,28 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_framework_packages::module_blobs(), count)
+    generate_test_genesis(cached_packages::head_release_bundle(), count)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
-    /// The Aptos account address of the validator
-    pub address: AccountAddress,
-    /// bls12381 public key used to sign consensus messages
-    pub consensus_pubkey: Vec<u8>,
-    /// Proof of Possession of the consensus pubkey
-    pub proof_of_possession: Vec<u8>,
+    /// The Aptos account address of the validator.
+    pub owner_address: AccountAddress,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
-    /// its own operator)
+    /// its own operator).
     pub operator_address: AccountAddress,
-    /// `NetworkAddress` for the validator
-    pub network_addresses: Vec<u8>,
-    /// `NetworkAddress` for the validator's full node
-    pub full_node_network_addresses: Vec<u8>,
-    /// Amount to stake for consensus
+    pub voter_address: AccountAddress,
+    /// Amount to stake for consensus. Also the intial amount minted to the owner account.
     pub stake_amount: u64,
+
+    /// bls12381 public key used to sign consensus messages.
+    pub consensus_pubkey: Vec<u8>,
+    /// Proof of Possession of the consensus pubkey.
+    pub proof_of_possession: Vec<u8>,
+    /// `NetworkAddress` for the validator.
+    pub network_addresses: Vec<u8>,
+    /// `NetworkAddress` for the validator's full node.
+    pub full_node_network_addresses: Vec<u8>,
 }
 
 pub struct TestValidator {
@@ -507,17 +502,17 @@ pub struct TestValidator {
 }
 
 impl TestValidator {
-    pub fn new_test_set(count: Option<usize>) -> Vec<TestValidator> {
-        let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([1u8; 32]);
+    pub fn new_test_set(count: Option<usize>, initial_stake: Option<u64>) -> Vec<TestValidator> {
+        let mut rng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
-            .map(|_| TestValidator::gen(&mut rng))
+            .map(|_| TestValidator::gen(&mut rng, initial_stake))
             .collect()
     }
 
-    fn gen(rng: &mut rand::rngs::StdRng) -> TestValidator {
+    fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let address = auth_key.derived_address();
+        let owner_address = auth_key.derived_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
@@ -526,14 +521,20 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
+        let stake_amount = if let Some(amount) = initial_stake {
+            amount
+        } else {
+            1
+        };
         let data = Validator {
-            address,
+            owner_address,
             consensus_pubkey,
             proof_of_possession,
-            operator_address: address,
+            operator_address: owner_address,
+            voter_address: owner_address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
-            stake_amount: 1,
+            stake_amount,
         };
         Self {
             key,
@@ -544,22 +545,23 @@ impl TestValidator {
 }
 
 pub fn generate_test_genesis(
-    stdlib_modules: &[Vec<u8>],
+    framework: &ReleaseBundle,
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    let test_validators = TestValidator::new_test_set(count);
+    let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
         validators,
-        stdlib_modules,
+        framework,
         OnChainConsensusConfig::default(),
         ChainId::test(),
         &GenesisConfiguration {
             allow_new_validators: true,
             epoch_duration_secs: 3600,
+            is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,
             // 1M APTOS coins (with 8 decimals).
@@ -568,6 +570,41 @@ pub fn generate_test_genesis(
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
+            voting_power_increase_limit: 50,
+        },
+    );
+    (genesis, test_validators)
+}
+
+pub fn generate_mainnet_genesis(
+    framework: &ReleaseBundle,
+    count: Option<usize>,
+) -> (ChangeSet, Vec<TestValidator>) {
+    // TODO: Update to have custom validators/accounts with initial balances at genesis.
+    let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
+    let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
+    let validators = &validators_;
+
+    let genesis = encode_genesis_change_set(
+        &GENESIS_KEYPAIR.1,
+        validators,
+        framework,
+        OnChainConsensusConfig::default(),
+        ChainId::test(),
+        // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
+        &GenesisConfiguration {
+            allow_new_validators: true,
+            epoch_duration_secs: 2 * 3600, // 2 hours
+            is_test: false,
+            min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            // 400M APT
+            min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
+            max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
+            recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
+            required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 7 * 24 * 3600, // 7 days
+            voting_power_increase_limit: 30,
         },
     );
     (genesis, test_validators)
@@ -575,18 +612,20 @@ pub fn generate_test_genesis(
 
 #[test]
 pub fn test_genesis_module_publishing() {
-    let mut stdlib_modules = Vec::new();
-    // create a data view for move_vm
+    // create a state view for move_vm
     let mut state_view = GenesisStateView::new();
-    for module_bytes in cached_framework_packages::module_blobs() {
-        let module = CompiledModule::deserialize(module_bytes).unwrap();
+    for (module_bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules()
+    {
         state_view.add_module(&module.self_id(), module_bytes);
-        stdlib_modules.push(module)
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
-    publish_stdlib(&mut session, stdlib_modules);
+    publish_framework(&mut session, cached_packages::head_release_bundle());
 }

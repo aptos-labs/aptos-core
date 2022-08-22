@@ -18,7 +18,7 @@ use crate::{
     error::{ApiError, ApiResult},
     types::{
         coin_store_resource_identifier, AccountBalanceRequest, AccountBalanceResponse, Amount,
-        BlockIdentifier, Currency, CurrencyMetadata,
+        Currency, CurrencyMetadata,
     },
     RosettaContext,
 };
@@ -71,15 +71,15 @@ async fn account_balance(
     let rest_client = server_context.rest_client()?;
 
     // Retrieve the block index to read
-    let block_index =
+    let block_height =
         get_block_index_from_request(&server_context, request.block_identifier.clone()).await?;
 
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_info = server_context
         .block_cache()?
-        .get_block_info(block_index)
+        .get_block_info_by_height(block_height)
         .await?;
-    let balance_version = block_info.end_version;
+    let balance_version = block_info.last_version;
 
     let (sequence_number, balances) = get_balances(
         &rest_client,
@@ -97,11 +97,8 @@ async fn account_balance(
     )
     .await?;
 
-    // Get the block identifier
-    let block_identifier = BlockIdentifier::from_block_info(block_info);
-
     Ok(AccountBalanceResponse {
-        block_identifier,
+        block_identifier: block_info.block_id,
         balances: amounts,
         metadata: AccountBalanceMetadata { sequence_number },
     })
@@ -186,7 +183,7 @@ async fn get_balances(
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
         } else {
-            return Err(ApiError::AptosError(Some(
+            return Err(ApiError::InternalError(Some(
                 "Failed to retrieve account sequence number".to_string(),
             )));
         };

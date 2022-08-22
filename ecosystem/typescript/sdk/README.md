@@ -1,12 +1,15 @@
 # SDK for Aptos Node API
+
 [![Discord][discord-image]][discord-url]
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
 ## API Docs
+
 Docs can be found [here][api-doc]
 
 ## Usage
+
 For Javascript or Typescript usage, check out the [`./examples`][examples] folder with ready-made `package.json` files to get you going quickly!
 
 If you are using the types in a `commonjs` module, like in a Node app, you just have to enable `esModuleInterop`
@@ -24,6 +27,7 @@ and `allowSyntheticDefaultImports` in your `tsconfig` for types compatibility:
 ```
 
 ### Requirements
+
 - [Node.js](https://nodejs.org)
 - [Yarn](https://yarnpkg.com/)
 
@@ -32,26 +36,38 @@ yarn install
 ```
 
 ### Generating API client
+
 This SDK is composed of two parts, a core client generated from the OpenAPI spec of the API, and a set of wrappers that make it nicer to use, enable certain content types, etc.
 
 To generate the core client from the spec, run:
+
 ```bash
 yarn generate-client
 ```
 
-### Testing against devnet
+### Working with devnet
+
+The public SDK downloaded from [npmjs](https://www.npmjs.com/package/aptos) is compatible with the [Aptos devnet](https://fullnode.devnet.aptoslabs.com). To start building, run below command in your project directory:
+
 ```bash
-yarn test
+yarn add aptos
 ```
 
-### Testing against local node
+### Working with local node
+
+To develop in a local environment, you need to use the SDK from the [main](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) branch.
+
+**NOTE**
+SDK from the main branch might not be compatible with the devnet.
 
 Run a local node (run from the root of the repo):
+
 ```
 cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
 ```
 
-Setup an env to configure the URLs:
+Run the SDK tests and make sure they pass. Go to the SDK directory, and setup an env to configure the URLs:
+
 ```
 rm .env
 echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> .env
@@ -59,16 +75,28 @@ echo 'APTOS_FAUCET_URL="http://127.0.01:8081"' >> .env
 ```
 
 Run the tests:
+
 ```
 yarn test
 ```
 
 If you see strange behavior regarding HTTP clients, try running the tests with `--detectOpenHandles`.
 
+Package the SDK and start building:
+
+```bash
+yarn build
+yarn pack
+# In your project directory
+yarn add PATH_TO_LOCAL_SDK_PACKAGE
+```
+
 ## Semantic versioning
+
 This project follows [semver](https://semver.org/) as closely as possible.
 
 ## References
+
 [examples]: https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/
 [repo]: https://github.com/aptos-labs/aptos-core
 [npm-image-version]: https://img.shields.io/npm/v/aptos.svg
@@ -79,14 +107,17 @@ This project follows [semver](https://semver.org/) as closely as possible.
 [api-doc]: https://aptos-labs.github.io/ts-sdk-doc/
 
 ## Release process
+
 To release a new version of the SDK do the following.
 
 1. Regenerate the client:
+
 ```
 yarn generate-client
 ```
 
 2. Test, lint and format:
+
 ```
 yarn test
 yarn lint

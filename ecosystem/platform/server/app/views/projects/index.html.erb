@@ -1,0 +1,33 @@
+<div class="bg-neutral-900 text-neutral-100 h-full">
+  <div class="max-w-screen-2xl mx-auto">
+    <div class="bg-neutral-800 rounded p-32 mt-16 mb-32">
+      <h2 class="font-display text-5xl mb-2">Community Projects</h2>
+      <h3 class="font-light text-2xl mb-8">Check out all projects building on Aptos, the safest and most scalable layer 1 blockchain.</h3>
+      <%= render ButtonComponent.new(href: new_project_path, size: :medium, class: '!inline-flex') do %>
+        Submit Project
+      <% end %>
+    </div>
+
+    <% @groups.each do |category_id, projects| %>
+      <% category = @categories[category_id] %>
+      <div class="mb-16">
+        <h3 class="font-light text-2xl mb-4"><%= category.title %></h3>
+        <div class="grid grid-cols-3 gap-8">
+          <% projects.each do |project| %>
+            <div class="border border-neutral-100 rounded-xl">
+              <div class="flex p-8 gap-8">
+                <img src="<%= project.thumbnail_url %>" class="overflow-hidden rounded-lg bg-neutral-800 w-20 h-20">
+                <div class="flex-1">
+                  <h4 class="text-lg mb-2">
+                    <%= link_to project.title, project_path(project) %>
+                  </h4>
+                  <p class="font-light text-lg text-neutral-300"><%= project.short_description %></p>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

@@ -10,7 +10,7 @@ use aptos_types::{
     account_config::AccountResource,
     account_state::AccountState,
     event::EventHandle,
-    proof::SparseMerkleProof,
+    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -53,12 +53,12 @@ impl DbReader for MockDbReaderWriter {
         Ok(self.get_latest_state_value(state_key.clone()).unwrap())
     }
 
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         _state_key: &StateKey,
         _version: Version,
-    ) -> Result<SparseMerkleProof> {
-        Ok(SparseMerkleProof::new(None, vec![]))
+    ) -> Result<SparseMerkleProofExt> {
+        Ok(SparseMerkleProofExt::new(None, vec![]))
     }
 }
 

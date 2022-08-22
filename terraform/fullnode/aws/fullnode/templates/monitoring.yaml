@@ -171,7 +171,7 @@ spec:
         - containerPort: 9090
         livenessProbe:
           httpGet:
-            path: /-/healthy
+            path: /v1/-/healthy
             port: 9090
           initialDelaySeconds: 10
         readinessProbe:
@@ -204,7 +204,7 @@ spec:
         - containerPort: 9093
         livenessProbe:
           httpGet:
-            path: /-/healthy
+            path: /v1/-/healthy
             port: 9093
           initialDelaySeconds: 10
         readinessProbe:

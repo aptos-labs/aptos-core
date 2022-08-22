@@ -24,7 +24,7 @@ pub struct ApiConfig {
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_PORT: u16 = 8080;
-pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 4 * 1024 * 1024; // 4mb
+pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
 
 fn default_enabled() -> bool {
     true

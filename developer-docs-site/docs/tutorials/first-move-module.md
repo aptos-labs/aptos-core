@@ -65,7 +65,7 @@ cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 
 ### Step 1.2) Review the Module
 
-In this terminal, change directories to `aptos-move/move-examples/hello_blockchain`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/HelloBlockchain.move`.
+In this terminal, change directories to `aptos-move/move-examples/hello_blockchain`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/hello_blockchain.move`.
 
 This module enables users to create a `String` resource under their account and set it. Users are only able to set their resource and cannot set other's resources.
 
@@ -99,7 +99,7 @@ In the code above, the two important sections are the struct `MessageHolder` and
 
 ### Step 1.3) Testing the Module
 
-Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
+Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/hello_blockchain_test.move` that demonstrates another method for writing tests.
 
 This can be tested by entering `cargo test test_hello_blockchain -p move-examples -- --exact` at the terminal.
 
@@ -127,7 +127,7 @@ Note: `sender_can_set_message` is a `script` function in order to call the `scri
 
 ## Step 2) Publishing and Interacting with the Move Module
 
-Now we return to our application to deploy and interact with the module on the Atpos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
+Now we return to our application to deploy and interact with the module on the Aptos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
 
 ### Step 2.1) Publishing the Move Module
 
@@ -263,7 +263,7 @@ For Rust:
   and press enter."
 - In the "Move Window" terminal, and for the Move file we had previously looked at:
   - Copy Alice's address
-  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
+  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses hello_blockchain=0x{alice_address_here}`. Here, we replace the generic named address `hello_blockchain='_'` in `hello_blockchain/move.toml` with Alice's Address
   - Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
 - Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
 
@@ -300,6 +300,6 @@ The data can be verified by visiting either a REST interface or the explorer:
 - Bob's account on the [explorer][bob_account_explorer]
 
 [account_basics]: /concepts/basics-accounts
-[alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/
+[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[rest_spec]: /rest-api
+[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

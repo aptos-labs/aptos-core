@@ -27,7 +27,7 @@ async fn batch_update(
     version: &Version,
 ) -> Result<()> {
     for validator in validators_to_update {
-        ctx.swarm().upgrade_validator(*validator, version)?;
+        ctx.swarm().upgrade_validator(*validator, version).await?;
     }
 
     ctx.swarm().health_check().await?;

@@ -5,6 +5,5 @@
 
 module Users
   class SessionsController < Devise::SessionsController
-    layout 'it3', only: %i[new]
   end
 end

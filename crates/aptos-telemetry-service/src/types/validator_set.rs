@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_rest_client::types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
+use aptos_rest_client::types::deserialize_from_string;
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ impl ValidatorConfig {
 /// Consensus information per validator, stored in ValidatorSet.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorInfo {
-    #[serde(deserialize_with = "deserialize_from_prefixed_hex_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     addr: AccountAddress,
     #[serde(deserialize_with = "deserialize_from_string")]
     voting_power: u64,

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
@@ -7,6 +10,13 @@ import * as Gen from "./generated/index";
 import { NODE_URL, FAUCET_URL } from "./util.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
+
+test("faucet url empty", () => {
+  expect(() => {
+    const faucetClient = new FaucetClient("http://localhost:8080", "");
+    faucetClient.getAccount("0x1");
+  }).toThrow("Faucet URL cannot be empty.");
+});
 
 test(
   "full tutorial faucet flow",
@@ -28,8 +38,8 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("0");
 
-    const payload: Gen.TransactionPayload_ScriptFunctionPayload = {
-      type: "script_function_payload",
+    const payload: Gen.TransactionPayload_EntryFunctionPayload = {
+      type: "entry_function_payload",
       function: "0x1::coin::transfer",
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "717"],

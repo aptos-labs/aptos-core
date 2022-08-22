@@ -32,6 +32,8 @@ use proptest::{collection::hash_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 
+use crate::TreeReader;
+use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::hash_map::HashMap,
@@ -136,11 +138,16 @@ impl NodeKey {
         };
         Ok(NodeKey::new(version, nibble_path))
     }
+
+    pub fn unpack(self) -> (Version, NibblePath) {
+        (self.version, self.nibble_path)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeType {
     Leaf,
+    Null,
     /// A internal node that haven't been finished the leaf count migration, i.e. None or not all
     /// of the children leaf counts are known.
     Internal {
@@ -194,6 +201,7 @@ impl Child {
         match self.node_type {
             NodeType::Leaf => 1,
             NodeType::Internal { leaf_count } => leaf_count,
+            NodeType::Null => unreachable!("Child cannot be Null"),
         }
     }
 }
@@ -344,6 +352,7 @@ impl InternalNode {
                 NodeType::Internal { leaf_count } => {
                     serialize_u64_varint(leaf_count as u64, binary);
                 }
+                NodeType::Null => unreachable!("Child cannot be Null"),
             };
             existence_bitmap &= !(1 << next_child);
         }
@@ -479,6 +488,63 @@ impl InternalNode {
         }
     }
 
+    fn gen_node_in_proof<K: crate::Key, R: TreeReader<K>>(
+        &self,
+        start: u8,
+        width: u8,
+        (existence_bitmap, leaf_bitmap): (u16, u16),
+        (tree_reader, node_key): (&R, &NodeKey),
+    ) -> Result<NodeInProof> {
+        // Given a bit [start, 1 << nibble_height], return the value of that range.
+        let (range_existence_bitmap, range_leaf_bitmap) =
+            Self::range_bitmaps(start, width, (existence_bitmap, leaf_bitmap));
+        Ok(if range_existence_bitmap == 0 {
+            // No child under this subtree
+            NodeInProof::Other(*SPARSE_MERKLE_PLACEHOLDER_HASH)
+        } else if width == 1 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
+        {
+            // Only 1 leaf child under this subtree or reach the lowest level
+            let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
+            let only_child = self
+                .child(only_child_index)
+                .with_context(|| {
+                    format!(
+                        "Corrupted internal node: existence_bitmap indicates \
+                         the existence of a non-exist child at index {:x}",
+                        only_child_index
+                    )
+                })
+                .unwrap();
+            if matches!(only_child.node_type, NodeType::Leaf) {
+                let only_child_node_key =
+                    node_key.gen_child_node_key(only_child.version, only_child_index);
+                match tree_reader.get_node(&only_child_node_key)? {
+                    Node::Internal(_) => unreachable!(
+                        "Corrupted internal node: in-memory leaf child is internal node on disk"
+                    ),
+                    Node::Leaf(leaf_node) => {
+                        NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
+                    }
+                    Node::Null => unreachable!("Child cannot be Null"),
+                }
+            } else {
+                NodeInProof::Other(only_child.hash)
+            }
+        } else {
+            let left_child = self.merkle_hash(
+                start,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
+            let right_child = self.merkle_hash(
+                start + width / 2,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
+            NodeInProof::Other(SparseMerkleInternalNode::new(left_child, right_child).hash())
+        })
+    }
+
     /// Gets the child and its corresponding siblings that are necessary to generate the proof for
     /// the `n`-th child. If it is an existence proof, the returned child must be the `n`-th
     /// child; otherwise, the returned child may be another child. See inline explanation for
@@ -499,11 +565,12 @@ impl InternalNode {
     ///     |   MSB|<---------------------- uint 16 ---------------------------->|LSB
     ///  height    chs: `child_half_start`         shs: `sibling_half_start`
     /// ```
-    pub fn get_child_with_siblings(
+    pub fn get_child_with_siblings<K: crate::Key, R: TreeReader<K>>(
         &self,
         node_key: &NodeKey,
         n: Nibble,
-    ) -> (Option<NodeKey>, Vec<HashValue>) {
+        reader: Option<&R>,
+    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
         let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 
@@ -514,18 +581,26 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            siblings.push(self.merkle_hash(
-                sibling_half_start,
-                width,
-                (existence_bitmap, leaf_bitmap),
-            ));
+            if let Some(reader) = reader {
+                siblings.push(self.gen_node_in_proof(
+                    sibling_half_start,
+                    width,
+                    (existence_bitmap, leaf_bitmap),
+                    (reader, node_key),
+                )?);
+            } else {
+                siblings.push(
+                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
+                        .into(),
+                );
+            }
 
             let (range_existence_bitmap, range_leaf_bitmap) =
                 Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
 
             if range_existence_bitmap == 0 {
                 // No child in this range.
-                return (None, siblings);
+                return Ok((None, siblings));
             } else if width == 1
                 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
             {
@@ -534,7 +609,7 @@ impl InternalNode {
                 // `None` because it's existence indirectly proves the n-th child doesn't exist.
                 // Please read proof format for details.
                 let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
-                return (
+                return Ok((
                     {
                         let only_child_version = self
                             .child(only_child_index)
@@ -551,7 +626,7 @@ impl InternalNode {
                         Some(node_key.gen_child_node_key(only_child_version, only_child_index))
                     },
                     siblings,
-                );
+                ));
             }
         }
         unreachable!("Impossible to get here without returning even at the lowest level.")
@@ -628,6 +703,7 @@ impl<K> From<LeafNode<K>> for SparseMerkleLeafNode {
 enum NodeTag {
     Leaf = 1,
     Internal = 2,
+    Null = 3,
 }
 
 /// The concrete node type of [`JellyfishMerkleTree`](crate::JellyfishMerkleTree).
@@ -637,6 +713,8 @@ pub enum Node<K> {
     Internal(InternalNode),
     /// A wrapper of [`LeafNode`].
     Leaf(LeafNode<K>),
+    /// Represents empty tree only
+    Null,
 }
 
 impl<K> From<InternalNode> for Node<K> {
@@ -688,6 +766,7 @@ where
             // internal node will never have a child of Node::Null.
             Self::Leaf(_) => NodeType::Leaf,
             Self::Internal(n) => n.node_type(),
+            Self::Null => NodeType::Null,
         }
     }
 
@@ -696,6 +775,7 @@ where
         match self {
             Node::Leaf(_) => 1,
             Node::Internal(internal_node) => internal_node.leaf_count,
+            Node::Null => 0,
         }
     }
 
@@ -714,6 +794,9 @@ where
                 out.extend(bcs::to_bytes(&leaf_node)?);
                 APTOS_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
             }
+            Node::Null => {
+                out.push(NodeTag::Null as u8);
+            }
         }
         Ok(out)
     }
@@ -723,6 +806,7 @@ where
         match self {
             Node::Internal(internal_node) => internal_node.hash(),
             Node::Leaf(leaf_node) => leaf_node.hash(),
+            Node::Null => *SPARSE_MERKLE_PLACEHOLDER_HASH,
         }
     }
 
@@ -736,6 +820,7 @@ where
         match node_tag {
             Some(NodeTag::Internal) => Ok(Node::Internal(InternalNode::deserialize(&val[1..])?)),
             Some(NodeTag::Leaf) => Ok(Node::Leaf(bcs::from_bytes(&val[1..])?)),
+            Some(NodeTag::Null) => Ok(Node::Null),
             None => Err(NodeDecodeError::UnknownTag { unknown_tag: tag }.into()),
         }
     }

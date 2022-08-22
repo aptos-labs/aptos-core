@@ -4,7 +4,7 @@
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::{
-        gas_schedule::GasAlgebra,
+        gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
         language_storage::{StructTag, TypeTag},
     },
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
@@ -46,8 +46,8 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeOfGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base: InternalGas,
+    pub per_byte_in_str: InternalGasPerByte,
 }
 
 fn native_type_of(
@@ -59,12 +59,12 @@ fn native_type_of(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
-    let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0 {
-        cost += gas_params.unit_cost * ty_args[0].size().get()
-    }
-
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
+
+    let mut cost = gas_params.base;
+    if gas_params.per_byte_in_str > 0.into() {
+        cost += gas_params.per_byte_in_str * NumBytes::new(type_tag.to_string().len() as u64);
+    }
 
     if let TypeTag::Struct(struct_tag) = type_tag {
         Ok(NativeResult::ok(
@@ -93,8 +93,8 @@ pub fn make_native_type_of(gas_params: TypeOfGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeNameGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base: InternalGas,
+    pub per_byte_in_str: InternalGasPerByte,
 }
 
 fn native_type_name(
@@ -106,13 +106,10 @@ fn native_type_name(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
-    let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0 {
-        cost += gas_params.unit_cost * ty_args[0].size().get()
-    }
-
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
     let type_name = type_tag.to_string();
+
+    let cost = gas_params.base + gas_params.per_byte_in_str * NumBytes::new(type_name.len() as u64);
 
     Ok(NativeResult::ok(
         cost,

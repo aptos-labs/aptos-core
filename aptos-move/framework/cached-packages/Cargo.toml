@@ -1,5 +1,5 @@
 [package]
-name = "cached-framework-packages"
+name = "cached-packages"
 version = "0.1.0"
 edition = "2018"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]

@@ -10,7 +10,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
-use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_gas::{FeePerGasUnit, Gas, InitialGasSchedule, TransactionGasParameters};
 use aptos_proptest_helpers::Index;
 use aptos_types::{
     transaction::{Script, SignedTransaction, TransactionStatus},
@@ -88,23 +88,28 @@ impl AUTransactionGen for InsufficientBalanceGen {
         // TODO: Move such config to AccountUniverse
         let txn_gas_params = TransactionGasParameters::initial();
         let raw_bytes_len = txn.raw_txn_bytes_len() as u64;
-        let min_cost =
-            txn_gas_params.to_external_units(txn_gas_params.calculate_intrinsic_gas(raw_bytes_len));
+        let min_cost: Gas = txn_gas_params
+            .calculate_intrinsic_gas(raw_bytes_len.into())
+            .to_unit_round_up_with_params(&txn_gas_params);
 
         (
             txn,
             (
-                if max_gas_unit > txn_gas_params.maximum_number_of_gas_units {
+                if Gas::from(max_gas_unit) > txn_gas_params.maximum_number_of_gas_units {
                     TransactionStatus::Discard(
                         StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
                     )
-                } else if max_gas_unit < min_cost {
+                } else if Gas::from(max_gas_unit) < min_cost {
                     TransactionStatus::Discard(
                         StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
                     )
-                } else if self.gas_unit_price > txn_gas_params.max_price_per_gas_unit {
+                } else if FeePerGasUnit::from(self.gas_unit_price)
+                    > txn_gas_params.max_price_per_gas_unit
+                {
                     TransactionStatus::Discard(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND)
-                } else if self.gas_unit_price < txn_gas_params.min_price_per_gas_unit {
+                } else if FeePerGasUnit::from(self.gas_unit_price)
+                    < txn_gas_params.min_price_per_gas_unit
+                {
                     TransactionStatus::Discard(StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND)
                 } else {
                     TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)

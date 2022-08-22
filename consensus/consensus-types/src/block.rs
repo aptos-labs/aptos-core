@@ -335,7 +335,7 @@ impl Block {
         ))
         .chain(
             self.payload()
-                .unwrap_or(&Payload::new_empty())
+                .unwrap_or(&Payload::empty())
                 .clone()
                 .into_iter()
                 .map(Transaction::UserTransaction),
@@ -350,22 +350,12 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            self.author().map(|proposer| {
-                u32::try_from(
-                    validators
-                        .iter()
-                        .position(|&v| v == proposer)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Proposer {} not in validator list {:?}",
-                                proposer, validators
-                            )
-                        }),
-                )
-                .unwrap()
-            }),
-            // A bitmap of voters
-            self.quorum_cert().ledger_info().get_voters_bitmap().clone(),
+            // A bitvec of voters
+            self.quorum_cert()
+                .ledger_info()
+                .get_voters_bitvec()
+                .clone()
+                .into(),
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()

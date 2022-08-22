@@ -3,15 +3,8 @@
 
 extern crate core;
 
-// Defines Forge Tests
-pub mod aptos;
-pub mod fullnode;
-pub mod indexer;
-pub mod nft_transaction;
-pub mod rest_api;
-pub mod transaction;
-
-// Converted to local Forge backend
+#[cfg(test)]
+mod aptos;
 #[cfg(test)]
 mod aptos_cli;
 #[cfg(test)]
@@ -19,13 +12,23 @@ mod client;
 #[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
+mod fullnode;
+#[cfg(test)]
+mod indexer;
+#[cfg(test)]
 mod network;
+#[cfg(test)]
+mod nft_transaction;
+#[cfg(test)]
+mod rest_api;
 #[cfg(test)]
 mod rosetta;
 #[cfg(test)]
 mod state_sync;
 #[cfg(test)]
 mod storage;
+#[cfg(test)]
+mod transaction;
 #[cfg(test)]
 mod txn_broadcast;
 

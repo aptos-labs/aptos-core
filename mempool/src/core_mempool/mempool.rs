@@ -236,17 +236,13 @@ impl Mempool {
         }
         let result_size = result.len();
         // convert transaction pointers to real values
-        let mut block_log = TxnsLog::new();
         let block: Vec<_> = result
             .into_iter()
-            .filter_map(|(address, tx_seq)| {
-                block_log.add(address, tx_seq);
-                self.transactions.get(&address, tx_seq)
-            })
+            .filter_map(|(address, tx_seq)| self.transactions.get(&address, tx_seq))
             .collect();
 
         debug!(
-            LogSchema::new(LogEntry::GetBlock).txns(block_log),
+            LogSchema::new(LogEntry::GetBlock),
             seen_consensus = seen_size,
             walked = txn_walked,
             seen_after = seen.len(),
@@ -279,7 +275,6 @@ impl Mempool {
             .gc_by_expiration_time(block_time, &self.metrics_cache);
     }
 
-    /// Read `count` transactions from timeline since `timeline_id`.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,

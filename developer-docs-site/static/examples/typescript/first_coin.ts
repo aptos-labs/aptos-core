@@ -23,8 +23,8 @@ async function initializeCoin(accountFrom: AptosAccount, coinTypeAddress: HexStr
   const serializer = new BCS.Serializer();
   serializer.serializeBool(false);
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x1::managed_coin",
       "initialize",
       [token],
@@ -40,7 +40,7 @@ async function initializeCoin(accountFrom: AptosAccount, coinTypeAddress: HexStr
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -61,8 +61,8 @@ async function registerCoin(coinReceiver: AptosAccount, coinTypeAddress: HexStri
     TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::moon_coin::MoonCoin`),
   );
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural("0x1::coins", "register", [token], []),
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural("0x1::coins", "register", [token], []),
   );
 
   const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
@@ -73,7 +73,7 @@ async function registerCoin(coinReceiver: AptosAccount, coinTypeAddress: HexStri
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(coinReceiver.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),
@@ -99,8 +99,8 @@ async function mintCoin(
     TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::moon_coin::MoonCoin`),
   );
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x1::managed_coin",
       "mint",
       [token],
@@ -116,7 +116,7 @@ async function mintCoin(
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(coinOwner.address()),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),

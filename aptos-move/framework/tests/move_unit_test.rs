@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_vm::natives;
 use framework::path_in_crate;
 use move_deps::move_cli::base::test::run_move_unit_tests;
@@ -20,7 +20,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default_with_bound(Some(1_000_000)),
+        UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
         /* compute_coverage */ false,
         &mut std::io::stdout(),
@@ -32,17 +32,15 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     // By side effect, configure for unit tests
     natives::configure_for_unit_test();
     // move_stdlib has the testing feature enabled to include debug native functions
-    natives::aptos_natives(NativeGasParameters::zeros())
+    natives::aptos_natives(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
 }
 
 #[test]
 fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework");
-}
-
-#[test]
-fn move_experimental_unit_tests() {
-    run_tests_for_pkg("aptos-experimental");
 }
 
 #[test]

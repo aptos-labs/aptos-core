@@ -1,0 +1,10 @@
+{
+  "chain_id": 4,
+  "epoch": "0",
+  "ledger_version": "0",
+  "oldest_ledger_version": "0",
+  "ledger_timestamp": "0",
+  "node_role": "validator",
+  "oldest_block_height": "0",
+  "block_height": "0"
+}

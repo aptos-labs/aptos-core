@@ -1755,14 +1755,14 @@ components:
       discriminator:
         propertyName: type
       oneOf:
-      - $ref: '#/components/schemas/ScriptFunctionPayload'
+      - $ref: '#/components/schemas/EntryFunctionPayload'
       - $ref: '#/components/schemas/ScriptPayload'
       - $ref: '#/components/schemas/ModuleBundlePayload'
       - $ref: '#/components/schemas/WriteSetPayload'
       title: Transaction Payload
-    ScriptFunctionPayload:
+    EntryFunctionPayload:
       example:
-        type: script_function_payload
+        type: entry_function_payload
         function: 0x1::PaymentScripts::peer_to_peer_with_metadata
         type_arguments:
         - 0x1::XDX::XDX
@@ -1776,7 +1776,7 @@ components:
           type: string
         function:
           description: |
-            Script function id is string representation of a script function defined on-chain.
+            Entry function id is string representation of a entry function defined on-chain.
 
             Format: `{address}::{module name}::{function name}`
 
@@ -1785,12 +1785,12 @@ components:
           title: Script Function ID
           type: string
         type_arguments:
-          description: Generic type arguments required by the script function.
+          description: Generic type arguments required by the entry function.
           items:
             $ref: '#/components/schemas/MoveTypeTagId'
           type: array
         arguments:
-          description: The script function arguments.
+          description: The entry function arguments.
           items:
             $ref: '#/components/schemas/MoveValue'
           type: array
@@ -1801,9 +1801,9 @@ components:
       - type_arguments
       title: Script Function Payload
       type: object
-    ScriptFunctionId:
+    EntryFunctionId:
       description: |
-        Script function id is string representation of a script function defined on-chain.
+        Entry function id is string representation of a entry function defined on-chain.
 
         Format: `{address}::{module name}::{function name}`
 

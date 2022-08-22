@@ -17,10 +17,7 @@ use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
-use move_deps::move_core_types::{
-    gas_schedule::{GasAlgebra, GasPrice},
-    vm_status::StatusCode::TYPE_MISMATCH,
-};
+use move_deps::move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
 fn failed_transaction_cleanup_test() {
@@ -36,8 +33,8 @@ fn failed_transaction_cleanup_test() {
 
         let txn_data = TransactionMetadata {
             sender: *sender.address(),
-            max_gas_amount: 100_000,
-            gas_unit_price: GasPrice::new(0),
+            max_gas_amount: 100_000.into(),
+            gas_unit_price: 0.into(),
             sequence_number: 10,
             ..Default::default()
         };
@@ -53,11 +50,11 @@ fn failed_transaction_cleanup_test() {
             &data_cache,
             &log_context,
         );
-        assert!(!out1.write_set().is_empty());
-        assert_eq!(out1.gas_used(), 90_000);
-        assert!(!out1.status().is_discarded());
+        assert!(!out1.txn_output().write_set().is_empty());
+        assert_eq!(out1.txn_output().gas_used(), 90_000);
+        assert!(!out1.txn_output().status().is_discarded());
         assert_eq!(
-            out1.status().status(),
+            out1.txn_output().status().status(),
             // StatusCode::TYPE_MISMATCH
             Ok(ExecutionStatus::MiscellaneousError(Some(TYPE_MISMATCH)))
         );
@@ -70,11 +67,11 @@ fn failed_transaction_cleanup_test() {
             &data_cache,
             &log_context,
         );
-        assert!(out2.write_set().is_empty());
-        assert!(out2.gas_used() == 0);
-        assert!(out2.status().is_discarded());
+        assert!(out2.txn_output().write_set().is_empty());
+        assert!(out2.txn_output().gas_used() == 0);
+        assert!(out2.txn_output().status().is_discarded());
         assert_eq!(
-            out2.status().status(),
+            out2.txn_output().status().status(),
             Err(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
         );
     }

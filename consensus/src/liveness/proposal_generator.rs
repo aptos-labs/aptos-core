@@ -124,10 +124,7 @@ impl ProposalGenerator {
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
-            (
-                Payload::new_empty(),
-                hqc.certified_block().timestamp_usecs(),
-            )
+            (Payload::empty(), hqc.certified_block().timestamp_usecs())
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.

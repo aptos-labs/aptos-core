@@ -102,7 +102,7 @@ impl SafetyRules {
         let two_chain = qc.parent_block().round();
         if one_chain > safety_data.one_chain_round {
             safety_data.one_chain_round = one_chain;
-            info!(
+            trace!(
                 SafetyLogSchema::new(LogEntry::OneChainRound, LogEvent::Update)
                     .preferred_round(safety_data.one_chain_round)
             );
@@ -110,7 +110,7 @@ impl SafetyRules {
         }
         if two_chain > safety_data.preferred_round {
             safety_data.preferred_round = two_chain;
-            info!(
+            trace!(
                 SafetyLogSchema::new(LogEntry::PreferredRound, LogEvent::Update)
                     .preferred_round(safety_data.preferred_round)
             );
@@ -173,7 +173,7 @@ impl SafetyRules {
         }
 
         safety_data.last_voted_round = round;
-        info!(
+        trace!(
             SafetyLogSchema::new(LogEntry::LastVotedRound, LogEvent::Update)
                 .last_voted_round(safety_data.last_voted_round)
         );
@@ -196,7 +196,7 @@ impl SafetyRules {
         let waypoint = self.persistent_storage.waypoint()?;
         let safety_data = self.persistent_storage.safety_data()?;
 
-        info!(SafetyLogSchema::new(LogEntry::State, LogEvent::Update)
+        trace!(SafetyLogSchema::new(LogEntry::State, LogEvent::Update)
             .author(self.persistent_storage.author()?)
             .epoch(safety_data.epoch)
             .last_voted_round(safety_data.last_voted_round)
@@ -263,7 +263,7 @@ impl SafetyRules {
             Some(expected_key) => {
                 let current_key = self.signer().ok().map(|s| s.public_key());
                 if current_key == Some(expected_key.clone()) {
-                    debug!(
+                    info!(
                         SafetyLogSchema::new(LogEntry::KeyReconciliation, LogEvent::Success),
                         "in set",
                     );
@@ -419,11 +419,11 @@ where
     L: for<'a> Fn(SafetyLogSchema<'a>) -> SafetyLogSchema<'a>,
 {
     let _timer = counters::start_timer("internal", log_entry.as_str());
-    debug!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Request)));
+    trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Request)));
     counters::increment_query(log_entry.as_str(), "request");
     callback()
         .map(|v| {
-            info!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Success)));
+            trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Success)));
             counters::increment_query(log_entry.as_str(), "success");
             v
         })

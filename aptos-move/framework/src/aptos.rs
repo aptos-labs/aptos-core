@@ -3,89 +3,150 @@
 
 #![forbid(unsafe_code)]
 
-use move_deps::{
-    move_binary_format::file_format::CompiledModule,
-    move_compiler::{
-        compiled_unit::{CompiledUnit, NamedCompiledModule},
-        shared::NumericalAddress,
-    },
-    move_package::compilation::compiled_package::CompiledPackage,
-};
+use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
+use crate::release_bundle::ReleaseBundle;
+use crate::{path_in_crate, BuildOptions, ReleaseOptions};
+use clap::ArgEnum;
+use move_deps::move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
-use std::collections::{BTreeMap, HashSet};
-use std::hash::Hash;
+use std::collections::BTreeMap;
+use std::fmt::Display;
+use std::path::PathBuf;
+use std::str::FromStr;
 
-const APTOS_FRAMEWORK_DIR: &str = "aptos-framework/sources";
-const APTOS_STDLIB_DIR: &str = "aptos-stdlib/sources";
-const MOVE_STDLIB_DIR: &str = "move-stdlib/sources";
-const TOKEN_MODULES_DIR: &str = "aptos-token/sources";
-static APTOS_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-framework"));
-static TOKEN_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-token"));
-static APTOS_STDLIB_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-stdlib"));
+// ===============================================================================================
+// Release Targets
 
-pub fn dedup<T, K: Hash + Eq, F: Fn(&T) -> K>(lists: Vec<T>, f: F) -> Vec<T> {
-    let mut res = vec![];
-    let mut keys = HashSet::new();
-    for l in lists {
-        let key: K = f(&l);
-        if keys.insert(key) {
-            res.push(l);
+/// Represents the available release targets. `Current` is in sync with the current client branch,
+/// which is ensured by tests.
+#[derive(ArgEnum, Clone, Copy, Debug)]
+pub enum ReleaseTarget {
+    Head,
+    Devnet,
+    Testnet,
+    Mainnet,
+}
+
+impl Display for ReleaseTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            ReleaseTarget::Head => "head",
+            ReleaseTarget::Devnet => "devnet",
+            ReleaseTarget::Testnet => "testnet",
+            ReleaseTarget::Mainnet => "mainnet",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl FromStr for ReleaseTarget {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "head" => Ok(ReleaseTarget::Head),
+            "devnet" => Ok(ReleaseTarget::Devnet),
+            "testnet" => Ok(ReleaseTarget::Testnet),
+            "mainnet" => Ok(ReleaseTarget::Mainnet),
+            _ => Err("Invalid target. Valid values are: head, devnet, testnet, mainnet"),
         }
     }
-    res
 }
 
-pub fn files() -> Vec<String> {
-    let mut files = super::move_files_in_path(MOVE_STDLIB_DIR);
-    files.extend(super::move_files_in_path(APTOS_STDLIB_DIR));
-    files.extend(super::move_files_in_path(APTOS_FRAMEWORK_DIR));
-    files.extend(super::move_files_in_path(TOKEN_MODULES_DIR));
-    files.extend(super::move_files_in_path(APTOS_STDLIB_DIR));
-    dedup(files, |f| f.to_string())
-}
+impl ReleaseTarget {
+    /// Returns the package directories (relative to `framework`), in the order
+    /// they need to be published, as well as an optional path to the file where
+    /// rust bindings generated from the package should be stored.
+    pub fn packages(self) -> Vec<(&'static str, Option<&'static str>)> {
+        let result = vec![
+            ("move-stdlib", None),
+            ("aptos-stdlib", None),
+            (
+                "aptos-framework",
+                Some("cached-packages/src/aptos_framework_sdk_builder.rs"),
+            ),
+            (
+                "aptos-token",
+                Some("cached-packages/src/aptos_token_sdk_builder.rs"),
+            ),
+        ];
+        // Currently we don't have experimental packages only included in particular targets.
+        result
+    }
 
-pub fn module_blobs() -> Vec<Vec<u8>> {
-    let mut framework_blobs = super::module_blobs(&*APTOS_PKG);
-    framework_blobs.extend(super::module_blobs(&*TOKEN_PKG));
-    framework_blobs.extend(super::module_blobs(&*APTOS_STDLIB_PKG));
-    dedup(framework_blobs, |blob| {
-        CompiledModule::deserialize(blob).unwrap().self_id()
-    })
-}
+    /// Returns the file name under which this particular target's release buundle is stored.
+    /// For example, for `Head` the file name will be `head.mrb`.
+    pub fn file_name(self) -> String {
+        format!("{}.{}", self, RELEASE_BUNDLE_EXTENSION)
+    }
 
-pub fn named_addresses() -> BTreeMap<String, NumericalAddress> {
-    let mut framework = super::named_addresses(&*APTOS_PKG);
-    framework.append(&mut super::named_addresses(&*TOKEN_PKG));
-    framework.append(&mut super::named_addresses(&*APTOS_STDLIB_PKG));
-    framework
-}
+    /// Loads the release bundle for this particular target.
+    pub fn load_bundle(self) -> anyhow::Result<ReleaseBundle> {
+        let path = path_in_crate("releases").join(self.file_name());
+        ReleaseBundle::read(path)
+    }
 
-pub fn modules() -> Vec<CompiledModule> {
-    let mut framework: Vec<CompiledModule> = APTOS_PKG
-        .all_compiled_units()
-        .filter_map(|unit| match unit {
-            CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module.clone()),
-            CompiledUnit::Script(_) => None,
-        })
-        .collect();
-    framework.extend(
-        TOKEN_PKG
-            .all_compiled_units()
-            .filter_map(|unit| match unit {
-                CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module.clone()),
-                CompiledUnit::Script(_) => None,
+    pub fn create_release(self, strip: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
+        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let packages = self
+            .packages()
+            .into_iter()
+            .map(|(path, binding_path)| {
+                (crate_dir.join(path), binding_path.unwrap_or("").to_owned())
             })
-            .collect::<Vec<CompiledModule>>(),
-    );
-    framework.extend(
-        APTOS_STDLIB_PKG
-            .all_compiled_units()
-            .filter_map(|unit| match unit {
-                CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module.clone()),
-                CompiledUnit::Script(_) => None,
-            })
-            .collect::<Vec<CompiledModule>>(),
-    );
+            .collect::<Vec<_>>();
+        let options = ReleaseOptions {
+            build_options: BuildOptions {
+                with_srcs: true,
+                with_abis: true,
+                with_source_maps: true,
+                with_error_map: true,
+                named_addresses: Default::default(),
+                install_dir: None,
+            },
+            packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
+            rust_bindings: packages
+                .into_iter()
+                .map(|(_, binding)| {
+                    if !binding.is_empty() {
+                        crate_dir.join(binding).display().to_string()
+                    } else {
+                        binding
+                    }
+                })
+                .collect(),
+            output: if let Some(path) = out {
+                path
+            } else {
+                // Place in current directory
+                PathBuf::from(self.file_name())
+            },
+        };
+        options.create_release(strip)
+    }
+}
 
-    dedup(framework, |f| f.self_id())
+// ===============================================================================================
+// Legacy Named Addresses
+
+// Some older Move tests work directly on sources, skipping the package system. For those
+// we define the relevant address aliases here.
+
+static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| {
+    let mut result = BTreeMap::new();
+    let zero = NumericalAddress::parse_str("0x0").unwrap();
+    let one = NumericalAddress::parse_str("0x1").unwrap();
+    let two = NumericalAddress::parse_str("0x2").unwrap();
+    let resources = NumericalAddress::parse_str("0xA550C18").unwrap();
+    result.insert("std".to_owned(), one);
+    result.insert("aptos_std".to_owned(), one);
+    result.insert("aptos_framework".to_owned(), one);
+    result.insert("aptos_token".to_owned(), two);
+    result.insert("core_resources".to_owned(), resources);
+    result.insert("vm_reserved".to_owned(), zero);
+    result
+});
+
+pub fn named_addresses() -> &'static BTreeMap<String, NumericalAddress> {
+    &NAMED_ADDRESSES
 }

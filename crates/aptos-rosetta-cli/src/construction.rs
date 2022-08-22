@@ -246,6 +246,7 @@ async fn metadata(
             operations,
             max_fee: Some(vec![amount]),
             suggested_fee_multiplier: Some(fee_multiplier as f64),
+            metadata: None,
         })
         .await?;
 

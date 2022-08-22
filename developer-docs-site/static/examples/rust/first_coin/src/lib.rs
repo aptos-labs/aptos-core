@@ -19,13 +19,13 @@ impl FirstCoinClient {
     /// Initializes the new coin.
     pub fn initialize_coin(&self, account_from: &mut Account) -> String {
         let payload = serde_json::json!({
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::initialize",
             "type_arguments": [format!("0x{}::moon_coin::MoonCoin", account_from.address())],
             "arguments": [
                 hex::encode("Moon Coin".as_bytes()),
                 hex::encode("MOON".as_bytes()),
-                "6",
+                6,
                 false,
             ]
         });
@@ -38,7 +38,7 @@ impl FirstCoinClient {
     /// Receiver needs to register the coin before they can receive it.
     pub fn register_coin(&self, account_receiver: &mut Account, coin_type_address: &str) -> String {
         let payload = serde_json::json!({
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coins::register",
             "type_arguments": [format!("0x{}::moon_coin::MoonCoin", coin_type_address)],
             "arguments": []
@@ -57,7 +57,7 @@ impl FirstCoinClient {
         amount: u64,
     ) -> String {
         let payload = serde_json::json!({
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::mint",
             "type_arguments": [format!("0x{}::moon_coin::MoonCoin", account_owner.address())],
             "arguments": [

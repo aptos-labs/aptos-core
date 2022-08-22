@@ -54,7 +54,7 @@ export const getAptosCoinTokenBalanceFromAccountResources = ({
     accountResources,
     resource: '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>',
   });
-  return aptosCoinResource ? (aptosCoinResource.data as { coin: { value: string } }).coin.value : undefined;
+  return (aptosCoinResource?.data as { coin: { value: string } })?.coin?.value;
 };
 
 export const getAccountExists = async ({

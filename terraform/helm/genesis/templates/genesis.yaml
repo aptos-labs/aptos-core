@@ -15,6 +15,7 @@ data:
     chain_id: {{ .Values.chain.chain_id | int }}
     allow_new_validators: {{ .Values.chain.allow_new_validators }}
     epoch_duration_secs: {{ .Values.chain.epoch_duration_secs | int }}
+    is_test: {{ .Values.chain.is_test }}
     min_price_per_gas_unit: {{ .Values.chain.min_price_per_gas_unit }}
     min_stake: {{ .Values.chain.min_stake | int }}
     min_voting_threshold: {{ .Values.chain.min_voting_threshold | int }}
@@ -23,6 +24,7 @@ data:
     required_proposer_stake: {{ .Values.chain.required_proposer_stake | int }}
     rewards_apy_percentage: {{ .Values.chain.rewards_apy_percentage | int }}
     voting_duration_secs: {{ .Values.chain.voting_duration_secs | int }}
+    voting_power_increase_limit: {{ .Values.chain.voting_power_increase_limit | int }}
 
 ---
 
@@ -120,6 +122,8 @@ spec:
           value: {{ .Values.genesis.validator.internal_host_suffix | quote }}
         - name: FULLNODE_INTERNAL_HOST_SUFFIX
           value: {{ .Values.genesis.fullnode.internal_host_suffix | quote }}
+        - name: STAKE_AMOUNT
+          value: {{ .Values.genesis.validator.stake_amount | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml

@@ -4,15 +4,12 @@ use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCre
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
-        LocalAccount,
-    },
+    types::{transaction::SignedTransaction, LocalAccount},
 };
-use rand::prelude::{SliceRandom, StdRng};
+use rand::prelude::StdRng;
+use rand_core::{OsRng, SeedableRng};
+
+use rand::Rng;
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone, Debug)]
@@ -29,18 +26,14 @@ impl AccountGenerator {
     fn gen_single_txn(
         &self,
         from: &mut LocalAccount,
-        _to: &AccountAddress,
+        to: AccountAddress,
         _num_coins: u64,
         txn_factory: &TransactionFactory,
         gas_price: u64,
     ) -> SignedTransaction {
-        let preimage = AuthenticationKeyPreimage::ed25519(from.public_key());
-        let auth_key = AuthenticationKey::from_preimage(&preimage);
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::account_create_account(
-                    auth_key.derived_address(),
-                ))
+                .payload(aptos_stdlib::account_create_account(to))
                 .gas_unit_price(gas_price),
         )
     }
@@ -51,16 +44,14 @@ impl TransactionGenerator for AccountGenerator {
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
-        all_addresses: Arc<Vec<AccountAddress>>,
+        _all_addresses: Arc<Vec<AccountAddress>>,
         _invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         for account in accounts {
             for _ in 0..transactions_per_account {
-                let receiver = all_addresses
-                    .choose(&mut self.rng)
-                    .expect("all_addresses can't be empty");
+                let receiver = LocalAccount::generate(&mut self.rng).address();
                 let request =
                     self.gen_single_txn(account, receiver, 0, &self.txn_factory, gas_price);
                 requests.push(request);
@@ -72,20 +63,19 @@ impl TransactionGenerator for AccountGenerator {
 
 #[derive(Debug)]
 pub struct AccountGeneratorCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
 }
 
 impl AccountGeneratorCreator {
-    pub fn new(rng: StdRng, txn_factory: TransactionFactory) -> Self {
-        Self { rng, txn_factory }
+    pub fn new(txn_factory: TransactionFactory) -> Self {
+        Self { txn_factory }
     }
 }
 
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
-            self.rng.clone(),
+            StdRng::from_seed(OsRng.gen()),
             self.txn_factory.clone(),
         ))
     }

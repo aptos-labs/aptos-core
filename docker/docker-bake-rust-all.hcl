@@ -63,7 +63,8 @@ group "all" {
     "node-checker",
     "tools",
     "faucet",
-    "forge"
+    "forge",
+    "telemetry-service"
   ]
 }
 
@@ -79,6 +80,7 @@ target "_common" {
     generate_cache_from("tools"),
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
+    generate_cache_from("telemetry-service"),
   ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
@@ -134,6 +136,13 @@ target "forge" {
   target   = "forge"
   cache-to = generate_cache_to("forge")
   tags     = generate_tags("forge")
+}
+
+target "telemetry-service" {
+  inherits = ["_common"]
+  target = "telemetry-service"
+  cache-to = generate_cache_to("telemetry-service")
+  tags     = generate_tags("telemetry-service")
 }
 
 function "generate_cache_from" {

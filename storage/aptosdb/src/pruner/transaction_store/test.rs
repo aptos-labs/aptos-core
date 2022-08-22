@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    AptosDB, ChangeSet, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore,
-};
+use crate::{AptosDB, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore};
 use aptos_temppath::TempPath;
 use proptest::proptest;
 use std::sync::Arc;
@@ -14,12 +12,15 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 
-use aptos_config::config::StoragePrunerConfig;
+use accumulator::HashReader;
+use aptos_config::config::LedgerPrunerConfig;
+use aptos_types::proof::position::Position;
 use aptos_types::{
     transaction::{TransactionInfo, Version},
     write_set::WriteSet,
 };
 use proptest::{collection::vec, prelude::*};
+use schemadb::SchemaBatch;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -53,24 +54,23 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
+        Arc::clone(&aptos_db.state_store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
 
     // write sets
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     for (ver, ws) in write_sets.iter().enumerate() {
         transaction_store
-            .put_write_set(ver as Version, ws, &mut cs)
+            .put_write_set(ver as Version, ws, &mut batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
     // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_write_sets).step_by(2) {
         pruner
@@ -101,13 +101,12 @@ fn verify_txn_store_pruner(
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
+        Arc::clone(&aptos_db.state_store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
 
@@ -120,7 +119,8 @@ fn verify_txn_store_pruner(
         &txns,
     );
 
-    // start pruning transactions batches of size step_size and verify transactions have been pruned from DB
+    // start pruning transactions batches of size step_size and verify transactions have been pruned
+    // from DB
     for i in (0..=num_transaction).step_by(step_size) {
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
@@ -132,6 +132,16 @@ fn verify_txn_store_pruner(
         );
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
+            // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
+            // read transaction proof.
+            // Note: we only prune versions which are odd numbers because the even versions will be
+            // pruned in the iteration of even_version + 1. So if the end version, i - 1, is an even
+            // version, it will not be pruned.
+            if j != i - 1 || j % 2 == 1 {
+                assert!(ledger_store
+                    .get_transaction_proof(j as u64, ledger_version)
+                    .is_err());
+            }
         }
         // ensure all other are valid in DB
         for j in i..num_transaction {
@@ -143,6 +153,7 @@ fn verify_txn_store_pruner(
                 ledger_version,
             );
         }
+        verify_transaction_accumulator_pruned(&ledger_store, i as u64);
     }
 }
 
@@ -191,6 +202,25 @@ fn verify_txn_in_store(
         .is_ok());
 }
 
+// Ensure that transaction accumulator has been pruned as well. The idea to verify is get the
+// inorder position of the left child of the accumulator root and ensure that all lower index
+// position from the DB should be deleted. We need to make several conversion between inorder and
+// postorder transaction because the DB stores the indices in postorder, while the APIs for the
+// accumulator deals with inorder.
+fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, least_readable_version: u64) {
+    let least_readable_position = if least_readable_version > 0 {
+        Position::root_from_leaf_index(least_readable_version).left_child()
+    } else {
+        Position::root_from_leaf_index(least_readable_version)
+    };
+    let least_readable_position_postorder = least_readable_position.to_postorder_index();
+    for i in 0..least_readable_position_postorder {
+        assert!(ledger_store
+            .get(Position::from_postorder_index(i).unwrap())
+            .is_err())
+    }
+}
+
 fn put_txn_in_store(
     aptos_db: &AptosDB,
     transaction_store: &TransactionStore,
@@ -198,16 +228,16 @@ fn put_txn_in_store(
     txn_infos: &[TransactionInfo],
     txns: &[Transaction],
 ) {
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &mut cs)
+            .put_transaction(i as u64, txns.get(i).unwrap(), &mut batch)
             .unwrap();
     }
     ledger_store
-        .put_transaction_infos(0, txn_infos, &mut cs)
+        .put_transaction_infos(0, txn_infos, &mut batch)
         .unwrap();
-    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(batch).unwrap();
 }
 
 fn verify_transaction_in_transaction_store(

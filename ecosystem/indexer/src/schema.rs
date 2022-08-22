@@ -11,7 +11,7 @@ table! {
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
         epoch -> Numeric,
-        previous_block_votes_bitmap -> Jsonb,
+        previous_block_votes_bitvec -> Jsonb,
         failed_proposer_indices -> Jsonb,
     }
 }

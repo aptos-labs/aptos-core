@@ -3,6 +3,7 @@
 
 use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
+    error::Error, metadata_storage::MetadataStorageInterface,
     storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
 };
 use anyhow::Result;
@@ -305,9 +306,8 @@ mock! {
             &self,
             version: Version,
             output_with_proof: TransactionOutputListWithProof,
+            ledger_infos: &[LedgerInfoWithSignatures],
         ) -> Result<()>;
-
-        fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()>;
 
         fn save_transactions<'a>(
             &self,
@@ -318,8 +318,35 @@ mock! {
             sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
+    }
+}
 
-        fn delete_genesis(&self) -> Result<()>;
+// This automatically creates a MockMetadataStorage.
+mock! {
+    pub MetadataStorage {}
+    impl MetadataStorageInterface for MetadataStorage {
+        fn is_snapshot_sync_complete(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<bool, Error>;
+
+        fn get_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<u64, Error>;
+
+        fn previous_snapshot_sync_target(&self) -> Result<Option<LedgerInfoWithSignatures>, Error>;
+
+        fn update_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+            last_persisted_state_value_index: u64,
+            snapshot_sync_completed: bool,
+        ) -> Result<(), Error>;
+    }
+
+    impl Clone for MetadataStorage {
+        fn clone(&self) -> Self;
     }
 }
 

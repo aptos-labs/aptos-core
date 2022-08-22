@@ -5,11 +5,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::util::u64_to_bigdecimal;
 use crate::{
     database::PgPoolConnection,
     models::{events::EventModel, write_set_changes::WriteSetChangeModel},
     schema::{block_metadata_transactions, transactions, user_transactions},
+    util::u64_to_bigdecimal,
 };
 use aptos_rest_client::aptos_api_types::{
     Address, BlockMetadataTransaction as APIBlockMetadataTransaction,
@@ -268,7 +268,7 @@ impl Transaction {
             payload,
             version: u64_to_bigdecimal(*info.version.inner()),
             hash: info.hash.to_string(),
-            state_root_hash: info.state_root_hash.to_string(),
+            state_root_hash: info.state_change_hash.to_string(),
             event_root_hash: info.event_root_hash.to_string(),
             gas_used: u64_to_bigdecimal(*info.gas_used.inner()),
             success: info.success,
@@ -335,7 +335,7 @@ pub struct BlockMetadataTransaction {
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
     pub epoch: bigdecimal::BigDecimal,
-    pub previous_block_votes_bitmap: serde_json::Value,
+    pub previous_block_votes_bitvec: serde_json::Value,
     pub failed_proposer_indices: serde_json::Value,
 }
 
@@ -352,7 +352,8 @@ impl BlockMetadataTransaction {
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),
             epoch: u64_to_bigdecimal(tx.epoch.0),
-            previous_block_votes_bitmap: serde_json::to_value(&tx.previous_block_votes).unwrap(),
+            previous_block_votes_bitvec: serde_json::to_value(&tx.previous_block_votes_bitvec)
+                .unwrap(),
             failed_proposer_indices: serde_json::to_value(&tx.failed_proposer_indices).unwrap(),
         }
     }

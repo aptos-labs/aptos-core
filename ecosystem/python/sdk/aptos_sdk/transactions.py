@@ -151,22 +151,19 @@ class MultiAgentRawTransaction:
 
 
 class TransactionPayload:
-    WRITE_SET: int = 0
-    SCRIPT: int = 1
-    MODULE_BUNDLE: int = 2
-    SCRIPT_FUNCTION: int = 3
+    SCRIPT: int = 0
+    MODULE_BUNDLE: int = 1
+    SCRIPT_FUNCTION: int = 2
 
     variant: int
     value: typing.Any
 
     def __init__(self, payload: typing.Any):
-        if isinstance(payload, WriteSet):
-            self.variant = TransactionPayload.WRITE_SET
-        elif isinstance(payload, Script):
+        if isinstance(payload, Script):
             self.variant = TransactionPayload.SCRIPT
         elif isinstance(payload, ModuleBundle):
             self.variant = TransactionPayload.MODULE_BUNDLE
-        elif isinstance(payload, ScriptFunction):
+        elif isinstance(payload, EntryFunction):
             self.variant = TransactionPayload.SCRIPT_FUNCTION
         else:
             raise Exception("Invalid type")
@@ -181,14 +178,12 @@ class TransactionPayload:
     def deserialize(deserializer: Deserializer) -> TransactionPayload:
         variant = deserializer.uleb128()
 
-        if variant == TransactionPayload.WRITE_SET:
-            payload = WriteSet.deserialize(deserializer)
-        elif variant == TransactionPayload.SCRIPT:
+        if variant == TransactionPayload.SCRIPT:
             payload = Script.deserialize(deserializer)
         elif variant == TransactionPayload.MODULE_BUNDLE:
             payload = ModuleBundle.deserialize(deserializer)
         elif variant == TransactionPayload.SCRIPT_FUNCTION:
-            payload = ScriptFunction.deserialize(deserializer)
+            payload = EntryFunction.deserialize(deserializer)
         else:
             raise Exception("Invalid type")
 
@@ -221,7 +216,7 @@ class Script:
         raise NotImplementedError
 
 
-class ScriptFunction:
+class EntryFunction:
     module: ModuleId
     function: str
     ty_args: List[TypeTag]
@@ -235,7 +230,7 @@ class ScriptFunction:
         self.ty_args = ty_args
         self.args = args
 
-    def __eq__(self, other: ScriptFunction) -> bool:
+    def __eq__(self, other: EntryFunction) -> bool:
         return (
             self.module == other.module
             and self.function == other.function
@@ -251,37 +246,26 @@ class ScriptFunction:
         function: str,
         ty_args: List[TypeTag],
         args: List[TransactionArgument],
-    ) -> ScriptFunction:
+    ) -> EntryFunction:
         module_id = ModuleId.from_str(module)
 
         byte_args = []
         for arg in args:
             byte_args.append(arg.encode())
-        return ScriptFunction(module_id, function, ty_args, byte_args)
+        return EntryFunction(module_id, function, ty_args, byte_args)
 
-    def deserialize(deserializer: Deserializer) -> ScriptFunction:
+    def deserialize(deserializer: Deserializer) -> EntryFunction:
         module = ModuleId.deserialize(deserializer)
         function = deserializer.str()
         ty_args = deserializer.sequence(TypeTag.deserialize)
         args = deserializer.sequence(Deserializer.bytes)
-        return ScriptFunction(module, function, ty_args, args)
+        return EntryFunction(module, function, ty_args, args)
 
     def serialize(self, serializer: Serializer):
         self.module.serialize(serializer)
         serializer.str(self.function)
         serializer.sequence(self.ty_args, Serializer.struct)
         serializer.sequence(self.args, Serializer.bytes)
-
-
-class WriteSet:
-    def __init__(self):
-        raise NotImplementedError
-
-    def deserialize(deserializer: Deserializer) -> WriteSet:
-        raise NotImplementedError
-
-    def serialize(self, serializer: Serializer):
-        raise NotImplementedError
 
 
 class ModuleId:
@@ -373,7 +357,7 @@ class SignedTransaction:
 
 
 class Test(unittest.TestCase):
-    def test_script_function(self):
+    def test_entry_function(self):
         private_key = ed25519.PrivateKey.random()
         public_key = private_key.public_key()
         account_address = AccountAddress.from_key(public_key)
@@ -387,7 +371,7 @@ class Test(unittest.TestCase):
             TransactionArgument(5000, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -411,7 +395,7 @@ class Test(unittest.TestCase):
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
-    def test_script_function_with_corpus(self):
+    def test_entry_function_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -442,7 +426,7 @@ class Test(unittest.TestCase):
             TransactionArgument(amount_input, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -472,9 +456,8 @@ class Test(unittest.TestCase):
 
         # Validated corpus
 
-        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
-
-        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a492004066965ff750d63ffdb56890b784a29e6a46cfda724590993b5bc1dec57aa7825ab3d5640d59ade594d384eec55330366d27bfb3f3d90859d1bfbf7a6c02e75606"
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000104636f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040f25b74ec60a38a1ed780fd2bef6ddb6eb4356e3ab39276c9176cdf0fcae2ab37d79b626abb43d926e91595b66503a4a3c90acbae36a28d405e308f3537af720b"
 
         self.verify_transactions(
             raw_transaction_input,
@@ -483,7 +466,7 @@ class Test(unittest.TestCase):
             signed_transaction_generated,
         )
 
-    def test_script_function_multi_agent_with_corpus(self):
+    def test_entry_function_multi_agent_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -515,7 +498,7 @@ class Test(unittest.TestCase):
             TransactionArgument(1, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "direct_transfer_script",
             [],
@@ -569,8 +552,8 @@ class Test(unittest.TestCase):
 
         # Validated corpus
 
-        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004"
-        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004020020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040d5d962367b93670841bfec7044e20c0ad8c20ad95b740bc4598398a7f8762b011b334ab392dead623304a0525302936229d825f6e3cd472d7362e84b49f9c802012d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9010020aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab400070276b7c7db3a10ddde8d9e451189219715e027ad590b650ed9005040bac1acffe8da0b7df9621631b428037aa8de616d15b7c3518eec0a97ca8420d56f306"
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004"
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000002000000000000000000000000000000000000000000000000000000000000000305746f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004020020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040343e7b10aa323c480391a5d7cd2d0cf708d51529b96b5a2be08cbb365e4f11dcc2cf0655766cf70d40853b9c395b62dad7a9f58ed998803d8bf1901ba7a7a401012d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9010020aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab408a7f06e404ae8d9535b0cbbeafb7c9e34e95fe1425e4529758150a4f7ce7a683354148ad5c313ec36549e3fb29e669d90010f97467c9074ff0aec3ed87f76608"
 
         self.verify_transactions(
             raw_transaction_input,

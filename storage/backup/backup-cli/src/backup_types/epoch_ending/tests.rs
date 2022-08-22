@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_config::utils::get_available_port;
 use aptos_temppath::TempPath;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
@@ -139,7 +139,7 @@ prop_compose! {
                 if overwrite && li.ledger_info().epoch() != 0 {
                     li = LedgerInfoWithSignatures::new(
                         li.ledger_info().clone(),
-                        MultiSignature::empty(),
+                        AggregateSignature::empty(),
                     );
                     should_fail_without_waypoints = true;
                 }

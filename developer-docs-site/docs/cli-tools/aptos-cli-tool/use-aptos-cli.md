@@ -738,7 +738,7 @@ Arguments must be given a type with a colon to separate it.  In this example, we
 parsed as a string, so we put `string:Hello!`.
 
 ```bash
-$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::set_message --args string:hello!
+$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::message::set_message --args string:hello!
 {
   "Result": {
     "changes": [
@@ -816,7 +816,7 @@ $ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3
 
 Additionally, profiles can replace addresses in the function id.
 ```bash
-$ aptos move run --function-id default::Message::set_message --args string:hello!
+$ aptos move run --function-id default::message::set_message --args string:hello!
 {
   "Result": {
     "changes": [

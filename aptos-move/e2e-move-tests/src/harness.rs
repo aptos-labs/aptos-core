@@ -1,23 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::{
-    common::types::MovePackageDir,
-    move_tool::{BuiltPackage, MemberId},
-};
+use crate::AptosPackageHooks;
+use aptos::move_tool::MemberId;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
-    transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+    transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use cached_framework_packages::aptos_stdlib;
-use framework::natives::code::UpgradePolicy;
+use cached_packages::aptos_stdlib;
+use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
@@ -48,8 +47,16 @@ pub struct MoveHarness {
 impl MoveHarness {
     /// Creates a new harness.
     pub fn new() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_fresh_genesis(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
+    pub fn new_mainnet() -> Self {
+        Self {
+            executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
     }
@@ -66,11 +73,16 @@ impl MoveHarness {
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
-        // APTOS has 8 decimals so this is only 1000 coins.
-        let data = AccountData::with_account(acc, 100_000_000_000, 10);
-        self.txn_seq_no.insert(addr, 10);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
         self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(addr, 10);
         data.account().clone()
+    }
+
+    /// Gets the account where the Aptos framework is installed (0x1).
+    pub fn aptos_framework_account(&mut self) -> Account {
+        self.new_account_at(AccountAddress::ONE)
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -138,7 +150,7 @@ impl MoveHarness {
         } = fun;
         self.create_transaction_payload(
             account,
-            TransactionPayload::ScriptFunction(ScriptFunction::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
                 module_id,
                 function_id,
                 ty_args,
@@ -165,13 +177,13 @@ impl MoveHarness {
         &mut self,
         account: &Account,
         path: &Path,
-        upgrade_policy: UpgradePolicy,
+        options: Option<BuildOptions>,
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(MovePackageDir::new(path.to_owned()), true, false)
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
-            .extract_metadata(upgrade_policy)
+            .extract_metadata()
             .expect("extracting package metadata must succeed");
         self.create_transaction_payload(
             account,
@@ -183,13 +195,19 @@ impl MoveHarness {
     }
 
     /// Runs transaction which publishes the Move Package.
-    pub fn publish_package(
+    pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None);
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package_with_options(
         &mut self,
         account: &Account,
         path: &Path,
-        upgrade_policy: UpgradePolicy,
+        options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, upgrade_policy);
+        let txn = self.create_publish_package(account, path, Some(options));
         self.run(txn)
     }
 
@@ -200,18 +218,18 @@ impl MoveHarness {
     }
 
     pub fn new_epoch(&mut self) {
-        self.fast_forward(3600);
+        self.fast_forward(7200);
         self.executor.new_block()
     }
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         self.fast_forward(1);
         self.executor
-            .new_block_with_metadata(proposer_index, failed_proposer_indices);
+            .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {

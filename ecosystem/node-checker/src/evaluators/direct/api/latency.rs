@@ -3,7 +3,7 @@
 
 use super::{super::DirectEvaluatorInput, ApiEvaluatorError, API_CATEGORY};
 use crate::{
-    configuration::EvaluatorArgs,
+    configuration::{EvaluatorArgs, NodeAddress},
     evaluator::{EvaluationResult, Evaluator},
     evaluators::EvaluatorType,
 };
@@ -13,7 +13,6 @@ use const_format::formatcp;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, Instant};
-use url::Url;
 
 const LINK: &str =
     "https://aptos.dev/nodes/node-health-checker-faq#how-does-the-latency-evaluator-work";
@@ -56,15 +55,13 @@ impl LatencyEvaluator {
         Self { args }
     }
 
-    async fn get_latency_datapoint(&self, target_url: Url) -> Result<Duration> {
-        let client = reqwest::ClientBuilder::new()
-            .timeout(std::time::Duration::from_millis(
-                self.args.max_api_latency_ms * 2,
-            ))
-            .build()
-            .unwrap();
+    async fn get_latency_datapoint(&self, target_node_address: &NodeAddress) -> Result<Duration> {
+        let client = target_node_address.get_api_client(std::time::Duration::from_millis(
+            self.args.max_api_latency_ms * 2,
+        ));
+
         let start = Instant::now();
-        client.get(target_url).send().await?;
+        client.get_ledger_information().await?;
         Ok(start.elapsed())
     }
 }
@@ -75,16 +72,11 @@ impl Evaluator for LatencyEvaluator {
     type Error = ApiEvaluatorError;
 
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let mut target_url = input.target_node_address.url.clone();
-        target_url
-            .set_port(Some(input.target_node_address.api_port))
-            .unwrap();
-
         let mut errors = vec![];
 
         let mut latencies = vec![];
         for _ in 0..self.args.num_samples {
-            match self.get_latency_datapoint(target_url.clone()).await {
+            match self.get_latency_datapoint(&input.target_node_address).await {
                 Ok(latency) => latencies.push(latency),
                 Err(e) => errors.push(e),
             }

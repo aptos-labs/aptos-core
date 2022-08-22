@@ -39,7 +39,7 @@ The overall structure of the Aptos Framework is as follows:
 │   ├── error_descriptions/*.errmap         # Generated error descriptions for use by the Move Explain tool
 │   ├── src                                 # External Rust interface/library to use the Aptos Framework
 │   ├── stdlib                              # The compiled Move bytecode of the Aptos Framework source modules
-│   ├── script_abis                         # Generated ABIs for script function transactions, and all new transactions
+│   ├── script_abis                         # Generated ABIs for entry function transactions, and all new transactions
 │   └── legacy/transaction_scripts          # Legacy generated ABIs and bytecode for each transaction script in the allowlist
 │       ├── abi/*.abi                       # Directory containing generated ABIs for legacy transaction scripts
 │       └── *.mv

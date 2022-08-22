@@ -24,7 +24,7 @@ Before you get started with this tutorial, read the following sections:
 
 * [Validator node concepts](/concepts/basics-validator-nodes).
 * [FullNode concepts](/concepts/basics-fullnodes).
-* [REST specifications](/rest-api).
+* [REST specifications](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 
 
 ## Hardware requirements
@@ -34,12 +34,12 @@ We recommend the following hardware resources:
 - For running a production grade FullNode:
 
   - **CPU**: 4 cores (Intel Xeon Skylake or newer).
-  - **Memory**: 8GiB RAM.
+  - **Memory**: 8GB RAM.
 
 - For running the FullNode for development or testing:
 
   - **CPU**: 2 cores.
-  - **Memory**: 4GiB RAM.
+  - **Memory**: 4GB RAM.
 
 ## Storage requirements
 
@@ -92,7 +92,7 @@ With your development environment ready, now you can start to setup your FullNod
 
 5. Checkout the `devnet` branch using `git checkout --track origin/devnet`.
 
-6. Make sure your current working directory is `aptos-core`. 
+6. Make sure your current working directory is `aptos-core`.
    Run `cp config/src/config/test_data/public_full_node.yaml fullnode.yaml` to create a copy of the fullnode config template. You will edit this file to ensure that your FullNode:
 
     - Contains the correct genesis blob that is published by the Aptos devnet.
@@ -153,7 +153,7 @@ This section describes how to configure and run your FullNode using Docker.
 
 :::caution Running Aptos-core via Docker is currently only suported on x86-64 CPUs and not on ARM64 CPUs (which includes M1/M2 Macs).
 
-We currently only publish docker images compatible with x86-64 CPUs. 
+We currently only publish docker images compatible with x86-64 CPUs.
 If you have an M1/M2 (ARM64) Mac, use the Aptos-core source approach.
 If M1/M2 support is important to you, please comment on and follow this issue: https://github.com/aptos-labs/aptos-core/issues/1412
 
@@ -161,7 +161,7 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
 
 1. Install [Docker](https://docs.docker.com/get-docker/).
 2. Create a directory for your local public FullNode, and `cd` into it.
-   For example: 
+   For example:
    ```bash
    mkdir aptos-fullnode && cd aptos-fullnode
    ```
@@ -283,7 +283,7 @@ full_node_networks:
             addresses:
             - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/handshake/0"
             role: "Upstream"
-...            
+...
 ```
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob

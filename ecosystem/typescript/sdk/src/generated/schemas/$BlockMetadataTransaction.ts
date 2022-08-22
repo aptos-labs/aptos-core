@@ -11,13 +11,16 @@ export const $BlockMetadataTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
-        state_root_hash: {
+        state_change_hash: {
             type: 'HashValue',
             isRequired: true,
         },
         event_root_hash: {
             type: 'HashValue',
             isRequired: true,
+        },
+        state_checkpoint_hash: {
+            type: 'HashValue',
         },
         gas_used: {
             type: 'U64',
@@ -61,10 +64,11 @@ export const $BlockMetadataTransaction = {
             },
             isRequired: true,
         },
-        previous_block_votes: {
+        previous_block_votes_bitvec: {
             type: 'array',
             contains: {
-                type: 'boolean',
+                type: 'number',
+                format: 'uint8',
             },
             isRequired: true,
         },

@@ -4,7 +4,7 @@
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
-    proof::SparseMerkleProof,
+    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -15,7 +15,7 @@ use std::{collections::HashMap, sync::Arc};
 /// storage.
 pub struct SyncProofFetcher {
     reader: Arc<dyn DbReader>,
-    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof>>,
+    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProofExt>>,
 }
 
 impl SyncProofFetcher {
@@ -32,10 +32,10 @@ impl ProofFetcher for SyncProofFetcher {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProof>)> {
+    ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
         let (state_value, proof) = self
             .reader
-            .get_state_value_with_proof_by_version(state_key, version)?;
+            .get_state_value_with_proof_by_version_ext(state_key, version)?;
         // multiple threads may enter this code, and another thread might add
         // an address before this one. Thus the insertion might return a None here.
         self.state_proof_cache
@@ -45,7 +45,7 @@ impl ProofFetcher for SyncProofFetcher {
         Ok((state_value, Some(proof)))
     }
 
-    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProof> {
+    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         self.state_proof_cache
             .read()
             .iter()

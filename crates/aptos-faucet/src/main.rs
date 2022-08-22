@@ -19,13 +19,13 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            AccountData, LedgerInfo, ModuleBundlePayload, PendingTransaction,
+            TransactionPayload as TransactionPayloadData,
         },
         FaucetClient,
     };
     use aptos_sdk::{
-        transaction_builder::aptos_stdlib::ScriptFunctionCall,
+        transaction_builder::aptos_stdlib::EntryFunctionCall,
         types::{
             account_address::AccountAddress,
             chain_id::ChainId,
@@ -36,6 +36,7 @@ mod tests {
             LocalAccount,
         },
     };
+    use aptos_warp_webserver::Response;
     use serde::Serialize;
     use std::{
         collections::HashMap,
@@ -92,7 +93,7 @@ mod tests {
         let stub = warp::path!("accounts" / String)
             .and(warp::any().map(move || accounts_cloned_0.clone()))
             .and_then(handle_get_account)
-            .or(warp::path!("transactions" / String)
+            .or(warp::path!("transactions" / "by_hash" / String)
                 .and(warp::get())
                 .and(warp::any().map(move || last_txn_0.clone()))
                 .and_then(handle_get_transaction))
@@ -116,7 +117,8 @@ mod tests {
             chain_id,
             faucet_account,
             maximum_amount,
-        );
+        )
+        .configure_for_testing();
         (accounts, Arc::new(service))
     }
 
@@ -153,8 +155,9 @@ mod tests {
                 let info = aptos_rest_client::aptos_api_types::TransactionInfo {
                     version: 0.into(),
                     hash: HashValue::zero().into(),
-                    state_root_hash: HashValue::zero().into(),
+                    state_change_hash: HashValue::zero().into(),
                     event_root_hash: HashValue::zero().into(),
+                    state_checkpoint_hash: None,
                     gas_used: 0.into(),
                     success: true,
                     vm_status: "Executed".to_string(),
@@ -185,16 +188,16 @@ mod tests {
         if let Script(script) = txn.payload() {
             panic!("unexpected type of script: {:?}", script.args())
         }
-        if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
-            match script_function {
-                ScriptFunctionCall::AccountCreateAccount {
+        if let Some(entry_function) = EntryFunctionCall::decode(txn.payload()) {
+            match entry_function {
+                EntryFunctionCall::AccountCreateAccount {
                     auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::AptosCoinMint {
+                EntryFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
@@ -208,7 +211,7 @@ mod tests {
                         .expect("account should be created");
                     account.balance += amount;
                 }
-                script => panic!("unexpected type of script function: {:?}", script),
+                script => panic!("unexpected type of entry function: {:?}", script),
             }
         }
 
@@ -227,18 +230,15 @@ mod tests {
             epoch: 1.into(),
             ledger_version: 5.into(),
             oldest_ledger_version: 0.into(),
+            block_height: 4.into(),
+            oldest_block_height: 0.into(),
             ledger_timestamp: 5.into(),
         };
         Response::new(li, body).unwrap().into_response()
     }
 
     fn dummy_payload() -> TransactionPayloadData {
-        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
-            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
-                changes: Vec::new(),
-                events: Vec::new(),
-            }),
-        })
+        TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
     #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -478,29 +478,15 @@ mod tests {
     async fn create_account_with_client() {
         let (faucet_client, _service) = get_client().await;
         let address = get_address();
-
-        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address))
-            .await
-            .unwrap();
-        res.unwrap();
+        faucet_client.create_account(address).await.unwrap();
     }
 
     #[tokio::test]
     async fn fund_account_with_client() {
         let (faucet_client, _service) = get_client().await;
         let address = get_address();
-
-        let (res1, res2) = tokio::task::spawn_blocking(move || {
-            (
-                faucet_client.create_account(address),
-                faucet_client.fund(address, 10),
-            )
-        })
-        .await
-        .unwrap();
-
-        res1.unwrap();
-        res2.unwrap();
+        faucet_client.create_account(address).await.unwrap();
+        faucet_client.fund(address, 10).await.unwrap();
     }
 
     async fn get_client() -> (FaucetClient, JoinHandle<()>) {
@@ -509,7 +495,7 @@ mod tests {
         let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
         let service = tokio::task::spawn(async move { future.await });
 
-        let faucet_client = FaucetClient::new(
+        let faucet_client = FaucetClient::new_for_testing(
             Url::parse(&format!("http://{}", address)).unwrap(),
             endpoint,
         );
@@ -527,7 +513,7 @@ mod tests {
         let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         assert_eq!(
             address.to_string(),
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
+            "9ff98e82355eb13098f3b1157ac018a725c62c0e0820f422000814cdba407835"
         );
         address
     }

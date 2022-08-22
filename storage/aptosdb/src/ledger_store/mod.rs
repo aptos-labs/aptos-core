@@ -5,11 +5,10 @@
 //! root(LedgerInfo) to leaf(TransactionInfo).
 
 use crate::{
-    change_set::ChangeSet,
     errors::AptosDbError,
     schema::{
-        epoch_by_version::EpochByVersionSchema, ledger_counters::LedgerCountersSchema,
-        ledger_info::LedgerInfoSchema, transaction_accumulator::TransactionAccumulatorSchema,
+        epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
+        transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
     },
 };
@@ -275,13 +274,13 @@ impl LedgerStore {
         &self,
         first_version: u64,
         txn_infos: &[TransactionInfo],
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<HashValue> {
         // write txn_info
         (first_version..first_version + txn_infos.len() as u64)
             .zip_eq(txn_infos.iter())
             .try_for_each(|(version, txn_info)| {
-                cs.batch.put::<TransactionInfoSchema>(&version, txn_info)
+                batch.put::<TransactionInfoSchema>(&version, txn_info)
             })?;
 
         // write hash of txn_info into the accumulator
@@ -293,42 +292,27 @@ impl LedgerStore {
         )?;
         writes
             .iter()
-            .try_for_each(|(pos, hash)| cs.batch.put::<TransactionAccumulatorSchema>(pos, hash))?;
+            .try_for_each(|(pos, hash)| batch.put::<TransactionAccumulatorSchema>(pos, hash))?;
         Ok(root_hash)
     }
 
-    /// Write `ledger_info` to `cs`.
+    /// Write `ledger_info` to `batch`.
     pub fn put_ledger_info(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         let ledger_info = ledger_info_with_sigs.ledger_info();
 
         if ledger_info.ends_epoch() {
             // This is the last version of the current epoch, update the epoch by version index.
-            cs.batch
-                .put::<EpochByVersionSchema>(&ledger_info.version(), &ledger_info.epoch())?;
+            batch.put::<EpochByVersionSchema>(&ledger_info.version(), &ledger_info.epoch())?;
         }
-        cs.batch
-            .put::<LedgerInfoSchema>(&ledger_info.epoch(), ledger_info_with_sigs)
+        batch.put::<LedgerInfoSchema>(&ledger_info.epoch(), ledger_info_with_sigs)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         Accumulator::get_root_hash(self, version + 1)
-    }
-
-    /// Prune the ledger counters stored in DB in the range [being, end)
-    pub fn prune_ledger_counters(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        for version in begin..end {
-            db_batch.delete::<LedgerCountersSchema>(&version)?;
-        }
-        Ok(())
     }
 }
 

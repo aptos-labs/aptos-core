@@ -86,7 +86,7 @@ impl ParallelAptosVM {
                     .collect(),
                 None,
             )),
-            Err(err @ Error::InferencerError) | Err(err @ Error::UnestimatedWrite) => {
+            Err(err @ Error::ModulePathReadWrite) => {
                 let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
                 Ok((
                     output

@@ -74,6 +74,10 @@ pub struct Dependency {
     pub rev: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aptos: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
 }
 
 /// A Rust representation of the package info

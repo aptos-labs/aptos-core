@@ -1,0 +1,10 @@
+[package]
+name = "MessageBoard"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+std = "0x1"
+message_board = "_"

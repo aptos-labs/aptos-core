@@ -43,7 +43,7 @@ export const sendAptosCoinTransaction = async ({
   const payload: Types.TransactionPayload = {
     arguments: [toAddress, `${amount}`],
     function: '0x1::coin::transfer',
-    type: 'script_function_payload',
+    type: 'entry_function_payload',
     type_arguments: ['0x1::aptos_coin::AptosCoin'],
   };
   const txnHash = await submitTransaction({

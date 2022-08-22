@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
 
-## Clone the Aptos-core repo
+### Clone the Aptos-core repo
 
 Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
@@ -61,41 +61,31 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
 
 Now your basic Aptos development environment is ready.
 
-## IDE plugins for Move
+### Aptos devnet
+
+- [REST API Open API Spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
+- **REST service:** [https://fullnode.devnet.aptoslabs.com/v1](https://fullnode.devnet.aptoslabs.com/v1).
+- **Faucet service:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
+- [Genesis](https://devnet.aptoslabs.com/genesis.blob).
+- [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
+- [ChainID](http://fullnode.devnet.aptoslabs.com/).
+
+### IDE plugins for Move
 
 - [Syntax hightlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax).
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer) - supports advanced code navigation and syntax highlighting.
 - [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language) - supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
 
-## Aptos CLI
+### Aptos CLI
 
 - [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
 - [Aptos CLI Documentation](/cli-tools/aptos-cli-tool/aptos-cli-index).
 
-## Aptos SDK
+### Aptos SDK
 
-- [Aptos Typescript SDK](https://www.npmjs.com/package/aptos).
-- [Typescript SDK API](https://aptos-labs.github.io/ts-sdk-doc/).
+- [Typescript](https://www.npmjs.com/package/aptos).
+- [Python](https://pypi.org/project/aptos-sdk/).
 
-## Aptos devnet
-
-- [Genesis](https://devnet.aptoslabs.com/genesis.blob).
-- [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
-- [ChainID](http://fullnode.devnet.aptoslabs.com/).
-
-## APIs
-
-- **API server URL for the Aptos devnet Faucet:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
-- **REST API URL:** [https://fullnode.devnet.aptoslabs.com](https://fullnode.devnet.aptoslabs.com).
-
-
-## Aptos explorer
+### Aptos explorer
 
 - [Aptos Exporer](https://explorer.devnet.aptos.dev/). Use the top-right drop-down menu to select the network.
-
-## Aptos status
-
-- [Aptos Status](https://community.aptoslabs.com/it1).
-
-
-

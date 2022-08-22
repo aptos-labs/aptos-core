@@ -10,7 +10,7 @@ fmt:
 	- find aptos_sdk -type f -name "*.py" | xargs poetry run black
 
 examples:
-	- poetry run python -m examples.coin
-	- poetry run python -m examples.token
+	- poetry run python -m examples.transfer-coin
+	- poetry run python -m examples.simple-nft
 
 .PHONY: test fmt examples
