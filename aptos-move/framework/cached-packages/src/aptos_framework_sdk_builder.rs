@@ -49,6 +49,12 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    AccountOfferSignerCapabilityEd25519 {
+        signer_capability_sig_bytes: Vec<u8>,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     AccountRotateAuthenticationKey {
         new_auth_key: Vec<u8>,
     },
@@ -275,6 +281,15 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountOfferSignerCapabilityEd25519 {
+                signer_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_signer_capability_ed25519(
+                signer_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
@@ -442,6 +457,29 @@ pub fn account_offer_rotation_capability_ed25519(
         vec![],
         vec![
             bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_offer_signer_capability_ed25519(
+    signer_capability_sig_bytes: Vec<u8>,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_signer_capability_ed25519").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&signer_capability_sig_bytes).unwrap(),
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
@@ -1104,6 +1142,20 @@ mod decoder {
         }
     }
 
+    pub fn account_offer_signer_capability_ed25519(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferSignerCapabilityEd25519 {
+                signer_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1486,6 +1538,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_rotation_capability_ed25519".to_string(),
             Box::new(decoder::account_offer_rotation_capability_ed25519),
+        );
+        map.insert(
+            "account_offer_signer_capability_ed25519".to_string(),
+            Box::new(decoder::account_offer_signer_capability_ed25519),
         );
         map.insert(
             "account_rotate_authentication_key".to_string(),
