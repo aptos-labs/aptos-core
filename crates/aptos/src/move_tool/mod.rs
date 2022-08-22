@@ -482,13 +482,13 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 compiled_units,
             );
             let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
             if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
                 return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {}k ({}k)! To lower the size \
+                    "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included_artifacts`. \
                 You can also override this check with `--override-size-check",
-                    MAX_PUBLISH_PACKAGE_SIZE / 1000,
-                    size / 1000
+                    MAX_PUBLISH_PACKAGE_SIZE, size
                 )));
             }
             txn_options
@@ -547,7 +547,7 @@ impl CliCommand<&'static str> for DownloadPackage {
         }
         let package_path = output_dir.join(package.name());
         package
-            .save_package_to_disk(package_path.as_path(), true)
+            .save_package_to_disk(package_path.as_path())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
         println!(
             "Saved package with {} module(s) to `{}`",
@@ -615,11 +615,8 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
                     println!("  upgrade_number: {}", data.upgrade_number());
+                    println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
-                    println!(
-                        "  build_info:\n    {}",
-                        data.build_info().replace('\n', "\n    ")
-                    );
                 }
             }
         }

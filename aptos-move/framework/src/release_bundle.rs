@@ -3,9 +3,8 @@
 
 use crate::built_package::BuiltPackage;
 use crate::natives::code::PackageMetadata;
-use crate::{path_in_crate, unzip_metadata};
+use crate::path_in_crate;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
 use move_deps::move_binary_format::CompiledModule;
@@ -59,16 +58,6 @@ impl ReleaseBundle {
     pub fn write(&self, path: PathBuf) -> anyhow::Result<()> {
         std::fs::write(path, bcs::to_bytes(self)?)?;
         Ok(())
-    }
-
-    /// Returns a list of all EntryABIs in this bundle.
-    pub fn abis(&self) -> Vec<EntryABI> {
-        let mut result = vec![];
-        for pack in &self.packages {
-            let mut abis = pack.abis();
-            result.append(&mut abis);
-        }
-        result
     }
 
     /// Returns a list of all module bytecodes in this bundle.
@@ -155,18 +144,6 @@ impl ReleasePackage {
         &mut self.metadata
     }
 
-    /// Returns the ABIs.
-    pub fn abis(&self) -> Vec<EntryABI> {
-        self.metadata
-            .abis
-            .iter()
-            .map(|a| {
-                bcs::from_bytes::<EntryABI>(&unzip_metadata(a).unwrap())
-                    .expect("BCS for EntryABI must be valid")
-            })
-            .collect()
-    }
-
     /// Returns code and compiled modules, topological sorted regarding dependencies.
     pub fn sorted_code_and_modules(&self) -> Vec<(&[u8], CompiledModule)> {
         let mut map = self
@@ -221,13 +198,10 @@ impl ReleasePackage {
             "// Upgrade proposal for package `{}`\n",
             self.metadata.name
         );
-        emitln!(
-            writer,
-            "/*\nBuildInfo.yaml:\n{}\n*/\n",
-            self.metadata.build_info
-        );
+        emitln!(writer, "// source digest: {}", self.metadata.source_digest);
         emitln!(writer, "script {");
         writer.indent();
+        emitln!(writer, "use std::vector;");
         emitln!(writer, "use aptos_framework::aptos_governance;");
         emitln!(writer, "use aptos_framework::code;\n");
         emitln!(writer, "fun main(proposal_id: u64){");
@@ -244,7 +218,8 @@ impl ReleasePackage {
 
         // The package metadata can be larger than 64k, which is the max for Move constants.
         // We therefore have to split it into chunks. Three chunks should be large enough
-        // to cover any current and future needs.
+        // to cover any current and future needs. We then dynamically append them to obtain
+        // the result.
         let mut metadata = bcs::to_bytes(&self.metadata)?;
         let chunk_size = metadata.len() / 3;
         for i in 1..4 {
@@ -254,10 +229,11 @@ impl ReleasePackage {
             Self::generate_blob(&writer, &chunk);
             emitln!(writer, ";")
         }
-
+        emitln!(writer, "vector::append(&mut chunk1, chunk2);");
+        emitln!(writer, "vector::append(&mut chunk1, chunk3);");
         emitln!(
             writer,
-            "code::publish_package_chunk3_txn(&framework_signer, chunk1, chunk2, chunk3, code)"
+            "code::publish_package_txn(&framework_signer, chunk1, code)"
         );
         writer.unindent();
         emitln!(writer, "}");

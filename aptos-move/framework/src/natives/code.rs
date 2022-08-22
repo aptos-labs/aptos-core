@@ -17,7 +17,7 @@ use move_deps::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
     },
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
@@ -31,34 +31,23 @@ pub struct PackageRegistry {
     pub packages: Vec<PackageMetadata>,
 }
 
-/// The PackageMetadata type. All blobs are encoded as base64-gzipped.
+/// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
+/// also found there.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
-    /// Name of this package.
     pub name: String,
-    /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
-    /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
-    /// This field will be automatically assigned on successful upgrade.
     pub upgrade_number: u64,
-    /// Build info, in BuildInfo.yaml format
-    pub build_info: String,
-    /// The package manifest, in the Move.toml format.
-    pub manifest: String,
-    /// The list of modules installed by this package.
+    pub source_digest: String,
+    pub manifest: Vec<u8>,
     pub modules: Vec<ModuleMetadata>,
-    /// ABIs, in compressed BCS
-    pub abis: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
-    /// Name of the module.
     pub name: String,
-    /// Source text if available, in compressed form.
-    pub source: String,
-    /// Source map, in BCS encoding, in compressed form.
-    pub source_map: String,
+    pub source: Vec<u8>,
+    pub source_map: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -98,43 +87,6 @@ impl fmt::Display for UpgradePolicy {
             _ => "immutable",
         })
     }
-}
-
-// ========================================================================================
-// Duplication for JSON
-
-// For JSON we need attributes on fields which aren't compatible with BCS, therefore we
-// need to duplicate the definitions...
-
-fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: FromStr,
-    <T as FromStr>::Err: std::fmt::Display,
-{
-    use serde::de::Error;
-
-    let s = <String>::deserialize(deserializer)?;
-    s.parse::<T>().map_err(D::Error::custom)
-}
-
-/// The package registry at the given address.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PackageRegistryJson {
-    pub packages: Vec<PackageMetadataJson>,
-}
-
-/// The PackageMetadata type, with an annotation on `upgrade_number`.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PackageMetadataJson {
-    pub name: String,
-    pub upgrade_policy: UpgradePolicy,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub upgrade_number: u64,
-    pub build_info: String,
-    pub manifest: String,
-    pub modules: Vec<ModuleMetadata>,
-    pub abis: Vec<String>,
 }
 
 // ========================================================================================
