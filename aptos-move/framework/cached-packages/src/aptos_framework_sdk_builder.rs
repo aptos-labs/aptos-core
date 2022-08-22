@@ -82,7 +82,7 @@ pub enum EntryFunctionCall {
     /// only the exact script with matching hash can be successfully executed.
     AptosGovernanceCreateProposal {
         stake_pool: AccountAddress,
-        execution_hash: Vec<u8>,
+        execution_hash: AccountAddress,
         metadata_location: Vec<u8>,
         metadata_hash: Vec<u8>,
     },
@@ -541,7 +541,7 @@ pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayl
 /// only the exact script with matching hash can be successfully executed.
 pub fn aptos_governance_create_proposal(
     stake_pool: AccountAddress,
-    execution_hash: Vec<u8>,
+    execution_hash: AccountAddress,
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
 ) -> TransactionPayload {

@@ -53,7 +53,7 @@ pub fn configure_for_unit_test() {
 
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
-    exts.add(NativeTransactionContext::new(vec![1]));
+    exts.add(NativeTransactionContext::new(CORE_CODE_ADDRESS.to_vec()));
     exts.add(NativeAggregatorContext::new(0, &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
 }

@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_core_types::gas_algebra::InternalGas,
+    move_binary_format::errors::{PartialVMError, PartialVMResult},
+    move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
@@ -48,10 +49,14 @@ fn native_get_script_hash(
     _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
+    let addr = AccountAddress::from_bytes(&transaction_context.script_hash).map_err(|err| {
+        PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+            .with_message(format!("Failed to parse script hash: {}", err))
+    })?;
 
     Ok(NativeResult::ok(
         gas_params.base,
-        smallvec![Value::vector_u8(transaction_context.script_hash.clone())],
+        smallvec![Value::address(addr)],
     ))
 }
 

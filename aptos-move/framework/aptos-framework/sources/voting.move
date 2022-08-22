@@ -25,7 +25,6 @@ module aptos_framework::voting {
     use std::option::{Self, Option};
     use std::signer;
     use std::string::String;
-    use std::vector;
 
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::simple_map::SimpleMap;
@@ -41,8 +40,6 @@ module aptos_framework::voting {
     const EPROPOSAL_CANNOT_BE_RESOLVED: u64 = 2;
     /// Proposal cannot be resolved more than once
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
-    /// Proposal cannot contain an empty execution script hash
-    const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -68,7 +65,7 @@ module aptos_framework::voting {
 
         /// Required. The hash for the execution script module. Only the same exact script module can resolve this
         /// proposal.
-        execution_hash: vector<u8>,
+        execution_hash: address,
 
         /// A proposal is only resolved if expiration has passed and the number of votes is above threshold.
         min_vote_threshold: u128,
@@ -108,7 +105,7 @@ module aptos_framework::voting {
     struct CreateProposalEvent has drop, store {
         proposal_id: u64,
         early_resolution_vote_threshold: Option<u128>,
-        execution_hash: vector<u8>,
+        execution_hash: address,
         expiration_secs: u64,
         metadata: SimpleMap<String, vector<u8>>,
         min_vote_threshold: u128,
@@ -168,15 +165,12 @@ module aptos_framework::voting {
         proposer: address,
         voting_forum_address: address,
         execution_content: ProposalType,
-        execution_hash: vector<u8>,
+        execution_hash: address,
         min_vote_threshold: u128,
         expiration_secs: u64,
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 acquires VotingForum {
-        // Make sure the execution script's hash is not empty.
-        assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
-
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
         voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
@@ -338,7 +332,7 @@ module aptos_framework::voting {
     public fun get_execution_hash<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): vector<u8> acquires VotingForum {
+    ): address acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
         proposal.execution_hash
@@ -371,13 +365,11 @@ module aptos_framework::voting {
         let proposal = TestProposal {};
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
         let proposal_id = create_proposal<TestProposal>(
             governance_address,
             governance_address,
             proposal,
-            execution_hash,
+            @0x1,
             10,
             100000,
             early_resolution_threshold,
@@ -385,26 +377,6 @@ module aptos_framework::voting {
         );
 
         proposal_id
-    }
-
-    #[test(governance = @0x123)]
-    #[expected_failure(abort_code = 0x10004)]
-    public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
-        register<TestProposal>(governance);
-        let governance_address = signer::address_of(governance);
-        let proposal = TestProposal {};
-
-        // This should fail because execution hash is empty.
-        create_proposal<TestProposal>(
-            governance_address,
-            governance_address,
-            proposal,
-            b"",
-            10,
-            100000,
-            option::none<u128>(),
-            simple_map::create<String, vector<u8>>(),
-        );
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
