@@ -40,12 +40,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -290,12 +292,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -542,12 +546,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -812,6 +818,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -969,12 +976,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: with_transactions
         schema:
           type: boolean
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -1216,12 +1225,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: with_transactions
         schema:
           type: boolean
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -1462,12 +1473,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: start
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       - name: limit
         schema:
           type: integer
@@ -1475,6 +1488,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -1718,24 +1732,28 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: event_handle
         schema:
           $ref: '#/components/schemas/MoveStructTag'
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: field_name
         schema:
           $ref: '#/components/schemas/IdentifierWrapper'
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: start
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       - name: limit
         schema:
           type: integer
@@ -1743,6 +1761,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -2139,18 +2158,21 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: resource_type
         schema:
           $ref: '#/components/schemas/MoveStructTag'
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -2396,18 +2418,21 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: module_name
         schema:
           $ref: '#/components/schemas/IdentifierWrapper'
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -2653,12 +2678,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: ledger_version
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       requestBody:
         content:
           application/json:
@@ -2905,6 +2932,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       - name: limit
         schema:
           type: integer
@@ -2912,6 +2940,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -3420,6 +3449,7 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -3658,6 +3688,7 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''
@@ -3896,12 +3927,14 @@ paths:
         in: path
         required: true
         deprecated: false
+        explode: true
       - name: start
         schema:
           $ref: '#/components/schemas/U64'
         in: query
         required: false
         deprecated: false
+        explode: true
       - name: limit
         schema:
           type: integer
@@ -3909,6 +3942,7 @@ paths:
         in: query
         required: false
         deprecated: false
+        explode: true
       responses:
         '200':
           description: ''

@@ -60,7 +60,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -69,7 +70,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -413,7 +415,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -422,7 +425,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -769,7 +773,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -778,7 +783,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1148,7 +1154,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1371,7 +1378,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "with_transactions",
@@ -1380,7 +1388,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1725,7 +1734,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "with_transactions",
@@ -1734,7 +1744,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -2078,7 +2089,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -2087,7 +2099,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -2097,7 +2110,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -2444,7 +2458,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "event_handle",
@@ -2453,7 +2468,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "field_name",
@@ -2462,7 +2478,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -2471,7 +2488,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -2481,7 +2499,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -3039,7 +3058,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "resource_type",
@@ -3048,7 +3068,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -3057,7 +3078,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -3401,7 +3423,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "module_name",
@@ -3410,7 +3433,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -3419,7 +3443,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -3763,7 +3788,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -3772,7 +3798,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "requestBody": {
@@ -4126,7 +4153,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -4136,7 +4164,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -4833,7 +4862,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -5177,7 +5207,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -5521,7 +5552,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -5530,7 +5562,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -5540,7 +5573,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
