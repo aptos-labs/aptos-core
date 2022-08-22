@@ -3,6 +3,7 @@
 module aptos_token::property_map {
     use std::vector;
     use std::string::String;
+    use aptos_std::any;
     use aptos_std::simple_map::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -67,6 +68,12 @@ module aptos_token::property_map {
         let found = contains_key(map, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         simple_map::borrow(&map.map, key)
+    }
+
+    /// SDK should ensure the property_value matching the type name and bcs serialization
+    public fun read_value<T>(map: &PropertyMap, key: &String): T {
+        let prop = borrow(map, key);
+        any::deserialize_primitives<T>(prop.type, prop.value)
     }
 
     public fun borrow_value(property: &PropertyValue): vector<u8> {
@@ -174,5 +181,17 @@ module aptos_token::property_map {
             type,
             value
         }
+    }
+
+    #[test]
+    fun test_read_value_with_type(){
+        use std::string::utf8;
+        use std::bcs;
+        let keys = vector<String>[ utf8(b"attack"), utf8(b"mutable")];
+        let values = vector<vector<u8>>[ bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(&false) ];
+        let types = vector<String>[ utf8(b"u8"), utf8(b"bool")];
+        let plist = new(keys, values, types);
+        assert!(!read_value<bool>(&plist, &utf8(b"mutable")), 1);
+        assert!(read_value<u8>(&plist, &utf8(b"attack")) == 10, 1);
     }
 }

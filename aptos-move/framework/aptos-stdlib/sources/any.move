@@ -2,10 +2,11 @@ module aptos_std::any {
     use aptos_std::type_info;
     use std::bcs;
     use std::error;
-    use std::string::String;
+    use std::string::{Self, String};
 
     /// The type provided for `unpack` is not the same as was given for `pack`.
-    const ETYPE_MISMATCH: u64 = 0;
+    const ETYPE_MISMATCH: u64 = 1;
+    const EDESERIALIZE_PRIMITIVE_ONLY_SUPPORT_PRIMITIVE_TYPES: u64 = 2;
 
     /// A type which can represent a value of any type. This allows for representation of 'unknown' future
     /// values. For example, to define a resource such that it can be later be extended without breaking
@@ -41,6 +42,28 @@ module aptos_std::any {
     /// Returns the type name of this Any
     public fun type_name(x: &Any): &String {
         &x.type_name
+    }
+
+    /// Deserialize primitive types
+    public fun deserialize_primitives<T>(type: String, data: vector<u8>): T {
+        if (
+            !(
+                type == string::utf8(b"bool") ||
+                type == string::utf8(b"u8")  ||
+                type == string::utf8(b"u64")  ||
+                type == string::utf8(b"u128")  ||
+                type == string::utf8(b"address") ||
+                type == string::utf8(b"0x1::string::String")
+            )
+        ) {
+            assert!( false, EDESERIALIZE_PRIMITIVE_ONLY_SUPPORT_PRIMITIVE_TYPES);
+        };
+
+        assert!(type_info::type_name<T>() == type, error::invalid_argument(ETYPE_MISMATCH));
+        from_bytes<T>(data)
+
+
+
     }
 
     /// Native function to deserialize a type T.
