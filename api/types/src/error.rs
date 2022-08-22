@@ -57,6 +57,7 @@ impl AptosError {
 #[derive(Copy, Clone, Debug, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+#[repr(u32)]
 pub enum AptosErrorCode {
     /// Account not found at the requested version
     AccountNotFound = 101,
@@ -126,4 +127,10 @@ pub enum AptosErrorCode {
 
     /// BCS format is not supported on this API.
     BcsNotSupported = 701,
+}
+
+impl AptosErrorCode {
+    pub fn as_u32(&self) -> u32 {
+        *self as u32
+    }
 }
