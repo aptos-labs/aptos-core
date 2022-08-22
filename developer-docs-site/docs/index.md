@@ -194,7 +194,7 @@ We are excited that you are here, and we look forward to getting to know you. We
 Start by reading the concepts first to acquire a comprehensive understanding of how to develop for the Aptos blockchain. 
 
 :::tip
-This section is a requirement for blockchain service providers.
+This section is a requirement for blockchain system integrators.
 :::
 
 <div class="docs-card-container">
