@@ -78,7 +78,6 @@ class User < ApplicationRecord
     return unless ait3_registration_complete?
 
     SendRegistrationCompleteEmailJob.perform_now({ user_id: id })
-    DiscourseAddGroupJob.perform_later({ user_id: id, group_name: 'ait3_eligible' })
   end
 
   def ait3_registration_complete?
