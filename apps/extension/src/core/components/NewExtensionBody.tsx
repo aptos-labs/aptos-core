@@ -47,6 +47,11 @@ export default function NewExtensionBody() {
               Get started
             </Button>
           </ChakraLink>
+          <ChakraLink to={Routes.createWallet.path} width="100%">
+            <Button variant="solid" width="100%">
+              Import account
+            </Button>
+          </ChakraLink>
         </VStack>
       </Flex>
     </VStack>
