@@ -5,20 +5,20 @@ metadata:
   labels:
     app.kubernetes.io/name: forge
     forge-namespace: potato
-    forge-image-tag: asdf
+    forge-image-tag: forge_asdf
 spec:
   restartPolicy: Never
   serviceAccountName: forge
   containers:
   - name: main
-    image: 123.dkr.ecr.banana-east-1.amazonaws.com/aptos/forge:asdf
+    image: 123.dkr.ecr.banana-east-1.amazonaws.com/aptos/forge:forge_asdf
     imagePullPolicy: Always
     command:
     - /bin/bash
     - -c
     - |
       ulimit -n 1048576
-      forge --suite banana --duration-secs 123 --avg-tps 593943 test k8s-swarm --image-tag asdf --upgrade-image-tag asdf-1 --namespace potato   
+      forge --suite banana --duration-secs 123 --avg-tps 593943 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato   
     env:
     - name: FORGE_TRIGGERED_BY
       value: github-actions
