@@ -21,7 +21,7 @@ pub(crate) const APTOS_GA_API_SECRET: &str = "ArtslKPTTjeiMi1n-IR39g";
 // See: https://developers.google.com/analytics/devguides/collection/protocol/v1/reference#transport
 pub(crate) const GA4_URL: &str = "https://www.google-analytics.com/mp/collect";
 pub(crate) const HTTPBIN_URL: &str = "https://httpbin.org/ip";
-pub(crate) const TELEMETRY_SERVICE_URL: &str = "http://localhost:8000";
+pub(crate) const TELEMETRY_SERVICE_URL: &str = "https://telemetry.aptoslabs.com";
 
 // Frequencies for the various metrics and pushes
 pub(crate) const NODE_CORE_METRICS_FREQ_SECS: u64 = 30; // 30 seconds
