@@ -35,9 +35,6 @@ module aptos_framework::aggregator_factory {
 
     friend aptos_framework::optional_aggregator;
 
-    #[test_only]
-    friend aptos_framework::aggregator_tests;
-
     /// When aggregator factory is not published yet.
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
 
@@ -80,4 +77,7 @@ module aptos_framework::aggregator_factory {
     }
 
     native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
+
+    #[test_only]
+    friend aptos_framework::aggregator_tests;
 }
