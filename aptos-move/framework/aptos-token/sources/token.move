@@ -1115,7 +1115,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xAF, owner = @0xBB)]
-    #[expected_failure(abort_code = 3)]
+    #[expected_failure(abort_code = 393219)]
     fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 
