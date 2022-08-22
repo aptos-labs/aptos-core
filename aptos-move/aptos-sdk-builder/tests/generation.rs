@@ -84,8 +84,10 @@ test = false
 // transaction builder does not support (it doesn't supported typed functions yet).
 #[ignore]
 fn test_that_rust_entry_fun_code_compiles() {
+    // TODO: need a way to get abis to reactivate this test
+    let abis = vec![];
     test_rust(
-        &cached_packages::head_release_bundle().abis(),
+        &abis, // &cached_packages::head_release_bundle().abis(),
         "examples/rust/script_fun_demo.rs",
         EXPECTED_SCRIPT_FUN_OUTPUT,
     );

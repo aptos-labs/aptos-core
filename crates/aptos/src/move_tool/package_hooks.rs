@@ -47,7 +47,7 @@ async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
         )
         .await?;
         let package = registry.get_package(info.package_name).await?;
-        package.save_package_to_disk(info.download_to.as_path(), true)
+        package.save_package_to_disk(info.download_to.as_path())
     } else {
         Ok(())
     }

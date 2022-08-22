@@ -39,7 +39,7 @@ struct CustomRelease {
 
 impl CustomRelease {
     fn execute(self) -> anyhow::Result<()> {
-        self.options.create_release(true)
+        self.options.create_release()
     }
 }
 
@@ -53,14 +53,10 @@ struct StandardRelease {
     /// some packages may be available in testnet, but aren't in mainnet.
     #[clap(long, default_value = "head")]
     target: ReleaseTarget,
-    /// Whether to reduce metadata to a minimum for saving space. This is currently the default
-    /// until we figured a better solution for the sice problem.
-    #[clap(long, default_value = "true")]
-    strip: bool,
 }
 
 impl StandardRelease {
     fn execute(self) -> anyhow::Result<()> {
-        self.target.create_release(self.strip, None)
+        self.target.create_release(None)
     }
 }

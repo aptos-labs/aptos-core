@@ -26,24 +26,23 @@ module aptos_framework::code {
         /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
         /// This field will be automatically assigned on successful upgrade.
         upgrade_number: u64,
-        /// The BuildInfo, in the BuildInfo.yaml format.
-        build_info: String,
-        /// The package manifest, in the Move.toml format.
-        manifest: String,
+        /// The source digest of the sources in the package. This is constructed by first building the
+        /// sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
+        source_digest: String,
+        /// The package manifest, in the Move.toml format. Gzipped text.
+        manifest: vector<u8>,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// ABIs, in compressed BCS
-        abis: vector<String>
     }
 
     /// Metadata about a module in a package.
     struct ModuleMetadata has store, copy, drop {
         /// Name of the module.
         name: String,
-        /// Source text, in compressed ascii.
-        source: String,
-        /// Source map, in compressed BCS.
-        source_map: String
+        /// Source text, gzipped String. Empty if not provided.
+        source: vector<u8>,
+        /// Source map, in compressed BCS. Empty if not provided.
+        source_map: vector<u8>
     }
 
     /// Describes an upgrade policy
@@ -67,7 +66,7 @@ module aptos_framework::code {
     /// publication mode should only be used for modules which aren't shared with user others.
     /// The developer is responsible for not breaking memory layout of any resources he already
     /// stored on chain.
-    public fun upgrade_policy_no_compat(): UpgradePolicy {
+    public fun upgrade_policy_arbitrary(): UpgradePolicy {
         UpgradePolicy{policy: 0}
     }
 
@@ -146,19 +145,6 @@ module aptos_framework::code {
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
-    }
-
-    /// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
-    /// size constraints.
-    public entry fun publish_package_chunk3_txn(owner: &signer,
-                                                metadata_chunk1: vector<u8>,
-                                                metadata_chunk2: vector<u8>,
-                                                metadata_chunk3: vector<u8>,
-                                                code: vector<vector<u8>>)
-    acquires PackageRegistry {
-        vector::append(&mut metadata_chunk1, metadata_chunk2);
-        vector::append(&mut metadata_chunk1, metadata_chunk3);
-        publish_package(owner, util::from_bytes<PackageMetadata>(metadata_chunk1), code)
     }
 
     // Helpers

@@ -534,7 +534,7 @@ impl CliCommand<&'static str> for DownloadPackage {
         }
         let package_path = output_dir.join(package.name());
         package
-            .save_package_to_disk(package_path.as_path(), true)
+            .save_package_to_disk(package_path.as_path())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
         println!(
             "Saved package with {} module(s) to `{}`",
@@ -602,11 +602,8 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
                     println!("  upgrade_number: {}", data.upgrade_number());
+                    println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
-                    println!(
-                        "  build_info:\n    {}",
-                        data.build_info().replace('\n', "\n    ")
-                    );
                 }
             }
         }

@@ -3,9 +3,10 @@
 
 use crate::error_map::generate_error_map;
 use crate::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
-use crate::{zip_metadata, RuntimeModuleMetadata, APTOS_METADATA_KEY};
+use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::transaction::EntryABI;
 use clap::Parser;
 use move_deps::move_binary_format::CompiledModule;
 use move_deps::move_command_line_common::files::MOVE_COMPILED_EXTENSION;
@@ -114,6 +115,15 @@ impl BuiltPackage {
             .collect()
     }
 
+    /// Returns the abis for this package, if available.
+    pub fn extract_abis(&self) -> Option<Vec<EntryABI>> {
+        self.package.compiled_abis.as_ref().map(|abis| {
+            abis.iter()
+                .map(|(_, bytes)| bcs::from_bytes::<EntryABI>(bytes.as_slice()).unwrap())
+                .collect()
+        })
+    }
+
     /// Returns an iterator for all compiled proper (non-script) modules.
     pub fn modules(&self) -> impl Iterator<Item = &CompiledModule> {
         self.package
@@ -139,11 +149,16 @@ impl BuiltPackage {
 
     /// Extracts metadata, as needed for releasing a package, from the built package.
     pub fn extract_metadata(&self) -> anyhow::Result<PackageMetadata> {
-        let build_info = serde_yaml::to_string(&self.package.compiled_package_info)?;
-
+        let source_digest = self
+            .package
+            .compiled_package_info
+            .source_digest
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         let manifest_file = self.package_path.join("Move.toml");
         let manifest = std::fs::read_to_string(&manifest_file)?;
         let custom_props = extract_custom_fields(&manifest)?;
+        let manifest = zip_metadata_str(&manifest)?;
         let upgrade_policy = if let Some(val) = custom_props.get(UPGRADE_POLICY_CUSTOM_FIELD) {
             str::parse::<UpgradePolicy>(val.as_ref())?
         } else {
@@ -153,14 +168,14 @@ impl BuiltPackage {
         for u in self.package.root_modules() {
             let name = u.unit.name().to_string();
             let source = if self.options.with_srcs {
-                zip_metadata(std::fs::read_to_string(&u.source_path)?.as_bytes())?
+                zip_metadata_str(&std::fs::read_to_string(&u.source_path)?)?
             } else {
-                String::new()
+                vec![]
             };
             let source_map = if self.options.with_source_maps {
                 zip_metadata(&u.unit.serialize_source_map())?
             } else {
-                String::new()
+                vec![]
             };
             modules.push(ModuleMetadata {
                 name,
@@ -168,28 +183,13 @@ impl BuiltPackage {
                 source_map,
             })
         }
-        let abis = if self.options.with_abis {
-            if let Some(abis) = &self.package.compiled_abis {
-                let mut r = vec![];
-                for (_, a) in abis {
-                    r.push(zip_metadata(a)?)
-                }
-                r
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        };
-
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
             upgrade_number: 0,
-            build_info,
+            source_digest,
             manifest,
             modules,
-            abis,
         })
     }
 }
