@@ -88,45 +88,25 @@ pub enum AptosErrorCode {
 
     /// The API's inputs were invalid
     InvalidInput = 300,
-    /// The start param given for paging is invalid.
-    InvalidStartParam = 301,
-    /// The limit param given for paging is invalid.
-    InvalidLimitParam = 302,
-    /// The event key for events is invalid.
-    InvalidEventKey = 303,
 
-    /// The transaction submitted was invalid.
-    InvalidSubmittedTransaction = 400,
     /// The transaction was an invalid update to an already submitted transaction.
     InvalidTransactionUpdate = 401,
     /// The sequence number for the transaction is behind the latest sequence number.
     SequenceNumberTooOld = 402,
     /// The submitted transaction failed VM checks.
     VmError = 403,
-    /// The transaction failed to submit.
-    TransactionSubmissionFailed = 404,
 
     /// Health check failed.
     HealthCheckFailed = 500,
     /// The mempool is full, no new transactions can be submitted.
     MempoolIsFull = 501,
-    /// The mempool is full for this account's quota, no new transactions can be submitted.
-    MempoolIsFullForAccount = 502,
 
     /// Internal server error
     InternalError = 600,
-    /// The API failed to read from storage for this request, not because of a
-    /// bad request, but because of some internal error.
-    ReadFromStorageError = 601,
-    /// The data we read from the DB was not valid BCS.
-    InvalidBcsInStorageError = 602,
-    /// We were unexpectedly unable to convert a Rust type to BCS.
-    BcsSerializationError = 603,
     /// Error from the web framework
-    WebFrameworkError = 604,
-
+    WebFrameworkError = 601,
     /// BCS format is not supported on this API.
-    BcsNotSupported = 701,
+    BcsNotSupported = 602,
 }
 
 impl AptosErrorCode {

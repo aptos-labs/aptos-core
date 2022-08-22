@@ -166,7 +166,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::InvalidBcsInStorageError,
+                    AptosErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -200,7 +200,7 @@ impl Account {
                     .map_err(|err| {
                         BasicErrorWith404::internal_with_code(
                             err,
-                            AptosErrorCode::InvalidBcsInStorageError,
+                            AptosErrorCode::InternalError,
                             &self.latest_ledger_info,
                         )
                     })?;
@@ -237,7 +237,7 @@ impl Account {
                             .map_err(|err| {
                                 BasicErrorWith404::internal_with_code(
                                     err,
-                                    AptosErrorCode::InvalidBcsInStorageError,
+                                    AptosErrorCode::InternalError,
                                     &self.latest_ledger_info,
                                 )
                             })?,
@@ -272,7 +272,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::ReadFromStorageError,
+                    AptosErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?
@@ -296,7 +296,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::InvalidEventKey,
+                    AptosErrorCode::InvalidInput,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -318,11 +318,11 @@ impl Account {
 
         // Serialization should not fail, otherwise it's internal bug
         let event_handle_bytes = bcs::to_bytes(&value)
-            .context("Failed to serialize event handle")
+            .context("Failed to serialize event handle from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::BcsSerializationError,
+                    AptosErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -335,7 +335,7 @@ impl Account {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
                     err,
-                    AptosErrorCode::BcsSerializationError,
+                    AptosErrorCode::InvalidInput,
                     &self.latest_ledger_info,
                 )
             })?;
@@ -362,11 +362,11 @@ impl Account {
         move_resolver
             .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)
-            .context("Failed to convert move structs")
+            .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
-                    AptosErrorCode::BcsSerializationError,
+                    AptosErrorCode::InternalError,
                     &self.latest_ledger_info,
                 )
             })

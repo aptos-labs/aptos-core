@@ -43,13 +43,10 @@ pub enum ApiError {
     VersionPruned(Option<String>),
     BlockPruned(Option<String>),
     InvalidInput(Option<String>),
-    InvalidSubmittedTransaction(Option<String>),
     InvalidTransactionUpdate(Option<String>),
     SequenceNumberTooOld(Option<String>),
     VmError(Option<String>),
-    TransactionSubmissionFailed(Option<String>),
     MempoolIsFull(Option<String>),
-    MempoolIsFullForAccount(Option<String>),
 }
 
 impl std::fmt::Display for ApiError {
@@ -91,13 +88,10 @@ impl ApiError {
             VersionPruned(None),
             BlockPruned(None),
             InvalidInput(None),
-            InvalidSubmittedTransaction(None),
             InvalidTransactionUpdate(None),
             SequenceNumberTooOld(None),
             VmError(None),
-            TransactionSubmissionFailed(None),
             MempoolIsFull(None),
-            MempoolIsFullForAccount(None),
         ]
     }
 
@@ -131,13 +125,10 @@ impl ApiError {
             VersionPruned(_) => AptosErrorCode::VersionPruned.as_u32(),
             BlockPruned(_) => AptosErrorCode::BlockPruned.as_u32(),
             InvalidInput(_) => AptosErrorCode::InvalidInput.as_u32(),
-            InvalidSubmittedTransaction(_) => AptosErrorCode::InvalidSubmittedTransaction.as_u32(),
             InvalidTransactionUpdate(_) => AptosErrorCode::InvalidTransactionUpdate.as_u32(),
             SequenceNumberTooOld(_) => AptosErrorCode::SequenceNumberTooOld.as_u32(),
             VmError(_) => AptosErrorCode::VmError.as_u32(),
-            TransactionSubmissionFailed(_) => AptosErrorCode::TransactionSubmissionFailed.as_u32(),
             MempoolIsFull(_) => AptosErrorCode::MempoolIsFull.as_u32(),
-            MempoolIsFullForAccount(_) => AptosErrorCode::MempoolIsFullForAccount.as_u32(),
         }
     }
 
@@ -145,7 +136,7 @@ impl ApiError {
         use ApiError::*;
         matches!(
             self,
-            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_) | MempoolIsFullForAccount(_)
+            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_)
         )
     }
 
@@ -160,7 +151,7 @@ impl ApiError {
             | TransactionNotFound(_)
             | StructFieldNotFound(_)
             | TableItemNotFound(_) => StatusCode::NOT_FOUND,
-            MempoolIsFull(_) | MempoolIsFullForAccount(_) => StatusCode::INSUFFICIENT_STORAGE,
+            MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
             BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
             NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
             _ => StatusCode::BAD_REQUEST,
@@ -198,13 +189,10 @@ impl ApiError {
             ApiError::VersionPruned(_) => "Version pruned",
             ApiError::BlockPruned(_) => "Block pruned",
             ApiError::InvalidInput(_) => "Invalid input",
-            ApiError::InvalidSubmittedTransaction(_) => "Invalid submitted transaction",
             ApiError::InvalidTransactionUpdate(_) => "Invalid transaction update.  Can only update gas unit price",
             ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
-            ApiError::TransactionSubmissionFailed(_) => "Transaction submission failed",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
-            ApiError::MempoolIsFullForAccount(_) => "Mempool is full for this account",
         }
         .to_string()
     }
@@ -228,13 +216,10 @@ impl ApiError {
             ApiError::VersionPruned(inner) => inner,
             ApiError::BlockPruned(inner) => inner,
             ApiError::InvalidInput(inner) => inner,
-            ApiError::InvalidSubmittedTransaction(inner) => inner,
             ApiError::InvalidTransactionUpdate(inner) => inner,
             ApiError::SequenceNumberTooOld(inner) => inner,
             ApiError::VmError(inner) => inner,
-            ApiError::TransactionSubmissionFailed(inner) => inner,
             ApiError::MempoolIsFull(inner) => inner,
-            ApiError::MempoolIsFullForAccount(inner) => inner,
             _ => None,
         }
         .map(|details| ErrorDetails { details })
@@ -291,38 +276,18 @@ impl From<RestError> for ApiError {
                 AptosErrorCode::BlockNotFound => ApiError::BlockNotFound(Some(err.error.message)),
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
-                AptosErrorCode::InvalidInput
-                | AptosErrorCode::InvalidStartParam
-                | AptosErrorCode::InvalidLimitParam
-                | AptosErrorCode::InvalidEventKey => {
-                    ApiError::InvalidInput(Some(err.error.message))
-                }
-                AptosErrorCode::InvalidSubmittedTransaction => {
-                    ApiError::InvalidSubmittedTransaction(Some(err.error.message))
-                }
+                AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
                 AptosErrorCode::InvalidTransactionUpdate => {
-                    ApiError::InvalidTransactionUpdate(Some(err.error.message))
+                    ApiError::InvalidInput(Some(err.error.message))
                 }
                 AptosErrorCode::SequenceNumberTooOld => {
                     ApiError::SequenceNumberTooOld(Some(err.error.message))
                 }
                 AptosErrorCode::VmError => ApiError::VmError(Some(err.error.message)),
-                AptosErrorCode::TransactionSubmissionFailed => {
-                    ApiError::TransactionSubmissionFailed(Some(err.error.message))
-                }
                 AptosErrorCode::HealthCheckFailed => {
                     ApiError::InternalError(Some(err.error.message))
                 }
                 AptosErrorCode::MempoolIsFull => ApiError::MempoolIsFull(Some(err.error.message)),
-                AptosErrorCode::MempoolIsFullForAccount => {
-                    ApiError::MempoolIsFullForAccount(Some(err.error.message))
-                }
-                AptosErrorCode::ReadFromStorageError | AptosErrorCode::InvalidBcsInStorageError => {
-                    ApiError::InternalError(Some(err.error.message))
-                }
-                AptosErrorCode::BcsSerializationError => {
-                    ApiError::DeserializationFailed(Some(err.error.message))
-                }
                 AptosErrorCode::WebFrameworkError => {
                     ApiError::InternalError(Some(err.error.message))
                 }
