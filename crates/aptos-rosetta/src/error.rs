@@ -28,7 +28,7 @@ pub enum ApiError {
     UnsupportedCurrency(Option<String>),
     UnsupportedSignatureCount(Option<usize>),
     NodeIsOffline,
-    TransactionParseError(Option<&'static str>),
+    TransactionParseError(Option<String>),
     InternalError(Option<String>),
 
     // Below here are codes directly from the REST API
@@ -215,7 +215,7 @@ impl ApiError {
             ApiError::InvalidTransferOperations(inner) => inner.map(|inner| inner.to_string()),
             ApiError::UnsupportedCurrency(inner) => inner,
             ApiError::UnsupportedSignatureCount(inner) => inner.map(|inner| inner.to_string()),
-            ApiError::TransactionParseError(inner) => inner.map(|inner| inner.to_string()),
+            ApiError::TransactionParseError(inner) => inner,
             ApiError::InternalError(inner) => inner,
             ApiError::AccountNotFound(inner) => inner,
             ApiError::ResourceNotFound(inner) => inner,
