@@ -15,7 +15,7 @@ use std::{
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Error {
     /// Error code
-    pub code: u64,
+    pub code: u32,
     /// Message that always matches the error code
     pub message: String,
     /// Possible generic information about an error code

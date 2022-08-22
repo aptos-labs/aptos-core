@@ -183,7 +183,7 @@ async fn get_balances(
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
         } else {
-            return Err(ApiError::AptosError(Some(
+            return Err(ApiError::InternalError(Some(
                 "Failed to retrieve account sequence number".to_string(),
             )));
         };
