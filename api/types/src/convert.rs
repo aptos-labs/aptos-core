@@ -678,10 +678,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         match status {
             ExecutionStatus::MoveAbort { location, code, info } => match &location {
                 AbortLocation::Module(_) => {
+
                     info.as_ref().map(|i| {
-                        format!("Move abort by {}\n{}", i.reason_name, i.description)
+                        format!("Move abort in {}: {}({:#x}): {}", Self::abort_location_to_str(location), i.reason_name, code, i.description)
                     }).unwrap_or_else(|| {
-                        format!("Move abort: code {:#x} at {}", code, location)
+                        format!("Move abort in {}: {:#x}", Self::abort_location_to_str(location), code)
                     })
                 }
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
@@ -696,8 +697,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let func_name = match location {
                     AbortLocation::Module(module_id) => self
                         .explain_function_index(module_id, function)
-                        .map(|name| format!("{}::{}", location, name))
-                        .unwrap_or_else(|_| format!("{}::<#{} function>", location, function)),
+                        .map(|name| format!("{}::{}", Self::abort_location_to_str(location), name))
+                        .unwrap_or_else(|_| format!("{}::<#{} function>", Self::abort_location_to_str(location), function)),
                     AbortLocation::Script => "script".to_owned(),
                 };
                 format!(
@@ -713,6 +714,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     ),
                 )
             }
+        }
+    }
+
+    fn abort_location_to_str(loc: &AbortLocation) -> String {
+        match loc {
+            AbortLocation::Module(mid) => {
+                format!("{}::{}", mid.address().to_hex_literal(), mid.name())
+            }
+            _ => loc.to_string(),
         }
     }
 
