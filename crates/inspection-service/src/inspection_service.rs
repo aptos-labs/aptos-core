@@ -120,8 +120,10 @@ async fn serve_requests(
         // Expose the system and build information
         (&Method::GET, "/system_information") => {
             if node_config.inspection_service.expose_system_information {
-                let system_information =
-                    aptos_telemetry::utils::get_system_and_build_information(None);
+                let mut system_information =
+                    aptos_telemetry::system_information::get_system_information();
+                let build_info = aptos_build_info::get_build_information();
+                system_information.extend(build_info);
                 let encoded_information = serde_json::to_string(&system_information).unwrap();
                 *resp.body_mut() = Body::from(encoded_information);
             } else {
