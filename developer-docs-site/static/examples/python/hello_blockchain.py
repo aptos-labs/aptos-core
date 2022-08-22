@@ -59,7 +59,7 @@ class HelloBlockchainClient(RestClient):
 if __name__ == "__main__":
     assert (
         len(sys.argv) == 2
-    ), "Expecting an argument that points to the helloblockchain module"
+    ), "Expecting an argument that points to the hello_blockchain module"
 
     client = HelloBlockchainClient(TESTNET_URL)
     faucet_client = FaucetClient(FAUCET_URL, client)
