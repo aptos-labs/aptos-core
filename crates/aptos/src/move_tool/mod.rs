@@ -48,7 +48,7 @@ use move_deps::{
         language_storage::{ModuleId, TypeTag},
     },
     move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
-    move_prover,
+    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 use std::fmt::{Display, Formatter};
@@ -322,6 +322,16 @@ impl CliCommand<&'static str> for ProvePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
+
+        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
+
+        let mut options = move_prover::cli::Options::default();
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
+                module_instance_names: vec![],
+            });
+
         let result = task::spawn_blocking(move || {
             move_cli::base::prove::run_move_prover(
                 config,
