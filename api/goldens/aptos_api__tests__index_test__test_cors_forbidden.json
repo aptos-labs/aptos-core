@@ -1,20 +1,20 @@
 {
-  "message": "unauthorized",
+  "message": "request-method not allowed",
   "error_code": "web_framework_error",
   "vm_error_code": null
 }
 {
-  "message": "unauthorized",
+  "message": "request-method not allowed",
   "error_code": "web_framework_error",
   "vm_error_code": null
 }
 {
-  "message": "unauthorized",
+  "message": "request-method not allowed",
   "error_code": "web_framework_error",
   "vm_error_code": null
 }
 {
-  "message": "unauthorized",
+  "message": "request-method not allowed",
   "error_code": "web_framework_error",
   "vm_error_code": null
 }
