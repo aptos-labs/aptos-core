@@ -352,7 +352,7 @@ impl RosettaClient {
             .await?;
 
         // Verify that we can parse the transaction
-        /*let response = self
+        let response = self
             .parse(&ConstructionParseRequest {
                 network_identifier,
                 signed: false,
@@ -370,8 +370,7 @@ impl RosettaClient {
             ))
         } else {
             Ok(payloads)
-        }*/
-        Ok(payloads)
+        }
     }
 
     /// Signs a transaction and combines it with an unsigned transaction
@@ -380,7 +379,7 @@ impl RosettaClient {
         network_identifier: NetworkIdentifier,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
         unsigned_response: ConstructionPayloadsResponse,
-        _operations: Vec<Operation>,
+        operations: Vec<Operation>,
     ) -> anyhow::Result<String> {
         let mut signatures = Vec::new();
         let mut signers: Vec<AccountIdentifier> = Vec::new();
@@ -424,7 +423,7 @@ impl RosettaClient {
             .await?;
 
         // Verify transaction can be parsed properly
-        /*let response = self
+        let response = self
             .parse(&ConstructionParseRequest {
                 network_identifier,
                 signed: true,
@@ -454,8 +453,7 @@ impl RosettaClient {
             ))
         } else {
             Ok(signed_response.signed_transaction)
-        }*/
-        Ok(signed_response.signed_transaction)
+        }
     }
 
     /// Submit a transaction to the blockchain
