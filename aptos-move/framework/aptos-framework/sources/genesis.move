@@ -77,8 +77,7 @@ module aptos_framework::genesis {
         );
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
-        // Ensure we can create aggregators for supply, but not enable it for common
-        // use just yet.
+        // Ensure we can create aggregators for supply, but not enable it for common use just yet.
         aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
         coin::initialize_supply_config(&aptos_framework_account);
 

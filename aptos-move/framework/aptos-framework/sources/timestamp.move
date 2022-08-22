@@ -30,10 +30,10 @@ module aptos_framework::timestamp {
 
     /// Marks that time has started and genesis has finished. This can only be called from genesis and with the
     /// aptos framework account.
-    public(friend) fun set_time_has_started(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun set_time_has_started(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
-        move_to(account, timer);
+        move_to(aptos_framework, timer);
     }
 
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
