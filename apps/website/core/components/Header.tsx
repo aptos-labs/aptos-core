@@ -33,7 +33,7 @@ const Header = () => {
           </Button>
         </ChakraLinkBare>
         <ChakraLinkBare
-          href="https://discord.gg/nhDrkGawxV"
+          href="https://discord.com/invite/petrawallet"
         >
           <IconButton
             as="a"
