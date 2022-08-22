@@ -11,6 +11,8 @@ class FooterComponent < ViewComponent::Base
     NavItem.new('/currents', 'Currents'),
     NavItem.new('/careers', 'Careers'),
     NavItem.new('https://www.linkedin.com/company/aptoslabs', 'Team'),
+    NavItem.new('https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/static/papers/whitepaper.pdf',
+                'Aptos Whitepaper'),
     NavItem.new('/privacy', 'Privacy'),
     NavItem.new('/terms', 'Terms')
   ].freeze
