@@ -307,6 +307,11 @@ async fn construction_parse(
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
                 && account_module_identifier() == module_name
+                && transfer_function_identifier() == function_name
+            {
+                parse_account_transfer_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && account_module_identifier() == module_name
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
@@ -412,6 +417,42 @@ fn parse_transfer_operation(
     } else {
         return Err(ApiError::TransactionParseError(Some(
             "No amount in transfer".to_string(),
+        )));
+    };
+
+    operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
+    operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
+    Ok(operations)
+}
+
+fn parse_account_transfer_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for account transfer
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Account transfer should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+    let mut operations = Vec::new();
+
+    // Retrieve the args for the operations
+
+    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver in account transfer".to_string(),
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(1) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in account transfer".to_string(),
         )));
     };
 
