@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
+use anyhow::anyhow;
 use forge::{NetworkContext, NetworkTest, Result, Test};
 
 pub struct PerformanceBenchmarkWithFN;
@@ -28,6 +29,8 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
         ctx.check_for_success(&txn_stat, &duration)?;
+        // REMOVE TESTING
+        Err(anyhow!("Fuck"))
 
         // This is currently flaky in main, turn off to mitigate impact on devs
         // let runtime = Runtime::new().unwrap();
@@ -45,6 +48,6 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
         //     end_timestamp as i64,
         //     SystemMetricsThreshold::new(cpu_threshold, memory_threshold),
         // ))?;
-        Ok(())
+        // Ok(())
     }
 }

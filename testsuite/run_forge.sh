@@ -10,7 +10,9 @@
 #
 
 # Default to off
-WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+# WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+# REMOVE ME 
+WRAPPER_KILLSWITCH="false"
 
 # output files
 FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
