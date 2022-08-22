@@ -302,9 +302,6 @@ module aptos_std::bls12381 {
         public_key: vector<u8>,
         proof_of_possesion: vector<u8>
     ): bool;
-    spec verify_proof_of_possession { // TODO: temporary mockup.
-        pragma opaque;
-    }
 
     /// CRYPTOGRAPHY WARNING: Assumes the public key has a valid proof-of-possesion (PoP). This prevents rogue-key
     /// attacks later on during signature aggregation.
