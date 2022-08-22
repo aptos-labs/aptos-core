@@ -15,7 +15,7 @@ This tutorial goes through how to build the wallet extension and how to use it w
 ## Step 1) Install the wallet on Chrome
 
 1. Download the latest [wallet release](https://github.com/aptos-labs/aptos-core/releases/) and unzip
-2. Open a Chrome window and navigate to [chrome://extensions](chrome://extensions)
+2. Open a Chrome window and navigate to [chrome://extensions]
 3. Enable **Developer mode** in the top right of the extension page
 4. Hit **Load unpacked** and point it to the folder you just downloaded
 
