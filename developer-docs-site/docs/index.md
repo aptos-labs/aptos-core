@@ -3,7 +3,7 @@ title: "Aptos Developer Documentation"
 slug: "/"
 hidden: false
 sidebar_position: 0
-hide_table_of_contents: true
+hide_table_of_contents: false
 ---
 
 # Aptos Developer Documentation
@@ -14,6 +14,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
   Click [here for Aptos Incentivized Testnet-3 docs](/nodes/ait/ait-3).
 :::
 
+<!--- 
 ## Start here
 
 <div class="docs-card-container">
@@ -33,6 +34,8 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 </div>
 </div>
 </div>
+
+
 
 ## Concepts and guides
 
@@ -130,3 +133,125 @@ We are excited that you are here, and we look forward to getting to know you. We
 
 [typeform]: https://www.aptoslabs.com/developers
 [discord]: https://discord.gg/aptoslabs
+
+--->
+
+## Where should I start
+
+<div class="aptos-timeline">
+<div class="aptos-timeline-outer">
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Set up developer tools and environment</aptos-timeline-h3>
+    <a href="guides/getting-started.html" class="card-link">Clone the Aptos repo and get to know important developer resources</a>
+    <p>Follow this step-by-step guide to install the tools you need to start developing.</p>
+    <a href="guides/local-testnet-dev-flow.html" class="card-link">Run a local testnet with the matching SDK, or access the Aptos devnet</a>
+    <p>Use either Python SDK or TypeScript SDK.</p>
+  </div>
+</div>
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Learn how to submit your first transaction</aptos-timeline-h3>
+    <a href="tutorials/your-first-transaction-sdk.html" class="card-link">Submit your first transaction to the Aptos blockchain</a>
+    <p>Get to know how to use the SDK by preparing and submitting your first transaction to the Aptos blockchain.</p>
+  </div>
+</div>
+</div>
+</div>
+
+## Tokenization 
+
+<div class="aptos-timeline">
+<div class="aptos-timeline-outer">
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Create your first NFT</aptos-timeline-h3>
+    <a href="tutorials/your-first-nft-sdk.html" class="card-link">Create and transfer NFTs on the Aptos blockchain</a>
+    <p>This SDK-based tutorial will also introduce you to the Aptos Token module in Move.</p>
+    <a href="guides/install-petra-wallet-extension.html" class="card-link">Get to know Petra (Aptos Wallet)</a>
+    <p>Install the Petra extension for the Chrome browser and get familiar with it.</p>
+  </div>
+</div>
+</div>
+</div>
+
+## Smart contracts and Dapps
+
+<div class="aptos-timeline">
+<div class="aptos-timeline-outer">
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Create your first smart contract with Move</aptos-timeline-h3>
+    <a href="/tutorials/your-first-move-module.html" class="card-link">Your first Move Module </a>
+    <p>Write, test and publish your first Move module. This forms the foundation for understanding how to write, publish and deploy smart contracts in Move language.</p>
+  </div>
+</div>
+</div>
+</div>
+
+## Detailed concepts and guides
+
+Start by reading the concepts first to acquire a comprehensive understanding of how to develop for the Aptos blockchain. 
+
+:::tip
+This section is a requirement for blockchain service providers.
+:::
+
+<div class="docs-card-container">
+<div class="row row-cols-1 row-cols-md-2 g-4">
+  <div class="col">
+    <div class="card card-body h-100 d-flex flex-column" >
+    <a href="concepts/aptos-concepts" class="card-title card-link stretched-link"> <h2>Aptos concepts</h2></a>
+    <p class="card-text">Learn the concepts that underlie everything from transactions, accounts and gas to nodes, staking and governance.</p>
+</div>
+</div>
+  <div class="col">
+    <div class="card card-body h-100 d-flex flex-column"  >
+    <a href="guides/aptos-guides" class="card-title card-link stretched-link"> <h2>Guides</h2></a>
+    <p class="card-text">Read the essential guides, such as how to interact with the Aptos blockchain, a walkthrough of a life of a transaction, the Move language guides and more.</p>
+</div>
+  </div>
+  
+</div>
+</div>
+
+
+## Integrate Aptos blockchain
+
+<div class="aptos-timeline">
+<div class="aptos-timeline-outer">
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Read the system integrators guide</aptos-timeline-h3>
+    <a href="guides/system-integrators-guide.html" class="card-link">System integrators guide</a>
+    <p>Learn how to provide your users a rich set of features for interacting and managing the on-chain assets in the Aptos blockchain.</p>
+  </div>
+</div>
+</div>
+</div>
+
+## Run a node
+
+<div class="aptos-timeline">
+<div class="aptos-timeline-outer">
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Run a validator or fullnode</aptos-timeline-h3>
+    <a href="nodes/nodes-index.html" class="card-link">Nodes homepage</a>
+    <p>Run a validator or a fullnode for local testnet or the Aptos devnet. Multiple ways of running a node are described in detail in this section. </p>
+  </div>
+</div>
+<div class="aptos-timeline-card">
+  <div class="aptos-timeline-info">
+    <aptos-timeline-h3 class="aptos-timeline-title">Stake and participate in governance</aptos-timeline-h3>
+    <a href="concepts/staking.html" class="card-link">Read how staking works on the Aptos blockchain</a> 
+    <p>Read a detailed description of how to join a valiator set, staking parameters, epoch triggers, staking rewards and much more.</p>
+    <a href="concepts/governance.html" class="card-linnk">Read how governance works</a>
+    <p>Read governance details, including how a proposal becomes ready to be resolved.</p>
+  </div>
+</div>
+</div>
+</div>
+
+
+
