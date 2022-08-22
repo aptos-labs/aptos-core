@@ -21,10 +21,8 @@ pub static APTOS_CHAIN_INFO: Lazy<ChainSpecificAccountInfo> =
         module_name: APTOS_ACCOUNT_MODULE_IDENTIFIER.to_owned(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         module_prologue_name: Identifier::new("module_prologue").unwrap(),
-        writeset_prologue_name: Identifier::new("writeset_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
-        writeset_epilogue_name: Identifier::new("writeset_epilogue").unwrap(),
     });
 
 /// A Rust representation of chain-specific account information
@@ -35,10 +33,8 @@ pub struct ChainSpecificAccountInfo {
     pub module_name: Identifier,
     pub script_prologue_name: Identifier,
     pub module_prologue_name: Identifier,
-    pub writeset_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
-    pub writeset_epilogue_name: Identifier,
 }
 
 impl ChainSpecificAccountInfo {

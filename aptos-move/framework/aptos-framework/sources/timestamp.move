@@ -36,11 +36,6 @@ module aptos_framework::timestamp {
         move_to(account, timer);
     }
 
-    #[test_only]
-    public fun set_time_has_started_for_testing(account: &signer) {
-        set_time_has_started(account);
-    }
-
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
     public fun update_global_time(
         account: &signer,
@@ -61,6 +56,11 @@ module aptos_framework::timestamp {
             assert!(now < timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
         };
         global_timer.microseconds = timestamp;
+    }
+
+    #[test_only]
+    public fun set_time_has_started_for_testing(account: &signer) {
+        set_time_has_started(account);
     }
 
     /// Gets the current time in microseconds.

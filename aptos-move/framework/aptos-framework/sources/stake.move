@@ -175,7 +175,6 @@ module aptos_framework::stake {
         mint_cap: MintCapability<AptosCoin>,
     }
 
-    // TODO change all types to u32 ?
     struct IndividualValidatorPerformance has store, drop {
         successful_proposals: u64,
         failed_proposals: u64,

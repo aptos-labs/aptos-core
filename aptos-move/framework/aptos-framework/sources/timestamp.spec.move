@@ -28,11 +28,11 @@ spec aptos_framework::timestamp {
         aborts_if [concrete]
             (if (proposer == @vm_reserved) {
                 now != timestamp
-             } else  {
+            } else  {
                 now >= timestamp
-             }
-            )
-            with error::INVALID_ARGUMENT;
+            }
+        )
+        with error::INVALID_ARGUMENT;
     }
 
     spec now_microseconds {
