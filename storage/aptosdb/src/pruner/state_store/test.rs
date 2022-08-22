@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/*
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
@@ -343,7 +342,9 @@ fn test_worker_quit_eagerly() {
     );
 
     {
-        let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
+        let state_pruner = utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
+            &aptos_db.state_merkle_db,
+        ));
         let worker = StatePrunerWorker::new(
             state_pruner,
             StateMerklePrunerConfig {
@@ -419,4 +420,3 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValu
         assert_eq!(&v_from_db, if pruned { &None } else { v });
     }
 }
-*/

@@ -62,6 +62,7 @@ where
     fn pruner(&self) -> &Self::Pruner {
         &self.pruner
     }
+
     fn is_pruner_enabled(&self) -> bool {
         self.pruner_enabled
     }
