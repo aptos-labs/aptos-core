@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod aggregator_natives;
+pub mod any;
 pub mod code;
 pub mod cryptography;
 pub mod event;
@@ -194,7 +195,8 @@ pub fn all_natives(
         cryptography::ristretto255::make_all(gas_params.ristretto255)
     );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
-    add_natives_from_module!("util", util::make_all(gas_params.util));
+    add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
+    add_natives_from_module!("any", util::make_all(gas_params.util));
     add_natives_from_module!(
         "transaction_context",
         transaction_context::make_all(gas_params.transaction_context)
