@@ -1,15 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
-use std::{sync::Arc, time::Duration};
-
-use aptos_config::config::{
-    EpochEndingStateMerklePrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
-};
-use proptest::prelude::*;
-
 use crate::{
     get_first_seq_num_and_limit,
     pruner::{
@@ -19,7 +10,10 @@ use crate::{
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
     AptosDB, PrunerManager, StaleNodeIndexSchema, ROCKSDB_PROPERTIES,
 };
-
+use aptos_config::config::{
+    EpochEndingStateMerklePrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
@@ -30,6 +24,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{ExecutionStatus, TransactionInfo},
 };
+use proptest::prelude::*;
+use std::collections::HashSet;
+use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
@@ -202,7 +199,7 @@ fn test_rocksdb_properties_reporter() {
 pub fn test_state_merkle_pruning_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
-    // set up DB with state prune window 5
+    // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
     let db = AptosDB::open(
         &tmp_dir,
@@ -221,7 +218,7 @@ pub fn test_state_merkle_pruning_impl(
             },
             epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
                 enable: true,
-                prune_window: 5,
+                prune_window: 10,
                 batch_size: 1,
             },
         },
@@ -261,20 +258,40 @@ pub fn test_state_merkle_pruning_impl(
         snapshot_versions.push((last_version, is_epoch_ending));
 
         let state_min_readable = last_version.saturating_sub(5);
-        let non_pruned_versions: Vec<_> = snapshot_versions
+        let epoch_ending_min_readable = last_version.saturating_sub(10);
+        let within_window: Vec<_> = snapshot_versions
             .iter()
             .filter(|(v, _is_epoch_ending)| *v >= state_min_readable)
             .map(|(v, _)| *v)
             .collect();
-        let pruner = &db.state_store.state_db.state_pruner;
+        let epoch_endings_within_window: Vec<_> = snapshot_versions
+            .iter()
+            .filter(|(v, is_epoch_ending)| *is_epoch_ending && *v >= epoch_ending_min_readable)
+            .map(|(v, _)| *v)
+            .collect();
+
         // Prune till the oldest snapshot readable.
+        let pruner = &db.state_store.state_db.state_pruner;
+        let epoch_ending_pruner = &db.state_store.state_db.epoch_ending_state_pruner;
         pruner
             .pruner_worker
-            .set_target_db_version(non_pruned_versions.first().cloned().unwrap());
+            .set_target_db_version(*within_window.first().unwrap());
+        epoch_ending_pruner
+            .pruner_worker
+            .set_target_db_version(std::cmp::min(
+                *within_window.first().unwrap(),
+                *epoch_endings_within_window.first().unwrap_or(&Version::MAX),
+            ));
         pruner.wait_for_pruner().unwrap();
+        epoch_ending_pruner.wait_for_pruner().unwrap();
 
         // Check strictly that all trees in the window accessible and all those nodes not needed
         // must be gone.
+        let non_pruned_versions: HashSet<_> = within_window
+            .into_iter()
+            .chain(epoch_endings_within_window.into_iter())
+            .collect();
+
         let expected_nodes: HashSet<_> = non_pruned_versions
             .iter()
             .flat_map(|v| db.state_store.get_all_jmt_nodes_referenced(*v).unwrap())
@@ -285,6 +302,7 @@ pub fn test_state_merkle_pruning_impl(
             .unwrap()
             .into_iter()
             .collect();
+
         assert_eq!(expected_nodes, all_nodes);
     }
 }
