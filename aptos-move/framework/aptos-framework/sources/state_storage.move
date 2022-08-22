@@ -21,13 +21,13 @@ module aptos_framework::state_storage {
         bytes: u64,
     }
 
-    public(friend) fun initialize(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun initialize(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<StateStorageUsage>(@aptos_framework),
             error::already_exists(EUSAGE_ALREADY_EXISTS)
         );
-        move_to(account, StateStorageUsage {
+        move_to(aptos_framework, StateStorageUsage {
             items: 0,
             bytes: 0,
             epoch: 0,
