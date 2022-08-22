@@ -134,7 +134,7 @@ export default function DocsPage({
               height: 600,
               type: 'image/jpeg',
               url: imageUrl,
-              width: 900,
+              width: 800,
             },
           ],
           site_name: COMPANY_NAME,
