@@ -76,7 +76,7 @@ fullnode:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
     # -- Size of fullnode persistent storage
-    size: 30Gi
+    size: 300Gi
   # -- Log level for the fullnode
   rust_log: info
   # -- Remote log level for the fullnode
