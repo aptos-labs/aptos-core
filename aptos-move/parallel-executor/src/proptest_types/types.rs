@@ -33,10 +33,6 @@ use std::{
 
 // When aggregator value has to be resolved from storage, pretend it is this number.
 const STORAGE_DELTA_VAL: u128 = 100;
-// Same convention for delta application failures, here for final output as well - for underflows
-// and overflows while reading, pretend the value was 0. This should lead to the same output as
-// the parallel execution, even if preparing it would panic (due to an actual under-/overflow).
-const FAILURE_DELTA_VAL: u128 = 0;
 
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
@@ -399,6 +395,7 @@ pub enum ExpectedOutput<V> {
     Aborted(usize),
     SkipRest(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
     Success(Vec<Vec<(Option<V>, Option<u128>)>>),
+    DeltaFailure(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
 }
 
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
@@ -460,12 +457,12 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                             Some(value) => value,
                         };
 
-                        // Apply delta to the base value, errors get resolved to a default value.
-                        let new_v = match delta.apply_to(base) {
-                            Ok(res) => res,
-                            Err(_) => FAILURE_DELTA_VAL,
-                        };
-                        delta_world.insert(k.clone(), new_v);
+                        // Apply delta to the base value.
+                        let applied_delta = delta.apply_to(base);
+                        if applied_delta.is_err() {
+                            return Self::DeltaFailure(idx, result_vec);
+                        }
+                        delta_world.insert(k.clone(), applied_delta.unwrap());
                     }
 
                     result_vec.push(result)
@@ -479,33 +476,41 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     fn check_result(
         expected_results: &Vec<(Option<V>, Option<u128>)>,
         results: &Vec<ReadResult<V>>,
+        delta_fail: bool,
     ) {
+        let mut delta_failed = false;
         expected_results
             .iter()
             .zip(results.iter())
-            .for_each(|(expected_result, result)| match result {
-                ReadResult::Value(v) => {
-                    assert_eq!(**v, expected_result.0.clone().unwrap());
-                    assert_eq!(expected_result.1, None);
-                }
-                ReadResult::U128(v) => {
-                    assert_eq!(expected_result.0, None);
-                    assert_eq!(*v, expected_result.1.unwrap());
-                }
-                ReadResult::Unresolved(delta) => {
-                    assert_eq!(expected_result.0, None);
-                    let resolved_val = match delta.apply_to(STORAGE_DELTA_VAL) {
-                        Ok(res) => res,
-                        Err(_) => FAILURE_DELTA_VAL,
-                    };
-                    if resolved_val != expected_result.1.unwrap() {
-                        println!("{:?}", delta);
+            .for_each(|(expected_result, result)| {
+                // failure should happen at the last index.
+                assert!(!delta_failed);
+                match result {
+                    ReadResult::Value(v) => {
+                        assert_eq!(**v, expected_result.0.clone().unwrap());
+                        assert_eq!(expected_result.1, None);
                     }
-                    assert_eq!(resolved_val, expected_result.1.unwrap());
-                }
-                ReadResult::None => {
-                    assert_eq!(expected_result.0, None);
-                    assert_eq!(expected_result.1, None);
+                    ReadResult::U128(v) => {
+                        assert_eq!(expected_result.0, None);
+                        assert_eq!(*v, expected_result.1.unwrap());
+                    }
+                    ReadResult::Unresolved(delta) => {
+                        assert_eq!(expected_result.0, None);
+                        let applied_delta = delta.apply_to(STORAGE_DELTA_VAL);
+                        if applied_delta.is_err() {
+                            delta_failed = true;
+                        }
+                        if delta_failed {
+                            // Should be expected to fail.
+                            assert!(delta_fail);
+                        } else {
+                            assert_eq!(applied_delta.unwrap(), expected_result.1.unwrap());
+                        }
+                    }
+                    ReadResult::None => {
+                        assert_eq!(expected_result.0, None);
+                        assert_eq!(expected_result.1, None);
+                    }
                 }
             })
     }
@@ -524,7 +529,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .take(*skip_at)
                     .zip(expected_results.iter())
                     .for_each(|(Output(_, _, result), expected_results)| {
-                        Self::check_result(expected_results, result)
+                        Self::check_result(expected_results, result, false)
                     });
 
                 results
@@ -532,11 +537,21 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .skip(*skip_at)
                     .for_each(|Output(_, _, result)| assert!(result.is_empty()))
             }
+            (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
+                // Check_result asserts internally, so no need to return a bool.
+                results
+                    .iter()
+                    .take(*fail_idx)
+                    .zip(expected_results.iter())
+                    .for_each(|(Output(_, _, result), expected_results)| {
+                        Self::check_result(expected_results, result, true)
+                    });
+            }
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())
                 .for_each(|(Output(_, _, result), expected_result)| {
-                    Self::check_result(expected_result, result);
+                    Self::check_result(expected_result, result, false);
                 }),
             _ => panic!("Incomparable execution outcomes"),
         }
