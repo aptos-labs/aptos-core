@@ -51,9 +51,9 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
    2. Click **Create a new wallet**. 
    3. Make sure to store your seed phrase somewhere safe. This account will be used in the future.
     
-5. Click on Step 2 **CONNECT WALLET** to register the owner wallet address to your Aptos Community account. The Aptos team will airdrop coins to this owner wallet address. 
+5. Click on Step 2 **CONNECT WALLET** to register the owner wallet address to your Aptos Community account. The Aptos team will airdrop coins to this owner wallet address.   [Note No where to click?]
 
-6. Click on the Step 3 **COMPLETE SURVEY** to complete the survey.
+6. Click on the Step 3 **COMPLETE SURVEY** to complete the survey. [Note No where to click?]
 
 7. Next, proceed to install and deploy the validator node.
 
