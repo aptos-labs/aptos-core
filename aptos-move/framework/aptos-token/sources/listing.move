@@ -4,12 +4,16 @@ module aptos_token::listing {
     use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, TokenId};
     use std::guid::{Self, ID};
+    use aptos_framework::coin;
 
     const EOWNER_NOT_HAVING_ENOUGH_TOKEN: u64 = 1;
     const ELISTING_NOT_EXIST:u64 = 2;
+    const EINVALID_BUY_NOT_INSTANT_SALE: u64 = 3;
+    const ELISTING_RECORDS_NOT_EXIST: u64 = 4;
+    const EBUYER_NOT_HAVING_ENOUGH_COINS: u64 = 5;
 
     /// immutable struct for recording listing info.
-    struct Listing<phantom CoinType> has drop, store {
+    struct Listing<phantom CoinType> has copy, drop, store {
         id: ID,
         owner: address,
         token_id: TokenId,
@@ -113,6 +117,28 @@ module aptos_token::listing {
         guid::id(&gid)
     }
 
+    public fun buy_internal<CoinType>(coin_owner: &signer, listing: Listing<CoinType>) {
+        assert!(listing.instant_sale, EINVALID_BUY_NOT_INSTANT_SALE);
+        let coin_owner_address = signer::address_of(coin_owner);
+
+        let total_amount = listing.min_price * listing.amount;
+        assert!(coin::balance<CoinType>(coin_owner_address) >= total_amount, EBUYER_NOT_HAVING_ENOUGH_COINS);
+
+        let token = token::withdraw_with_event_internal(listing.owner, listing.token_id, listing.amount);
+        coin::transfer<CoinType>(coin_owner, listing.owner, total_amount);
+        token::direct_deposit(signer::address_of(coin_owner), token);
+    }
+
+    public entry fun buy<CoinType>(coin_owner: &signer, token_owner: &signer, listing_id: u64) acquires ListingRecords {
+        let token_owner_address = signer::address_of(token_owner);
+        assert!(exists<ListingRecords<CoinType>>(token_owner_address), ELISTING_RECORDS_NOT_EXIST);
+        let token_owner_records = &mut borrow_global_mut<ListingRecords<CoinType>>(token_owner_address).records;
+        let listing_id = guid::create_id(signer::address_of(token_owner), listing_id);
+        assert!(table::contains(token_owner_records, listing_id), ELISTING_NOT_EXIST);
+        let listing = table::borrow(token_owner_records, listing_id);
+        buy_internal(coin_owner, *listing);
+    }
+
     public fun get_listing_id<CoinType>(list: &Listing<CoinType>): ID {
         list.id
     }
@@ -147,7 +173,7 @@ module aptos_token::listing {
     }
 
     #[test(owner = @0xAF)]
-    public fun test_cancel_listing(owner: signer)acquires ListingRecords {
+    public fun test_cancel_listing(owner: signer) acquires ListingRecords {
         use aptos_framework::coin;
 
         let token_id = token::create_collection_and_token(&owner, 2, 2, 2);
@@ -162,4 +188,58 @@ module aptos_token::listing {
         cancel_direct_list<coin::FakeMoney>(&owner, guid::id_creation_num(&listing_id));
     }
 
+    #[test_only]
+    public fun set_up_buy_test(owner: signer, buyer: signer, aptos_framework: signer, min_price: u64, instant_sale: bool, valid_listing_id: bool): (u64, TokenId) acquires ListingRecords {
+        let buyer_addr = signer::address_of(&buyer);
+        coin::create_fake_money(&aptos_framework, &buyer, 100);
+        coin::transfer<coin::FakeMoney>(&aptos_framework, buyer_addr, 100);
+        coin::register_for_test<coin::FakeMoney>(&owner);
+        token::initialize_token_store(&buyer);
+
+        let token_id = token::create_collection_and_token(&owner, 2, 2, 2);
+        let listing_id = create_list_under_user_account<coin::FakeMoney>(
+            &owner,
+            token_id,
+            1,
+             min_price,
+            instant_sale,
+            0
+        );
+        let id = guid::id_creation_num(&listing_id);
+
+        if (valid_listing_id) {
+            buy<coin::FakeMoney>(&buyer, &owner, id);
+        } else {
+            buy<coin::FakeMoney>(&buyer, &owner, 1);
+        };
+
+        (id, token_id)
+    }
+
+    #[test(owner = @0xAF, buyer = @0xAB, aptos_framework = @aptos_framework)]
+    public fun test_successful_buy(owner: signer, buyer: signer, aptos_framework: signer) acquires ListingRecords {
+        let buyer_addr = signer::address_of(&buyer);
+        let (_, token_id) = set_up_buy_test(owner, buyer, aptos_framework, 1, true, true);
+
+        assert!(coin::balance<coin::FakeMoney>(buyer_addr) == 99, 0);
+        assert!(token::balance_of(buyer_addr, token_id) == 1, 1);
+    }
+
+    #[test(owner = @0xAF, buyer = @0xAB, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 2)]
+    public fun test_failed_buy_invalid_listing_id(owner: signer, buyer: signer, aptos_framework: signer) acquires ListingRecords {
+        set_up_buy_test(owner, buyer, aptos_framework, 1, true, false);
+    }
+
+    #[test(owner = @0xAF, buyer = @0xAB, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 3)]
+    public fun test_failed_buy_not_instant_sale(owner: signer, buyer: signer, aptos_framework: signer) acquires ListingRecords {
+        set_up_buy_test(owner, buyer, aptos_framework, 1, false, true);
+    }
+
+    #[test(owner = @0xAF, buyer = @0xAB, aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 5)]
+    public fun test_failed_buy_insufficient_balance(owner: signer, buyer: signer, aptos_framework: signer) acquires ListingRecords {
+       set_up_buy_test(owner, buyer, aptos_framework, 1000, true, true);
+    }
 }

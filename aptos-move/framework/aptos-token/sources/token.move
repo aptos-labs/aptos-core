@@ -9,6 +9,7 @@ module aptos_token::token {
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
     friend aptos_token::bid;
+    friend aptos_token::listing;
 
     const TOKEN_MAX_MUTABLE_IND: u64 = 0;
     const TOKEN_URI_MUTABLE_IND: u64 = 1;
