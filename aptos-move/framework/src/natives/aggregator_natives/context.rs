@@ -32,7 +32,7 @@ pub struct AggregatorChangeSet {
 /// Note: table resolver is reused for fine-grained storage access.
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
-    txn_hash: u128,
+    txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
 }
@@ -40,7 +40,7 @@ pub struct NativeAggregatorContext<'a> {
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: u128, resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
         Self {
             txn_hash,
             resolver,
@@ -49,7 +49,7 @@ impl<'a> NativeAggregatorContext<'a> {
     }
 
     /// Returns the hash of transaction associated with this context.
-    pub fn txn_hash(&self) -> u128 {
+    pub fn txn_hash(&self) -> [u8; 32] {
         self.txn_hash
     }
 
@@ -99,6 +99,7 @@ impl<'a> NativeAggregatorContext<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_aggregator::aggregator_extension::AggregatorHandle;
     use aptos_types::account_address::AccountAddress;
     use claim::assert_matches;
     use move_deps::move_table_extension::TableHandle;
@@ -161,7 +162,7 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let context = NativeAggregatorContext::new(0, &EmptyStorage);
+        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage);
         use AggregatorChange::*;
 
         test_set_up(&context);
