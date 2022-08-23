@@ -16,7 +16,7 @@ use aptos_gas::{
     NativeGasParameters,
 };
 use aptos_logger::prelude::*;
-use aptos_state_view::StateView;
+use aptos_state_view::{state_storage_usage::StateStorageUsage, StateView};
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
@@ -45,6 +45,7 @@ use std::sync::Arc;
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
     gas_params: Option<AptosGasParameters>,
+    state_storage_usage: Option<StateStorageUsage>,
     version: Option<Version>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
     metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
@@ -76,6 +77,8 @@ impl AptosVMImpl {
         let mut vm = Self {
             move_vm: Arc::new(inner),
             gas_params,
+            // TODO(Gas): Fetch this from the chain.
+            state_storage_usage: Some(StateStorageUsage::new(0, 0)),
             version: None,
             chain_account_info: None,
             metadata_cache: Default::default(),
@@ -97,6 +100,8 @@ impl AptosVMImpl {
         Self {
             move_vm: Arc::new(inner),
             gas_params: Some(gas_params),
+            // TODO(Gas): Check if this is correct.
+            state_storage_usage: Some(StateStorageUsage::new(0, 0)),
             version: Some(version),
             chain_account_info: None,
             metadata_cache: Default::default(),
@@ -132,6 +137,17 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
         self.gas_params.as_ref().ok_or_else(|| {
+            log_context.alert();
+            error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+        })
+    }
+
+    pub fn get_state_storage_usage(
+        &self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<&StateStorageUsage, VMStatus> {
+        self.state_storage_usage.as_ref().ok_or_else(|| {
             log_context.alert();
             error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)

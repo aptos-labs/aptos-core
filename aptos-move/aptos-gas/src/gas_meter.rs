@@ -8,6 +8,7 @@ use crate::{
     algebra::Gas, instr::InstructionGasParameters, misc::MiscGasParameters,
     transaction::TransactionGasParameters,
 };
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, NumArgs, NumBytes},
@@ -471,6 +472,20 @@ impl GasMeter for AptosGasMeter {
 impl AptosGasMeter {
     pub fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
         let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
+        self.charge(cost).map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn charge_write_set_gas<'a>(
+        &mut self,
+        num_items_in_storage: NumArgs,
+        num_bytes_in_storage: NumBytes,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> VMResult<()> {
+        let cost = self.gas_params.txn.calculate_write_set_gas(
+            num_items_in_storage,
+            num_bytes_in_storage,
+            ops,
+        );
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
 }

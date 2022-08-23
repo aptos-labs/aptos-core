@@ -4,23 +4,21 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
-use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitFractionalWithParams,
-    ToUnitWithParams,
+use crate::{
+    algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit},
+    InternalGasMultiplier,
 };
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use move_core_types::gas_algebra::{
+    GasQuantity, InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs,
+    NumBytes, ToUnitFractionalWithParams, ToUnitWithParams,
+};
+use std::cmp;
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
     [
-        [load_data_base: InternalGas, "load_data.base", 1],
-        [
-            load_data_per_byte: InternalGasPerByte,
-            "load_data.per_byte",
-            1
-        ],
-        [load_data_failure: InternalGas, "load_data.failure", 1],
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
         [
@@ -73,8 +71,87 @@ crate::params::define_gas_parameters!(
             "gas_unit_scaling_factor",
             1000
         ],
+        // Gas Parameters for reading data from storage.
+        [load_data_base: InternalGas, "load_data.base", 1],
+        [
+            load_data_per_byte: InternalGasPerByte,
+            "load_data.per_byte",
+            1
+        ],
+        [load_data_failure: InternalGas, "load_data.failure", 1],
+        // Gas parameters for writing data to storage.
+        [
+            write_data_per_op: InternalGasPerArg,
+            "write_data.per_op",
+            100
+        ],
+        [
+            write_data_per_new_item: InternalGasPerArg,
+            "write_data.new_item",
+            1000
+        ],
+        [
+            write_data_per_byte_in_key: InternalGasPerByte,
+            "write_data.per_byte_in_key",
+            100
+        ],
+        [
+            write_data_per_byte_in_val: InternalGasPerByte,
+            "write_data.per_byte_in_val",
+            100
+        ],
+        // Multiplier for write operations.
+        [
+            write_data_multiplier_max: InternalGasMultiplier,
+            "write_data.multiplier.max",
+            10
+        ],
+        [
+            write_data_multiplier_exp_base: InternalGasMultiplier,
+            "write_data.multiplier.exp_base",
+            32
+        ],
+        [
+            write_data_multiplier_target_items: NumArgs,
+            "write_data.multiplier.target.items",
+            1_000_000,
+        ],
+        [
+            write_data_multiplier_target_bytes: NumBytes,
+            "write_data.multiplier.target.bytes",
+            256 * 1024 * 1024 * 1024, /* 256 GB */
+        ],
     ]
 );
+
+fn calculate_write_multiplier<U>(
+    min: InternalGasMultiplier,
+    max: InternalGasMultiplier,
+    base: InternalGasMultiplier,
+    used: GasQuantity<U>,
+    target: GasQuantity<U>,
+) -> f64 {
+    // Clamp the params.
+    let min = cmp::max(min, 1.into());
+    let max = cmp::max(min, max);
+    let base = cmp::max(base, 1.into());
+
+    let target = cmp::max(target, 1.into());
+
+    // Convert to f64.
+    let min = u64::from(min) as f64;
+    let max = u64::from(max) as f64;
+    let base = u64::from(base) as f64;
+
+    let used = u64::from(used) as f64;
+    let target = u64::from(target) as f64;
+
+    if used >= target {
+        max
+    } else {
+        min + (max - min) * ((base.powf(used / target) - 1.0) / (base - 1.0))
+    }
+}
 
 impl TransactionGasParameters {
     // TODO(Gas): Right now we are relying on this to avoid div by zero errors when using the all-zero
@@ -98,6 +175,77 @@ impl TransactionGasParameters {
         } else {
             min_transaction_fee
         }
+    }
+
+    pub fn calculate_write_set_gas<'a>(
+        &self,
+        num_items_in_storage: NumArgs,
+        num_bytes_in_storage: NumBytes,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> InternalGas {
+        use WriteOp::*;
+
+        // Counting
+        let mut num_ops = NumArgs::zero();
+        let mut num_new_items = NumArgs::zero();
+        let mut num_bytes_key = NumBytes::zero();
+        let mut num_bytes_val = NumBytes::zero();
+
+        for (key, op) in ops.into_iter() {
+            num_ops += 1.into();
+
+            if self.write_data_per_byte_in_key > 0.into() {
+                // TODO(Gas): Are we supposed to panic here?
+                num_bytes_key += NumBytes::new(
+                    key.encode()
+                        .expect("Should be able to serialize state key")
+                        .len() as u64,
+                );
+            }
+
+            match op {
+                Creation(data) => {
+                    num_new_items += 1.into();
+                    num_bytes_val += NumBytes::new(data.len() as u64);
+                }
+                Modification(data) => {
+                    num_bytes_val += NumBytes::new(data.len() as u64);
+                }
+                Deletion => (),
+            }
+        }
+
+        // Calculate the unscaled costs
+        let cost_ops = self.write_data_per_op * num_ops;
+        let cost_bytes = self.write_data_per_byte_in_key * num_bytes_key
+            + self.write_data_per_byte_in_val * num_bytes_val;
+        let cost_new_items = self.write_data_per_new_item * num_new_items;
+
+        // Calculate the scaled costs
+        let per_new_item_multiplier = calculate_write_multiplier(
+            1.into(),
+            self.write_data_multiplier_max,
+            self.write_data_multiplier_exp_base,
+            num_items_in_storage,
+            self.write_data_multiplier_target_items,
+        );
+
+        let per_byte_multiplier = calculate_write_multiplier(
+            1.into(),
+            self.write_data_multiplier_max,
+            self.write_data_multiplier_exp_base,
+            num_bytes_in_storage,
+            self.write_data_multiplier_target_bytes,
+        );
+
+        let cost_new_items = InternalGas::from(
+            (f64::ceil(u64::from(cost_new_items) as f64 * per_new_item_multiplier)) as u64,
+        );
+        let cost_bytes = InternalGas::from(
+            (f64::ceil(u64::from(cost_bytes) as f64 * per_byte_multiplier)) as u64,
+        );
+
+        cost_ops + cost_new_items + cost_bytes
     }
 }
 

@@ -25,7 +25,7 @@ use aptos_aggregator::{
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
 use aptos_crypto::HashValue;
-use aptos_gas::AptosGasMeter;
+use aptos_gas::{AptosGasMeter, NumArgs, NumBytes};
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
@@ -355,7 +355,14 @@ impl AptosVM {
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext = session_output.into_change_set(&mut ())?;
 
-            // charge for write set
+            // Charge gas for write set
+            let storage_usage = self.0.get_state_storage_usage(log_context)?;
+            gas_meter.charge_write_set_gas(
+                NumArgs::new(storage_usage.items() as u64),
+                NumBytes::new(storage_usage.bytes() as u64),
+                change_set_ext.write_set().iter(),
+            )?;
+            // TODO(Gas): Charge for aggregator writes
 
             self.success_transaction_cleanup(
                 storage,
@@ -483,6 +490,15 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext = session_output.into_change_set(&mut ())?;
+
+        // Charge gas for write set
+        let storage_usage = self.0.get_state_storage_usage(log_context)?;
+        gas_meter.charge_write_set_gas(
+            NumArgs::new(storage_usage.items() as u64),
+            NumBytes::new(storage_usage.bytes() as u64),
+            change_set_ext.write_set().iter(),
+        )?;
+        // TODO(Gas): Charge for aggregator writes
 
         self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
     }

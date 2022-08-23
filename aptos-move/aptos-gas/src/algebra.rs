@@ -20,3 +20,5 @@ pub type GasScalingFactor = GasQuantity<UnitDiv<InternalGasUnit, GasUnit>>;
 pub type Fee = GasQuantity<Octa>;
 
 pub type FeePerGasUnit = GasQuantity<UnitDiv<Octa, GasUnit>>;
+
+pub type InternalGasMultiplier = GasQuantity<UnitDiv<InternalGasUnit, InternalGasUnit>>;
