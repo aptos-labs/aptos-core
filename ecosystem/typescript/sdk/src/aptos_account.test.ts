@@ -27,7 +27,9 @@ test("generates derive path accounts", () => {
 });
 
 test("generates derive path accounts", () => {
-  expect(() => { AptosAccount.fromDerivePath("", mnemonic); }).toThrow(new Error("Invalid derivation path"));
+  expect(() => {
+    AptosAccount.fromDerivePath("", mnemonic);
+  }).toThrow(new Error("Invalid derivation path"));
 });
 
 test("accepts custom address", () => {
