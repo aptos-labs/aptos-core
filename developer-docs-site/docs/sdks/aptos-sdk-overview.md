@@ -127,7 +127,7 @@ An example of an e2e test for submitting a BCS transaction can be found [here](h
 
 There are a total of three test vectors. Each covers one type of transaction payload.
 
-- [ScriptFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_function_payload.json)
+- [ScriptFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_entry_function_payload.json)
 - [Script vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_payload.json)
 - [ModuleBundle vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_module_payload.json)
 
