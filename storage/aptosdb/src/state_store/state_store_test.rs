@@ -11,9 +11,8 @@ use aptos_types::{
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
 use crate::{
-    pruner::state_store::StateMerklePruner,
     test_helper::{arb_state_kv_sets, update_store},
-    AptosDB,
+    AptosDB, StateMerklePruner,
 };
 
 use super::*;

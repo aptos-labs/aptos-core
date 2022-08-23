@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
 use std::{sync::Arc, time::Duration};
 
-use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
+use aptos_config::config::{
+    LedgerPrunerConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+};
 use proptest::prelude::*;
 
 use crate::{
@@ -19,12 +23,14 @@ use crate::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::transaction::{TransactionToCommit, Version};
 use aptos_types::{
     proof::SparseMerkleLeafNode,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{ExecutionStatus, TransactionInfo},
 };
-use storage_interface::{DbReader, ExecutedTrees, Order};
+use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -192,4 +198,99 @@ fn test_rocksdb_properties_reporter() {
     let _db = AptosDB::new_for_test(&tmp_dir);
     std::thread::sleep(Duration::from_secs(1));
     assert_eq!(get_metric(), 1);
+}
+
+pub fn test_state_merkle_pruning_impl(
+    input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+) {
+    // set up DB with state prune window 5
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::open(
+        &tmp_dir,
+        false, /* is_read_only */
+        PrunerConfig {
+            ledger_pruner_config: LedgerPrunerConfig {
+                enable: true,
+                prune_window: 10,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+            state_merkle_pruner_config: StateMerklePrunerConfig {
+                enable: true,
+                prune_window: 5,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+        },
+        RocksdbConfigs::default(),
+        false, /* enable_indexer */
+        TARGET_SNAPSHOT_SIZE,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    )
+    .unwrap();
+
+    // augment DB in blocks
+    let mut in_memory_state = db
+        .state_store
+        .buffered_state()
+        .lock()
+        .current_state()
+        .clone();
+    let _ancester = in_memory_state.current.clone();
+    let mut next_ver: Version = 0;
+    let mut snapshot_versions = vec![];
+    for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
+        test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions(
+            txns_to_commit,
+            next_ver,                /* first_version */
+            next_ver.checked_sub(1), /* base_state_version */
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+
+        next_ver += txns_to_commit.len() as u64;
+
+        let last_version = next_ver - 1;
+        let is_epoch_ending = ledger_info_with_sigs.ledger_info().ends_epoch();
+        snapshot_versions.push((last_version, is_epoch_ending));
+
+        let state_min_readable = last_version.saturating_sub(5);
+        let non_pruned_versions: Vec<_> = snapshot_versions
+            .iter()
+            .filter(|(v, _is_epoch_ending)| *v >= state_min_readable)
+            .map(|(v, _)| *v)
+            .collect();
+        let pruner = &db.state_store.state_db.state_pruner;
+        // Prune till the oldest snapshot readable.
+        pruner
+            .pruner_worker
+            .set_target_db_version(non_pruned_versions.first().cloned().unwrap());
+        pruner.wait_for_pruner().unwrap();
+
+        // Check strictly that all trees in the window accessible and all those nodes not needed
+        // must be gone.
+        let expected_nodes: HashSet<_> = non_pruned_versions
+            .iter()
+            .flat_map(|v| db.state_store.get_all_jmt_nodes_referenced(*v).unwrap())
+            .collect();
+        let all_nodes: HashSet<_> = db
+            .state_store
+            .get_all_jmt_nodes()
+            .unwrap()
+            .into_iter()
+            .collect();
+        assert_eq!(expected_nodes, all_nodes);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
+        test_state_merkle_pruning_impl(input);
+    }
 }

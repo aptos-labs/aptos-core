@@ -35,6 +35,12 @@ pub trait PrunerManager: Debug + Sync {
     /// an internal counter.
     #[cfg(test)]
     fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()> {
+        self.maybe_set_pruner_target_db_version(latest_version);
+        self.wait_for_pruner()
+    }
+
+    #[cfg(test)]
+    fn wait_for_pruner(&self) -> anyhow::Result<()> {
         use std::{
             thread::sleep,
             time::{Duration, Instant},
@@ -43,8 +49,6 @@ pub trait PrunerManager: Debug + Sync {
         if !self.is_pruner_enabled() {
             return Ok(());
         }
-
-        self.maybe_set_pruner_target_db_version(latest_version);
 
         // Assuming no big pruning chunks will be issued by a test.
         const TIMEOUT: Duration = Duration::from_secs(10);
