@@ -180,7 +180,11 @@ impl TelemetrySender {
                     self.reset_token();
                     Err(anyhow!("Unauthorized"))
                 } else {
-                    Err(anyhow!("Error status received: {}", status_code))
+                    Err(anyhow!(
+                        "Error status received {}: {}",
+                        status_code,
+                        response.text().await?,
+                    ))
                 }
             }
             Err(error) => Err(anyhow!("Error sending metrics. Err: {}", error)),
