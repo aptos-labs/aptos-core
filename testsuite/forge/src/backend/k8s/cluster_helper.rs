@@ -380,7 +380,7 @@ fn generate_new_era() -> String {
 }
 
 fn get_node_default_helm_path() -> String {
-    let forge_run_mode = std::env::var("FORGE_RUNNER_MODE").unwrap_or("k8s".to_string());
+    let forge_run_mode = std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
     if forge_run_mode.eq("local") {
         "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml".to_string()
     } else {
