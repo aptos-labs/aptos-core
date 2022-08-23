@@ -24,8 +24,8 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
-    VersionedEvent,
+    GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData,
+    UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
@@ -893,6 +893,12 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<AccountResource>> {
         let url = self.build_path(&format!("accounts/{}", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
+        let url = self.build_path("estimate_gas_price")?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
