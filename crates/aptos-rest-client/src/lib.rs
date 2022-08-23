@@ -207,6 +207,10 @@ impl Client {
             oldest_block_height: r.oldest_block_height.into(),
             block_height: r.block_height.into(),
         });
+        assert_eq!(response.inner().chain_id, response.state().chain_id);
+        assert_eq!(response.inner().epoch, response.state().epoch);
+        assert_eq!(response.inner().version, response.state().version);
+        assert_eq!(response.inner().block_height, response.state().block_height);
 
         Ok(response)
     }
@@ -414,6 +418,29 @@ impl Client {
         }
 
         return Err(anyhow!("Timed out waiting for transaction").into());
+    }
+
+    pub async fn wait_for_version(&self, version: u64) -> Result<State> {
+        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+
+        let start = std::time::Instant::now();
+        loop {
+            let state = self.get_ledger_information().await?.into_inner();
+            if state.version >= version {
+                return Ok(state);
+            }
+
+            if start.elapsed() >= DEFAULT_TIMEOUT {
+                return Err(anyhow!(
+                    "timeout when waiting for version {}, only got to {}",
+                    version,
+                    state.version
+                ));
+            }
+
+            tokio::time::sleep(DEFAULT_DELAY).await;
+        }
     }
 
     pub async fn get_transactions(

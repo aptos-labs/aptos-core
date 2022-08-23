@@ -33,10 +33,8 @@ module aptos_framework::aggregator_factory {
     use aptos_std::aggregator::Aggregator;
     use aptos_std::table::{Self, Table};
 
+    friend aptos_framework::genesis;
     friend aptos_framework::optional_aggregator;
-
-    #[test_only]
-    friend aptos_framework::aggregator_tests;
 
     /// When aggregator factory is not published yet.
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
@@ -46,13 +44,14 @@ module aptos_framework::aggregator_factory {
         phantom_table: Table<u128, u128>,
     }
 
+    /// Can only be called during genesis.
     /// Creates a new factory for aggregators.
-    public fun initialize_aggregator_factory(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun initialize_aggregator_factory(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         let aggregator_factory = AggregatorFactory {
             phantom_table: table::new()
         };
-        move_to(account, aggregator_factory);
+        move_to(aptos_framework, aggregator_factory);
     }
 
     /// Creates a new aggregator instance which overflows on exceeding a `limit`.
@@ -80,4 +79,12 @@ module aptos_framework::aggregator_factory {
     }
 
     native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
+
+    #[test_only]
+    friend aptos_framework::aggregator_tests;
+
+    #[test_only]
+    public fun initialize_aggregator_factory_for_test(aptos_framework: &signer) {
+        initialize_aggregator_factory(aptos_framework);
+    }
 }

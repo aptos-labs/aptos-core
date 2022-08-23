@@ -17,10 +17,10 @@ module aptos_framework::consensus_config {
     const EINVALID_CONFIG: u64 = 1;
 
     /// Publishes the ConsensusConfig config.
-    public(friend) fun initialize(account: &signer, config: vector<u8>) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
-        move_to(account, ConsensusConfig { config });
+        move_to(aptos_framework, ConsensusConfig { config });
     }
 
     /// This can be called by on-chain governance to update on-chain consensus configs.

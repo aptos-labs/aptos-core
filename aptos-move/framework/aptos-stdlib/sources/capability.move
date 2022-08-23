@@ -71,7 +71,7 @@
 ///                  is_valid_delegate_for_feature(d);
 /// ```
 ///
-module std::capability {
+module aptos_std::capability {
     use std::error;
     use std::signer;
     use std::vector;

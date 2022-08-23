@@ -49,38 +49,36 @@ module aptos_framework::reconfiguration {
 
     /// Only called during genesis.
     /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
-    public(friend) fun initialize(
-        account: &signer,
-    ) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun initialize(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(account)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(aptos_framework)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
-            account,
+            aptos_framework,
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
-                events: event::new_event_handle<NewEpochEvent>(account),
+                events: event::new_event_handle<NewEpochEvent>(aptos_framework),
             }
         );
     }
 
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
-    fun disable_reconfiguration(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
+    fun disable_reconfiguration(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        move_to(account, DisableReconfiguration {} )
+        move_to(aptos_framework, DisableReconfiguration {} )
     }
 
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
-    fun enable_reconfiguration(account: &signer) acquires DisableReconfiguration {
-        system_addresses::assert_aptos_framework(account);
+    fun enable_reconfiguration(aptos_framework: &signer) acquires DisableReconfiguration {
+        system_addresses::assert_aptos_framework(aptos_framework);
 
         assert!(!reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(account));
+        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(aptos_framework));
     }
 
     fun reconfiguration_enabled(): bool {

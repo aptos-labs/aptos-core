@@ -112,15 +112,15 @@ module aptos_framework::coin {
     //
 
     /// Publishes supply configuration. Initially, upgrading is not allowed.
-    public(friend) fun initialize_supply_config(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
-        move_to(account, SupplyConfig { allow_upgrades: false });
+    public(friend) fun initialize_supply_config(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, SupplyConfig { allow_upgrades: false });
     }
 
     /// This should be called by on-chain governance to update the config and allow
     // or disallow upgradability of total supply.
-    public fun allow_supply_upgrades(account: &signer, allowed: bool) acquires SupplyConfig {
-        system_addresses::assert_aptos_framework(account);
+    public fun allow_supply_upgrades(aptos_framework: &signer, allowed: bool) acquires SupplyConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
         *allow_upgrades = allowed;
     }
@@ -486,7 +486,7 @@ module aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
     ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) {
-        aggregator_factory::initialize_aggregator_factory(account);
+        aggregator_factory::initialize_aggregator_factory_for_test(account);
         initialize<FakeMoney>(
             account,
             string::utf8(b"Fake money"),
@@ -540,7 +540,7 @@ module aptos_framework::coin {
         let name = string::utf8(b"Fake money");
         let symbol = string::utf8(b"FMD");
 
-        aggregator_factory::initialize_aggregator_factory(&source);
+        aggregator_factory::initialize_aggregator_factory_for_test(&source);
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             name,
@@ -611,7 +611,7 @@ module aptos_framework::coin {
     #[test(source = @0x2, framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10001)]
     public fun fail_initialize(source: signer, framework: signer) {
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
@@ -822,13 +822,13 @@ module aptos_framework::coin {
     #[test(framework = @aptos_framework, other = @0x123)]
     #[expected_failure(abort_code = 0x50003)]
     fun test_supply_initialize_fails(framework: signer, other: signer) {
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&other);
     }
 
     #[test(framework = @aptos_framework)]
     fun test_supply_initialize(framework: signer) acquires CoinInfo {
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 
         let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
@@ -846,7 +846,7 @@ module aptos_framework::coin {
     #[test(framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x20001)]
     fun test_supply_overflow(framework: signer) acquires CoinInfo {
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 
         let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
@@ -861,7 +861,7 @@ module aptos_framework::coin {
     #[expected_failure(abort_code = 0x5000B)]
     fun test_supply_upgrade_fails(framework: signer) acquires CoinInfo, SupplyConfig {
         initialize_supply_config(&framework);
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_integer(&framework);
 
         let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
@@ -881,7 +881,7 @@ module aptos_framework::coin {
     #[test(framework = @aptos_framework)]
     fun test_supply_upgrade(framework: signer) acquires CoinInfo, SupplyConfig {
         initialize_supply_config(&framework);
-        aggregator_factory::initialize_aggregator_factory(&framework);
+        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_integer(&framework);
 
         // Ensure we have a non-parellelizable non-zero supply.

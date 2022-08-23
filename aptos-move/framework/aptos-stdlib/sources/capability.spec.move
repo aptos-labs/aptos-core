@@ -1,4 +1,4 @@
-spec std::capability {
+spec aptos_std::capability {
     /// Helper specification function to check whether a capability exists at address.
     spec fun spec_has_cap<Feature>(addr: address): bool {
         exists<CapState<Feature>>(addr)

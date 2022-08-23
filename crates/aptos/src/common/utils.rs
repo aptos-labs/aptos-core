@@ -5,10 +5,10 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_build_info::build_information;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::Client;
-use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
@@ -78,38 +78,7 @@ pub async fn to_common_result<T: Serialize>(
 }
 
 pub fn cli_build_information() -> BTreeMap<String, String> {
-    shadow_rs::shadow!(build);
-
-    let mut build_information = collect_build_information!();
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_BRANCH.into(),
-        build::BRANCH.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_CARGO_VERSION.into(),
-        build::CARGO_VERSION.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-        build::COMMIT_HASH.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_OS.into(),
-        build::BUILD_OS.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_PKG_VERSION.into(),
-        build::PKG_VERSION.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_RUST_CHANNEL.into(),
-        build::RUST_CHANNEL.into(),
-    );
-    build_information.insert(
-        aptos_telemetry::build_information::BUILD_RUST_VERSION.into(),
-        build::RUST_VERSION.into(),
-    );
-    build_information
+    build_information!()
 }
 
 /// Sends a telemetry event about the CLI build, command and result

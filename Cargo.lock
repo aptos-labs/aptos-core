@@ -144,6 +144,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-build-info",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",
@@ -363,6 +364,13 @@ dependencies = [
  "serde 1.0.144",
  "serde_bytes",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-build-info"
+version = "0.1.0"
+dependencies = [
+ "shadow-rs",
 ]
 
 [[package]]
@@ -856,6 +864,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api",
+ "aptos-build-info",
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
@@ -3807,6 +3816,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-genesis",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
@@ -3823,6 +3833,7 @@ dependencies = [
  "inspection-service",
  "k8s-openapi",
  "kube",
+ "num_cpus",
  "once_cell",
  "prometheus-http-query",
  "rand 0.7.3",
@@ -4699,6 +4710,7 @@ name = "inspection-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-build-info",
  "aptos-config",
  "aptos-infallible",
  "aptos-logger",
@@ -8781,6 +8793,7 @@ dependencies = [
  "futures",
  "hex",
  "move-deps",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",

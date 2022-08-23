@@ -52,29 +52,34 @@ pub mod aptos_api {
             Ok((validator_infos, state))
         }
 
-        pub async fn validator_set_validator_addresses(
-            &self,
-        ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
-            self.validator_set_addresses(|info| Self::validator_addresses(info.config()))
-                .await
-        }
-
         fn validator_addresses(config: &ValidatorConfig) -> Result<Vec<NetworkAddress>> {
-            config
-                .validator_network_addresses()
-                .map_err(|e| anyhow!("unable to parse network address {}", e.to_string()))
+            config.validator_network_addresses().map_err(|e| {
+                anyhow!(
+                    "unable to parse validator network address {}",
+                    e.to_string()
+                )
+            })
         }
 
-        async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>>>(
+        fn fullnode_addresses(config: &ValidatorConfig) -> Result<Vec<NetworkAddress>> {
+            config
+                .fullnode_network_addresses()
+                .map_err(|e| anyhow!("unable to parse fullnode network address {}", e.to_string()))
+        }
+
+        pub async fn validator_set_all_addresses(
             &self,
-            address_accessor: F,
-        ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
+        ) -> Result<(
+            Vec<(PeerId, Vec<NetworkAddress>, Vec<NetworkAddress>)>,
+            State,
+        )> {
             let (set, state) = self.validator_set().await?;
             let mut decoded_set = Vec::new();
             for info in set {
                 let peer_id = *info.account_address();
-                let addrs = address_accessor(info)?;
-                decoded_set.push((peer_id, addrs));
+                let validator_addrs = Self::validator_addresses(info.config())?;
+                let fullnode_addrs = Self::fullnode_addresses(info.config())?;
+                decoded_set.push((peer_id, validator_addrs, fullnode_addrs));
             }
 
             Ok((decoded_set, state))

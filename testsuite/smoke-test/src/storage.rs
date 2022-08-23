@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::reconfig;
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
@@ -15,7 +14,7 @@ use anyhow::{bail, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use backup_cli::metadata::view::BackupStorageState;
-use forge::{NodeExt, Swarm, SwarmExt};
+use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
     path::Path,

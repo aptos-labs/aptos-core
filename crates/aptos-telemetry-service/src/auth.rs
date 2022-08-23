@@ -6,7 +6,7 @@ use crate::error::ServiceError;
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
 use anyhow::{anyhow, Result};
-use aptos_config::config::PeerRole;
+use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
 use aptos_logger::{debug, error, warn};
 use aptos_types::PeerId;
@@ -28,6 +28,8 @@ pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
 }
 
 pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Reply, Rejection> {
+    debug!("received auth request: {:?}", body);
+
     let client_init_message = &body.handshake_msg;
 
     // Check whether the client (validator) is using the correct server's public key, which the
@@ -59,7 +61,13 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
             ))
         })?;
 
-    let (epoch, peer_role) = match context.validator_cache().read().get(&body.chain_id) {
+    let cache = if body.role_type == RoleType::Validator {
+        context.validator_cache()
+    } else {
+        context.vfn_cache()
+    };
+
+    let (epoch, peer_role) = match cache.read().get(&body.chain_id) {
         Some((epoch, peer_set)) => {
             match peer_set.get(&body.peer_id) {
                 Some(peer) => {

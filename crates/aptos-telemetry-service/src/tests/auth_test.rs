@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{Peer, PeerRole, PeerSet};
+use aptos_config::config::{Peer, PeerRole, PeerSet, RoleType};
+use aptos_crypto::noise::{InitiatorHandshakeState, NoiseConfig};
 use aptos_crypto::{noise, x25519, Uniform};
 use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};
 use aptos_types::{
@@ -18,11 +19,15 @@ use crate::{
     types::auth::{AuthResponse, Claims},
 };
 
-#[tokio::test]
-async fn test_auth() {
-    let context = new_test_context().await;
-    let server_public_key = context.inner.noise_config().public_key();
-
+fn init(
+    peer_role: PeerRole,
+) -> (
+    rand::rngs::ThreadRng,
+    NoiseConfig,
+    ChainId,
+    PeerId,
+    std::collections::HashMap<PeerId, Peer>,
+) {
     let mut rng = rand::thread_rng();
     let initiator_static = x25519::PrivateKey::generate(&mut rng);
     let initiator_public_key = initiator_static.public_key();
@@ -36,16 +41,20 @@ async fn test_auth() {
         Handshake(0),
     ];
     let addr = NetworkAddress::from_protocols(protocols).unwrap();
-    let peer = Peer::from_addrs(PeerRole::Validator, vec![addr]);
+    let peer = Peer::from_addrs(peer_role, vec![addr]);
     let mut peer_set = PeerSet::new();
     peer_set.insert(peer_id, peer);
 
-    context
-        .inner
-        .validator_cache()
-        .write()
-        .insert(chain_id, (1, peer_set));
+    (rng, initiator, chain_id, peer_id, peer_set)
+}
 
+fn init_handshake(
+    rng: &mut (impl rand::RngCore + rand::CryptoRng),
+    chain_id: ChainId,
+    peer_id: PeerId,
+    server_public_key: x25519::PublicKey,
+    initiator: &NoiseConfig,
+) -> (noise::InitiatorHandshakeState, Vec<u8>) {
     // buffer to first noise handshake message
     let mut client_noise_msg = vec![0; noise::handshake_init_msg_len(0)];
 
@@ -61,7 +70,7 @@ async fn test_auth() {
     // craft first handshake message  (-> e, es, s, ss)
     let initiator_state = initiator
         .initiate_connection(
-            &mut rng,
+            rng,
             &prologue,
             server_public_key,
             None,
@@ -69,14 +78,14 @@ async fn test_auth() {
         )
         .unwrap();
 
-    let req = json!({
-        "chain_id": chain_id,
-        "peer_id": peer_id,
-        "server_public_key": server_public_key,
-        "handshake_msg": client_noise_msg,
-    });
-    let resp = context.post("/auth", req).await;
+    (initiator_state, client_noise_msg)
+}
 
+fn finish_handshake(
+    initiator: &NoiseConfig,
+    initiator_state: InitiatorHandshakeState,
+    resp: serde_json::Value,
+) -> jsonwebtoken::TokenData<Claims> {
     let resp: AuthResponse = serde_json::from_value(resp).unwrap();
 
     let (response_payload, _) = initiator
@@ -85,12 +94,40 @@ async fn test_auth() {
 
     let jwt = String::from_utf8(response_payload).unwrap();
 
-    let decoded = decode::<Claims>(
+    decode::<Claims>(
         &jwt,
         &DecodingKey::from_secret(b"jwt_signing_key"),
         &Validation::new(Algorithm::HS512),
     )
-    .unwrap();
+    .unwrap()
+}
+
+#[tokio::test]
+async fn test_auth_validator() {
+    let context = new_test_context().await;
+    let server_public_key = context.inner.noise_config().public_key();
+
+    let (mut rng, initiator, chain_id, peer_id, peer_set) = init(PeerRole::Validator);
+
+    context
+        .inner
+        .validator_cache()
+        .write()
+        .insert(chain_id, (1, peer_set));
+
+    let (initiator_state, client_noise_msg) =
+        init_handshake(&mut rng, chain_id, peer_id, server_public_key, &initiator);
+
+    let req = json!({
+        "chain_id": chain_id,
+        "peer_id": peer_id,
+        "role_type": RoleType::Validator,
+        "server_public_key": server_public_key,
+        "handshake_msg": &client_noise_msg,
+    });
+    let resp = context.post("/auth", req).await;
+
+    let decoded = finish_handshake(&initiator, initiator_state, resp);
 
     assert_eq!(
         decoded.claims,
@@ -98,6 +135,46 @@ async fn test_auth() {
             chain_id,
             peer_id,
             peer_role: PeerRole::Validator,
+            epoch: 1,
+            exp: decoded.claims.exp,
+            iat: decoded.claims.iat
+        },
+    )
+}
+
+#[tokio::test]
+async fn test_auth_validatorfullnode() {
+    let context = new_test_context().await;
+    let server_public_key = context.inner.noise_config().public_key();
+
+    let (mut rng, initiator, chain_id, peer_id, peer_set) = init(PeerRole::ValidatorFullNode);
+
+    context
+        .inner
+        .vfn_cache()
+        .write()
+        .insert(chain_id, (1, peer_set));
+
+    let (initiator_state, client_noise_msg) =
+        init_handshake(&mut rng, chain_id, peer_id, server_public_key, &initiator);
+
+    let req = json!({
+        "chain_id": chain_id,
+        "peer_id": peer_id,
+        "role_type": RoleType::FullNode,
+        "server_public_key": server_public_key,
+        "handshake_msg": &client_noise_msg,
+    });
+    let resp = context.post("/auth", req).await;
+
+    let decoded = finish_handshake(&initiator, initiator_state, resp);
+
+    assert_eq!(
+        decoded.claims,
+        Claims {
+            chain_id,
+            peer_id,
+            peer_role: PeerRole::ValidatorFullNode,
             epoch: 1,
             exp: decoded.claims.exp,
             iat: decoded.claims.iat
@@ -135,40 +212,17 @@ async fn test_auth_wrong_key() {
         .write()
         .insert(chain_id, (1, peer_set));
 
-    // buffer to first noise handshake message
-    let mut client_noise_msg = vec![0; noise::handshake_init_msg_len(0)];
-
-    // build the prologue (chain_id | peer_id | public_key)
-    const CHAIN_ID_LENGTH: usize = 1;
-    const ID_SIZE: usize = CHAIN_ID_LENGTH + PeerId::LENGTH;
-    const PROLOGUE_SIZE: usize = CHAIN_ID_LENGTH + PeerId::LENGTH + x25519::PUBLIC_KEY_SIZE;
-    let mut prologue = [0; PROLOGUE_SIZE];
-    prologue[..CHAIN_ID_LENGTH].copy_from_slice(&[chain_id.id()]);
-    prologue[CHAIN_ID_LENGTH..ID_SIZE].copy_from_slice(peer_id.as_ref());
-    prologue[ID_SIZE..PROLOGUE_SIZE].copy_from_slice(server_public_key.as_slice());
-
-    // craft first handshake message  (-> e, es, s, ss)
-    let initiator_state = initiator
-        .initiate_connection(
-            &mut rng,
-            &prologue,
-            server_public_key,
-            None,
-            &mut client_noise_msg,
-        )
-        .unwrap();
+    let (initiator_state, client_noise_msg) =
+        init_handshake(&mut rng, chain_id, peer_id, server_public_key, &initiator);
 
     let req = json!({
         "chain_id": chain_id,
         "peer_id": peer_id,
+        "role_type": RoleType::Validator,
         "server_public_key": server_public_key,
         "handshake_msg": client_noise_msg,
     });
     let resp = context.post("/auth", req).await;
 
-    let resp: AuthResponse = serde_json::from_value(resp).unwrap();
-
-    initiator
-        .finalize_connection(initiator_state, resp.handshake_msg.as_slice())
-        .unwrap();
+    finish_handshake(&initiator, initiator_state, resp);
 }

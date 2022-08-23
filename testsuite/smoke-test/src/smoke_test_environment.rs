@@ -6,9 +6,10 @@ use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
-use forge::Node;
+use forge::{ActiveNodesGuard, Node};
 use forge::{Factory, LocalFactory, LocalSwarm};
 use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
@@ -62,10 +63,13 @@ impl SwarmBuilder {
         // Add support for forge
         assert!(self.local);
         static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
-
         let version = FACTORY.versions().max().unwrap();
-
         info!("Node finished compiling");
+
+        let slots = self.num_validators.get() * 2;
+
+        static ACTIVE_NODES: Lazy<Arc<Mutex<usize>>> = Lazy::new(|| Arc::new(Mutex::new(0)));
+        let guard = ActiveNodesGuard::grab(slots, ACTIVE_NODES.clone()).await;
 
         let init_genesis_config = self.init_genesis_config;
 
@@ -81,6 +85,7 @@ impl SwarmBuilder {
                         (init_genesis_config)(genesis_config);
                     }
                 })),
+                guard,
             )
             .await
             .unwrap()
