@@ -9,16 +9,14 @@ use crate::{
     pruner::db_pruner::DBPruner, utils, StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
+use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::error;
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::schema::KeyCodec;
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::{atomic::Ordering, Arc};
 
 pub mod generics;
 pub(crate) mod state_value_pruner;
@@ -35,10 +33,9 @@ pub struct StateMerklePruner<S> {
     state_merkle_db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
-    min_readable_version: AtomicVersion,
-    /// Keeps track of if the target version has been fully pruned to see if there is pruning
-    /// pending.
-    pruned_to_the_end_of_target_version: AtomicBool,
+    /// 1. min readable version
+    /// 2. if things before that version fully cleaned
+    progress: Mutex<(Version, bool)>,
     _phantom: std::marker::PhantomData<S>,
 }
 
@@ -54,7 +51,7 @@ where
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
-        let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
+        let min_readable_version = self.min_readable_version();
         let target_version = self.target_version();
 
         return match self.prune_state_merkle(min_readable_version, target_version, batch_size, None)
@@ -81,7 +78,8 @@ where
     }
 
     fn min_readable_version(&self) -> Version {
-        self.min_readable_version.load(Ordering::Relaxed)
+        let (version, _) = *self.progress.lock();
+        version
     }
 
     fn set_target_version(&self, target_version: Version) {
@@ -92,24 +90,19 @@ where
         self.target_version.load(Ordering::Relaxed)
     }
 
+    // used only by blanket `initialize()`, use the underlying implementation instead elsewhere.
     fn record_progress(&self, min_readable_version: Version) {
-        self.min_readable_version
-            .store(min_readable_version, Ordering::Relaxed);
-        PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["state_store"])
-            .set(min_readable_version as i64);
+        self.record_progress_impl(min_readable_version, false /* is_fully_pruned */);
     }
 
     fn is_pruning_pending(&self) -> bool {
-        self.target_version() > self.min_readable_version()
-            || !self
-                .pruned_to_the_end_of_target_version
-                .load(Ordering::Relaxed)
+        let (min_readable_version, fully_pruned) = *self.progress.lock();
+        self.target_version() > min_readable_version || !fully_pruned
     }
 
     /// (For tests only.) Updates the minimal readable version kept by pruner.
     fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
+        self.record_progress_impl(version, true /* is_fully_pruned */);
     }
 }
 
@@ -121,8 +114,7 @@ where
         let pruner = StateMerklePruner {
             state_merkle_db,
             target_version: AtomicVersion::new(0),
-            min_readable_version: AtomicVersion::new(0),
-            pruned_to_the_end_of_target_version: AtomicBool::new(false),
+            progress: Mutex::new((0, true)),
             _phantom: std::marker::PhantomData,
         };
         pruner.initialize();
@@ -143,9 +135,7 @@ where
         let (indices, is_end_of_target_version) =
             self.get_stale_node_indices(min_readable_version, target_version, batch_size)?;
         if indices.is_empty() {
-            self.pruned_to_the_end_of_target_version
-                .store(is_end_of_target_version, Ordering::Relaxed);
-            self.record_progress(target_version);
+            self.record_progress_impl(target_version, is_end_of_target_version);
             Ok(target_version)
         } else {
             let _timer = OTHER_TIMERS_SECONDS
@@ -179,11 +169,16 @@ where
             // TODO(zcc): recording progress after writing schemas might provide wrong answers to
             // API calls when they query min_readable_version while the write_schemas are still in
             // progress.
-            self.record_progress(new_min_readable_version);
-            self.pruned_to_the_end_of_target_version
-                .store(is_end_of_target_version, Ordering::Relaxed);
+            self.record_progress_impl(new_min_readable_version, is_end_of_target_version);
             Ok(new_min_readable_version)
         }
+    }
+
+    fn record_progress_impl(&self, min_readable_version: Version, is_fully_pruned: bool) {
+        *self.progress.lock() = (min_readable_version, is_fully_pruned);
+        PRUNER_LEAST_READABLE_VERSION
+            .with_label_values(&["state_store"])
+            .set(min_readable_version as i64);
     }
 
     fn get_stale_node_indices(
@@ -230,7 +225,7 @@ impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
             utils::create_state_pruner::<StaleNodeIndexCrossEpochSchema>(state_merkle_db);
         state_pruner.set_target_version(target_version);
 
-        let min_readable_version = state_pruner.min_readable_version.load(Ordering::Relaxed);
+        let min_readable_version = state_pruner.min_readable_version();
         let target_version = state_pruner.target_version();
         state_pruner.prune_state_merkle(
             min_readable_version,
