@@ -57,17 +57,20 @@ pub fn generate_traffic<'t>(
         .build()
         .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
+
+    // as we are loading nodes, use higher client timeout
+    let client_timeout = Duration::from_secs(30);
     let validator_clients = ctx
         .swarm()
         .validators()
         .filter(|v| nodes.contains(&v.peer_id()))
-        .map(|n| n.rest_client())
+        .map(|n| n.rest_client_with_timeout(client_timeout))
         .collect::<Vec<_>>();
     let fullnode_clients = ctx
         .swarm()
         .full_nodes()
         .filter(|v| nodes.contains(&v.peer_id()))
-        .map(|n| n.rest_client())
+        .map(|n| n.rest_client_with_timeout(client_timeout))
         .collect::<Vec<_>>();
     let all_node_clients = [&fullnode_clients[..], &validator_clients[..]].concat();
 
