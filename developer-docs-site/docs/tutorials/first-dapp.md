@@ -357,11 +357,11 @@ The signature for `set_message` looks like this:
 public(script) fun set_message(account: signer, message_bytes: vector<u8>)
 ```
 
-To call this function, we need to use the `window.aptos` API provided by the wallet to submit a transaction. Specifically, we will create a `script_function_payload` transaction that looks like this:
+To call this function, we need to use the `window.aptos` API provided by the wallet to submit a transaction. Specifically, we will create a `entry_function_payload` transaction that looks like this:
 
 ```javascript
 {
-  type: "script_function_payload",
+  type: "entry_function_payload",
   function: "<address>::Message::set_message",
   arguments: ["<hex encoded utf-8 message>"],
   type_arguments: []
@@ -387,7 +387,7 @@ Using this function, our transaction payload becomes:
 
 ```javascript
 {
-  type: "script_function_payload",
+  type: "entry_function_payload",
   function: "<address>::Message::set_message",
   arguments: [stringToHex(message)],
   type_arguments: []
@@ -418,7 +418,7 @@ function App() {
 
     const message = ref.current.value;
     const transaction = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: `${address}::Message::set_message`,
       arguments: [stringToHex(message)],
       type_arguments: [],

@@ -24,7 +24,7 @@ class MessageboardUtil {
   // generate txn payload for any script function
   static getScriptFunctionTxnPayload(funcName: string, args: Types.MoveValue[]): Types.TransactionPayload {
     const payload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: `${funcName}`,
       type_arguments: [],
       arguments: args,
