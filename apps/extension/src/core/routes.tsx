@@ -1,4 +1,3 @@
-/* eslint-disable sort-keys-fix/sort-keys-fix,sort-keys */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,6 +23,7 @@ import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
 import CreateAccount from 'pages/CreateAccount';
 import AddNetwork from 'pages/AddNetwork';
 import RenameAccount from 'pages/RenameAccount';
+import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
 
 // TODO: have a single representation for routes
 
@@ -51,6 +51,10 @@ export const Routes = Object.freeze({
   createWallet: {
     element: <CreateWallet />,
     path: '/create-wallet',
+  },
+  createWalletViaImportAccount: {
+    element: <CreateWalletViaImportAccount />,
+    path: '/create-wallet/import-account',
   },
   credentials: {
     element: <Credentials />,
@@ -138,24 +142,32 @@ export const mainRoutes = Object.freeze([
   Routes.help,
   // this needs to be here to prevent force redirect on last screen of wallet creation
   Routes.createWallet,
-  { path: '*', element: <Navigate to={Routes.wallet.path} replace /> },
+  { element: <Navigate to={Routes.wallet.path} replace />, path: '*' },
 ]);
 
 export const noAccountsRoutes = Object.freeze([
   Routes.addAccount,
   Routes.createAccount,
-  Routes.importWalletMnemonic,
-  Routes.importWalletPrivateKey,
-  { path: '*', element: <Navigate to={Routes.addAccount.path} replace /> },
+  {
+    element: <Navigate to={Routes.addAccount.path} replace />,
+    path: '*',
+  },
 ]);
 
 export const lockedWalletRoutes = Object.freeze([
   Routes.password,
-  { path: '*', element: <Navigate to={Routes.password.path} replace /> },
+  {
+    element: <Navigate to={Routes.password.path} replace />,
+    path: '*',
+  },
 ]);
 
 export const uninitializedRoutes = Object.freeze([
   Routes.noWallet,
+  Routes.createWalletViaImportAccount,
   Routes.createWallet,
-  { path: '*', element: <Navigate to={Routes.noWallet.path} replace /> },
+  {
+    element: <Navigate to={Routes.noWallet.path} replace />,
+    path: '*',
+  },
 ]);

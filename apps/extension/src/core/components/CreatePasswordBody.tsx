@@ -23,7 +23,7 @@ import { useFormContext } from 'react-hook-form';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import zxcvbnEnPackage from '@zxcvbn-ts/language-en';
-import { OnboardFormValues } from 'core/layouts/CreateWalletLayout';
+import { type CreateWalletFormValues } from 'core/layouts/CreateWalletLayout';
 
 export const passwordOptions = {
   dictionary: {
@@ -61,7 +61,7 @@ export const passwordScoreArray = Object.freeze([
 
 export default function CreatePasswordBody() {
   const { colorMode } = useColorMode();
-  const { register, watch } = useFormContext<OnboardFormValues>();
+  const { register, watch } = useFormContext<CreateWalletFormValues>();
   const [show, setShow] = useState(false);
   const handleClick = () => setShow(!show);
 

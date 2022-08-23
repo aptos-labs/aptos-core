@@ -4,14 +4,14 @@
 import React, { useMemo } from 'react';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import { OnboardingStateProvider, useOnboardingStateContext } from 'core/hooks/useOnboardingState';
+import { OnboardingStateProvider, useOnboardingState } from 'core/hooks/useOnboardingState';
 import CreateWalletLayout, { OnboardingPage } from 'core/layouts/CreateWalletLayout';
 import CreatePasswordBody from 'core/components/CreatePasswordBody';
 import SecretRecoveryPhraseBody from 'core/components/SecretRecoveryPhraseBody';
 import ConfirmOnboardBody from 'core/components/ConfirmOnboardBody';
 
 function NewWalletBody() {
-  const { activeStep } = useOnboardingStateContext();
+  const { activeStep } = useOnboardingState();
 
   const onboardContent = useMemo(() => {
     switch (activeStep) {

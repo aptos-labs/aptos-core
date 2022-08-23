@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { Steps, Step } from 'chakra-ui-steps';
 import { secondaryBgColor } from 'core/colors';
-import { useOnboardingStateContext } from 'core/hooks/useOnboardingState';
+import { useOnboardingState } from 'core/hooks/useOnboardingState';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FormProvider, useForm, useFormContext } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -31,7 +31,7 @@ const steps = [
   { content: null, label: 'Secret phrase' },
 ];
 
-export interface OnboardFormValues {
+export interface CreateWalletFormValues {
   confirmPassword: string;
   initialPassword: string;
   mnemonic: string[];
@@ -40,14 +40,20 @@ export interface OnboardFormValues {
   termsOfService: boolean;
 }
 
-const NextButton = () => {
-  const { watch } = useFormContext<OnboardFormValues>();
+interface NextButtonProps {
+  isImport?: boolean;
+}
+
+function NextButton({
+  isImport = false,
+}: NextButtonProps) {
+  const { watch } = useFormContext<CreateWalletFormValues>();
   const { initAccounts } = useGlobalStateContext();
   const { fundAccount } = useFundAccount();
 
   const {
     activeStep, nextStep,
-  } = useOnboardingStateContext();
+  } = useOnboardingState();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -168,13 +174,13 @@ const NextButton = () => {
     secretRecoveryPhrase,
   ]);
 
-  return NextButtonComponent;
-};
+  return (isImport && activeStep >= 1) ? null : NextButtonComponent;
+}
 
 const PrevButton = () => {
   const {
     activeStep, prevStep,
-  } = useOnboardingStateContext();
+  } = useOnboardingState();
   const navigate = useNavigate();
 
   const prevOnClick = useCallback(() => {
@@ -211,9 +217,9 @@ export default function CreateWalletLayout({
 }: CreateWalletLayoutProps) {
   const {
     activeStep,
-  } = useOnboardingStateContext();
+  } = useOnboardingState();
   const mnemonic = generateMnemonic();
-  const methods = useForm<OnboardFormValues>({
+  const methods = useForm<CreateWalletFormValues>({
     defaultValues: {
       confirmPassword: '',
       initialPassword: '',

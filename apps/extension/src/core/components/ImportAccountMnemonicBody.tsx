@@ -13,13 +13,21 @@ import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { type MnemonicFormValues } from 'core/layouts/AddAccountLayout';
 
-export default function ImportAccountMnemonicBody() {
+interface ImportAccountMnemonicBodyProps {
+  hasSubmit?: boolean;
+  px?: number;
+}
+
+export default function ImportAccountMnemonicBody({
+  hasSubmit = true,
+  px = 4,
+}: ImportAccountMnemonicBodyProps) {
   const {
     register,
   } = useFormContext<MnemonicFormValues>();
 
   return (
-    <VStack spacing={4} px={4} pt={4}>
+    <VStack spacing={4} px={px} pt={4}>
       <VStack width="100%">
         <SimpleGrid columns={2} gap={4}>
           <VStack>
@@ -76,9 +84,13 @@ export default function ImportAccountMnemonicBody() {
           </VStack>
         </SimpleGrid>
       </VStack>
-      <Button colorScheme="teal" width="100%" type="submit">
-        Submit
-      </Button>
+      {
+        hasSubmit ? (
+          <Button colorScheme="teal" width="100%" type="submit">
+            Submit
+          </Button>
+        ) : null
+      }
     </VStack>
   );
 }

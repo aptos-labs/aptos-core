@@ -8,9 +8,9 @@ import pbkdf2 from 'pbkdf2';
 import { Account } from 'core/types/stateTypes';
 import { WALLET_ACCOUNTS_KEY } from 'core/constants';
 
-const pbkdf2Iterations = 10000;
-const pbkdf2Digest = 'sha256';
-const pbkdf2SaltSize = 16;
+export const pbkdf2Iterations = 10000;
+export const pbkdf2Digest = 'sha256';
+export const pbkdf2SaltSize = 16;
 
 export type Accounts = Record<string, Account>;
 

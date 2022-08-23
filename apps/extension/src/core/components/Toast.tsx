@@ -118,4 +118,12 @@ export const switchNetworkToast = (networkName: string, isSwitching: boolean) =>
   });
 };
 
+export const networkDoesNotExistToast = () => {
+  toast({
+    description: 'Error: network not found',
+    status: 'error',
+    title: 'Error getting network',
+  });
+};
+
 export default toast;

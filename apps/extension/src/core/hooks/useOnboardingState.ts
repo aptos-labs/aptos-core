@@ -4,7 +4,7 @@
 import constate from 'constate';
 import { useState } from 'react';
 
-export default function useOnboardingState() {
+export default function useOnboardingStateRecorder() {
   const [activeStep, setActiveStep] = useState<number>(0);
 
   const nextStep = () => {
@@ -22,4 +22,4 @@ export default function useOnboardingState() {
   };
 }
 
-export const [OnboardingStateProvider, useOnboardingStateContext] = constate(useOnboardingState);
+export const [OnboardingStateProvider, useOnboardingState] = constate(useOnboardingStateRecorder);

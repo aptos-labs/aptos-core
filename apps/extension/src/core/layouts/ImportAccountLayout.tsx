@@ -15,7 +15,7 @@ interface WalletLayoutProps {
 export default function ImportAccountLayout({
   backPage,
   children,
-  headerValue = 'Import wallet',
+  headerValue = 'Import account',
 }: WalletLayoutProps) {
   const { colorMode } = useColorMode();
 

@@ -14,13 +14,13 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { secondaryTextColor } from 'core/colors';
-import { OnboardFormValues } from 'core/layouts/CreateWalletLayout';
+import { type CreateWalletFormValues } from 'core/layouts/CreateWalletLayout';
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
 export default function SecretRecoveryPhraseBody() {
   const { colorMode } = useColorMode();
-  const { register, watch } = useFormContext<OnboardFormValues>();
+  const { register, watch } = useFormContext<CreateWalletFormValues>();
 
   const mnemonic = watch('mnemonic');
 

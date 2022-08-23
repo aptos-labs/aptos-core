@@ -14,7 +14,7 @@ import NewExtensionBody from 'core/components/NewExtensionBody';
 /**
  * First screen that is shown to the user when they download the extension
  */
-function NewExtension() {
+function NoWallet() {
   return (
     <AuthLayout routePath={PageRoutes.noWallet.path}>
       <WalletLayout hasWalletFooter={false} hasWalletHeader={false}>
@@ -28,4 +28,4 @@ function NewExtension() {
   );
 }
 
-export default NewExtension;
+export default NoWallet;

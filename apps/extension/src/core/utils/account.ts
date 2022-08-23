@@ -31,13 +31,12 @@ import {
   defaultNetworkName,
   defaultNetworks,
 } from 'core/hooks/useNetworks';
-import { Accounts } from 'core/hooks/useEncryptedStorageState';
+import {
+  Accounts, pbkdf2Digest, pbkdf2Iterations, pbkdf2SaltSize,
+} from 'core/hooks/useEncryptedStorageState';
 
 // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
 const bip44Coin = 637;
-const pbkdf2Iterations = 10000;
-const pbkdf2Digest = 'sha256';
-const pbkdf2SaltSize = 16;
 
 interface EncryptedAccounts {
   encrypted: string,
