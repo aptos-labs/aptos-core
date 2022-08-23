@@ -3,16 +3,15 @@
 
 use crate::common::native_coin;
 use crate::types::{
-    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, Amount, BlockRequest,
-    BlockResponse, ConstructionCombineRequest, ConstructionCombineResponse,
-    ConstructionDeriveRequest, ConstructionDeriveResponse, ConstructionHashRequest,
-    ConstructionMetadata, ConstructionMetadataRequest, ConstructionMetadataResponse,
-    ConstructionParseRequest, ConstructionParseResponse, ConstructionPayloadsRequest,
-    ConstructionPayloadsResponse, ConstructionPreprocessRequest, ConstructionPreprocessResponse,
-    ConstructionSubmitRequest, ConstructionSubmitResponse, Error, MetadataRequest,
-    NetworkIdentifier, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
-    NetworkStatusResponse, Operation, PreprocessMetadata, PublicKey, Signature, SignatureType,
-    TransactionIdentifier, TransactionIdentifierResponse,
+    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockRequest, BlockResponse,
+    ConstructionCombineRequest, ConstructionCombineResponse, ConstructionDeriveRequest,
+    ConstructionDeriveResponse, ConstructionHashRequest, ConstructionMetadata,
+    ConstructionMetadataRequest, ConstructionMetadataResponse, ConstructionParseRequest,
+    ConstructionParseResponse, ConstructionPayloadsRequest, ConstructionPayloadsResponse,
+    ConstructionPreprocessRequest, ConstructionPreprocessResponse, ConstructionSubmitRequest,
+    ConstructionSubmitResponse, Error, MetadataRequest, NetworkIdentifier, NetworkListResponse,
+    NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse, Operation, PreprocessMetadata,
+    PublicKey, Signature, SignatureType, TransactionIdentifier, TransactionIdentifierResponse,
 };
 use anyhow::anyhow;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -283,23 +282,24 @@ impl RosettaClient {
         &self,
         network_identifier: NetworkIdentifier,
         operations: Vec<Operation>,
-        max_fee: u64,
-        fee_multiplier: u32,
+        max_gas_amount: u64,
+        gas_price: u64,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
     ) -> anyhow::Result<(ConstructionMetadataResponse, Vec<PublicKey>)> {
         // Request the given operation with the given gas constraints
-        let amount = val_to_amount(max_fee, false);
         let preprocess_response = self
             .preprocess(&ConstructionPreprocessRequest {
                 network_identifier: network_identifier.clone(),
                 operations,
-                max_fee: Some(vec![amount]),
-                suggested_fee_multiplier: Some(fee_multiplier as f64),
+                max_fee: None,
+                suggested_fee_multiplier: None,
                 metadata: Some(PreprocessMetadata {
                     expiry_time_secs: Some(expiry_time_secs),
                     sequence_number,
+                    max_gas_amount: Some(max_gas_amount),
+                    gas_price: Some(gas_price),
                 }),
             })
             .await?;
@@ -468,20 +468,5 @@ impl RosettaClient {
             })
             .await?
             .transaction_identifier)
-    }
-}
-
-/// Converts a value to a Rosetta [`Amount`]
-///
-/// Only works with the native coin
-fn val_to_amount(amount: u64, withdraw: bool) -> Amount {
-    let value = if withdraw {
-        format!("-{}", amount)
-    } else {
-        amount.to_string()
-    };
-    Amount {
-        value,
-        currency: native_coin(),
     }
 }

@@ -27,7 +27,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        is_native_coin, native_coin, to_hex_lower, with_context,
+        native_coin, to_hex_lower, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -36,7 +36,7 @@ use crate::{
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
-    signing_message,
+    signing_message, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::debug;
 use aptos_sdk::{
@@ -53,8 +53,7 @@ use aptos_types::{
         Transaction::UserTransaction, TransactionPayload,
     },
 };
-use cached_packages::aptos_stdlib;
-use std::str::FromStr;
+use std::convert::TryFrom;
 use warp::Filter;
 
 pub fn combine_route(
@@ -253,14 +252,66 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
+    // Determine max gas by simulation if it isn't provided
+    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
+        max_gas
+    } else {
+        let transaction_factory = TransactionFactory::new(server_context.chain_id)
+            .with_gas_unit_price(1)
+            .with_max_gas_amount(u64::MAX);
+
+        let (txn_payload, sender) = request.options.internal_operation.payload()?;
+        let unsigned_transaction = transaction_factory
+            .payload(txn_payload)
+            .sender(sender)
+            .sequence_number(sequence_number)
+            .build();
+        let signed_transaction = if let Some(public_key) = request.public_keys.first() {
+            SignedTransaction::new(
+                unsigned_transaction,
+                Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
+                    ApiError::InvalidInput(Some(format!("Failed to parse public key {:?}", err)))
+                })?,
+                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            )
+        } else {
+            return Err(ApiError::InvalidInput(Some(
+                "No public key given in metadata call".to_string(),
+            )));
+        };
+
+        rest_client
+            .simulate_bcs(&signed_transaction)
+            .await?
+            .into_inner()
+            .info
+            .gas_used()
+    };
+
+    // Determine the gas price (either provided from upstream, or through estimation)
+    let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
+        gas_price
+    } else {
+        rest_client
+            .estimate_gas_price()
+            .await?
+            .into_inner()
+            .gas_estimate
+    };
+
+    let suggested_fee = Amount {
+        value: format!("-{}", gas_price_per_unit * max_gas_amount),
+        currency: native_coin(),
+    };
+
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
             sequence_number,
-            max_gas: request.options.max_gas,
-            gas_price_per_unit: request.options.gas_price_per_unit,
+            max_gas_amount,
+            gas_price_per_unit,
             expiry_time_secs: request.options.expiry_time_secs,
         },
-        suggested_fee: None,
+        suggested_fee: Some(vec![suggested_fee]),
     })
 }
 
@@ -505,28 +556,12 @@ async fn construction_payloads(
     };
 
     // Encode operation
-    let (txn_payload, sender) = match operation {
-        InternalOperation::CreateAccount(create_account) => (
-            aptos_stdlib::account_create_account(create_account.new_account),
-            create_account.sender,
-        ),
-        InternalOperation::Transfer(transfer) => {
-            is_native_coin(&transfer.currency)?;
-            (
-                aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
-                transfer.sender,
-            )
-        }
-        InternalOperation::SetOperator(set_operator) => (
-            aptos_stdlib::stake_set_operator(set_operator.operator),
-            set_operator.owner,
-        ),
-    };
+    let (txn_payload, sender) = operation.payload()?;
 
     // Build the transaction and make it ready for signing
     let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
-        .with_max_gas_amount(metadata.max_gas);
+        .with_max_gas_amount(metadata.max_gas_amount);
     if let Some(expiry_time_secs) = metadata.expiry_time_secs {
         transaction_factory =
             transaction_factory.with_transaction_expiration_time(expiry_time_secs);
@@ -554,9 +589,6 @@ async fn construction_payloads(
     })
 }
 
-const DEFAULT_GAS_PRICE_PER_UNIT: u64 = 1;
-const DEFAULT_MAX_GAS_PRICE: u64 = 10000;
-
 /// Construction preprocess command (OFFLINE)
 ///
 /// This creates the request needed to fetch metadata
@@ -569,37 +601,17 @@ async fn construction_preprocess(
     debug!("/construction/preprocess {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    // Ensure that the max fee is only in the native coin
-    let max_gas = if let Some(max_fees) = request.max_fee {
-        if max_fees.len() != 1 {
-            return Err(ApiError::InvalidMaxGasFees);
-        }
-        let max_fee = max_fees.first().unwrap();
-        is_native_coin(&max_fee.currency)?;
-        u64::from_str(&max_fee.value)?
-    } else {
-        DEFAULT_MAX_GAS_PRICE
-    };
-
-    // Let's not accept fractions, as we don't support it
-    let gas_price_per_unit = if let Some(fee_multiplier) = request.suggested_fee_multiplier {
-        if fee_multiplier != (fee_multiplier as u32) as f64 {
-            return Err(ApiError::InvalidGasMultiplier);
-        }
-
-        fee_multiplier as u64
-    } else {
-        DEFAULT_GAS_PRICE_PER_UNIT
-    };
-
     let internal_operation = InternalOperation::extract(&request.operations)?;
     let required_public_keys = vec![internal_operation.sender().into()];
 
     Ok(ConstructionPreprocessResponse {
         options: Some(MetadataOptions {
             internal_operation,
-            max_gas,
-            gas_price_per_unit,
+            max_gas_amount: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.max_gas_amount),
+            gas_price_per_unit: request.metadata.as_ref().and_then(|inner| inner.gas_price),
             expiry_time_secs: request
                 .metadata
                 .as_ref()
