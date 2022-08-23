@@ -39,7 +39,7 @@ pub use table::TableItemRequest;
 pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
-    GenesisPayload, GenesisTransaction, ModuleBundlePayload, MultiEd25519Signature,
+    GasEstimation, GenesisPayload, GenesisTransaction, ModuleBundlePayload, MultiEd25519Signature,
     PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
     TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
     TransactionSignature, TransactionSigningMessage, UserCreateSigningMessageRequest,

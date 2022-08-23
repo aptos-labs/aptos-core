@@ -25,6 +25,7 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
+use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -38,6 +39,7 @@ pub struct Context {
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     node_config: NodeConfig,
+    gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
 impl Context {
@@ -52,6 +54,10 @@ impl Context {
             db,
             mp_sender,
             node_config,
+            gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
+                last_updated_version: 0,
+                median_gas_price: 1,
+            })),
         }
     }
 
@@ -540,4 +546,51 @@ impl Context {
                 })
         }
     }
+
+    pub fn estimate_gas_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+        // The search size
+        const SEARCH_SIZE: u64 = 100_000;
+        let oldest_search_version = std::cmp::max(
+            ledger_info.ledger_version.0.saturating_sub(SEARCH_SIZE),
+            ledger_info.oldest_ledger_version.0,
+        );
+
+        // If it's cached, let's use that
+        {
+            let gas_estimation = self.gas_estimation.read().unwrap();
+
+            if gas_estimation.last_updated_version > oldest_search_version {
+                return Ok(gas_estimation.median_gas_price);
+            }
+        }
+
+        // Otherwise, get the estimated amount from storage
+        {
+            let mut gas_estimation = self.gas_estimation.write().unwrap();
+
+            // If this has been updated by a different thread, use that instead
+            if gas_estimation.last_updated_version > oldest_search_version {
+                return Ok(gas_estimation.median_gas_price);
+            }
+            let mut gas_prices: Vec<u64> = self
+                .db
+                .get_gas_prices(
+                    oldest_search_version,
+                    SEARCH_SIZE,
+                    ledger_info.ledger_version.0,
+                )
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+                })?;
+            gas_prices.sort();
+            let mid = gas_prices.len() / 2;
+            gas_estimation.median_gas_price = gas_prices[mid];
+            Ok(gas_estimation.median_gas_price)
+        }
+    }
+}
+
+pub struct GasEstimationCache {
+    last_updated_version: u64,
+    median_gas_price: u64,
 }
