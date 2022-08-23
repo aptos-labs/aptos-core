@@ -34,4 +34,5 @@ export type Account = PublicAccount & {
   mnemonic?: string;
   name: string;
   privateKey: string;
+  styleIndex: number
 };

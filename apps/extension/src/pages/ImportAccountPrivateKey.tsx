@@ -13,7 +13,7 @@ import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { addAccount } = useGlobalStateContext();
+  const { addAccount, newAccountStyleIndex } = useGlobalStateContext();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,
@@ -38,6 +38,7 @@ export default function ImportAccountPrivateKey() {
         name: 'Wallet',
         privateKey: privateKeyHex,
         publicKey: publicKeyHex!,
+        styleIndex: newAccountStyleIndex ?? 0,
       });
 
       importAccountToast();

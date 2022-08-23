@@ -14,7 +14,7 @@ import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
-  const { addAccount } = useGlobalStateContext();
+  const { addAccount, newAccountStyleIndex } = useGlobalStateContext();
 
   const onSubmit = useCallback(async (
     mnemonicAll: MnemonicFormValues,
@@ -43,6 +43,7 @@ export default function ImportWalletMnemonic() {
         name: 'Wallet',
         privateKey: privateKeyHex,
         publicKey: publicKeyHex!,
+        styleIndex: newAccountStyleIndex ?? 0,
       });
 
       importAccountToast();

@@ -8,6 +8,7 @@ export const WALLET_ACCOUNTS_KEY = 'accounts';
 export const WALLET_STATE_ACCOUNT_ADDRESS_KEY = 'activeAccount';
 export const WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY = 'activeNetwork';
 export const WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY = 'customNetworks';
+export const WALLET_STATE_STYLE_INDEX_KEY = 'accountStyleIndex';
 
 export const STATIC_GAS_AMOUNT = 150;
 

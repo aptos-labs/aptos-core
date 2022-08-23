@@ -29,17 +29,20 @@ import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import indexColor from 'core/accountColors';
 
 interface ButtonProps {
   onClick: MouseEventHandler<HTMLDivElement>;
 }
 
 function AccountCircle({ onClick }: ButtonProps) {
+  const { activeAccount } = useGlobalStateContext();
+  const color = indexColor(activeAccount?.styleIndex ?? 0);
   return (
     <Box
       height="40px"
       width="40px"
-      background="gray"
+      background={color}
       borderRadius="2rem"
       cursor="pointer"
       onClick={onClick}
@@ -105,7 +108,6 @@ function NavigationBar({
             <AccountCircle onClick={onOpen} />
           </Tooltip>
         </HStack>
-
       </HStack>
       <AccountDrawer isOpen={isOpen} onClose={onClose} />
     </Box>
