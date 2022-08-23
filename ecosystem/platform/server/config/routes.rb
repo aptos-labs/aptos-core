@@ -47,6 +47,8 @@ Rails.application.routes.draw do
   get 'settings', to: redirect('/settings/profile')
   get 'settings/profile'
   patch 'settings/profile', to: 'settings#profile_update'
+  get 'settings/notifications'
+  patch 'settings/notifications', to: 'settings#notifications_update'
   get 'settings/connections'
   delete 'settings/connections', to: 'settings#connections_delete'
   delete 'settings/delete_account', to: 'settings#delete_account'
