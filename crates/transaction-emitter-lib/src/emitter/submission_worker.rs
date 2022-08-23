@@ -2,16 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{
-        stats::StatsAccumulator, wait_for_accounts_sequence, MAX_TXN_BATCH_SIZE,
-        TRANSACTIONS_PER_ACCOUNT, TXN_EXPIRATION_SECONDS,
-    },
+    emitter::{stats::StatsAccumulator, wait_for_accounts_sequence},
     transaction_generator::TransactionGenerator,
-    EmitThreadParams,
+    EmitModeParams,
 };
-use aptos_logger::sample::SampleRate;
 use aptos_logger::sample::Sampling;
-use aptos_logger::{debug, sample, warn};
+use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -36,11 +32,12 @@ pub struct SubmissionWorker {
     client: RestClient,
     all_addresses: Arc<Vec<AccountAddress>>,
     stop: Arc<AtomicBool>,
-    params: EmitThreadParams,
+    params: EmitModeParams,
     stats: Arc<StatsAccumulator>,
     txn_generator: Box<dyn TransactionGenerator>,
     invalid_transaction_ratio: usize,
     rng: ::rand::rngs::StdRng,
+    worker_index: usize,
 }
 
 // Note, there is an edge case that can occur if the transaction emitter
@@ -54,11 +51,12 @@ impl SubmissionWorker {
         client: RestClient,
         all_addresses: Arc<Vec<AccountAddress>>,
         stop: Arc<AtomicBool>,
-        params: EmitThreadParams,
+        params: EmitModeParams,
         stats: Arc<StatsAccumulator>,
         txn_generator: Box<dyn TransactionGenerator>,
         invalid_transaction_ratio: usize,
         rng: ::rand::rngs::StdRng,
+        worker_index: usize,
     ) -> Self {
         Self {
             accounts,
@@ -70,33 +68,49 @@ impl SubmissionWorker {
             txn_generator,
             invalid_transaction_ratio,
             rng,
+            worker_index,
         }
+    }
+
+    fn start_sleep_time(&mut self) -> Duration {
+        let random_jitter_millis = self.rng.gen_range(0, self.params.start_jitter_millis);
+        Duration::from_millis(
+            (self.params.start_offset_multiplier_millis * self.worker_index as f64) as u64
+                + random_jitter_millis,
+        )
     }
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
-        // Introduce a random jitter between 0 to 5 seconds so that we don't hammer the rest APIs
-        // all at once.
-        let random_jitter_ms = self.rng.gen_range(0, 5000);
-        sleep(Duration::from_millis(random_jitter_ms)).await;
+        // Introduce a random jitter between, so that:
+        //  - we don't hammer the rest APIs all at once.
+        //  - allow for even spread for fixed TPS setup
+        let start_sleep_duration = self.start_sleep_time();
+        let start_time = Instant::now() + start_sleep_duration;
+
+        self.sleep_check_done(start_sleep_duration).await;
 
         let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
-        let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
-            self.params.txn_expiration_time_secs,
-            TXN_EXPIRATION_SECONDS,
-        ));
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-
-        let start_time = Instant::now();
+        let mut wait_until = start_time;
         let mut total_num_requests = 0;
 
         while !self.stop.load(Ordering::Relaxed) {
+            let loop_start_time = Arc::new(Instant::now());
+            if loop_start_time.duration_since(wait_until) > wait_duration {
+                warn!(
+                    "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
+                    self.client,
+                    loop_start_time.duration_since(wait_until).as_secs()
+                );
+            }
+            // always add expected cycle duration, to not drift from expected pace.
+            wait_until += wait_duration;
+
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
             total_num_requests += num_requests;
-            let loop_start_time = Arc::new(Instant::now());
-            let wait_until = *loop_start_time + wait_duration;
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
             if let Err(e) = try_join_all(requests.into_iter().map(|req| {
@@ -117,19 +131,30 @@ impl SubmissionWorker {
             }
 
             if self.params.wait_committed {
-                let loop_start_time = Instant::now();
+                let wait_for_accounts_sequence_timeout =
+                    if self.params.check_account_sequence_only_once {
+                        self.sleep_check_done(Duration::from_secs(
+                            self.params.txn_expiration_time_secs,
+                        ))
+                        .await;
+                        Duration::from_secs(self.params.txn_expiration_time_secs + 10)
+                    } else {
+                        Duration::from_secs(self.params.txn_expiration_time_secs)
+                    };
+
                 self.update_stats(
-                    loop_start_time,
+                    *loop_start_time,
                     txn_offset_time.load(Ordering::Relaxed),
                     num_requests,
                     false,
                     wait_for_accounts_sequence_timeout,
+                    self.params.check_account_sequence_only_once,
                 )
                 .await;
             }
             let now = Instant::now();
             if wait_until > now {
-                sleep(wait_until - now).await;
+                self.sleep_check_done(wait_until - now).await;
             }
         }
 
@@ -143,11 +168,25 @@ impl SubmissionWorker {
                 total_num_requests,
                 true,
                 Duration::from_millis(500),
+                false,
             )
             .await
         }
 
         self.accounts
+    }
+
+    async fn sleep_check_done(&self, duration: Duration) -> bool {
+        let start_time = Instant::now();
+        loop {
+            sleep(Duration::from_secs(1)).await;
+            if self.stop.load(Ordering::Relaxed) {
+                return false;
+            }
+            if start_time.elapsed() >= duration {
+                return true;
+            }
+        }
     }
 
     /// This function assumes that num_requests == num_accounts, which is
@@ -164,11 +203,15 @@ impl SubmissionWorker {
         num_requests: usize,
         skip_latency_stats: bool,
         wait_for_accounts_sequence_timeout: Duration,
+        check_account_sequence_only_once: bool,
     ) {
         match wait_for_accounts_sequence(
+            start_time,
             &self.client,
             &mut self.accounts,
+            self.params.transactions_per_account,
             wait_for_accounts_sequence_timeout,
+            check_account_sequence_only_once,
             &mut self.rng,
         )
         .await
@@ -189,7 +232,7 @@ impl SubmissionWorker {
                 }
             }
             Err(uncommitted) => {
-                let num_uncommitted = uncommitted.len() as u64;
+                let num_uncommitted = uncommitted.values().sum::<usize>() as u64;
                 let num_committed = num_requests as u64 - num_uncommitted;
                 // To avoid negative result caused by uncommitted tx occur
                 // Simplified from:
@@ -225,14 +268,20 @@ impl SubmissionWorker {
     }
 
     fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
-        let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
+        let batch_size = max(
+            1,
+            min(
+                self.params.max_submit_batch_size / self.params.transactions_per_account,
+                self.accounts.len(),
+            ),
+        );
         let accounts = self
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
         self.txn_generator.generate_transactions(
             accounts,
-            TRANSACTIONS_PER_ACCOUNT,
+            self.params.transactions_per_account,
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
             gas_price,
