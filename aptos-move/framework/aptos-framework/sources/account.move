@@ -486,6 +486,13 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
+    /// create the account for system reserved addresses
+    public(friend) fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
+        let signer = create_account_unchecked(addr);
+        let signer_cap = SignerCapability { account: addr };
+        (signer, signer_cap)
+    }
+
     public entry fun transfer(source: &signer, to: address, amount: u64) acquires Account {
         if(!exists<Account>(to)) {
             create_account(to)
