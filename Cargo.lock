@@ -1255,7 +1255,6 @@ dependencies = [
  "aptos-rest-client",
  "aptos-types",
  "bcs",
- "bytes 1.2.1",
  "chrono",
  "clap 3.2.17",
  "flate2",
