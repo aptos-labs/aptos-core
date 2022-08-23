@@ -31,7 +31,7 @@ function Gallery() {
 
   return (
     <AuthLayout routePath={PageRoutes.gallery.path}>
-      <WalletLayout>
+      <WalletLayout title="Collectibles">
         <VStack width="100%" paddingTop={8} px={4}>
           <Grid pb={4} templateColumns="1fr 72px" width="100%">
             <Heading fontSize="xl">Collectibles</Heading>

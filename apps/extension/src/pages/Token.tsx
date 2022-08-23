@@ -10,7 +10,7 @@ import { Routes as PageRoutes } from 'core/routes';
 function Token() {
   return (
     <AuthLayout routePath={PageRoutes.token.path}>
-      <WalletLayout showBackButton>
+      <WalletLayout title="Token" showBackButton>
         <TokenBody />
       </WalletLayout>
     </AuthLayout>

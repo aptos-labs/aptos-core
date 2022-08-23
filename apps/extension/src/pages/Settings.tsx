@@ -57,7 +57,7 @@ function Account() {
 
   return (
     <AuthLayout routePath={PageRoutes.settings.path}>
-      <WalletLayout>
+      <WalletLayout title="Settings">
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">
             <Heading fontSize="xl">Settings</Heading>

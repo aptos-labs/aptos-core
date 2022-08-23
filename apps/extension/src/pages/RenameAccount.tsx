@@ -11,7 +11,7 @@ import RenameAccountBody from 'core/components/RenameAccountBody';
 function RenameAccount() {
   return (
     <AuthLayout routePath={PageRoutes.rename_account.path}>
-      <WalletLayout showBackButton>
+      <WalletLayout title="Rename Account" showBackButton>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">
             <RenameAccountBody />

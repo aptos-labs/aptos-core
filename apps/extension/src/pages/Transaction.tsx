@@ -10,7 +10,7 @@ import TransactionBody from 'core/components/TransactionBody';
 function Transaction() {
   return (
     <AuthLayout routePath={PageRoutes.transaction.path}>
-      <WalletLayout showBackButton>
+      <WalletLayout title="Transaction" showBackButton>
         <TransactionBody />
       </WalletLayout>
     </AuthLayout>

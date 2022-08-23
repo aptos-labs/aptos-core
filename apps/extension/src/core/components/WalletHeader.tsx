@@ -30,10 +30,6 @@ import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
 
-interface WalletHeaderProps {
-  showBackButton?: boolean;
-}
-
 interface ButtonProps {
   onClick: MouseEventHandler<HTMLDivElement>;
 }
@@ -68,7 +64,7 @@ function BackButton({ onClick }: ButtonProps) {
 
 interface NavigationBarProps {
   showBackButton?: boolean;
-  title: string
+  title?: string
 }
 
 function NavigationBar({
@@ -113,7 +109,8 @@ function NavigationBar({
 
 export default function WalletHeader({
   showBackButton,
-}: WalletHeaderProps) {
+  title,
+}: NavigationBarProps) {
   const { activeAccount, activeAccountAddress } = useGlobalStateContext();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
@@ -122,7 +119,7 @@ export default function WalletHeader({
 
   if ((!process.env.NODE_ENV || process.env.NODE_ENV === 'development')) {
     return (
-      <NavigationBar title="Home" showBackButton={showBackButton} />
+      <NavigationBar title={title} showBackButton={showBackButton} />
     );
   }
 

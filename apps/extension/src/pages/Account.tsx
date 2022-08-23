@@ -65,7 +65,7 @@ function Account() {
 
   return (
     <AuthLayout routePath={PageRoutes.account.path}>
-      <WalletLayout showBackButton>
+      <WalletLayout title="Account" showBackButton>
         <VStack width="100%" paddingTop={8} px={4} spacing={4}>
           <Box w={20}>
             <GraceHopperBoringAvatar type="beam" />

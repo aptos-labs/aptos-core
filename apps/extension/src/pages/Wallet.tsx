@@ -35,7 +35,7 @@ function Wallet() {
 
   return (
     <AuthLayout routePath={PageRoutes.wallet.path}>
-      <WalletLayout>
+      <WalletLayout title="Home">
         <VStack width="100%" p={4}>
           <Flex
             py={4}

@@ -14,7 +14,7 @@ import { Routes as PageRoutes } from 'core/routes';
 function Credentials() {
   return (
     <AuthLayout routePath={PageRoutes.credentials.path}>
-      <WalletLayout showBackButton>
+      <WalletLayout title="Credentials" showBackButton>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">
             <CredentialsBody />

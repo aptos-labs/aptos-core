@@ -23,7 +23,7 @@ function Activity() {
   const sortedTxns = transactions?.sort((a, b) => Number(b.version) - Number(a.version));
   return (
     <AuthLayout routePath={PageRoutes.activity.path}>
-      <WalletLayout>
+      <WalletLayout title="Activity">
         <VStack width="100%" paddingTop={8} px={4} alignItems="start">
           <Heading fontSize="xl" mb={4}>Activity</Heading>
           <TransactionList transactions={sortedTxns} isLoading={isLoading} />

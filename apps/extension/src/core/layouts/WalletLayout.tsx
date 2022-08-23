@@ -12,6 +12,7 @@ interface WalletLayoutProps {
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
   showBackButton?: boolean;
+  title?: string
 }
 
 export default function WalletLayout({
@@ -19,6 +20,7 @@ export default function WalletLayout({
   hasWalletFooter = true,
   hasWalletHeader = true,
   showBackButton,
+  title,
 }: WalletLayoutProps) {
   const { colorMode } = useColorMode();
 
@@ -44,7 +46,7 @@ export default function WalletLayout({
       bgColor={secondaryBgColor[colorMode]}
     >
       {hasWalletHeader ? (
-        <WalletHeader showBackButton={showBackButton} />
+        <WalletHeader title={title} showBackButton={showBackButton} />
       ) : undefined}
       <Box maxH="100%" overflowY="auto" pb={4}>
         {children}
