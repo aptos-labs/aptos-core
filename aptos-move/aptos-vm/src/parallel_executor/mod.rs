@@ -58,6 +58,10 @@ impl PTransactionOutput for AptosTransactionOutput {
     }
 }
 
+fn dedup(raw: Vec<Transaction>) -> Vec<Transaction> {
+    raw
+}
+
 pub struct ParallelAptosVM();
 
 impl ParallelAptosVM {
@@ -69,7 +73,8 @@ impl ParallelAptosVM {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
-        let signature_verified_block: Vec<PreprocessedTransaction> = transactions
+        let dedupped_transactions = dedup(transactions);
+        let signature_verified_block: Vec<PreprocessedTransaction> = dedupped_transactions
             .par_iter()
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
@@ -87,7 +92,8 @@ impl ParallelAptosVM {
                 None,
             )),
             Err(err @ Error::ModulePathReadWrite) => {
-                let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
+                let output =
+                    AptosVM::execute_block_and_keep_vm_status(dedupped_transactions, state_view)?;
                 Ok((
                     output
                         .into_iter()
