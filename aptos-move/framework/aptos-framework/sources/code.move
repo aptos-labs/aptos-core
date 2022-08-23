@@ -7,18 +7,20 @@ module aptos_framework::code {
 
     use aptos_framework::util;
     use aptos_framework::system_addresses;
+    use aptos_std::any::Any;
+    use std::option::Option;
 
     // ----------------------------------------------------------------------
     // Code Publishing
 
     /// The package registry at the given address.
-    struct PackageRegistry has key {
+    struct PackageRegistry has key, store, drop {
         /// Packages installed at this address.
         packages: vector<PackageMetadata>,
     }
 
     /// Metadata for a package. All byte blobs are represented as base64-of-gzipped-bytes
-    struct PackageMetadata has store, copy, drop {
+    struct PackageMetadata has store, drop {
         /// Name of this package.
         name: String,
         /// The upgrade policy of this package.
@@ -33,16 +35,20 @@ module aptos_framework::code {
         manifest: vector<u8>,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
+        /// For future extensions.
+        extension: Option<Any>,
     }
 
     /// Metadata about a module in a package.
-    struct ModuleMetadata has store, copy, drop {
+    struct ModuleMetadata has store, drop {
         /// Name of the module.
         name: String,
         /// Source text, gzipped String. Empty if not provided.
         source: vector<u8>,
         /// Source map, in compressed BCS. Empty if not provided.
-        source_map: vector<u8>
+        source_map: vector<u8>,
+        /// For future extensions.
+        extension: Option<Any>,
     }
 
     /// Describes an upgrade policy
@@ -130,6 +136,7 @@ module aptos_framework::code {
         *&mut pack.upgrade_number = upgrade_number;
 
         // Update registry
+        let policy = pack.upgrade_policy;
         if (index < len) {
             *vector::borrow_mut(packages, index) = pack
         } else {
@@ -137,7 +144,7 @@ module aptos_framework::code {
         };
 
         // Request publish
-        request_publish(addr, module_names, code, pack.upgrade_policy.policy)
+        request_publish(addr, module_names, code, policy.policy)
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because

@@ -3,6 +3,15 @@
 
 use crate::natives::{util, GasParameters};
 use move_deps::move_vm_runtime::native_functions::NativeFunction;
+use serde::{Deserialize, Serialize};
+
+/// Rust representation of the Move Any type
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Any {
+    pub type_name: String,
+    #[serde(with = "serde_bytes")]
+    pub data: Vec<u8>,
+}
 
 // The Any module hijacks just one function, from_bytes, from the util module. This
 // is a friend function which cannot be used across packages, so we have it both
