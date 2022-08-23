@@ -430,16 +430,17 @@ export class AptosClient {
   async waitForTransactionWithResult(txnHash: string): Promise<Gen.Transaction> {
     let isPending = true;
     let count = 0;
+    let lastTxn: Gen.Transaction | undefined;
     while (isPending) {
       if (count >= 10) {
         break;
       }
       try {
         // eslint-disable-next-line no-await-in-loop
-        const txn = await this.client.transactions.getTransactionByHash(txnHash);
-        isPending = txn.type === "pending_transaction";
+        lastTxn = await this.client.transactions.getTransactionByHash(txnHash);
+        isPending = lastTxn.type === "pending_transaction";
         if (!isPending) {
-          return txn;
+          return lastTxn;
         }
       } catch (e) {
         if (e instanceof Gen.ApiError) {
@@ -452,7 +453,7 @@ export class AptosClient {
       await sleep(1000);
       count += 1;
     }
-    throw new Error(`Waiting for transaction ${txnHash} timed out!`);
+    throw new WaitForTransactionError(`Waiting for transaction ${txnHash} timed out!`, lastTxn);
   }
 
   // TODO: For some reason this endpoint doesn't appear in the generated client
@@ -514,11 +515,11 @@ export class AptosClient {
   async generateRawTransaction(
     accountFrom: HexString,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: { maxGasAmount?: BCS.Uint64; gastUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
+    extraArgs?: { maxGasAmount?: BCS.Uint64; gasUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
-    const { maxGasAmount, gastUnitPrice, expireTimestamp } = {
+    const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
       maxGasAmount: 2000n,
-      gastUnitPrice: 1n,
+      gasUnitPrice: 1n,
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
       ...extraArgs,
     };
@@ -533,9 +534,78 @@ export class AptosClient {
       BigInt(sequenceNumber),
       payload,
       maxGasAmount,
-      gastUnitPrice,
+      gasUnitPrice,
       expireTimestamp,
       new TxnBuilderTypes.ChainId(chainId),
     );
+  }
+
+  /**
+   * Helper for generating, submitting, and waiting for a transaction, and then
+   * checking whether it was committed successfully. This has the same failure
+   * semantics as `submitTransaction` and `waitForTransactionWithResult`, see
+   * those for information about how this can fail (throw errors).
+   *
+   * If you set checkSuccess there are additional error cases, see the
+   * documentation for `checkSuccess` below.
+   *
+   * @param sender AptosAccount of transaction sender
+   * @param payload Transaction payload
+   * @param extraArgs Extra args for building transaction payload and configuring
+   * behavior of this function.
+   * @param checkSuccess If set, check whether the transaction was successful and
+   * throw a TransactionNotCommittedError if not.
+   * @returns The transaction response from the API.
+   */
+  async generateSignSendWaitForTransaction(
+    sender: AptosAccount,
+    payload: TxnBuilderTypes.TransactionPayload,
+    extraArgs?: {
+      maxGasAmount?: BCS.Uint64;
+      gasUnitPrice?: BCS.Uint64;
+      expireTimestamp?: BCS.Uint64;
+      checkSuccess?: boolean;
+    },
+  ): Promise<Gen.Transaction> {
+    const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+    const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
+    const transactionResponse = await this.waitForTransactionWithResult(pendingTransaction.hash);
+    if (extraArgs?.checkSuccess === undefined || extraArgs?.checkSuccess === null || !extraArgs.checkSuccess) {
+      return transactionResponse;
+    }
+    if (!(transactionResponse as any)?.success) {
+      throw new TransactionNotCommittedError(
+        `Transaction ${pendingTransaction.hash} processed by blockchain but not committed successfully`,
+        transactionResponse,
+      );
+    }
+    return transactionResponse;
+  }
+}
+
+/**
+ * This error is used by `waitForTransactionWithResult` when waiting for a
+ * transaction times out.
+ */
+export class WaitForTransactionError extends Error {
+  public readonly lastSubmittedTransaction: Gen.Transaction | undefined;
+
+  constructor(message: string, lastSubmittedTransaction: Gen.Transaction | undefined) {
+    super(message);
+    this.lastSubmittedTransaction = lastSubmittedTransaction;
+  }
+}
+
+/**
+ * This error is used by `generateSignSendWaitForTransaction` when a transaction
+ * is processed by the API, but it was not committed successfully.
+ */
+export class TransactionNotCommittedError extends Error {
+  public readonly transaction: Gen.Transaction;
+
+  constructor(message: string, transaction: Gen.Transaction | undefined) {
+    super(message);
+    this.transaction = transaction;
   }
 }

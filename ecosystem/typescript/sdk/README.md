@@ -4,9 +4,14 @@
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
-## API Docs
+## Quickstart
+The public SDK downloaded from [npmjs](https://www.npmjs.com/package/aptos) is compatible with the [Aptos devnet](https://fullnode.devnet.aptoslabs.com). To start building, run below command in your project directory:
 
-Docs can be found [here][api-doc]
+```bash
+yarn add aptos
+```
+
+Learn the basics of how to use the SDK by following [this tutorial](https://aptos.dev/tutorials/your-first-transaction-sdk) in the Aptos developer site.
 
 ## Usage
 
@@ -46,12 +51,7 @@ yarn generate-client
 ```
 
 ### Working with devnet
-
-The public SDK downloaded from [npmjs](https://www.npmjs.com/package/aptos) is compatible with the [Aptos devnet](https://fullnode.devnet.aptoslabs.com). To start building, run below command in your project directory:
-
-```bash
-yarn add aptos
-```
+See the quickstart above.
 
 ### Working with local node
 
