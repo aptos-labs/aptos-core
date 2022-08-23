@@ -116,7 +116,7 @@ async fn main() -> Result<(), Error> {
             }
         };
         match processor
-            .process_substream_with_status(substream_module_name.clone(), data, block_height)
+            .process_substream_with_status(data, block_height)
             .await
         {
             Ok(_) => {

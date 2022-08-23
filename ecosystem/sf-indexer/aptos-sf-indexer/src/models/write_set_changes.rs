@@ -41,11 +41,9 @@ impl WriteSetChange {
             .unwrap()
             .to_string();
         let type_ = write_set_change.r#type.clone();
-        let wsc;
-        let wsc_detail;
         match write_set_change.change.as_ref().unwrap() {
-            Change::MoveModule(module) => {
-                wsc = WriteSetChange {
+            Change::MoveModule(module) => (
+                WriteSetChange {
                     transaction_version: version,
                     hash,
                     transaction_block_height: block_height,
@@ -53,16 +51,16 @@ impl WriteSetChange {
                     address: module.address.clone(),
                     index: index as i64,
                     inserted_at: chrono::Utc::now().naive_utc(),
-                };
-                wsc_detail = WriteSetChangeDetail::Module(MoveModule::from_module(
+                },
+                WriteSetChangeDetail::Module(MoveModule::from_module(
                     module,
                     index,
                     version,
                     block_height,
-                ));
-            }
-            Change::MoveResource(resource) => {
-                wsc = WriteSetChange {
+                )),
+            ),
+            Change::MoveResource(resource) => (
+                WriteSetChange {
                     transaction_version: version,
                     hash,
                     transaction_block_height: block_height,
@@ -70,16 +68,16 @@ impl WriteSetChange {
                     address: resource.address.clone(),
                     index: index as i64,
                     inserted_at: chrono::Utc::now().naive_utc(),
-                };
-                wsc_detail = WriteSetChangeDetail::Resource(MoveResource::from_resource(
+                },
+                WriteSetChangeDetail::Resource(MoveResource::from_resource(
                     resource,
                     index,
                     version,
                     block_height,
-                ));
-            }
-            Change::TableItem(table_item) => {
-                wsc = WriteSetChange {
+                )),
+            ),
+            Change::TableItem(table_item) => (
+                WriteSetChange {
                     transaction_version: version,
                     hash,
                     transaction_block_height: block_height,
@@ -87,14 +85,13 @@ impl WriteSetChange {
                     address: String::default(),
                     index: index as i64,
                     inserted_at: chrono::Utc::now().naive_utc(),
-                };
-                wsc_detail = WriteSetChangeDetail::Table(
+                },
+                WriteSetChangeDetail::Table(
                     TableItem::from_table_item(table_item, index, version, block_height),
                     TableMetadata::from_table_item(table_item),
-                );
-            }
+                ),
+            ),
         }
-        (wsc, wsc_detail)
     }
 
     pub fn from_write_set_changes(
@@ -152,21 +149,13 @@ impl MoveModule {
             transaction_block_height: block_height,
             name: move_module.name.clone(),
             address: move_module.address.clone(),
-            bytecode: if move_module.is_deleted {
-                None
-            } else {
-                Some(move_module.bytecode.clone())
-            },
-            friends: if move_module.is_deleted {
-                None
-            } else {
-                Some(serde_json::to_value(move_module.friends.clone()).unwrap())
-            },
-            structs: if move_module.is_deleted {
-                None
-            } else {
-                Some(serde_json::to_value(move_module.structs.clone()).unwrap())
-            },
+            bytecode: move_module.is_deleted.then(|| move_module.bytecode.clone()),
+            friends: move_module
+                .is_deleted
+                .then(|| serde_json::to_value(move_module.friends.clone()).unwrap()),
+            structs: move_module
+                .is_deleted
+                .then(|| serde_json::to_value(move_module.structs.clone()).unwrap()),
             is_deleted: move_module.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),
         }
@@ -207,16 +196,12 @@ impl MoveResource {
             name: move_resource.name.clone(),
             address: move_resource.address.clone(),
             module: move_resource.module.clone(),
-            generic_type_params: if move_resource.is_deleted {
-                None
-            } else {
-                Some(serde_json::to_value(move_resource.generic_type_params.clone()).unwrap())
-            },
-            data: if move_resource.is_deleted {
-                None
-            } else {
-                Some(serde_json::from_str(&move_resource.data).unwrap())
-            },
+            generic_type_params: move_resource
+                .is_deleted
+                .then(|| serde_json::to_value(move_resource.generic_type_params.clone()).unwrap()),
+            data: move_resource
+                .is_deleted
+                .then(|| serde_json::from_str(&move_resource.data).unwrap()),
             is_deleted: move_resource.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),
         }
@@ -256,11 +241,9 @@ impl TableItem {
             key: table_item.key.clone(),
             table_handle: table_item.handle.clone(),
             decoded_key: serde_json::from_str(&table_item.decoded_key).unwrap(),
-            decoded_value: if table_item.is_deleted {
-                None
-            } else {
-                Some(serde_json::from_str(&table_item.decoded_value).unwrap())
-            },
+            decoded_value: table_item
+                .is_deleted
+                .then(|| serde_json::from_str(&table_item.decoded_value).unwrap()),
             is_deleted: table_item.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),
         }

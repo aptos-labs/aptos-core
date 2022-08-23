@@ -77,13 +77,9 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     /// This is a helper method, tying together the other helper methods to allow tracking status in the DB
     async fn process_substream_with_status(
         &mut self,
-        input_substream_name: String,
         stream_data: BlockScopedData,
         block_height: u64,
     ) -> Result<ProcessingResult, BlockProcessingError> {
-        if input_substream_name != self.substream_module_name() {
-            panic!("Wrong processor detected: this processor can only process module {},  module {} detected.", self.substream_module_name(), input_substream_name);
-        }
         PROCESSOR_INVOCATIONS
             .with_label_values(&[self.substream_module_name()])
             .inc();

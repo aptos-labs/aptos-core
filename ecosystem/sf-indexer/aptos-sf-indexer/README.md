@@ -11,6 +11,35 @@
 
 # Local Development
 
+## Compiling Protobufs
+
+#### Install `protoc`
+
+protoc is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages, out of the protobuf definitions you will create or get through third-party Substreams packages.
+
+There are multiple ways on how to do it. Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
+
+#### Install plugins
+
+This tool helps you render Rust structures out of protobuf definitions, for use in your Substreams modules. It is called by protoc following their plugin system.
+Install it with:
+
+```bash
+  cargo install --version 0.2.0 protoc-gen-prost
+  cargo install --version 0.1.3 protoc-gen-tonic
+```
+
+> If you forget to install `protoc`, when generating the definitions, you might see error about `cmake` not defined, this is a fallback when `protoc` is not found.
+
+#### Install `buf`
+
+[https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
+
+See the [installation instructions here](https://docs.buf.build/installation).
+
+#### generating
+run `buf generate --include-imports`
+
 ### Run Firehose
 TBD
 

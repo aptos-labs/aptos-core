@@ -85,11 +85,7 @@ impl Transaction {
         }
         let txn = Self::from_transaction_info(
             transaction_info,
-            if payload.is_none() {
-                None
-            } else {
-                Some(serde_json::to_value(&payload).unwrap())
-            },
+            payload.map(|payload| serde_json::to_value(&payload).unwrap()),
             transaction_info.r#type.clone(),
             events.len(),
             write_set_changes.len(),
@@ -143,22 +139,14 @@ impl Transaction {
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
-        let zipped = transactions
-            .iter()
-            .map(Self::from_transaction)
-            .collect::<Vec<(
-                Self,
-                Option<TransactionDetail>,
-                Vec<EventModel>,
-                Vec<WriteSetChangeModel>,
-                Vec<WriteSetChangeDetail>,
-            )>>();
         let mut txns = vec![];
         let mut txn_details = vec![];
         let mut events = vec![];
         let mut wscs = vec![];
         let mut wsc_details = vec![];
-        for (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) in zipped {
+        for (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) in
+            transactions.iter().map(Self::from_transaction)
+        {
             txns.push(txn);
             if let Some(a) = txn_detail {
                 txn_details.push(a);
