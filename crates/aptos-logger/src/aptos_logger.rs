@@ -562,7 +562,7 @@ impl LoggerService {
                             .facade
                             .filter
                             .read()
-                            .remote_filter
+                            .telemetry_filter
                             .enabled(&entry.metadata)
                         {
                             let s = (self.facade.formatter)(&entry).expect("Unable to format");
