@@ -3,7 +3,6 @@
 
 import {
   Box,
-  Heading,
   useColorMode,
   VStack,
   Button,
@@ -60,8 +59,7 @@ function Account() {
       <WalletLayout title="Settings">
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">
-            <Heading fontSize="xl">Settings</Heading>
-            <Flex pb={2} pt={1}>
+            <Flex pb={2} pt={1} justifyContent="end">
               <Button
                 fontSize="sm"
                 fontWeight={400}

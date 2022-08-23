@@ -33,20 +33,17 @@ function Gallery() {
     <AuthLayout routePath={PageRoutes.gallery.path}>
       <WalletLayout title="Collectibles">
         <VStack width="100%" paddingTop={8} px={4}>
-          <Grid pb={4} templateColumns="1fr 72px" width="100%">
-            <Heading fontSize="xl">Collectibles</Heading>
-            <Flex justifyContent="right">
-              <CreateNFTDrawer />
-            </Flex>
-          </Grid>
           {
             isLoading
               ? <Center pt={4}><Spinner size="lg" /></Center>
               : (
                 <>
-                  <Flex alignItems="flex-start" width="100%">
+                  <Grid pb={4} templateColumns="1fr 72px" width="100%">
                     <Heading fontWeight={500} fontSize="md">Created by you</Heading>
-                  </Flex>
+                    <Flex justifyContent="right">
+                      <CreateNFTDrawer />
+                    </Flex>
+                  </Grid>
                   <SimpleGrid w="100%" columns={2} spacing={2}>
                     {
                       (galleryItems && galleryItems!.length > 0)

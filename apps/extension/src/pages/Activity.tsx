@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Heading,
   VStack,
 } from '@chakra-ui/react';
 import React from 'react';
@@ -25,7 +24,6 @@ function Activity() {
     <AuthLayout routePath={PageRoutes.activity.path}>
       <WalletLayout title="Activity">
         <VStack width="100%" paddingTop={8} px={4} alignItems="start">
-          <Heading fontSize="xl" mb={4}>Activity</Heading>
           <TransactionList transactions={sortedTxns} isLoading={isLoading} />
         </VStack>
       </WalletLayout>

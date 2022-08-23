@@ -5,9 +5,10 @@ import React from 'react';
 import {
   Badge,
   Box,
-  Button, Center,
-  Heading,
-  HStack, Spinner,
+  Button,
+  Center,
+  HStack,
+  Spinner,
   Text,
   Tooltip,
   VStack,
@@ -65,9 +66,6 @@ function TransactionBody() {
       px={4}
       alignItems="stretch"
     >
-      <Heading fontSize="xl">
-        Transaction detail
-      </Heading>
       <Button
         fontSize="sm"
         fontWeight={400}
@@ -77,6 +75,7 @@ function TransactionBody() {
         variant="unstyled"
         cursor="pointer"
         href={explorerAddress}
+        alignSelf="end"
       >
         View on explorer
       </Button>

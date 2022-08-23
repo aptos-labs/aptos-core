@@ -3,7 +3,6 @@
 
 import React from 'react';
 import {
-  Heading,
   VStack,
 } from '@chakra-ui/react';
 import WalletLayout from 'core/layouts/WalletLayout';
@@ -16,7 +15,6 @@ function RecoveryPhrase() {
     <AuthLayout routePath={PageRoutes.recovery_phrase.path}>
       <WalletLayout title="Recovery Phrase" showBackButton>
         <VStack width="100%" height="100%" spacing={8} paddingTop={8} paddingStart={8} paddingEnd={8}>
-          <Heading fontSize="2xl">Recovery Phrase</Heading>
           <RecoveryPhraseBox />
         </VStack>
       </WalletLayout>

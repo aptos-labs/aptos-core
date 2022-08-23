@@ -3,7 +3,6 @@
 
 import {
   VStack,
-  Heading,
   HStack,
   useRadioGroup,
   Button,
@@ -51,8 +50,7 @@ export default function NetworkBody() {
 
   return (
     <>
-      <HStack w="100%" pb={4} justifyContent="space-between">
-        <Heading fontSize="xl">Network</Heading>
+      <HStack justifyContent="end">
         <ChakraLink to={Routes.addNetwork.path}>
           <Button
             colorScheme="teal"

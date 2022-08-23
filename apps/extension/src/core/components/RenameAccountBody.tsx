@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Flex,
-  SimpleGrid,
-  Heading,
   FormControl,
   Input,
   Button,
@@ -41,32 +38,25 @@ export default function RenameAccountBody() {
   };
 
   return (
-    <>
-      <SimpleGrid columns={2} width="100%" pb={4}>
-        <Flex>
-          <Heading fontSize="xl">Rename account</Heading>
-        </Flex>
-      </SimpleGrid>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <FormControl isInvalid={errors.name !== undefined}>
-          <Input
-            placeholder="Insert account name"
-            {...register('name', {
-              maxLength: { message: 'Too long', value: 20 },
-              required: 'Please insert a valid name',
-            })}
-          />
-          <FormErrorMessage>{ errors.name?.message }</FormErrorMessage>
-        </FormControl>
-        <Button
-          isDisabled={!isValid}
-          type="submit"
-          colorScheme="teal"
-          mt={3}
-        >
-          Confirm
-        </Button>
-      </form>
-    </>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <FormControl isInvalid={errors.name !== undefined}>
+        <Input
+          placeholder="Insert account name"
+          {...register('name', {
+            maxLength: { message: 'Too long', value: 20 },
+            required: 'Please insert a valid name',
+          })}
+        />
+        <FormErrorMessage>{ errors.name?.message }</FormErrorMessage>
+      </FormControl>
+      <Button
+        isDisabled={!isValid}
+        type="submit"
+        colorScheme="teal"
+        mt={3}
+      >
+        Confirm
+      </Button>
+    </form>
   );
 }

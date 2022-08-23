@@ -4,10 +4,8 @@
 import {
   VStack,
   Flex,
-  SimpleGrid,
   Tag,
   useDisclosure,
-  Heading,
   Drawer,
   DrawerOverlay,
   DrawerContent,
@@ -57,44 +55,39 @@ export default function CredentialsBody() {
 
   return (
     <>
-      <SimpleGrid columns={2} width="100%" pb={4}>
-        <Flex>
-          <Heading fontSize="xl">Credentials</Heading>
-        </Flex>
-        <Flex justifyContent="right">
-          <Tag size="sm" onClick={onOpen} cursor="pointer">
-            View more
-          </Tag>
-          <Drawer
-            isOpen={isOpen}
-            onClose={onClose}
-            placement="bottom"
-          >
-            <DrawerOverlay />
-            <DrawerContent>
-              <DrawerHeader borderBottomWidth="1px" px={4}>
-                Credentials
-              </DrawerHeader>
-              <DrawerBody px={4}>
-                <VStack mt={2} spacing={4} pb={8} alignItems="flex-start">
-                  <CredentialHeaderAndBody
-                    header="Private key"
-                    body={privateKey}
-                  />
-                  <CredentialHeaderAndBody
-                    header="Public key"
-                    body={publicKey}
-                  />
-                  <CredentialHeaderAndBody
-                    header="Address"
-                    body={address}
-                  />
-                </VStack>
-              </DrawerBody>
-            </DrawerContent>
-          </Drawer>
-        </Flex>
-      </SimpleGrid>
+      <Flex justifyContent="right">
+        <Tag size="sm" onClick={onOpen} cursor="pointer">
+          View more
+        </Tag>
+        <Drawer
+          isOpen={isOpen}
+          onClose={onClose}
+          placement="bottom"
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerHeader borderBottomWidth="1px" px={4}>
+              Credentials
+            </DrawerHeader>
+            <DrawerBody px={4}>
+              <VStack mt={2} spacing={4} pb={8} alignItems="flex-start">
+                <CredentialHeaderAndBody
+                  header="Private key"
+                  body={privateKey}
+                />
+                <CredentialHeaderAndBody
+                  header="Public key"
+                  body={publicKey}
+                />
+                <CredentialHeaderAndBody
+                  header="Address"
+                  body={address}
+                />
+              </VStack>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+      </Flex>
       <VStack mt={2} spacing={2} alignItems="left">
         <CredentialRow
           header="Private key"
