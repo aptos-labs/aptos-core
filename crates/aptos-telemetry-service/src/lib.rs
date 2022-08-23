@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use warp::{Filter, Reply};
 
 use crate::{
+    clients::humio,
     clients::victoria_metrics_api::Client as MetricsClient,
     context::Context,
     index::routes,
@@ -25,11 +26,13 @@ use crate::{
 
 mod auth;
 mod clients;
+mod constants;
 mod context;
 mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
+mod log_ingest;
 mod prometheus_push_metrics;
 #[cfg(any(test))]
 pub(crate) mod tests;
@@ -70,11 +73,17 @@ impl AptosTelemetryServiceArgs {
             config.victoria_metrics_token.clone(),
         );
 
+        let humio_client = humio::IngestClient::new(
+            Url::parse(&config.humio_url).unwrap(),
+            config.humio_auth_token.clone(),
+        );
+
         let context = Context::new(
             &config,
             cache.clone(),
             Some(gcp_bigquery_client),
             Some(victoria_metrics_client),
+            humio_client,
         );
 
         ValidatorSetCacheUpdater::new(cache, &config).run();
@@ -116,6 +125,8 @@ pub struct TelemetryServiceConfig {
     pub gcp_bq_config: GCPBigQueryConfig,
     pub victoria_metrics_base_url: String,
     pub victoria_metrics_token: String,
+    pub humio_url: String,
+    pub humio_auth_token: String,
 }
 
 impl TelemetryServiceConfig {
