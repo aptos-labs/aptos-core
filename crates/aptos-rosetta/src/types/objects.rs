@@ -36,6 +36,7 @@ use aptos_rest_client::{
 };
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -384,6 +385,28 @@ impl Operation {
     }
 }
 
+impl std::cmp::PartialOrd for Operation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for Operation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_op =
+            OperationType::from_str(&self.operation_type).expect("Expect type to be valid");
+        let other_op =
+            OperationType::from_str(&other.operation_type).expect("Expect type to be valid");
+        match self_op.cmp(&other_op) {
+            Ordering::Equal => self
+                .operation_identifier
+                .index
+                .cmp(&other.operation_identifier.index),
+            order => order,
+        }
+    }
+}
+
 /// This object is needed for flattening all the types into a
 /// single json object used by Rosetta
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -618,6 +641,13 @@ impl Transaction {
                 operations.append(&mut ops);
             }
         };
+
+        // Reorder operations by type so that there's no invalid ordering
+        // (Create before transfer) (Withdraw before deposit)
+        operations.sort();
+        for (i, operation) in operations.iter_mut().enumerate() {
+            operation.operation_identifier.index = i as u64;
+        }
 
         // Everything committed costs gas
         if let Some(ref request) = maybe_user_transaction_request {
