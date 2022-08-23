@@ -268,15 +268,15 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
-        let epoch_ending_state_pruner = StatePrunerManager::new(
+        let epoch_snapshot_pruner = StatePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
-            pruner_config.epoch_ending_state_merkle_pruner_config.into(),
+            pruner_config.epoch_snapshot_pruner_config.into(),
         );
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             state_pruner,
-            epoch_ending_state_pruner,
+            epoch_snapshot_pruner,
             target_snapshot_size,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
@@ -835,7 +835,7 @@ impl AptosDB {
         let min_readable_epoch_snapshot_version = self
             .state_store
             .state_db
-            .epoch_ending_state_pruner
+            .epoch_snapshot_pruner
             .get_min_readable_version();
         if version >= min_readable_epoch_snapshot_version {
             self.ledger_store.ensure_epoch_ending(version)

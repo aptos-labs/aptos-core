@@ -101,7 +101,7 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
-    epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
+    epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
         enable: false,
         prune_window: 0,
         batch_size: 0,
@@ -141,7 +141,7 @@ pub struct StateMerklePrunerConfig {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct EpochEndingStateMerklePrunerConfig {
+pub struct EpochSnapshotPrunerConfig {
     pub enable: bool,
     /// Window size in versions, but only the snapshots at epoch ending versions are kept, because
     /// other snapshots are pruned by the state merkle pruner.
@@ -153,8 +153,8 @@ pub struct EpochEndingStateMerklePrunerConfig {
 // Config for the epoch ending state pruner is actually in the same format as the state merkle
 // pruner, but it has it's own type hence separate default values. This converts it to the same
 // type, to use the same pruner implementation (but parameterized on the stale node index DB schema).
-impl From<EpochEndingStateMerklePrunerConfig> for StateMerklePrunerConfig {
-    fn from(config: EpochEndingStateMerklePrunerConfig) -> Self {
+impl From<EpochSnapshotPrunerConfig> for StateMerklePrunerConfig {
+    fn from(config: EpochSnapshotPrunerConfig) -> Self {
         Self {
             enable: config.enable,
             prune_window: config.prune_window,
@@ -168,7 +168,7 @@ impl From<EpochEndingStateMerklePrunerConfig> for StateMerklePrunerConfig {
 pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
-    pub epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig,
+    pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
 }
 
 impl Default for LedgerPrunerConfig {
@@ -199,7 +199,7 @@ impl Default for StateMerklePrunerConfig {
     }
 }
 
-impl Default for EpochEndingStateMerklePrunerConfig {
+impl Default for EpochSnapshotPrunerConfig {
     fn default() -> Self {
         Self {
             enable: true,

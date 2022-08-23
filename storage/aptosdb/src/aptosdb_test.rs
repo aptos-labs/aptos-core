@@ -11,7 +11,7 @@ use crate::{
     AptosDB, PrunerManager, StaleNodeIndexSchema, ROCKSDB_PROPERTIES,
 };
 use aptos_config::config::{
-    EpochEndingStateMerklePrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
     StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -130,7 +130,7 @@ fn test_error_if_version_pruned() {
         db.error_if_state_merkle_pruned("State", 4)
             .unwrap_err()
             .to_string(),
-        "State at version 4 is pruned, min available version is 5."
+        "Version 4 is not epoch ending."
     );
     assert!(db.error_if_state_merkle_pruned("State", 5).is_ok());
     assert_eq!(
@@ -216,7 +216,7 @@ pub fn test_state_merkle_pruning_impl(
                 prune_window: 5,
                 batch_size: 1,
             },
-            epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
                 enable: true,
                 prune_window: 10,
                 batch_size: 1,
@@ -257,39 +257,39 @@ pub fn test_state_merkle_pruning_impl(
         let is_epoch_ending = ledger_info_with_sigs.ledger_info().ends_epoch();
         snapshot_versions.push((last_version, is_epoch_ending));
 
-        let state_min_readable = last_version.saturating_sub(5);
-        let epoch_ending_min_readable = last_version.saturating_sub(10);
-        let within_window: Vec<_> = snapshot_versions
+        let state_merkle_min_readable = last_version.saturating_sub(5);
+        let epoch_snapshot_min_readable = last_version.saturating_sub(10);
+        let snapshots: Vec<_> = snapshot_versions
             .iter()
-            .filter(|(v, _is_epoch_ending)| *v >= state_min_readable)
+            .filter(|(v, _is_epoch_ending)| *v >= state_merkle_min_readable)
             .map(|(v, _)| *v)
             .collect();
-        let epoch_endings_within_window: Vec<_> = snapshot_versions
+        let epoch_snapshots: Vec<_> = snapshot_versions
             .iter()
-            .filter(|(v, is_epoch_ending)| *is_epoch_ending && *v >= epoch_ending_min_readable)
+            .filter(|(v, is_epoch_ending)| *is_epoch_ending && *v >= epoch_snapshot_min_readable)
             .map(|(v, _)| *v)
             .collect();
 
         // Prune till the oldest snapshot readable.
         let pruner = &db.state_store.state_db.state_pruner;
-        let epoch_ending_pruner = &db.state_store.state_db.epoch_ending_state_pruner;
+        let epoch_snapshot_pruner = &db.state_store.state_db.epoch_snapshot_pruner;
         pruner
             .pruner_worker
-            .set_target_db_version(*within_window.first().unwrap());
-        epoch_ending_pruner
+            .set_target_db_version(*snapshots.first().unwrap());
+        epoch_snapshot_pruner
             .pruner_worker
             .set_target_db_version(std::cmp::min(
-                *within_window.first().unwrap(),
-                *epoch_endings_within_window.first().unwrap_or(&Version::MAX),
+                *snapshots.first().unwrap(),
+                *epoch_snapshots.first().unwrap_or(&Version::MAX),
             ));
         pruner.wait_for_pruner().unwrap();
-        epoch_ending_pruner.wait_for_pruner().unwrap();
+        epoch_snapshot_pruner.wait_for_pruner().unwrap();
 
         // Check strictly that all trees in the window accessible and all those nodes not needed
         // must be gone.
-        let non_pruned_versions: HashSet<_> = within_window
+        let non_pruned_versions: HashSet<_> = snapshots
             .into_iter()
-            .chain(epoch_endings_within_window.into_iter())
+            .chain(epoch_snapshots.into_iter())
             .collect();
 
         let expected_nodes: HashSet<_> = non_pruned_versions
