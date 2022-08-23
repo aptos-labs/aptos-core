@@ -118,6 +118,10 @@ pub struct InitPackage {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -133,11 +137,11 @@ impl CliCommand<()> for InitPackage {
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
-
+        let aptos_rest_url = self.rest_options.url(&self.profile_options.profile)?;
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            "devnet",
+            aptos_rest_url,
             addresses,
             self.prompt_options,
         )
@@ -147,7 +151,7 @@ impl CliCommand<()> for InitPackage {
 pub fn init_move_dir(
     package_dir: &Path,
     name: &str,
-    rev: &str,
+    aptos_rest_url: reqwest::Url,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<()> {
@@ -165,10 +169,10 @@ pub fn init_move_dir(
         Dependency {
             local: None,
             git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-            rev: Some(rev.to_string()),
-            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-            aptos: None,
-            address: None,
+            rev: None,
+            subdir: None,
+            aptos: Some(aptos_rest_url.to_string()),
+            address: Some(AccountAddress::ONE.to_hex_literal()),
         },
     );
     let manifest = MovePackageManifest {

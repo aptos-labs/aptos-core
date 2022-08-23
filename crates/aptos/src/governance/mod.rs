@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, PromptOptions, TransactionOptions,
-    TransactionSummary,
+    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions, PromptOptions,
+    RestOptions, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::move_tool::{init_move_dir, IncludedArtifacts};
@@ -76,7 +76,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
-        let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
+        let (_bytecode, script_hash) = self.compile_proposal_args.compile(
+            self.txn_options
+                .rest_options
+                .url(&self.txn_options.profile_options.profile)?,
+        )?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -297,7 +301,7 @@ impl std::fmt::Display for ProposalMetadata {
 
 fn compile_in_temp_dir(
     script_path: &Path,
-    git_revision: &str,
+    aptos_rest_url: reqwest::Url,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
@@ -310,7 +314,7 @@ fn compile_in_temp_dir(
     init_move_dir(
         package_dir,
         "Proposal",
-        git_revision,
+        aptos_rest_url,
         BTreeMap::new(),
         prompt_options,
     )?;
@@ -368,8 +372,10 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
+    /// The number proposal to execute
     #[clap(long)]
     pub(crate) proposal_id: u64,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -383,7 +389,11 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile(
+            self.txn_options
+                .rest_options
+                .url(&self.txn_options.profile_options.profile)?,
+        )?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
@@ -403,16 +413,16 @@ pub struct CompileProposalArgs {
     #[clap(long, parse(from_os_str))]
     pub script_path: PathBuf,
 
-    /// Git hash or branch of the framework in aptos core
-    #[clap(long)]
-    pub framework_git_rev: String,
-
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
 }
 
 impl CompileProposalArgs {
-    fn compile(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    fn compile(&self, aptos_rest_url: reqwest::Url) -> CliTypedResult<(Vec<u8>, HashValue)> {
         // Check script file
         let script_path = self.script_path.as_path();
         if !self.script_path.exists() {
@@ -428,7 +438,7 @@ impl CompileProposalArgs {
         }
 
         // Compile script
-        compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
+        compile_in_temp_dir(script_path, aptos_rest_url, self.prompt_options)
     }
 }
 
