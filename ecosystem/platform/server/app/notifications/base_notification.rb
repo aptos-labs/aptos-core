@@ -11,7 +11,7 @@ class BaseNotification < Noticed::Base
     unless respond_to?(guard_method_name)
       define_method guard_method_name do
         prefs = recipient.notification_preferences.where(delivery_method:).first
-        return true if prefs.nil?
+        return false if prefs.nil?
 
         prefs[notification_name]
       end
