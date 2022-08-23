@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::any::Any;
 use anyhow::bail;
 use aptos_types::transaction::ModuleBundle;
 use aptos_types::vm_status::StatusCode;
@@ -24,6 +25,19 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
+/// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
+/// TODO: move this elsewhere for reuse?
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct MoveOption<T> {
+    pub value: Vec<T>,
+}
+
+impl<T> Default for MoveOption<T> {
+    fn default() -> Self {
+        Self { value: vec![] }
+    }
+}
+
 /// The package registry at the given address.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageRegistry {
@@ -41,6 +55,7 @@ pub struct PackageMetadata {
     pub source_digest: String,
     pub manifest: Vec<u8>,
     pub modules: Vec<ModuleMetadata>,
+    pub extension: MoveOption<Any>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -48,6 +63,7 @@ pub struct ModuleMetadata {
     pub name: String,
     pub source: Vec<u8>,
     pub source_map: Vec<u8>,
+    pub extension: MoveOption<Any>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
