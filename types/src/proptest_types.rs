@@ -86,14 +86,10 @@ impl Arbitrary for WriteSet {
         // important? Not sure.
         vec((any::<AccessPath>(), any::<WriteOp>()), 0..64)
             .prop_map(|write_set| {
-                let write_set_mut = WriteSetMut::new(
-                    write_set
-                        .iter()
-                        .map(|(access_path, write_op)| {
-                            (StateKey::AccessPath(access_path.clone()), write_op.clone())
-                        })
-                        .collect(),
-                );
+                let write_set_mut =
+                    WriteSetMut::new(write_set.iter().map(|(access_path, write_op)| {
+                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
+                    }));
                 write_set_mut
                     .freeze()
                     .expect("generated write sets should always be valid")
@@ -780,7 +776,7 @@ impl TransactionToCommitGen {
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
 
-        let (state_updates, write_set): (HashMap<_, _>, Vec<_>) = self
+        let (state_updates, write_set): (HashMap<_, _>, BTreeMap<_, _>) = self
             .account_state_gens
             .into_iter()
             .flat_map(|(index, account_gen)| {
