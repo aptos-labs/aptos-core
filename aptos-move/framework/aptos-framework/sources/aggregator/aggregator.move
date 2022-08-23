@@ -75,7 +75,7 @@ module aptos_framework::aggregator {
 
     struct Aggregator has store {
         handle: address,
-        key: u128,
+        key: address,
         limit: u128,
     }
 
