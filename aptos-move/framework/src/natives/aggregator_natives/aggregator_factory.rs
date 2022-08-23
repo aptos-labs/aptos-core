@@ -51,12 +51,11 @@ fn native_new_aggregator(
     // Every aggregator instance uses a unique key in its id. Here we can reuse
     // the strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far.
-    let txn_hash_buffer = u128::to_be_bytes(aggregator_context.txn_hash());
-    let num_aggregators_buffer = u128::to_be_bytes(aggregator_data.num_aggregators());
+    let num_aggregators_len = aggregator_data.num_aggregators() as u32;
 
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
-    hasher.update(&txn_hash_buffer);
-    hasher.update(&num_aggregators_buffer);
+    hasher.update(&aggregator_context.txn_hash());
+    hasher.update(&num_aggregators_len.to_be_bytes());
     let hash = hasher.finish().to_vec();
     let key = AggregatorHandle(
         AccountAddress::from_bytes(&hash)
