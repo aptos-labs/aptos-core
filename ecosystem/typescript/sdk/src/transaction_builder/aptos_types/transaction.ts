@@ -122,7 +122,7 @@ export class Script {
 export class EntryFunction {
   /**
    * Contains the payload to run a function within a module.
-   * @param module_name Fullly qualified module name. ModuleId consists of account address and module name.
+   * @param module_name Fully qualified module name. ModuleId consists of account address and module name.
    * @param function_name The function to run.
    * @param ty_args Type arguments that move function requires.
    *
