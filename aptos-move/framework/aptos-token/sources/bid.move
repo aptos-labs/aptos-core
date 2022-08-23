@@ -1,5 +1,5 @@
 module aptos_token::bid {
-    use aptos_token::listing::{Self, Listing};
+    use aptos_token::marketplace_utils::{Self, Listing};
     use aptos_token::token::{Self, TokenId};
     use std::guid::{Self, ID};
     use std::signer;
@@ -97,12 +97,12 @@ module aptos_token::bid {
         let bid = table::borrow(bid_records, bid_id);
 
         let coin_owner = bid.bidder;
-        let token_owner = listing::get_listing_owner(&entry);
+        let token_owner = marketplace_utils::get_listing_owner(&entry);
         // validate token_id match
-        assert!(bid.token_id == listing::get_listing_token_id(&entry), ETOKEN_ID_NOT_MATCH);
+        assert!(bid.token_id == marketplace_utils::get_listing_token_id(&entry), ETOKEN_ID_NOT_MATCH);
         // validate offerred amount and price
-        let listed_amount =  listing::get_listing_token_amount(&entry);
-        let min_total = listing::get_listing_min_price(&entry) * listed_amount;
+        let listed_amount =  marketplace_utils::get_listing_token_amount(&entry);
+        let min_total = marketplace_utils::get_listing_min_price(&entry) * listed_amount;
         assert!(coin::value(&bid.coin) >= min_total, ENO_SUFFICIENT_FUND);
         assert!(bid.token_amount == listed_amount, ETOKEN_AMOUNT_NOT_MATCH);
         // validate expiration time
@@ -110,9 +110,9 @@ module aptos_token::bid {
         // only when lock time expires, funds can be extracted for executions
         assert!(bid.lock_until_sec <= now, ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME);
         // listing should expire after auction ends
-        assert!(listing::get_listing_expiration(&entry) >= now, ELISTING_EXPIRED);
+        assert!(marketplace_utils::get_listing_expiration(&entry) >= now, ELISTING_EXPIRED);
         //listing_id matches
-        assert!(listing::get_listing_id(&entry) == bid.listing_id, ELISTING_ID_NOT_MATCH);
+        assert!(marketplace_utils::get_listing_id(&entry) == bid.listing_id, ELISTING_ID_NOT_MATCH);
 
         // transfer coin and token
         let token = token::withdraw_with_event_internal(token_owner, bid.token_id, listed_amount);
@@ -156,7 +156,7 @@ module aptos_token::bid {
 
         // owner creats a listing
         let token_id = token::create_collection_and_token(owner, 2, 2, 2);
-        let entry = listing::create_list<coin::FakeMoney>(
+        let entry = marketplace_utils::create_list<coin::FakeMoney>(
             owner,
             token_id,
             1,
@@ -164,7 +164,7 @@ module aptos_token::bid {
             false,
             100
         );
-        let list_id = listing::get_listing_id(&entry);
+        let list_id = marketplace_utils::get_listing_id(&entry);
         // setup the bider
 
         coin::create_fake_money(aptos_framework, bidder_a, 100);

@@ -34,20 +34,26 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// bidder should be able to cancel a bid and get fund back
+    /// bidder can cancel a bid and get fund back
     BidCancelBid {
         coin_type: TypeTag,
         bid_id_creation_number: u64,
     },
 
-    /// remove an listing for the direct listing records
-    ListingCancelDirectList {
+    MarketplaceUtilsBuy {
+        coin_type: TypeTag,
+        token_owner_address: AccountAddress,
+        id_creation_number: u64,
+    },
+
+    /// remove a listing for the direct listing records
+    MarketplaceUtilsCancelDirectList {
         coin_type: TypeTag,
         listing_id_creation_number: u64,
     },
 
-    /// creator use this function to direct list token for sale under their own account
-    ListingDirectListing {
+    /// creator uses this function to directly list token for sale under their own accounts
+    MarketplaceUtilsDirectListing {
         coin_type: TypeTag,
         creator: AccountAddress,
         collection_name: Vec<u8>,
@@ -177,11 +183,16 @@ impl EntryFunctionCall {
                 coin_type,
                 bid_id_creation_number,
             } => bid_cancel_bid(coin_type, bid_id_creation_number),
-            ListingCancelDirectList {
+            MarketplaceUtilsBuy {
+                coin_type,
+                token_owner_address,
+                id_creation_number,
+            } => marketplace_utils_buy(coin_type, token_owner_address, id_creation_number),
+            MarketplaceUtilsCancelDirectList {
                 coin_type,
                 listing_id_creation_number,
-            } => listing_cancel_direct_list(coin_type, listing_id_creation_number),
-            ListingDirectListing {
+            } => marketplace_utils_cancel_direct_list(coin_type, listing_id_creation_number),
+            MarketplaceUtilsDirectListing {
                 coin_type,
                 creator,
                 collection_name,
@@ -191,7 +202,7 @@ impl EntryFunctionCall {
                 min_price,
                 instant_sale,
                 expiration_sec,
-            } => listing_direct_listing(
+            } => marketplace_utils_direct_listing(
                 coin_type,
                 creator,
                 collection_name,
@@ -361,7 +372,7 @@ impl EntryFunctionCall {
     }
 }
 
-/// bidder should be able to cancel a bid and get fund back
+/// bidder can cancel a bid and get fund back
 pub fn bid_cancel_bid(coin_type: TypeTag, bid_id_creation_number: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -377,8 +388,30 @@ pub fn bid_cancel_bid(coin_type: TypeTag, bid_id_creation_number: u64) -> Transa
     ))
 }
 
-/// remove an listing for the direct listing records
-pub fn listing_cancel_direct_list(
+pub fn marketplace_utils_buy(
+    coin_type: TypeTag,
+    token_owner_address: AccountAddress,
+    id_creation_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("marketplace_utils").to_owned(),
+        ),
+        ident_str!("buy").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&token_owner_address).unwrap(),
+            bcs::to_bytes(&id_creation_number).unwrap(),
+        ],
+    ))
+}
+
+/// remove a listing for the direct listing records
+pub fn marketplace_utils_cancel_direct_list(
     coin_type: TypeTag,
     listing_id_creation_number: u64,
 ) -> TransactionPayload {
@@ -388,7 +421,7 @@ pub fn listing_cancel_direct_list(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 3,
             ]),
-            ident_str!("listing").to_owned(),
+            ident_str!("marketplace_utils").to_owned(),
         ),
         ident_str!("cancel_direct_list").to_owned(),
         vec![coin_type],
@@ -396,8 +429,8 @@ pub fn listing_cancel_direct_list(
     ))
 }
 
-/// creator use this function to direct list token for sale under their own account
-pub fn listing_direct_listing(
+/// creator uses this function to directly list token for sale under their own accounts
+pub fn marketplace_utils_direct_listing(
     coin_type: TypeTag,
     creator: AccountAddress,
     collection_name: Vec<u8>,
@@ -414,7 +447,7 @@ pub fn listing_direct_listing(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 3,
             ]),
-            ident_str!("listing").to_owned(),
+            ident_str!("marketplace_utils").to_owned(),
         ),
         ident_str!("direct_listing").to_owned(),
         vec![coin_type],
@@ -779,9 +812,23 @@ mod decoder {
         }
     }
 
-    pub fn listing_cancel_direct_list(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn marketplace_utils_buy(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::ListingCancelDirectList {
+            Some(EntryFunctionCall::MarketplaceUtilsBuy {
+                coin_type: script.ty_args().get(0)?.clone(),
+                token_owner_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                id_creation_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn marketplace_utils_cancel_direct_list(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MarketplaceUtilsCancelDirectList {
                 coin_type: script.ty_args().get(0)?.clone(),
                 listing_id_creation_number: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -790,9 +837,11 @@ mod decoder {
         }
     }
 
-    pub fn listing_direct_listing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn marketplace_utils_direct_listing(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::ListingDirectListing {
+            Some(EntryFunctionCall::MarketplaceUtilsDirectListing {
                 coin_type: script.ty_args().get(0)?.clone(),
                 creator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection_name: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -1009,12 +1058,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::bid_cancel_bid),
         );
         map.insert(
-            "listing_cancel_direct_list".to_string(),
-            Box::new(decoder::listing_cancel_direct_list),
+            "marketplace_utils_buy".to_string(),
+            Box::new(decoder::marketplace_utils_buy),
         );
         map.insert(
-            "listing_direct_listing".to_string(),
-            Box::new(decoder::listing_direct_listing),
+            "marketplace_utils_cancel_direct_list".to_string(),
+            Box::new(decoder::marketplace_utils_cancel_direct_list),
+        );
+        map.insert(
+            "marketplace_utils_direct_listing".to_string(),
+            Box::new(decoder::marketplace_utils_direct_listing),
         );
         map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
         map.insert(
