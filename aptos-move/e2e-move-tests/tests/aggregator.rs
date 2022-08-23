@@ -30,12 +30,9 @@ fn test_aggregators_e2e() {
 
     // All transactions in block must fail, so values of aggregators are still 0.
     let failed_txns: Vec<SignedTransaction> = (0..block_size)
-        .map(|i| {
-            if i % 2 == 0 {
-                materialize_and_add(&mut h, &acc, i, (i as u128) * 100000 + 1)
-            } else {
-                materialize_and_sub(&mut h, &acc, i, (i as u128) * 100000 + 1)
-            }
+        .map(|i| match i % 2 {
+            0 => materialize_and_add(&mut h, &acc, i, (i as u128) * 100000 + 1),
+            _ => materialize_and_sub(&mut h, &acc, i, (i as u128) * 100000 + 1),
         })
         .collect();
     h.run_block(failed_txns);
@@ -48,34 +45,22 @@ fn test_aggregators_e2e() {
 
     // TODO: proptests with random transaction generator might be useful here.
     let txns: Vec<SignedTransaction> = (0..block_size)
-        .map(|i| {
-            let case = i % 4;
-            if case == 0 {
-                sub_add(&mut h, &acc, i, (i as u128) * 1000, (i as u128) * 3000)
-            } else if case == 1 {
-                materialize_and_add(&mut h, &acc, i, (i as u128) * 1000)
-            } else if case == 2 {
-                sub_and_materialize(&mut h, &acc, i, (i as u128) * 1000)
-            } else {
-                add(&mut h, &acc, i, i as u128)
-            }
+        .map(|i| match i % 4 {
+            0 => sub_add(&mut h, &acc, i, (i as u128) * 1000, (i as u128) * 3000),
+            1 => materialize_and_add(&mut h, &acc, i, (i as u128) * 1000),
+            2 => sub_and_materialize(&mut h, &acc, i, (i as u128) * 1000),
+            _ => add(&mut h, &acc, i, i as u128),
         })
         .collect();
     h.run_block(txns);
 
     // Finally, check values.
     let txns: Vec<SignedTransaction> = (0..block_size)
-        .map(|i| {
-            let case = i % 4;
-            if case == 0 {
-                check(&mut h, &acc, i, (i as u128) * 3000)
-            } else if case == 1 {
-                check(&mut h, &acc, i, (i as u128) * 2000)
-            } else if case == 2 {
-                check(&mut h, &acc, i, 0)
-            } else {
-                check(&mut h, &acc, i, (i as u128) * 1000 + (i as u128))
-            }
+        .map(|i| match i % 4 {
+            0 => check(&mut h, &acc, i, (i as u128) * 3000),
+            1 => check(&mut h, &acc, i, (i as u128) * 2000),
+            2 => check(&mut h, &acc, i, 0),
+            _ => check(&mut h, &acc, i, (i as u128) * 1000 + (i as u128)),
         })
         .collect();
     let outputs = h.run_block(txns);
