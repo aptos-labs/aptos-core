@@ -11,15 +11,8 @@ use aptos_infallible::Mutex;
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
+use rayon::ThreadPool;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
-
-static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get())
-        .thread_name(|index| format!("parallel_executor_{}", index))
-        .build()
-        .unwrap()
-});
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -105,6 +98,7 @@ pub struct ParallelTransactionExecutor<T: Transaction, E: ExecutorTask> {
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     phantom: PhantomData<(T, E)>,
+    thread_pool: ThreadPool,
 }
 
 impl<T, E> ParallelTransactionExecutor<T, E>
@@ -120,9 +114,23 @@ where
             "Parallel execution concurrency level {} should be between 2 and number of CPUs",
             concurrency_level
         );
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(concurrency_level)
+            .thread_name(|index| format!("parallel_executor_{}", index))
+            .build()
+            .unwrap();
         Self {
             concurrency_level,
             phantom: PhantomData,
+            thread_pool,
+        }
+    }
+
+    pub fn new3(thread_pool: ThreadPool) -> Self {
+        Self {
+            concurrency_level: thread_pool.current_num_threads(),
+            phantom: PhantomData,
+            thread_pool,
         }
     }
 
@@ -299,8 +307,7 @@ where
         let versioned_data_cache = MVHashMap::new();
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
-
-        RAYON_EXEC_POOL.scope(|s| {
+        self.thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
                     self.work_task_with_scope(
