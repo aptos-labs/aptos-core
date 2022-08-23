@@ -19,7 +19,7 @@ export interface SettingsListItemProps {
   bgColorDict?: BgColorDictType;
   hoverBgColorDict?: BgColorDictType;
   icon: any | undefined;
-  path: string;
+  path: string | null;
   textColorDict?: BgColorDictType;
   title: string;
 }
@@ -37,12 +37,19 @@ export default function SettingsListItem({
   const { activeAccount, lockAccounts } = useGlobalStateContext();
 
   const gridOnClick = async () => {
+    // todo: Create an enum for these titles for more typed code
     if (title === 'Lock wallet' && activeAccount) {
       // todo: add toasts for removing the account
       // we should probably combine the toasts from the wallet drawer
       await lockAccounts();
+    } else if (title === 'View on Explorer') {
+      const explorerAddress = activeAccount?.address ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}` : 'https://explorer.devnet.aptos.dev';
+      window.open(explorerAddress, '_blank');
     }
-    navigate(path);
+
+    if (path) {
+      navigate(path);
+    }
   };
 
   return (
