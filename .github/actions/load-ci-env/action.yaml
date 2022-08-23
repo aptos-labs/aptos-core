@@ -1,0 +1,7 @@
+name: Load and common environment variables from ci-config branch
+
+runs:
+  using: composite
+  steps:
+    - name: fetch and set ci config env
+      run: curl https://raw.githubusercontent.com/aptos-labs/aptos-core/ci-config/ci.env >> $GITHUB_ENV 
