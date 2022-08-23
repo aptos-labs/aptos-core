@@ -50,7 +50,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
                 .collect::<Vec<_>>();
             let futures = clients
                 .iter()
-                .map(|client| query_sequence_numbers(client, addresses));
+                .map(|client| query_sequence_numbers(client, addresses.iter()));
             let results = join_all(futures).await;
             let mut all_good = true;
             for (instance, result) in zip(instances.iter(), results) {
