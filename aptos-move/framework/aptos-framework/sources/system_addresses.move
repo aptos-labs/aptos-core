@@ -8,6 +8,8 @@ module aptos_framework::system_addresses {
     const EVM: u64 = 2;
     /// The address/account did not correspond to the core framework address
     const ENOT_APTOS_FRAMEWORK_ADDRESS: u64 = 3;
+    /// The address is not framework reserved address
+    const ENOT_FRAMEWORK_RESERVED_ADDRESS: u64 = 4;
 
     public fun assert_core_resource(account: &signer) {
         assert_core_resource_address(signer::address_of(account))
@@ -25,6 +27,23 @@ module aptos_framework::system_addresses {
         assert!(
             is_aptos_framework_address(signer::address_of(account)),
             error::permission_denied(ENOT_APTOS_FRAMEWORK_ADDRESS),
+        )
+    }
+
+    public fun assert_framework_reserved_address(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(
+            addr == @aptos_framework ||
+            addr == @0x2 ||
+            addr == @0x3 ||
+            addr == @0x4 ||
+            addr == @0x5 ||
+            addr == @0x6 ||
+            addr == @0x7 ||
+            addr == @0x8 ||
+            addr == @0x9 ||
+            addr == @0x10,
+            error::permission_denied(ENOT_FRAMEWORK_RESERVED_ADDRESS),
         )
     }
 
