@@ -44,16 +44,16 @@ module aptos_framework::block {
     const EZERO_EPOCH_INTERVAL: u64 = 3;
 
     /// This can only be called during Genesis.
-    public(friend) fun initialize(account: &signer, epoch_interval_microsecs: u64) {
-        system_addresses::assert_aptos_framework(account);
+    public(friend) fun initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(epoch_interval_microsecs > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         move_to<BlockResource>(
-            account,
+            aptos_framework,
             BlockResource {
                 height: 0,
                 epoch_interval: epoch_interval_microsecs,
-                new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
+                new_block_events: event::new_event_handle<Self::NewBlockEvent>(aptos_framework),
             }
         );
     }

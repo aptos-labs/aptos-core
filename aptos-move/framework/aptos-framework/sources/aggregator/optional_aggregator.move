@@ -79,7 +79,7 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Switches between parallelizable and non-parallelizable implementations.
-    public(friend) fun switch(optional_aggregator: &mut OptionalAggregator) {
+    public fun switch(optional_aggregator: &mut OptionalAggregator) {
         let value = read(optional_aggregator);
         switch_and_zero_out(optional_aggregator);
         add(optional_aggregator, value);

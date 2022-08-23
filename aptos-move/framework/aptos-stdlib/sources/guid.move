@@ -1,5 +1,5 @@
 /// A module for generating globally unique identifiers
-module std::guid {
+module aptos_std::guid {
     use std::signer;
 
     /// A generator for new GUIDs.
