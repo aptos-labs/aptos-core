@@ -212,6 +212,7 @@ pub struct AptosDataBuilder {
     printer: Option<Box<dyn Writer>>,
     remote_log_tx: Option<channel::mpsc::Sender<TelemetryLog>>,
     is_async: bool,
+    enable_telemetry_flush: bool,
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
 }
 
@@ -229,6 +230,7 @@ impl AptosDataBuilder {
             printer: Some(Box::new(StdoutWriter::new())),
             remote_log_tx: None,
             is_async: false,
+            enable_telemetry_flush: true,
             custom_format: None,
         }
     }
@@ -290,6 +292,11 @@ impl AptosDataBuilder {
 
     pub fn is_async(&mut self, is_async: bool) -> &mut Self {
         self.is_async = is_async;
+        self
+    }
+
+    pub fn enable_telemetry_flush(&mut self, enable_telemetry_flush: bool) -> &mut Self {
+        self.enable_telemetry_flush = enable_telemetry_flush;
         self
     }
 
@@ -378,6 +385,7 @@ impl AptosDataBuilder {
                 sender: Some(sender),
                 printer: None,
                 filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             });
             let service = LoggerService {
@@ -396,6 +404,7 @@ impl AptosDataBuilder {
                 sender: None,
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             })
         };
@@ -434,6 +443,7 @@ pub struct AptosData {
     sender: Option<sync::mpsc::SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<FilterTuple>,
+    enable_telemetry_flush: bool,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 
@@ -465,6 +475,10 @@ impl AptosData {
 
     pub fn set_remote_filter(&self, filter: Filter) {
         self.filter.write().remote_filter = filter;
+    }
+
+    pub fn set_telemetry_filter(&self, filter: Filter) {
+        self.filter.write().telemetry_filter = filter;
     }
 
     fn send_entry(&self, entry: LogEntry) {
@@ -576,13 +590,15 @@ impl LoggerService {
                 LoggerServiceEvent::Flush(sender) => {
                     // Flush is only done on TelemetryLogWriter
                     if let Some(writer) = &mut telemetry_writer {
-                        match writer.flush() {
-                            Ok(rx) => {
-                                let flush_result = rx.recv_timeout(FLUSH_TIMEOUT);
-                                eprintln!("flushed with result: {}", flush_result.is_ok());
-                            }
-                            Err(err) => {
-                                eprintln!("flush failed: {}", err);
+                        if self.facade.enable_telemetry_flush {
+                            match writer.flush() {
+                                Ok(rx) => {
+                                    let flush_result = rx.recv_timeout(FLUSH_TIMEOUT);
+                                    eprintln!("flushed with result: {}", flush_result.is_ok());
+                                }
+                                Err(err) => {
+                                    eprintln!("flush failed: {}", err);
+                                }
                             }
                         }
                     }

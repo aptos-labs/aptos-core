@@ -544,17 +544,6 @@ impl RoundManager {
             .proposer_election
             .get_valid_proposer(proposal_round + 1);
 
-        if self.epoch_state.epoch == 5 && proposal_round == 10 {
-            error!(
-                "BCHO log: injecting panic at {}, {}",
-                self.epoch_state.epoch, proposal_round
-            );
-            panic!(
-                "BCHO panic: injecting panic at {}, {}",
-                self.epoch_state.epoch, proposal_round
-            );
-        }
-
         info!(
             self.new_log(LogEvent::Vote).remote_peer(recipient),
             "{}", vote

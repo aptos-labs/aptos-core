@@ -171,6 +171,7 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         .is_async(config.logger.is_async)
         .level(config.logger.level)
         .telemetry_level(config.logger.telemetry_level)
+        .enable_telemetry_flush(config.logger.enable_telemetry_flush)
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
