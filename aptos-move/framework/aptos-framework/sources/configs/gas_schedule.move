@@ -33,8 +33,8 @@ module aptos_framework::gas_schedule {
     }
 
     /// This can be called by on-chain governance to update gas schedule.
-    public fun set_gas_schedule(account: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule {
-        system_addresses::assert_core_resource(account);
+    public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(vector::length(&gas_schedule_blob) > 0, error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         // TODO(Gas): check if gas schedule is consistent
