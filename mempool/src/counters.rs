@@ -73,7 +73,6 @@ pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 
 // invalid ACK type labels
-pub const INVALID_REQUEST_ID: &str = "invalid_req_id";
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
 /// Counter tracking size of various indices in core mempool

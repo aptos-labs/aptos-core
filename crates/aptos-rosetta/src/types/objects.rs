@@ -36,6 +36,7 @@ use aptos_rest_client::{
 };
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -266,7 +267,7 @@ pub struct Operation {
     pub amount: Option<Amount>,
     /// Operation specific metadata for any operation that's missing information it needs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<OperationSpecificMetadata>,
+    pub metadata: Option<OperationMetadata>,
 }
 
 impl Operation {
@@ -276,7 +277,7 @@ impl Operation {
         status: Option<OperationStatusType>,
         address: AccountAddress,
         amount: Option<Amount>,
-        metadata: Option<OperationSpecificMetadata>,
+        metadata: Option<OperationMetadata>,
     ) -> Operation {
         Operation {
             operation_identifier: OperationIdentifier {
@@ -304,7 +305,7 @@ impl Operation {
             status,
             address,
             None,
-            Some(OperationSpecificMetadata::create_account(sender)),
+            Some(OperationMetadata::create_account(sender)),
         )
     }
 
@@ -379,40 +380,57 @@ impl Operation {
             status,
             address,
             None,
-            Some(OperationSpecificMetadata::set_operator(operator)),
+            Some(OperationMetadata::set_operator(operator)),
         )
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum OperationSpecificMetadata {
-    CreateAccount(CreateAccountArguments),
-    SetOperator(SetOperatorArguments),
-}
-
-impl OperationSpecificMetadata {
-    pub fn create_account(sender: AccountAddress) -> OperationSpecificMetadata {
-        OperationSpecificMetadata::CreateAccount(CreateAccountArguments {
-            sender: sender.into(),
-        })
-    }
-
-    pub fn set_operator(operator: AccountAddress) -> OperationSpecificMetadata {
-        OperationSpecificMetadata::SetOperator(SetOperatorArguments {
-            operator: operator.into(),
-        })
+impl std::cmp::PartialOrd for Operation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct CreateAccountArguments {
-    /// Sender for operations that affect accounts other than the sender
-    pub sender: AccountIdentifier,
+impl std::cmp::Ord for Operation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_op =
+            OperationType::from_str(&self.operation_type).expect("Expect type to be valid");
+        let other_op =
+            OperationType::from_str(&other.operation_type).expect("Expect type to be valid");
+        match self_op.cmp(&other_op) {
+            Ordering::Equal => self
+                .operation_identifier
+                .index
+                .cmp(&other.operation_identifier.index),
+            order => order,
+        }
+    }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SetOperatorArguments {
-    operator: AccountIdentifier,
+/// This object is needed for flattening all the types into a
+/// single json object used by Rosetta
+#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OperationMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sender: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    operator: Option<AccountIdentifier>,
+}
+
+impl OperationMetadata {
+    pub fn create_account(sender: AccountAddress) -> Self {
+        OperationMetadata {
+            sender: Some(sender.into()),
+            ..Default::default()
+        }
+    }
+
+    pub fn set_operator(operator: AccountAddress) -> Self {
+        OperationMetadata {
+            operator: Some(operator.into()),
+            ..Default::default()
+        }
+    }
 }
 
 /// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
@@ -623,6 +641,13 @@ impl Transaction {
                 operations.append(&mut ops);
             }
         };
+
+        // Reorder operations by type so that there's no invalid ordering
+        // (Create before transfer) (Withdraw before deposit)
+        operations.sort();
+        for (i, operation) in operations.iter_mut().enumerate() {
+            operation.operation_identifier.index = i as u64;
+        }
 
         // Everything committed costs gas
         if let Some(ref request) = maybe_user_transaction_request {
@@ -902,9 +927,10 @@ impl InternalOperation {
                     match OperationType::from_str(&operation.operation_type) {
                         Ok(OperationType::CreateAccount) => {
                             if let (
-                                Some(OperationSpecificMetadata::CreateAccount(
-                                    CreateAccountArguments { sender },
-                                )),
+                                Some(OperationMetadata {
+                                    sender: Some(sender),
+                                    ..
+                                }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {
@@ -916,9 +942,10 @@ impl InternalOperation {
                         }
                         Ok(OperationType::SetOperator) => {
                             if let (
-                                Some(OperationSpecificMetadata::SetOperator(
-                                    SetOperatorArguments { operator },
-                                )),
+                                Some(OperationMetadata {
+                                    operator: Some(operator),
+                                    ..
+                                }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {

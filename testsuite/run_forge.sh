@@ -26,6 +26,10 @@ else
     exec python3 testsuite/forge.py test "$@"
 fi
 
+# available clusters to choose from
+# forge-1 is used for continuous testing exclusively
+FORGE_CLUSTERS=("aptos-forge-0" "aptos-forge-2")
+
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
@@ -175,17 +179,28 @@ get_dashboard_link() {
 
 print_output_files
 
+if [ -z "$FORGE_CLUSTER_NAME" ]; then
+    FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
+fi
+
+aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+
 # determine cluster name from kubectl context and set o11y resources
-FORGE_CLUSTER_NAME=$(kubectl config current-context | grep -oE 'aptos.*')
-echo "Using cluster ${FORGE_CLUSTER_NAME} from current kubectl context"
+echo "Using cluster ${FORGE_CLUSTER_NAME}"
+echo "Note: the current kubectl context has changed"
 # remove the "aptos-" prefix and add "net" suffix to get the chain name
 # as used by the deployment setup and as reported to o11y systems
 FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
+HUMIO_START_TIME_MS=$(date +%s000)
+HUMIO_END_TIME_MS=$(($HUMIO_START_TIME_MS + 1000 * 60 * 45)) # 45 min later
 
 # set the namespace in FORGE_NAMESPACE
 set_forge_namespace
 
-HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_instance%3Dvalidator-0%29%20%7C%20$FORGE_NAMESPACE%20&live=true&start=24h&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showOnlyFirstLine=false"
+set_humio_logs_link() {
+    HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_instance%3D%2A%29%20%7C%20$FORGE_NAMESPACE%20&live=false&start=$HUMIO_START_TIME_MS&end=$HUMIO_END_TIME_MS&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showOnlyFirstLine=false"
+}
+
 
 get_image_tags
 
@@ -220,8 +235,8 @@ ENABLE_DASHBOARD_AUTO_REFRESH=true get_dashboard_link
 cat <<EOF >$FORGE_PRE_COMMENT
 ### Forge is running with \`${IMAGE_TAG}\`
 * [Grafana dashboard (auto-refresh)]($FORGE_DASHBOARD_LINK)
-* [Validator 0 logs (auto-refresh)]($VALIDATOR_LOGS_LINK)
 * [Humio Logs]($HUMIO_LOGS_LINK)
+* [(Deprecated) OpenSearch Logs]($VALIDATOR_LOGS_LINK)
 EOF
 echo "=====START PRE_FORGE COMMENT====="
 cat $FORGE_PRE_COMMENT
@@ -252,7 +267,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
 
     # try to kill orphaned port-forwards
     if [ -z "$KEEP_ARGS" ]; then
-        ps -A | grep "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+        ps -A | grep "port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
         kill -9 $prometheus_port_forward_pid
     fi
 
@@ -355,6 +370,8 @@ fi
 # Get the final o11y links that are not auto-refresh
 get_dashboard_link
 get_validator_logs_link
+HUMIO_END_TIME_MS=$FORGE_END_TIME_MS
+set_humio_logs_link
 
 # construct forge comment output
 if [ "$FORGE_EXIT_CODE" = "0" ]; then
@@ -372,8 +389,8 @@ $FORGE_COMMENT_HEADER
 $FORGE_REPORT_TXT
 \`\`\`
 * [Grafana dashboard]($FORGE_DASHBOARD_LINK)
-* [Validator 0 logs]($VALIDATOR_LOGS_LINK)
 * [Humio Logs]($HUMIO_LOGS_LINK)
+* [(Deprecated) OpenSearch Logs]($VALIDATOR_LOGS_LINK)
 EOF
 
 echo "=====START FORGE COMMENT====="

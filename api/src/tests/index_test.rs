@@ -85,8 +85,7 @@ async fn test_cors_forbidden() {
             .method("OPTIONS")
             .path(&format!("/v1{}", path));
         let resp = context.reply(req).await;
-        // https://github.com/poem-web/poem/issues/368
-        assert_eq!(resp.status(), 401);
+        assert_eq!(resp.status(), 403);
         let err: serde_json::Value = serde_json::from_slice(resp.body()).unwrap();
         context.check_golden_output(err);
     }

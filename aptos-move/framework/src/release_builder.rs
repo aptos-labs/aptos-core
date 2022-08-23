@@ -4,7 +4,9 @@
 use crate::built_package::{BuildOptions, BuiltPackage};
 use crate::path_relative_to_crate;
 use crate::release_bundle::{ReleaseBundle, ReleasePackage};
+use anyhow::anyhow;
 use aptos_sdk_builder::rust;
+use aptos_types::transaction::EntryABI;
 use clap::Parser;
 use std::path::{Path, PathBuf};
 
@@ -30,8 +32,9 @@ pub struct ReleaseOptions {
 }
 
 impl ReleaseOptions {
-    /// Creates a release bundle from the specified options and saves it to disk.
-    pub fn create_release(self, strip: bool) -> anyhow::Result<()> {
+    /// Creates a release bundle from the specified options and saves it to disk. As a side
+    /// effect, also generates rust bindings.
+    pub fn create_release(self) -> anyhow::Result<()> {
         let ReleaseOptions {
             build_options,
             packages,
@@ -43,17 +46,13 @@ impl ReleaseOptions {
         for (package_path, rust_binding_path) in packages.into_iter().zip(rust_bindings.into_iter())
         {
             let built = BuiltPackage::build(package_path.clone(), build_options.clone())?;
-            let mut released = ReleasePackage::new(built)?;
             if !rust_binding_path.is_empty() {
-                Self::generate_rust_bindings(&released, &PathBuf::from(rust_binding_path))?;
+                let abis = built
+                    .extract_abis()
+                    .ok_or_else(|| anyhow!("abis not available, can't generate sdk"))?;
+                Self::generate_rust_bindings(&abis, &PathBuf::from(rust_binding_path))?;
             }
-            // Strip redundant information from the package.
-            if strip {
-                let metadata = released.package_metadata_mut();
-                for module in metadata.modules.iter_mut() {
-                    module.source_map.clear();
-                }
-            }
+            let released = ReleasePackage::new(built)?;
             let size = bcs::to_bytes(&released)?.len();
             println!(
                 "Including package `{}` size {}k",
@@ -70,10 +69,10 @@ impl ReleaseOptions {
         Ok(())
     }
 
-    fn generate_rust_bindings(released: &ReleasePackage, path: &Path) -> anyhow::Result<()> {
+    fn generate_rust_bindings(abis: &[EntryABI], path: &Path) -> anyhow::Result<()> {
         {
             let mut file = std::fs::File::create(path)?;
-            rust::output(&mut file, released.abis().as_slice(), true)?;
+            rust::output(&mut file, abis, true)?;
         }
         std::process::Command::new("rustfmt")
             .arg("--config")

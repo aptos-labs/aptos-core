@@ -3,7 +3,6 @@
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
@@ -12,6 +11,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
 };
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor,

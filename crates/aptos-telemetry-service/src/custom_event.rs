@@ -26,7 +26,11 @@ pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::Unknown],
+            vec![
+                PeerRole::Validator,
+                PeerRole::ValidatorFullNode,
+                PeerRole::Unknown,
+            ],
         ))
         .and(warp::body::json())
         .and_then(handle_custom_event)

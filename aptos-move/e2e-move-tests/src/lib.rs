@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod aggregator;
 pub mod harness;
+pub mod package_builder;
 pub mod stake;
 
 use anyhow::bail;

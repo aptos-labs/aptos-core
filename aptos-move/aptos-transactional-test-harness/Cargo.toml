@@ -34,7 +34,6 @@ vm-genesis = { path = "../vm-genesis" }
 # Other Aptos dependencies
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 storage-interface = { path = "../../storage/storage-interface" }
 

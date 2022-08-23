@@ -60,7 +60,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -69,7 +70,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -97,7 +99,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -158,6 +160,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -168,6 +221,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -176,6 +341,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -199,7 +476,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -208,7 +486,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -239,7 +518,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -300,6 +579,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -310,6 +640,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -318,6 +760,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -341,7 +895,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -350,7 +905,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -381,7 +937,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -442,6 +998,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -452,6 +1059,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -460,6 +1179,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -506,7 +1337,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -534,7 +1366,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -587,12 +1419,63 @@
               }
             }
           },
-          "400": {
+          "503": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -603,6 +1486,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -627,7 +1561,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "with_transactions",
@@ -636,7 +1571,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -664,7 +1600,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -725,6 +1661,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -735,6 +1722,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -743,6 +1842,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -767,7 +1978,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "with_transactions",
@@ -776,7 +1988,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -804,7 +2017,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -865,6 +2078,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -875,6 +2139,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -883,6 +2259,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -906,7 +2394,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -915,7 +2404,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -925,7 +2415,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -956,7 +2447,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1017,6 +2508,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1027,6 +2569,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1035,6 +2689,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1058,7 +2824,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "event_handle",
@@ -1067,7 +2834,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "field_name",
@@ -1076,7 +2844,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -1085,7 +2854,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -1095,7 +2865,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1126,7 +2897,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1187,6 +2958,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1197,6 +3019,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1205,6 +3139,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1245,7 +3291,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1306,6 +3352,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1314,6 +3411,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1337,7 +3546,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "resource_type",
@@ -1346,7 +3556,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -1355,7 +3566,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1383,7 +3595,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1444,6 +3656,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1454,6 +3717,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1462,6 +3837,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1485,7 +3972,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "module_name",
@@ -1494,7 +3982,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -1503,7 +3992,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1531,7 +4021,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1592,6 +4082,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1602,6 +4143,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1610,6 +4263,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1629,11 +4394,12 @@
           {
             "name": "table_handle",
             "schema": {
-              "$ref": "#/components/schemas/U128"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "ledger_version",
@@ -1642,7 +4408,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "requestBody": {
@@ -1680,7 +4447,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1741,6 +4508,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1751,6 +4569,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1759,6 +4689,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1782,7 +4824,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -1792,7 +4835,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -1823,7 +4867,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -1884,6 +4928,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -1894,6 +4989,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -1902,6 +5109,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1959,7 +5278,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2020,6 +5339,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "413": {
@@ -2028,6 +5398,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2040,6 +5461,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "507": {
@@ -2048,6 +5581,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2071,7 +5655,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -2099,7 +5684,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2160,6 +5745,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -2170,6 +5806,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -2178,6 +5926,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2201,7 +6061,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -2229,7 +6090,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2290,6 +6151,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -2300,6 +6212,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -2308,6 +6332,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2331,7 +6467,8 @@
             },
             "in": "path",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "start",
@@ -2340,7 +6477,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "limit",
@@ -2350,7 +6488,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -2381,7 +6520,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2442,6 +6581,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "404": {
@@ -2452,6 +6642,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -2460,6 +6762,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2522,7 +6936,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2583,6 +6997,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "413": {
@@ -2591,6 +7056,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2603,6 +7119,118 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "507": {
@@ -2611,6 +7239,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2661,7 +7340,7 @@
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
-                  "format": "uint16"
+                  "format": "uint8"
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
@@ -2722,6 +7401,57 @@
                   "$ref": "#/components/schemas/AptosError"
                 }
               }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
             }
           },
           "500": {
@@ -2730,6 +7460,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -2822,17 +7664,28 @@
         "type": "object",
         "description": "This is the generic struct we use for all API errors, it contains a string\nmessage and an Aptos API specific error code.",
         "required": [
-          "message"
+          "message",
+          "error_code"
         ],
         "properties": {
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "A message describing the error"
           },
           "error_code": {
-            "$ref": "#/components/schemas/AptosErrorCode"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AptosErrorCode"
+              },
+              {
+                "description": "A code providing more granular error information beyond the HTTP status code"
+              }
+            ]
           },
-          "aptos_ledger_version": {
-            "$ref": "#/components/schemas/U64"
+          "vm_error_code": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "A code providing VM error details when submitting transactions to the VM"
           }
         }
       },
@@ -2840,11 +7693,25 @@
         "type": "string",
         "description": "These codes provide more granular error information beyond just the HTTP\nstatus code of the response.",
         "enum": [
-          "read_from_storage_error",
-          "invalid_bcs_in_storage_error",
-          "bcs_serialization_error",
-          "invalid_start_param",
-          "invalid_limit_param"
+          "account_not_found",
+          "resource_not_found",
+          "module_not_found",
+          "struct_field_not_found",
+          "version_not_found",
+          "transaction_not_found",
+          "table_item_not_found",
+          "block_not_found",
+          "version_pruned",
+          "block_pruned",
+          "invalid_input",
+          "invalid_transaction_update",
+          "sequence_number_too_old",
+          "vm_error",
+          "health_check_failed",
+          "mempool_is_full",
+          "internal_error",
+          "web_framework_error",
+          "bcs_not_supported"
         ]
       },
       "Block": {

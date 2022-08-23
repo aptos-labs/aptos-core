@@ -3,12 +3,14 @@
 
 use std::collections::HashMap;
 
+use crate::clients::humio;
 use crate::GCPBigQueryConfig;
-use crate::{context::Context, index, validator_cache::ValidatorSetCache, TelemetryServiceConfig};
+use crate::{context::Context, index, validator_cache::PeerSetCache, TelemetryServiceConfig};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
+use reqwest::Url;
 use serde_json::Value;
 use warp::http::header::CONTENT_TYPE;
 use warp::http::Response;
@@ -26,16 +28,31 @@ pub async fn new_test_context() -> TestContext {
         server_private_key: ConfigKey::new(server_private_key),
         jwt_signing_key: "jwt_signing_key".into(),
         update_interval: 60,
-        gcp_sa_key_file: String::from(""),
         gcp_bq_config: GCPBigQueryConfig {
             project_id: String::from("1"),
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
+        victoria_metrics_base_url: "".into(),
+        victoria_metrics_token: "".into(),
+        humio_url: "".into(),
+        humio_auth_token: "".into(),
     };
-    let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+    let humio_client = humio::IngestClient::new(
+        Url::parse("http://localhost/").unwrap(),
+        config.humio_auth_token.clone(),
+    );
+    let validator_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+    let vfn_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-    TestContext::new(Context::new(config, cache, None))
+    TestContext::new(Context::new(
+        config,
+        validator_cache,
+        vfn_cache,
+        None,
+        None,
+        humio_client,
+    ))
 }
 
 #[derive(Clone)]

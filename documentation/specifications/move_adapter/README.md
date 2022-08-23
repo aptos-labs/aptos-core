@@ -322,11 +322,6 @@ the `TransactionPublishingOption` module to see if publishing is allowed
 for the transaction sender. If not, validation fails with a
 `INVALID_MODULE_PUBLISHER` status code.
 
-* `WriteSet`: The prologue function is `writeset_prologue`. In addition to the
-common checks listed below, it also checks that the sender is the Aptos root
-address and that `Roles::has_aptos_root_role(sender)` is true. If those checks
-fail, the status code is set to `REJECTED_WRITE_SET`.
-
 The following checks are performed by all the prologue functions:
 
 * If the transaction's `chain_id` value does not match the expected value for

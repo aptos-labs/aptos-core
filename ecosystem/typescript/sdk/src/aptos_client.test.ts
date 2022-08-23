@@ -256,7 +256,7 @@ test(
       type: "entry_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [account2.address().hex(), "100000"],
+      arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
     const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];

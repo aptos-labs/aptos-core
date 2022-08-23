@@ -182,7 +182,8 @@ impl Mempool {
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_batch(
         &self,
-        batch_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         mut seen: HashSet<TxnPointer>,
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
@@ -193,6 +194,7 @@ impl Mempool {
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
+        let mut total_bytes = 0;
         let seen_size = seen.len();
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
@@ -215,7 +217,7 @@ impl Mempool {
                 let ptr = TxnPointer::from(txn);
                 seen.insert(ptr);
                 result.push(ptr);
-                if (result.len() as u64) == batch_size {
+                if (result.len() as u64) == max_txns {
                     break;
                 }
 
@@ -225,7 +227,7 @@ impl Mempool {
                 while skipped.contains(&skipped_txn) {
                     seen.insert(skipped_txn);
                     result.push(skipped_txn);
-                    if (result.len() as u64) == batch_size {
+                    if (result.len() as u64) == max_txns {
                         break 'main;
                     }
                     skipped_txn = (txn.address, skipped_txn.1 + 1);
@@ -235,11 +237,17 @@ impl Mempool {
             }
         }
         let result_size = result.len();
-        // convert transaction pointers to real values
-        let block: Vec<_> = result
-            .into_iter()
-            .filter_map(|(address, tx_seq)| self.transactions.get(&address, tx_seq))
-            .collect();
+        let mut block = Vec::with_capacity(result_size);
+        for (address, seq) in result {
+            if let Some(txn) = self.transactions.get(&address, seq) {
+                let txn_size = txn.raw_txn_bytes_len();
+                if total_bytes + txn_size > max_bytes as usize {
+                    break;
+                }
+                total_bytes += txn_size;
+                block.push(txn);
+            }
+        }
 
         debug!(
             LogSchema::new(LogEntry::GetBlock),
@@ -247,7 +255,8 @@ impl Mempool {
             walked = txn_walked,
             seen_after = seen.len(),
             result_size = result_size,
-            block_size = block.len()
+            block_size = block.len(),
+            byte_size = total_bytes,
         );
         for transaction in &block {
             self.log_latency(
@@ -275,7 +284,6 @@ impl Mempool {
             .gc_by_expiration_time(block_time, &self.metrics_cache);
     }
 
-    /// Read `count` transactions from timeline since `timeline_id`.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,

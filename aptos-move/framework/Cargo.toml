@@ -19,6 +19,7 @@ clap = "3.1.8"
 curve25519-dalek = { version = "3", default-features = false }
 flate2 = "1.0.24"
 include_dir = "0.7.2"
+itertools = "0.10.0"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 once_cell = "1.10.0"
@@ -37,9 +38,11 @@ tempfile = "3.3.0"
 
 aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
+gas-algebra-ext =  { path = "../gas-algebra-ext" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]

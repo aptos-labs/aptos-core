@@ -55,6 +55,7 @@ pub struct TransactionStore {
     // configuration
     capacity: usize,
     capacity_per_user: usize,
+    max_batch_bytes: u64,
 }
 
 impl TransactionStore {
@@ -76,6 +77,7 @@ impl TransactionStore {
             // configuration
             capacity: config.capacity,
             capacity_per_user: config.capacity_per_user,
+            max_batch_bytes: config.shared_mempool_max_batch_bytes,
         }
     }
 
@@ -130,18 +132,19 @@ impl TransactionStore {
             {
                 if current_version.txn.payload() != txn.txn.payload() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different payload".to_string(),
+                        "Transaction already in mempool with a different payload".to_string(),
                     );
                 } else if current_version.txn.expiration_timestamp_secs()
                     != txn.txn.expiration_timestamp_secs()
                 {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different expiration timestamp"
+                        "Transaction already in mempool with a different expiration timestamp"
                             .to_string(),
                     );
                 } else if current_version.txn.max_gas_amount() != txn.txn.max_gas_amount() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with different max gas amount".to_string(),
+                        "Transaction already in mempool with a different max gas amount"
+                            .to_string(),
                     );
                 } else if current_version.txn.gas_unit_price() < txn.get_gas_price() {
                     // Update txn if gas unit price is a larger value than before
@@ -150,7 +153,7 @@ impl TransactionStore {
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        "Transaction already in mempool with higher gas price".to_string(),
+                        "Transaction already in mempool with a higher gas price".to_string(),
                     );
                 } else {
                     // If the transaction is the same, it's an idempotent call
@@ -166,7 +169,7 @@ impl TransactionStore {
             sequence_number.account_sequence_number_type.min_seq(),
         ) {
             return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
-                "mempool size: {}, capacity: {}",
+                "Mempool is full. Mempool size: {}, Capacity: {}",
                 self.system_ttl_index.size(),
                 self.capacity,
             ));
@@ -186,7 +189,7 @@ impl TransactionStore {
             if txns.len() >= self.capacity_per_user {
                 return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
                     format!(
-                        "txns length: {} capacity per user: {}",
+                        "Mempool over capacity for account. Number of transactions from account: {} Capacity per account: {}",
                         txns.len(),
                         self.capacity_per_user,
                     ),
@@ -428,7 +431,8 @@ impl TransactionStore {
         self.track_indices();
     }
 
-    /// Read `count` transactions from timeline since `timeline_id`.
+    /// Read at most `count` transactions from timeline since `timeline_id`.
+    /// This method takes into account the max number of bytes per transaction batch.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
@@ -436,19 +440,29 @@ impl TransactionStore {
         count: usize,
     ) -> (Vec<SignedTransaction>, u64) {
         let mut batch = vec![];
+        let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id;
+
+        // Add as many transactions to the batch as possible
         for (address, sequence_number) in self.timeline_index.read_timeline(timeline_id, count) {
             if let Some(txn) = self
                 .transactions
                 .get(&address)
                 .and_then(|txns| txns.get(&sequence_number))
             {
-                batch.push(txn.txn.clone());
-                if let TimelineState::Ready(timeline_id) = txn.timeline_state {
-                    last_timeline_id = timeline_id;
+                let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
+                if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
+                    break; // The batch is full
+                } else {
+                    batch.push(txn.txn.clone());
+                    batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
+                    if let TimelineState::Ready(timeline_id) = txn.timeline_state {
+                        last_timeline_id = timeline_id;
+                    }
                 }
             }
         }
+
         (batch, last_timeline_id)
     }
 

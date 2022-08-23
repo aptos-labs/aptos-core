@@ -28,7 +28,7 @@ use crate::{
     },
     CliCommand, CliResult,
 };
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
@@ -47,11 +47,8 @@ use move_deps::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
-    move_package::{
-        compilation::compiled_package::CompiledPackage,
-        source_package::layout::SourcePackageLayout, BuildConfig,
-    },
-    move_prover,
+    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
+    move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
 use std::fmt::{Display, Formatter};
@@ -207,19 +204,18 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
-        let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            generate_abis: true,
-            generate_docs: true,
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: true,
+            with_source_maps: true,
+            with_error_map: true,
             install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
+            named_addresses: self.move_options.named_addresses(),
         };
-        let compiled_package = compile_move(
-            build_config,
-            self.move_options.get_package_path()?.as_path(),
-        )?;
+        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let mut ids = Vec::new();
-        for &module in compiled_package.root_modules_map().iter_modules().iter() {
+        for module in pack.modules() {
             verify_module_init_function(module)
                 .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
             ids.push(module.self_id().to_string());
@@ -263,7 +259,10 @@ impl CliCommand<&'static str> for TestPackage {
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
-            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
+            aptos_debug_natives::aptos_debug_natives(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            ),
             false,
             &mut std::io::stdout(),
         )
@@ -323,6 +322,16 @@ impl CliCommand<&'static str> for ProvePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
+
+        const APTOS_NATIVE_TEMPLATE: &[u8] = include_bytes!("aptos-natives.bpl");
+
+        let mut options = move_prover::cli::Options::default();
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: APTOS_NATIVE_TEMPLATE.to_vec(),
+                module_instance_names: vec![],
+            });
+
         let result = task::spawn_blocking(move || {
             move_cli::base::prove::run_move_prover(
                 config,
@@ -340,17 +349,6 @@ impl CliCommand<&'static str> for ProvePackage {
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
     }
-}
-
-/// Compiles a Move package dir, and returns the compiled modules.
-pub(crate) fn compile_move(
-    build_config: BuildConfig,
-    package_dir: &Path,
-) -> CliTypedResult<CompiledPackage> {
-    // TODO: Add caching
-    build_config
-        .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| CliError::MoveCompilationError(format!("{:#}", err)))
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain
@@ -413,22 +411,28 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+    pub(crate) fn build_options(
+        self,
+        named_addresses: BTreeMap<String, AccountAddress>,
+    ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
             None => BuildOptions {
                 with_srcs: false,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                // Always enable error map bytecode injection
+                with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
             Sparse => BuildOptions {
                 with_srcs: true,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -436,6 +440,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
         }
     }
@@ -472,18 +477,18 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
             let metadata = package.extract_metadata()?;
-            let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
+            let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
             );
             let size = bcs::serialized_size(&payload)?;
+            println!("package size {} bytes", size);
             if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
                 return Err(CliError::UnexpectedError(format!(
-                    "The package is larger than {}k ({}k)! To lower the size \
+                    "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included_artifacts`. \
                 You can also override this check with `--override-size-check",
-                    MAX_PUBLISH_PACKAGE_SIZE / 1000,
-                    size / 1000
+                    MAX_PUBLISH_PACKAGE_SIZE, size
                 )));
             }
             txn_options
@@ -542,7 +547,7 @@ impl CliCommand<&'static str> for DownloadPackage {
         }
         let package_path = output_dir.join(package.name());
         package
-            .save_package_to_disk(package_path.as_path(), true)
+            .save_package_to_disk(package_path.as_path())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
         println!(
             "Saved package with {} module(s) to `{}`",
@@ -556,7 +561,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 /// Lists information about packages and modules on-chain
 #[derive(Parser)]
 pub struct ListPackage {
-    /// Address of the account onchain
+    /// Address of the account for which to list packages.
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
@@ -610,11 +615,8 @@ impl CliCommand<&'static str> for ListPackage {
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
                     println!("  upgrade_number: {}", data.upgrade_number());
+                    println!("  source_digest: {}", data.source_digest());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
-                    println!(
-                        "  build_info:\n    {}",
-                        data.build_info().replace('\n', "\n    ")
-                    );
                 }
             }
         }

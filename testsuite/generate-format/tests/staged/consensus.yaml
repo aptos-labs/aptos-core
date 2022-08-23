@@ -380,7 +380,8 @@ SyncInfo:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
 TableHandle:
-  NEWTYPESTRUCT: U128
+  NEWTYPESTRUCT:
+    TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:

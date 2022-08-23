@@ -5,7 +5,7 @@
 ///! database restore operations, as required by db-restore and
 ///! state sync v2.
 use crate::{
-    change_set::ChangeSet, event_store::EventStore, ledger_store::LedgerStore,
+    event_store::EventStore, ledger_store::LedgerStore,
     schema::transaction_accumulator::TransactionAccumulatorSchema,
     transaction_store::TransactionStore,
 };
@@ -18,7 +18,7 @@ use aptos_types::{
     proof::{definition::LeafCount, position::FrozenSubTreeIterator},
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
-use schemadb::DB;
+use schemadb::{SchemaBatch, DB};
 use std::sync::Arc;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
@@ -27,16 +27,16 @@ pub fn save_ledger_infos(
     db: Arc<DB>,
     ledger_store: Arc<LedgerStore>,
     ledger_infos: &[LedgerInfoWithSignatures],
-    existing_change_set: Option<&mut ChangeSet>,
+    existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
     ensure!(!ledger_infos.is_empty(), "No LedgerInfos to save.");
 
-    if let Some(existing_change_set) = existing_change_set {
-        save_ledger_infos_impl(ledger_store, ledger_infos, existing_change_set)?;
+    if let Some(existing_batch) = existing_batch {
+        save_ledger_infos_impl(ledger_store, ledger_infos, existing_batch)?;
     } else {
-        let mut change_set = ChangeSet::new();
-        save_ledger_infos_impl(ledger_store.clone(), ledger_infos, &mut change_set)?;
-        db.write_schemas(change_set.batch)?;
+        let mut batch = SchemaBatch::new();
+        save_ledger_infos_impl(ledger_store.clone(), ledger_infos, &mut batch)?;
+        db.write_schemas(batch)?;
         update_latest_ledger_info(ledger_store, ledger_infos)?;
     }
 
@@ -65,7 +65,7 @@ pub fn confirm_or_save_frozen_subtrees(
     db: Arc<DB>,
     num_leaves: LeafCount,
     frozen_subtrees: &[HashValue],
-    existing_change_set: Option<&mut ChangeSet>,
+    existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
     let positions: Vec<_> = FrozenSubTreeIterator::new(num_leaves).collect();
     ensure!(
@@ -75,17 +75,12 @@ pub fn confirm_or_save_frozen_subtrees(
         frozen_subtrees.len(),
     );
 
-    if let Some(existing_change_set) = existing_change_set {
-        confirm_or_save_frozen_subtrees_impl(db, frozen_subtrees, positions, existing_change_set)?;
+    if let Some(existing_batch) = existing_batch {
+        confirm_or_save_frozen_subtrees_impl(db, frozen_subtrees, positions, existing_batch)?;
     } else {
-        let mut change_set = ChangeSet::new();
-        confirm_or_save_frozen_subtrees_impl(
-            db.clone(),
-            frozen_subtrees,
-            positions,
-            &mut change_set,
-        )?;
-        db.write_schemas(change_set.batch)?;
+        let mut batch = SchemaBatch::new();
+        confirm_or_save_frozen_subtrees_impl(db.clone(), frozen_subtrees, positions, &mut batch)?;
+        db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -102,9 +97,9 @@ pub fn save_transactions(
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
-    existing_change_set: Option<&mut ChangeSet>,
+    existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
-    if let Some(existing_change_set) = existing_change_set {
+    if let Some(existing_batch) = existing_batch {
         save_transactions_impl(
             ledger_store,
             transaction_store,
@@ -113,10 +108,10 @@ pub fn save_transactions(
             txns,
             txn_infos,
             events,
-            existing_change_set,
+            existing_batch,
         )?;
     } else {
-        let mut change_set = ChangeSet::new();
+        let mut batch = SchemaBatch::new();
         save_transactions_impl(
             ledger_store,
             transaction_store,
@@ -125,9 +120,9 @@ pub fn save_transactions(
             txns,
             txn_infos,
             events,
-            &mut change_set,
+            &mut batch,
         )?;
-        db.write_schemas(change_set.batch)?;
+        db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -140,24 +135,24 @@ pub fn save_transaction_outputs(
     transaction_store: Arc<TransactionStore>,
     first_version: Version,
     transaction_outputs: Vec<TransactionOutput>,
-    existing_change_set: Option<&mut ChangeSet>,
+    existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
-    if let Some(existing_change_set) = existing_change_set {
+    if let Some(existing_batch) = existing_batch {
         save_transaction_outputs_impl(
             transaction_store,
             first_version,
             transaction_outputs,
-            existing_change_set,
+            existing_batch,
         )?;
     } else {
-        let mut change_set = ChangeSet::new();
+        let mut batch = SchemaBatch::new();
         save_transaction_outputs_impl(
             transaction_store,
             first_version,
             transaction_outputs,
-            &mut change_set,
+            &mut batch,
         )?;
-        db.write_schemas(change_set.batch)?;
+        db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -167,11 +162,11 @@ pub fn save_transaction_outputs(
 fn save_ledger_infos_impl(
     ledger_store: Arc<LedgerStore>,
     ledger_infos: &[LedgerInfoWithSignatures],
-    change_set: &mut ChangeSet,
+    batch: &mut SchemaBatch,
 ) -> Result<()> {
     ledger_infos
         .iter()
-        .map(|li| ledger_store.put_ledger_info(li, change_set))
+        .map(|li| ledger_store.put_ledger_info(li, batch))
         .collect::<Result<Vec<_>>>()?;
 
     Ok(())
@@ -186,13 +181,13 @@ pub fn save_transactions_impl(
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
-    change_set: &mut ChangeSet,
+    batch: &mut SchemaBatch,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
-        transaction_store.put_transaction(first_version + idx as Version, txn, change_set)?;
+        transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
     }
-    ledger_store.put_transaction_infos(first_version, txn_infos, change_set)?;
-    event_store.put_events_multiple_versions(first_version, events, change_set)?;
+    ledger_store.put_transaction_infos(first_version, txn_infos, batch)?;
+    event_store.put_events_multiple_versions(first_version, events, batch)?;
 
     Ok(())
 }
@@ -202,10 +197,10 @@ pub fn save_transaction_outputs_impl(
     transaction_store: Arc<TransactionStore>,
     first_version: Version,
     transaction_outputs: Vec<TransactionOutput>,
-    change_set: &mut ChangeSet,
+    batch: &mut SchemaBatch,
 ) -> Result<()> {
     for output in transaction_outputs {
-        transaction_store.put_write_set(first_version, output.write_set(), change_set)?;
+        transaction_store.put_write_set(first_version, output.write_set(), batch)?;
     }
 
     Ok(())
@@ -216,7 +211,7 @@ fn confirm_or_save_frozen_subtrees_impl(
     db: Arc<DB>,
     frozen_subtrees: &[HashValue],
     positions: Vec<Position>,
-    change_set: &mut ChangeSet,
+    batch: &mut SchemaBatch,
 ) -> Result<()> {
     positions
         .iter()
@@ -230,7 +225,7 @@ fn confirm_or_save_frozen_subtrees_impl(
                         _h,
                     );
             } else {
-                change_set.batch.put::<TransactionAccumulatorSchema>(p, h)?;
+                batch.put::<TransactionAccumulatorSchema>(p, h)?;
             }
             Ok(())
         })

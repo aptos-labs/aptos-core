@@ -22,6 +22,7 @@ use short_hex_str::AsShortHexStr;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    fmt,
     path::PathBuf,
     string::ToString,
     time::Duration,
@@ -41,8 +42,10 @@ pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
-pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KB: a buffer for metadata that might be added to messages by networking */
-pub const MAX_APPLICATION_MESSAGE_SIZE: usize = MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE; /* The message size that applications should check against */
+pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
+pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
+pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
+    (MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE) - MESSAGE_PADDING_SIZE; /* The message size that applications should check against */
 pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
@@ -427,7 +430,7 @@ pub type PeerSet = HashMap<PeerId, Peer>;
 /// Downstream -> Downstream, defining a controlled downstream that I always want to connect
 /// Known -> A known peer, but it has no particular role assigned to it
 /// Unknown -> Undiscovered peer, likely due to a non-mutually authenticated connection always downstream
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum PeerRole {
     Validator = 0,
     PreferredUpstream,
@@ -438,10 +441,36 @@ pub enum PeerRole {
     Unknown,
 }
 
+impl PeerRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PeerRole::Validator => "validator",
+            PeerRole::PreferredUpstream => "preferred_upstream_peer",
+            PeerRole::Upstream => "upstream_peer",
+            PeerRole::ValidatorFullNode => "validator_fullnode",
+            PeerRole::Downstream => "downstream_peer",
+            PeerRole::Known => "known_peer",
+            PeerRole::Unknown => "unknown_peer",
+        }
+    }
+}
+
 impl Default for PeerRole {
     /// Default to least trusted
     fn default() -> Self {
         PeerRole::Unknown
+    }
+}
+
+impl fmt::Debug for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 

@@ -44,6 +44,7 @@ use aptos_types::{
     validator_info::ValidatorInfo,
 };
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
@@ -597,9 +598,9 @@ impl CliTestFramework {
         let sources_dir = move_dir.join("sources");
 
         let hello_blockchain_contents = include_str!(
-            "../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchain.move"
+            "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
         );
-        let source_path = sources_dir.join("HelloBlockchain.move");
+        let source_path = sources_dir.join("hello_blockchain.move");
         write_to_file(
             source_path.as_path(),
             &source_path.as_display().to_string(),
@@ -607,8 +608,8 @@ impl CliTestFramework {
         )
         .unwrap();
 
-        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchainTest.move");
-        let test_path = sources_dir.join("HelloBlockchainTest.move");
+        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
+        let test_path = sources_dir.join("hello_blockchain_test.move");
         write_to_file(
             test_path.as_path(),
             &test_path.as_display().to_string(),
@@ -858,7 +859,7 @@ pub struct ValidatorSet {
     pub pending_active: Vec<ValidatorInfo>,
 }
 
-fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
+pub fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
     ValidatorSet {
         consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
             0u64 => ConsensusScheme::BLS12381,
@@ -885,4 +886,25 @@ fn json_account_to_balance(value: &Value) -> u64 {
             .unwrap(),
     )
     .unwrap()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IndividualValidatorPerformance {
+    successful_proposals: String,
+    failed_proposals: String,
+}
+
+impl IndividualValidatorPerformance {
+    pub fn successful_proposals(&self) -> u32 {
+        self.successful_proposals.parse().unwrap()
+    }
+
+    pub fn failed_proposals(&self) -> u32 {
+        self.failed_proposals.parse().unwrap()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorPerformance {
+    pub validators: Vec<IndividualValidatorPerformance>,
 }

@@ -15,10 +15,11 @@ use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     transaction::Version,
 };
+use data_streaming_service::data_stream::DataStreamId;
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
+    data_notification::DataNotification, data_stream::DataStreamListener,
+    streaming_client::DataStreamingClient,
 };
 use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
@@ -143,45 +144,18 @@ pub async fn get_data_notification(
 /// Terminates the stream with the provided notification ID and feedback
 pub async fn terminate_stream_with_feedback<StreamingClient: DataStreamingClient + Clone>(
     streaming_client: &mut StreamingClient,
-    notification_id: NotificationId,
-    notification_feedback: NotificationFeedback,
+    data_stream_id: DataStreamId,
+    notification_and_feedback: Option<NotificationAndFeedback>,
 ) -> Result<(), Error> {
     info!(LogSchema::new(LogEntry::Driver).message(&format!(
-        "Terminating the current stream! Feedback: {:?}, notification ID: {:?}",
-        notification_feedback, notification_id
+        "Terminating the data stream with ID: {:?}, notification and feedback: {:?}",
+        data_stream_id, notification_and_feedback
     )));
 
     streaming_client
-        .terminate_stream_with_feedback(notification_id, notification_feedback)
+        .terminate_stream_with_feedback(data_stream_id, notification_and_feedback)
         .await
         .map_err(|error| error.into())
-}
-
-/// Handles the end of stream notification or an invalid payload by terminating
-/// the stream appropriately.
-pub async fn handle_end_of_stream_or_invalid_payload<
-    StreamingClient: DataStreamingClient + Clone,
->(
-    streaming_client: &mut StreamingClient,
-    data_notification: DataNotification,
-) -> Result<(), Error> {
-    // Terminate the stream with the appropriate feedback
-    let notification_feedback = match data_notification.data_payload {
-        DataPayload::EndOfStream => NotificationFeedback::EndOfStream,
-        _ => NotificationFeedback::PayloadTypeIsIncorrect,
-    };
-    terminate_stream_with_feedback(
-        streaming_client,
-        data_notification.notification_id,
-        notification_feedback,
-    )
-    .await?;
-
-    // Return an error if the payload was invalid
-    match data_notification.data_payload {
-        DataPayload::EndOfStream => Ok(()),
-        _ => Err(Error::InvalidPayload("Unexpected payload type!".into())),
-    }
 }
 
 /// Fetches the latest epoch state from the specified storage

@@ -28,10 +28,9 @@ aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-push-metrics = { path = "../../crates/aptos-push-metrics" }
 aptos-sdk = { path = "../../sdk" }
-aptos-secure-push-metrics = { path = "../../secure/push-metrics" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 

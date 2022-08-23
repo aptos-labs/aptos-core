@@ -7,6 +7,7 @@ use crate::{
     event::{EventHandle, EventKey},
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use move_deps::move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -30,6 +31,10 @@ pub struct NewBlockEvent {
 }
 
 impl NewBlockEvent {
+    pub fn hash(&self) -> Result<HashValue> {
+        Ok(HashValue::from_slice(self.hash.to_vec())?)
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }

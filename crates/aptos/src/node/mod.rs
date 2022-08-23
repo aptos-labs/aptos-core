@@ -24,10 +24,10 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
@@ -767,10 +767,22 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
         let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
             || self.analyze_mode == AnalyzeMode::All;
         for epoch_info in epochs {
-            let epoch_stats = AnalyzeValidators::analyze(epoch_info.blocks, &epoch_info.validators);
+            let epoch_stats =
+                AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
             if print_detailed {
                 println!("Detailed table for epoch {}:", epoch_info.epoch);
-                AnalyzeValidators::print_detailed_epoch_table(&epoch_stats, None, true);
+                AnalyzeValidators::print_detailed_epoch_table(
+                    &epoch_stats,
+                    Some((
+                        "voting_power",
+                        &epoch_info
+                            .validators
+                            .iter()
+                            .map(|v| (v.address, v.voting_power.to_string()))
+                            .collect::<HashMap<_, _>>(),
+                    )),
+                    true,
+                );
             }
             stats.insert(epoch_info.epoch, epoch_stats);
         }

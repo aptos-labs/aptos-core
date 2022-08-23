@@ -39,6 +39,7 @@ uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.2"
 
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
+aptos-build-info = { path = "../../crates/aptos-build-info" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto", features = [] }
 aptos-faucet = { path = "../aptos-faucet" }
@@ -54,7 +55,6 @@ aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-transactional-test-harness = { path = "../../aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }

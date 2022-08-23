@@ -10,12 +10,11 @@ use crate::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
         event_store::event_store_pruner::EventStorePruner,
-        ledger_store::ledger_counter_pruner::LedgerCounterPruner,
         transaction_store::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
-    utils, ChangeSet, EventStore, LedgerStore, StateStore, TransactionStore,
+    utils, EventStore, StateStore, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{SchemaBatch, DB};
@@ -34,7 +33,6 @@ pub(crate) struct LedgerPruner {
     state_value_pruner: Arc<dyn DBSubPruner + Send + Sync>,
     event_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
     write_set_pruner: Arc<dyn DBSubPruner + Send + Sync>,
-    ledger_counter_pruner: Arc<dyn DBSubPruner + Send + Sync>,
 }
 
 impl DBPruner for LedgerPruner {
@@ -104,14 +102,12 @@ impl LedgerPruner {
         db: Arc<DB>,
         transaction_store: Arc<TransactionStore>,
         event_store: Arc<EventStore>,
-        ledger_store: Arc<LedgerStore>,
         state_store: Arc<StateStore>,
     ) -> Self {
         let pruner = LedgerPruner {
             db,
             target_version: AtomicVersion::new(0),
             min_readable_version: AtomicVersion::new(0),
-            ledger_counter_pruner: Arc::new(LedgerCounterPruner::new(ledger_store)),
             transaction_store_pruner: Arc::new(TransactionStorePruner::new(
                 transaction_store.clone(),
             )),
@@ -127,14 +123,14 @@ impl LedgerPruner {
     pub fn prune_genesis(
         ledger_db: Arc<DB>,
         state_store: Arc<StateStore>,
-        change_set: &mut ChangeSet,
+        db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 
         let ledger_pruner = utils::create_ledger_pruner(ledger_db, state_store);
         ledger_pruner.set_target_version(target_version);
-        ledger_pruner.prune_inner(max_version, &mut change_set.batch)?;
+        ledger_pruner.prune_inner(max_version, db_batch)?;
 
         Ok(())
     }
@@ -158,8 +154,6 @@ impl LedgerPruner {
         self.write_set_pruner
             .prune(db_batch, min_readable_version, current_target_version)?;
         self.state_value_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-        self.ledger_counter_pruner
             .prune(db_batch, min_readable_version, current_target_version)?;
         self.event_store_pruner
             .prune(db_batch, min_readable_version, current_target_version)?;

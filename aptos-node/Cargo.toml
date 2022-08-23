@@ -22,10 +22,11 @@ tokio = { version = "1.18.2", features = ["full"] }
 tokio-stream = "0.1.8"
 
 aptos-api = { path = "../api" }
+aptos-build-info = { path = "../crates/aptos-build-info" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
-aptos-fh-stream = { path = "../fh-stream" }
+aptos-fh-stream = { path = "../ecosystem/sf-indexer/firehose-stream" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }

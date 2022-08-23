@@ -391,8 +391,10 @@ export class TransactionBuilderRemoteABI {
     const senderAddress = sender instanceof AccountAddress ? HexString.fromUint8Array(sender.address) : sender;
 
     const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      this.aptosClient.getAccount(senderAddress),
-      this.aptosClient.getChainId(),
+      rest?.sequenceNumber
+        ? Promise.resolve({ sequence_number: rest?.sequenceNumber })
+        : this.aptosClient.getAccount(senderAddress),
+      rest?.chainId ? Promise.resolve(rest?.chainId) : this.aptosClient.getChainId(),
     ]);
 
     const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)], {

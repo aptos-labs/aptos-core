@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use crate::metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by};
 use anyhow::{anyhow, Error};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
     noise::{self, NoiseConfig},
     x25519,
@@ -15,8 +16,9 @@ use aptos_telemetry_service::types::{
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
-use reqwest::StatusCode;
-use std::sync::Arc;
+use flate2::{write::GzEncoder, Compression};
+use reqwest::{RequestBuilder, Response, StatusCode};
+use std::{io::Write, sync::Arc};
 use tokio_retry::{
     strategy::{jitter, ExponentialBackoff},
     Retry,
@@ -43,18 +45,153 @@ pub(crate) struct TelemetrySender {
     base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,
+    role_type: RoleType,
     client: reqwest::Client,
     auth_context: Arc<AuthContext>,
 }
 
 impl TelemetrySender {
-    pub fn new(base_url: &str, chain_id: ChainId, node_config: &NodeConfig) -> Self {
+    pub fn new(base_url: String, chain_id: ChainId, node_config: &NodeConfig) -> Self {
         Self {
-            base_url: base_url.into(),
+            base_url,
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
+            role_type: node_config.base.role,
             client: reqwest::Client::new(),
             auth_context: Arc::new(AuthContext::new(node_config)),
+        }
+    }
+
+    // sends an authenticated request to the telemetry service, automatically adding an auth token
+    // This function does not work with streaming bodies at the moment and will panic if you try so.
+    pub async fn send_authenticated_request(
+        &self,
+        request_builder: RequestBuilder,
+    ) -> Result<Response, anyhow::Error> {
+        let token = self.get_auth_token().await?;
+
+        let mut response = request_builder
+            .try_clone()
+            .expect("Could not clone request_builder")
+            .bearer_auth(token)
+            .send()
+            .await?;
+        // do 1 retry if the first attempt failed
+        if response.status() == StatusCode::UNAUTHORIZED {
+            // looks like request failed due to auth error. Let's get a new a fresh token. If this fails again we'll just return the error.
+            self.reset_token();
+            let token = self.get_auth_token().await?;
+            response = request_builder.bearer_auth(token).send().await?;
+        }
+        Ok(response)
+    }
+
+    pub(crate) async fn push_prometheus_metrics(&self) -> Result<(), anyhow::Error> {
+        debug!("Sending Prometheus Metrics");
+
+        let token = self.get_auth_token().await?;
+
+        let scraped_metrics =
+            prometheus::TextEncoder::new().encode_to_string(&aptos_metrics_core::gather())?;
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(scraped_metrics.as_bytes())?;
+        let compressed_bytes = gzip_encoder.finish()?;
+
+        let response = self
+            .send_authenticated_request(
+                self.client
+                    .post(format!("{}/push-metrics", self.base_url))
+                    .header("Content-Encoding", "gzip")
+                    .bearer_auth(token)
+                    .body(compressed_bytes),
+            )
+            .await;
+
+        match response {
+            Err(e) => Err(anyhow!("Prometheus Metrics push failed: {}", e)),
+            Ok(response) => {
+                if response.status().is_success() {
+                    Ok(())
+                } else {
+                    Err(anyhow!(
+                        "Prometheus Metrics push failed with response: {}, body: {}",
+                        response.status(),
+                        response
+                            .text()
+                            .await
+                            .unwrap_or_else(|_| "empty body".to_string()),
+                    ))
+                }
+            }
+        }
+    }
+
+    pub(crate) async fn try_push_prometheus_metrics(&self) {
+        self.push_prometheus_metrics().await.map_or_else(
+            |e| error!("Failed to push Prometheus Metrics: {}", e),
+            |_| debug!("Prometheus Metrics pushed successfully."),
+        );
+    }
+
+    pub async fn send_logs(&self, batch: Vec<String>) {
+        if let Ok(json) = serde_json::to_string(&batch) {
+            let len = json.len();
+
+            let retry_strategy = ExponentialBackoff::from_millis(10)
+                .map(jitter) // add jitter to delays
+                .take(4); // limit to 4 retries
+
+            let result = Retry::spawn(retry_strategy, || async {
+                self.post_logs(json.as_bytes()).await
+            })
+            .await;
+            match result {
+                Ok(_) => {
+                    increment_log_ingest_successes_by(batch.len() as u64);
+                    debug!("Sent log of length: {}", len);
+                }
+                Err(error) => {
+                    increment_log_ingest_failures_by(batch.len() as u64);
+                    error!("Failed send log of length: {} with error: {}", len, error);
+                }
+            }
+        } else {
+            error!("Failed json serde of batch: {:?}", batch);
+        }
+    }
+
+    async fn post_logs(&self, json: &[u8]) -> Result<(), anyhow::Error> {
+        let token = self.get_auth_token().await?;
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(json)?;
+        let compressed_bytes = gzip_encoder.finish()?;
+
+        // Send the request and wait for a response
+        let send_result = self
+            .client
+            .post(format!("{}/log_ingest", self.base_url))
+            .header("Content-Encoding", "gzip")
+            .bearer_auth(token)
+            .body(compressed_bytes)
+            .send()
+            .await;
+
+        // Process the result
+        match send_result {
+            Ok(response) => {
+                let status_code = response.status();
+                if status_code.is_success() {
+                    Ok(())
+                } else if status_code == StatusCode::UNAUTHORIZED {
+                    self.reset_token();
+                    Err(anyhow!("Unauthorized"))
+                } else {
+                    Err(anyhow!("Error status received: {}", status_code))
+                }
+            }
+            Err(error) => Err(anyhow!("Error sending log. Err: {}", error)),
         }
     }
 
@@ -84,7 +221,7 @@ impl TelemetrySender {
     }
 
     async fn post_metrics(&self, telemetry_dump: &TelemetryDump) -> Result<(), anyhow::Error> {
-        let token = self.get_token().await?;
+        let token = self.get_auth_token().await?;
 
         // Send the request and wait for a response
         let send_result = self
@@ -105,14 +242,18 @@ impl TelemetrySender {
                     self.reset_token();
                     Err(anyhow!("Unauthorized"))
                 } else {
-                    Err(anyhow!("Error status received: {}", status_code))
+                    Err(anyhow!(
+                        "Error status received {}: {}",
+                        status_code,
+                        response.text().await?,
+                    ))
                 }
             }
             Err(error) => Err(anyhow!("Error sending metrics. Err: {}", error)),
         }
     }
 
-    async fn get_token(&self) -> Result<String, Error> {
+    async fn get_auth_token(&self) -> Result<String, Error> {
         // Try to read the token holding a read lock
         let token = { self.auth_context.token.read().as_ref().cloned() };
         match token {
@@ -128,7 +269,7 @@ impl TelemetrySender {
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
         let response = self.client.get(self.base_url.to_string()).send().await?;
 
-        match response.error_for_status() {
+        match error_for_status_with_body(response).await {
             Ok(response) => {
                 let public_key = response.json::<x25519::PublicKey>().await?;
                 Ok(public_key)
@@ -189,6 +330,7 @@ impl TelemetrySender {
         let auth_request = AuthRequest {
             chain_id: self.chain_id,
             peer_id: self.peer_id,
+            role_type: self.role_type,
             server_public_key,
             handshake_msg: client_noise_msg,
         };
@@ -200,12 +342,12 @@ impl TelemetrySender {
             .send()
             .await?;
 
-        let resp = match response.error_for_status() {
+        let resp = match error_for_status_with_body(response).await {
             Ok(response) => Ok(response.json::<AuthResponse>().await?),
             Err(err) => {
                 error!(
                     "[telemetry-client] Error sending authentication request: {}",
-                    err
+                    err,
                 );
                 Err(anyhow!("error {}", err))
             }
@@ -248,7 +390,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
 
         let result1 = client.server_public_key().await;
         let result2 = client.server_public_key().await;
@@ -300,7 +442,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -339,7 +481,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -359,5 +501,81 @@ mod tests {
                 .get(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn test_push_prometheus_metrics() {
+        metrics::increment_telemetry_service_successes("test-event");
+
+        let scraped_metrics = prometheus::TextEncoder::new()
+            .encode_to_string(&aptos_metrics_core::gather())
+            .unwrap();
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(scraped_metrics.as_bytes()).unwrap();
+        let expected_compressed_bytes = gzip_encoder.finish().unwrap();
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST")
+                .header("Authorization", "Bearer SECRET_JWT_TOKEN")
+                .path("/push-metrics")
+                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+            then.status(200);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        let result = client.push_prometheus_metrics().await;
+
+        mock.assert();
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_post_logs() {
+        let batch = vec!["log1".to_string(), "log2".to_string()];
+        let json = serde_json::to_string(&batch);
+        assert!(json.is_ok());
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(json.unwrap().as_bytes()).unwrap();
+        let expected_compressed_bytes = gzip_encoder.finish().unwrap();
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST")
+                .header("Authorization", "Bearer SECRET_JWT_TOKEN")
+                .path("/log_ingest")
+                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+            then.status(200);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        client.send_logs(batch).await;
+
+        mock.assert();
+    }
+}
+
+async fn error_for_status_with_body(response: Response) -> Result<Response, anyhow::Error> {
+    if response.status().is_client_error() || response.status().is_server_error() {
+        Err(anyhow!(
+            "HTTP status error ({}) for url ({}): {}",
+            response.status(),
+            response.url().clone(),
+            response.text().await?,
+        ))
+    } else {
+        Ok(response)
     }
 }

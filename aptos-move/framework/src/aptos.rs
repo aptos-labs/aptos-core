@@ -86,7 +86,7 @@ impl ReleaseTarget {
         ReleaseBundle::read(path)
     }
 
-    pub fn create_release(self, strip: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
+    pub fn create_release(self, out: Option<PathBuf>) -> anyhow::Result<()> {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let packages = self
             .packages()
@@ -99,9 +99,10 @@ impl ReleaseTarget {
             build_options: BuildOptions {
                 with_srcs: true,
                 with_abis: true,
-                with_source_maps: true,
+                with_source_maps: false,
                 with_error_map: true,
                 named_addresses: Default::default(),
+                install_dir: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
@@ -121,7 +122,7 @@ impl ReleaseTarget {
                 PathBuf::from(self.file_name())
             },
         };
-        options.create_release(strip)
+        options.create_release()
     }
 }
 

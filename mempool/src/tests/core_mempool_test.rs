@@ -26,11 +26,11 @@ fn test_transaction_ordering_only_seqnos() {
         vec![TestTransaction::new(0, 0, 3), TestTransaction::new(1, 0, 5)],
     );
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec!(transactions[1].clone())
     );
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec!(transactions[0].clone())
     );
 
@@ -42,7 +42,7 @@ fn test_transaction_ordering_only_seqnos() {
     );
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
@@ -60,7 +60,7 @@ fn test_transaction_ordering_only_seqnos() {
     );
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
@@ -79,11 +79,11 @@ fn test_transaction_ordering_only_crsns() {
         ],
     );
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec!(transactions[1].clone())
     );
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec!(transactions[0].clone())
     );
 
@@ -98,7 +98,7 @@ fn test_transaction_ordering_only_crsns() {
     );
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
@@ -118,7 +118,7 @@ fn test_transaction_ordering_only_crsns() {
     );
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
@@ -140,7 +140,7 @@ fn test_transaction_nonblocking_crsns() {
     );
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
@@ -167,14 +167,14 @@ fn test_transaction_eviction_crsns() {
 
     for transaction in &transactions {
         assert_eq!(
-            consensus.get_block(&mut mempool, 1),
+            consensus.get_block(&mut mempool, 1, 1024),
             vec![transaction.clone()]
         );
     }
 
     // These transactions should have been evicted because the account's min_nonce got bumped
     for _transaction in &to_be_removed_txns {
-        assert_eq!(consensus.get_block(&mut mempool, 1), vec![]);
+        assert_eq!(consensus.get_block(&mut mempool, 1, 1024), vec![]);
     }
 }
 
@@ -201,10 +201,13 @@ fn test_update_transaction_in_mempool() {
 
     // Check that first transactions pops up first
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec![fixed_txns[0].clone()]
     );
-    assert_eq!(consensus.get_block(&mut mempool, 1), vec![txns[1].clone()]);
+    assert_eq!(
+        consensus.get_block(&mut mempool, 1, 1024),
+        vec![txns[1].clone()]
+    );
 }
 
 #[test]
@@ -221,10 +224,13 @@ fn test_update_transaction_in_mempool_crsn() {
 
     // Check that first transactions pops up first
     assert_eq!(
-        consensus.get_block(&mut mempool, 1),
+        consensus.get_block(&mut mempool, 1, 1024),
         vec![fixed_txns[0].clone()]
     );
-    assert_eq!(consensus.get_block(&mut mempool, 1), vec![txns[1].clone()]);
+    assert_eq!(
+        consensus.get_block(&mut mempool, 1, 1024),
+        vec![txns[1].clone()]
+    );
 }
 
 #[test]
@@ -279,8 +285,11 @@ fn test_update_invalid_transaction_in_mempool() {
 
     // Since both gas price and mas gas amount were updated, the ordering should not have changed.
     // The second transaction with gas price 2 should come first.
-    assert_eq!(consensus.get_block(&mut mempool, 1), vec![txns[1].clone()]);
-    let next_tnx = consensus.get_block(&mut mempool, 1);
+    assert_eq!(
+        consensus.get_block(&mut mempool, 1, 1024),
+        vec![txns[1].clone()]
+    );
+    let next_tnx = consensus.get_block(&mut mempool, 1, 1024);
     assert_eq!(next_tnx, vec![txns[0].clone()]);
     assert_eq!(next_tnx[0].gas_unit_price(), 1);
 }
@@ -299,14 +308,17 @@ fn test_update_invalid_transaction_in_mempool_crsn() {
         &TestTransaction::new(0, 0, 5).crsn(0),
         200,
     );
-    let _added_tnx = add_signed_txn(&mut mempool, updated_txn);
+    let _added_txn = add_signed_txn(&mut mempool, updated_txn);
 
     // Since both gas price and mas gas amount were updated, the ordering should not have changed.
     // The second transaction with gas price 2 should come first.
-    assert_eq!(consensus.get_block(&mut mempool, 1), vec![txns[1].clone()]);
-    let next_tnx = consensus.get_block(&mut mempool, 1);
-    assert_eq!(next_tnx, vec![txns[0].clone()]);
-    assert_eq!(next_tnx[0].gas_unit_price(), 1);
+    assert_eq!(
+        consensus.get_block(&mut mempool, 1, 1024),
+        vec![txns[1].clone()]
+    );
+    let next_txn = consensus.get_block(&mut mempool, 1, 1024);
+    assert_eq!(next_txn, vec![txns[0].clone()]);
+    assert_eq!(next_txn[0].gas_unit_price(), 1);
 }
 
 #[test]
@@ -326,8 +338,14 @@ fn test_remove_transaction() {
         vec![TestTransaction::new(1, 0, 3), TestTransaction::new(1, 1, 4)],
     );
     // Should return only txns from new_txns.
-    assert_eq!(consensus.get_block(&mut pool, 1), vec!(new_txns[0].clone()));
-    assert_eq!(consensus.get_block(&mut pool, 1), vec!(new_txns[1].clone()));
+    assert_eq!(
+        consensus.get_block(&mut pool, 1, 1024),
+        vec!(new_txns[0].clone())
+    );
+    assert_eq!(
+        consensus.get_block(&mut pool, 1, 1024),
+        vec!(new_txns[1].clone())
+    );
 }
 
 #[test]
@@ -353,8 +371,14 @@ fn test_remove_transaction_crsn() {
         ],
     );
     // Should return only txns from new_txns.
-    assert_eq!(consensus.get_block(&mut pool, 1), vec!(new_txns[0].clone()));
-    assert_eq!(consensus.get_block(&mut pool, 1), vec!(new_txns[1].clone()));
+    assert_eq!(
+        consensus.get_block(&mut pool, 1, 1024),
+        vec!(new_txns[0].clone())
+    );
+    assert_eq!(
+        consensus.get_block(&mut pool, 1, 1024),
+        vec!(new_txns[1].clone())
+    );
 }
 
 #[test]
@@ -375,7 +399,7 @@ fn test_system_ttl() {
 
     // GC routine should clear transaction from first insert but keep last one.
     mempool.gc();
-    let batch = mempool.get_batch(1, HashSet::new());
+    let batch = mempool.get_batch(1, 1024, HashSet::new());
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
 
@@ -387,11 +411,11 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, HashSet::new()).is_empty());
+    assert!(pool.get_batch(1, 1024, HashSet::new()).is_empty());
     // Transaction 5 got back from consensus.
     pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
     // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, HashSet::new())[0], txns[0]);
+    assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
 }
 
 #[test]
@@ -405,7 +429,7 @@ fn test_sequence_number_cache() {
     // for AC is 0).
     add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
     // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, HashSet::new()).len(), 1);
+    assert_eq!(pool.get_batch(1, 1024, HashSet::new()).len(), 1);
 }
 
 #[test]
@@ -502,7 +526,7 @@ fn test_parking_lot_eviction() {
     }
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, HashSet::new())
+        .get_batch(5, 5120, HashSet::new())
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -531,7 +555,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, HashSet::new())
+        .get_batch(5, 5120, HashSet::new())
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -572,7 +596,7 @@ fn test_gc_ready_transaction() {
     pool.gc_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
-    let block = pool.get_batch(10, HashSet::new());
+    let block = pool.get_batch(1, 1024, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
@@ -595,7 +619,7 @@ fn test_clean_stuck_transactions() {
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
     );
-    let block = pool.get_batch(10, HashSet::new());
+    let block = pool.get_batch(1, 1024, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
 }
@@ -671,4 +695,21 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
 
     let txn_by_new_hash = pool.get_by_hash(new_txn_hash);
     assert_eq!(txn_by_new_hash, Some(new_txn));
+}
+
+#[test]
+fn test_bytes_limit() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 100;
+    let mut pool = CoreMempool::new(&config);
+    // add 100 transacionts
+    for seq in 0..100 {
+        add_txn(&mut pool, TestTransaction::new(1, seq, 1)).unwrap();
+    }
+    let get_all = pool.get_batch(100, 100 * 1024, HashSet::new());
+    assert_eq!(get_all.len(), 100);
+    let txn_size = get_all[0].raw_txn_bytes_len() as u64;
+    let limit = 10;
+    let hit_limit = pool.get_batch(100, txn_size * limit, HashSet::new());
+    assert_eq!(hit_limit.len(), limit as usize);
 }

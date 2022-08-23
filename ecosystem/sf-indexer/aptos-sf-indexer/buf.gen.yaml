@@ -1,0 +1,9 @@
+version: v1
+plugins:
+  - name: prost
+    out: src/proto
+    opt:
+
+  - name: tonic
+    out: src/proto
+    opt:

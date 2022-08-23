@@ -19,9 +19,10 @@ fn module_loop_depth_at_limit() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    assert_success!(
-        h.publish_package(&acc, &common::package_path("max_loop_depth.data/pack-good"),)
-    );
+    assert_success!(h.publish_package(
+        &acc,
+        &common::test_dir_path("max_loop_depth.data/pack-good"),
+    ));
 }
 
 #[test]
@@ -31,7 +32,7 @@ fn module_loop_depth_just_above_limit() {
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
     assert_vm_status!(
-        h.publish_package(&acc, &common::package_path("max_loop_depth.data/pack-bad"),),
+        h.publish_package(&acc, &common::test_dir_path("max_loop_depth.data/pack-bad"),),
         StatusCode::LOOP_MAX_DEPTH_REACHED
     );
 }

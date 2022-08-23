@@ -5,7 +5,7 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
@@ -24,10 +24,13 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    pub fn new(native_gas_params: NativeGasParameters) -> VMResult<Self> {
+    pub fn new(
+        native_gas_params: NativeGasParameters,
+        abs_val_size_gas_params: AbstractValueSizeGasParameters,
+    ) -> VMResult<Self> {
         Ok(Self {
             inner: MoveVM::new_with_verifier_config(
-                aptos_natives(native_gas_params),
+                aptos_natives(native_gas_params, abs_val_size_gas_params),
                 VerifierConfig {
                     max_loop_depth: Some(5),
                 },

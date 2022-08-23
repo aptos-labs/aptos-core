@@ -29,8 +29,9 @@ pub fn get_transaction_info_output(
         hash: info.hash.clone(),
         r#type: get_transaction_type(txn.r#type()),
         version: txn.version,
-        state_root_hash: info.state_root_hash.clone(),
+        state_change_hash: info.state_change_hash.clone(),
         event_root_hash: info.event_root_hash.clone(),
+        state_checkpoint_hash: info.state_checkpoint_hash.clone(),
         gas_used: info.gas_used,
         success: info.success,
         epoch: txn.epoch,
@@ -197,7 +198,7 @@ fn parse_single_signature(
         public_key: s.public_key.clone(),
         signature: s.signature.clone(),
         threshold: 1,
-        bitmap: Vec::default(),
+        public_key_indices: Vec::default(),
         multi_agent_index,
         multi_sig_index: 0,
     }
@@ -216,17 +217,21 @@ fn parse_multi_signature(
     if let Some(addr) = override_address {
         signer = addr;
     }
-    for (index, key) in s.public_keys.iter().enumerate() {
-        let signature = s.signatures.get(index).unwrap();
+    for (index, signature) in s.signatures.iter().enumerate() {
+        let public_key = s
+            .public_keys
+            .get(s.public_key_indices.clone()[index] as usize)
+            .unwrap()
+            .clone();
         signatures.push(SignatureOutput {
             version: info.version,
             signer: signer.clone(),
             is_sender_primary,
             signature_type: get_signature_type(SignatureType::MultiEd25519),
-            public_key: key.clone(),
+            public_key,
             signature: signature.clone(),
             threshold: s.threshold,
-            bitmap: s.bitmap.clone(),
+            public_key_indices: s.public_key_indices.clone(),
             multi_agent_index,
             multi_sig_index: index as u32,
         });

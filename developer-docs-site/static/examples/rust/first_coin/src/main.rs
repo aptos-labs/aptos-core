@@ -6,7 +6,7 @@ use first_transaction::{Account, FaucetClient, FAUCET_URL, TESTNET_URL};
 use hello_blockchain::HelloBlockchainClient;
 use std::env;
 
-fn main() -> () {
+fn main() {
     let args: Vec<String> = env::args().collect();
     println!("{:?}", args);
 

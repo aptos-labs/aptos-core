@@ -17,13 +17,9 @@ fn main() {
         println!("cargo:rerun-if-changed=../move-stdlib/sources");
         println!("cargo:rerun-if-changed=../move-stdlib/Move.toml");
         ReleaseTarget::Head
-            .create_release(
-                true,
-                Some(
-                    PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"))
-                        .join("head.mrb"),
-                ),
-            )
+            .create_release(Some(
+                PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined")).join("head.mrb"),
+            ))
             .expect("release build failed");
     }
 }

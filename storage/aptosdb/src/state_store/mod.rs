@@ -3,6 +3,17 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::epoch_by_version::EpochByVersionSchema;
+use crate::{
+    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
+    schema::state_value::StateValueSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
+    state_store::buffered_state::BufferedState,
+    version_data::{VersionData, VersionDataSchema},
+    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
+    StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -31,23 +42,10 @@ use storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
-use crate::{
-    change_set::ChangeSet,
-    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    schema::state_value::StateValueSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
-    state_merkle_db::StateMerkleDb,
-    state_store::buffered_state::BufferedState,
-    version_data::{VersionData, VersionDataSchema},
-    AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
-};
-
-#[cfg(test)]
-use aptos_types::nibble::nibble_path::NibblePath;
-
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
+
 #[cfg(test)]
 mod state_store_test;
 
@@ -60,14 +58,16 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 #[derive(Debug)]
-pub struct StateDb {
+pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
 #[derive(Debug)]
 pub(crate) struct StateStore {
-    state_db: Arc<StateDb>,
+    pub(crate) state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
@@ -171,6 +171,22 @@ impl StateDb {
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
+
+    /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
+    /// ends an epoch, return one epoch early than that.
+    pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
+        if version == 0 {
+            return Ok(None);
+        }
+        let prev_version = version - 1;
+
+        let mut iter = self
+            .ledger_db
+            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
+        // Search for the end of the previous epoch.
+        iter.seek_for_prev(&prev_version)?;
+        iter.next().transpose()
+    }
 }
 
 impl DbReader for StateStore {
@@ -182,7 +198,7 @@ impl DbReader for StateStore {
         self.deref().get_state_snapshot_before(next_version)
     }
 
-    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
+    /// Get the latest state value of the given key up to the given version. Only used for testing for now
     /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
     /// value without proof.
     fn get_state_value_by_version(
@@ -237,6 +253,8 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
+        state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+        epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         target_snapshot_size: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -248,6 +266,8 @@ impl StateStore {
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
+            state_pruner,
+            epoch_snapshot_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
@@ -454,9 +474,9 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         expected_usage: StateStorageUsage,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
-        self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, cs)?;
+        self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, batch)?;
 
         let kv_batch = value_state_sets
             .iter()
@@ -466,7 +486,7 @@ impl StateStore {
                     .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
             .collect::<HashMap<_, _>>();
-        add_kv_batch(&mut cs.batch, &kv_batch)
+        add_kv_batch(batch, &kv_batch)
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -487,7 +507,7 @@ impl StateStore {
         value_state_sets: &[&HashMap<StateKey, Option<StateValue>>],
         first_version: Version,
         expected_usage: StateStorageUsage,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -506,7 +526,7 @@ impl StateStore {
                     usage.add_item(key.size() + value.size());
                 } else {
                     // stale index of the tombstone at current version.
-                    cs.batch.put::<StaleStateValueIndexSchema>(
+                    batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version,
@@ -530,7 +550,7 @@ impl StateStore {
                 if let Some((old_version, old_value)) = old_version_and_value_opt {
                     usage.remove_item(key.size() + old_value.size());
                     // stale index of the old value at its version.
-                    cs.batch.put::<StaleStateValueIndexSchema>(
+                    batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version: old_version,
@@ -543,7 +563,7 @@ impl StateStore {
 
             STATE_ITEMS.set(usage.items() as i64);
             TOTAL_STATE_BYTES.set(usage.bytes() as i64);
-            cs.batch.put::<VersionDataSchema>(&version, &usage.into())?;
+            batch.put::<VersionDataSchema>(&version, &usage.into())?;
         }
 
         if !expected_usage.is_untracked() {
@@ -564,7 +584,7 @@ impl StateStore {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        node_hashes: Option<&HashMap<aptos_types::nibble::nibble_path::NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
@@ -573,6 +593,7 @@ impl StateStore {
             node_hashes,
             version,
             base_version,
+            None, // previous epoch ending version
         )?;
         self.state_merkle_db.write_schemas(batch)?;
         Ok(hash)
@@ -679,6 +700,29 @@ impl StateStore {
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn get_all_jmt_nodes_referenced(
+        &self,
+        version: Version,
+    ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
+            .get_all_nodes_referenced(version)
+    }
+
+    #[cfg(test)]
+    pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        let mut iter = self
+            .state_db
+            .state_merkle_db
+            .db
+            .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+            Default::default(),
+        )?;
+        iter.seek_to_first();
+        let all_rows = iter.collect::<Result<Vec<_>>>()?;
+        Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
     }
 }
 

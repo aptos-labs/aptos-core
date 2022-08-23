@@ -42,20 +42,20 @@ In AIT3 we will have UI support to allow owner managing the staking pool, see de
 
 ## Bootstrapping validator node
 
-Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT3 network Chain ID is 43.
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
 
 ### Using source code
 
-- Stop your node and remove the data directory.
+- Stop your node and remove the data directory. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
+- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
 - Pull the latest changes on `testnet` branch
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
 ### Using Docker
 
-- Stop your node and remove the data volumes, `docker compose down --volumes`
+- Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Update your docker image to use tag `testnet`
@@ -85,7 +85,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
     ```
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
 - Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-0-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
@@ -99,7 +99,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ## Joining Validator Set
 
-All the selected participant will get Aptos coin airdrop into their owner account, once received the token you should initialize a staking pool and set your operator account. The step below is to setup the validator node, and join the validator set.
+At this point you already used your owner account to initialized a validator staking pool, and assigned the operator to your operator account. The step below is to setup the validator node using operator account, and join the validator set.
 
 1. Initialize Aptos CLI
 
@@ -110,14 +110,14 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     --skip-faucet
     ```
     
-    Note: `account_private_key` can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
+    Note: `account_private_key` for operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
 
 2. Check your validator account balance, make sure you have some coins to pay gas. (If not, transfer some coin to this account from your owner account) 
 
     You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=ait3` or use the CLI
 
     ```
-    aptos account list --profile ait2
+    aptos account list --profile ait3-operator
     ```
     
     This will show you the coin balance you have in the validator account. You should be able to see something like:
@@ -142,7 +142,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     ```
     aptos node update-consensus-key  \
       --pool-address <owner-address> \
-      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
       --profile ait3-operator
     ```
 
@@ -194,7 +194,15 @@ You can check the details about node liveness definition [here](https://aptos.de
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
     ```
 
-3. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
+3. Check if your node is state syncing
+
+    ```
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version"
+    ```
+    
+    You should expect to see the "committed" version keeps increasing.
+
+4. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
 
     ```
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
@@ -203,6 +211,18 @@ You can check the details about node liveness definition [here](https://aptos.de
     ```
 
     You should expect to see this number keep increasing.
+    
+5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=ait3`
+
+    ```
+    0x1::stake::StakePool
+
+    "active": {
+      "value": "100009129447462"
+    }
+    ```
+    
+    You should expect the active value for your StakePool to keep increasing. It's updated at every epoch, so it will be every two hours.
 
 
 ## Leaving Validator Set

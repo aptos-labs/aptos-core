@@ -13,9 +13,9 @@ module aptos_framework::chain_id {
 
     /// Only called during genesis.
     /// Publish the chain ID `id` of this instance under the SystemAddresses address
-    public(friend) fun initialize(account: &signer, id: u8) {
-        system_addresses::assert_aptos_framework(account);
-        move_to(account, ChainId { id })
+    public(friend) fun initialize(aptos_framework: &signer, id: u8) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, ChainId { id })
     }
 
     /// Return the chain ID of this instance

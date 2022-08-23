@@ -576,7 +576,8 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_manager),
             self.time_service.clone(),
-            self.config.max_block_size,
+            self.config.max_block_txns,
+            self.config.max_block_bytes,
             onchain_config.max_failed_authors_to_store(),
         );
 

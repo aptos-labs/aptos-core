@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::HashMap, convert::Infallible, fs::File, io::Read, net::SocketAddr, path::PathBuf,
+    collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
+    path::PathBuf,
 };
 
 use aptos_config::keys::ConfigKey;
@@ -11,22 +12,28 @@ use aptos_logger::info;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use gcp_bigquery_client::Client;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use warp::{Filter, Reply};
 
 use crate::{
+    clients::humio,
+    clients::victoria_metrics_api::Client as MetricsClient,
     context::Context,
     index::routes,
-    validator_cache::{ValidatorSetCache, ValidatorSetCacheUpdater},
+    validator_cache::{PeerSetCache, PeerSetCacheUpdater},
 };
 
 mod auth;
+mod clients;
+mod constants;
 mod context;
 mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
-mod rest_client;
+mod log_ingest;
+mod prometheus_push_metrics;
 #[cfg(any(test))]
 pub(crate) mod tests;
 pub mod types;
@@ -51,12 +58,36 @@ impl AptosTelemetryServiceArgs {
             });
         info!("Using config {:?}", &config);
 
-        let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-        let gcp_bigquery_client =
-            Client::from_service_account_key_file(&config.gcp_sa_key_file).await;
-        let context = Context::new(&config, cache.clone(), Some(gcp_bigquery_client));
+        let gcp_bigquery_client = Client::from_service_account_key_file(
+            env::var("GOOGLE_APPLICATION_CREDENTIALS")
+                .expect("environment variable GOOGLE_APPLICATION_CREDENTIALS must be set")
+                .as_str(),
+        )
+        .await;
 
-        ValidatorSetCacheUpdater::new(cache, &config).run();
+        let victoria_metrics_client = MetricsClient::new(
+            Url::parse(&config.victoria_metrics_base_url)
+                .expect("base url must be provided for victoria metrics"),
+            config.victoria_metrics_token.clone(),
+        );
+
+        let humio_client = humio::IngestClient::new(
+            Url::parse(&config.humio_url).unwrap(),
+            config.humio_auth_token.clone(),
+        );
+        let validators_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+        let vfns_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+
+        let context = Context::new(
+            &config,
+            validators_cache.clone(),
+            vfns_cache.clone(),
+            Some(gcp_bigquery_client),
+            Some(victoria_metrics_client),
+            humio_client,
+        );
+
+        PeerSetCacheUpdater::new(validators_cache, vfns_cache, &config).run();
 
         Self::serve(&config, routes(context)).await;
     }
@@ -92,8 +123,11 @@ pub struct TelemetryServiceConfig {
     pub server_private_key: ConfigKey<x25519::PrivateKey>,
     pub jwt_signing_key: String,
     pub update_interval: u64,
-    pub gcp_sa_key_file: String,
     pub gcp_bq_config: GCPBigQueryConfig,
+    pub victoria_metrics_base_url: String,
+    pub victoria_metrics_token: String,
+    pub humio_url: String,
+    pub humio_auth_token: String,
 }
 
 impl TelemetryServiceConfig {

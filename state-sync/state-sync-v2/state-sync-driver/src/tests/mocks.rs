@@ -30,10 +30,12 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
+use data_streaming_service::data_stream::DataStreamId;
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::NotificationId,
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
+    streaming_client::{DataStreamingClient, Epoch},
 };
 use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
@@ -410,8 +412,8 @@ mock! {
 
         async fn terminate_stream_with_feedback(
             &self,
-            notification_id: NotificationId,
-            notification_feedback: NotificationFeedback,
+            data_stream_id: DataStreamId,
+            notification_and_feedback: Option<NotificationAndFeedback>,
         ) -> Result<(), data_streaming_service::error::Error>;
     }
     impl Clone for StreamingClient {

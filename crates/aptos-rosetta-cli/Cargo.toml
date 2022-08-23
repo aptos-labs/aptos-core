@@ -20,7 +20,7 @@ url = "2.2.2"
 
 aptos = { path = "../aptos" }
 aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto", features = ["fuzzing"] }
+aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-rosetta = { path = "../aptos-rosetta" }
 aptos-types = { path = "../../types" }

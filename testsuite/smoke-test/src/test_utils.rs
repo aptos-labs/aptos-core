@@ -6,8 +6,8 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_transaction_builder::aptos_stdlib;
-use forge::{LocalSwarm, NodeExt, Swarm};
+use cached_packages::aptos_stdlib;
+use forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use rand::random;
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
@@ -49,30 +49,6 @@ pub async fn transfer_coins(
     client.wait_for_signed_transaction(&txn).await.unwrap();
 
     txn
-}
-
-pub async fn reconfig(
-    client: &RestClient,
-    transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
-) {
-    let aptos_version = client.get_aptos_version().await.unwrap();
-    let current_version = *aptos_version.into_inner().major.inner();
-    let txn = root_account.sign_with_transaction_builder(
-        transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
-    );
-    client
-        .submit_and_wait(&txn)
-        .await
-        .map_err(|e| {
-            panic!(
-                "Couldn't execute {:?}, for account {:?}, error {:?}",
-                txn, root_account, e
-            )
-        })
-        .unwrap();
-
-    println!("Changing aptos version to {}", current_version + 1,);
 }
 
 pub async fn transfer_and_reconfig(

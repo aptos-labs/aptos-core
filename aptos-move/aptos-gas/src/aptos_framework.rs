@@ -72,9 +72,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],
 
     [.type_info.type_of.base, "type_info.type_of.base", 1],
-    [.type_info.type_of.per_abstract_memory_unit, "type_info.type_of.per_abstract_memory_unit", 1],
+    [.type_info.type_of.per_byte_in_str, "type_info.type_of.per_abstract_memory_unit", 1],
     [.type_info.type_name.base, "type_info.type_name.base", 1],
-    [.type_info.type_name.per_abstract_memory_unit, "type_info.type_name.per_abstract_memory_unit", 1],
+    [.type_info.type_name.per_byte_in_str, "type_info.type_name.per_abstract_memory_unit", 1],
 
     [.util.from_bytes.base, "util.from_bytes.base", 1],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 1],
@@ -85,7 +85,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 1],
 
     [.event.write_to_event_store.base, "event.write_to_event_store.base", 1],
-    [.event.write_to_event_store.per_abstract_memory_unit, "event.write_to_event_store.per_abstract_memory_unit", 1],
+    [.event.write_to_event_store.per_abstract_value_unit, "event.write_to_event_store.per_abstract_memory_unit", 1],
 
     [.state_storage.get_usage.base_cost, "state_storage.get_usage.base", 1],
 

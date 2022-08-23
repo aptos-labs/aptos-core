@@ -12,11 +12,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use schemadb::{ReadOptions, DB};
+use schemadb::{ReadOptions, SchemaBatch, DB};
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
 use crate::{
-    change_set::ChangeSet,
     pruner::{state_pruner_worker::StatePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     state_store::StateStore,
@@ -45,16 +44,16 @@ fn put_value_set(
         )
         .unwrap();
 
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &mut cs,
+            &mut batch,
         )
         .unwrap();
-    db.write_schemas(cs.batch).unwrap();
+    db.write_schemas(batch).unwrap();
 
     root
 }
@@ -75,14 +74,13 @@ fn verify_state_in_store(
 fn create_state_pruner_manager(
     state_merkle_db: &Arc<DB>,
     prune_batch_size: usize,
-) -> StatePrunerManager {
+) -> StatePrunerManager<StaleNodeIndexSchema> {
     StatePrunerManager::new(
         Arc::clone(state_merkle_db),
         StateMerklePrunerConfig {
             enable: true,
             prune_window: 0,
             batch_size: prune_batch_size,
-            user_pruning_window_offset: 0,
         },
     )
 }
@@ -344,14 +342,15 @@ fn test_worker_quit_eagerly() {
     );
 
     {
-        let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
+        let state_pruner = utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
+            &aptos_db.state_merkle_db,
+        ));
         let worker = StatePrunerWorker::new(
             state_pruner,
             StateMerklePrunerConfig {
                 enable: true,
                 prune_window: 1,
                 batch_size: 100,
-                user_pruning_window_offset: 0,
             },
         );
         worker.set_target_db_version(/*target_db_version=*/ 1);

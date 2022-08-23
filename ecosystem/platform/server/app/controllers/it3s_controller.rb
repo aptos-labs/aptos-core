@@ -6,11 +6,11 @@
 class It3sController < ApplicationController
   layout 'it3'
 
+  before_action :authenticate_user!
   before_action :ensure_confirmed!
+  before_action :ensure_registration_open!
 
   def show
-    redirect_to root_path unless user_signed_in?
-    redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
     @it3_registration_closed = Flipper.enabled?(:it3_registration_closed, current_user)
     @steps = [
       connect_discord_step,
@@ -41,6 +41,10 @@ class It3sController < ApplicationController
   end
 
   private
+
+  def ensure_registration_open!
+    redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
+  end
 
   def connect_discord_step
     completed = current_user.authorizations.where(provider: :discord).exists?

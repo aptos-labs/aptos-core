@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod aggregator_natives;
+pub mod any;
 pub mod code;
 pub mod cryptography;
 pub mod event;
@@ -15,9 +16,11 @@ pub mod util;
 
 use aggregator_natives::{aggregator, aggregator_factory};
 use cryptography::ed25519;
+use gas_algebra_ext::AbstractValueSize;
 use move_deps::{
     move_core_types::{account_address::AccountAddress, identifier::Identifier},
     move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable},
+    move_vm_types::values::Value,
 };
 
 pub mod status {
@@ -115,11 +118,11 @@ impl GasParameters {
             type_info: type_info::GasParameters {
                 type_of: type_info::TypeOfGasParameters {
                     base: 0.into(),
-                    per_abstract_memory_unit: 0.into(),
+                    per_byte_in_str: 0.into(),
                 },
                 type_name: type_info::TypeNameGasParameters {
                     base: 0.into(),
-                    per_abstract_memory_unit: 0.into(),
+                    per_byte_in_str: 0.into(),
                 },
             },
             util: util::GasParameters {
@@ -140,7 +143,7 @@ impl GasParameters {
             event: event::GasParameters {
                 write_to_event_store: event::WriteToEventStoreGasParameters {
                     base: 0.into(),
-                    per_abstract_memory_unit: 0.into(),
+                    per_abstract_value_unit: 0.into(),
                 },
             },
             state_storage: state_storage::GasParameters {
@@ -164,6 +167,7 @@ impl GasParameters {
 pub fn all_natives(
     framework_addr: AccountAddress,
     gas_params: GasParameters,
+    calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
 
@@ -191,13 +195,17 @@ pub fn all_natives(
         cryptography::ristretto255::make_all(gas_params.ristretto255)
     );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
-    add_natives_from_module!("util", util::make_all(gas_params.util));
+    add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
+    add_natives_from_module!("any", util::make_all(gas_params.util));
     add_natives_from_module!(
         "transaction_context",
         transaction_context::make_all(gas_params.transaction_context)
     );
     add_natives_from_module!("code", code::make_all(gas_params.code));
-    add_natives_from_module!("event", event::make_all(gas_params.event));
+    add_natives_from_module!(
+        "event",
+        event::make_all(gas_params.event, calc_abstract_val_size)
+    );
     add_natives_from_module!(
         "state_storage",
         state_storage::make_all(gas_params.state_storage)

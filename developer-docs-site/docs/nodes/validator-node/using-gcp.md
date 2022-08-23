@@ -16,7 +16,7 @@ This guide assumes you already have GCP account setup, and have created a new pr
 
 Install the below pre-requisites if have not done so:
 
-   * Aptos CLI 0.3.1: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
+   * Aptos CLI 0.3.1: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * Terraform 1.2.4: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
    * Google Cloud CLI: https://cloud.google.com/sdk/docs/install-sdk

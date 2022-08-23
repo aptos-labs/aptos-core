@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pruner::db_pruner::DBPruner;
 use aptos_types::transaction::Version;
 use std::fmt::Debug;
 
@@ -13,6 +14,8 @@ use std::fmt::Debug;
 /// It creates a worker thread on construction and joins it on destruction. When destructed, it
 /// quits the worker thread eagerly without waiting for all pending work to be done.
 pub trait PrunerManager: Debug + Sync {
+    type Pruner: DBPruner;
+
     fn is_pruner_enabled(&self) -> bool;
 
     fn get_pruner_window(&self) -> Version;
@@ -26,8 +29,37 @@ pub trait PrunerManager: Debug + Sync {
 
     fn set_pruner_target_db_version(&self, latest_version: Version);
 
+    fn pruner(&self) -> &Self::Pruner;
+
     /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling
     /// an internal counter.
     #[cfg(test)]
-    fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()>;
+    fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()> {
+        self.maybe_set_pruner_target_db_version(latest_version);
+        self.wait_for_pruner()
+    }
+
+    #[cfg(test)]
+    fn wait_for_pruner(&self) -> anyhow::Result<()> {
+        use std::{
+            thread::sleep,
+            time::{Duration, Instant},
+        };
+
+        if !self.is_pruner_enabled() {
+            return Ok(());
+        }
+
+        // Assuming no big pruning chunks will be issued by a test.
+        const TIMEOUT: Duration = Duration::from_secs(10);
+        let end = Instant::now() + TIMEOUT;
+
+        while Instant::now() < end {
+            if !self.pruner().is_pruning_pending() {
+                return Ok(());
+            }
+            sleep(Duration::from_millis(1));
+        }
+        anyhow::bail!("Timeout waiting for pruner worker.");
+    }
 }

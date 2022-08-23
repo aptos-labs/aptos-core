@@ -60,12 +60,18 @@ pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 40;
 pub struct MockAptosDataClient {
     pub advertised_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
     pub advertised_synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
-    pub data_beyond_highest_advertised: bool,
+    pub data_beyond_highest_advertised: bool, // If true, data exists beyond the highest advertised
     pub highest_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
+    pub limit_chunk_sizes: bool, // If true, responses will be truncated to emulate chunk and network limits
+    pub skip_emulate_network_latencies: bool, // If true, skips network latency emulation
 }
 
 impl MockAptosDataClient {
-    pub fn new(data_beyond_highest_advertised: bool) -> Self {
+    pub fn new(
+        data_beyond_highest_advertised: bool,
+        limit_chunk_sizes: bool,
+        skip_emulate_network_latencies: bool,
+    ) -> Self {
         // Create the advertised data
         let advertised_epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(
             MIN_ADVERTISED_EPOCH_END,
@@ -94,10 +100,16 @@ impl MockAptosDataClient {
             advertised_synced_ledger_infos,
             data_beyond_highest_advertised,
             highest_epoch_ending_ledger_infos,
+            limit_chunk_sizes,
+            skip_emulate_network_latencies,
         }
     }
 
     fn emulate_network_latencies(&self) {
+        if self.skip_emulate_network_latencies {
+            return;
+        }
+
         // Sleep for 10 - 50 ms to emulate variance
         thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
     }
@@ -106,6 +118,21 @@ impl MockAptosDataClient {
         thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
         aptos_data_client::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
+
+    fn calculate_last_index(&self, start_index: u64, end_index: u64) -> u64 {
+        if self.limit_chunk_sizes {
+            let num_items_requested = (end_index - start_index) + 1;
+            let chunk_reduction_factor = create_range_random_u64(2, 9);
+            let num_reduced_items_requested = num_items_requested / chunk_reduction_factor;
+            if num_reduced_items_requested <= 1 {
+                start_index // Limit the chunk to a single item
+            } else {
+                start_index + num_reduced_items_requested - 1 // Limit the chunk by the reduction factor
+            }
+        } else {
+            end_index // No need to limit the chunk
+        }
+    }
 }
 
 #[async_trait]
@@ -113,10 +140,10 @@ impl AptosDataClient for MockAptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {
-            state_chunk_size: create_non_zero_random_u64(100),
+            state_chunk_size: create_range_random_u64(10, 200),
             epoch_chunk_size: create_non_zero_random_u64(10),
-            transaction_chunk_size: create_non_zero_random_u64(1000),
-            transaction_output_chunk_size: create_non_zero_random_u64(1000),
+            transaction_chunk_size: create_range_random_u64(20, 1000),
+            transaction_output_chunk_size: create_range_random_u64(20, 1000),
         };
 
         // Create a global data summary with a fixed set of data
@@ -155,6 +182,9 @@ impl AptosDataClient for MockAptosDataClient {
     ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
+        // Calculate the last index based on if we should limit the chunk size
+        let end_index = self.calculate_last_index(start_index, end_index);
+
         // Create state keys and values according to the given indices
         let mut state_keys_and_values = vec![];
         for _ in start_index..=end_index {
@@ -183,6 +213,9 @@ impl AptosDataClient for MockAptosDataClient {
         end_epoch: Epoch,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::Error> {
         self.emulate_network_latencies();
+
+        // Calculate the last epoch based on if we should limit the chunk size
+        let end_epoch = self.calculate_last_index(start_epoch, end_epoch);
 
         // Fetch the epoch ending ledger infos according to the requested epochs
         let mut epoch_ending_ledger_infos = vec![];
@@ -309,6 +342,9 @@ impl AptosDataClient for MockAptosDataClient {
     ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
+        // Calculate the last version based on if we should limit the chunk size
+        let end_version = self.calculate_last_index(start_version, end_version);
+
         // Create the requested transactions and transaction outputs
         let mut transactions_and_outputs = vec![];
         for _ in start_version..=end_version {
@@ -330,6 +366,9 @@ impl AptosDataClient for MockAptosDataClient {
         include_events: bool,
     ) -> Result<Response<TransactionListWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
+
+        // Calculate the last version based on if we should limit the chunk size
+        let end_version = self.calculate_last_index(start_version, end_version);
 
         let transaction_list_with_proof =
             create_transaction_list_with_proof(start_version, end_version, include_events);

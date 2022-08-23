@@ -173,8 +173,13 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
-    pub fn create_publish_package(&mut self, account: &Account, path: &Path) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), BuildOptions::default())
+    pub fn create_publish_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: Option<BuildOptions>,
+    ) -> SignedTransaction {
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
@@ -191,7 +196,18 @@ impl MoveHarness {
 
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path);
+        let txn = self.create_publish_package(account, path, None);
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package_with_options(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, Some(options));
         self.run(txn)
     }
 

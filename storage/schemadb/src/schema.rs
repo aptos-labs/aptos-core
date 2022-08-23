@@ -67,6 +67,7 @@ use std::fmt::Debug;
 #[macro_export]
 macro_rules! define_schema {
     ($schema_type: ident, $key_type: ty, $value_type: ty, $cf_name: expr) => {
+        #[derive(Debug)]
         pub(crate) struct $schema_type;
 
         impl $crate::schema::Schema for $schema_type {
@@ -114,7 +115,7 @@ where
 
 /// This trait defines a schema: an association of a column family name, the key type and the value
 /// type.
-pub trait Schema {
+pub trait Schema: Debug + Send + Sync + 'static {
     /// The column family name associated with this struct.
     /// Note: all schemas within the same SchemaDB must have distinct column family names.
     const COLUMN_FAMILY_NAME: ColumnFamilyName;

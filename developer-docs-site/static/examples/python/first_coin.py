@@ -3,82 +3,89 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-from hello_blockchain import HelloBlockchainClient
-from typing import Optional
 import sys
+from typing import Optional
 
-from first_transaction import Account, FaucetClient, RestClient, TESTNET_URL, FAUCET_URL
+from first_transaction import FAUCET_URL, TESTNET_URL, Account, FaucetClient, RestClient
+from hello_blockchain import HelloBlockchainClient
+
 
 class FirstCoin(RestClient):
 
-#:!:>section_1
+    #:!:>section_1
     def initialize_coin(self, account_from: Account) -> Optional[str]:
-        """ Initialize a new coin with the given coin type. """
+        """Initialize a new coin with the given coin type."""
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::initialize",
             "type_arguments": [f"0x{account_from.address()}::moon_coin::MoonCoin"],
             "arguments": [
                 "Moon Coin".encode("utf-8").hex(),
                 "MOON".encode("utf-8").hex(),
-                "6",
-                False
-            ]
+                6,
+                False,
+            ],
         }
         res = self.execute_transaction_with_payload(account_from, payload)
         return str(res["hash"])
-#<:!:section_1
 
-#:!:>section_2
+    # <:!:section_1
+
+    #:!:>section_2
     def register_coin(self, account_receiver: Account, coin_type_address: str) -> str:
-        """ Register the receiver account to receive transfers for the new coin. """
+        """Register the receiver account to receive transfers for the new coin."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coins::register",
             "type_arguments": [f"0x{coin_type_address}::moon_coin::MoonCoin"],
-            "arguments": []
+            "arguments": [],
         }
         res = self.execute_transaction_with_payload(account_receiver, payload)
         return str(res["hash"])
-#<:!:section_2
 
-#:!:>section_3
+    # <:!:section_2
+
+    #:!:>section_3
     def mint_coin(
-        self,
-        account_coin_owner: Account,
-        receiver_address: str,
-        amount: int
+        self, account_coin_owner: Account, receiver_address: str, amount: int
     ) -> str:
-        """ Register the receiver account to receive transfers for the new coin. """
+        """Register the receiver account to receive transfers for the new coin."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::mint",
-            "type_arguments": [f"0x{account_coin_owner.address()}::moon_coin::MoonCoin"],
-            "arguments": [
-                receiver_address,
-                f"{amount}"
-            ]
+            "type_arguments": [
+                f"0x{account_coin_owner.address()}::moon_coin::MoonCoin"
+            ],
+            "arguments": [receiver_address, f"{amount}"],
         }
         res = self.execute_transaction_with_payload(account_coin_owner, payload)
         return str(res["hash"])
-#<:!:section_3
 
-#:!:>section_4
+    # <:!:section_3
+
+    #:!:>section_4
     def get_balance(
         self,
         account_address: str,
         coin_type_address: str,
     ) -> str:
-        """ Returns the coin balance of the given account """
+        """Returns the coin balance of the given account"""
 
-        balance = self.account_resource(account_address, f"0x1::coin::CoinStore<0x{coin_type_address}::moon_coin::MoonCoin>")
+        balance = self.account_resource(
+            account_address,
+            f"0x1::coin::CoinStore<0x{coin_type_address}::moon_coin::MoonCoin>",
+        )
         return balance["data"]["coin"]["value"]
-#<:!:section_4
+
+
+# <:!:section_4
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 2, "Expecting an argument that points to the helloblockchain module"
+    assert (
+        len(sys.argv) == 2
+    ), "Expecting an argument that points to the helloblockchain module"
 
     client = FirstCoin(TESTNET_URL)
     faucet_client = FaucetClient(FAUCET_URL, client)
@@ -93,7 +100,9 @@ if __name__ == "__main__":
     faucet_client.fund_account(alice.address(), 5_000)
     faucet_client.fund_account(bob.address(), 5_000)
 
-    input("\nUpdate the module with Alice's address, build, copy to the provided path, and press enter.")
+    input(
+        "\nUpdate the module with Alice's address, build, copy to the provided path, and press enter."
+    )
     module_path = sys.argv[1]
     with open(module_path, "rb") as f:
         module_hex = f.read().hex()
@@ -110,9 +119,13 @@ if __name__ == "__main__":
     print("Bob registers the newly created coin so he can receive it from Alice")
     tx_hash = client.register_coin(bob, alice.address())
     client.wait_for_transaction(tx_hash)
-    print(f"Bob's initial MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}")
+    print(
+        f"Bob's initial MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}"
+    )
 
     print("Alice mints Bob some of the new coin")
     tx_hash = client.mint_coin(alice, bob.address(), 100)
     client.wait_for_transaction(tx_hash)
-    print(f"Bob's updated MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}")
+    print(
+        f"Bob's updated MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}"
+    )

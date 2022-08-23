@@ -64,16 +64,16 @@ pub(crate) fn update_store(
                 version.checked_sub(1),
             )
             .unwrap();
-        let mut cs = ChangeSet::new();
+        let mut batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
-                &mut cs,
+                &mut batch,
             )
             .unwrap();
-        store.ledger_db.write_schemas(cs.batch).unwrap();
+        store.ledger_db.write_schemas(batch).unwrap();
     }
     root_hash
 }
@@ -768,11 +768,11 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
+        .put_transaction_infos(version, &[txn_info.clone()], &mut batch)
         .unwrap();
-    db.ledger_db.write_schemas(cs.batch).unwrap();
+    db.ledger_db.write_schemas(batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {

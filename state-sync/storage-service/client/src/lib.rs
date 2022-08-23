@@ -11,7 +11,6 @@ use network::{
         interface::{MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
     },
-    error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{
         AppConfig, ApplicationNetworkSender, NetworkSender, NewNetworkSender, RpcError,
@@ -128,16 +127,6 @@ impl NewNetworkSender for StorageServiceNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<StorageServiceMessage> for StorageServiceNetworkSender {
-    fn send_to(
-        &self,
-        _recipient: PeerId,
-        _message: StorageServiceMessage,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    // TODO(philiphayes): a lot of boilerplate just to add `ProtocolId::StorageServiceRpc`
-    // by default.
     async fn send_rpc(
         &self,
         recipient: PeerId,

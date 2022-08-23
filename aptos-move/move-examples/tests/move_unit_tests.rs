@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas::AbstractValueSizeGasParameters;
 use aptos_types::account_address::AccountAddress;
 use aptos_vm::natives::aptos_natives;
 use move_deps::move_cli::base::test::run_move_unit_tests;
@@ -32,7 +33,10 @@ pub fn run_tests_for_pkg(
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),
         // TODO(Gas): we may want to switch to non-zero costs in the future
-        aptos_natives(aptos_gas::NativeGasParameters::zeros()),
+        aptos_natives(
+            aptos_gas::NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+        ),
         /* compute_coverage */ false,
         &mut std::io::stdout(),
     )
@@ -42,10 +46,19 @@ pub fn run_tests_for_pkg(
 #[test]
 fn test_hello_blockchain() {
     let named_address = BTreeMap::from([(
-        String::from("HelloBlockchain"),
+        String::from("hello_blockchain"),
         AccountAddress::from_hex_literal("0x1").unwrap(),
     )]);
     run_tests_for_pkg("hello_blockchain", named_address);
+}
+
+#[test]
+fn test_message_board() {
+    let named_address = BTreeMap::from([(
+        String::from("message_board"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("message_board", named_address);
 }
 
 #[test]

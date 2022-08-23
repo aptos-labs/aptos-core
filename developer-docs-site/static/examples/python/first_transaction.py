@@ -3,14 +3,15 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-from nacl.signing import SigningKey
-import os
 import hashlib
-import requests
+import os
 import time
 from typing import Any, Dict, Optional
 
-TESTNET_URL = os.getenv("APTOS_NODE_URL") or "https://fullnode.devnet.aptoslabs.com"
+import requests
+from nacl.signing import SigningKey
+
+TESTNET_URL = os.getenv("APTOS_NODE_URL") or "https://fullnode.devnet.aptoslabs.com/v1"
 FAUCET_URL = os.getenv("APTOS_FAUCET_URL") or "https://faucet.devnet.aptoslabs.com"
 
 #:!:>section_1
@@ -32,14 +33,16 @@ class Account:
         """Returns the auth_key for the associated account"""
 
         hasher = hashlib.sha3_256()
-        hasher.update(self.signing_key.verify_key.encode() + b'\x00')
+        hasher.update(self.signing_key.verify_key.encode() + b"\x00")
         return hasher.hexdigest()
 
     def pub_key(self) -> str:
         """Returns the public key for the associated account"""
 
         return self.signing_key.verify_key.encode().hex()
-#<:!:section_1
+
+
+# <:!:section_1
 
 #:!:>section_2
 class RestClient:
@@ -47,9 +50,10 @@ class RestClient:
 
     def __init__(self, url: str) -> None:
         self.url = url
-#<:!:section_2
 
-#:!:>section_3
+    # <:!:section_2
+
+    #:!:>section_3
     def account(self, account_address: str) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
@@ -57,18 +61,25 @@ class RestClient:
         assert response.status_code == 200, f"{response.text} - {account_address}"
         return response.json()
 
-    def account_resource(self, account_address: str, resource_type: str) -> Optional[Dict[str, Any]]:
-        response = requests.get(f"{self.url}/accounts/{account_address}/resource/{resource_type}")
+    def account_resource(
+        self, account_address: str, resource_type: str
+    ) -> Optional[Dict[str, Any]]:
+        response = requests.get(
+            f"{self.url}/accounts/{account_address}/resource/{resource_type}"
+        )
         if response.status_code == 404:
             return None
         assert response.status_code == 200, response.text
         return response.json()
-#<:!:section_3
 
-#:!:>section_4
-    def generate_transaction(self, sender: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    # <:!:section_3
+
+    #:!:>section_4
+    def generate_transaction(
+        self, sender: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Generates a transaction request that can be submitted to produce a raw transaction that
-        can be signed, which upon being signed can be submitted to the blockchain. """
+        can be signed, which upon being signed can be submitted to the blockchain."""
 
         account_res = self.account(sender)
         seq_num = int(account_res["sequence_number"])
@@ -82,13 +93,17 @@ class RestClient:
         }
         return txn_request
 
-    def sign_transaction(self, account_from: Account, txn_request: Dict[str, Any]) -> Dict[str, Any]:
+    def sign_transaction(
+        self, account_from: Account, txn_request: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Converts a transaction request produced by `generate_transaction` into a properly signed
         transaction, which can then be submitted to the blockchain."""
 
-        res = requests.post(f"{self.url}/transactions/signing_message", json=txn_request)
+        res = requests.post(
+            f"{self.url}/transactions/encode_submission", json=txn_request
+        )
         assert res.status_code == 200, res.text
-        to_sign = bytes.fromhex(res.json()["message"][2:])
+        to_sign = bytes.fromhex(str(res.json()[2:]))
         signature = account_from.signing_key.sign(to_sign).signature
         txn_request["signature"] = {
             "type": "ed25519_signature",
@@ -100,12 +115,14 @@ class RestClient:
     def submit_transaction(self, txn: Dict[str, Any]) -> Dict[str, Any]:
         """Submits a signed transaction to the blockchain."""
 
-        headers = {'Content-Type': 'application/json'}
+        headers = {"Content-Type": "application/json"}
         response = requests.post(f"{self.url}/transactions", headers=headers, json=txn)
         assert response.status_code == 202, f"{response.text} - {txn}"
         return response.json()
 
-    def execute_transaction_with_payload(self, account_from: Account, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_transaction_with_payload(
+        self, account_from: Account, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Execute a transaction for the given payload."""
 
         txn_request = self.generate_transaction(account_from.address(), payload)
@@ -113,7 +130,7 @@ class RestClient:
         return self.submit_transaction(signed_txn)
 
     def transaction_pending(self, txn_hash: str) -> bool:
-        response = requests.get(f"{self.url}/transactions/{txn_hash}")
+        response = requests.get(f"{self.url}/transactions/by_hash/{txn_hash}")
         if response.status_code == 404:
             return True
         assert response.status_code == 200, f"{response.text} - {txn_hash}"
@@ -127,33 +144,43 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-        response = requests.get(f"{self.url}/transactions/{txn_hash}")
+        response = requests.get(f"{self.url}/transactions/by_hash/{txn_hash}")
         assert "success" in response.json(), f"{response.text} - {txn_hash}"
-#<:!:section_4
 
-#:!:>section_5
+    # <:!:section_4
+
+    #:!:>section_5
     def account_balance(self, account_address: str) -> Optional[int]:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
+        return (
+            self.account_resource(
+                account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+            )
+            .get("data")
+            .get("coin")
+            .get("value")
+        )
 
     def transfer(self, account_from: Account, recipient: str, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
         Returns the sequence number of the transaction used to transfer."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"0x{recipient}",
                 str(amount),
-            ]
+            ],
         }
         txn_request = self.generate_transaction(account_from.address(), payload)
         signed_txn = self.sign_transaction(account_from, txn_request)
         res = self.submit_transaction(signed_txn)
         return str(res["hash"])
-#<:!:section_5
+
+
+# <:!:section_5
 
 #:!:>section_6
 class FaucetClient:
@@ -170,7 +197,9 @@ class FaucetClient:
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
             self.rest_client.wait_for_transaction(txn_hash)
-#<:!:section_6
+
+
+# <:!:section_6
 
 
 #:!:>section_7
@@ -200,4 +229,4 @@ if __name__ == "__main__":
     print("\n=== Final Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")
     print(f"Bob: {rest_client.account_balance(bob.address())}")
-#<:!:section_7
+# <:!:section_7
