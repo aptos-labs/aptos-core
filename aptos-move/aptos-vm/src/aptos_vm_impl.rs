@@ -11,16 +11,22 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, Gas, NativeGasParameters};
+use aptos_gas::{
+    AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
+    NativeGasParameters,
+};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
     on_chain_config::{GasSchedule, OnChainConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
+use dashmap::DashMap;
 use fail::fail_point;
+use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use move_deps::{
     move_binary_format::{errors::VMResult, CompiledModule},
     move_core_types::{
@@ -41,6 +47,7 @@ pub struct AptosVMImpl {
     gas_params: Option<AptosGasParameters>,
     version: Option<Version>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
+    metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
 }
 
 impl AptosVMImpl {
@@ -55,12 +62,15 @@ impl AptosVMImpl {
         });
 
         // TODO(Gas): this doesn't look right.
-        let native_gas_params = match &gas_params {
-            Some(gas_params) => gas_params.natives.clone(),
-            None => NativeGasParameters::zeros(),
+        let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
+            Some(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
+            None => (
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            ),
         };
 
-        let inner = MoveVmExt::new(native_gas_params)
+        let inner = MoveVmExt::new(native_gas_params, abs_val_size_gas_params)
             .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
@@ -68,6 +78,7 @@ impl AptosVMImpl {
             gas_params,
             version: None,
             chain_account_info: None,
+            metadata_cache: Default::default(),
         };
         vm.version = Version::fetch_config(&storage);
         vm.chain_account_info = Self::get_chain_specific_account_info(&RemoteStorage::new(state));
@@ -80,7 +91,7 @@ impl AptosVMImpl {
             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
                 .expect("failed to get gas parameters");
 
-        let inner = MoveVmExt::new(gas_params.natives.clone())
+        let inner = MoveVmExt::new(gas_params.natives.clone(), gas_params.misc.abs_val.clone())
             .expect("should be able to create Move VM; check if there are duplicated natives");
 
         Self {
@@ -88,6 +99,7 @@ impl AptosVMImpl {
             gas_params: Some(gas_params),
             version: Some(version),
             chain_account_info: None,
+            metadata_cache: Default::default(),
         }
     }
 
@@ -400,6 +412,31 @@ impl AptosVMImpl {
             })
     }
 
+    pub(crate) fn extract_abort_info(
+        &self,
+        module: &ModuleId,
+        abort_code: u64,
+    ) -> Option<AbortInfo> {
+        let entry = self
+            .metadata_cache
+            .entry(module.clone())
+            .or_insert_with(|| {
+                if let Some(m) = self
+                    .move_vm
+                    .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
+                {
+                    bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok()
+                } else {
+                    None
+                }
+            });
+        if let Some(m) = entry.value() {
+            m.extract_abort_info(abort_code)
+        } else {
+            None
+        }
+    }
+
     pub fn new_session<'r, R: MoveResolverExt>(
         &self,
         r: &'r R,
@@ -474,7 +511,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let (delta_change_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();
+    let (delta_change_set, change_set) = session_out.into_change_set(ap_cache)?.into_inner();
     let (write_set, events) = change_set.into_inner();
 
     let txn_output = TransactionOutput::new(

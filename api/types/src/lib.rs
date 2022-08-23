@@ -21,8 +21,7 @@ mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
-pub use block::Block;
-pub use block::BlockInfo;
+pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
 pub use error::{AptosError, AptosErrorCode};

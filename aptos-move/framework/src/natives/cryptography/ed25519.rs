@@ -39,7 +39,7 @@ fn native_public_key_validate(
 
     let key_bytes = pop_arg!(arguments, Vec<u8>);
 
-    let mut cost = gas_params.base_cost + gas_params.per_pubkey_deserialize_cost * NumArgs::one();
+    let mut cost = gas_params.base + gas_params.per_pubkey_deserialize * NumArgs::one();
 
     let key_bytes_slice = match <[u8; 32]>::try_from(key_bytes) {
         Ok(slice) => slice,
@@ -60,7 +60,7 @@ fn native_public_key_validate(
     // Check if the point lies on a small subgroup. This is required when using curves with a
     // small cofactor (e.g., in Ed25519, cofactor = 8).
     // NOTE(Gas): O(1) cost: multiplies the point by the cofactor
-    cost += gas_params.per_pubkey_small_order_check_cost * NumArgs::one();
+    cost += gas_params.per_pubkey_small_order_check * NumArgs::one();
     let valid = !point.is_small_order();
 
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
@@ -90,9 +90,9 @@ fn native_signature_verify_strict(
     let pubkey = pop_arg!(arguments, Vec<u8>);
     let signature = pop_arg!(arguments, Vec<u8>);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
-    cost += gas_params.per_pubkey_deserialize_cost * NumArgs::one();
+    cost += gas_params.per_pubkey_deserialize * NumArgs::one();
     let pk = match ed25519::Ed25519PublicKey::try_from(pubkey.as_slice()) {
         Ok(pk) => pk,
         Err(_) => {
@@ -100,7 +100,7 @@ fn native_signature_verify_strict(
         }
     };
 
-    cost += gas_params.per_sig_deserialize_cost * NumArgs::one();
+    cost += gas_params.per_sig_deserialize * NumArgs::one();
     let sig = match ed25519::Ed25519Signature::try_from(signature.as_slice()) {
         Ok(sig) => sig,
         Err(_) => {
@@ -109,9 +109,9 @@ fn native_signature_verify_strict(
     };
 
     // NOTE(Gas): hashing the message to the group and a size-2 multi-scalar multiplication
-    cost += gas_params.per_sig_strict_verify_cost * NumArgs::one()
-        + gas_params.per_msg_hashing_base_cost * NumArgs::one()
-        + gas_params.per_msg_byte_hashing_cost * NumBytes::new(msg.len() as u64);
+    cost += gas_params.per_sig_strict_verify * NumArgs::one()
+        + gas_params.per_msg_hashing_base * NumArgs::one()
+        + gas_params.per_msg_byte_hashing * NumBytes::new(msg.len() as u64);
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
     Ok(NativeResult::ok(
@@ -126,13 +126,13 @@ fn native_signature_verify_strict(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub base_cost: InternalGas,
-    pub per_pubkey_deserialize_cost: InternalGasPerArg,
-    pub per_pubkey_small_order_check_cost: InternalGasPerArg,
-    pub per_sig_deserialize_cost: InternalGasPerArg,
-    pub per_sig_strict_verify_cost: InternalGasPerArg,
-    pub per_msg_hashing_base_cost: InternalGasPerArg,
-    pub per_msg_byte_hashing_cost: InternalGasPerByte, // signature verification involves signing |msg| bytes
+    pub base: InternalGas,
+    pub per_pubkey_deserialize: InternalGasPerArg,
+    pub per_pubkey_small_order_check: InternalGasPerArg,
+    pub per_sig_deserialize: InternalGasPerArg,
+    pub per_sig_strict_verify: InternalGasPerArg,
+    pub per_msg_hashing_base: InternalGasPerArg,
+    pub per_msg_byte_hashing: InternalGasPerByte, // signature verification involves signing |msg| bytes
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {

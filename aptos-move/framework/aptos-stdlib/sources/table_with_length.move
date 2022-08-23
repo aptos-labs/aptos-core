@@ -64,7 +64,13 @@ module aptos_std::table_with_length {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
     public fun borrow_mut_with_default<K: copy + drop, V: drop>(table: &mut TableWithLength <K, V>, key: K, default: V): &mut V {
-        table::borrow_mut_with_default(&mut table.inner, key, default)
+        if (table::contains(&table.inner, key)) {
+            table::borrow_mut(&mut table.inner, key)
+        } else {
+            table::add(&mut table.inner, key, default);
+            table.length = table.length + 1;
+            table::borrow_mut(&mut table.inner, key)
+        }
     }
 
     /// Remove from `table` and return the value which `key` maps to.

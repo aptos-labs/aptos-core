@@ -7,7 +7,8 @@ FactoryBot.define do
   factory :it3_profile do
     user { nil }
     owner_key { "0x#{Faker::Crypto.sha256}" }
-    consensus_key { "0x#{Faker::Crypto.sha256}" }
+    consensus_key { "0x#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}"[0...98] }
+    consensus_pop { "0x#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}"[0...194] }
     account_key { "0x#{Faker::Crypto.sha256}" }
     network_key { "0x#{Faker::Crypto.sha256}" }
     validator_address { "0x#{Faker::Crypto.sha256}" }

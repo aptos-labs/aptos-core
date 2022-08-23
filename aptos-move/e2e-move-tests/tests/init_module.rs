@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
+use e2e_move_tests::{assert_success, MoveHarness};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
@@ -17,11 +17,10 @@ struct ModuleData {
 #[test]
 fn init_module() {
     let mut h = MoveHarness::new();
-    enable_golden!(h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::package_path("init_module.data/pack"),));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("init_module.data/pack")));
 
     // Verify that init_module was called.
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();

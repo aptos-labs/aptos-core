@@ -26,7 +26,8 @@ class It3ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_nil @user.it3_profile
     post it3_profiles_path, params: { it3_profile: {
       owner_key: '0xecaa0d44b821a745bc29767713cd78dbc88da73679e3ccdf5c145a2b4f7b17ac',
-      consensus_key: '0xbcaa0d44b821a745bc29767713cd78dbc88da73679e3ccdf5c145a2b4f7b17ac',
+      consensus_key: "0x#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}"[0...98],
+      consensus_pop: "0x#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}#{Faker::Crypto.sha256}"[0...194],
       account_key: '0x7964a378e4c6d387d900c6e02430b7ee8263a977ace368484fc72c3b8469f520',
       network_key: '0x2b0ebca9776bd79dcd3c0551e784965e87e8a1551d52c4a48758e1df2122064b',
       validator_address: '127.0.0.1',

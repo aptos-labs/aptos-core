@@ -15,7 +15,7 @@ module aptos_framework::aptos_governance {
     use std::error;
     use std::option;
     use std::signer;
-    use std::string::utf8;
+    use std::string::{Self, String, utf8};
 
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -47,9 +47,17 @@ module aptos_framework::aptos_governance {
     const ESCRIPT_HASH_ALREADY_ADDED: u64 = 7;
     /// The proposal has not been resolved yet
     const EPROPOSAL_NOT_RESOLVED_YET: u64 = 8;
+    /// Metadata location cannot be longer than 256 chars
+    const EMETADATA_LOCATION_TOO_LONG: u64 = 9;
+    /// Metadata hash cannot be longer than 256 chars
+    const EMETADATA_HASH_TOO_LONG: u64 = 10;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
+
+    /// Proposal metadata attribute keys.
+    const METADATA_LOCATION_KEY: vector<u8> = b"metadata_location";
+    const METADATA_HASH_KEY: vector<u8> = b"metadata_hash";
 
     /// Store the SignerCapabilities of accounts under the on-chain governance's control.
     struct GovernanceResponsbility has key {
@@ -93,8 +101,7 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64,
         execution_hash: vector<u8>,
-        metadata_location: vector<u8>,
-        metadata_hash: vector<u8>,
+        proposal_metadata: SimpleMap<String, vector<u8>>,
     }
 
     /// Event emitted when there's a vote on a proposa;
@@ -213,7 +220,7 @@ module aptos_framework::aptos_governance {
 
         // The proposer's stake needs to be at least the required bond amount.
         let governance_config = borrow_global<GovernanceConfig>(@aptos_framework);
-        let stake_balance = stake::get_current_epoch_voting_power(stake_pool);
+        let stake_balance = get_voting_power(stake_pool);
         assert!(
             stake_balance >= governance_config.required_proposer_stake,
             error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE),
@@ -226,6 +233,9 @@ module aptos_framework::aptos_governance {
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
+
+        // Create and validate proposal metadata.
+        let proposal_metadata = create_proposal_metadata(metadata_location, metadata_hash);
 
         // We want to allow early resolution of proposals if more than 50% of the total supply of the network coins
         // has voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
@@ -242,14 +252,12 @@ module aptos_framework::aptos_governance {
         let proposal_id = voting::create_proposal(
             proposer_address,
             @aptos_framework,
-            governance_proposal::create_proposal(
-                utf8(metadata_location),
-                utf8(metadata_hash),
-            ),
+            governance_proposal::create_proposal(),
             execution_hash,
             governance_config.min_voting_threshold,
             proposal_expiration,
             early_resolution_vote_threshold,
+            proposal_metadata,
         );
 
         let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
@@ -260,8 +268,7 @@ module aptos_framework::aptos_governance {
                 proposer: proposer_address,
                 stake_pool,
                 execution_hash,
-                metadata_location,
-                metadata_hash,
+                proposal_metadata,
             },
         );
     }
@@ -290,7 +297,7 @@ module aptos_framework::aptos_governance {
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
-        let voting_power = stake::get_current_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
@@ -362,6 +369,21 @@ module aptos_framework::aptos_governance {
         };
     }
 
+    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    public fun reconfigure(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        reconfiguration::reconfigure();
+    }
+
+    /// Return the voting power a stake pool has with respect to governance proposals.
+    fun get_voting_power(pool_address: address): u64 {
+        let (active, _, pending_active, pending_inactive) = stake::get_stake(pool_address);
+        // We calculate the voting power as total non-inactive stakes of the pool. Even if the validator is not in the
+        // active validator set, as long as they have a lockup (separately checked in create_proposal and voting), their
+        // stake would still count in their voting power for governance proposals.
+        active + pending_active + pending_inactive
+    }
+
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
     fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
@@ -369,10 +391,14 @@ module aptos_framework::aptos_governance {
         create_signer_with_capability(signer_cap)
     }
 
-    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
-    public fun reconfigure(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::reconfigure();
+    fun create_proposal_metadata(metadata_location: vector<u8>, metadata_hash: vector<u8>): SimpleMap<String, vector<u8>> {
+        assert!(string::length(&utf8(metadata_location)) <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
+        assert!(string::length(&utf8(metadata_hash)) <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
+
+        let metadata = simple_map::create<String, vector<u8>>();
+        simple_map::add(&mut metadata, utf8(METADATA_LOCATION_KEY), metadata_location);
+        simple_map::add(&mut metadata, utf8(METADATA_HASH_KEY), metadata_hash);
+        metadata
     }
 
     #[test_only]

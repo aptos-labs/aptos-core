@@ -1,8 +1,9 @@
 {
   "version": "2",
   "hash": "",
-  "state_root_hash": "",
+  "state_change_hash": "",
   "event_root_hash": "",
+  "state_checkpoint_hash": null,
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",

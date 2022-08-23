@@ -19,13 +19,9 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::{
-    aptos_api_types::{
-        DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteSetChange,
-        WriteTableItem,
-    },
-    Client, Transaction,
-};
+use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_rest_client::error::RestError;
+use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{
     move_types::{
         ident_str,
@@ -108,6 +104,12 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
         }
+    }
+}
+
+impl From<RestError> for CliError {
+    fn from(e: RestError) -> Self {
+        CliError::ApiError(e.to_string())
     }
 }
 
@@ -897,79 +899,89 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 }
 
 /// A shortened transaction output
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct TransactionSummary {
-    changes: Vec<ChangeSummary>,
-    gas_used: Option<u64>,
-    success: bool,
-    version: Option<u64>,
-    vm_status: String,
+    pub transaction_hash: HashValue,
+    pub gas_used: Option<u64>,
+    pub gas_unit_price: Option<u64>,
+    pub pending: Option<bool>,
+    pub sender: Option<AccountAddress>,
+    pub sequence_number: Option<u64>,
+    pub success: Option<bool>,
+    pub timestamp_us: Option<u64>,
+    pub version: Option<u64>,
+    pub vm_status: Option<String>,
 }
 
 impl From<Transaction> for TransactionSummary {
     fn from(transaction: Transaction) -> Self {
-        let mut summary = TransactionSummary {
-            success: transaction.success(),
-            version: transaction.version(),
-            vm_status: transaction.vm_status(),
-            ..Default::default()
-        };
-
-        if let Ok(info) = transaction.transaction_info() {
-            summary.gas_used = Some(info.gas_used.0);
-            summary.changes = info
-                .changes
-                .iter()
-                .map(|change| match change {
-                    WriteSetChange::DeleteModule(DeleteModule { module, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        module: Some(module.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteResource(DeleteResource {
-                        address, resource, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        resource: Some(resource.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteTableItem(DeleteTableItem { handle, key, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            handle: Some(handle.to_string()),
-                            key: Some(key.to_string()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteModule(WriteModule { address, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            address: Some(*address.inner()),
-                            resource: Some(data.typ.to_string()),
-                            data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteTableItem(WriteTableItem {
-                        handle, key, value, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        handle: Some(handle.to_string()),
-                        key: Some(key.to_string()),
-                        value: Some(value.to_string()),
-                        ..Default::default()
-                    },
-                })
-                .collect();
+        TransactionSummary::from(&transaction)
+    }
+}
+impl From<&Transaction> for TransactionSummary {
+    fn from(transaction: &Transaction) -> Self {
+        match transaction {
+            Transaction::PendingTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.hash,
+                pending: Some(true),
+                sender: Some(*txn.request.sender.inner()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                gas_used: None,
+                gas_unit_price: None,
+                success: None,
+                version: None,
+                vm_status: None,
+                timestamp_us: None,
+            },
+            Transaction::UserTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                sender: Some(*txn.request.sender.inner()),
+                gas_used: Some(txn.info.gas_used.0),
+                gas_unit_price: Some(txn.request.gas_unit_price.0),
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                timestamp_us: Some(txn.timestamp.0),
+                pending: None,
+            },
+            Transaction::GenesisTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+                timestamp_us: None,
+            },
+            Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
         }
-
-        summary
     }
 }
 

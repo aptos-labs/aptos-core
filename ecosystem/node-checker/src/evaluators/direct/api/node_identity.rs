@@ -27,7 +27,7 @@ pub async fn get_node_identity(
         .await
         .map_err(|e| format_err!("Failed to get response from index (/) of API. Make sure your API port ({}) is open: {}", node_address.api_port, e))?;
     Ok((
-        ChainId::new(index_response.ledger_info.chain_id),
+        ChainId::new(index_response.chain_id),
         index_response.node_role,
     ))
 }

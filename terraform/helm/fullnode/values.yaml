@@ -5,8 +5,8 @@ chain:
 
 aptos_chains:
   devnet:
-    id: 23
-    waypoint: 0:d88fc7e7e94668dd534a5bb8f8ac510225f76902cf6bbf5ff2cdad34a6e1d8ca
+    id: 24
+    waypoint: 0:e5844c0dd980f6a75bd8dee5901425df5c1420883dfa216f79c9bfd287642573
 
 # fullnode network config
 fullnode_identity:
@@ -36,11 +36,11 @@ image:
 
 resources:
   limits:
-    cpu: 2
-    memory: 4Gi
+    cpu: 8
+    memory: 15Gi
   requests:
-    cpu: 2
-    memory: 4Gi
+    cpu: 8
+    memory: 15Gi
 
 nodeSelector: {}
 tolerations: []
@@ -49,7 +49,7 @@ affinity: {}
 storage:
   # Set this to a StorageClass available on your Kubernetes cluster
   class:
-  size: 350Gi
+  size: 512Gi
 
 service:
   # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
@@ -118,11 +118,11 @@ restore:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 2
-      memory: 4Gi
+      cpu: 6
+      memory: 15Gi
     requests:
-      cpu: 2
-      memory: 3Gi
+      cpu: 6
+      memory: 15Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}

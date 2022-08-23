@@ -6,9 +6,13 @@
 mod aptos;
 
 pub use aptos::*;
+use std::io::{Read, Write};
 
 mod built_package;
 pub use built_package::*;
+
+mod module_metadata;
+pub use module_metadata::*;
 
 mod error_map;
 pub mod natives;
@@ -17,9 +21,9 @@ pub use release_builder::*;
 mod release_bundle;
 pub use release_bundle::*;
 
-use anyhow::bail;
-use miniz_oxide::deflate::compress_to_vec;
-use miniz_oxide::inflate::decompress_to_vec;
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -35,12 +39,24 @@ pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
 }
 
 pub fn zip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    Ok(compress_to_vec(data, 10))
+    let mut e = GzEncoder::new(Vec::new(), Compression::best());
+    e.write_all(data)?;
+    Ok(e.finish()?)
+}
+
+pub fn zip_metadata_str(s: &str) -> anyhow::Result<Vec<u8>> {
+    zip_metadata(s.as_bytes())
 }
 
 pub fn unzip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    match decompress_to_vec(data) {
-        Ok(r) => Ok(r),
-        Err(e) => bail!("decompression error: {:?}", e),
-    }
+    let mut d = GzDecoder::new(data);
+    let mut res = vec![];
+    d.read_to_end(&mut res)?;
+    Ok(res)
+}
+
+pub fn unzip_metadata_str(data: &[u8]) -> anyhow::Result<String> {
+    let r = unzip_metadata(data)?;
+    let s = String::from_utf8(r)?;
+    Ok(s)
 }

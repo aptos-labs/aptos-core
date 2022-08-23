@@ -24,7 +24,7 @@ class ApplicationController < ActionController::Base
     if user.email.nil? || user.username.nil?
       onboarding_email_path
     else
-      it3_path
+      community_path
     end
   end
 

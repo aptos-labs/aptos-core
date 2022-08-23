@@ -4,16 +4,12 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
-use framework::natives::code::{
-    ModuleMetadata, PackageMetadata, PackageRegistry, PackageRegistryJson, UpgradePolicy,
-};
-use framework::unzip_metadata;
+use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
+use framework::unzip_metadata_str;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
-use serde_bytes::ByteBuf;
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -38,17 +34,20 @@ impl CachedPackageRegistry {
     pub async fn create(url: Url, addr: AccountAddress) -> anyhow::Result<Self> {
         let client = Client::new(url);
         // Need to use a different type to deserialize JSON
-        let from_json = client
-            .get_resource::<PackageRegistryJson>(addr, "0x1::code::PackageRegistry")
+        let inner = client
+            .get_account_resource_bcs::<PackageRegistry>(addr, "0x1::code::PackageRegistry")
             .await?
             .into_inner();
-        let inner = bcs::from_bytes::<PackageRegistry>(&bcs::to_bytes(&from_json)?)?;
         Ok(Self { inner })
     }
 
     /// Returns the list of packages in this registry by name.
-    pub fn package_names(&self) -> Vec<String> {
-        self.inner.packages.iter().map(|p| p.name.clone()).collect()
+    pub fn package_names(&self) -> Vec<&str> {
+        self.inner
+            .packages
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect()
     }
 
     /// Finds the metadata for the given module in the registry by its unique name.
@@ -95,27 +94,19 @@ impl<'a> CachedPackageMetadata<'a> {
         self.metadata.upgrade_number
     }
 
-    pub fn build_info(&self) -> &str {
-        &self.metadata.build_info
+    pub fn source_digest(&self) -> &str {
+        &self.metadata.source_digest
     }
 
-    pub fn manifest(&self) -> &str {
-        &self.metadata.manifest
+    pub fn manifest(&self) -> anyhow::Result<String> {
+        unzip_metadata_str(&self.metadata.manifest)
     }
 
-    pub fn error_map_raw(&self) -> &[u8] {
-        &self.metadata.error_map
-    }
-
-    pub fn abis(&self) -> &[ByteBuf] {
-        self.metadata.abis.as_slice()
-    }
-
-    pub fn module_names(&self) -> Vec<String> {
+    pub fn module_names(&self) -> Vec<&str> {
         self.metadata
             .modules
             .iter()
-            .map(|s| s.name.clone())
+            .map(|s| s.name.as_str())
             .collect()
     }
 
@@ -129,49 +120,17 @@ impl<'a> CachedPackageMetadata<'a> {
         bail!("module `{}` not found", name)
     }
 
-    pub fn save_package_to_disk(
-        &self,
-        path: PathBuf,
-        with_derived_artifacts: bool,
-    ) -> anyhow::Result<()> {
-        fs::create_dir_all(&path)?;
-        fs::write(path.join("Move.toml"), &self.metadata.manifest)?;
+    pub fn save_package_to_disk(&self, path: &Path) -> anyhow::Result<()> {
+        fs::create_dir_all(path)?;
         fs::write(
-            path.join("error_description.errmap"),
-            &self.metadata.error_map,
+            path.join("Move.toml"),
+            unzip_metadata_str(&self.metadata.manifest)?,
         )?;
-        fs::write(path.join("BuildInfo.yaml"), &self.metadata.build_info)?;
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
-            let source = std::str::from_utf8(&unzip_metadata(&module.source)?)?.to_string();
+            let source = unzip_metadata_str(&module.source)?;
             fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
-        }
-        if with_derived_artifacts {
-            let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
-            for abi_blob in &self.metadata.abis {
-                let abi = bcs::from_bytes::<EntryABI>(abi_blob.as_slice())?;
-                let path = match abi {
-                    EntryABI::TransactionScript(abi) => {
-                        PathBuf::from(format!("{}.abi", abi.name()))
-                    }
-                    EntryABI::EntryFunction(abi) => {
-                        PathBuf::from(abi.module_name().name().as_str())
-                            .join(format!("{}.abi", abi.name()))
-                    }
-                };
-                let dest = abis_dir.join(path);
-                fs::create_dir_all(&dest.parent().unwrap())?;
-                fs::write(dest, abi_blob)?
-            }
-            let source_map_dir = path.join(CompiledPackageLayout::SourceMaps.path());
-            fs::create_dir_all(&source_map_dir)?;
-            for module in &self.metadata.modules {
-                fs::write(
-                    source_map_dir.join(format!("{}.mvsm", module.name)),
-                    &module.source_map,
-                )?;
-            }
         }
         Ok(())
     }

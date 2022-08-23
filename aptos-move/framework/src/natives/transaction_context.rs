@@ -38,7 +38,7 @@ impl NativeTransactionContext {
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct GetScriptHashGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 }
 
 fn native_get_script_hash(
@@ -50,7 +50,7 @@ fn native_get_script_hash(
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
     Ok(NativeResult::ok(
-        gas_params.base_cost,
+        gas_params.base,
         smallvec![Value::vector_u8(transaction_context.script_hash.clone())],
     ))
 }

@@ -1,43 +1,57 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
-use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::OTHER_TIMERS_SECONDS;
+use crate::{
+    lru_node_cache::LruNodeCache, metrics::NODE_CACHE_SECONDS,
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    stale_node_index::StaleNodeIndexSchema, versioned_node_cache::VersionedNodeCache,
+    OTHER_TIMERS_SECONDS,
+};
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_jellyfish_merkle::node_type::NodeType;
 use aptos_jellyfish_merkle::{
-    node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
+    node_type::{NodeKey, NodeType},
+    JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
-use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
-    proof::SparseMerkleRangeProof,
+    proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::state_key::StateKey,
     transaction::Version,
 };
 use rayon::prelude::*;
 use schemadb::{SchemaBatch, DB};
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 
 #[derive(Debug)]
-pub struct StateMerkleDb(Arc<DB>);
+pub struct StateMerkleDb {
+    db: Arc<DB>,
+    enable_cache: bool,
+    version_cache: VersionedNodeCache,
+    lru_cache: LruNodeCache,
+}
 
 impl Deref for StateMerkleDb {
     type Target = DB;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.db
     }
 }
 
 impl StateMerkleDb {
-    pub fn new(state_merkle_rocksdb: Arc<DB>) -> Self {
-        Self(state_merkle_rocksdb)
+    pub fn new(state_merkle_rocksdb: Arc<DB>, max_nodes_per_lru_cache_shard: usize) -> Self {
+        Self {
+            db: state_merkle_rocksdb,
+            // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
+            // hacky, need to revisit.
+            enable_cache: max_nodes_per_lru_cache_shard > 0,
+            version_cache: VersionedNodeCache::new(),
+            lru_cache: LruNodeCache::new(max_nodes_per_lru_cache_shard),
+        }
     }
 
     pub fn get_with_proof_ext(
@@ -117,6 +131,18 @@ impl StateMerkleDb {
             self.batch_put_value_set(value_set, node_hashes, base_version, version)
         }?;
 
+        if self.cache_enabled() {
+            self.version_cache.add_version(
+                version,
+                tree_update_batch
+                    .node_batch
+                    .iter()
+                    .flatten()
+                    .cloned()
+                    .collect(),
+            );
+        }
+
         let batch = SchemaBatch::new();
         {
             let _timer = OTHER_TIMERS_SECONDS
@@ -147,6 +173,18 @@ impl StateMerkleDb {
         Ok((batch, new_root_hash))
     }
 
+    pub(crate) fn cache_enabled(&self) -> bool {
+        self.enable_cache
+    }
+
+    pub(crate) fn version_cache(&self) -> &VersionedNodeCache {
+        &self.version_cache
+    }
+
+    pub(crate) fn lru_cache(&self) -> &LruNodeCache {
+        &self.lru_cache
+    }
+
     /// Finds the rightmost leaf by scanning the entire DB.
     #[cfg(test)]
     pub fn get_rightmost_leaf_naive(&self) -> Result<Option<(NodeKey, LeafNode)>> {
@@ -174,7 +212,37 @@ impl StateMerkleDb {
 
 impl TreeReader<StateKey> for StateMerkleDb {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        self.get::<JellyfishMerkleNodeSchema>(node_key)
+        let start_time = Instant::now();
+        if !self.cache_enabled() {
+            let node_opt = self.get::<JellyfishMerkleNodeSchema>(node_key)?;
+            NODE_CACHE_SECONDS
+                .with_label_values(&["cache_disabled"])
+                .observe(start_time.elapsed().as_secs_f64());
+            return Ok(node_opt);
+        }
+        let node_opt = if let Some(node_cache) = self.version_cache.get_version(node_key.version())
+        {
+            let node = node_cache.get(node_key).cloned();
+            NODE_CACHE_SECONDS
+                .with_label_values(&["versioned_cache_hit"])
+                .observe(start_time.elapsed().as_secs_f64());
+            node
+        } else if let Some(node) = self.lru_cache.get(node_key) {
+            NODE_CACHE_SECONDS
+                .with_label_values(&["lru_cache_hit"])
+                .observe(start_time.elapsed().as_secs_f64());
+            Some(node)
+        } else {
+            let node_opt = self.get::<JellyfishMerkleNodeSchema>(node_key)?;
+            if let Some(node) = &node_opt {
+                self.lru_cache.put(node_key.clone(), node.clone());
+            }
+            NODE_CACHE_SECONDS
+                .with_label_values(&["cache_miss"])
+                .observe(start_time.elapsed().as_secs_f64());
+            node_opt
+        };
+        Ok(node_opt)
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {

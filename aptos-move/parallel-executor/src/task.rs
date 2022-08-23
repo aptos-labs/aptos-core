@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::executor::MVHashMapView;
-use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
+use aptos_types::{
+    access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
+};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -37,7 +39,7 @@ impl ModulePath for StateKey {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath;
-    type Value: Send + Sync;
+    type Value: Send + Sync + TransactionWrite;
 }
 
 /// Inference result of a transaction.

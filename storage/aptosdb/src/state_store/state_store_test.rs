@@ -10,8 +10,11 @@ use aptos_types::{
 };
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
-use crate::test_helper::{arb_state_kv_sets, update_store};
-use crate::{pruner::state_store::StateMerklePruner, AptosDB};
+use crate::{
+    pruner::state_store::StateMerklePruner,
+    test_helper::{arb_state_kv_sets, update_store},
+    AptosDB,
+};
 
 use super::*;
 
@@ -30,11 +33,16 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     state_store
-        .put_value_sets(vec![&value_set], version, &mut cs)
+        .put_value_sets(
+            vec![&value_set],
+            version,
+            StateStorageUsage::new_untracked(),
+            &mut batch,
+        )
         .unwrap();
-    state_store.ledger_db.write_schemas(cs.batch).unwrap();
+    state_store.ledger_db.write_schemas(batch).unwrap();
     root
 }
 
@@ -249,7 +257,7 @@ fn test_stale_node_index() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
 
     // Update.
@@ -371,7 +379,7 @@ fn test_stale_node_index_with_target_version() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
 
     // Update.
@@ -480,7 +488,7 @@ fn test_stale_node_index_all_at_once() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
     let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
@@ -570,16 +578,10 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
 
     // hack: VersionData expected on every version, so duplicate the data at version 1
-    let (state_items, total_state_bytes) = store.get_usage(Some(0)).unwrap();
+    let usage = store.get_usage(Some(0)).unwrap();
     store
         .ledger_db
-        .put::<VersionDataSchema>(
-            &1,
-            &VersionData {
-                state_items,
-                total_state_bytes,
-            },
-        )
+        .put::<VersionDataSchema>(&1, &usage.into())
         .unwrap();
 
     // put in another version
@@ -788,8 +790,9 @@ proptest! {
             let (items, bytes) = snapshot.iter().fold((0, 0), |(items, bytes), (k, v)| {
                 (items + 1, bytes + k.size() + v.size())
             });
+            let expected_usage = StateStorageUsage::new(items, bytes);
             prop_assert_eq!(
-                (items, bytes),
+                expected_usage,
                 store.get_usage(Some(last_version)).unwrap(),
                 "version: {} next_version: {}",
                 version,
@@ -808,7 +811,7 @@ proptest! {
             restore.add_chunk(snapshot, proof).unwrap();
             restore.finish_box().unwrap();
             prop_assert_eq!(
-                (items, bytes),
+                expected_usage,
                 db2.state_store.get_usage(Some(100)).unwrap(),
                 "version: {} next_version: {}",
                 version,

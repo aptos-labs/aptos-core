@@ -19,7 +19,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -223,6 +223,17 @@ impl FakeExecutor {
             accounts.push(account_data.into_account());
         }
         accounts
+    }
+
+    /// Creates an account for the given static address. This address needs to be static so
+    /// we can load regular Move code to there without need to rewrite code addresses.
+    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        // The below will use the genesis keypair but that should be fine.
+        let acc = Account::new_genesis_account(addr);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
+        self.add_account_data(&data);
+        data.account().clone()
     }
 
     /// Applies a [`WriteSet`] to this executor's data store.
@@ -504,7 +515,11 @@ impl FakeExecutor {
     ) {
         let write_set = {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            )
+            .unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
@@ -524,10 +539,12 @@ impl FakeExecutor {
                     )
                 });
             let session_out = session.finish().expect("Failed to generate txn effects");
-            let (write_set, _events) = session_out
+            // TODO: Support deltas in fake executor.
+            let (_, change_set) = session_out
                 .into_change_set(&mut ())
                 .expect("Failed to generate writeset")
                 .into_inner();
+            let (write_set, _events) = change_set.into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -541,7 +558,11 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
-        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+        )
+        .unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
@@ -554,10 +575,12 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");
-        let (writeset, _events) = session_out
+        // TODO: Support deltas in fake executor.
+        let (_, change_set) = session_out
             .into_change_set(&mut ())
             .expect("Failed to generate writeset")
             .into_inner();
+        let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }
 }

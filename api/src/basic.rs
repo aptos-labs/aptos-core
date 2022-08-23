@@ -1,21 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::accept_type::AcceptType;
+use crate::context::Context;
+use crate::response::InternalError;
+use crate::response::ServiceUnavailableError;
+use crate::{generate_error_response, generate_success_response, ApiTags};
+use anyhow::Context as AnyhowContext;
+use aptos_api_types::AptosErrorCode;
+use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
+use serde::{Deserialize, Serialize};
+use std::ops::Sub;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::response::{BasicError, BasicResponse, BasicResponseStatus, BasicResult, InternalError};
-use crate::ApiTags;
-use anyhow::Context as AnyhowContext;
-use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
-use serde::{Deserialize, Serialize};
-use std::ops::Sub;
-
 const OPEN_API_HTML: &str = include_str!("../doc/spec.html");
+
+// Generate error and response types
+generate_success_response!(HealthCheckResponse, (200, Ok));
+generate_error_response!(HealthCheckError, (503, ServiceUnavailable), (500, Internal));
+pub type HealthCheckResult<T> = poem::Result<HealthCheckResponse<T>, HealthCheckError>;
 
 pub struct BasicApi {
     pub context: Arc<Context>,
@@ -69,7 +75,7 @@ impl BasicApi {
         &self,
         accept_type: AcceptType,
         duration_secs: Query<Option<u32>>,
-    ) -> BasicResult<HealthCheckSuccess> {
+    ) -> HealthCheckResult<HealthCheckSuccess> {
         let ledger_info = self.context.get_latest_ledger_info()?;
         if let Some(duration) = duration_secs.0 {
             let timestamp = ledger_info.timestamp();
@@ -79,18 +85,26 @@ impl BasicApi {
                 .sub(Duration::from_secs(duration as u64))
                 .duration_since(UNIX_EPOCH)
                 .context("Failed to determine absolute unix time based on given duration")
-                .map_err(BasicError::internal)?;
+                .map_err(|err| {
+                    HealthCheckError::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?;
 
             if timestamp < expectation {
-                return Err(BasicError::internal_str(
+                return Err(HealthCheckError::service_unavailable_with_code(
                     "The latest ledger info timestamp is less than the expected timestamp",
+                    AptosErrorCode::HealthCheckFailed,
+                    &ledger_info,
                 ));
             }
         }
-        BasicResponse::try_from_rust_value((
+        HealthCheckResponse::try_from_rust_value((
             HealthCheckSuccess::new(),
             &ledger_info,
-            BasicResponseStatus::Ok,
+            HealthCheckResponseStatus::Ok,
             &accept_type,
         ))
     }

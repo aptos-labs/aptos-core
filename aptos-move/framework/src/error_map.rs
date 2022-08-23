@@ -101,8 +101,8 @@ impl<'env> ErrorMapGenerator<'env> {
                 let _ = self.output.add_error_category(
                     error_category,
                     ErrorDescription {
-                        code_name: name.to_string(),
-                        code_description: named_constant.get_doc().to_string(),
+                        code_name: name.trim().to_string(),
+                        code_description: named_constant.get_doc().trim().to_string(),
                     },
                 );
             }
@@ -119,8 +119,8 @@ impl<'env> ErrorMapGenerator<'env> {
                         module_id.clone(),
                         abort_code,
                         ErrorDescription {
-                            code_name: name.to_string(),
-                            code_description: named_constant.get_doc().to_string(),
+                            code_name: name.trim().to_string(),
+                            code_description: named_constant.get_doc().trim().to_string(),
                         },
                     );
                 }

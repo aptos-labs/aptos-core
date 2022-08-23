@@ -8,6 +8,7 @@ use crate::state_store::state_key::StateKey;
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -40,6 +41,19 @@ impl WriteOp {
     }
 }
 
+pub trait TransactionWrite {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+}
+
+impl TransactionWrite for WriteOp {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            WriteOp::Creation(v) | WriteOp::Modification(v) => Some(v.clone()),
+            WriteOp::Deletion => None,
+        }
+    }
+}
+
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -64,15 +78,46 @@ impl std::fmt::Debug for WriteOp {
     }
 }
 
+#[derive(
+    BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, Hash, PartialEq, Serialize, Deserialize,
+)]
+pub enum WriteSet {
+    V0(WriteSetV0),
+}
+
+impl Default for WriteSet {
+    fn default() -> Self {
+        Self::V0(WriteSetV0::default())
+    }
+}
+
+impl WriteSet {
+    pub fn into_mut(self) -> WriteSetMut {
+        match self {
+            Self::V0(write_set) => write_set.0,
+        }
+    }
+}
+
+impl Deref for WriteSet {
+    type Target = WriteSetV0;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::V0(write_set) => write_set,
+        }
+    }
+}
+
 /// `WriteSet` contains all access paths that one transaction modifies. Each of them is a `WriteOp`
 /// where `Value(val)` means that serialized representation should be updated to `val`, and
 /// `Deletion` means that we are going to delete this access path.
 #[derive(
     BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize,
 )]
-pub struct WriteSet(WriteSetMut);
+pub struct WriteSetV0(WriteSetMut);
 
-impl WriteSet {
+impl WriteSetV0 {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -80,12 +125,7 @@ impl WriteSet {
 
     #[inline]
     pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, WriteOp)> {
-        self.into_iter()
-    }
-
-    #[inline]
-    pub fn into_mut(self) -> WriteSetMut {
-        self.0
+        self.0.write_set.iter()
     }
 }
 
@@ -117,7 +157,7 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet(self))
+        Ok(WriteSet::V0(WriteSetV0(self)))
     }
 }
 
@@ -136,7 +176,9 @@ impl<'a> IntoIterator for &'a WriteSet {
     type IntoIter = ::std::slice::Iter<'a, (StateKey, WriteOp)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.write_set.iter()
+        match self {
+            WriteSet::V0(write_set) => write_set.0.write_set.iter(),
+        }
     }
 }
 
@@ -145,6 +187,8 @@ impl ::std::iter::IntoIterator for WriteSet {
     type IntoIter = ::std::vec::IntoIter<(StateKey, WriteOp)>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.write_set.into_iter()
+        match self {
+            Self::V0(write_set) => write_set.0.write_set.into_iter(),
+        }
     }
 }

@@ -4,12 +4,9 @@
 use crate::accept_type::AcceptType;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use crate::response::{
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
-};
+use crate::response::{BasicResponse, BasicResponseStatus, BasicResultWith404};
 use crate::ApiTags;
-use anyhow::Context as AnyhowContext;
-use aptos_api_types::Block;
+use aptos_api_types::{BcsBlock, Block, LedgerInfo};
 use poem_openapi::param::{Path, Query};
 use poem_openapi::OpenApi;
 use std::sync::Arc;
@@ -77,19 +74,13 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_height(block_height, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
-
-        BasicResponse::try_from_rust_value((
-            block,
+        let bcs_block = self.context.get_block_by_height(
+            block_height,
             &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+            with_transactions,
+        )?;
+
+        self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
     }
 
     fn get_by_version(
@@ -99,18 +90,45 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_version(version, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
+        let bcs_block =
+            self.context
+                .get_block_by_version(version, &latest_ledger_info, with_transactions)?;
 
-        BasicResponse::try_from_rust_value((
-            block,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+        self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
+    }
+
+    fn render_bcs_block(
+        &self,
+        accept_type: &AcceptType,
+        latest_ledger_info: LedgerInfo,
+        bcs_block: BcsBlock,
+    ) -> BasicResultWith404<Block> {
+        match accept_type {
+            AcceptType::Json => {
+                let transactions = if let Some(inner) = bcs_block.transactions {
+                    Some(self.context.render_transactions_sequential(
+                        &latest_ledger_info,
+                        inner,
+                        bcs_block.block_timestamp,
+                    )?)
+                } else {
+                    None
+                };
+                let block = Block {
+                    block_height: bcs_block.block_height.into(),
+                    block_hash: bcs_block.block_hash.into(),
+                    block_timestamp: bcs_block.block_timestamp.into(),
+                    first_version: bcs_block.first_version.into(),
+                    last_version: bcs_block.last_version.into(),
+                    transactions,
+                };
+                BasicResponse::try_from_json((block, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                bcs_block,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }

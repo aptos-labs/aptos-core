@@ -1,10 +1,12 @@
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [],
-                },
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: [],
+                    },
+                ),
             ),
             events: [],
             gas_used: 0,
@@ -17,10 +19,12 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [],
-                },
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: [],
+                    },
+                ),
             ),
             events: [],
             gas_used: 0,

@@ -8,7 +8,6 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
@@ -25,6 +24,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use consensus_types::block::Block;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
@@ -37,7 +37,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
-    let mut genesis_account: LocalAccount = LocalAccount::new(
+    let mut core_resources_account: LocalAccount = LocalAccount::new(
         aptos_test_root_address(),
         AccountKey::from_private_key(vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
@@ -78,21 +78,21 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         vec![],
         1,
     ));
-    let tx1 = genesis_account
+    let tx1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account1.public_key()));
-    let tx2 = genesis_account
+    let tx2 = core_resources_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account2.public_key()));
-    let tx3 = genesis_account
+    let tx3 = core_resources_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account3.public_key()));
 
     // Create account1 with 2M coins.
-    let txn1 = genesis_account
+    let txn1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.mint(account1.address(), 2_000_000));
     // Create account2 with 1.2M coins.
-    let txn2 = genesis_account
+    let txn2 = core_resources_account
         .sign_with_transaction_builder(txn_factory.mint(account2.address(), 1_200_000));
     // Create account3 with 1M coins.
-    let txn3 = genesis_account
+    let txn3 = core_resources_account
         .sign_with_transaction_builder(txn_factory.mint(account3.address(), 1_000_000));
 
     // Transfer 20k coins from account1 to account2.
@@ -110,7 +110,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let txn6 =
         account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70_000));
 
-    let reconfig1 = genesis_account
+    let reconfig1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
 
     let block1: Vec<_> = vec![
@@ -137,7 +137,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         vec![],
         2,
     ));
-    let reconfig2 = genesis_account
+    let reconfig2 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(200)));
     let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
@@ -178,31 +178,31 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let t1 = db
         .reader
-        .get_account_transaction(genesis_account.address(), 3, false, current_version)
+        .get_account_transaction(core_resources_account.address(), 3, false, current_version)
         .unwrap();
     verify_committed_txn_status(t1.as_ref(), &block1[4]).unwrap();
 
     let t2 = db
         .reader
-        .get_account_transaction(genesis_account.address(), 4, false, current_version)
+        .get_account_transaction(core_resources_account.address(), 4, false, current_version)
         .unwrap();
     verify_committed_txn_status(t2.as_ref(), &block1[5]).unwrap();
 
     let t3 = db
         .reader
-        .get_account_transaction(genesis_account.address(), 5, false, current_version)
+        .get_account_transaction(core_resources_account.address(), 5, false, current_version)
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &block1[6]).unwrap();
 
     let reconfig1 = db
         .reader
-        .get_account_transaction(genesis_account.address(), 6, false, current_version)
+        .get_account_transaction(core_resources_account.address(), 6, false, current_version)
         .unwrap();
     verify_committed_txn_status(reconfig1.as_ref(), &block1[10]).unwrap();
 
     let tn = db
         .reader
-        .get_account_transaction(genesis_account.address(), 7, false, current_version)
+        .get_account_transaction(core_resources_account.address(), 7, false, current_version)
         .unwrap();
     assert!(tn.is_none());
 

@@ -5,7 +5,7 @@
 
 use crate::{
     pruner::{ledger_store::ledger_store_pruner::LedgerPruner, state_store::StateMerklePruner},
-    EventStore, LedgerStore, StateStore, TransactionStore,
+    EventStore, StateStore, TransactionStore,
 };
 
 use schemadb::DB;
@@ -25,7 +25,6 @@ pub(crate) fn create_ledger_pruner(
         Arc::clone(&ledger_db),
         Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
         Arc::new(EventStore::new(Arc::clone(&ledger_db))),
-        Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
         state_store,
     ))
 }

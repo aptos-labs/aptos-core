@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_19_233543) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -214,6 +214,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
     t.string "account_address", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "consensus_pop"
     t.index ["account_address"], name: "index_it3_profiles_on_account_address", unique: true
     t.index ["account_key"], name: "index_it3_profiles_on_account_key", unique: true
     t.index ["consensus_key"], name: "index_it3_profiles_on_consensus_key", unique: true

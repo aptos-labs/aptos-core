@@ -29,7 +29,7 @@ fn code_publishing_basic() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
+        &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // Validate metadata as expected.
@@ -68,13 +68,13 @@ fn code_publishing_upgrade_success_no_compat() {
     // Install the initial version with no compat requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial_arbitrary"),
+        &common::test_dir_path("code_publishing.data/pack_initial_arbitrary"),
     ));
 
     // We should be able to upgrade it with the incompatible version
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_upgrade_incompat_arbitrary"),
+        &common::test_dir_path("code_publishing.data/pack_upgrade_incompat_arbitrary"),
     ));
 }
 
@@ -86,13 +86,13 @@ fn code_publishing_upgrade_success_compat() {
     // Install the initial version with compat requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
+        &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // We should be able to upgrade it with the compatible version
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_upgrade_compat"),
+        &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
     ));
 }
 
@@ -104,13 +104,13 @@ fn code_publishing_upgrade_fail_compat() {
     // Install the initial version with compat requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
+        &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // We should not be able to upgrade it with the incompatible version
     let status = h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_upgrade_incompat"),
+        &common::test_dir_path("code_publishing.data/pack_upgrade_incompat"),
     );
     assert_vm_status!(status, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
@@ -123,13 +123,13 @@ fn code_publishing_upgrade_fail_immutable() {
     // Install the initial version with immutable requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial_immutable"),
+        &common::test_dir_path("code_publishing.data/pack_initial_immutable"),
     ));
 
     // We should not be able to upgrade it with the compatible version
     let status = h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_upgrade_compat"),
+        &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
     );
     assert_abort!(status, _);
 }
@@ -142,13 +142,13 @@ fn code_publishing_upgrade_fail_overlapping_module() {
     // Install the initial version
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
+        &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // Install a different package with the same module.
     let status = h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_other_name"),
+        &common::test_dir_path("code_publishing.data/pack_other_name"),
     );
     assert_abort!(status, _);
 }
@@ -169,19 +169,22 @@ fn code_publishing_upgrade_loader_cache_consistency() {
     let txns = vec![
         h.create_publish_package(
             &acc,
-            &common::package_path("code_publishing.data/pack_initial"),
+            &common::test_dir_path("code_publishing.data/pack_initial"),
+            None,
         ),
         // Compatible with above package
         h.create_publish_package(
             &acc,
-            &common::package_path("code_publishing.data/pack_upgrade_compat"),
+            &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
+            None,
         ),
         // Not compatible with above package, but with first one.
         // Correct behavior: should create backward_incompatible error
         // Bug behavior: succeeds because is compared with the first module
         h.create_publish_package(
             &acc,
-            &common::package_path("code_publishing.data/pack_compat_first_not_second"),
+            &common::test_dir_path("code_publishing.data/pack_compat_first_not_second"),
+            None,
         ),
     ];
     let result = h.run_block(txns);
@@ -199,7 +202,7 @@ fn code_publishing_framework_upgrade() {
     // compatible changes. (We added a new function to string.move.)
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_stdlib"),
+        &common::test_dir_path("code_publishing.data/pack_stdlib"),
     ));
 }
 
@@ -212,7 +215,7 @@ fn code_publishing_framework_upgrade_fail() {
     // from the string module.
     let result = h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_stdlib_incompat"),
+        &common::test_dir_path("code_publishing.data/pack_stdlib_incompat"),
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }

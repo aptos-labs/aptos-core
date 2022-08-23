@@ -12,10 +12,8 @@ class HeaderComponent < ViewComponent::Base
       NavItem.new('#', 'Community', 'Aptos Community'),
       [
         NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
-        NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
-        NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2 Results'),
-        NavItem.new('/it3', 'AIT3', 'Incentivized Testnet 3'),
-        NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
+        NavItem.new('https://forum.aptoslabs.com/', 'Discussion Forum', 'Aptos Forum'),
+        NavItem.new('/incentivized-testnet', 'Incentivized Testnet', 'Aptos Forum')
       ]
     ),
     NavGroup.new(

@@ -26,16 +26,16 @@ validator:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15.5
+      memory: 30Gi
     requests:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15
+      memory: 26Gi
   storage:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
     # -- Size of validator persistent storage
-    size: 350Gi
+    size: 512Gi
   # -- Log level for the validator
   rust_log: info
   # -- Remote log level for the validator
@@ -67,16 +67,16 @@ fullnode:
     replicas: 1
   resources:
     limits:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15.5
+      memory: 30Gi
     requests:
-      cpu: 3.5
-      memory: 6Gi
+      cpu: 15
+      memory: 26Gi
   storage:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
     # -- Size of fullnode persistent storage
-    size: 350Gi
+    size: 512Gi
   # -- Log level for the fullnode
   rust_log: info
   # -- Remote log level for the fullnode

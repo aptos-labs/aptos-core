@@ -4,7 +4,10 @@
 //! This module contains the official gas meter implementation, along with some top-level gas
 //! parameters and traits to help manipulate them.
 
-use crate::{algebra::Gas, instr::InstructionGasParameters, transaction::TransactionGasParameters};
+use crate::{
+    algebra::Gas, instr::InstructionGasParameters, misc::MiscGasParameters,
+    transaction::TransactionGasParameters,
+};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, NumArgs, NumBytes},
@@ -44,6 +47,7 @@ pub trait InitialGasSchedule: Sized {
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
     pub aptos_framework: framework::natives::GasParameters,
+    pub table: move_table_extension::GasParameters,
 }
 
 impl FromOnChainGasSchedule for NativeGasParameters {
@@ -51,6 +55,7 @@ impl FromOnChainGasSchedule for NativeGasParameters {
         Some(Self {
             move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
             aptos_framework: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            table: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
         })
     }
 }
@@ -59,6 +64,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
     fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
         let mut entries = self.move_stdlib.to_on_chain_gas_schedule();
         entries.extend(self.aptos_framework.to_on_chain_gas_schedule());
+        entries.extend(self.table.to_on_chain_gas_schedule());
         entries
     }
 }
@@ -68,6 +74,7 @@ impl NativeGasParameters {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
             aptos_framework: framework::natives::GasParameters::zeros(),
+            table: move_table_extension::GasParameters::zeros(),
         }
     }
 }
@@ -77,6 +84,7 @@ impl InitialGasSchedule for NativeGasParameters {
         Self {
             move_stdlib: InitialGasSchedule::initial(),
             aptos_framework: InitialGasSchedule::initial(),
+            table: InitialGasSchedule::initial(),
         }
     }
 }
@@ -85,6 +93,7 @@ impl InitialGasSchedule for NativeGasParameters {
 /// instructions, transactions and native functions from various packages.
 #[derive(Debug, Clone)]
 pub struct AptosGasParameters {
+    pub misc: MiscGasParameters,
     pub instr: InstructionGasParameters,
     pub txn: TransactionGasParameters,
     pub natives: NativeGasParameters,
@@ -93,6 +102,7 @@ pub struct AptosGasParameters {
 impl FromOnChainGasSchedule for AptosGasParameters {
     fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
         Some(Self {
+            misc: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
             instr: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
             txn: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
             natives: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
@@ -105,6 +115,7 @@ impl ToOnChainGasSchedule for AptosGasParameters {
         let mut entries = self.instr.to_on_chain_gas_schedule();
         entries.extend(self.txn.to_on_chain_gas_schedule());
         entries.extend(self.natives.to_on_chain_gas_schedule());
+        entries.extend(self.misc.to_on_chain_gas_schedule());
         entries
     }
 }
@@ -112,6 +123,7 @@ impl ToOnChainGasSchedule for AptosGasParameters {
 impl AptosGasParameters {
     pub fn zeros() -> Self {
         Self {
+            misc: MiscGasParameters::zeros(),
             instr: InstructionGasParameters::zeros(),
             txn: TransactionGasParameters::zeros(),
             natives: NativeGasParameters::zeros(),
@@ -122,6 +134,7 @@ impl AptosGasParameters {
 impl InitialGasSchedule for AptosGasParameters {
     fn initial() -> Self {
         Self {
+            misc: InitialGasSchedule::initial(),
             instr: InitialGasSchedule::initial(),
             txn: InitialGasSchedule::initial(),
             natives: InitialGasSchedule::initial(),
@@ -152,6 +165,7 @@ impl AptosGasMeter {
             .to_unit_round_down_with_params(&self.gas_params.txn)
     }
 
+    #[inline]
     fn charge(&mut self, amount: InternalGas) -> PartialVMResult<()> {
         match self.balance.checked_sub(amount) {
             Some(new_balance) => {
@@ -167,20 +181,31 @@ impl AptosGasMeter {
 }
 
 impl GasMeter for AptosGasMeter {
+    #[inline]
     fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
         let cost = self.gas_params.instr.simple_instr_cost(instr)?;
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_native_function(&mut self, amount: InternalGas) -> PartialVMResult<()> {
         self.charge(amount)
     }
 
-    fn charge_load_resource(&mut self, _loaded: Option<NumBytes>) -> PartialVMResult<()> {
-        // TODO(Gas): Charge gas for loading
-        Ok(())
+    #[inline]
+    fn charge_load_resource(&mut self, loaded: Option<NumBytes>) -> PartialVMResult<()> {
+        let txn_params = &self.gas_params.txn;
+
+        let cost = txn_params.load_data_base
+            + match loaded {
+                Some(num_bytes) => txn_params.load_data_per_byte * num_bytes,
+                None => txn_params.load_data_failure,
+            };
+
+        self.charge(cost)
     }
 
+    #[inline]
     fn charge_call(
         &mut self,
         _module_id: &ModuleId,
@@ -191,6 +216,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(params.call_base + params.call_per_arg * NumArgs::new(args.len() as u64))
     }
 
+    #[inline]
     fn charge_call_generic(
         &mut self,
         _module_id: &ModuleId,
@@ -206,24 +232,34 @@ impl GasMeter for AptosGasMeter {
         )
     }
 
+    #[inline]
     fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()> {
         let params = &self.gas_params.instr;
         self.charge(params.ld_const_base + params.ld_const_per_byte * size)
     }
 
-    fn charge_copy_loc(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
-        // TODO(Gas): Should charge for deep copy
-        self.charge(self.gas_params.instr.copy_loc_base)
+    #[inline]
+    fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+        // Note(Gas): this makes a deep copy so we need to charge for the full value size
+        let instr_params = &self.gas_params.instr;
+        let cost = instr_params.copy_loc_base
+            + instr_params.copy_loc_per_abs_val_unit
+                * self.gas_params.misc.abs_val.abstract_value_size(val);
+
+        self.charge(cost)
     }
 
+    #[inline]
     fn charge_move_loc(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.move_loc_base)
     }
 
+    #[inline]
     fn charge_store_loc(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.st_loc_base)
     }
 
+    #[inline]
     fn charge_pack(
         &mut self,
         is_generic: bool,
@@ -240,6 +276,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_unpack(
         &mut self,
         is_generic: bool,
@@ -256,33 +293,50 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
-    fn charge_read_ref(&mut self, _ref_val: impl ValueView) -> PartialVMResult<()> {
-        // TODO(Gas): Should charge for the deep copy
-        self.charge(self.gas_params.instr.read_ref_base)
+    #[inline]
+    fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+        // Note(Gas): this makes a deep copy so we need to charge for the full value size
+        let instr_params = &self.gas_params.instr;
+        let cost = instr_params.read_ref_base
+            + instr_params.read_ref_per_abs_val_unit
+                * self.gas_params.misc.abs_val.abstract_value_size(val);
+        self.charge(cost)
     }
 
+    #[inline]
     fn charge_write_ref(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.write_ref_base)
     }
 
+    #[inline]
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        // TODO(Gas): Stop using abstract memory size
-        let params = &self.gas_params.instr;
-        let cost = params.eq_base
-            + params.eq_unit
-                * (lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size());
+        let instr_params = &self.gas_params.instr;
+        let abs_val_params = &self.gas_params.misc.abs_val;
+        let per_unit = instr_params.eq_per_abs_val_unit;
+
+        let cost = instr_params.eq_base
+            + per_unit
+                * (abs_val_params.abstract_value_size_dereferenced(lhs)
+                    + abs_val_params.abstract_value_size_dereferenced(rhs));
+
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        // TODO(Gas): Stop using abstract memory size
-        let params = &self.gas_params.instr;
-        let cost = params.eq_base
-            + params.eq_unit
-                * (lhs.legacy_abstract_memory_size() + rhs.legacy_abstract_memory_size());
+        let instr_params = &self.gas_params.instr;
+        let abs_val_params = &self.gas_params.misc.abs_val;
+        let per_unit = instr_params.neq_per_abs_val_unit;
+
+        let cost = instr_params.neq_base
+            + per_unit
+                * (abs_val_params.abstract_value_size_dereferenced(lhs)
+                    + abs_val_params.abstract_value_size_dereferenced(rhs));
+
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_borrow_global(
         &mut self,
         is_mut: bool,
@@ -300,6 +354,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_exists(
         &mut self,
         is_generic: bool,
@@ -314,6 +369,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_move_from(
         &mut self,
         is_generic: bool,
@@ -328,6 +384,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_move_to(
         &mut self,
         is_generic: bool,
@@ -343,6 +400,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_vec_pack<'a>(
         &mut self,
         _ty: impl TypeView + 'a,
@@ -354,6 +412,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_vec_unpack(
         &mut self,
         _ty: impl TypeView,
@@ -365,10 +424,12 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.vec_len_base)
     }
 
+    #[inline]
     fn charge_vec_borrow(
         &mut self,
         is_mut: bool,
@@ -383,6 +444,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(cost)
     }
 
+    #[inline]
     fn charge_vec_push_back(
         &mut self,
         _ty: impl TypeView,
@@ -391,6 +453,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(self.gas_params.instr.vec_push_back_base)
     }
 
+    #[inline]
     fn charge_vec_pop_back(
         &mut self,
         _ty: impl TypeView,
@@ -399,6 +462,7 @@ impl GasMeter for AptosGasMeter {
         self.charge(self.gas_params.instr.vec_pop_back_base)
     }
 
+    #[inline]
     fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
         self.charge(self.gas_params.instr.vec_swap_base)
     }

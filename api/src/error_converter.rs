@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::mime_types::JSON;
-use aptos_api_types::AptosError;
+use aptos_api_types::{AptosError, AptosErrorCode};
 use poem::http::header::{HeaderValue, CONTENT_TYPE};
 use poem::{IntoResponse, Response};
 use poem_openapi::payload::Json;
@@ -37,5 +37,9 @@ pub async fn convert_error(error: poem::Error) -> impl poem::IntoResponse {
 }
 
 fn build_error_response(error_string: String) -> Response {
-    Json(AptosError::new(error_string)).into_response()
+    Json(AptosError::new_with_error_code(
+        error_string,
+        AptosErrorCode::WebFrameworkError,
+    ))
+    .into_response()
 }

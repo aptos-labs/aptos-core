@@ -8,7 +8,7 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,
@@ -38,13 +38,15 @@ use event_notifications::EventNotificationListener;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
+use rand::rngs::OsRng;
+use rand::Rng;
 use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
 pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStreamListener) {
     let (notification_sender, notification_receiver) =
         aptos_channel::new(QueueStyle::KLAST, 100, None);
-    let data_stream_listener = DataStreamListener::new(notification_receiver);
+    let data_stream_listener = DataStreamListener::new(create_random_u64(), notification_receiver);
 
     (notification_sender, data_stream_listener)
 }
@@ -52,7 +54,7 @@ pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStrea
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
     let ledger_info = LedgerInfo::genesis(HashValue::zero(), ValidatorSet::empty());
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a single test event
@@ -87,7 +89,7 @@ pub fn create_global_summary(highest_ended_epoch: Epoch) -> GlobalDataSummary {
 pub fn create_ledger_info_at_version(version: Version) -> LedgerInfoWithSignatures {
     let block_info = BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None);
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a test transaction output list with proof
@@ -116,7 +118,7 @@ pub fn create_random_epoch_ending_ledger_info(
         Some(EpochState::empty()),
     );
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Returns an empty epoch state
@@ -129,6 +131,12 @@ pub fn create_epoch_state(epoch: u64) -> EpochState {
     let mut epoch_state = create_empty_epoch_state();
     epoch_state.epoch = epoch;
     epoch_state
+}
+
+/// Returns a random u64
+fn create_random_u64() -> u64 {
+    let mut rng = OsRng;
+    rng.gen()
 }
 
 /// Creates a test state value chunk with proof

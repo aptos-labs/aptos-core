@@ -54,12 +54,15 @@ pub async fn authorize_jwt(
 
     let claims = decoded.claims;
 
-    let current_epoch = context
-        .validator_cache()
-        .read()
-        .get(&claims.chain_id)
-        .unwrap()
-        .0;
+    let current_epoch = match context.validator_cache().read().get(&claims.chain_id) {
+        Some(info) => info.0,
+        None => {
+            return Err(reject::custom(ServiceError::new(
+                StatusCode::UNAUTHORIZED,
+                "invalid claim".into(),
+            )));
+        }
+    };
 
     if allow_roles.contains(&claims.peer_role)
         && claims.epoch == current_epoch
@@ -68,7 +71,7 @@ pub async fn authorize_jwt(
         Ok(claims)
     } else {
         Err(reject::custom(ServiceError::new(
-            StatusCode::FORBIDDEN,
+            StatusCode::UNAUTHORIZED,
             "invalid claim".into(),
         )))
     }

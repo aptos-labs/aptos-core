@@ -22,12 +22,13 @@ const sidebars = {
 
     {
       type: "category",
-      label: "Aptos Quickstarts",
+      label: "Developer Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
       items: [
         "tutorials/first-transaction-sdk",
+        "tutorials/your-first-nft-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
@@ -64,6 +65,7 @@ const sidebars = {
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
+        "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",

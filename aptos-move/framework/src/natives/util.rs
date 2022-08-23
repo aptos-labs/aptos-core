@@ -64,8 +64,8 @@ macro_rules! pop_vec_arg {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct FromBytesGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerByte,
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
 }
 
 fn native_from_bytes(
@@ -86,7 +86,7 @@ fn native_from_bytes(
     })?;
 
     let bytes = pop_arg!(args, Vec<u8>);
-    let cost = gas_params.base_cost + gas_params.unit_cost * NumBytes::new(bytes.len() as u64);
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
     let val = match Value::simple_deserialize(&bytes, &layout) {
         Some(val) => val,
         None => return Ok(NativeResult::err(cost, EFROM_BYTES)),

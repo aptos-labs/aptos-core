@@ -12,8 +12,10 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_gas::{
-    AptosGasParameters, InitialGasSchedule, NativeGasParameters, ToOnChainGasSchedule,
+    AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
+    ToOnChainGasSchedule,
 };
+use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -46,6 +48,7 @@ const GENESIS_SEED: [u8; 32] = [42; 32];
 const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
+const VERSION_MODULE_NAME: &str = "version";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -108,7 +111,11 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
@@ -121,6 +128,9 @@ pub fn encode_genesis_change_set(
     }
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
+    if genesis_config.is_test {
+        allow_core_resources_to_set_version(&mut session);
+    }
 
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
@@ -139,7 +149,22 @@ pub fn encode_genesis_change_set(
     let session2_out = session.finish().unwrap();
 
     session1_out.squash(session2_out).unwrap();
-    let change_set = session1_out.into_change_set(&mut ()).unwrap();
+
+    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let (delta_change_set, change_set) = change_set_ext.into_inner();
+
+    // Publishing stdlib should not produce any deltas.
+    // Proof: First session output is obtained during genesis when we initialize
+    // the data. This implies that all values which are aggregators know their
+    // real values, and therefore map to write ops and not deltas. For example,
+    // `create_and_initialize_validators` mints aptos coins which has aggregatable
+    // supply, but since supply is initialized during the same session there will
+    // be no deltas. The second session pusblishes framework module bundle which
+    // does not produce deltas either.
+    debug_assert!(
+        delta_change_set.is_empty(),
+        "non-empty delta change set in genesis"
+    );
 
     assert!(!change_set
         .write_set()
@@ -322,6 +347,16 @@ fn create_and_initialize_validators(
         "create_initialize_validators",
         vec![],
         serialized_values,
+    );
+}
+
+fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        VERSION_MODULE_NAME,
+        "initialize_for_test",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
     );
 }
 
@@ -585,7 +620,11 @@ pub fn test_genesis_module_publishing() {
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
     publish_framework(&mut session, cached_packages::head_release_bundle());

@@ -8,6 +8,9 @@ use std::{
     path::PathBuf,
 };
 
+// Lru cache will consume about 2G RAM based on this default value.
+pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
+
 pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
 
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
@@ -18,6 +21,30 @@ pub struct RocksdbConfig {
     pub max_open_files: i32,
     pub max_total_wal_size: u64,
     pub max_background_jobs: i32,
+    pub block_cache_size: u64,
+    pub block_size: u64,
+    pub cache_index_and_filter_blocks: bool,
+}
+
+impl Default for RocksdbConfig {
+    fn default() -> Self {
+        Self {
+            // Allow db to close old sst files, saving memory.
+            max_open_files: 5000,
+            // For now we set the max total WAL size to be 1G. This config can be useful when column
+            // families are updated at non-uniform frequencies.
+            max_total_wal_size: 1u64 << 30,
+            // This includes threads for flashing and compaction. Rocksdb will decide the # of
+            // threads to use internally.
+            max_background_jobs: 16,
+            // Default block cache size is 8MB,
+            block_cache_size: 8 * (1u64 << 20),
+            // Default block cache size is 4KB,
+            block_size: 4 * (1u64 << 10),
+            // Whether cache index and filter blocks into block cache.
+            cache_index_and_filter_blocks: false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -31,35 +58,11 @@ pub struct RocksdbConfigs {
 impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
-            ledger_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
-            },
-            state_merkle_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
-            },
+            ledger_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
                 max_open_files: 1000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
+                ..Default::default()
             },
         }
     }
@@ -76,6 +79,8 @@ pub struct StorageConfig {
     data_dir: PathBuf,
     /// The threshold that determine whether a snapshot should be committed to state merkle db.
     pub target_snapshot_size: usize,
+    /// The max # of nodes for a lru cache shard.
+    pub max_num_nodes_per_lru_cache_shard: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
     /// Try to enable the internal indexer. The indexer expects to have seen all transactions
@@ -143,7 +148,9 @@ impl Default for LedgerPrunerConfig {
     fn default() -> Self {
         LedgerPrunerConfig {
             enable: true,
-            prune_window: 10_000_000,
+            // This assumes we have 1T disk, minus the space needed by state merkle db and the
+            // overhead in storage.
+            prune_window: 150_000_000,
             batch_size: 500,
             user_pruning_window_offset: 200_000,
         }
@@ -154,7 +161,8 @@ impl Default for StateMerklePrunerConfig {
     fn default() -> Self {
         StateMerklePrunerConfig {
             enable: true,
-            prune_window: 1_000_000,
+            // This is based on ~5K TPS * 2h/epoch * 2 epochs.
+            prune_window: 80_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
@@ -180,6 +188,7 @@ impl Default for StorageConfig {
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
             target_snapshot_size: TARGET_SNAPSHOT_SIZE,
+            max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         }
     }
 }

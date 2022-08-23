@@ -2,132 +2,227 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types, types::ErrorDetails};
+use aptos_rest_client::aptos_api_types::AptosErrorCode;
+use aptos_rest_client::error::RestError;
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use std::fmt::Formatter;
 use warp::{http::StatusCode, reply::Reply};
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
-#[derive(Debug, Deserialize, Serialize, Error)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum ApiError {
-    #[error("Aptos error")]
-    AptosError(Option<String>),
-    #[error("Retriable aptos error")]
-    RetriableAptosError(Option<String>),
-    #[error("Must provide either hash or index but not both")]
     BlockParameterConflict,
-    #[error("Transaction is pending")]
     TransactionIsPending,
-    #[error("Network identifier doesn't match the supported network")]
     NetworkIdentifierMismatch,
-    #[error("ChainId doesn't match the on-chain state")]
     ChainIdMismatch,
-    #[error("Deserialization failed")]
     DeserializationFailed(Option<String>),
-    #[error("Transfer operations failed")]
     InvalidTransferOperations(Option<&'static str>),
-    #[error("Account not found")]
-    AccountNotFound(Option<String>),
-    #[error("Invalid signature type, only Ed25519 is supported")]
     InvalidSignatureType,
-    #[error("Invalid max gas fees, only one native gas fee is allowed")]
     InvalidMaxGasFees,
-    #[error("Invalid fee multiplier, only integers are allowed")]
     InvalidGasMultiplier,
-    #[error("Operations don't map to a supported internal operation")]
     InvalidOperations,
-    #[error("Missing payload metadata containing the internal transaction")]
     MissingPayloadMetadata,
-    #[error("Unsupported currency")]
     UnsupportedCurrency(Option<String>),
-    #[error("Unsupported signature count")]
     UnsupportedSignatureCount(Option<usize>),
-    #[error("Node is offline, and this API is not supported in offline mode")]
     NodeIsOffline,
-    #[error("Block is not yet complete, request will need to be retried")]
-    BlockIncomplete,
-    #[error("Transaction cannot be parsed")]
-    TransactionParseError(Option<&'static str>),
+    TransactionParseError(Option<String>),
+    InternalError(Option<String>),
+
+    // Below here are codes directly from the REST API
+    AccountNotFound(Option<String>),
+    ResourceNotFound(Option<String>),
+    ModuleNotFound(Option<String>),
+    StructFieldNotFound(Option<String>),
+    VersionNotFound(Option<String>),
+    TransactionNotFound(Option<String>),
+    TableItemNotFound(Option<String>),
+    BlockNotFound(Option<String>),
+    VersionPruned(Option<String>),
+    BlockPruned(Option<String>),
+    InvalidInput(Option<String>),
+    InvalidTransactionUpdate(Option<String>),
+    SequenceNumberTooOld(Option<String>),
+    VmError(Option<String>),
+    MempoolIsFull(Option<String>),
 }
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ApiError {}
 
 impl ApiError {
     pub fn all() -> Vec<ApiError> {
         use ApiError::*;
         vec![
-            AptosError(None),
-            RetriableAptosError(None),
+            BlockParameterConflict,
             TransactionIsPending,
+            NetworkIdentifierMismatch,
+            ChainIdMismatch,
             DeserializationFailed(None),
             InvalidTransferOperations(None),
             InvalidSignatureType,
-            NodeIsOffline,
-            BlockIncomplete,
-            BlockParameterConflict,
-            NetworkIdentifierMismatch,
-            ChainIdMismatch,
-            AccountNotFound(None),
             InvalidMaxGasFees,
             InvalidGasMultiplier,
             InvalidOperations,
             MissingPayloadMetadata,
             UnsupportedCurrency(None),
             UnsupportedSignatureCount(None),
+            NodeIsOffline,
             TransactionParseError(None),
+            InternalError(None),
+            AccountNotFound(None),
+            ResourceNotFound(None),
+            ModuleNotFound(None),
+            StructFieldNotFound(None),
+            VersionNotFound(None),
+            TransactionNotFound(None),
+            TableItemNotFound(None),
+            BlockNotFound(None),
+            VersionPruned(None),
+            BlockPruned(None),
+            InvalidInput(None),
+            InvalidTransactionUpdate(None),
+            SequenceNumberTooOld(None),
+            VmError(None),
+            MempoolIsFull(None),
         ]
     }
 
-    pub fn code(&self) -> u64 {
+    pub fn code(&self) -> u32 {
         use ApiError::*;
         match self {
-            AptosError(_) => 1,
-            TransactionIsPending => 2,
-            DeserializationFailed(_) => 3,
-            InvalidTransferOperations(_) => 4,
-            InvalidSignatureType => 5,
-            NodeIsOffline => 6,
-            BlockIncomplete => 7,
-            BlockParameterConflict => 8,
-            NetworkIdentifierMismatch => 9,
-            ChainIdMismatch => 10,
-            AccountNotFound(_) => 11,
-            InvalidMaxGasFees => 12,
-            InvalidGasMultiplier => 13,
-            InvalidOperations => 14,
-            MissingPayloadMetadata => 15,
-            UnsupportedCurrency(_) => 16,
-            UnsupportedSignatureCount(_) => 17,
-            TransactionParseError(_) => 18,
-            RetriableAptosError(_) => 19,
+            BlockParameterConflict => 0,
+            TransactionIsPending => 1,
+            NetworkIdentifierMismatch => 2,
+            ChainIdMismatch => 3,
+            DeserializationFailed(_) => 4,
+            InvalidTransferOperations(_) => 5,
+            InvalidSignatureType => 6,
+            InvalidMaxGasFees => 7,
+            InvalidGasMultiplier => 8,
+            InvalidOperations => 9,
+            MissingPayloadMetadata => 10,
+            UnsupportedCurrency(_) => 11,
+            UnsupportedSignatureCount(_) => 12,
+            NodeIsOffline => 13,
+            TransactionParseError(_) => 14,
+            InternalError(_) => AptosErrorCode::InternalError.as_u32(),
+            AccountNotFound(_) => AptosErrorCode::AccountNotFound.as_u32(),
+            ResourceNotFound(_) => AptosErrorCode::ResourceNotFound.as_u32(),
+            ModuleNotFound(_) => AptosErrorCode::ModuleNotFound.as_u32(),
+            StructFieldNotFound(_) => AptosErrorCode::StructFieldNotFound.as_u32(),
+            VersionNotFound(_) => AptosErrorCode::VersionNotFound.as_u32(),
+            TransactionNotFound(_) => AptosErrorCode::TransactionNotFound.as_u32(),
+            TableItemNotFound(_) => AptosErrorCode::TableItemNotFound.as_u32(),
+            BlockNotFound(_) => AptosErrorCode::BlockNotFound.as_u32(),
+            VersionPruned(_) => AptosErrorCode::VersionPruned.as_u32(),
+            BlockPruned(_) => AptosErrorCode::BlockPruned.as_u32(),
+            InvalidInput(_) => AptosErrorCode::InvalidInput.as_u32(),
+            InvalidTransactionUpdate(_) => AptosErrorCode::InvalidTransactionUpdate.as_u32(),
+            SequenceNumberTooOld(_) => AptosErrorCode::SequenceNumberTooOld.as_u32(),
+            VmError(_) => AptosErrorCode::VmError.as_u32(),
+            MempoolIsFull(_) => AptosErrorCode::MempoolIsFull.as_u32(),
         }
     }
 
     pub fn retriable(&self) -> bool {
+        use ApiError::*;
         matches!(
             self,
-            ApiError::AccountNotFound(_)
-                | ApiError::BlockIncomplete
-                | ApiError::RetriableAptosError(_)
+            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_)
         )
     }
 
     pub fn status_code(&self) -> StatusCode {
         use ApiError::*;
         match self {
-            AccountNotFound(_) => StatusCode::NOT_FOUND,
-            BlockIncomplete => StatusCode::PRECONDITION_FAILED,
+            AccountNotFound(_)
+            | BlockNotFound(_)
+            | ResourceNotFound(_)
+            | ModuleNotFound(_)
+            | VersionNotFound(_)
+            | TransactionNotFound(_)
+            | StructFieldNotFound(_)
+            | TableItemNotFound(_) => StatusCode::NOT_FOUND,
+            MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
+            BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
             NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
-            // TODO: Improve the error codes for these
-            RetriableAptosError(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::BAD_REQUEST,
         }
     }
 
     pub fn message(&self) -> String {
-        let full = format!("{:?}", self);
-        let parts: Vec<_> = full.split(':').collect();
-        parts[0].to_string()
+        match self {
+            ApiError::BlockParameterConflict => {
+                "Block parameter conflict. Must provide either hash or index but not both"
+            }
+            ApiError::TransactionIsPending => "Transaction is pending",
+            ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
+            ApiError::ChainIdMismatch => "Chain Id doesn't match",
+            ApiError::DeserializationFailed(_) => "Deserialization failed",
+            ApiError::InvalidTransferOperations(_) => "Invalid operations for a transfer",
+            ApiError::AccountNotFound(_) => "Account not found",
+            ApiError::InvalidSignatureType => "Invalid signature type",
+            ApiError::InvalidMaxGasFees => "Invalid max gas fee",
+            ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
+            ApiError::InvalidOperations => "Invalid operations",
+            ApiError::MissingPayloadMetadata => "Payload metadata is missing",
+            ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
+            ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
+            ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
+            ApiError::BlockNotFound(_) => "Block is missing events",
+            ApiError::TransactionParseError(_) => "Transaction failed to parse",
+            ApiError::InternalError(_) => "Internal error",
+            ApiError::ResourceNotFound(_) => "Resource not found",
+            ApiError::ModuleNotFound(_) => "Module not found",
+            ApiError::StructFieldNotFound(_) => "Struct field not found",
+            ApiError::VersionNotFound(_) => "Version not found",
+            ApiError::TransactionNotFound(_) => "Transaction not found",
+            ApiError::TableItemNotFound(_) => "Table item not found",
+            ApiError::VersionPruned(_) => "Version pruned",
+            ApiError::BlockPruned(_) => "Block pruned",
+            ApiError::InvalidInput(_) => "Invalid input",
+            ApiError::InvalidTransactionUpdate(_) => "Invalid transaction update.  Can only update gas unit price",
+            ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
+            ApiError::VmError(_) => "Transaction submission failed due to VM error",
+            ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
+        }
+        .to_string()
+    }
+
+    pub fn details(self) -> Option<ErrorDetails> {
+        match self {
+            ApiError::DeserializationFailed(inner) => inner,
+            ApiError::InvalidTransferOperations(inner) => inner.map(|inner| inner.to_string()),
+            ApiError::UnsupportedCurrency(inner) => inner,
+            ApiError::UnsupportedSignatureCount(inner) => inner.map(|inner| inner.to_string()),
+            ApiError::TransactionParseError(inner) => inner,
+            ApiError::InternalError(inner) => inner,
+            ApiError::AccountNotFound(inner) => inner,
+            ApiError::ResourceNotFound(inner) => inner,
+            ApiError::ModuleNotFound(inner) => inner,
+            ApiError::StructFieldNotFound(inner) => inner,
+            ApiError::VersionNotFound(inner) => inner,
+            ApiError::TransactionNotFound(inner) => inner,
+            ApiError::TableItemNotFound(inner) => inner,
+            ApiError::BlockNotFound(inner) => inner,
+            ApiError::VersionPruned(inner) => inner,
+            ApiError::BlockPruned(inner) => inner,
+            ApiError::InvalidInput(inner) => inner,
+            ApiError::InvalidTransactionUpdate(inner) => inner,
+            ApiError::SequenceNumberTooOld(inner) => inner,
+            ApiError::VmError(inner) => inner,
+            ApiError::MempoolIsFull(inner) => inner,
+            _ => None,
+        }
+        .map(|details| ErrorDetails { details })
     }
 
     pub fn deserialization_failed(type_: &str) -> ApiError {
@@ -135,30 +230,76 @@ impl ApiError {
     }
 
     pub fn into_error(self) -> types::Error {
-        (&self).into()
+        self.into()
     }
 }
 
-impl From<&ApiError> for types::Error {
-    fn from(error: &ApiError) -> Self {
-        let details = match error {
-            ApiError::AptosError(details) => details.clone(),
-            ApiError::RetriableAptosError(details) => details.clone(),
-            ApiError::DeserializationFailed(details) => details.clone(),
-            ApiError::InvalidTransferOperations(details) => details.map(|inner| inner.to_string()),
-            ApiError::AccountNotFound(details) => details.clone(),
-            ApiError::UnsupportedCurrency(details) => details.clone(),
-            ApiError::UnsupportedSignatureCount(details) => details.map(|inner| inner.to_string()),
-            ApiError::TransactionParseError(details) => details.map(|inner| inner.to_string()),
-            _ => None,
-        }
-        .map(|details| ErrorDetails { details });
+impl From<ApiError> for types::Error {
+    fn from(error: ApiError) -> Self {
+        let message = error.message();
+        let code = error.code();
+        let retriable = error.retriable();
+        let details = error.details();
         types::Error {
-            message: error.message(),
-            code: error.code(),
-            retriable: error.retriable(),
+            message,
+            code,
+            retriable,
             details,
             description: None,
+        }
+    }
+}
+
+impl From<RestError> for ApiError {
+    fn from(err: RestError) -> Self {
+        match err {
+            RestError::Api(err) => match err.error.error_code {
+                AptosErrorCode::AccountNotFound => {
+                    ApiError::AccountNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::ResourceNotFound => {
+                    ApiError::ResourceNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::ModuleNotFound => ApiError::ModuleNotFound(Some(err.error.message)),
+                AptosErrorCode::StructFieldNotFound => {
+                    ApiError::StructFieldNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::VersionNotFound => {
+                    ApiError::VersionNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::TransactionNotFound => {
+                    ApiError::TransactionNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::TableItemNotFound => {
+                    ApiError::TableItemNotFound(Some(err.error.message))
+                }
+                AptosErrorCode::BlockNotFound => ApiError::BlockNotFound(Some(err.error.message)),
+                AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
+                AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
+                AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
+                AptosErrorCode::InvalidTransactionUpdate => {
+                    ApiError::InvalidInput(Some(err.error.message))
+                }
+                AptosErrorCode::SequenceNumberTooOld => {
+                    ApiError::SequenceNumberTooOld(Some(err.error.message))
+                }
+                AptosErrorCode::VmError => ApiError::VmError(Some(err.error.message)),
+                AptosErrorCode::HealthCheckFailed => {
+                    ApiError::InternalError(Some(err.error.message))
+                }
+                AptosErrorCode::MempoolIsFull => ApiError::MempoolIsFull(Some(err.error.message)),
+                AptosErrorCode::WebFrameworkError => {
+                    ApiError::InternalError(Some(err.error.message))
+                }
+                AptosErrorCode::BcsNotSupported => ApiError::InvalidInput(Some(err.error.message)),
+                AptosErrorCode::InternalError => ApiError::InternalError(Some(err.error.message)),
+            },
+            RestError::Bcs(_) => ApiError::DeserializationFailed(None),
+            RestError::Json(_) => ApiError::DeserializationFailed(None),
+            RestError::WebClient(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::UrlParse(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::Timeout(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::Unknown(err) => ApiError::InternalError(Some(err.to_string())),
         }
     }
 }
@@ -181,19 +322,9 @@ impl From<bcs::Error> for ApiError {
     }
 }
 
-impl From<aptos_rest_client::error::Error> for ApiError {
-    fn from(err: aptos_rest_client::error::Error) -> Self {
-        if err.is_retriable() {
-            ApiError::RetriableAptosError(Some(err.to_string()))
-        } else {
-            ApiError::AptosError(Some(err.to_string()))
-        }
-    }
-}
-
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> Self {
-        ApiError::AptosError(Some(err.to_string()))
+        ApiError::InternalError(Some(err.to_string()))
     }
 }
 

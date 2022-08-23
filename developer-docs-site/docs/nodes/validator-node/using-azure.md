@@ -9,7 +9,7 @@ This guide assumes you already have Azure account setup.
 
 Install pre-requisites if needed:
 
-   * Aptos CLI 0.3.0: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
+   * Aptos CLI 0.3.1: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * Terraform 1.2.4: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
    * Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
@@ -65,7 +65,7 @@ Install pre-requisites if needed:
     source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/azure?ref=testnet"
     region        = <azure region>  # Specify the region
     era           = 1              # bump era number to wipe the chain
-    chain_id      = 40
+    chain_id      = 43
     image_tag     = "testnet" # Specify the docker image tag to use
     validator_name = "<Name of Your Validator>"
   }
@@ -167,7 +167,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    curl https://raw.githubusercontent.com/aptos-labs/aptos-core/testnet/aptos-move/framework/releases/head.mrb --output framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
 
 14. Compile the genesis blob and waypoint.

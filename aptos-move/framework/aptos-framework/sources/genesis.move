@@ -2,11 +2,12 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::aggregator_factory;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
-    use aptos_framework::coin::MintCapability;
+    use aptos_framework::coin::{Self, MintCapability};
     use aptos_framework::coins;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
@@ -16,6 +17,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_fee;
     use aptos_framework::staking_config;
     use aptos_framework::version;
+    use aptos_framework::state_storage;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -81,11 +83,17 @@ module aptos_framework::genesis {
         );
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
+        // Ensure we can create aggregators for supply, but not enable it for common
+        // use just yet.
+        aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
+        coin::initialize_supply_config(&aptos_framework_account);
+
         // This needs to be called at the very end because earlier initializations might rely on timestamp not being
         // initialized yet.
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
+        state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 

@@ -7,8 +7,6 @@ import TabItem from '@theme/TabItem';
 
 # Building the Wallet Extension
 
-*Note: Wallet is very early in development and not secure or production ready*
-
 This tutorial goes through how to build the wallet extension and how to use it with your dApp 
 1. Install the wallet on Chrome
 2. Wallet functionality
@@ -59,16 +57,12 @@ const status = await (window as any).aptos.isConnected()
 const accountAddress = await (window as any).aptos.account()
 
 // Create a transaction
-// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
-        "0x1::coin",
-        "transfer",
-        [token],
-        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
-    ),
-);
+const transaction = {
+    arguments: [address, '717'],
+    function: '0x1::coin::transfer',
+    type: 'entry_function_payload',
+    type_arguments: ['0x1::aptos_coin::TestCoin'],
+};
 
 // Send transaction to the extension to be signed and submitted to chain
 const response = await (window as any).aptos.signAndSubmitTransaction(transaction)

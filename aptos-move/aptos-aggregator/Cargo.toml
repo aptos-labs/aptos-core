@@ -27,4 +27,3 @@ claim = "0.5.0"
 
 [features]
 default = []
-aggregator-extension = []

@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_transaction_builder::aptos_stdlib;
+use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 // TODO(Gas): double check if this is correct
@@ -23,16 +23,16 @@ pub struct CreateAccount {
 }
 
 #[async_trait]
-impl CliCommand<String> for CreateAccount {
+impl CliCommand<TransactionSummary> for CreateAccount {
     fn command_name(&self) -> &'static str {
         "CreateAccount"
     }
 
-    async fn execute(self) -> CliTypedResult<String> {
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let address = self.account;
         self.txn_options
             .submit_transaction(aptos_stdlib::account_create_account(address))
             .await
-            .map(|_| format!("Account Created at {}", address))
+            .map(TransactionSummary::from)
     }
 }

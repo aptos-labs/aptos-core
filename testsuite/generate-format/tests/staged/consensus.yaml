@@ -25,6 +25,19 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+AggregateSignature:
+  STRUCT:
+    - validator_bitmask:
+        TYPENAME: BitVec
+    - sig:
+        OPTION:
+          TYPENAME: Signature
+AggregateSignatureWithRounds:
+  STRUCT:
+    - sig:
+        TYPENAME: AggregateSignature
+    - rounds:
+        SEQ: U64
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -227,7 +240,11 @@ EventKey:
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 LedgerInfo:
@@ -247,7 +264,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        TYPENAME: MultiSignature
+        TYPENAME: AggregateSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -266,13 +283,6 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
-MultiSignature:
-  STRUCT:
-    - validator_bitmask:
-        TYPENAME: BitVec
-    - multi_sig:
-        OPTION:
-          TYPENAME: Signature
 Payload:
   ENUM:
     0:
@@ -370,7 +380,8 @@ SyncInfo:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
 TableHandle:
-  NEWTYPESTRUCT: U128
+  NEWTYPESTRUCT:
+    TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:
@@ -461,14 +472,8 @@ TwoChainTimeoutCertificate:
   STRUCT:
     - timeout:
         TYPENAME: TwoChainTimeout
-    - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TUPLE:
-              - U64
-              - TYPENAME: Signature
+    - signatures_with_rounds:
+        TYPENAME: AggregateSignatureWithRounds
 TypeTag:
   ENUM:
     0:
@@ -541,8 +546,11 @@ WriteOp:
     2:
       Deletion: UNIT
 WriteSet:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: WriteSetV0
 WriteSetMut:
   STRUCT:
     - write_set:
@@ -563,3 +571,6 @@ WriteSetPayload:
               TYPENAME: AccountAddress
           - script:
               TYPENAME: Script
+WriteSetV0:
+  NEWTYPESTRUCT:
+    TYPENAME: WriteSetMut

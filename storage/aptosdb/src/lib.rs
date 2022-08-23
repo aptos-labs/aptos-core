@@ -18,16 +18,15 @@ pub mod errors;
 pub mod metrics;
 pub mod schema;
 
-mod change_set;
 mod db_options;
 mod event_store;
-mod ledger_counters;
 mod ledger_store;
+mod lru_node_cache;
 mod pruner;
 mod state_merkle_db;
 mod state_store;
-mod system_store;
 mod transaction_store;
+mod versioned_node_cache;
 
 #[cfg(test)]
 mod aptosdb_test;
@@ -36,14 +35,12 @@ mod aptosdb_test;
 use crate::state_store::buffered_state::BufferedState;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
-    change_set::{ChangeSet, SealedChangeSet},
     db_options::{
         gen_ledger_cfds, gen_state_merkle_cfds, ledger_db_column_families,
         state_merkle_db_column_families,
     },
     errors::AptosDbError,
     event_store::EventStore,
-    ledger_counters::LedgerCounters,
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
@@ -52,17 +49,20 @@ use crate::{
     pruner::{pruner_manager::PrunerManager, utils},
     schema::*,
     state_store::StateStore,
-    system_store::SystemStore,
     transaction_store::TransactionStore,
 };
 use anyhow::{bail, ensure, Result};
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
+
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -94,7 +94,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::DB;
+use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -170,8 +170,8 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
-fn error_if_version_is_pruned(
-    pruner: &(dyn PrunerManager),
+fn error_if_version_is_pruned<P: PrunerManager>(
+    pruner: &P,
     data_type: &str,
     version: Version,
 ) -> Result<()> {
@@ -260,7 +260,6 @@ pub struct AptosDB {
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
-    system_store: Arc<SystemStore>,
     transaction_store: Arc<TransactionStore>,
     state_pruner: StatePrunerManager,
     ledger_pruner: LedgerPrunerManager,
@@ -275,6 +274,7 @@ impl AptosDB {
         state_merkle_rocksdb: DB,
         pruner_config: PrunerConfig,
         target_snapshot_size: usize,
+        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
@@ -287,6 +287,7 @@ impl AptosDB {
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             target_snapshot_size,
+            max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
         let ledger_pruner = LedgerPrunerManager::new(
@@ -301,7 +302,6 @@ impl AptosDB {
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_store,
-            system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_pruner,
             ledger_pruner,
@@ -321,6 +321,7 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
         target_snapshot_size: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -352,13 +353,13 @@ impl AptosDB {
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
                     "ledger_db",
-                    gen_ledger_cfds(),
+                    gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
                 )?,
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
                     "state_merkle_db",
-                    gen_state_merkle_cfds(),
+                    gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
             )
         };
@@ -368,6 +369,7 @@ impl AptosDB {
             state_merkle_db,
             pruner_config,
             target_snapshot_size,
+            max_num_nodes_per_lru_cache_shard,
             readonly,
         );
 
@@ -457,6 +459,7 @@ impl AptosDB {
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
             TARGET_SNAPSHOT_SIZE,
+            0,
             true,
         ))
     }
@@ -466,6 +469,7 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         target_snapshot_size: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
     ) -> Self {
         Self::open(
@@ -475,6 +479,7 @@ impl AptosDB {
             RocksdbConfigs::default(),
             enable_indexer,
             target_snapshot_size,
+            max_num_nodes_per_lru_cache_shard,
         )
         .expect("Unable to open AptosDB")
     }
@@ -482,13 +487,31 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, false)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
+    }
+
+    /// This opens db in non-readonly mode, without the pruner and cache.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
+        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, 0, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, true)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            true,
+        )
     }
 
     /// This opens db in non-readonly mode, without the pruner.
@@ -497,13 +520,25 @@ impl AptosDB {
         db_root_path: P,
         target_snapshot_size: usize,
     ) -> Self {
-        Self::new_without_pruner(db_root_path, false, target_snapshot_size, false)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            target_snapshot_size,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
     }
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, true, TARGET_SNAPSHOT_SIZE, false)
+        Self::new_without_pruner(
+            db_root_path,
+            true,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
     }
 
     /// This gets the current buffered_state in StateStore.
@@ -704,35 +739,12 @@ impl AptosDB {
         Ok(events_with_version)
     }
 
-    /// Convert a `ChangeSet` to `SealedChangeSet`.
-    ///
-    /// Specifically, counter increases are added to current counter values and converted to DB
-    /// alternations.
-    fn seal_change_set(
-        &self,
-        first_version: Version,
-        num_txns: Version,
-        mut cs: ChangeSet,
-    ) -> Result<(SealedChangeSet, Option<LedgerCounters>)> {
-        // Avoid reading base counter values when not necessary.
-        let counters = if num_txns > 0 {
-            Some(self.system_store.bump_ledger_counters(
-                first_version,
-                first_version + num_txns - 1,
-                &mut cs,
-            )?)
-        } else {
-            None
-        };
-
-        Ok((SealedChangeSet { batch: cs.batch }, counters))
-    }
-
     fn save_transactions_impl(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
-        cs: &mut ChangeSet,
+        expected_state_db_usage: StateStorageUsage,
+        cs: &mut SchemaBatch,
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
@@ -746,8 +758,12 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
-            self.state_store
-                .put_value_sets(state_updates_vec, first_version, cs)?;
+            self.state_store.put_value_sets(
+                state_updates_vec,
+                first_version,
+                expected_state_db_usage,
+                cs,
+            )?;
         }
 
         // Event updates. Gather event accumulator root hashes.
@@ -790,8 +806,8 @@ impl AptosDB {
     /// Write the whole schema batch including all data necessary to mutate the ledger
     /// state of some transaction by leveraging rocksdb atomicity support. Also committed are the
     /// LedgerCounters.
-    fn commit(&self, sealed_cs: SealedChangeSet) -> Result<()> {
-        self.ledger_db.write_schemas(sealed_cs.batch)?;
+    fn commit(&self, batch: SchemaBatch) -> Result<()> {
+        self.ledger_db.write_schemas(batch)?;
         Ok(())
     }
 
@@ -1139,7 +1155,7 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
-            error_if_version_is_pruned(&self.state_pruner, "State", version)?;
+            error_if_version_is_pruned(&self.ledger_pruner, "State", version)?;
 
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
@@ -1152,7 +1168,7 @@ impl DbReader for AptosDB {
         state_key: &StateKey,
         version: Version,
     ) -> Result<SparseMerkleProofExt> {
-        gauged_api("get_proof_by_version", || {
+        gauged_api("get_state_proof_by_version_ext", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
@@ -1383,6 +1399,15 @@ impl DbReader for AptosDB {
     fn indexer_enabled(&self) -> bool {
         self.indexer.is_some()
     }
+
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        gauged_api("get_state_storage_usage", || {
+            if let Some(v) = version {
+                error_if_version_is_pruned(&self.ledger_pruner, "state storage usage", v)?;
+            }
+            self.state_store.get_usage(version)
+        })
+    }
 }
 
 impl DbWriter for AptosDB {
@@ -1428,10 +1453,14 @@ impl DbWriter for AptosDB {
             }
 
             // Gather db mutations to `batch`.
-            let mut cs = ChangeSet::new();
+            let mut batch = SchemaBatch::new();
 
-            let new_root_hash =
-                self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
+            let new_root_hash = self.save_transactions_impl(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                &mut batch,
+            )?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {
@@ -1443,7 +1472,7 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 );
 
-                self.ledger_store.put_ledger_info(x, &mut cs)?;
+                self.ledger_store.put_ledger_info(x, &mut batch)?;
             }
 
             ensure!(Some(last_version) == latest_in_memory_state.current_version,
@@ -1453,12 +1482,11 @@ impl DbWriter for AptosDB {
             );
 
             // Persist.
-            let (sealed_cs, counters) = self.seal_change_set(first_version, num_txns, cs)?;
             {
                 let _timer = OTHER_TIMERS_SECONDS
                     .with_label_values(&["save_transactions_commit"])
                     .start_timer();
-                self.commit(sealed_cs)?;
+                self.commit(batch)?;
             }
 
             {
@@ -1504,16 +1532,12 @@ impl DbWriter for AptosDB {
                 )?;
             }
 
-            // Only increment counter if commit succeeds and there are at least one transaction written
-            // to the storage. That's also when we'd inform the pruner thread to work.
+            // If commit succeeds and there are at least one transaction written to the storage, we
+            // will inform the pruner thread to work.
             if num_txns > 0 {
                 let last_version = first_version + num_txns - 1;
                 COMMITTED_TXNS.inc_by(num_txns);
                 LATEST_TXN_VERSION.set(last_version as i64);
-                counters
-                    .expect("Counters should be bumped with transactions being saved.")
-                    .bump_op_counters();
-
                 self.set_pruner_target_version(last_version);
             }
 
@@ -1584,7 +1608,7 @@ impl DbWriter for AptosDB {
             )?;
 
             // Create a single change set for all further write operations
-            let mut change_set = ChangeSet::new();
+            let mut batch = SchemaBatch::new();
 
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
@@ -1607,14 +1631,14 @@ impl DbWriter for AptosDB {
                 &transactions,
                 &transaction_infos,
                 &events,
-                Some(&mut change_set),
+                Some(&mut batch),
             )?;
             restore_utils::save_transaction_outputs(
                 self.ledger_db.clone(),
                 self.transaction_store.clone(),
                 version,
                 outputs,
-                Some(&mut change_set),
+                Some(&mut batch),
             )?;
 
             // Save the epoch ending ledger infos
@@ -1622,19 +1646,19 @@ impl DbWriter for AptosDB {
                 self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 ledger_infos,
-                Some(&mut change_set),
+                Some(&mut batch),
             )?;
 
             // Delete the genesis transaction
-            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
+            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut batch)?;
             LedgerPruner::prune_genesis(
                 self.ledger_db.clone(),
                 self.state_store.clone(),
-                &mut change_set,
+                &mut batch,
             )?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
-            self.ledger_db.clone().write_schemas(change_set.batch)?;
+            self.ledger_db.clone().write_schemas(batch)?;
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
 

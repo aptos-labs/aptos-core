@@ -20,8 +20,8 @@ use std::{collections::VecDeque, hash::Hasher, sync::Arc};
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct SipHashGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerByte,
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
 }
 
 /// Feed thes bytes into SipHasher. This is not cryptographically secure.
@@ -36,7 +36,7 @@ fn native_sip_hash(
 
     let bytes = pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base_cost + gas_params.unit_cost * NumBytes::new(bytes.len() as u64);
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
 
     // SipHash of the serialized bytes
     let mut hasher = siphasher::sip::SipHasher::new();

@@ -20,23 +20,83 @@ const EADD_OVERFLOW: u64 = 0x02_0001;
 /// When `Subtraction` operation goes below zero.
 const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
-/// Specifies different delta partial function specifications.
+/// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub enum DeltaOp {
-    /// Addition of `value` which overflows on `limit`.
-    Addition { value: u128, limit: u128 },
-    /// Subtraction of `value` which cannot go below zero.
-    Subtraction { value: u128 },
+pub struct DeltaOp {
+    /// Maximum positive delta seen during execution.
+    max_positive: u128,
+    /// Smallest negative delta seen during execution.
+    min_negative: u128,
+    /// Postcondition: delta overflows on exceeding this limit or going below
+    /// zero.
+    limit: u128,
+    /// Delta whoch is the result of the execution.
+    update: DeltaUpdate,
+}
+
+/// Different delta functions.
+#[derive(Copy, Clone, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum DeltaUpdate {
+    Plus(u128),
+    Minus(u128),
 }
 
 impl DeltaOp {
+    /// Creates a new delta op.
+    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128) -> Self {
+        Self {
+            max_positive,
+            min_negative,
+            limit,
+            update,
+        }
+    }
+
+    /// Returns the kind of update for the delta op.
+    pub fn get_update(&self) -> DeltaUpdate {
+        self.update
+    }
+
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
-        match self {
-            DeltaOp::Addition { value, limit } => addition(base, *value, *limit),
-            DeltaOp::Subtraction { value } => subtraction(base, *value),
+        // First, validate if delta op can be applied to `base`. Note that
+        // this is possible if the values observed during execution didn't
+        // overflow or dropped below zero. The check can be emulated by actually
+        // doing addition and subtraction.
+        addition(base, self.max_positive, self.limit)?;
+        subtraction(base, self.min_negative)?;
+
+        // If delta has been sucessfully validated, apply the update.
+        match self.update {
+            DeltaUpdate::Plus(value) => addition(base, value, self.limit),
+            DeltaUpdate::Minus(value) => subtraction(base, value),
         }
+    }
+
+    /// Aggregates another delta into `self`.
+    pub fn merge_with(&mut self, other: DeltaOp) -> PartialVMResult<()> {
+        use DeltaUpdate::*;
+
+        Ok(match (self.update, other.update) {
+            (Plus(value), Plus(other_value)) => {
+                let new_value = addition(value, other_value, self.limit)?;
+                self.update = Plus(new_value);
+            }
+            (Plus(value), Minus(other_value)) | (Minus(other_value), Plus(value)) => {
+                if value >= other_value {
+                    let new_value = subtraction(value, other_value)?;
+                    self.update = Plus(new_value);
+                } else {
+                    let new_value = subtraction(other_value, value)?;
+                    self.update = Minus(new_value);
+                }
+            }
+            (Minus(value), Minus(other_value)) => {
+                let new_value = addition(value, other_value, self.limit)?;
+                self.update = Minus(new_value);
+            }
+        })
     }
 
     /// Consumes a single delta and tries to materialize it with a given state
@@ -106,11 +166,11 @@ fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
 
 impl std::fmt::Debug for DeltaOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeltaOp::Addition { value, limit } => {
-                write!(f, "+{} ensures result <= {}", value, limit)
+        match self.update {
+            DeltaUpdate::Plus(value) => {
+                write!(f, "+{} ensures result <= {}", value, self.limit)
             }
-            DeltaOp::Subtraction { value } => {
+            DeltaUpdate::Minus(value) => {
                 write!(f, "-{} ensures 0 <= result", value)
             }
         }
@@ -187,16 +247,17 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claim::{assert_err, assert_matches, assert_ok_eq};
+    use aptos_state_view::state_storage_usage::StateStorageUsage;
+    use claim::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
     fn addition(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::Addition { value, limit }
+        DeltaOp::new(DeltaUpdate::Plus(value), limit, 0, 0)
     }
 
-    fn subtraction(value: u128) -> DeltaOp {
-        DeltaOp::Subtraction { value }
+    fn subtraction(value: u128, limit: u128) -> DeltaOp {
+        DeltaOp::new(DeltaUpdate::Minus(value), limit, 0, 0)
     }
 
     #[test]
@@ -211,12 +272,40 @@ mod tests {
 
     #[test]
     fn test_delta_subtraction() {
-        let sub5 = subtraction(5);
+        let sub5 = subtraction(5, 100);
         assert_err!(sub5.apply_to(0));
         assert_err!(sub5.apply_to(1));
 
         assert_ok_eq!(sub5.apply_to(5), 0);
         assert_ok_eq!(sub5.apply_to(100), 95);
+    }
+
+    #[test]
+    fn test_delta_merge() {
+        use DeltaUpdate::*;
+
+        let mut v = addition(5, 20);
+        let add20 = addition(20, 20);
+        let sub15 = subtraction(15, 20);
+        let add7 = addition(7, 20);
+        let mut sub1 = subtraction(1, 20);
+        let sub20 = subtraction(20, 20);
+
+        // Overflow on merge.
+        assert_err!(v.merge_with(add20)); // 25
+
+        // Successful merges.
+        assert_ok!(v.merge_with(v)); // 10
+        assert_matches!(v.update, Plus(10));
+        assert_ok!(v.merge_with(sub15)); // -5
+        assert_matches!(v.update, Minus(5));
+        assert_ok!(v.merge_with(add7)); // 2
+        assert_matches!(v.update, Plus(2));
+        assert_ok!(v.merge_with(sub1)); // 1
+        assert_matches!(v.update, Plus(1));
+
+        // Underflow on merge.
+        assert_err!(sub1.merge_with(sub20)); // -21
     }
 
     #[derive(Default)]
@@ -231,6 +320,10 @@ mod tests {
 
         fn is_genesis(&self) -> bool {
             self.data.is_empty()
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            Ok(StateStorageUsage::new_untracked())
         }
     }
 
@@ -253,7 +346,7 @@ mod tests {
 
         // Both addition and subtraction should succeed!
         let add_op = addition(100, 200);
-        let sub_op = subtraction(100);
+        let sub_op = subtraction(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &*KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
@@ -269,7 +362,7 @@ mod tests {
 
         // Both addition and subtraction should fail!
         let add_op = addition(15, 100);
-        let sub_op = subtraction(101);
+        let sub_op = subtraction(101, 1000);
 
         assert_matches!(
             add_op.try_into_write_op(&state_view, &*KEY),

@@ -8,6 +8,7 @@ use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
 };
 use anyhow::{anyhow, Error, Result};
+use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
 };
@@ -60,10 +61,10 @@ impl AccountState {
     }
 
     /// Into an iterator over the module values stored under this account
-    pub fn into_modules(self) -> impl Iterator<Item = Vec<u8>> {
+    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Vec<u8>)> {
         self.data.into_iter().filter_map(|(k, v)| {
             match Path::try_from(&k).expect("Invalid access path") {
-                Path::Code(_) => Some(v),
+                Path::Code(module) => Some((module, v)),
                 Path::Resource(_) => None,
             }
         })
@@ -133,7 +134,7 @@ impl TryFrom<&StateValue> for AccountState {
     type Error = Error;
 
     fn try_from(state_value: &StateValue) -> Result<Self> {
-        AccountState::try_from(&state_value.bytes).map_err(Into::into)
+        AccountState::try_from(state_value.bytes()).map_err(Into::into)
     }
 }
 
@@ -141,6 +142,14 @@ impl TryFrom<&Vec<u8>> for AccountState {
     type Error = Error;
 
     fn try_from(blob: &Vec<u8>) -> Result<Self> {
+        bcs::from_bytes(blob).map_err(Into::into)
+    }
+}
+
+impl TryFrom<&[u8]> for AccountState {
+    type Error = Error;
+
+    fn try_from(blob: &[u8]) -> Result<Self> {
         bcs::from_bytes(blob).map_err(Into::into)
     }
 }
@@ -179,7 +188,7 @@ impl TryFrom<(AccountAddress, &HashMap<StateKey, StateValue>)> for AccountState 
         for (key, value) in key_value_map {
             match key {
                 StateKey::AccessPath(access_path) => {
-                    btree_map.insert(access_path.path.clone(), value.bytes.clone());
+                    btree_map.insert(access_path.path.clone(), value.bytes().to_vec());
                 }
                 _ => return Err(anyhow!("Encountered unexpected key type {:?}", key)),
             }

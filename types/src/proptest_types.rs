@@ -6,6 +6,7 @@ use crate::{
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
     account_state::AccountState,
+    aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -13,7 +14,6 @@ use crate::{
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    multi_signature::PartialSignatures,
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -600,9 +600,8 @@ impl Arbitrary for LedgerInfoWithSignatures {
                 LedgerInfoWithSignatures::new(
                     ledger_info,
                     validator_verifier
-                        .aggregate_multi_signature(&partial_sig)
-                        .unwrap()
-                        .0,
+                        .aggregate_signatures(&partial_sig)
+                        .unwrap(),
                 )
             })
             .boxed()

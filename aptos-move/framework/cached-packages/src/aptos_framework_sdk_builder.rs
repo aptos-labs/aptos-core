@@ -39,6 +39,16 @@ pub enum EntryFunctionCall {
         auth_key: AccountAddress,
     },
 
+    /// Offer rotation capability of this account to another address
+    /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
+    /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
+    /// The recipient address refers to the address that the account owner wants to give the rotation capability to.
+    AccountOfferRotationCapabilityEd25519 {
+        rotation_capability_sig_bytes: Vec<u8>,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     AccountRotateAuthenticationKey {
         new_auth_key: Vec<u8>,
     },
@@ -97,7 +107,7 @@ pub enum EntryFunctionCall {
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
-        pack_serialized: Vec<u8>,
+        metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
     },
 
@@ -106,6 +116,12 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
         to: AccountAddress,
         amount: u64,
+    },
+
+    /// Upgrade total supply to use a parallelizable implementation if it is
+    /// available.
+    CoinUpgradeSupply {
+        coin_type: TypeTag,
     },
 
     /// Entry function to register to receive a specific `CoinType`. An account that wants to hold a coin type
@@ -238,7 +254,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Updates the major version to a larger version.
-    /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+    /// This can be called by on chain governance.
     VersionSetVersion {
         major: u64,
     },
@@ -250,6 +266,15 @@ impl EntryFunctionCall {
         use EntryFunctionCall::*;
         match self {
             AccountCreateAccount { auth_key } => account_create_account(auth_key),
+            AccountOfferRotationCapabilityEd25519 {
+                rotation_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_rotation_capability_ed25519(
+                rotation_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
@@ -285,14 +310,15 @@ impl EntryFunctionCall {
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
             CodePublishPackageTxn {
-                pack_serialized,
+                metadata_serialized,
                 code,
-            } => code_publish_package_txn(pack_serialized, code),
+            } => code_publish_package_txn(metadata_serialized, code),
             CoinTransfer {
                 coin_type,
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
+            CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
             CoinsRegister { coin_type } => coins_register(coin_type),
             GasScheduleSetGasSchedule { gas_schedule_blob } => {
                 gas_schedule_set_gas_schedule(gas_schedule_blob)
@@ -392,6 +418,33 @@ pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
         ident_str!("create_account").to_owned(),
         vec![],
         vec![bcs::to_bytes(&auth_key).unwrap()],
+    ))
+}
+
+/// Offer rotation capability of this account to another address
+/// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
+/// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
+/// The recipient address refers to the address that the account owner wants to give the rotation capability to.
+pub fn account_offer_rotation_capability_ed25519(
+    rotation_capability_sig_bytes: Vec<u8>,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability_ed25519").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
     ))
 }
 
@@ -564,7 +617,7 @@ pub fn aptos_governance_vote(
 /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
 /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
 pub fn code_publish_package_txn(
-    pack_serialized: Vec<u8>,
+    metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -578,7 +631,7 @@ pub fn code_publish_package_txn(
         ident_str!("publish_package_txn").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&pack_serialized).unwrap(),
+            bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
         ],
     ))
@@ -597,6 +650,23 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
         ident_str!("transfer").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Upgrade total supply to use a parallelizable implementation if it is
+/// available.
+pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("upgrade_supply").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -993,7 +1063,7 @@ pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
 }
 
 /// Updates the major version to a larger version.
-/// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+/// This can be called by on chain governance.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1014,6 +1084,20 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountCreateAccount {
                 auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_offer_rotation_capability_ed25519(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferRotationCapabilityEd25519 {
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -1121,7 +1205,7 @@ mod decoder {
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
-                pack_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1135,6 +1219,16 @@ mod decoder {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinUpgradeSupply {
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -1390,6 +1484,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_create_account),
         );
         map.insert(
+            "account_offer_rotation_capability_ed25519".to_string(),
+            Box::new(decoder::account_offer_rotation_capability_ed25519),
+        );
+        map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
         );
@@ -1428,6 +1526,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
+        );
+        map.insert(
+            "coin_upgrade_supply".to_string(),
+            Box::new(decoder::coin_upgrade_supply),
         );
         map.insert(
             "coins_register".to_string(),

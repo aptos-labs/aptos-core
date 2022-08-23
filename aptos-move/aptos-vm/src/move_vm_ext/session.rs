@@ -5,17 +5,24 @@ use crate::{
     access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::ChangeSetExt};
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    delta_change_set::{serialize, DeltaChangeSet},
+    transaction::ChangeSetExt,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
-use framework::natives::code::{NativeCodeContext, PublishRequest};
+use framework::natives::{
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
+    code::{NativeCodeContext, PublishRequest},
+};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
@@ -29,6 +36,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::btree_map::Entry,
     convert::TryInto,
     ops::{Deref, DerefMut},
 };
@@ -107,20 +115,14 @@ where
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        // TODO: Once we are ready to connect aggregator with delta writes,
-        // make sure we pass them to the session output.
-        //
-        // Expected changes will be:
-        //   * Use `Aggregator` for gas fees tracking in coin.
-        //   * Pass `aggregator_change_set` further to produce `DeltaChangeSet`.
-        //   * Have e2e tests and benchmarks.
-        // let aggregator_context: NativeAggregatorContext = extensions.remove();
-        // let _ = aggregator_context.into_change_set();
+        let aggregator_context: NativeAggregatorContext = extensions.remove();
+        let aggregator_change_set = aggregator_context.into_change_set();
 
         Ok(SessionOutput {
             change_set,
             events,
             table_change_set,
+            aggregator_change_set,
         })
     }
 
@@ -148,22 +150,25 @@ pub struct SessionOutput {
     pub change_set: MoveChangeSet,
     pub events: Vec<MoveEvent>,
     pub table_change_set: TableChangeSet,
+    pub aggregator_change_set: AggregatorChangeSet,
 }
 
 impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
-    ) -> Result<ChangeSet, VMStatus> {
+    ) -> Result<ChangeSetExt, VMStatus> {
         use MoveStorageOp::*;
-
         let Self {
             change_set,
             events,
             table_change_set,
+            aggregator_change_set,
         } = self;
 
         let mut write_set_mut = WriteSetMut::new(Vec::new());
+        let mut delta_change_set = DeltaChangeSet::empty();
+
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
@@ -198,6 +203,24 @@ impl SessionOutput {
             }
         }
 
+        for (id, change) in aggregator_change_set.changes {
+            let AggregatorID { handle, key } = id;
+            let key_bytes = serialize(&key);
+            let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
+
+            match change {
+                AggregatorChange::Write(value) => {
+                    let write_op = WriteOp::Modification(serialize(&value));
+                    write_set_mut.push((state_key, write_op));
+                }
+                AggregatorChange::Merge(delta_op) => delta_change_set.push((state_key, delta_op)),
+                AggregatorChange::Delete => {
+                    let write_op = WriteOp::Deletion;
+                    write_set_mut.push((state_key, write_op));
+                }
+            }
+        }
+
         let write_set = write_set_mut
             .freeze()
             .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
@@ -211,17 +234,8 @@ impl SessionOutput {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        Ok(ChangeSet::new(write_set, events))
-    }
-
-    pub fn into_change_set_ext<C: AccessPathCache>(
-        self,
-        ap_cache: &mut C,
-    ) -> Result<ChangeSetExt, VMStatus> {
-        // TODO: extract `DeltaChangeSet` from Aggregator extension (when it lands)
-        // and initialize `ChangeSetExt` properly.
-        self.into_change_set(ap_cache)
-            .map(|change_set| ChangeSetExt::new(DeltaChangeSet::empty(), change_set))
+        let change_set = ChangeSet::new(write_set, events);
+        Ok(ChangeSetExt::new(delta_change_set, change_set))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
@@ -230,7 +244,7 @@ impl SessionOutput {
             .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
         self.events.extend(other.events.into_iter());
 
-        // Squash the table changes
+        // Squash the table changes.
         self.table_change_set
             .new_tables
             .extend(other.table_change_set.new_tables);
@@ -254,6 +268,42 @@ impl SessionOutput {
                 });
             my_changes.entries.extend(changes.entries.into_iter());
         }
+
+        // Squash aggregator changes.
+        for (other_id, other_change) in other.aggregator_change_set.changes {
+            match self.aggregator_change_set.changes.entry(other_id) {
+                // If something was changed only in `other` session, add it.
+                Entry::Vacant(entry) => {
+                    entry.insert(other_change);
+                }
+                // Otherwise, we might need to aggregate deltas.
+                Entry::Occupied(mut entry) => {
+                    use AggregatorChange::*;
+
+                    let entry_mut = entry.get_mut();
+                    match (*entry_mut, other_change) {
+                        (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
+                        (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
+                        (Write(data), Merge(delta)) => {
+                            let new_data = delta
+                                .apply_to(data)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Write(new_data);
+                        }
+                        (Merge(mut delta1), Merge(delta2)) => {
+                            delta1
+                                .merge_with(delta2)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Merge(delta1)
+                        }
+                        // Hashing properties guarantee that aggregator keys should
+                        // not collide, making this case impossible.
+                        (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 }

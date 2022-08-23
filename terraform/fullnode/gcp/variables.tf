@@ -68,7 +68,7 @@ variable "chain_id" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "c2-standard-4"
+  default     = "c2-standard-8"
 }
 
 variable "enable_backup" {

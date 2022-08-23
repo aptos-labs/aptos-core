@@ -1,11 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::driver_factory::DriverFactory;
-use crate::metadata_storage::PersistentMetadataStorage;
-use aptos_config::config::TARGET_SNAPSHOT_SIZE;
+use crate::{driver_factory::DriverFactory, metadata_storage::PersistentMetadataStorage};
 use aptos_config::{
-    config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
+    config::{
+        RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+        TARGET_SNAPSHOT_SIZE,
+    },
     utils::get_genesis_txn,
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
@@ -39,6 +40,7 @@ fn test_new_initialized_configs() {
         RocksdbConfigs::default(),
         false,
         TARGET_SNAPSHOT_SIZE,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
     .unwrap();
     let (_, db_rw) = DbReaderWriter::wrap(db);

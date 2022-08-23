@@ -17,7 +17,7 @@ module aptos_framework::code {
         packages: vector<PackageMetadata>,
     }
 
-    /// Metadata for a package.
+    /// Metadata for a package. All byte blobs are represented as base64-of-gzipped-bytes
     struct PackageMetadata has store, copy, drop {
         /// Name of this package.
         name: String,
@@ -26,26 +26,23 @@ module aptos_framework::code {
         /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
         /// This field will be automatically assigned on successful upgrade.
         upgrade_number: u64,
-        /// The BuildInfo, in the BuildInfo.yaml format.
-        build_info: String,
-        /// The package manifest, in the Move.toml format.
-        manifest: String,
+        /// The source digest of the sources in the package. This is constructed by first building the
+        /// sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
+        source_digest: String,
+        /// The package manifest, in the Move.toml format. Gzipped text.
+        manifest: vector<u8>,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// Error map, in BCS
-        error_map: vector<u8>,
-        /// ABIs, in BCS
-        abis: vector<vector<u8>>
     }
 
     /// Metadata about a module in a package.
     struct ModuleMetadata has store, copy, drop {
         /// Name of the module.
         name: String,
-        /// Source text, in gzipped form.
+        /// Source text, gzipped String. Empty if not provided.
         source: vector<u8>,
-        /// Source map, in internal encoding, and then gziped.
-        source_map: vector<u8>,
+        /// Source map, in compressed BCS. Empty if not provided.
+        source_map: vector<u8>
     }
 
     /// Describes an upgrade policy
@@ -69,7 +66,7 @@ module aptos_framework::code {
     /// publication mode should only be used for modules which aren't shared with user others.
     /// The developer is responsible for not breaking memory layout of any resources he already
     /// stored on chain.
-    public fun upgrade_policy_no_compat(): UpgradePolicy {
+    public fun upgrade_policy_arbitrary(): UpgradePolicy {
         UpgradePolicy{policy: 0}
     }
 
@@ -145,9 +142,9 @@ module aptos_framework::code {
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
-    public entry fun publish_package_txn(owner: &signer, pack_serialized: vector<u8>, code: vector<vector<u8>>)
+    public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
-        publish_package(owner, util::from_bytes<PackageMetadata>(pack_serialized), code)
+        publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
     }
 
     // Helpers

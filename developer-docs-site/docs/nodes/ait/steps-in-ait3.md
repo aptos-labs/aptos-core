@@ -8,90 +8,123 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Steps in AIT-3
 
-:::caution DRAFT-only
-These AIT-3 docs are draft-only for now.
+See below the summary flowcharts and detailed steps you will execute while participating in AIT-3.
+
+:::caution Chrome browser only
+The new Petra (Aptos Wallet) is supported only on the Chrome browser. Hence, for all the below AIT-3 tasks, make sure that you use only the Chrome browser. 
 :::
 
-See below the summary flowcharts and detailed steps you will execute while participating.
-
-## Deploy the validator node and register 
+## Sign-in, connect Wallet and complete survey
 
 Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the minimum performance requirements as reported by the [Node Health Checker](/nodes/node-health-checker). 
 
 ### Summary steps
 
+<center>
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
-    light: useBaseUrl('/img/docs/install-node-and-register.svg'),
-    dark: useBaseUrl('/img/docs/install-node-and-register.svg'),
+    light: useBaseUrl('/img/docs/sign-in-to-survey.svg'),
+    dark: useBaseUrl('/img/docs/sign-in-to-survey-dark.svg'),
   }}
 />
+</center>
 
 ### Detailed steps
 
+
 To participate in the AIT-3 program, follow the below steps. Use these steps as a checklist to keep track of your progress. Click on the links in each step for a detailed documentation.
+
+1. Navigate to the [Aptos Community page](https://aptoslabs.com/community) and follow the steps, starting with registering or signing in to your Discord account.
+
+2. Before you click on Step 2 **CONNECT WALLET**: 
+   1. Delete any previous versions of Aptos Wallet you have installed on Chrome
+   2. Install the Petra (Aptos Wallet) extension using Step 3 instructions, and 
+   2. Create the first wallet using Step 4 instructions.
+3. **Install** the Petra (Aptos Wallet) extension on your Chrome browser by [following the instructions here](/guides/install-petra-wallet-extension).
+    
+4. <span id="create-wallet">Create the first wallet using Petra (Aptos Wallet)</span>. 
+
+  **This first wallet will always be the owner wallet**. 
+
+   1. Open the Aptos Wallet extension from the Extensions section of the Chrome browser, or by clicking on the puzzle piece on top right of the browser and selecting Aptos Wallet.
+   2. Click **Create a new wallet**. 
+   3. Make sure to store your seed phrase somewhere safe. This account will be used in the future.
+    
+5. Click on Step 2 **CONNECT WALLET** to register the owner wallet address to your Aptos Community account. The Aptos team will airdrop coins to this owner wallet address. 
+
+6. Click on the Step 3 **COMPLETE SURVEY** to complete the survey.
+
+7. Next, proceed to install and deploy the validator node.
+
+## Deploy the validator node and register the node
+
+### Summary steps
+
+<center>
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/install-validator-and-register.svg'),
+    dark: useBaseUrl('/img/docs/install-validator-and-register-dark.svg'),
+  }}
+/>
+</center>
+
+### Detailed steps
 
 1. Read the Node Requirements. 
 
+  :::tip
+
   Before you proceed, make sure that your hardware, storage and network resources satisfy the [Node Requirements](node-requirements.md).
+  :::
 
-2. Follow the instructions and deploy a validator node in the test mode.
+2. Follow the detailed node installation steps provided in [Validators](/nodes/validator-node/validators) and deploy a validator node in the test mode.
 
-  Follow the detailed node installation steps provided in: [Validators](/nodes/validator-node/validators). **Make sure to set your node in the Test mode.** Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.
+  **Make sure to set your node in the Test mode.** Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.
 
-3. Register your node in the Aptos Community Platform.
+3. Come back to the Aptos Community page and register your node by clicking on Step 4: **NODE REGISTRATION** button.
    
-  Navigate to the [Aptos Community page](https://aptoslabs.com/community) and register your node. Provide your account address, your operator public key, and your validator's network addresses. The operator public key is the  `account_public_key` from the "aptosbot.yaml" file for the validator node.
+  Provide the details of your validator node on this node registration screen, all the public key information you need is in the `~/$WORKSPACE/keys/public-keys.yaml` file (please don't enter anything from private keys).
+  
+    - OWNER KEY: the first wallet public key. From Settings -> Credentials
+    - CONSENSUS KEY: consensus_public_key from `public-keys.yaml`
+    - CONSENSUS POP: consensus_proof_of_possession from `public-keys.yaml`
+    - ACCOUNT KEY: account_public_key from `public-keys.yaml`
+    - VALIDATOR NETWORK KEY: validator_network_public_key from `public-keys.yaml`
 
-4. If your node passes healthcheck, you will be prompted to complete the KYC process.
+4. Next, click on **VALIDATE NODE**. If your node passes healthcheck, you will be prompted to complete the identity verification process.
 
-  The Aptos team will perform a node health check on your validator, using the [Node Health Checker](/nodes/node-health-checker). When Aptos confirms that your node is healthy, you will be asked to complete the KYC process. You will also be automatically enrolled in the Aptos notifications. This will enable you to receive all communication from Aptos Labs throughout the AIT-3 program.
+  The Aptos team will perform a node health check on your validator, using the [Node Health Checker](/nodes/node-health-checker). When Aptos confirms that your node is healthy, you will be asked to complete the KYC process. 
 
-5. If you are selected, then proceed to **Install the Wallet and Stake** step.
+5. Wait for the selection announcement. If you are selected, the Aptos team will airdrop coins into your owner wallet address. If you do not see airdropped coins in your owner wallet, you were not selected.
 
+6. If you are selected, then proceed to **Iniatilize staking pool** step. 
 
-## Install the Wallet and Stake
+## Initialize staking pool
 
 ### Summary steps
 
 <ThemedImage
 alt="Signed Transaction Flow"
 sources={{
-    light: useBaseUrl('/img/docs/wallet-actions.svg'),
-    dark: useBaseUrl('/img/docs/wallet-actions.svg'),
+    light: useBaseUrl('/img/docs/initialize-staking-pool.svg'),
+    dark: useBaseUrl('/img/docs/initialize-staking-pool-dark.svg'),
   }}
 />
 
 ### Detailed steps
 
 :::caution Before you proceed
-Proceed to the below steps only if your node has passed the NHC for AIT-3 and you are selected to participate in the AIT-3.
+Proceed to the below steps only if you are selected to participate in the AIT-3.
 :::
 
-1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals?network=test2). 
+1. Confirm that you received the token from the Aptos team by checking the balance of your Petra wallet. Make sure you are connected to the AIT-3 network by click **Settings** → **Network**.
 
-2. Install Petra (Aptos Wallet).
-    
-  Click on the **INSTALL WALLET** button and follow the directions to install the Aptos Wallet Extension on your Chrome browser. 
-    
-3. Create wallets for the owner and the voter. 
+2. Create another wallet address for the voter. See [the above Step 4: Create the wallet using Petra](#create-wallet) to create a wallet on Petra. This step is optional. You can use the owner wallet account as voter wallet as well. However, the best practice is to have a dedicate voting account so that you do not need to access your owner key frequently for governance operations.
 
-  In this step you will create wallets for two personas: the owner and the voter. See [Owner, operator and voter personas](/nodes/ait/whats-new-in-ait3#owner-operator-and-voter-personas) for an explanation of personas. 
-    
-    1. Create the first wallet. **This first wallet will always be the owner wallet**.
-        1. Open the Aptos Wallet extension from the Extensions section of the Chrome browser, or by clicking on the puzzle piece on top right of the browser and selecting Aptos Wallet.
-        2. Click **Create a new wallet**. 
-        3. When you are done creating the wallet, go to **Extensions** > **Aptos Wallet** and click on the gear icon on the bottom right. You will see the **Settings** screen. Click on the **Network** button and select **Localhost** network. 
-        4. Next, click again on the gear icon on the bottom right to go to the **Settings** page. Click on the **Credentials**. Copy and paste and save both the **Private key** and **Address** keys in a separate text file for later use. **This private key is the owner key**.
-    2. Create the voter wallet. 
-        1. Open the Aptos Wallet extension. 
-        2. Click on the pair of 3 vertical dots at the top right of the Aptos Wallet screen. A slide-up screen will appear showing **+New Wallet** button. Create a new wallet and name it as **voter**.  
-        3. Save the **Private key** and **Address** for the voter wallets. See the first wallet creation step above that describes how to save. 
-        4. Now you have two wallets: For the owner and the voter.
-4. Register the owner wallet address in the Aptos Community Platform. The Aptos team will airdrop coins to this owner wallet address. This step will also establish that you are the owner for the node you registered earlier (see Step 3 above in the **Deploy the validator node** section).
-5. Wait until the Aptos team airdrops the coins into the owner wallet before proceeding further. Proceed to the next step, i.e., staking, after you verify that the airdropped coins are in the owner wallet. 
-6. **Next you will stake and delegate.** 
+3. **Next you will stake and delegate.** 
 
   :::tip Read the Staking document
 
@@ -100,14 +133,17 @@ Proceed to the below steps only if your node has passed the NHC for AIT-3 and yo
 
   You will begin by initializing the staking pool and delegating to the operator and the voter. 
 
-    1. From the Chrome browser, go to the [**Staking section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals/stake?network=test2).
+    1. From the Chrome browser, go to the [**Staking section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals/stake?network=ait3).
     2. Make sure the wallet is connected with your **owner** account.
     3. Provide the following inputs:
-        1. Staking Amount: TODO
-        2. Operator Address: The address of your operator (i.e., validator). This is the `account_address` from the "aptosbot.yaml" file.
+        1. Staking Amount: 100000000000000 (1 million Aptos coin with 8 decimals)
+        2. Operator Address: The address of your operator account. This is the `operator_account_address` from the "operator.yaml" file, under `~/$WORKSPACE/$USERNAME` folder.
         3. Voter Address: The wallet address of your voter.
     4. Click **SUBMIT**. You will see a green snackbar indicating that the transaction is successful.
-7. Next, proceed to **Connect to AIT-3 and join the validator set**.
+
+6. Next, as the owner, using Petra wallet, transfer 5000 coin each to your operator address and voter wallet address. Both the operator and the voter will use these funds to pay the gas fees while validating and voting.
+
+7. Proceed to **Connect to AIT-3 and join the validator set**.
 
 
 ## Connect to AIT-3 and join the validator set
@@ -121,7 +157,7 @@ See [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) fo
 
 You will test the voting feature in this step.
 
-1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals?network=test2).
+1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals?network=ait3).
 2. View the proposals. When you are ready to vote on a proposal, click on the proposal. 
 3. Make sure you connected the wallet with your **voter** wallet account. 
 4. Provide your **owner** account address and vote “For” or “Against”. 

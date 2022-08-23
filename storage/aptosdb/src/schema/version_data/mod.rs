@@ -15,6 +15,7 @@
 use super::VERSION_DATA_CF_NAME;
 use crate::schema::ensure_slice_len_eq;
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::Version;
 use byteorder::{BigEndian, ReadBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
@@ -31,6 +32,21 @@ use std::mem::size_of;
 pub struct VersionData {
     pub state_items: usize,
     pub total_state_bytes: usize,
+}
+
+impl From<StateStorageUsage> for VersionData {
+    fn from(usage: StateStorageUsage) -> Self {
+        Self {
+            state_items: usage.items(),
+            total_state_bytes: usage.bytes(),
+        }
+    }
+}
+
+impl VersionData {
+    pub fn get_state_storage_usage(&self) -> StateStorageUsage {
+        StateStorageUsage::new(self.state_items, self.total_state_bytes)
+    }
 }
 
 define_schema!(

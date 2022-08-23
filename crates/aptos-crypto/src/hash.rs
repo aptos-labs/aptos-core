@@ -105,7 +105,7 @@ use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::{
     self,
     convert::{AsRef, TryFrom},
@@ -290,8 +290,12 @@ impl ser::Serialize for HashValue {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
             // as the original type.
-            serializer
-                .serialize_newtype_struct("HashValue", serde_bytes::Bytes::new(&self.hash[..]))
+            #[derive(Serialize)]
+            #[serde(rename = "HashValue")]
+            struct Value<'a> {
+                hash: &'a [u8; HashValue::LENGTH],
+            }
+            Value { hash: &self.hash }.serialize(serializer)
         }
     }
 }
@@ -307,12 +311,15 @@ impl<'de> de::Deserialize<'de> for HashValue {
                 .map_err(<D::Error as ::serde::de::Error>::custom)
         } else {
             // See comment in serialize.
-            #[derive(::serde::Deserialize)]
+            #[derive(Deserialize)]
             #[serde(rename = "HashValue")]
-            struct Value<'a>(&'a [u8]);
+            struct Value {
+                hash: [u8; HashValue::LENGTH],
+            }
 
-            let value = Value::deserialize(deserializer)?;
-            Self::from_slice(value.0).map_err(<D::Error as ::serde::de::Error>::custom)
+            let value = Value::deserialize(deserializer)
+                .map_err(<D::Error as ::serde::de::Error>::custom)?;
+            Ok(Self::new(value.hash))
         }
     }
 }

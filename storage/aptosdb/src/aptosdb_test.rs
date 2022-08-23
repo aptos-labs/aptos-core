@@ -17,6 +17,7 @@ use crate::{
 };
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proof::SparseMerkleLeafNode,
@@ -83,37 +84,34 @@ fn test_too_many_requested() {
 }
 
 #[test]
-fn test_storage_config() {
+fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    for enable_ledger in [false, true] {
-        for enable_state in [false, true] {
-            let state_pruner = StatePrunerManager::new(
-                Arc::clone(&aptos_db.state_merkle_db),
-                StateMerklePrunerConfig {
-                    enable: enable_state,
-                    prune_window: 20,
-                    batch_size: 1,
-                    user_pruning_window_offset: 0,
-                },
-            );
+    for enable in [false, true] {
+        let state_pruner = StatePrunerManager::new(
+            Arc::clone(&aptos_db.state_merkle_db),
+            StateMerklePrunerConfig {
+                enable,
+                prune_window: 20,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+        );
+        assert_eq!(state_pruner.is_pruner_enabled(), enable);
+        assert_eq!(state_pruner.get_pruner_window(), 20);
 
-            assert_eq!(state_pruner.is_pruner_enabled(), enable_state);
-            assert_eq!(state_pruner.get_pruner_window(), 20);
-
-            let ledger_pruner = LedgerPrunerManager::new(
-                Arc::clone(&aptos_db.ledger_db),
-                Arc::clone(&aptos_db.state_store),
-                LedgerPrunerConfig {
-                    enable: enable_ledger,
-                    prune_window: 100,
-                    batch_size: 1,
-                    user_pruning_window_offset: 0,
-                },
-            );
-            assert_eq!(ledger_pruner.is_pruner_enabled(), enable_ledger);
-            assert_eq!(ledger_pruner.get_pruner_window(), 100);
-        }
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            Arc::clone(&aptos_db.state_store),
+            LedgerPrunerConfig {
+                enable,
+                prune_window: 100,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+        );
+        assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
+        assert_eq!(ledger_pruner.get_pruner_window(), 100);
     }
 }
 
@@ -187,6 +185,7 @@ fn test_get_latest_executed_trees() {
     assert!(
         bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
+            StateStorageUsage::new_untracked(),
             vec![txn_info.hash()],
             1,
         ))

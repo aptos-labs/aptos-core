@@ -183,7 +183,7 @@ impl LocalNode {
             .get_ledger_information()
             .await
             .map(|_| ())
-            .map_err(HealthCheckError::Failure)
+            .map_err(|err| HealthCheckError::Failure(err.into()))
     }
 }
 

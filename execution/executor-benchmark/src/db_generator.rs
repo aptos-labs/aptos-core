@@ -7,7 +7,9 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 
-use aptos_config::config::{PrunerConfig, TARGET_SNAPSHOT_SIZE};
+use aptos_config::config::{
+    PrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
@@ -61,6 +63,7 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
             rocksdb_configs,
             false, /* indexer */
             TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )
         .expect("DB should open."),
     );

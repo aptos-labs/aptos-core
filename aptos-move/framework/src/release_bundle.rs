@@ -4,15 +4,17 @@
 use crate::built_package::BuiltPackage;
 use crate::natives::code::PackageMetadata;
 use crate::path_in_crate;
-use aptos_types::transaction::EntryABI;
+use aptos_types::account_address::AccountAddress;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
 use move_deps::move_binary_format::CompiledModule;
 use move_deps::move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_EXTENSION,
 };
-use move_deps::move_core_types::errmap::ErrorMapping;
 use move_deps::move_core_types::language_storage::ModuleId;
+use move_deps::move_model::code_writer::CodeWriter;
+use move_deps::move_model::model::Loc;
+use move_deps::move_model::{emit, emitln};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -56,31 +58,6 @@ impl ReleaseBundle {
     pub fn write(&self, path: PathBuf) -> anyhow::Result<()> {
         std::fs::write(path, bcs::to_bytes(self)?)?;
         Ok(())
-    }
-
-    /// Constructs a unified error map for all packages in this bundle.
-    pub fn error_mapping(&self) -> ErrorMapping {
-        let mut map = ErrorMapping::default();
-        for pack in &self.packages {
-            let ErrorMapping {
-                mut error_categories,
-                mut module_error_maps,
-            } = bcs::from_bytes::<ErrorMapping>(&pack.package_metadata().error_map)
-                .expect("bcs of error map");
-            map.error_categories.append(&mut error_categories);
-            map.module_error_maps.append(&mut module_error_maps);
-        }
-        map
-    }
-
-    /// Returns a list of all EntryABIs in this bundle.
-    pub fn abis(&self) -> Vec<EntryABI> {
-        let mut result = vec![];
-        for pack in &self.packages {
-            let mut abis = pack.abis();
-            result.append(&mut abis);
-        }
-        result
     }
 
     /// Returns a list of all module bytecodes in this bundle.
@@ -167,15 +144,6 @@ impl ReleasePackage {
         &mut self.metadata
     }
 
-    /// Returns the ABIs.
-    pub fn abis(&self) -> Vec<EntryABI> {
-        self.metadata
-            .abis
-            .iter()
-            .map(|a| bcs::from_bytes::<EntryABI>(a).expect("BCS for EntryABI must be valid"))
-            .collect()
-    }
-
     /// Returns code and compiled modules, topological sorted regarding dependencies.
     pub fn sorted_code_and_modules(&self) -> Vec<(&[u8], CompiledModule)> {
         let mut map = self
@@ -217,5 +185,86 @@ impl ReleasePackage {
             }
         }
         order.push(id)
+    }
+
+    pub fn generate_script_proposal(
+        &self,
+        for_address: AccountAddress,
+        out: PathBuf,
+    ) -> anyhow::Result<()> {
+        let writer = CodeWriter::new(Loc::default());
+        emitln!(
+            writer,
+            "// Upgrade proposal for package `{}`\n",
+            self.metadata.name
+        );
+        emitln!(writer, "// source digest: {}", self.metadata.source_digest);
+        emitln!(writer, "script {");
+        writer.indent();
+        emitln!(writer, "use std::vector;");
+        emitln!(writer, "use aptos_framework::aptos_governance;");
+        emitln!(writer, "use aptos_framework::code;\n");
+        emitln!(writer, "fun main(proposal_id: u64){");
+        writer.indent();
+
+        emitln!(
+            writer,
+            "let framework_signer = aptos_governance::resolve(proposal_id, @{});",
+            for_address
+        );
+        emit!(writer, "let code = ");
+        Self::generate_blobs(&writer, &self.code);
+        emitln!(writer, ";");
+
+        // The package metadata can be larger than 64k, which is the max for Move constants.
+        // We therefore have to split it into chunks. Three chunks should be large enough
+        // to cover any current and future needs. We then dynamically append them to obtain
+        // the result.
+        let mut metadata = bcs::to_bytes(&self.metadata)?;
+        let chunk_size = metadata.len() / 3;
+        for i in 1..4 {
+            let to_drain = if i == 3 { metadata.len() } else { chunk_size };
+            let chunk = metadata.drain(0..to_drain).collect::<Vec<_>>();
+            emit!(writer, "let chunk{} = ", i);
+            Self::generate_blob(&writer, &chunk);
+            emitln!(writer, ";")
+        }
+        emitln!(writer, "vector::append(&mut chunk1, chunk2);");
+        emitln!(writer, "vector::append(&mut chunk1, chunk3);");
+        emitln!(
+            writer,
+            "code::publish_package_txn(&framework_signer, chunk1, code)"
+        );
+        writer.unindent();
+        emitln!(writer, "}");
+        writer.unindent();
+        emitln!(writer, "}");
+        writer.process_result(|s| std::fs::write(&out, s))?;
+        Ok(())
+    }
+
+    fn generate_blobs(writer: &CodeWriter, blobs: &[Vec<u8>]) {
+        emitln!(writer, "vector[");
+        writer.indent();
+        for blob in blobs {
+            Self::generate_blob(writer, blob);
+            emitln!(writer, ",")
+        }
+        writer.unindent();
+        emit!(writer, "]");
+    }
+
+    fn generate_blob(writer: &CodeWriter, data: &[u8]) {
+        emitln!(writer, "vector[");
+        writer.indent();
+        for (i, b) in data.iter().enumerate() {
+            if (i + 1) % 20 == 0 {
+                emitln!(writer);
+            }
+            emit!(writer, "{}u8,", b);
+        }
+        emitln!(writer);
+        writer.unindent();
+        emit!(writer, "]")
     }
 }

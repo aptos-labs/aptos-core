@@ -155,8 +155,9 @@ mod tests {
                 let info = aptos_rest_client::aptos_api_types::TransactionInfo {
                     version: 0.into(),
                     hash: HashValue::zero().into(),
-                    state_root_hash: HashValue::zero().into(),
+                    state_change_hash: HashValue::zero().into(),
                     event_root_hash: HashValue::zero().into(),
+                    state_checkpoint_hash: None,
                     gas_used: 0.into(),
                     success: true,
                     vm_status: "Executed".to_string(),
@@ -512,7 +513,7 @@ mod tests {
         let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         assert_eq!(
             address.to_string(),
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
+            "9ff98e82355eb13098f3b1157ac018a725c62c0e0820f422000814cdba407835"
         );
         address
     }

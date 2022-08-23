@@ -132,6 +132,10 @@ module aptos_framework::reconfiguration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
 
+    public fun current_epoch(): u64 acquires Configuration {
+        borrow_global<Configuration>(@aptos_framework).epoch
+    }
+
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
@@ -145,5 +149,24 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
+    }
+
+    // For tests, skips the guid validation.
+    #[test_only]
+    public fun initialize_for_test(account: &signer) {
+        system_addresses::assert_aptos_framework(account);
+        move_to<Configuration>(
+            account,
+            Configuration {
+                epoch: 0,
+                last_reconfiguration_time: 0,
+                events: event::new_event_handle<NewEpochEvent>(account),
+            }
+        );
+    }
+
+    #[test_only]
+    public fun reconfigure_for_test() acquires Configuration {
+        reconfigure();
     }
 }

@@ -1,23 +1,25 @@
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [
-                        (
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: [
+                            (
+                                AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+                                ),
+                                Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1030000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
                             ),
-                            Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1030000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
-                        ),
-                        (
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
+                            (
+                                AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
+                                ),
+                                Creation(a11ceb0b0500000006010002030205050703070a04080e200c2e0700000001000100010300014d0166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10001000001010200),
                             ),
-                            Creation(a11ceb0b0500000006010002030205050703070a04080e200c2e0700000001000100010300014d0166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10001000001010200),
-                        ),
-                    ],
-                },
+                        ],
+                    },
+                ),
             ),
             events: [],
             gas_used: 1,
@@ -30,17 +32,19 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [
-                        (
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: [
+                            (
+                                AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+                                ),
+                                Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1040000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
                             ),
-                            Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1040000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
-                        ),
-                    ],
-                },
+                        ],
+                    },
+                ),
             ),
             events: [],
             gas_used: 1,

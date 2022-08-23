@@ -4,5 +4,5 @@
 mod data_stream;
 mod stream_engine;
 mod streaming_client;
-mod streaming_service;
-mod utils;
+pub mod streaming_service;
+pub mod utils;

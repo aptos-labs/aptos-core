@@ -50,7 +50,7 @@
               <% elsif step.name == :node_registration %>
                 Register your node, and automatically verify that it is set up correctly.
               <% elsif step.name == :identity_verification %>
-                Identity must be verified by noon (PST) July 11 to get into the selection process.
+                Identity must be verified by noon (PST) August 27 to get into the selection process.
               <% end %>
               </p>
 
@@ -69,7 +69,7 @@
                     <% elsif step.name == :connect_wallet %>
                       <p class="font-light">
                       An Aptos wallet must be installed to continue.
-                      <%= render(LinkComponent.new(href: 'https://aptos.dev/guides/building-wallet-extension#step-1-install-the-wallet-on-chrome'), target: '_blank') { 'Learn more' } %></p>
+                      <%= render(LinkComponent.new(href: 'https://aptos.dev/guides/building-wallet-extension#step-1-install-the-wallet-on-chrome', target: '_blank')) { 'Learn more' } %></p>
                     <% end %>
                   <% end %>
                 <% end %>

@@ -656,7 +656,7 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MoveModuleId {
     pub address: Address,
     pub name: IdentifierWrapper,

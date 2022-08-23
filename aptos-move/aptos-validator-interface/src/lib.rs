@@ -6,6 +6,7 @@ mod storage_interface;
 pub use crate::storage_interface::DBDebuggerInterface;
 
 use anyhow::{anyhow, Result};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -120,7 +121,7 @@ impl<'a> DebuggerStateView<'a> {
         Ok(self
             .db
             .get_state_value_by_version(state_key, version)?
-            .map(|v| v.bytes))
+            .map(|v| v.into_bytes()))
     }
 }
 
@@ -134,5 +135,9 @@ impl<'a> StateView for DebuggerStateView<'a> {
 
     fn is_genesis(&self) -> bool {
         false
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        unimplemented!()
     }
 }

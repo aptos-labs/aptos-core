@@ -1,10 +1,12 @@
 spec aptos_framework::timestamp {
     spec set_time_has_started {
+        use std::signer;
         /// This function can't be verified on its own and has to be verified in the context of Genesis execution.
         ///
         /// After time has started, all invariants guarded by `Timestamp::is_operating` will become activated
         /// and need to hold.
         pragma delegate_invariants_to_caller;
+        aborts_if exists<CurrentTimeMicroseconds>(signer::address_of(account));
         include AbortsIfNotGenesis;
         include system_addresses::AbortsIfNotAptosFramework{account};
         ensures is_operating();
@@ -50,11 +52,6 @@ spec aptos_framework::timestamp {
     }
     spec fun spec_now_seconds(): u64 {
         spec_now_microseconds() / MICRO_CONVERSION_FACTOR
-    }
-
-    spec assert_genesis {
-        pragma opaque = true;
-        include AbortsIfNotGenesis;
     }
 
     /// Helper schema to specify that a function aborts if not in genesis.

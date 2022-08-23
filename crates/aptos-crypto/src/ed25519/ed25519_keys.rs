@@ -141,7 +141,7 @@ impl SigningKey for Ed25519PrivateKey {
         Ed25519PrivateKey::sign_arbitrary_message(self, signing_message(message).as_ref())
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(any(test, feature = "fuzzing", feature = "sign-arbitrary-message"))]
     fn sign_arbitrary_message(&self, message: &[u8]) -> Ed25519Signature {
         Ed25519PrivateKey::sign_arbitrary_message(self, message)
     }

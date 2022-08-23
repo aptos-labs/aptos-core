@@ -268,7 +268,7 @@ impl Transaction {
             payload,
             version: u64_to_bigdecimal(*info.version.inner()),
             hash: info.hash.to_string(),
-            state_root_hash: info.state_root_hash.to_string(),
+            state_root_hash: info.state_change_hash.to_string(),
             event_root_hash: info.event_root_hash.to_string(),
             gas_used: u64_to_bigdecimal(*info.gas_used.inner()),
             success: info.success,

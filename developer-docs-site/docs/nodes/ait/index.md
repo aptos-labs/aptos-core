@@ -8,10 +8,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # AIT-3
 
-:::caution DRAFT-only
-These AIT-3 docs are draft-only for now.
-:::
-
 <p class="card-section-h2">Welcome to AIT-3</p>
 
 The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos validator node operator, and be willing and capable to test the new features.
@@ -22,7 +18,9 @@ The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos comm
 _All dates and times shown are for Pacific Time, year 2022._
 
 - **August 19:** Registration starts. Node and identity verification begins.
-- **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
+- **August 25:** Registration ends.
+- **August 29:** Notification of the selection results sent out.
+- **August 30:** AIT-3 becomes live.
 - **September 9:** AIT-3 concludes.
 
 :::

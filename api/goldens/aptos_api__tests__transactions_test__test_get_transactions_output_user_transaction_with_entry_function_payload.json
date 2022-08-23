@@ -2,8 +2,9 @@
   {
     "version": "1",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
+    "state_checkpoint_hash": null,
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
@@ -50,6 +51,15 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::state_storage::StateStorageUsage",
+          "data": "state storage omitted"
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "500000"
@@ -69,6 +79,7 @@
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "hash": "",
           "height": "1",
           "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
@@ -88,9 +99,10 @@
   {
     "version": "2",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
-    "gas_used": "2",
+    "state_checkpoint_hash": null,
+    "gas_used": "3",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -239,8 +251,9 @@
   {
     "version": "3",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
+    "state_checkpoint_hash": "",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",

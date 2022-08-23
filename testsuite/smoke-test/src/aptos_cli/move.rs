@@ -5,12 +5,14 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::move_tool::MemberId;
 use aptos::test::CliTestFramework;
 use aptos_logger::info;
+use framework::{BuildOptions, BuiltPackage};
+use move_deps::move_core_types::account_address::AccountAddress;
 use move_deps::move_package::source_package::manifest_parser::parse_move_manifest_from_file;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
 const PACKAGE_NAME: &str = "AwesomePackage";
-const HELLO_BLOCKCHAIN: &str = "HelloBlockchain";
+const HELLO_BLOCKCHAIN: &str = "hello_blockchain";
 
 #[tokio::test]
 async fn test_move_compile_flow() {
@@ -119,5 +121,33 @@ async fn test_move_publish_flow() {
         .run_function(0, None, function_id, vec!["string:hello_world"], vec![])
         .await
         .is_ok());
-    // TODO: Verify output
+
+    // Now download the package. It will be stored in a directory PACKAGE_NAME inside move_dir.
+    let _ = match cli
+        .download_package(0, PACKAGE_NAME.to_owned(), cli.move_dir())
+        .await
+    {
+        Ok(response) => response,
+        Err(err) => panic!("Should not have failed to download package {:?}", err),
+    };
+
+    // Ensure the downloaded package can build. This is a test that the information is correctly
+    // roundtripped.
+    let _ = match BuiltPackage::build(
+        cli.move_dir().join(PACKAGE_NAME),
+        BuildOptions {
+            named_addresses: std::iter::once((
+                HELLO_BLOCKCHAIN.to_owned(),
+                AccountAddress::from_hex_literal(&account).expect("account address parsable"),
+            ))
+            .collect(),
+            ..BuildOptions::default()
+        },
+    ) {
+        Ok(response) => response,
+        Err(err) => panic!(
+            "Should not have failed to build downloaded package {:?}",
+            err
+        ),
+    };
 }

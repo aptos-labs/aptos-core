@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliError, CliTypedResult, PoolAddressArgs, PromptOptions, TransactionOptions,
+    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, PromptOptions, TransactionOptions,
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use crate::move_tool::{compile_move, init_move_dir, ArgWithType, FunctionArgType};
+use crate::move_tool::{init_move_dir, ArgWithType, FunctionArgType, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
@@ -18,10 +18,9 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::Parser;
-use move_deps::{
-    move_compiler::compiled_unit::CompiledUnitEnum,
-    move_core_types::{language_storage::TypeTag, transaction_argument::TransactionArgument},
-    move_package::BuildConfig,
+use framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use move_deps::move_core_types::{
+    language_storage::TypeTag, transaction_argument::TransactionArgument,
 };
 use reqwest::Url;
 use serde::Deserialize;
@@ -46,6 +45,7 @@ pub enum GovernanceTool {
     Propose(SubmitProposal),
     Vote(SubmitVote),
     ExecuteProposal(ExecuteProposal),
+    GenerateUpgradeProposal(GenerateUpgradeProposal),
 }
 
 impl GovernanceTool {
@@ -55,6 +55,7 @@ impl GovernanceTool {
             Propose(tool) => tool.execute_serialized().await,
             Vote(tool) => tool.execute_serialized().await,
             ExecuteProposal(tool) => tool.execute_serialized().await,
+            GenerateUpgradeProposal(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -113,11 +114,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         if let Transaction::UserTransaction(inner) = txn {
             // Find event with proposal id
-            let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+            let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
                 event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
             }) {
-                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
-                    .map_err(|_| {
+                let data: CreateProposalEvent =
+                    serde_json::from_value(event.data).map_err(|_| {
                         CliError::UnexpectedError(
                             "Failed to parse Proposal event to get ProposalId".to_string(),
                         )
@@ -330,15 +331,18 @@ fn compile_in_temp_dir(
 }
 
 fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
-    let build_config = BuildConfig {
-        additional_named_addresses: BTreeMap::new(),
-        generate_abis: false,
-        generate_docs: false,
-        ..Default::default()
+    let build_options = BuildOptions {
+        with_srcs: false,
+        with_abis: false,
+        with_source_maps: false,
+        with_error_map: false,
+        install_dir: None,
+        named_addresses: Default::default(),
     };
 
-    let compiled_package = compile_move(build_config, package_dir)?;
-    let scripts_count = compiled_package.scripts().count();
+    let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)?;
+
+    let scripts_count = pack.script_count();
 
     if scripts_count != 1 {
         return Err(CliError::UnexpectedError(format!(
@@ -348,26 +352,9 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
         )));
     }
 
-    let script = *compiled_package
-        .scripts()
-        .collect::<Vec<_>>()
-        .get(0)
-        .unwrap();
-
-    match script.unit {
-        CompiledUnitEnum::Script(ref s) => {
-            let mut bytes = vec![];
-
-            s.script
-                .serialize(&mut bytes)
-                .map_err(|err| CliError::UnexpectedError(format!("Unexpected error: {}", err)))?;
-            let hash = HashValue::sha3_256_of(bytes.as_slice());
-            Ok((bytes, hash))
-        }
-        CompiledUnitEnum::Module(_) => Err(CliError::UnexpectedError(
-            "You can only execute a script, a module is not supported.".to_string(),
-        )),
-    }
+    let bytes = pack.extract_script_code().pop().unwrap();
+    let hash = HashValue::sha3_256_of(bytes.as_slice());
+    Ok((bytes, hash))
 }
 
 /// Execute a proposal that has passed voting requirements
@@ -452,7 +439,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let mut type_args: Vec<TypeTag> = Vec::new();
 
         // These TypeArgs are used for generics
-        for type_arg in self.type_args.iter().cloned() {
+        for type_arg in self.type_args.into_iter() {
             let type_tag = TypeTag::try_from(type_arg)
                 .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
             type_args.push(type_tag)
@@ -500,5 +487,52 @@ impl CompileProposalArgs {
 
         // Compile script
         compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
+    }
+}
+
+/// Generates a package upgrade proposal script.
+#[derive(Parser)]
+pub struct GenerateUpgradeProposal {
+    /// Address of the account which the proposal addresses.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+
+    /// Where to store the generated proposal
+    #[clap(long, parse(from_os_str), default_value = "proposal.move")]
+    pub(crate) output: PathBuf,
+
+    /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
+    /// `all`. `none` is the most compact form and does not allow to reconstruct a source
+    /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
+    /// a source package; `all` includes all available artifacts. The choice of included
+    /// artifacts heavily influences the size and therefore gas cost of publishing: `none`
+    /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
+    /// as much.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
+
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for GenerateUpgradeProposal {
+    fn command_name(&self) -> &'static str {
+        "GenerateUpgradeProposal"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let GenerateUpgradeProposal {
+            move_options,
+            account,
+            included_artifacts,
+            output,
+        } = self;
+        let package_path = move_options.get_package_path()?;
+        let options = included_artifacts.build_options(move_options.named_addresses());
+        let package = BuiltPackage::build(package_path, options)?;
+        let release = ReleasePackage::new(package)?;
+        release.generate_script_proposal(account, output)?;
+        Ok("success")
     }
 }

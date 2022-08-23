@@ -4,19 +4,36 @@
 use crate::transaction::Version;
 use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, CryptoHasher, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct StateValue {
-    pub bytes: Vec<u8>,
-    #[serde(skip)]
+    inner: StateValueInner,
     hash: HashValue,
+}
+
+#[derive(
+    BCSCryptoHash,
+    Clone,
+    CryptoHasher,
+    Debug,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Serialize,
+    Ord,
+    PartialOrd,
+    Hash,
+)]
+#[serde(rename = "StateValue")]
+pub enum StateValueInner {
+    V0(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -34,27 +51,44 @@ impl<'de> Deserialize<'de> for StateValue {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(rename = "StateValue")]
-        struct Bytes {
-            bytes: Vec<u8>,
-        }
-        let bytes = Bytes::deserialize(deserializer)?;
+        let inner = StateValueInner::deserialize(deserializer)?;
+        let hash = CryptoHash::hash(&inner);
+        Ok(Self { inner, hash })
+    }
+}
 
-        Ok(Self::new(bytes.bytes))
+impl Serialize for StateValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.inner.serialize(serializer)
     }
 }
 
 impl StateValue {
-    fn new(bytes: Vec<u8>) -> Self {
-        let mut hasher = StateValueHasher::default();
-        hasher.update(bytes.as_slice());
-        let hash = hasher.finish();
-        Self { bytes, hash }
+    pub fn new(bytes: Vec<u8>) -> Self {
+        let inner = StateValueInner::V0(bytes);
+        let hash = CryptoHash::hash(&inner);
+        Self { inner, hash }
     }
 
     pub fn size(&self) -> usize {
-        self.bytes.len()
+        match &self.inner {
+            StateValueInner::V0(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        match &self.inner {
+            StateValueInner::V0(bytes) => bytes,
+        }
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        match self.inner {
+            StateValueInner::V0(bytes) => bytes,
+        }
     }
 }
 

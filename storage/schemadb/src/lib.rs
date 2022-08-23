@@ -34,8 +34,8 @@ use std::{collections::HashMap, iter::Iterator, marker::PhantomData, path::Path}
 
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
-    ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions, SliceTransform,
-    DEFAULT_COLUMN_FAMILY_NAME,
+    BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
+    SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
 pub type ColumnFamilyName = &'static str;
 

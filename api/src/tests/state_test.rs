@@ -65,6 +65,35 @@ async fn test_get_account_resource_struct_tag_not_found() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resource_with_version() {
+    let mut context = new_test_context(current_function_name!());
+    let ledger_version = context.get_latest_ledger_info().version();
+    let resp = context
+        .get(&get_account_resource_with_version(
+            "0xA550C18",
+            "0x1::guid::Generator",
+            ledger_version,
+        ))
+        .await;
+
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resource_with_version_too_large() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = context
+        .expect_status_code(404)
+        .get(&get_account_resource_with_version(
+            "0xA550C18",
+            "0x1::guid::Generator",
+            100000000,
+        ))
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_module() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get(&get_account_module("0x1", "guid")).await;
@@ -177,11 +206,18 @@ fn get_account_resource(address: &str, struct_tag: &str) -> String {
     format!("/accounts/{}/resource/{}", address, struct_tag)
 }
 
+fn get_account_resource_with_version(address: &str, struct_tag: &str, version: u64) -> String {
+    format!(
+        "/accounts/{}/resource/{}?ledger_version={}",
+        address, struct_tag, version
+    )
+}
+
 fn get_account_module(address: &str, name: &str) -> String {
     format!("/accounts/{}/module/{}", address, name)
 }
 
-fn get_table_item(handle: u128) -> String {
+fn get_table_item(handle: AccountAddress) -> String {
     format!("/tables/{}/item", handle)
 }
 

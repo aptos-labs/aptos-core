@@ -178,7 +178,7 @@ impl BlockCache {
     ) -> ApiResult<aptos_rest_client::aptos_api_types::Block> {
         let block = self
             .rest_client
-            .get_block(height, with_transactions)
+            .get_block_by_height(height, with_transactions)
             .await?
             .into_inner();
         let block_id = BlockInfo::from_block(&block);
@@ -210,7 +210,7 @@ impl BlockCache {
         } else {
             // TODO: We can alternatively scan backwards in time to find the hash
             // If for some reason the block doesn't get found, retry with block incomplete
-            Err(ApiError::BlockIncomplete)
+            Err(ApiError::BlockNotFound(None))
         }
     }
 }

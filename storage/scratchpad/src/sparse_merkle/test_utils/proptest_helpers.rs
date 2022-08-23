@@ -7,6 +7,7 @@ use crate::{
     SparseMerkleTree,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::state_value::StateValue;
 use proptest::{
     collection::{hash_set, vec},
@@ -74,7 +75,10 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
     let mut naive_q = VecDeque::new();
     naive_q.push_back(NaiveSmt::new::<StateValue>(&[]));
     let mut updater_q = VecDeque::new();
-    updater_q.push_back(SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+    updater_q.push_back(SparseMerkleTree::new(
+        *SPARSE_MERKLE_PLACEHOLDER_HASH,
+        StateStorageUsage::zero(),
+    ));
 
     for action in input {
         match action {

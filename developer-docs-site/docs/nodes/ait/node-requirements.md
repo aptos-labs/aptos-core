@@ -23,7 +23,7 @@ In test mode, you will be running a local network with one single node, and it s
 
 ## Hardware requirements
 
-For running an Aptos **Validator node** we recommend the following hardware resources:
+For running an Aptos **Validator and Fullnode** we recommend the following hardware resources:
 
   - **CPU**:
       - 8 cores, 16 threads
@@ -39,23 +39,6 @@ Example machine types on various clouds:
       - c2-standard-16
   - Azure
       - Standard_B8ms
-
-For running an Aptos **Fullnode** we recommend the following hardware resources:
-
-  - **CPU**:
-      - 4 cores, 8 threads
-      - 2.8GHz, or faster
-      - Intel Xeon Skylake or newer
-  - **Memory**: 16GB RAM.
-
-Example machine types on various clouds:
-  - AWS
-      - c5.2xlarge
-      - c6i.2xlarge
-  - GCP
-      - c2-standard-8
-  - Azure
-      - Standard_B4ms
 
 ## Storage requirements
 

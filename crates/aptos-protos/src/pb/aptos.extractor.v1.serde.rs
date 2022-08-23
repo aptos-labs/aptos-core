@@ -5226,10 +5226,13 @@ impl serde::Serialize for TransactionInfo {
         if !self.hash.is_empty() {
             len += 1;
         }
-        if !self.state_root_hash.is_empty() {
+        if !self.state_change_hash.is_empty() {
             len += 1;
         }
         if !self.event_root_hash.is_empty() {
+            len += 1;
+        }
+        if self.state_checkpoint_hash.is_some() {
             len += 1;
         }
         if self.gas_used != 0 {
@@ -5253,16 +5256,22 @@ impl serde::Serialize for TransactionInfo {
             struct_ser
                 .serialize_field("hash", pbjson::private::base64::encode(&self.hash).as_str())?;
         }
-        if !self.state_root_hash.is_empty() {
+        if !self.state_change_hash.is_empty() {
             struct_ser.serialize_field(
-                "stateRootHash",
-                pbjson::private::base64::encode(&self.state_root_hash).as_str(),
+                "stateChangeHash",
+                pbjson::private::base64::encode(&self.state_change_hash).as_str(),
             )?;
         }
         if !self.event_root_hash.is_empty() {
             struct_ser.serialize_field(
                 "eventRootHash",
                 pbjson::private::base64::encode(&self.event_root_hash).as_str(),
+            )?;
+        }
+        if let Some(v) = self.state_checkpoint_hash.as_ref() {
+            struct_ser.serialize_field(
+                "stateCheckpointHash",
+                pbjson::private::base64::encode(&v).as_str(),
             )?;
         }
         if self.gas_used != 0 {
@@ -5294,8 +5303,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
     {
         const FIELDS: &[&str] = &[
             "hash",
-            "stateRootHash",
+            "stateChangeHash",
             "eventRootHash",
+            "stateCheckpointHash",
             "gasUsed",
             "success",
             "vmStatus",
@@ -5306,8 +5316,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Hash,
-            StateRootHash,
+            StateChangeHash,
             EventRootHash,
+            StateCheckpointHash,
             GasUsed,
             Success,
             VmStatus,
@@ -5338,8 +5349,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                     {
                         match value {
                             "hash" => Ok(GeneratedField::Hash),
-                            "stateRootHash" => Ok(GeneratedField::StateRootHash),
+                            "stateChangeHash" => Ok(GeneratedField::StateChangeHash),
                             "eventRootHash" => Ok(GeneratedField::EventRootHash),
+                            "stateCheckpointHash" => Ok(GeneratedField::StateCheckpointHash),
                             "gasUsed" => Ok(GeneratedField::GasUsed),
                             "success" => Ok(GeneratedField::Success),
                             "vmStatus" => Ok(GeneratedField::VmStatus),
@@ -5365,8 +5377,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut hash__ = None;
-                let mut state_root_hash__ = None;
+                let mut state_change_hash__ = None;
                 let mut event_root_hash__ = None;
+                let mut state_checkpoint_hash__ = None;
                 let mut gas_used__ = None;
                 let mut success__ = None;
                 let mut vm_status__ = None;
@@ -5383,11 +5396,11 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                                     .0,
                             );
                         }
-                        GeneratedField::StateRootHash => {
-                            if state_root_hash__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("stateRootHash"));
+                        GeneratedField::StateChangeHash => {
+                            if state_change_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stateChangeHash"));
                             }
-                            state_root_hash__ = Some(
+                            state_change_hash__ = Some(
                                 map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
                                     .0,
                             );
@@ -5397,6 +5410,17 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                                 return Err(serde::de::Error::duplicate_field("eventRootHash"));
                             }
                             event_root_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                        GeneratedField::StateCheckpointHash => {
+                            if state_checkpoint_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field(
+                                    "stateCheckpointHash",
+                                ));
+                            }
+                            state_checkpoint_hash__ = Some(
                                 map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
                                     .0,
                             );
@@ -5443,8 +5467,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                 }
                 Ok(TransactionInfo {
                     hash: hash__.unwrap_or_default(),
-                    state_root_hash: state_root_hash__.unwrap_or_default(),
+                    state_change_hash: state_change_hash__.unwrap_or_default(),
                     event_root_hash: event_root_hash__.unwrap_or_default(),
+                    state_checkpoint_hash: state_checkpoint_hash__,
                     gas_used: gas_used__.unwrap_or_default(),
                     success: success__.unwrap_or_default(),
                     vm_status: vm_status__.unwrap_or_default(),

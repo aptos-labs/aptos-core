@@ -16,8 +16,8 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, IncludedArtifacts, InitPackage, MemberId, PublishPackage,
-    RunFunction, TestPackage,
+    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
+    PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
@@ -259,7 +259,7 @@ impl CliTestFramework {
         proof_of_possession: bls12381::ProofOfPossession,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         InitializeValidator {
             txn_options: self.transaction_options(index, None),
             operator_config_file_args: OperatorConfigFileArgs {
@@ -280,7 +280,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
         AddStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -289,7 +289,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn unlock_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn unlock_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<TransactionSummary> {
         UnlockStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -298,7 +302,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn withdraw_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<TransactionSummary> {
         WithdrawStake {
             node_op_options: self.transaction_options(index, None),
             amount,
@@ -307,7 +315,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
         IncreaseLockup {
             txn_options: self.transaction_options(index, None),
         }
@@ -319,7 +327,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         JoinValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -332,7 +340,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         LeaveValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -347,7 +355,7 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -387,7 +395,7 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -424,7 +432,7 @@ impl CliTestFramework {
         initial_stake_amount: u64,
         voter_index: Option<usize>,
         operator_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         InitializeStakeOwner {
             txn_options: self.transaction_options(owner_index, None),
             initial_stake_amount,
@@ -439,7 +447,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         operator_index: usize,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
@@ -452,7 +460,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         voter_index: usize,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),
@@ -589,9 +597,9 @@ impl CliTestFramework {
         let sources_dir = move_dir.join("sources");
 
         let hello_blockchain_contents = include_str!(
-            "../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchain.move"
+            "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
         );
-        let source_path = sources_dir.join("HelloBlockchain.move");
+        let source_path = sources_dir.join("hello_blockchain.move");
         write_to_file(
             source_path.as_path(),
             &source_path.as_display().to_string(),
@@ -599,8 +607,8 @@ impl CliTestFramework {
         )
         .unwrap();
 
-        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchainTest.move");
-        let test_path = sources_dir.join("HelloBlockchainTest.move");
+        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
+        let test_path = sources_dir.join("hello_blockchain_test.move");
         write_to_file(
             test_path.as_path(),
             &test_path.as_display().to_string(),
@@ -669,6 +677,23 @@ impl CliTestFramework {
             legacy_flow,
             override_size_check: false,
             included_artifacts: IncludedArtifacts::All,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn download_package(
+        &self,
+        index: usize,
+        package: String,
+        output_dir: PathBuf,
+    ) -> CliTypedResult<&'static str> {
+        DownloadPackage {
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+            account: self.account_id(index),
+            package,
+            output_dir: Some(output_dir),
         }
         .execute()
         .await

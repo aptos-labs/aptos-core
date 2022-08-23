@@ -1,5 +1,5 @@
 {
-  "message": "Failed to retrieve block by height: NotFound(Json(AptosError { message: \"Failed to find block: Event 02000000000000000000000000000000000000000000000000000000000000000000000000000001 of seq num 1000. not found.\", error_code: None, aptos_ledger_version: None }))",
-  "error_code": null,
-  "aptos_ledger_version": null
+  "message": "Block not found by Block height(1000)",
+  "error_code": "block_not_found",
+  "vm_error_code": null
 }

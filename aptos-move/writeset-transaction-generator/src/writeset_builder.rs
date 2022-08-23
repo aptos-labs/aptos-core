@@ -3,7 +3,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -107,7 +107,11 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeS
 where
     F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
 {
-    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
+    let move_vm = MoveVmExt::new(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
+    .unwrap();
     let state_view_storage = RemoteStorage::new(state_view);
     let session_out = {
         // TODO: specify an id by human and pass that in.
@@ -125,8 +129,11 @@ where
             .unwrap()
     };
 
-    session_out
+    // Genesis never produces the delta change set.
+    let (_, change_set) = session_out
         .into_change_set(&mut ())
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
         .unwrap()
+        .into_inner();
+    change_set
 }

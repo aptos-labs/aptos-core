@@ -133,7 +133,7 @@ impl CliCommand<()> for InitTool {
                 )
             }
         };
-        profile_config.faucet_url = faucet_url.clone().map(|inner| inner.to_string());
+        profile_config.faucet_url = faucet_url.as_ref().map(|inner| inner.to_string());
 
         // Private key
         let private_key = if let Some(private_key) = self

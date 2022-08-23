@@ -84,7 +84,7 @@ variable "k8s_debugger_groups" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "Standard_B2s"
+  default     = "Standard_B8ms"
 }
 
 variable "utility_instance_num" {

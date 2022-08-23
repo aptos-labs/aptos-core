@@ -19,13 +19,17 @@ use crate::{
     VMExecutor, VMValidator,
 };
 use anyhow::Result;
-use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_aggregator::{
+    delta_change_set::DeltaChangeSet,
+    transaction::{ChangeSetExt, TransactionOutputExt},
+};
 use aptos_crypto::HashValue;
 use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::account_config::new_block_event_key;
+use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
@@ -165,8 +169,25 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, TransactionOutputExt) {
         let mut session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
+        // DNS HERE
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
+                // Inject abort info if available.
+                let status = match status {
+                    ExecutionStatus::MoveAbort {
+                        location: AbortLocation::Module(module),
+                        code,
+                        ..
+                    } => {
+                        let info = self.0.extract_abort_info(&module, code);
+                        ExecutionStatus::MoveAbort {
+                            location: AbortLocation::Module(module),
+                            code,
+                            info,
+                        }
+                    }
+                    _ => status,
+                };
                 // The transaction should be charged for gas, so run the epilogue to do that.
                 // This is running in a new session that drops any side effects from the
                 // attempted transaction (e.g., spending funds that were needed to pay for gas),
@@ -542,11 +563,13 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
+    ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => change_set.clone(),
+            WriteSetPayload::Direct(change_set) => {
+                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
+            }
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -631,27 +654,26 @@ impl AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set = match self.execute_writeset(
+        let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
             None,
             SessionId::genesis(genesis_id),
         ) {
-            Ok(cs) => cs,
+            Ok(cse) => cse,
             Err(e) => return e,
         };
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let txn_output = TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into());
         Ok((
             VMStatus::Executed,
-            TransactionOutputExt::from(TransactionOutput::new(
-                write_set,
-                events,
-                0,
-                VMStatus::Executed.into(),
-            )),
+            TransactionOutputExt::new(delta_change_set, txn_output),
         ))
     }
 
@@ -945,7 +967,7 @@ impl AptosSimulationVM {
     ) -> (VMStatus, TransactionOutputExt) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
-        if txn.clone().check_signature().is_ok() {
+        if txn.signature_is_valid() {
             return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
         }
 
