@@ -5,6 +5,7 @@
 
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_build_info::build_information;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
@@ -725,9 +726,13 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
 
+    let build_info = build_information!();
     // Create the telemetry service
-    let telemetry_runtime =
-        aptos_telemetry::service::start_telemetry_service(node_config.clone(), chain_id);
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id,
+        build_info,
+    );
 
     Ok(AptosHandle {
         _api: api_runtime,

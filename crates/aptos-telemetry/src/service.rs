@@ -3,18 +3,18 @@
 
 #![forbid(unsafe_code)]
 
+use futures::future;
+use once_cell::sync::Lazy;
+use rand::Rng;
+use rand_core::OsRng;
+use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::time::Duration;
 use std::{
     env,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use futures::future;
-use once_cell::sync::Lazy;
-use rand::Rng;
-use rand_core::OsRng;
-use serde::Deserialize;
 use tokio::{
     runtime::{Builder, Runtime},
     task::JoinHandle,
@@ -31,8 +31,8 @@ use crate::constants::{
     ENV_APTOS_DISABLE_EXPERIMENTAL_PUSH_METRICS, ENV_TELEMETRY_SERVICE_URL,
     PROMETHEUS_PUSH_METRICS_FREQ_SECS,
 };
+use crate::utils::create_build_info_telemetry_event;
 use crate::{
-    build_information::create_build_info_telemetry_event,
     constants::{
         APTOS_GA_API_SECRET, APTOS_GA_MEASUREMENT_ID, ENV_APTOS_DISABLE_TELEMETRY,
         ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, GA4_URL, HTTPBIN_URL,
@@ -73,7 +73,11 @@ fn enable_experimental_prometheus_push_metrics() -> bool {
 
 /// Starts the telemetry service and returns the execution runtime.
 /// Note: The service will not be created if telemetry is disabled.
-pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Option<Runtime> {
+pub fn start_telemetry_service(
+    node_config: NodeConfig,
+    chain_id: ChainId,
+    build_info: BTreeMap<String, String>,
+) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
         warn!("Aptos telemetry is disabled!");
@@ -89,9 +93,12 @@ pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Op
 
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);
-    telemetry_runtime
-        .handle()
-        .spawn(spawn_telemetry_service(peer_id, chain_id, node_config));
+    telemetry_runtime.handle().spawn(spawn_telemetry_service(
+        peer_id,
+        chain_id,
+        node_config,
+        build_info,
+    ));
 
     Some(telemetry_runtime)
 }
@@ -117,7 +124,12 @@ where
 }
 
 /// Spawns the dedicated telemetry service that operates periodically
-async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
+async fn spawn_telemetry_service(
+    peer_id: String,
+    chain_id: ChainId,
+    node_config: NodeConfig,
+    build_info: BTreeMap<String, String>,
+) {
     let telemetry_svc_url =
         env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
 
@@ -127,6 +139,7 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
     send_build_information(
         peer_id.clone(),
         chain_id.to_string().clone(),
+        build_info,
         telemetry_sender.clone(),
     )
     .await;
@@ -166,9 +179,10 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
 async fn send_build_information(
     peer_id: String,
     chain_id: String,
+    build_info: BTreeMap<String, String>,
     telemetry_sender: TelemetrySender,
 ) {
-    let telemetry_event = create_build_info_telemetry_event(chain_id).await;
+    let telemetry_event = create_build_info_telemetry_event(chain_id, build_info).await;
     send_telemetry_event_with_ip(peer_id, Some(telemetry_sender), telemetry_event).await;
 }
 
