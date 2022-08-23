@@ -1,9 +1,5 @@
 ## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
-## If you are trying to change how this CI works, you MUST go read the important
-## note at the top of build-images. In short, to test this, you must temporarily
-## change build-images to use the pull_request trigger instead of pull_request_target.
-
 ## Make sure to add the CICD:CICD:build-images and CICD:run-e2e-tests labels to test
 ## this within an in-review PR.
 
@@ -43,9 +39,9 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
 
       - uses: ./.github/actions/gar-auth
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: ./.github/actions/load-secrets
+        id: secrets
 
       - uses: actions/setup-node@v3
         with:
@@ -69,13 +65,13 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
       - uses: nick-fields/retry@v2
         name: generate-json-spec
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
@@ -101,7 +97,7 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
-      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
+      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
 
       # Wait for the API and faucet to startup.
       - run: npm install -g wait-on
@@ -144,7 +140,7 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
         if: github.event_name == 'push' && github.ref_name == 'devnet'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.secrets.outputs.NPM_JS_AUTH_TOKEN }}
 
       - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}

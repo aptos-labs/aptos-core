@@ -5,6 +5,7 @@ inputs:
     required: true
   GCP_SERVICE_ACCOUNT_EMAIL:
     required: true
+    default: "github-actions@aptos-ci.iam.gserviceaccount.com"
 
 runs:
   using: composite
@@ -13,9 +14,8 @@ runs:
       name: "Authenticate to Google Cloud"
       uses: "google-github-actions/auth@v0"
       with:
-        create_credentials_file: false
         token_format: "access_token"
-        workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        workload_identity_provider: projects/865717136349/locations/global/workloadIdentityPools/github-actions/providers/github-actions
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
 
     - name: Login to Google Artifact Registry
