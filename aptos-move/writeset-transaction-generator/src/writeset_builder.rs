@@ -11,7 +11,7 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::RemoteStorage,
+    data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
 use move_deps::{
@@ -105,14 +105,14 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
 
 pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeSet
 where
-    F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
+    F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
 {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
     )
     .unwrap();
-    let state_view_storage = RemoteStorage::new(state_view);
+    let state_view_storage = StorageAdapter::new(state_view);
     let session_out = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

@@ -5,10 +5,13 @@
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
 use crate::state_store::state_key::StateKey;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{
+    collections::{btree_map, BTreeMap},
+    ops::Deref,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -124,8 +127,12 @@ impl WriteSetV0 {
     }
 
     #[inline]
-    pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, WriteOp)> {
+    pub fn iter(&self) -> btree_map::Iter<'_, StateKey, WriteOp> {
         self.0.write_set.iter()
+    }
+
+    pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
+        self.0.get(key)
     }
 }
 
@@ -134,20 +141,18 @@ impl WriteSetV0 {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
-    write_set: Vec<(StateKey, WriteOp)>,
+    write_set: BTreeMap<StateKey, WriteOp>,
 }
 
 impl WriteSetMut {
-    pub fn new(write_set: Vec<(StateKey, WriteOp)>) -> Self {
-        Self { write_set }
+    pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Self {
+        Self {
+            write_set: write_ops.into_iter().collect(),
+        }
     }
 
-    pub fn push(&mut self, item: (StateKey, WriteOp)) {
-        self.write_set.push(item);
-    }
-
-    pub fn append(&mut self, other: &mut Self) {
-        self.write_set.append(&mut other.write_set);
+    pub fn insert(&mut self, item: (StateKey, WriteOp)) {
+        self.write_set.insert(item.0, item.1);
     }
 
     #[inline]
@@ -163,21 +168,60 @@ impl WriteSetMut {
         // TODO: add structural validation
         Ok(WriteSet::V0(WriteSetV0(self)))
     }
+
+    pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
+        self.write_set.get(key)
+    }
+
+    pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, WriteOp> {
+        &mut self.write_set
+    }
+
+    pub fn squash(mut self, other: Self) -> Result<Self> {
+        use btree_map::Entry::*;
+        use WriteOp::*;
+
+        for (key, op) in other.write_set.into_iter() {
+            match self.write_set.entry(key) {
+                Occupied(mut entry) => {
+                    let r = entry.get_mut();
+                    match (&r, op) {
+                        (Modification(_) | Creation(_), Creation(_))
+                        | (Deletion, Deletion | Modification(_)) => {
+                            bail!("The given change sets cannot be squashed")
+                        }
+                        (Modification(_), Modification(data)) => *r = Modification(data),
+                        (Creation(_), Modification(data)) => *r = Creation(data),
+                        (Modification(_), Deletion) => *r = Deletion,
+                        (Deletion, Creation(data)) => *r = Modification(data),
+                        (Creation(_), Deletion) => {
+                            entry.remove();
+                        }
+                    }
+                }
+                Vacant(entry) => {
+                    entry.insert(op);
+                }
+            }
+        }
+
+        Ok(self)
+    }
 }
 
 impl ::std::iter::FromIterator<(StateKey, WriteOp)> for WriteSetMut {
     fn from_iter<I: IntoIterator<Item = (StateKey, WriteOp)>>(iter: I) -> Self {
         let mut ws = WriteSetMut::default();
         for write in iter {
-            ws.push((write.0, write.1));
+            ws.insert((write.0, write.1));
         }
         ws
     }
 }
 
 impl<'a> IntoIterator for &'a WriteSet {
-    type Item = &'a (StateKey, WriteOp);
-    type IntoIter = ::std::slice::Iter<'a, (StateKey, WriteOp)>;
+    type Item = (&'a StateKey, &'a WriteOp);
+    type IntoIter = btree_map::Iter<'a, StateKey, WriteOp>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -188,7 +232,7 @@ impl<'a> IntoIterator for &'a WriteSet {
 
 impl ::std::iter::IntoIterator for WriteSet {
     type Item = (StateKey, WriteOp);
-    type IntoIter = ::std::vec::IntoIter<(StateKey, WriteOp)>;
+    type IntoIter = btree_map::IntoIter<StateKey, WriteOp>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {

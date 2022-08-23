@@ -51,8 +51,10 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::state_storage::StateStorageUsage",
-          "data": "state storage omitted"
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "500000"
+          }
         },
         "type": "write_resource"
       },
@@ -60,10 +62,8 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::timestamp::CurrentTimeMicroseconds",
-          "data": {
-            "microseconds": "500000"
-          }
+          "type": "0x1::state_storage::StateStorageUsage",
+          "data": "state storage omitted"
         },
         "type": "write_resource"
       }
@@ -142,37 +142,6 @@
         "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::account::Account",
-          "data": {
-            "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-            "coin_register_events": {
-              "counter": "1",
-              "guid": {
-                "id": {
-                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "rotation_capability_offer": {
-              "for": {
-                "vec": []
-              }
-            },
-            "sequence_number": "0",
-            "signer_capability_offer": {
-              "for": {
-                "vec": []
-              }
-            }
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
@@ -208,6 +177,37 @@
           "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::account::Account",
+          "data": {
+            "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "coin_register_events": {
+              "counter": "1",
+              "guid": {
+                "id": {
+                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+                  "creation_num": "0"
+                }
+              }
+            },
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"

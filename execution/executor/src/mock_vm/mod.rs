@@ -252,11 +252,11 @@ fn seqnum_ap(account: AccountAddress) -> AccessPath {
 fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
     let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(validator_set_ap),
         WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
@@ -270,11 +270,11 @@ fn gen_genesis_writeset() -> WriteSet {
 
 fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> WriteSet {
     let mut write_set = WriteSetMut::default();
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(balance_ap(sender)),
         WriteOp::Modification(balance.to_le_bytes().to_vec()),
     ));
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(seqnum_ap(sender)),
         WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
     ));
@@ -289,15 +289,15 @@ fn gen_payment_writeset(
     recipient_balance: u64,
 ) -> WriteSet {
     let mut write_set = WriteSetMut::default();
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(balance_ap(sender)),
         WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
     ));
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(seqnum_ap(sender)),
         WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
     ));
-    write_set.push((
+    write_set.insert((
         StateKey::AccessPath(balance_ap(recipient)),
         WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
     ));
