@@ -4,7 +4,7 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
-use crate::telemetry_log_writer::TelemetryLogWriter;
+use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
         PROCESSED_STRUCT_LOG_COUNT, SENT_STRUCT_LOG_BYTES, SENT_STRUCT_LOG_COUNT,
@@ -23,6 +23,7 @@ use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::fmt::Debug;
 use std::io::Stdout;
+use std::time::Duration;
 use std::{
     collections::BTreeMap,
     env, fmt,
@@ -40,6 +41,7 @@ const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -208,8 +210,9 @@ pub struct AptosDataBuilder {
     telemetry_level: Level,
     address: Option<String>,
     printer: Option<Box<dyn Writer>>,
-    remote_log_tx: Option<channel::mpsc::Sender<String>>,
+    remote_log_tx: Option<channel::mpsc::Sender<TelemetryLog>>,
     is_async: bool,
+    enable_telemetry_flush: bool,
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
 }
 
@@ -227,6 +230,7 @@ impl AptosDataBuilder {
             printer: Some(Box::new(StdoutWriter::new())),
             remote_log_tx: None,
             is_async: false,
+            enable_telemetry_flush: true,
             custom_format: None,
         }
     }
@@ -278,13 +282,21 @@ impl AptosDataBuilder {
         self
     }
 
-    pub fn remote_log_tx(&mut self, remote_log_tx: channel::mpsc::Sender<String>) -> &mut Self {
+    pub fn remote_log_tx(
+        &mut self,
+        remote_log_tx: channel::mpsc::Sender<TelemetryLog>,
+    ) -> &mut Self {
         self.remote_log_tx = Some(remote_log_tx);
         self
     }
 
     pub fn is_async(&mut self, is_async: bool) -> &mut Self {
         self.is_async = is_async;
+        self
+    }
+
+    pub fn enable_telemetry_flush(&mut self, enable_telemetry_flush: bool) -> &mut Self {
+        self.enable_telemetry_flush = enable_telemetry_flush;
         self
     }
 
@@ -373,6 +385,7 @@ impl AptosDataBuilder {
                 sender: Some(sender),
                 printer: None,
                 filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             });
             let service = LoggerService {
@@ -391,6 +404,7 @@ impl AptosDataBuilder {
                 sender: None,
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
+                enable_telemetry_flush: self.enable_telemetry_flush,
                 formatter: self.custom_format.take().unwrap_or(text_format),
             })
         };
@@ -429,6 +443,7 @@ pub struct AptosData {
     sender: Option<sync::mpsc::SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<FilterTuple>,
+    enable_telemetry_flush: bool,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 
@@ -460,6 +475,10 @@ impl AptosData {
 
     pub fn set_remote_filter(&self, filter: Filter) {
         self.filter.write().remote_filter = filter;
+    }
+
+    pub fn set_telemetry_filter(&self, filter: Filter) {
+        self.filter.write().telemetry_filter = filter;
     }
 
     fn send_entry(&self, entry: LogEntry) {
@@ -517,7 +536,7 @@ struct LoggerService {
     address: Option<String>,
     printer: Option<Box<dyn Writer>>,
     facade: Arc<AptosData>,
-    remote_tx: Option<channel::mpsc::Sender<String>>,
+    remote_tx: Option<channel::mpsc::Sender<TelemetryLog>>,
 }
 
 impl LoggerService {
@@ -569,8 +588,21 @@ impl LoggerService {
                     }
                 }
                 LoggerServiceEvent::Flush(sender) => {
-                    // This is just to notify the other side, the logger doesn't actually care if
-                    // the listener is still listening
+                    // Flush is only done on TelemetryLogWriter
+                    if let Some(writer) = &mut telemetry_writer {
+                        if self.facade.enable_telemetry_flush {
+                            match writer.flush() {
+                                Ok(rx) => {
+                                    if let Err(err) = rx.recv_timeout(FLUSH_TIMEOUT) {
+                                        eprintln!("flush recv failed: {}", err);
+                                    }
+                                }
+                                Err(err) => {
+                                    eprintln!("flush failed: {}", err);
+                                }
+                            }
+                        }
+                    }
                     let _ = sender.send(());
                 }
             }
