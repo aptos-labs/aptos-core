@@ -48,8 +48,7 @@ module aptos_framework::genesis {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
-        let (aptos_framework_account, framework_signer_cap) = account::create_aptos_framework_account();
-
+        let (aptos_framework_account, aptos_framework_signer_cap) = account::create_framework_reserved_account(@aptos_framework);
         // Initialize account configs on aptos framework account.
         account::initialize(
             &aptos_framework_account,
@@ -60,7 +59,18 @@ module aptos_framework::genesis {
         );
 
         // Give the decentralized on-chain governance control over the core framework account.
-        aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
+        aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
+
+        // put reserved framework reserved accounts under aptos governance
+        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0x10];
+        let i = 0;
+        while (!vector::is_empty(&framework_reserved_addresses)){
+            let address = vector::pop_back<address>(&mut framework_reserved_addresses);
+            let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
+            aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
+            i = i+1;
+        };
+
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
@@ -196,6 +206,15 @@ module aptos_framework::genesis {
     #[test]
     fun test_setup() {
         setup();
-        assert!(account::exists_at(@aptos_framework), 0);
+        assert!(account::exists_at(@aptos_framework), 1);
+        assert!(account::exists_at(@0x2), 1);
+        assert!(account::exists_at(@0x3), 1);
+        assert!(account::exists_at(@0x4), 1);
+        assert!(account::exists_at(@0x5), 1);
+        assert!(account::exists_at(@0x6), 1);
+        assert!(account::exists_at(@0x7), 1);
+        assert!(account::exists_at(@0x8), 1);
+        assert!(account::exists_at(@0x9), 1);
+        assert!(account::exists_at(@0x10), 1);
     }
 }
