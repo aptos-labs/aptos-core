@@ -636,6 +636,8 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
         }
         .execute()
         .await
