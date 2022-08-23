@@ -35,7 +35,7 @@ pub struct StatePrunerManager {
     /// of the min_readable_version.
     pruner: Arc<StateMerklePruner>,
     /// Wrapper class of the state pruner.
-    pruner_worker: Arc<StatePrunerWorker>,
+    pub(crate) pruner_worker: Arc<StatePrunerWorker>,
     /// The worker thread handle for state_pruner, created upon Pruner instance construction and
     /// joined upon its destruction. It is `None` when state pruner is not enabled or it only
     /// becomes `None` after joined in `drop()`.

@@ -29,7 +29,7 @@ type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 
 #[derive(Debug)]
 pub struct StateMerkleDb {
-    db: Arc<DB>,
+    pub(crate) db: Arc<DB>,
     enable_cache: bool,
     version_cache: VersionedNodeCache,
     lru_cache: LruNodeCache,

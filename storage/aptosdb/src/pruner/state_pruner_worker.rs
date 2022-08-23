@@ -62,8 +62,9 @@ impl StatePrunerWorker {
     }
 
     pub fn set_target_db_version(&self, target_db_version: Version) {
-        assert!(target_db_version >= self.pruner.target_version());
-        self.pruner.set_target_version(target_db_version);
+        if target_db_version > self.pruner.target_version() {
+            self.pruner.set_target_version(target_db_version);
+        }
     }
 
     pub fn stop_pruning(&self) {
