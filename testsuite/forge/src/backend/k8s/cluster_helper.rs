@@ -27,10 +27,11 @@ use kube::{
 use rand::Rng;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
-    fs,
+    env, fs,
     fs::File,
     io::Write,
     net::TcpListener,
@@ -388,6 +389,10 @@ fn get_node_default_helm_path() -> String {
     }
 }
 
+fn get_current_working_dir() -> std::io::Result<PathBuf> {
+    env::current_dir()
+}
+
 pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
@@ -412,6 +417,14 @@ pub async fn install_testnet_resources(
 
     // get forge override helm values and cache it
 
+    println!(
+        "current working directory is {}",
+        get_current_working_dir().unwrap().to_str().unwrap()
+    );
+    println!(
+        "Current node default helm path is {}",
+        get_node_default_helm_path()
+    );
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
