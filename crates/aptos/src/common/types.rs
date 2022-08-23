@@ -1093,8 +1093,7 @@ impl TransactionOptions {
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        let sender_key = self.private_key()?;
-        Ok(account_address_from_public_key(&sender_key.public_key()))
+        self.profile_options.account_address()
     }
 
     /// Submit a transaction
