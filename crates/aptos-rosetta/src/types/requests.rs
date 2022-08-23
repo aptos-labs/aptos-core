@@ -179,10 +179,10 @@ pub struct ConstructionMetadataRequest {
 pub struct MetadataOptions {
     /// The operation to run at a high level (e.g. CreateAccount/Transfer)
     pub internal_operation: InternalOperation,
-    /// Maximum gas willing to pay for the transaction
-    pub max_gas: u64,
-    /// Multiplier e.g. how much each unit of gas is worth in the native coin
-    pub gas_price_per_unit: u64,
+    /// Maximum total gas units willing to pay for the transaction
+    pub max_gas_amount: Option<u64>,
+    /// Multiplier how much more willing to pay for the fees
+    pub gas_price_per_unit: Option<u64>,
     /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<u64>,
@@ -211,7 +211,7 @@ pub struct ConstructionMetadata {
     /// Sequence number of the sending account
     pub sequence_number: u64,
     /// Maximum gas willing to pay for the transaction
-    pub max_gas: u64,
+    pub max_gas_amount: u64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
     pub gas_price_per_unit: u64,
     /// Expiry time of the transaction in unix epoch seconds
@@ -307,6 +307,10 @@ pub struct PreprocessMetadata {
     pub expiry_time_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_gas_amount: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price: Option<u64>,
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]
