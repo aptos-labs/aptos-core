@@ -89,8 +89,10 @@ module aptos_framework::account {
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 8;
     /// The caller does not have a digital-signature-based capability to call this function
     const ENO_CAPABILITY: u64 = 9;
-    // The caller does not have a valid rotation capability offer from the other account
+    /// The caller does not have a valid rotation capability offer from the other account
     const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
+    ///
+    const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -476,10 +478,23 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
-    /// Create the account for @aptos_framework to help module upgrades on testnet.
-    public(friend) fun create_aptos_framework_account(): (signer, SignerCapability) {
-        let signer = create_account_unchecked(@aptos_framework);
-        let signer_cap = SignerCapability { account: @aptos_framework };
+    /// create the account for system reserved addresses
+    public(friend) fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
+        assert!(
+            addr == @0x1 ||
+            addr == @0x2 ||
+            addr == @0x3 ||
+            addr == @0x4 ||
+            addr == @0x5 ||
+            addr == @0x6 ||
+            addr == @0x7 ||
+            addr == @0x8 ||
+            addr == @0x9 ||
+            addr == @0x10,
+            error::permission_denied(ENO_VALID_FRAMEWORK_RESERVED_ADDRESS),
+        );
+        let signer = create_account_unchecked(addr);
+        let signer_cap = SignerCapability { account: addr };
         (signer, signer_cap)
     }
 
