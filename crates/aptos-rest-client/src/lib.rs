@@ -77,6 +77,13 @@ impl Client {
         }
     }
 
+    pub fn show_base_url_string(&self) -> String {
+        self.base_url
+            .join(&self.version_path_base)
+            .map(|path| path.to_string())
+            .unwrap_or_else(|_| "<bad_base_url>".to_string())
+    }
+
     /// Set a different version path base, e.g. "v1/" See
     /// DEFAULT_VERSION_PATH_BASE for the default value.
     pub fn version_path_base(mut self, version_path_base: String) -> Result<Self> {
