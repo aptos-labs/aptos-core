@@ -66,17 +66,17 @@ pub async fn handle_log_ingest(
     tags.insert(CHAIN_ID_TAG_NAME.into(), claims.chain_id.to_string());
     tags.insert(PEER_ROLE_TAG_NAME.into(), claims.peer_role.to_string());
 
-    let structured_log = UnstructuredLog {
+    let unstructured_log = UnstructuredLog {
         fields,
         tags,
         messages: log_messages,
     };
 
-    debug!("ingesting to humio: {:?}", structured_log);
+    debug!("ingesting to humio: {:?}", unstructured_log);
 
     let res = context
         .humio_client
-        .ingest_unstructured_logs(&vec![structured_log])
+        .ingest_unstructured_logs(&vec![unstructured_log])
         .await;
 
     match res {
