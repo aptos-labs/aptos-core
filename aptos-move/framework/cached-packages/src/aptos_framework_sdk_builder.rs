@@ -131,11 +131,6 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
-    /// This can be called by on-chain governance to update gas schedule.
-    GasScheduleSetGasSchedule {
-        gas_schedule_blob: Vec<u8>,
-    },
-
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -320,9 +315,6 @@ impl EntryFunctionCall {
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
             CoinsRegister { coin_type } => coins_register(coin_type),
-            GasScheduleSetGasSchedule { gas_schedule_blob } => {
-                gas_schedule_set_gas_schedule(gas_schedule_blob)
-            }
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -685,22 +677,6 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("register").to_owned(),
         vec![coin_type],
         vec![],
-    ))
-}
-
-/// This can be called by on-chain governance to update gas schedule.
-pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("gas_schedule").to_owned(),
-        ),
-        ident_str!("set_gas_schedule").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&gas_schedule_blob).unwrap()],
     ))
 }
 
@@ -1245,18 +1221,6 @@ mod decoder {
         }
     }
 
-    pub fn gas_schedule_set_gas_schedule(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::GasScheduleSetGasSchedule {
-                gas_schedule_blob: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -1534,10 +1498,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coins_register".to_string(),
             Box::new(decoder::coins_register),
-        );
-        map.insert(
-            "gas_schedule_set_gas_schedule".to_string(),
-            Box::new(decoder::gas_schedule_set_gas_schedule),
         );
         map.insert(
             "managed_coin_burn".to_string(),
