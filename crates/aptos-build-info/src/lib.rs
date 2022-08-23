@@ -16,6 +16,10 @@ pub const BUILD_PKG_VERSION: &str = "build_pkg_version";
 pub const BUILD_RUST_CHANNEL: &str = "build_rust_channel";
 pub const BUILD_RUST_VERSION: &str = "build_rust_version";
 
+/// This macro returns the build information as visible during build-time.
+/// Use of this macro is recommended over the `get_build_information`
+/// function because this macro includes the caller crate package version
+/// in the returned build information map.
 #[macro_export]
 macro_rules! build_information {
     () => {{
@@ -30,6 +34,9 @@ macro_rules! build_information {
     }};
 }
 
+/// This method returns the build information as visible during build-time.
+/// Note that it is recommended to use the the `build_information` macro since
+/// this method does not return the build package version.
 pub fn get_build_information() -> BTreeMap<String, String> {
     shadow!(build);
 
