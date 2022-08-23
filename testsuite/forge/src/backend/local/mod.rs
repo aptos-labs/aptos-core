@@ -4,6 +4,7 @@
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
 use framework::ReleaseBundle;
 use rand::rngs::StdRng;
 use std::time::Duration;
@@ -19,6 +20,8 @@ mod node;
 mod swarm;
 pub use node::LocalNode;
 pub use swarm::{LocalSwarm, SwarmDirectory};
+
+pub use self::swarm::ActiveNodesGuard;
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -106,19 +109,6 @@ impl LocalFactory {
         Self::with_revision_and_workspace(&merge_base)
     }
 
-    pub async fn new_swarm<R>(
-        &self,
-        rng: R,
-        number_of_validators: NonZeroUsize,
-    ) -> Result<LocalSwarm>
-    where
-        R: ::rand::RngCore + ::rand::CryptoRng,
-    {
-        let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version, None, None, None)
-            .await
-    }
-
     pub async fn new_swarm_with_version<R>(
         &self,
         rng: R,
@@ -127,11 +117,11 @@ impl LocalFactory {
         genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
+        guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        println!("Preparing a new swarm");
         let mut swarm = LocalSwarm::build(
             rng,
             number_of_validators,
@@ -141,6 +131,7 @@ impl LocalFactory {
             init_genesis_config,
             None,
             genesis_framework,
+            guard,
         )?;
 
         swarm
@@ -178,8 +169,12 @@ impl Factory for LocalFactory {
             },
             None => None,
         };
+
+        // no guarding, as this code path is not used in parallel
+        let guard = ActiveNodesGuard::grab(1, Arc::new(Mutex::new(0))).await;
+
         let swarm = self
-            .new_swarm_with_version(rng, num_validators, version, framework, None, None)
+            .new_swarm_with_version(rng, num_validators, version, framework, None, None, guard)
             .await?;
 
         Ok(Box::new(swarm))
