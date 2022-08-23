@@ -25,9 +25,9 @@ where
         .execute_transactions_parallel((), transactions.clone())
         .map(|(res, _)| res);
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions);
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-    baseline.assert_output(&output);
+    baseline.assert_output(&output, None);
 }
 
 fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {

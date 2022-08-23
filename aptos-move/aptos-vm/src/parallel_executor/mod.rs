@@ -99,8 +99,8 @@ impl ParallelAptosVM {
                 for res in results.iter() {
                     let output_ext = AptosTransactionOutput::as_ref(res);
                     for (key, _) in output_ext.delta_change_set().iter() {
-                        if !aggregator_keys.contains_key(&key) {
-                            aggregator_keys.insert(key.clone(), state_view.get_state_value(&key));
+                        if !aggregator_keys.contains_key(key) {
+                            aggregator_keys.insert(key.clone(), state_view.get_state_value(key));
                         }
                     }
                 }

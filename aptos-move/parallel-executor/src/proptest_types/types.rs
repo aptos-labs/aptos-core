@@ -14,7 +14,9 @@ use aptos_aggregator::{
     transaction::AggregatorValue,
 };
 use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, write_set::TransactionWrite,
+    access_path::AccessPath,
+    account_address::AccountAddress,
+    write_set::{TransactionWrite, WriteOp},
 };
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -170,6 +172,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
+        allow_deletes: bool,
     ) -> Vec<(Vec<(KeyType<K>, ValueType<V>)>, Vec<(KeyType<K>, DeltaOp)>)> {
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
@@ -185,8 +188,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
                         None => {
                             // One out of 23 writes will be a deletion
-                            let is_deletion =
-                                AggregatorValue::from_write(&ValueType(value.clone(), true))
+                            let is_deletion = allow_deletes
+                                && AggregatorValue::from_write(&ValueType(value.clone(), true))
                                     .unwrap()
                                     .into()
                                     % 23
@@ -239,6 +242,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 self.keys_modified,
                 &is_module_write,
                 &is_delta,
+                true,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
@@ -248,6 +252,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         self,
         universe: &[K],
         delta_threshold: usize,
+        allow_deletes: bool,
     ) -> Transaction<KeyType<K>, ValueType<V>> {
         let is_module_write = |_| -> bool { false };
         let is_module_read = |_| -> bool { false };
@@ -275,6 +280,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 self.keys_modified,
                 &is_module_write,
                 &is_delta,
+                allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
@@ -305,6 +311,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 self.keys_modified,
                 &is_module_write,
                 &is_delta,
+                true,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
@@ -419,7 +426,10 @@ pub enum ExpectedOutput<V> {
 
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
-    pub fn generate_baseline<K: Hash + Clone + Eq>(txns: &[Transaction<K, V>]) -> Self {
+    pub fn generate_baseline<K: Hash + Clone + Eq>(
+        txns: &[Transaction<K, V>],
+        resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
+    ) -> Self {
         let mut current_world = HashMap::new();
         // Delta world stores the latest u128 value of delta aggregator. When empty, the
         // value is derived based on deserializing current_world, or falling back to
@@ -428,6 +438,13 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
         let mut result_vec = vec![];
         for (idx, txn) in txns.iter().enumerate() {
+            let delta_writes_at_idx = resolved_deltas.as_ref().map(|delta_writes| {
+                delta_writes[idx]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<K, WriteOp>>()
+            });
+
             match txn {
                 Transaction::Abort => return Self::Aborted(idx),
                 Transaction::Write {
@@ -466,34 +483,46 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     for (k, delta) in delta_set.iter() {
                         let latest_write = current_world.remove(k);
 
-                        let base = match (&latest_write, delta_world.remove(k)) {
-                            (Some(_), Some(_)) => {
-                                unreachable!(
-                                    "Must record latest value or resolved delta, not both"
+                        match delta_writes_at_idx.as_ref() {
+                            Some(delta_writes) => {
+                                assert_eq!(delta_writes.len(), delta_set.len());
+                                delta_world.insert(
+                                    k.clone(),
+                                    AggregatorValue::from_write(delta_writes.get(k).unwrap())
+                                        .unwrap()
+                                        .into(),
                                 );
                             }
-                            // Get base value from the latest write.
-                            (Some(w_value), None) => {
-                                AggregatorValue::from_write(w_value).map(|value| value.into())
-                            }
-                            // Get base value from latest resolved aggregator value.
-                            (None, Some(value)) => Some(value),
-                            // Storage always gets resolved to a default constant.
-                            (None, None) => Some(STORAGE_DELTA_VAL),
-                        };
-
-                        match base {
-                            Some(base) => {
-                                let applied_delta = delta.apply_to(base);
-                                if applied_delta.is_err() {
-                                    return Self::DeltaFailure(idx, result_vec);
-                                }
-                                delta_world.insert(k.clone(), applied_delta.unwrap());
-                            }
                             None => {
-                                // Latest write was a deletion, can't resolve any delta to
-                                // it, must keep the deletion as the latest Op.
-                                current_world.insert(k.clone(), latest_write.unwrap());
+                                let base = match (&latest_write, delta_world.remove(k)) {
+                                    (Some(_), Some(_)) => {
+                                        unreachable!(
+                                            "Must record latest value or resolved delta, not both"
+                                        );
+                                    }
+                                    // Get base value from the latest write.
+                                    (Some(w_value), None) => AggregatorValue::from_write(w_value)
+                                        .map(|value| value.into()),
+                                    // Get base value from latest resolved aggregator value.
+                                    (None, Some(value)) => Some(value),
+                                    // Storage always gets resolved to a default constant.
+                                    (None, None) => Some(STORAGE_DELTA_VAL),
+                                };
+
+                                match base {
+                                    Some(base) => {
+                                        let applied_delta = delta.apply_to(base);
+                                        if applied_delta.is_err() {
+                                            return Self::DeltaFailure(idx, result_vec);
+                                        }
+                                        delta_world.insert(k.clone(), applied_delta.unwrap());
+                                    }
+                                    None => {
+                                        // Latest write was a deletion, can't resolve any delta to
+                                        // it, must keep the deletion as the latest Op.
+                                        current_world.insert(k.clone(), latest_write.unwrap());
+                                    }
+                                }
                             }
                         }
                     }
@@ -510,6 +539,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
         expected_results: &[(Option<V>, Option<u128>)],
         results: &[ReadResult<V>],
         delta_fail: bool,
+        storage_delta_val: Option<u128>,
     ) {
         let mut delta_failed = false;
         expected_results
@@ -529,7 +559,8 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     }
                     ReadResult::Unresolved(delta) => {
                         assert_eq!(expected_result.0, None);
-                        let applied_delta = delta.apply_to(STORAGE_DELTA_VAL);
+                        let applied_delta =
+                            delta.apply_to(storage_delta_val.unwrap_or(STORAGE_DELTA_VAL));
                         if applied_delta.is_err() {
                             delta_failed = true;
                         }
@@ -550,7 +581,11 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub fn assert_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) {
+    pub fn assert_output<K>(
+        &self,
+        results: &Result<Vec<Output<K, V>>, usize>,
+        storage_delta_val: Option<u128>,
+    ) {
         match (self, results) {
             (Self::Aborted(i), Err(Error::UserError(idx))) => {
                 assert_eq!(i, idx);
@@ -562,7 +597,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .take(*skip_at)
                     .zip(expected_results.iter())
                     .for_each(|(Output(_, _, result), expected_results)| {
-                        Self::check_result(expected_results, result, false)
+                        Self::check_result(expected_results, result, false, storage_delta_val)
                     });
 
                 results
@@ -577,14 +612,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .take(*fail_idx)
                     .zip(expected_results.iter())
                     .for_each(|(Output(_, _, result), expected_results)| {
-                        Self::check_result(expected_results, result, true)
+                        Self::check_result(expected_results, result, true, storage_delta_val)
                     });
             }
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())
                 .for_each(|(Output(_, _, result), expected_result)| {
-                    Self::check_result(expected_result, result, false);
+                    Self::check_result(expected_result, result, false, storage_delta_val);
                 }),
             _ => panic!("Incomparable execution outcomes"),
         }

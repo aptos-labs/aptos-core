@@ -99,7 +99,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions);
+        let expected_output = ExpectedOutput::generate_baseline(&transactions, None);
 
         Self {
             transactions,
@@ -115,6 +115,6 @@ where
         .execute_transactions_parallel((), self.transactions.clone())
         .map(|(res, _)| res);
 
-        self.expected_output.assert_output(&output);
+        self.expected_output.assert_output(&output, None);
     }
 }

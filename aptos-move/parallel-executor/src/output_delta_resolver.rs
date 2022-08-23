@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-// use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_types::write_set::{TransactionWrite, WriteOp};
 use mvhashmap::{EntryCell, MVHashMap};

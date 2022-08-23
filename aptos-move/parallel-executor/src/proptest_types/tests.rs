@@ -8,6 +8,7 @@ use crate::{
         ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
 };
+use aptos_aggregator::delta_change_set::serialize;
 use claim::assert_ok;
 use num_cpus;
 use proptest::{
@@ -57,9 +58,9 @@ fn run_transactions<K, V>(
             continue;
         }
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions);
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-        baseline.assert_output(&output);
+        baseline.assert_output(&output, None);
     }
 }
 
@@ -145,6 +146,7 @@ fn dynamic_read_writes() {
 #[test]
 fn deltas_writes_mixed() {
     let mut runner = TestRunner::default();
+    let num_txns = 1000;
 
     let universe = vec(any::<[u8; 32]>(), 50)
         .new_tree(&mut runner)
@@ -152,26 +154,79 @@ fn deltas_writes_mixed() {
         .current();
     let transaction_gen = vec(
         any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        1000,
+        num_txns,
     )
     .new_tree(&mut runner)
     .expect("creating a new value should succeed")
     .current();
+
     let transactions: Vec<_> = transaction_gen
         .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15))
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true))
         .collect();
 
-    let output = ParallelTransactionExecutor::<
-        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get())
-    .execute_transactions_parallel((), transactions.clone())
-    .map(|(res, _)| res);
+    for _ in 0..20 {
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions);
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+        baseline.assert_output(&output, None);
+    }
+}
 
-    baseline.assert_output(&output);
+#[test]
+fn deltas_resolver() {
+    let mut runner = TestRunner::default();
+    let num_txns = 1000;
+
+    let universe = vec(any::<[u8; 32]>(), 50)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        num_txns,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    // Do not allow deletes as that would panic in resolver.
+    let transactions: Vec<_> = transaction_gen
+        .into_iter()
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
+        .collect();
+
+    for _ in 0..20 {
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone());
+
+        let (output, delta_resolver) = output.unwrap();
+        // Should not be possible to overflow or underflow, as each delta is at
+        // most 100 in the tests.
+        let storage_delta_val = 100001;
+        let resolved = delta_resolver.resolve(
+            (15..50)
+                .map(|i| {
+                    (
+                        KeyType(universe[i], false),
+                        Ok(Some(serialize(&storage_delta_val))),
+                    )
+                })
+                .collect(),
+            num_txns,
+        );
+
+        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
+        baseline.assert_output(&Ok(output), Some(storage_delta_val));
+    }
 }
 
 #[test]
