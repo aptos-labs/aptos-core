@@ -8,6 +8,10 @@ use std::time::Duration;
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
+// TODO: This test should be moved to e2e-move-tests as only 0x1 can make changes to gas schedule
+// and there's no easy way to do this in a smoke test without going through the full governance
+// flow.
+#[ignore]
 #[tokio::test]
 async fn test_gas_check() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
