@@ -127,15 +127,13 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         );
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
-        assert!(prev_entry
-            .map(|entry| -> bool {
-                if let EntryCell::Write(i, _) = entry.cell {
-                    i < incarnation
-                } else {
-                    true
-                }
-            })
-            .unwrap_or(true));
+        assert!(prev_entry.map_or(true, |entry| -> bool {
+            if let EntryCell::Write(i, _) = entry.cell {
+                i < incarnation
+            } else {
+                true
+            }
+        }));
     }
 
     /// Add a delta at a specified key.
@@ -173,64 +171,58 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
             Some(tree) => {
                 let mut iter = tree.range(0..txn_idx);
 
-                // If read encounters a delta, it must traverse the block of
-                // transactions (top-down) until it encounters a write or reaches
-                // the end of the block. During traversal, all deltas have to be
-                // aggregated together.
-                let mut aggregator: Option<DeltaOp> = None;
+                // If read encounters a delta, it must traverse the block of transactions
+                // (top-down) until it encounters a write or reaches the end of the block.
+                // During traversal, all aggregator deltas have to be accumulated together.
+                let mut accumulator: Option<DeltaOp> = None;
                 while let Some((idx, entry)) = iter.next_back() {
                     let flag = entry.flag();
 
                     if flag == FLAG_ESTIMATE {
                         // Found a dependency.
                         return Err(Dependency(*idx));
-                    } else {
-                        // The entry should be populated.
-                        debug_assert!(flag == FLAG_DONE);
+                    }
 
-                        match &entry.cell {
-                            EntryCell::Write(incarnation, data) => {
-                                match aggregator.as_ref() {
-                                    Some(delta) => {
-                                        // Read hit a write during traversal. We need
-                                        // to deserialize the value of the write and
-                                        // apply the aggregated delta. If Delta application
-                                        // fails, we return a corresponding error, so that
-                                        // the speculative execution can also fail.
-                                        return delta
-                                            .apply_to(
-                                                AggregatorValue::from_write(data.as_ref()).into(),
-                                            )
-                                            .map_err(|_| DeltaApplicationFailure)
-                                            .map(|result| Resolved(result));
-                                    }
-                                    None => {
-                                        // Read hit a write without any traversal
-                                        // or delta aggregation. In this case, return
-                                        // the version.
-                                        let write_version = (*idx, *incarnation);
-                                        return Ok(Version(write_version, data.clone()));
-                                    }
-                                }
+                    // The entry should be populated.
+                    debug_assert!(flag == FLAG_DONE);
+
+                    match &entry.cell {
+                        EntryCell::Write(incarnation, data) => {
+                            // Read hit a write during traversal. We must deserialize the value
+                            // of the write and apply the aggregated delta accumulator.
+
+                            // None if data represents deletion. Otherwise, panics if the
+                            // data can't be resolved to an aggregator value.
+                            let maybe_value = AggregatorValue::from_write(data.as_ref());
+                            if accumulator.is_none() || maybe_value.is_none() {
+                                // Resolve to the write if no deltas were applied in between
+                                // or if the WriteOp was deletion (MoveVM will observe 'deletion').
+                                let write_version = (*idx, *incarnation);
+                                return Ok(Version(write_version, data.clone()));
                             }
-                            EntryCell::Delta(delta) => {
-                                match aggregator.as_mut() {
-                                    Some(accumulator) => {
-                                        // Read hit a delta during traversing the
-                                        // block and aggregating other deltas. Merge
-                                        // two deltas together. If Delta application
-                                        // fails, we return a corresponding error, so that
-                                        // the speculative execution can also fail.
-                                        accumulator
-                                            .merge_with(delta.clone())
-                                            .map_err(|_| DeltaApplicationFailure)?;
-                                    }
-                                    None => {
-                                        // Read hit a delta value and has to
-                                        // start data aggregation. Initialize the
-                                        // accumulator and continue traversal.
-                                        aggregator = Some(delta.clone())
-                                    }
+
+                            return accumulator
+                                .unwrap()
+                                .apply_to(maybe_value.unwrap().into())
+                                .map_err(|_| DeltaApplicationFailure)
+                                .map(|result| Resolved(result));
+                        }
+                        EntryCell::Delta(delta) => {
+                            match accumulator.as_mut() {
+                                Some(accumulator) => {
+                                    // Read hit a delta during traversing the
+                                    // block and aggregating other deltas. Merge
+                                    // two deltas together. If Delta application
+                                    // fails, we return a corresponding error, so that
+                                    // the speculative execution can also fail.
+                                    accumulator
+                                        .merge_with(*delta)
+                                        .map_err(|_| DeltaApplicationFailure)?;
+                                }
+                                None => {
+                                    // Read hit a delta and must start accumulating.
+                                    // Initialize the accumulator and continue traversal.
+                                    accumulator = Some(*delta)
                                 }
                             }
                         }
@@ -240,8 +232,8 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                 // It can happen that while traversing the block and resolving
                 // deltas the actual written value has not been seen yet (i.e.
                 // it is not added as an entry to the data-structure).
-                match aggregator {
-                    Some(delta) => Err(Unresolved(delta)),
+                match accumulator {
+                    Some(accumulator) => Err(Unresolved(accumulator)),
                     None => Err(NotFound),
                 }
             }

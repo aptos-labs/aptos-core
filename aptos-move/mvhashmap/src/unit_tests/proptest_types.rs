@@ -39,13 +39,17 @@ struct Value<V>(Option<V>);
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        let mut bytes = match self.0.clone().map(|v| v.into()) {
-            Some(v) => v,
-            None => vec![],
-        };
+        if self.0.is_none() {
+            None
+        } else {
+            let mut bytes = match self.0.clone().map(|v| v.into()) {
+                Some(v) => v,
+                None => vec![],
+            };
 
-        bytes.resize(16, 0);
-        Some(bytes)
+            bytes.resize(16, 0);
+            Some(bytes)
+        }
     }
 }
 
@@ -66,7 +70,7 @@ where
             let value_to_update = match op {
                 Operator::Insert(v) => Data::Write(Value(Some(v.clone()))),
                 Operator::Remove => Data::Write(Value(None)),
-                Operator::Update(d) => Data::Delta(d.clone()),
+                Operator::Update(d) => Data::Delta(*d),
                 Operator::Read => continue,
             };
 
@@ -79,7 +83,7 @@ where
     }
 
     pub fn get(&self, key: &K, version: usize) -> ExpectedOutput<V> {
-        match self.0.get(key).and_then(|tree| Some(tree.range(..version))) {
+        match self.0.get(key).map(|tree| tree.range(..version)) {
             None => ExpectedOutput::NotInMap,
             Some(mut iter) => {
                 let mut acc: Option<DeltaOp> = None;
@@ -87,8 +91,15 @@ where
                     match data {
                         Data::Write(v) => match acc {
                             Some(d) => {
-                                let int = AggregatorValue::from_write(v).into();
-                                match d.apply_to(int) {
+                                let maybe_value =
+                                    AggregatorValue::from_write(v).map(|value| value.into());
+                                if maybe_value.is_none() {
+                                    // v must be a deletion.
+                                    assert!(matches!(v, Value(None)));
+                                    return ExpectedOutput::Deleted;
+                                }
+
+                                match d.apply_to(maybe_value.unwrap()) {
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),
                                 }
@@ -100,11 +111,11 @@ where
                         },
                         Data::Delta(d) => match acc.as_mut() {
                             Some(a) => {
-                                if a.merge_with(d.clone()).is_err() {
+                                if a.merge_with(*d).is_err() {
                                     return ExpectedOutput::Failure;
                                 }
                             }
-                            None => acc = Some(d.clone()),
+                            None => acc = Some(*d),
                         },
                     }
                 }
@@ -246,7 +257,7 @@ where
                     Operator::Insert(v) => {
                         map.add_write(key, (idx, 1), Value(Some(v.clone())));
                     }
-                    Operator::Update(delta) => map.add_delta(key, idx, delta.clone()),
+                    Operator::Update(delta) => map.add_delta(key, idx, *delta),
                 }
             })
         }

@@ -72,15 +72,23 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
 pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     pub V,
+    /// Determines whether V is going to contain a value (o.w. deletion). This is useful for
+    /// testing the bahavior of deleting aggregators, in which case we shouldn't panic
+    /// but let the Move-VM handle the read the same as for any deleted resource.
+    pub bool,
 );
 
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        let mut v = self.0.clone().into();
-        v.resize(16, 1);
-        Some(v)
+        if self.1 {
+            let mut v = self.0.clone().into();
+            v.resize(16, 1);
+            Some(v)
+        } else {
+            None
+        }
     }
 }
 
@@ -176,8 +184,17 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                     match delta_fn(i, &value) {
                         Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
                         None => {
-                            incarnation_writes
-                                .push((KeyType(key, module_write_fn(i)), ValueType(value.clone())));
+                            // One out of 23 writes will be a deletion
+                            let is_deletion =
+                                AggregatorValue::from_write(&ValueType(value.clone(), true))
+                                    .unwrap()
+                                    .into()
+                                    % 23
+                                    == 0;
+                            incarnation_writes.push((
+                                KeyType(key, module_write_fn(i)),
+                                ValueType(value.clone(), !is_deletion),
+                            ));
                         }
                     }
                 }
@@ -236,7 +253,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         let is_module_read = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
             if i >= delta_threshold {
-                let val = AggregatorValue::from_write(&ValueType(v.clone())).into();
+                let val = AggregatorValue::from_write(&ValueType(v.clone(), true))
+                    .unwrap()
+                    .into();
                 if val % 10 == 0 {
                     None
                 } else if val % 10 < 5 {
@@ -447,22 +466,36 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     for (k, delta) in delta_set.iter() {
                         let latest_write = current_world.remove(k);
 
-                        // Get the base value either from the latest write or latest resolved
-                        // delta value. Storage always gets resolved to a default constant.
-                        let base = match delta_world.remove(k) {
-                            None => match latest_write {
-                                None => STORAGE_DELTA_VAL,
-                                Some(w_value) => AggregatorValue::from_write(&w_value).into(),
-                            },
-                            Some(value) => value,
+                        let base = match (&latest_write, delta_world.remove(k)) {
+                            (Some(_), Some(_)) => {
+                                unreachable!(
+                                    "Must record latest value or resolved delta, not both"
+                                );
+                            }
+                            // Get base value from the latest write.
+                            (Some(w_value), None) => {
+                                AggregatorValue::from_write(w_value).map(|value| value.into())
+                            }
+                            // Get base value from latest resolved aggregator value.
+                            (None, Some(value)) => Some(value),
+                            // Storage always gets resolved to a default constant.
+                            (None, None) => Some(STORAGE_DELTA_VAL),
                         };
 
-                        // Apply delta to the base value.
-                        let applied_delta = delta.apply_to(base);
-                        if applied_delta.is_err() {
-                            return Self::DeltaFailure(idx, result_vec);
+                        match base {
+                            Some(base) => {
+                                let applied_delta = delta.apply_to(base);
+                                if applied_delta.is_err() {
+                                    return Self::DeltaFailure(idx, result_vec);
+                                }
+                                delta_world.insert(k.clone(), applied_delta.unwrap());
+                            }
+                            None => {
+                                // Latest write was a deletion, can't resolve any delta to
+                                // it, must keep the deletion as the latest Op.
+                                current_world.insert(k.clone(), latest_write.unwrap());
+                            }
                         }
-                        delta_world.insert(k.clone(), applied_delta.unwrap());
                     }
 
                     result_vec.push(result)

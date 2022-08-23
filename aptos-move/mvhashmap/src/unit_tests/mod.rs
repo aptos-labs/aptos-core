@@ -38,7 +38,9 @@ fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
 
 // Convert value for txn_idx and incarnation into u128.
 fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
-    AggregatorValue::from_write(&value_for(txn_idx, incarnation)).into()
+    AggregatorValue::from_write(&value_for(txn_idx, incarnation))
+        .unwrap()
+        .into()
 }
 
 // Generate determinitc additions.
@@ -157,7 +159,7 @@ fn create_write_read_placeholder_struct() {
 
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow (with txn index)
-    let sub_base = AggregatorValue::from_write(&val).into();
+    let sub_base = AggregatorValue::from_write(&val).unwrap().into();
     mvtbl.add_write(&ap2, (10, 3), val);
     mvtbl.add_delta(&ap2, 30, sub_for(30, sub_base));
     let r_31 = mvtbl.read(&ap2, 31);

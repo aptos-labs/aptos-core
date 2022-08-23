@@ -15,13 +15,11 @@ use aptos_types::{
 pub struct AggregatorValue(u128);
 
 impl AggregatorValue {
-    /// Panics if the write doesn't contain a value, or the value raw bytes can't be
-    /// deserialized into an u128.
-    pub fn from_write(write: &dyn TransactionWrite) -> Self {
-        let v = write
-            .extract_raw_bytes()
-            .expect("Write must contain a value");
-        Self(bcs::from_bytes(&v).expect("Must be serialized aggregator value"))
+    /// Returns None if the write doesn't contain a value (i.e deletion), and panics if
+    /// the value raw bytes can't be deserialized into an u128.
+    pub fn from_write(write: &dyn TransactionWrite) -> Option<Self> {
+        let v = write.extract_raw_bytes();
+        v.map(|bytes| Self(bcs::from_bytes(&bytes).expect("Must be serialized aggregator value")))
     }
 
     pub fn into(self) -> u128 {

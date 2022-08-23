@@ -277,6 +277,12 @@ where
                 Err(Dependency(_)) => false, // Dependency implies a validation failure.
                 Err(Unresolved(delta)) => r.validate_unresolved(delta),
                 Err(NotFound) => r.validate_storage(),
+                // We successfully validate when read (again) results in a delta application
+                // failure. If the failure is speculative, a later validation will fail due to
+                // a read without this error. However, if the failure is real, passing
+                // validation here allows to avoid infinitely looping and instead panic when
+                // materializing deltas as writes in the final output preparation state. Panic
+                // is also preferrable as it allows testing for this scenario.
                 Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
             }
         });
