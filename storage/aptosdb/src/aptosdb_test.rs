@@ -7,7 +7,7 @@ use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use proptest::prelude::*;
 
 use crate::{
-    error_if_version_is_pruned, get_first_seq_num_and_limit,
+    get_first_seq_num_and_limit,
     pruner::{
         ledger_pruner_manager::LedgerPrunerManager, state_pruner_manager::StatePrunerManager,
     },
@@ -116,45 +116,25 @@ fn test_pruner_config() {
 }
 
 #[test]
-fn test_error_if_version_is_pruned() {
+fn test_error_if_version_pruned() {
     let tmp_dir = TempPath::new();
-    let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_pruner = StatePrunerManager::new(
-        Arc::clone(&aptos_db.state_merkle_db),
-        StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
-
-    let ledger_pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_store),
-        LedgerPrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
-    state_pruner.testonly_update_min_version(5);
-    ledger_pruner.testonly_update_min_version(10);
+    let db = AptosDB::new_for_test(&tmp_dir);
+    db.state_pruner.testonly_update_min_version(5);
+    db.ledger_pruner.testonly_update_min_version(10);
     assert_eq!(
-        error_if_version_is_pruned(&state_pruner, "State", 4)
+        db.error_if_state_merkle_pruned("State", 4)
             .unwrap_err()
             .to_string(),
         "State at version 4 is pruned, min available version is 5."
     );
-    assert!(error_if_version_is_pruned(&state_pruner, "State", 5).is_ok());
+    assert!(db.error_if_state_merkle_pruned("State", 5).is_ok());
     assert_eq!(
-        error_if_version_is_pruned(&ledger_pruner, "Transaction", 9)
+        db.error_if_ledger_pruned("Transaction", 9)
             .unwrap_err()
             .to_string(),
         "Transaction at version 9 is pruned, min available version is 10."
     );
-    assert!(error_if_version_is_pruned(&ledger_pruner, "Transaction", 10).is_ok());
+    assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
 }
 
 #[test]
