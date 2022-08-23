@@ -35,6 +35,7 @@ use aptos_rest_client::{
     aptos_api_types::{WriteSetChange, U64},
 };
 use aptos_types::{account_address::AccountAddress, event::EventKey};
+use cached_packages::aptos_stdlib;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::cmp::Ordering;
 use std::{
@@ -974,6 +975,28 @@ impl InternalOperation {
             Self::Transfer(inner) => inner.sender,
             Self::SetOperator(inner) => inner.owner,
         }
+    }
+
+    pub fn payload(
+        &self,
+    ) -> ApiResult<(aptos_types::transaction::TransactionPayload, AccountAddress)> {
+        Ok(match self {
+            InternalOperation::CreateAccount(create_account) => (
+                aptos_stdlib::account_create_account(create_account.new_account),
+                create_account.sender,
+            ),
+            InternalOperation::Transfer(transfer) => {
+                is_native_coin(&transfer.currency)?;
+                (
+                    aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
+                    transfer.sender,
+                )
+            }
+            InternalOperation::SetOperator(set_operator) => (
+                aptos_stdlib::stake_set_operator(set_operator.operator),
+                set_operator.owner,
+            ),
+        })
     }
 }
 
