@@ -125,9 +125,13 @@ impl Aggregator {
     /// Implements logic for adding to an aggregator.
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
-            AggregatorState::Data | AggregatorState::PositiveDelta => {
-                // If aggregator knows the value, or is a positive delta, we
-                // can add directly and keep the state.
+            AggregatorState::Data => {
+                // If aggregator knows the value, add directly and keep the state.
+                self.value = addition(self.value, value, self.limit)?;
+                return Ok(());
+            }
+            AggregatorState::PositiveDelta => {
+                // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit)?;
             }
             AggregatorState::NegativeDelta => {
@@ -156,8 +160,10 @@ impl Aggregator {
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
-                // checking we don't drop below zero.
+                // checking we don't drop below zero. We do not need to
+                // record the history.
                 self.value = subtraction(self.value, value)?;
+                return Ok(());
             }
             AggregatorState::PositiveDelta => {
                 // Positive delta is a special case because the state can
@@ -248,8 +254,10 @@ impl Aggregator {
                         }
                     }
 
-                    // Change the state and return the new value.
+                    // Change the state and return the new value. Also, make
+                    // sure history is no longer tracked.
                     self.state = AggregatorState::Data;
+                    self.history = None;
                     Ok(self.value)
                 },
             )
