@@ -8,6 +8,7 @@ import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/colors';
 
 interface WalletLayoutProps {
+  accessoryButton?: React.ReactNode,
   children: React.ReactNode;
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
@@ -16,6 +17,7 @@ interface WalletLayoutProps {
 }
 
 export default function WalletLayout({
+  accessoryButton,
   children,
   hasWalletFooter = true,
   hasWalletHeader = true,
@@ -46,7 +48,11 @@ export default function WalletLayout({
       bgColor={secondaryBgColor[colorMode]}
     >
       {hasWalletHeader ? (
-        <WalletHeader title={title} showBackButton={showBackButton} />
+        <WalletHeader
+          accessoryButton={accessoryButton}
+          title={title}
+          showBackButton={showBackButton}
+        />
       ) : undefined}
       <Box maxH="100%" overflowY="auto" pb={4}>
         {children}

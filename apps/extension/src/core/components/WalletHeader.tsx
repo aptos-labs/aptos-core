@@ -63,11 +63,13 @@ function BackButton({ onClick }: ButtonProps) {
 }
 
 interface NavigationBarProps {
+  accessoryButton?: React.ReactNode,
   showBackButton?: boolean;
   title?: string
 }
 
 function NavigationBar({
+  accessoryButton,
   showBackButton,
   title,
 }: NavigationBarProps) {
@@ -97,9 +99,13 @@ function NavigationBar({
             {title}
           </Text>
         </HStack>
-        <Tooltip label="Switch wallet" closeDelay={300}>
-          <AccountCircle onClick={onOpen} />
-        </Tooltip>
+        <HStack spacing={4}>
+          {accessoryButton}
+          <Tooltip label="Switch wallet" closeDelay={300}>
+            <AccountCircle onClick={onOpen} />
+          </Tooltip>
+        </HStack>
+
       </HStack>
       <AccountDrawer isOpen={isOpen} onClose={onClose} />
     </Box>
@@ -108,6 +114,7 @@ function NavigationBar({
 }
 
 export default function WalletHeader({
+  accessoryButton,
   showBackButton,
   title,
 }: NavigationBarProps) {
@@ -119,7 +126,11 @@ export default function WalletHeader({
 
   if ((!process.env.NODE_ENV || process.env.NODE_ENV === 'development')) {
     return (
-      <NavigationBar title={title} showBackButton={showBackButton} />
+      <NavigationBar
+        accessoryButton={accessoryButton}
+        title={title}
+        showBackButton={showBackButton}
+      />
     );
   }
 
