@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use crate::test_utils::reconfig;
 use aptos::common::types::TransactionSummary;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -10,7 +9,7 @@ use aptos_crypto::{bls12381, x25519};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_types::network_address::DnsName;
-use forge::{NodeExt, Swarm};
+use forge::{reconfig, NodeExt, Swarm};
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::Duration;
