@@ -119,7 +119,10 @@ fn test_pruner_config() {
 fn test_error_if_version_pruned() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
-    db.state_pruner.testonly_update_min_version(5);
+    db.state_store
+        .state_db
+        .state_pruner
+        .testonly_update_min_version(5);
     db.ledger_pruner.testonly_update_min_version(10);
     assert_eq!(
         db.error_if_state_merkle_pruned("State", 4)

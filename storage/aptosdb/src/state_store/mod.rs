@@ -38,7 +38,7 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::buffered_state::BufferedState,
     version_data::{VersionData, VersionDataSchema},
-    AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
+    AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 
 #[cfg(test)]
@@ -62,11 +62,12 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 pub struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    pub state_pruner: StatePrunerManager,
 }
 
 #[derive(Debug)]
 pub(crate) struct StateStore {
-    state_db: Arc<StateDb>,
+    pub(crate) state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
@@ -236,6 +237,7 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
+        state_pruner: StatePrunerManager,
         target_snapshot_size: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -247,6 +249,7 @@ impl StateStore {
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
+            state_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
