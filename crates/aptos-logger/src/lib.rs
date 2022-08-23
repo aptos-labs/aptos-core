@@ -151,7 +151,7 @@ mod logger;
 mod macros;
 mod metadata;
 pub mod sample;
-mod telemetry_log_writer;
+pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 
 mod security;

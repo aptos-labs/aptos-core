@@ -74,7 +74,7 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
     }
 }
 
-/// Flush the global `Logger`
+/// Flush the global `Logger`. Note this is expensive, only use off the critical path.
 pub fn flush() {
     if let Some(logger) = LOGGER.get() {
         logger.flush();
