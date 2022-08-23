@@ -5,6 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_build_info::build_information;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::Client;
@@ -77,7 +78,7 @@ pub async fn to_common_result<T: Serialize>(
 }
 
 pub fn cli_build_information() -> BTreeMap<String, String> {
-    aptos_build_info::get_build_information()
+    build_information!()
 }
 
 /// Sends a telemetry event about the CLI build, command and result

@@ -16,9 +16,21 @@ pub const BUILD_PKG_VERSION: &str = "build_pkg_version";
 pub const BUILD_RUST_CHANNEL: &str = "build_rust_channel";
 pub const BUILD_RUST_VERSION: &str = "build_rust_version";
 
-pub type BuildInfomation = BTreeMap<String, String>;
+#[macro_export]
+macro_rules! build_information {
+    () => {{
+        let mut build_information = aptos_build_info::get_build_information();
 
-pub fn get_build_information() -> BuildInfomation {
+        build_information.insert(
+            aptos_build_info::BUILD_PKG_VERSION.into(),
+            env!("CARGO_PKG_VERSION").into(),
+        );
+
+        build_information
+    }};
+}
+
+pub fn get_build_information() -> BTreeMap<String, String> {
     shadow!(build);
 
     let mut build_information = BTreeMap::new();
@@ -32,7 +44,6 @@ pub fn get_build_information() -> BuildInfomation {
     build_information.insert(BUILD_TAG.into(), build::TAG.into());
     build_information.insert(BUILD_TIME.into(), build::BUILD_TIME.into());
     build_information.insert(BUILD_OS.into(), build::BUILD_OS.into());
-    build_information.insert(BUILD_PKG_VERSION.into(), build::PKG_VERSION.into());
     build_information.insert(BUILD_RUST_CHANNEL.into(), build::RUST_CHANNEL.into());
     build_information.insert(BUILD_RUST_VERSION.into(), build::RUST_VERSION.into());
 
