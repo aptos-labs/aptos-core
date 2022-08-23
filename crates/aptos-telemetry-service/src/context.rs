@@ -4,8 +4,8 @@
 use std::{convert::Infallible, sync::Arc};
 
 use crate::{
-    clients::victoria_metrics_api::Client as MetricsClient, validator_cache::ValidatorSetCache,
-    GCPBigQueryConfig, TelemetryServiceConfig,
+    clients::humio, clients::victoria_metrics_api::Client as MetricsClient,
+    validator_cache::ValidatorSetCache, GCPBigQueryConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::noise;
 use gcp_bigquery_client::Client as BQClient;
@@ -24,6 +24,8 @@ pub struct Context {
 
     pub jwt_encoding_key: EncodingKey,
     pub jwt_decoding_key: DecodingKey,
+
+    pub humio_client: humio::IngestClient,
 }
 
 impl Context {
@@ -32,6 +34,7 @@ impl Context {
         validator_cache: ValidatorSetCache,
         gcp_bigquery_client: Option<BQClient>,
         victoria_metrics_client: Option<MetricsClient>,
+        humio_client: humio::IngestClient,
     ) -> Self {
         let private_key = config.server_private_key.private_key();
         Self {
@@ -45,6 +48,8 @@ impl Context {
 
             jwt_encoding_key: EncodingKey::from_secret(config.jwt_signing_key.as_bytes()),
             jwt_decoding_key: DecodingKey::from_secret(config.jwt_signing_key.as_bytes()),
+
+            humio_client,
         }
     }
 

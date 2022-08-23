@@ -22,6 +22,7 @@ use short_hex_str::AsShortHexStr;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    fmt,
     path::PathBuf,
     string::ToString,
     time::Duration,
@@ -429,7 +430,7 @@ pub type PeerSet = HashMap<PeerId, Peer>;
 /// Downstream -> Downstream, defining a controlled downstream that I always want to connect
 /// Known -> A known peer, but it has no particular role assigned to it
 /// Unknown -> Undiscovered peer, likely due to a non-mutually authenticated connection always downstream
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum PeerRole {
     Validator = 0,
     PreferredUpstream,
@@ -440,10 +441,36 @@ pub enum PeerRole {
     Unknown,
 }
 
+impl PeerRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PeerRole::Validator => "validator",
+            PeerRole::PreferredUpstream => "preferred_upstream_peer",
+            PeerRole::Upstream => "upstream_peer",
+            PeerRole::ValidatorFullNode => "validator_fullnode",
+            PeerRole::Downstream => "downstream_peer",
+            PeerRole::Known => "known_peer",
+            PeerRole::Unknown => "unknown_peer",
+        }
+    }
+}
+
 impl Default for PeerRole {
     /// Default to least trusted
     fn default() -> Self {
         PeerRole::Unknown
+    }
+}
+
+impl fmt::Debug for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
