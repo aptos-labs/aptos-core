@@ -4,6 +4,7 @@
 use crate::metrics::increment_log_ingest_too_large_by;
 use crate::sender::TelemetrySender;
 use aptos_logger::prelude::*;
+use aptos_logger::telemetry_log_writer::TelemetryLog;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::time::Duration;
@@ -54,9 +55,17 @@ impl TelemetryLogSender {
         None
     }
 
-    pub async fn handle_next_log(&mut self, log: String) {
-        if let Some(batch) = self.add_to_batch(log) {
-            self.sender.send_logs(batch).await;
+    pub async fn handle_next_log(&mut self, log: TelemetryLog) {
+        match log {
+            TelemetryLog::Log(log) => {
+                if let Some(batch) = self.add_to_batch(log) {
+                    self.sender.send_logs(batch).await;
+                }
+            }
+            TelemetryLog::Flush(tx) => {
+                self.flush_batch().await;
+                let _ = tx.send(());
+            }
         }
     }
 
@@ -67,7 +76,7 @@ impl TelemetryLogSender {
         }
     }
 
-    pub async fn start(mut self, mut rx: mpsc::Receiver<String>) {
+    pub async fn start(mut self, mut rx: mpsc::Receiver<TelemetryLog>) {
         let mut interval = IntervalStream::new(interval(MAX_BATCH_TIME)).fuse();
 
         loop {

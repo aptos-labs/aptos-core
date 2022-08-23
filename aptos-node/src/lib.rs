@@ -17,6 +17,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
+use aptos_logger::telemetry_log_writer::TelemetryLog;
 use aptos_logger::{prelude::*, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
@@ -481,7 +482,7 @@ fn setup_state_sync_storage_service(
 
 pub fn setup_environment(
     node_config: NodeConfig,
-    remote_log_rx: Option<mpsc::Receiver<String>>,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
 ) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
