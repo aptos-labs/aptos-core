@@ -20,6 +20,7 @@ use aptos_crypto::SigningKey;
 use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::transaction::RawTransaction;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
@@ -384,33 +385,31 @@ impl RosettaClient {
         let mut signatures = Vec::new();
         let mut signers: Vec<AccountIdentifier> = Vec::new();
 
-        // Go through all payloads, and sign them accordingly
-        for payload in unsigned_response.payloads {
-            // Payloads must have a signer and an associated key
-            if let Some(ref account) = payload.account_identifier {
-                let address = account.account_address()?;
+        // Sign the unsigned transaction
+        let unsigned_transaction: RawTransaction = bcs::from_bytes(&hex::decode(
+            unsigned_response.unsigned_transaction.clone(),
+        )?)?;
+        let signing_message = hex::encode(unsigned_transaction.signing_message());
 
-                if let Some(private_key) = keys.get(&address) {
-                    // Sign the message
-                    let signing_bytes = hex::decode(&payload.hex_bytes)?;
-                    let txn_signature = private_key.sign_arbitrary_message(&signing_bytes);
+        // Sign the payload if it matches the unsigned transaction
+        for payload in unsigned_response.payloads.into_iter() {
+            let account = payload
+                .account_identifier
+                .as_ref()
+                .expect("Must have an account");
+            let private_key = keys
+                .get(&account.account_address()?)
+                .expect("Should have a private key");
+            signers.push(account.clone());
 
-                    signers.push(address.into());
-                    signatures.push(Signature {
-                        signing_payload: payload,
-                        public_key: private_key.public_key().try_into()?,
-                        signature_type: SignatureType::Ed25519,
-                        hex_bytes: txn_signature.to_encoded_string()?,
-                    })
-                } else {
-                    return Err(anyhow!(
-                        "Address in payload doesn't have an associated key {}",
-                        address
-                    ));
-                }
-            } else {
-                return Err(anyhow!("No account in payload to sign!"));
-            }
+            assert_eq!(signing_message, payload.hex_bytes);
+            let txn_signature = private_key.sign(&unsigned_transaction);
+            signatures.push(Signature {
+                signing_payload: payload,
+                public_key: private_key.public_key().try_into()?,
+                signature_type: SignatureType::Ed25519,
+                hex_bytes: txn_signature.to_encoded_string()?,
+            });
         }
 
         // Build the signed transaction
