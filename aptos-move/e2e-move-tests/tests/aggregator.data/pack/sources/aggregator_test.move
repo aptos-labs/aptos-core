@@ -38,7 +38,7 @@ module 0x1::aggregator_test {
     public entry fun new(account: &signer, i: u64, limit: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
-        let aggregator = aggregator_factory::create_aggregator_signed(account, limit);
+        let aggregator = aggregator_factory::create_aggregator(account, limit);
         table::add(aggregators, i, aggregator);
     }
 
