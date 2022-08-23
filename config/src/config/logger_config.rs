@@ -18,6 +18,8 @@ pub struct LoggerConfig {
     pub level: Level,
     // tokio-console port
     pub console_port: Option<u16>,
+    pub enable_telemetry_remote_log: bool,
+    pub telemetry_level: Level,
 }
 
 impl Default for LoggerConfig {
@@ -28,6 +30,8 @@ impl Default for LoggerConfig {
             is_async: true,
             level: Level::Info,
             console_port: Some(6669),
+            enable_telemetry_remote_log: false,
+            telemetry_level: Level::Error,
         }
     }
 }
