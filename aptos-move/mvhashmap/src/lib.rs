@@ -116,7 +116,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     }
 
     /// For processing outputs - removes the BTreeMap from the MVHashMap.
-    pub fn indexed_entries(&self, key: &K) -> Option<BTreeMap<TxnIndex, CachePadded<Entry<V>>>> {
+    pub fn entry_map_for_key(&self, key: &K) -> Option<BTreeMap<TxnIndex, CachePadded<Entry<V>>>> {
         self.data.remove(&*key).map(|(_, tree)| tree)
     }
 

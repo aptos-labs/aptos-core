@@ -42,7 +42,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
 
             let indexed_entries = self
                 .versioned_outputs
-                .indexed_entries(&key)
+                .entry_map_for_key(&key)
                 .expect("No entries found for the provided key");
             for (idx, entry) in indexed_entries.iter() {
                 match &entry.cell {
