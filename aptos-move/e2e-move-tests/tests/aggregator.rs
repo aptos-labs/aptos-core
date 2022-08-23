@@ -84,13 +84,16 @@ fn test_aggregator_lifetime() {
         check(&mut h, &acc, 0, 900),
         sub_add(&mut h, &acc, 0, 200, 300),
         check(&mut h, &acc, 0, 1000),
-        // These transactions fail, and should have no side-effects
+        // These 2 transactions fail, and should have no side-effects.
         add_and_materialize(&mut h, &acc, 0, 501),
         sub_and_materialize(&mut h, &acc, 0, 1001),
         check(&mut h, &acc, 0, 1000),
         destroy(&mut h, &acc, 0),
+        // Aggregator has been destroyed and we cannot add this delta.
+        add(&mut h, &acc, 0, 1),
     ];
     let outputs = h.run_block(txns);
+    // 2 materializations should have failed.
     assert_abort!(outputs[10], 131073);
     assert_abort!(outputs[11], 131074);
 
@@ -99,6 +102,10 @@ fn test_aggregator_lifetime() {
     assert_success!(outputs[7]);
     assert_success!(outputs[9]);
     assert_success!(outputs[12]);
+
+    // Aggregator is destroyed (abort code from `table::borrow` failure).
+    assert_success!(outputs[13]);
+    assert_abort!(outputs[14], 25863);
 }
 
 #[test]
