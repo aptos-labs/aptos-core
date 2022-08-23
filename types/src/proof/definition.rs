@@ -12,8 +12,6 @@ use crate::{
     transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
-#[cfg(any(test, feature = "fuzzing"))]
-use aptos_crypto::hash::TestOnlyHasher;
 use aptos_crypto::{
     hash::{
         CryptoHash, CryptoHasher, EventAccumulatorHasher, TransactionAccumulatorHasher,
@@ -21,10 +19,14 @@ use aptos_crypto::{
     },
     HashValue,
 };
+use serde::{Deserialize, Serialize};
+use std::any::type_name;
+use std::marker::PhantomData;
+
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_crypto::hash::TestOnlyHasher;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 /// A proof that can be used authenticate an element in an accumulator given trusted root hash. For
 /// example, both `LedgerInfoToTransactionInfoProof` and `TransactionInfoToEventProof` can be
@@ -100,7 +102,8 @@ where
             .0;
         ensure!(
             actual_root_hash == expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            "{}: Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            type_name::<Self>(),
             actual_root_hash,
             expected_root_hash
         );
@@ -334,7 +337,8 @@ impl SparseMerkleProof {
             });
         ensure!(
             actual_root_hash == expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            "{}: Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            type_name::<Self>(),
             actual_root_hash,
             expected_root_hash,
         );
@@ -617,7 +621,8 @@ where
 
         ensure!(
             current_hashes[0] == expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            "{}: Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            type_name::<Self>(),
             current_hashes[0],
             expected_root_hash,
         );
@@ -728,7 +733,8 @@ impl SparseMerkleRangeProof {
 
         ensure!(
             current_hash == expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            "{}: Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            type_name::<Self>(),
             current_hash,
             expected_root_hash,
         );
@@ -915,7 +921,8 @@ impl<H: CryptoHasher> AccumulatorExtensionProof<H> {
             InMemoryAccumulator::<H>::new(self.frozen_subtree_roots.clone(), self.num_leaves)?;
         ensure!(
             original_tree.root_hash() == original_root,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            "{}: Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            type_name::<Self>(),
             original_tree.root_hash(),
             original_root
         );
