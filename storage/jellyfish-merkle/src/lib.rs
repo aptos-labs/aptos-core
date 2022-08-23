@@ -923,6 +923,33 @@ where
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
         self.get_root_node(version).map(|n| n.leaf_count())
     }
+
+    pub fn get_all_nodes_referenced(&self, version: Version) -> Result<Vec<NodeKey>> {
+        let mut out_keys = vec![];
+        self.get_all_nodes_referenced_impl(NodeKey::new_empty_path(version), &mut out_keys)?;
+        Ok(out_keys)
+    }
+
+    fn get_all_nodes_referenced_impl(
+        &self,
+        key: NodeKey,
+        out_keys: &mut Vec<NodeKey>,
+    ) -> Result<()> {
+        match self.reader.get_node(&key)? {
+            Node::Internal(internal_node) => {
+                for (child_nibble, child) in internal_node.children_sorted() {
+                    self.get_all_nodes_referenced_impl(
+                        key.gen_child_node_key(child.version, *child_nibble),
+                        out_keys,
+                    )?;
+                }
+            }
+            Node::Leaf(_) | Node::Null => {}
+        };
+
+        out_keys.push(key);
+        Ok(())
+    }
 }
 
 trait NibbleExt {

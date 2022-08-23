@@ -41,12 +41,10 @@ use crate::{
     AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 
-#[cfg(test)]
-use aptos_types::nibble::nibble_path::NibblePath;
-
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
+
 #[cfg(test)]
 mod state_store_test;
 
@@ -182,7 +180,7 @@ impl DbReader for StateStore {
         self.deref().get_state_snapshot_before(next_version)
     }
 
-    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
+    /// Get the latest state value of the given key up to the given version. Only used for testing for now
     /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
     /// value without proof.
     fn get_state_value_by_version(
@@ -566,7 +564,7 @@ impl StateStore {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        node_hashes: Option<&HashMap<aptos_types::nibble::nibble_path::NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
@@ -681,6 +679,29 @@ impl StateStore {
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn get_all_jmt_nodes_referenced(
+        &self,
+        version: Version,
+    ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
+            .get_all_nodes_referenced(version)
+    }
+
+    #[cfg(test)]
+    pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        let mut iter = self
+            .state_db
+            .state_merkle_db
+            .db
+            .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+            Default::default(),
+        )?;
+        iter.seek_to_first();
+        let all_rows = iter.collect::<Result<Vec<_>>>()?;
+        Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
     }
 }
 
