@@ -145,14 +145,14 @@ fn test_error_if_version_is_pruned() {
         error_if_version_is_pruned(&state_pruner, "State", 4)
             .unwrap_err()
             .to_string(),
-        "State version 4 is pruned, min available version is 5."
+        "State at version 4 is pruned, min available version is 5."
     );
     assert!(error_if_version_is_pruned(&state_pruner, "State", 5).is_ok());
     assert_eq!(
         error_if_version_is_pruned(&ledger_pruner, "Transaction", 9)
             .unwrap_err()
             .to_string(),
-        "Transaction version 9 is pruned, min available version is 10."
+        "Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(error_if_version_is_pruned(&ledger_pruner, "Transaction", 10).is_ok());
 }
