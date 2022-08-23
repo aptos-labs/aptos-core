@@ -28,12 +28,12 @@ impl IngestClient {
         }
     }
 
-    pub async fn ingest_unstructured_logs(
+    pub async fn ingest_unstructured_log(
         &self,
-        unstructured_logs: &Vec<UnstructuredLog>,
+        unstructured_log: UnstructuredLog,
     ) -> Result<reqwest::Response, anyhow::Error> {
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
-        serde_json::to_writer(&mut gzip_encoder, unstructured_logs)
+        serde_json::to_writer(&mut gzip_encoder, &vec![unstructured_log])
             .map_err(|e| anyhow!("unable to serialize json: {}", e))?;
         let compressed_bytes = gzip_encoder.finish()?;
 

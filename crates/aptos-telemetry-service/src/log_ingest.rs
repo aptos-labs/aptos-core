@@ -76,7 +76,7 @@ pub async fn handle_log_ingest(
 
     let res = context
         .humio_client
-        .ingest_unstructured_logs(&vec![unstructured_log])
+        .ingest_unstructured_log(unstructured_log)
         .await;
 
     match res {
