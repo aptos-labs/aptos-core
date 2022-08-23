@@ -116,6 +116,11 @@ mod test {
     }
 
     fn test_id(key: u128) -> AggregatorID {
+        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
+            .iter()
+            .flat_map(|b| b.to_vec())
+            .collect();
+        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
         AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 
