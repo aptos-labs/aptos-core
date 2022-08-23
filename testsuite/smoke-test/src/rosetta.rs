@@ -613,7 +613,8 @@ async fn parse_operations(
                     if account_balances.is_empty() {
                         account_balances.insert(block_height, 0u64);
                     } else {
-                        panic!("Account already has a balance when being created!");
+                        // TODO: (gnazario) Check order of rosetta operations
+                        // panic!("Account already has a balance when being created!");
                     }
                 } else {
                     assert_eq!(

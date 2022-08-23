@@ -44,7 +44,11 @@ impl PTransactionOutput for AptosTransactionOutput {
     type T = PreprocessedTransaction;
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.0.write_set().iter().cloned().collect()
+        self.0
+            .write_set()
+            .iter()
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect()
     }
 
     /// Execution output for transactions that comes after SkipRest signal.

@@ -24,7 +24,7 @@ use aptos_types::{
     },
 };
 use aptos_vm::{
-    data_cache::{AsMoveResolver, IntoMoveResolver, RemoteStorageOwned},
+    data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
     AptosVM,
 };
 use clap::StructOpt;
@@ -74,7 +74,7 @@ use vm_genesis::GENESIS_KEYPAIR;
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: RemoteStorageOwned<FakeDataStore>,
+    storage: StorageAdapterOwned<FakeDataStore>,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
 }

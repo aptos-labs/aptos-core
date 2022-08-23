@@ -5,6 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
+use std::collections::{btree_map, BTreeMap};
+
 use crate::module::AGGREGATOR_MODULE;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -232,6 +234,34 @@ impl DeltaChangeSet {
 
         // All deltas are applied successfully.
         Ok(WriteSetMut::new(materialized_write_set))
+    }
+
+    pub fn merge_with(self, other: Self) -> PartialVMResult<Self> {
+        let mut buffer = vec![];
+        let mut index_map = BTreeMap::new();
+
+        for (key, op) in self
+            .delta_change_set
+            .into_iter()
+            .chain(other.delta_change_set)
+        {
+            match index_map.entry(key) {
+                btree_map::Entry::Occupied(entry) => {
+                    let idx = *entry.get();
+                    let elem: &mut (StateKey, DeltaOp) = &mut buffer[idx];
+                    let op_mut: &mut DeltaOp = &mut elem.1;
+                    op_mut.merge_with(op)?;
+                }
+                btree_map::Entry::Vacant(entry) => {
+                    buffer.push((entry.key().clone(), op));
+                    entry.insert(buffer.len());
+                }
+            }
+        }
+
+        Ok(Self {
+            delta_change_set: buffer,
+        })
     }
 }
 

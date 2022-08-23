@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_cache::{IntoMoveResolver, RemoteStorageOwned};
+use crate::data_cache::{IntoMoveResolver, StorageAdapterOwned};
 use aptos_parallel_executor::executor::MVHashMapView;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
@@ -16,7 +16,7 @@ impl<'a, S: StateView> VersionedView<'a, S> {
     pub fn new_view(
         base_view: &'a S,
         hashmap_view: &'a MVHashMapView<'a, StateKey, WriteOp>,
-    ) -> RemoteStorageOwned<VersionedView<'a, S>> {
+    ) -> StorageAdapterOwned<VersionedView<'a, S>> {
         VersionedView {
             base_view,
             hashmap_view,

@@ -5,9 +5,13 @@ use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
 };
+use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-use move_deps::move_table_extension::TableResolver;
-use std::{cell::RefCell, collections::BTreeMap};
+use move_deps::{move_binary_format::errors::Location, move_table_extension::TableResolver};
+use std::{
+    cell::RefCell,
+    collections::{btree_map, BTreeMap},
+};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug)]
@@ -93,6 +97,45 @@ impl<'a> NativeAggregatorContext<'a> {
         }
 
         AggregatorChangeSet { changes }
+    }
+}
+
+impl AggregatorChangeSet {
+    pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
+        for (other_id, other_change) in other.changes {
+            match self.changes.entry(other_id) {
+                // If something was changed only in `other` session, add it.
+                btree_map::Entry::Vacant(entry) => {
+                    entry.insert(other_change);
+                }
+                // Otherwise, we might need to aggregate deltas.
+                btree_map::Entry::Occupied(mut entry) => {
+                    use AggregatorChange::*;
+
+                    let entry_mut = entry.get_mut();
+                    match (*entry_mut, other_change) {
+                        (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
+                        (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
+                        (Write(data), Merge(delta)) => {
+                            let new_data = delta
+                                .apply_to(data)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Write(new_data);
+                        }
+                        (Merge(mut delta1), Merge(delta2)) => {
+                            delta1
+                                .merge_with(delta2)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Merge(delta1)
+                        }
+                        // Hashing properties guarantee that aggregator keys should
+                        // not collide, making this case impossible.
+                        (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 

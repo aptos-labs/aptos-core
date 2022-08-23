@@ -6,6 +6,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
     vm_status::VMStatus,
+    write_set::WriteSet,
 };
 
 /// Extension of `ChangeSet` that also holds deltas.
@@ -22,8 +23,23 @@ impl ChangeSetExt {
         }
     }
 
+    pub fn delta_change_set(&self) -> &DeltaChangeSet {
+        &self.delta_change_set
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        self.change_set.write_set()
+    }
+
     pub fn into_inner(self) -> (DeltaChangeSet, ChangeSet) {
         (self.delta_change_set, self.change_set)
+    }
+
+    pub fn squash(self, other: Self) -> anyhow::Result<Self> {
+        Ok(Self {
+            delta_change_set: self.delta_change_set.merge_with(other.delta_change_set)?,
+            change_set: self.change_set.squash(other.change_set)?,
+        })
     }
 }
 
@@ -83,12 +99,11 @@ impl TransactionOutputExt {
                 // handling quite challenging.
                 panic!("something terrible happened when applying aggregator deltas");
             }
-            Ok(mut materialized_deltas) => {
+            Ok(materialized_deltas) => {
                 let (write_set, events, gas_used, status) = txn_output.unpack();
                 // We expect to have only a few delta changes, so add them to
                 // the write set of the transaction.
-                let mut write_set_mut = write_set.into_mut();
-                write_set_mut.append(&mut materialized_deltas);
+                let write_set_mut = write_set.into_mut().squash(materialized_deltas).unwrap();
 
                 let output = TransactionOutput::new(
                     write_set_mut.freeze().unwrap(),
