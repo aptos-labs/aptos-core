@@ -245,7 +245,6 @@ pub struct AptosDB {
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
     transaction_store: Arc<TransactionStore>,
-    state_pruner: StatePrunerManager,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
@@ -270,6 +269,7 @@ impl AptosDB {
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
+            state_pruner,
             target_snapshot_size,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
@@ -287,7 +287,6 @@ impl AptosDB {
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_store,
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            state_pruner,
             ledger_pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
@@ -795,13 +794,6 @@ impl AptosDB {
         Ok(())
     }
 
-    fn set_pruner_target_version(&self, latest_version: Version) {
-        self.state_pruner
-            .maybe_set_pruner_target_db_version(latest_version);
-        self.ledger_pruner
-            .maybe_set_pruner_target_db_version(latest_version);
-    }
-
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
@@ -824,7 +816,11 @@ impl AptosDB {
     }
 
     fn error_if_state_merkle_pruned(&self, data_type: &str, version: Version) -> Result<()> {
-        let min_readable_version = self.state_pruner.get_min_readable_version();
+        let min_readable_version = self
+            .state_store
+            .state_db
+            .state_pruner
+            .get_min_readable_version();
         ensure!(
             version >= min_readable_version,
             "{} at version {} is pruned, min available version is {}.",
@@ -1386,13 +1382,13 @@ impl DbReader for AptosDB {
 
     fn is_state_pruner_enabled(&self) -> Result<bool> {
         gauged_api("is_state_pruner_enabled", || {
-            Ok(self.state_pruner.is_pruner_enabled())
+            Ok(self.state_store.state_db.state_pruner.is_pruner_enabled())
         })
     }
 
     fn get_state_prune_window(&self) -> Result<usize> {
         gauged_api("get_state_prune_window", || {
-            Ok(self.state_pruner.get_pruner_window() as usize)
+            Ok(self.state_store.state_db.state_pruner.get_pruner_window() as usize)
         })
     }
 
@@ -1558,7 +1554,10 @@ impl DbWriter for AptosDB {
                 let last_version = first_version + num_txns - 1;
                 COMMITTED_TXNS.inc_by(num_txns);
                 LATEST_TXN_VERSION.set(last_version as i64);
-                self.set_pruner_target_version(last_version);
+                // Activate the ledger pruner. Note the state merkle pruner is activated when
+                // state snapshots are persisted in their async thread.
+                self.ledger_pruner
+                    .maybe_set_pruner_target_db_version(last_version);
             }
 
             // Once everything is successfully persisted, update the latest in-memory ledger info.
