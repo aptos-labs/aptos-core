@@ -1,20 +1,20 @@
 ---
-title: "Connecting to Wallet"
+title: "Connecting to Petra Wallet"
 slug: "connect-to-wallet"
 ---
 
-# Connecting to Wallet
+# Connecting to <CompanyName />
 
-To use Wallet with your dApp, your user must first install Wallet on their Chrome browser. Wallet injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. 
+To use <CompanyName /> with your dApp, your user must first install <CompanyName /> on their Chrome browser. <CompanyName /> injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. 
 
-To check if the user has installed Wallet, perform the below check:
+To check if the user has installed <CompanyName />, perform the below check:
 
 ```typescript
-const isAptosInstalled = window.aptos
+const isPetraInstalled = window.aptos
 ```
 
 <br />
-If Wallet is not installed, you can prompt the user to first install the Wallet extension and provide the below installation instructions. For example, see below:
+If <CompanyName /> is not installed, you can prompt the user to first install <CompanyName /> and provide the below installation instructions. For example, see below:
 
 ```typescript
 const getAptosWallet = () => {
@@ -26,24 +26,15 @@ const getAptosWallet = () => {
 }
 ```
 
-## Installing the Wallet extension 
+## Installing <CompanyName /> 
 
-To install the Wallet extension on your Chrome browser, follow these steps:
+To install <CompanyName /> on your Chrome browser, you can download it from the [chrome store](https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci?hl=encategory=extensions).
 
-1. Download the latest [Petra Wallet release](https://github.com/aptos-labs/aptos-core/releases?q=wallet&expanded=true) and unzip.
-2. Open a Chrome window and navigate to the Extensions using any of the below methods:
-    - At the top right corner of the browser window, click the three vertical dots and then More tools and then Extensions, or
-    - On a new tab or a window type `chrome://extensions` in the URL field and press return.
-3. Enable **Developer mode** at the top right of the Extensions page.
-4. Click on **Load unpacked** at the top left, and point it to the folder where you just unzipped the downloaded Wallet release.
+## Connecting to <CompanyName />
 
-Now you will see Wallet in your Chrome extensions.
+After confirming that the web app has the `aptos` object, we can connect to <CompanyName /> by calling `wallet.connect()`. 
 
-## Connecting to Wallet
-
-After confirming that the web app has the `aptos` object, we can connect to Wallet by calling `wallet.connect()`. 
-
-When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to Wallet, and obtains from the user basic information like the `address` and `public key`. 
+When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to <CompanyName />, and obtains from the user basic information like the `address` and `public key`. 
 
 See the example code below:
 
@@ -62,12 +53,12 @@ try {
 
 **NOTE**: After the user has approved the connnection for the first time, the web app's domain will be remembered for the future sessions. 
 
-## Disconnecting Wallet
+## Disconnecting <CompanyName />
 
-When you want the web app to forget about the connection status with Wallet, you can do this by calling `wallet.disconnect()` in your web app. See below:
+When you want the web app to forget about the connection status with <CompanyName />, you can do this by calling `wallet.disconnect()` in your web app. See below:
 
 ```typescript
 await wallet.disconnect();
 ```
 
-**NOTE**: After disconnecting, the web app must reconnect to Wallet to make requests. 
+**NOTE**: After disconnecting, the web app must reconnect to <CompanyName /> to make requests. 
