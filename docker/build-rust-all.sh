@@ -4,7 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
+RUSTFLAGS="--cfg tokio_unstable" cargo build --profile performance \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
@@ -39,7 +39,7 @@ mkdir dist
 
 for BIN in "${BINS[@]}"
 do
-    cp target/release/$BIN dist/$BIN
+    cp target/performance/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
