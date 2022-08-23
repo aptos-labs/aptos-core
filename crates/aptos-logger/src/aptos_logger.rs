@@ -336,8 +336,6 @@ impl AptosDataBuilder {
                 if self.is_async && self.remote_log_tx.is_some() {
                     if env::var(RUST_LOG_TELEMETRY).is_ok() {
                         filter_builder.with_env(RUST_LOG_TELEMETRY);
-                    } else if env::var(RUST_LOG).is_ok() {
-                        filter_builder.with_env(RUST_LOG);
                     } else {
                         filter_builder.filter_level(self.telemetry_level.into());
                     }
