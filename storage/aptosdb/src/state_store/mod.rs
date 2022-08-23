@@ -62,7 +62,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_ending_state_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
 #[derive(Debug)]
@@ -254,7 +254,7 @@ impl StateStore {
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-        epoch_ending_state_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+        epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         target_snapshot_size: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -267,7 +267,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             state_pruner,
-            epoch_ending_state_pruner,
+            epoch_snapshot_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(

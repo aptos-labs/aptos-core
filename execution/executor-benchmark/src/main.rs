@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{
-    EpochEndingStateMerklePrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
+    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
@@ -18,7 +18,7 @@ struct PrunerOpt {
     enable_state_pruner: bool,
 
     #[structopt(long)]
-    enable_epoch_ending_state_pruner: bool,
+    enable_epoch_snapshot_pruner: bool,
 
     #[structopt(long)]
     enable_ledger_pruner: bool,
@@ -27,7 +27,7 @@ struct PrunerOpt {
     state_prune_window: u64,
 
     #[structopt(long, default_value = "100000")]
-    epoch_ending_state_prune_window: u64,
+    epoch_snapshot_prune_window: u64,
 
     #[structopt(long, default_value = "100000")]
     ledger_prune_window: u64,
@@ -39,7 +39,7 @@ struct PrunerOpt {
     state_pruning_batch_size: usize,
 
     #[structopt(long, default_value = "500")]
-    epoch_ending_state_pruning_batch_size: usize,
+    epoch_snapshot_pruning_batch_size: usize,
 }
 
 impl PrunerOpt {
@@ -50,10 +50,10 @@ impl PrunerOpt {
                 prune_window: self.state_prune_window,
                 batch_size: self.state_pruning_batch_size,
             },
-            epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
-                enable: self.enable_epoch_ending_state_pruner,
-                prune_window: self.epoch_ending_state_prune_window,
-                batch_size: self.epoch_ending_state_pruning_batch_size,
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
+                enable: self.enable_epoch_snapshot_pruner,
+                prune_window: self.epoch_snapshot_prune_window,
+                batch_size: self.epoch_snapshot_pruning_batch_size,
             },
             ledger_pruner_config: LedgerPrunerConfig {
                 enable: self.enable_ledger_pruner,
