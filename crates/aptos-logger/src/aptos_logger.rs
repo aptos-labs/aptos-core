@@ -593,8 +593,9 @@ impl LoggerService {
                         if self.facade.enable_telemetry_flush {
                             match writer.flush() {
                                 Ok(rx) => {
-                                    let flush_result = rx.recv_timeout(FLUSH_TIMEOUT);
-                                    eprintln!("flushed with result: {}", flush_result.is_ok());
+                                    if let Err(err) = rx.recv_timeout(FLUSH_TIMEOUT) {
+                                        eprintln!("flush recv failed: {}", err);
+                                    }
                                 }
                                 Err(err) => {
                                     eprintln!("flush failed: {}", err);
