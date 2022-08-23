@@ -124,7 +124,7 @@ impl Cluster {
         client: &RestClient,
         address: AccountAddress,
     ) -> Result<LocalAccount> {
-        let sequence_number = query_sequence_numbers(client, &[address])
+        let sequence_number = query_sequence_numbers(client, [address].iter())
             .await
             .map_err(|e| {
                 format_err!(

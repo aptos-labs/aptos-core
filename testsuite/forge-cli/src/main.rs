@@ -7,7 +7,6 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, *};
-use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
@@ -27,7 +26,9 @@ use url::Url;
 #[derive(StructOpt, Debug)]
 struct Args {
     #[structopt(long, default_value = "30000")]
-    mempool_backlog: u64,
+    mempool_backlog: usize,
+    #[structopt(long, default_value = "0")]
+    target_tps: usize,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
@@ -189,10 +190,12 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
+
+    let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
+
     let global_emit_job_request = EmitJobRequest::default()
         .duration(Duration::from_secs(args.duration_secs as u64))
-        .thread_params(EmitThreadParams::default())
-        .mempool_backlog(args.mempool_backlog.try_into().unwrap());
+        .mode(emitter_mode);
 
     let success_criteria = SuccessCriteria::new(
         args.success_criteria.avg_tps,
