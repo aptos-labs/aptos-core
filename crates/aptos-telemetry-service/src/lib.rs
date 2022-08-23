@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use warp::{Filter, Reply};
 
 use crate::{
-    clients::humio::{self, IngestClient},
+    clients::humio,
     clients::victoria_metrics_api::Client as MetricsClient,
     context::Context,
     index::routes,

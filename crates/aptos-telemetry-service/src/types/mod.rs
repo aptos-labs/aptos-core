@@ -34,8 +34,8 @@ pub mod common {
 }
 
 pub mod humio {
-    use std::collections::HashMap;
     use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
 
     #[derive(Deserialize, Serialize, Clone, Debug)]
     pub struct UnstructuredLog {

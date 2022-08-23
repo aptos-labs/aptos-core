@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::anyhow;
 use flate2::{write::GzEncoder, Compression};
 use reqwest::{self, Url};

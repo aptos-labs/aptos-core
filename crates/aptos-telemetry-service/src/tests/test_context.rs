@@ -40,7 +40,7 @@ pub async fn new_test_context() -> TestContext {
     };
     let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
     let humio_client = humio::IngestClient::new(
-        Url::parse("http://localhost/".into()).unwrap(),
+        Url::parse("http://localhost/").unwrap(),
         config.humio_auth_token.clone(),
     );
     TestContext::new(Context::new(config, cache, None, None, humio_client))
