@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { MouseEventHandler } from 'react';
+import React, { LegacyRef, MouseEventHandler } from 'react';
 import {
   Box,
   HStack,
@@ -21,7 +21,10 @@ interface ButtonProps {
   onClick: MouseEventHandler<HTMLDivElement>;
 }
 
-function AccountCircle({ onClick }: ButtonProps) {
+const AccountCircle = React.forwardRef((
+  { onClick }: ButtonProps,
+  ref: LegacyRef<HTMLDivElement>,
+) => {
   const { activeAccount } = useGlobalStateContext();
   const color = indexColor(activeAccount?.styleIndex ?? 0);
   return (
@@ -32,9 +35,10 @@ function AccountCircle({ onClick }: ButtonProps) {
       borderRadius="2rem"
       cursor="pointer"
       onClick={onClick}
+      ref={ref}
     />
   );
-}
+});
 
 function BackButton({ onClick }: ButtonProps) {
   return (
