@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react';
+import React, { MouseEventHandler } from 'react';
 import {
   Box,
   Center,
@@ -12,6 +12,7 @@ import {
   InputLeftAddon,
   InputRightAddon,
   Tooltip,
+  Text,
   useClipboard,
   useColorMode,
   useDisclosure,
@@ -33,6 +34,83 @@ interface WalletHeaderProps {
   showBackButton?: boolean;
 }
 
+interface ButtonProps {
+  onClick: MouseEventHandler<HTMLDivElement>;
+}
+
+function AccountCircle({ onClick }: ButtonProps) {
+  return (
+    <Box
+      height="40px"
+      width="40px"
+      background="gray"
+      borderRadius="2rem"
+      cursor="pointer"
+      onClick={onClick}
+    />
+  );
+}
+
+function BackButton({ onClick }: ButtonProps) {
+  return (
+    <Box
+      height="44px"
+      width="44px"
+      background="#F2F4F8"
+      borderRadius="0.5rem"
+      cursor="pointer"
+      onClick={onClick}
+    >
+      <ChevronLeftIcon color="#333333" width="100%" height="100%" />
+    </Box>
+  );
+}
+
+interface NavigationBarProps {
+  showBackButton?: boolean;
+  title: string
+}
+
+function NavigationBar({
+  showBackButton,
+  title,
+}: NavigationBarProps) {
+  const navigate = useNavigate();
+  const { colorMode } = useColorMode();
+  const { isOpen, onClose, onOpen } = useDisclosure();
+
+  return (
+    <Box>
+      <HStack
+        maxW="100%"
+        width="100%"
+        py={4}
+        height="84px"
+        borderBottomColor={secondaryBorderColor[colorMode]}
+        borderBottomWidth="1px"
+        justifyContent="space-between"
+        padding={4}
+      >
+        <HStack>
+          {(showBackButton)
+            ? (
+              <BackButton onClick={() => navigate(-1)} />
+            )
+            : null}
+          <Text fontSize="xl" fontWeight="semibold">
+            {title}
+          </Text>
+        </HStack>
+        <Tooltip label="Switch wallet" closeDelay={300}>
+          <AccountCircle onClick={onOpen} />
+        </Tooltip>
+      </HStack>
+      <AccountDrawer isOpen={isOpen} onClose={onClose} />
+    </Box>
+
+  );
+}
+
 export default function WalletHeader({
   showBackButton,
 }: WalletHeaderProps) {
@@ -41,6 +119,12 @@ export default function WalletHeader({
   const { colorMode } = useColorMode();
   const { hasCopied, onCopy } = useClipboard(activeAccountAddress || '');
   const navigate = useNavigate();
+
+  if ((!process.env.NODE_ENV || process.env.NODE_ENV === 'development')) {
+    return (
+      <NavigationBar title="Home" showBackButton={showBackButton} />
+    );
+  }
 
   return (
     <Grid
