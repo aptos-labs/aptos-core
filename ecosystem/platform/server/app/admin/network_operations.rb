@@ -52,10 +52,8 @@ ActiveAdmin.register NetworkOperation do
     end
 
     @users = User
-             .left_outer_joins(:notification_preferences)
-             .where(users: { notification_preferences: { delivery_method: :email,
-                                                         @notification_type => true } })
-             .or(User.where(users: { notification_preferences: { id: nil } }))
+             .joins(:notification_preferences)
+             .where(users: { notification_preferences: { @notification_type => true } })
 
     if request.post?
       notification = notification_types[@notification_type].with(network_operation: @network_operation)
