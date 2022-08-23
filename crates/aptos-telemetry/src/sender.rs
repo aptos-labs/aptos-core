@@ -3,7 +3,7 @@
 
 use crate::metrics;
 use anyhow::{anyhow, Error};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
     noise::{self, NoiseConfig},
     x25519,
@@ -44,6 +44,7 @@ pub(crate) struct TelemetrySender {
     base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,
+    role_type: RoleType,
     client: reqwest::Client,
     auth_context: Arc<AuthContext>,
 }
@@ -54,6 +55,7 @@ impl TelemetrySender {
             base_url,
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
+            role_type: node_config.base.role,
             client: reqwest::Client::new(),
             auth_context: Arc::new(AuthContext::new(node_config)),
         }
@@ -178,7 +180,11 @@ impl TelemetrySender {
                     self.reset_token();
                     Err(anyhow!("Unauthorized"))
                 } else {
-                    Err(anyhow!("Error status received: {}", status_code))
+                    Err(anyhow!(
+                        "Error status received {}: {}",
+                        status_code,
+                        response.text().await?,
+                    ))
                 }
             }
             Err(error) => Err(anyhow!("Error sending metrics. Err: {}", error)),
@@ -201,7 +207,7 @@ impl TelemetrySender {
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
         let response = self.client.get(self.base_url.to_string()).send().await?;
 
-        match response.error_for_status() {
+        match error_for_status_with_body(response).await {
             Ok(response) => {
                 let public_key = response.json::<x25519::PublicKey>().await?;
                 Ok(public_key)
@@ -262,6 +268,7 @@ impl TelemetrySender {
         let auth_request = AuthRequest {
             chain_id: self.chain_id,
             peer_id: self.peer_id,
+            role_type: self.role_type,
             server_public_key,
             handshake_msg: client_noise_msg,
         };
@@ -273,12 +280,12 @@ impl TelemetrySender {
             .send()
             .await?;
 
-        let resp = match response.error_for_status() {
+        let resp = match error_for_status_with_body(response).await {
             Ok(response) => Ok(response.json::<AuthResponse>().await?),
             Err(err) => {
                 error!(
                     "[telemetry-client] Error sending authentication request: {}",
-                    err
+                    err,
                 );
                 Err(anyhow!("error {}", err))
             }
@@ -465,5 +472,18 @@ mod tests {
 
         mock.assert();
         assert!(result.is_ok());
+    }
+}
+
+async fn error_for_status_with_body(response: Response) -> Result<Response, anyhow::Error> {
+    if response.status().is_client_error() || response.status().is_server_error() {
+        Err(anyhow!(
+            "HTTP status error ({}) for url ({}): {}",
+            response.status(),
+            response.url().clone(),
+            response.text().await?,
+        ))
+    } else {
+        Ok(response)
     }
 }
