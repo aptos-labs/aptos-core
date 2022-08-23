@@ -379,6 +379,15 @@ fn generate_new_era() -> String {
     format!("forge{}", r)
 }
 
+fn get_node_default_helm_path() -> String {
+    let forge_run_mode = std::env::var("FORGE_RUNNER_MODE").unwrap_or("k8s".to_string());
+    if forge_run_mode.eq("local") {
+        "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml".to_string()
+    } else {
+        "helm-values/aptos-node-default-values.yaml".to_string()
+    }
+}
+
 pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
@@ -405,10 +414,8 @@ pub async fn install_testnet_resources(
 
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
         node_helm_config_fn,
-        fs::read_to_string(
-            "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml",
-        )
-        .expect("Not able to read default value file"),
+        fs::read_to_string(get_node_default_helm_path())
+            .expect("Not able to read default value file"),
         kube_namespace.clone(),
         new_era.clone(),
         num_validators,
