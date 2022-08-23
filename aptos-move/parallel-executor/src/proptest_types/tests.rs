@@ -49,7 +49,8 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -165,7 +166,8 @@ fn deltas_writes_mixed() {
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
-    .execute_transactions_parallel((), transactions.clone());
+    .execute_transactions_parallel((), transactions.clone())
+    .map(|(res, _)| res);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
@@ -329,7 +331,8 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

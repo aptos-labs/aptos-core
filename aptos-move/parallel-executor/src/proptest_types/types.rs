@@ -507,8 +507,8 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     }
 
     fn check_result(
-        expected_results: &Vec<(Option<V>, Option<u128>)>,
-        results: &Vec<ReadResult<V>>,
+        expected_results: &[(Option<V>, Option<u128>)],
+        results: &[ReadResult<V>],
         delta_fail: bool,
     ) {
         let mut delta_failed = false;

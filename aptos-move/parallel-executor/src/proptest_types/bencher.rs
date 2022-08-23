@@ -112,7 +112,8 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), self.transactions.clone());
+        .execute_transactions_parallel((), self.transactions.clone())
+        .map(|(res, _)| res);
 
         self.expected_output.assert_output(&output);
     }

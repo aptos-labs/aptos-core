@@ -218,6 +218,10 @@ impl DeltaChangeSet {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.delta_change_set.len()
+    }
+
     pub fn new(delta_change_set: Vec<(StateKey, DeltaOp)>) -> Self {
         DeltaChangeSet { delta_change_set }
     }

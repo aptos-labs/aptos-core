@@ -22,7 +22,8 @@ where
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
@@ -39,28 +40,28 @@ fn delta_counters() {
     let mut transactions = vec![Transaction::Write {
         incarnation: Arc::new(AtomicUsize::new(0)),
         reads: vec![vec![]],
-        writes_and_deltas: vec![(vec![(key.clone(), random_value(false))], vec![])],
+        writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
     }];
 
     for _ in 0..50 {
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_add(5, u128::MAX))])],
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
         });
     }
 
     transactions.push(Transaction::Write {
         incarnation: Arc::new(AtomicUsize::new(0)),
         reads: vec![vec![]],
-        writes_and_deltas: vec![(vec![(key.clone(), random_value(false))], vec![])],
+        writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
     });
 
     for _ in 0..50 {
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_sub(2, u128::MAX))])],
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_sub(2, u128::MAX))])],
         });
     }
 
@@ -74,22 +75,32 @@ fn deleted_aggregator() {
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![]],
-            writes_and_deltas: vec![(vec![(key.clone(), random_value(true))], vec![])],
+            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
         },
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_add(5, u128::MAX))])],
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
         },
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![]],
-            writes_and_deltas: vec![(vec![(key.clone(), random_value(false))], vec![])],
+            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
         },
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_add(5, u128::MAX))])],
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![]],
+            writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
         },
     ];
 
@@ -116,7 +127,7 @@ fn delta_chains() {
                         .enumerate()
                         .filter_map(|(j, k)| match (i + j) % 2 == 0 {
                             true => Some((
-                                k.clone(),
+                                *k,
                                 // Deterministic pattern for adds/subtracts.
                                 DeltaOp::new(
                                     if (i % 2 == 0) == (j < 5) {

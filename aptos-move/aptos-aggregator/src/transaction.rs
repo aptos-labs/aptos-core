@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::DeltaChangeSet;
+use crate::delta_change_set::{deserialize, DeltaChangeSet};
 use aptos_state_view::StateView;
 use aptos_types::write_set::TransactionWrite;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
-    vm_status::VMStatus,
-    write_set::WriteSet,
+    write_set::WriteSetMut,
 };
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
@@ -19,7 +18,7 @@ impl AggregatorValue {
     /// the value raw bytes can't be deserialized into an u128.
     pub fn from_write(write: &dyn TransactionWrite) -> Option<Self> {
         let v = write.extract_raw_bytes();
-        v.map(|bytes| Self(bcs::from_bytes(&bytes).expect("Must be serialized aggregator value")))
+        v.map(|bytes| Self(deserialize(&bytes)))
     }
 
     pub fn into(self) -> u128 {
@@ -77,48 +76,57 @@ impl TransactionOutputExt {
     /// TODO: ideally, we may want to expose this function to VM instead. Since
     /// we do not care about rerunning the epilogue - it sufficies to have it
     /// here for now.
-    pub fn into_transaction_output(
-        self,
-        state_view: &impl StateView,
-    ) -> Result<(TransactionOutput, Option<WriteSet>), VMStatus> {
+    pub fn into_transaction_output(self, state_view: &impl StateView) -> TransactionOutput {
         let (delta_change_set, txn_output) = self.into();
 
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
         if txn_output.status().is_discarded() || delta_change_set.is_empty() {
-            return Ok((txn_output, None));
+            return txn_output;
         }
 
-        match delta_change_set.try_into_write_set_mut(state_view) {
-            Err(_) => {
-                // TODO: at this point we know that delta application failed
-                // (and it should have occurred in user transaction in general).
-                // We need to rerun the epilogue and charge gas. Currently, the use
-                // case of an aggregator is for gas fees (which are computed in
-                // the epilogue), and therefore this should never happen.
-                // Also, it is worth mentioning that current VM error handling is
-                // rather ugly and has a lot of legacy code. This makes proper error
-                // handling quite challenging.
-                panic!("something terrible happened when applying aggregator deltas");
-            }
-            Ok(materialized_deltas) => {
-                let (write_set, events, gas_used, status) = txn_output.unpack();
-                // We expect to have only a few delta changes, so add them to
-                // the write set of the transaction.
-                let mut write_set_mut = write_set.into_mut();
-                write_set_mut.append(&mut materialized_deltas.clone());
+        // TODO: at this point we know that delta application failed
+        // (and it should have occurred in user transaction in general).
+        // We need to rerun the epilogue and charge gas. Currently, the use
+        // case of an aggregator is for gas fees (which are computed in
+        // the epilogue), and therefore this should never happen.
+        // Also, it is worth mentioning that current VM error handling is
+        // rather ugly and has a lot of legacy code. This makes proper error
+        // handling quite challenging.
+        delta_change_set
+            .try_into_write_set_mut(state_view)
+            .map(|materialized_deltas| Self::merge_delta_writes(txn_output, materialized_deltas))
+            .expect("Failed to apply aggregator delta outputs")
+    }
 
-                let output = TransactionOutput::new(
-                    write_set_mut.freeze().unwrap(),
-                    events,
-                    gas_used,
-                    status,
-                );
+    pub fn output_with_delta_writes(self, delta_writes: WriteSetMut) -> TransactionOutput {
+        let (delta_change_set, txn_output) = self.into();
 
-                Ok((output, Some(materialized_deltas.freeze().unwrap())))
-            }
+        // First, check if output of transaction should be discarded or delta
+        // change set is empty. In both cases, we do not need to apply any
+        // deltas and can return immediately.
+        if txn_output.status().is_discarded() || delta_change_set.is_empty() {
+            return txn_output;
         }
+
+        // We should have a delta write for every delta in the output.
+        assert_eq!(delta_change_set.len(), delta_writes.len());
+
+        Self::merge_delta_writes(txn_output, delta_writes)
+    }
+
+    fn merge_delta_writes(
+        output: TransactionOutput,
+        mut delta_writes: WriteSetMut,
+    ) -> TransactionOutput {
+        let (write_set, events, gas_used, status) = output.unpack();
+        // We expect to have only a few delta changes, so add them to
+        // the write set of the transaction.
+        let mut write_set_mut = write_set.into_mut();
+        write_set_mut.append(&mut delta_writes);
+
+        TransactionOutput::new(write_set_mut.freeze().unwrap(), events, gas_used, status)
     }
 }
 

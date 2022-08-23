@@ -155,6 +155,10 @@ impl WriteSetMut {
         self.write_set.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.write_set.len()
+    }
+
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
         Ok(WriteSet::V0(WriteSetV0(self)))

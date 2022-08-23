@@ -27,15 +27,15 @@ const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry<V> {
+pub struct Entry<V> {
     /// Used to mark the entry as a "write estimate".
     flag: AtomicUsize,
     /// Actual content.
-    cell: EntryCell<V>,
+    pub cell: EntryCell<V>,
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-enum EntryCell<V> {
+pub enum EntryCell<V> {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
@@ -115,6 +115,11 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         }
     }
 
+    /// For processing outputs - removes the BTreeMap from the MVHashMap.
+    pub fn indexed_entries(&self, key: &K) -> Option<BTreeMap<TxnIndex, CachePadded<Entry<V>>>> {
+        self.data.remove(&*key).map(|(_, tree)| tree)
+    }
+
     /// Add a write of versioned data at a specified key. If the entry is overwritten, asserts
     /// that the new incarnation is strictly higher.
     pub fn add_write(&self, key: &K, version: Version, data: V) {
@@ -186,45 +191,46 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                     // The entry should be populated.
                     debug_assert!(flag == FLAG_DONE);
 
-                    match &entry.cell {
-                        EntryCell::Write(incarnation, data) => {
-                            // Read hit a write during traversal. We must deserialize the value
+                    match (&entry.cell, accumulator.as_mut()) {
+                        (EntryCell::Write(incarnation, data), None) => {
+                            // Resolve to the write if no deltas were applied in between.
+                            let write_version = (*idx, *incarnation);
+                            return Ok(Version(write_version, data.clone()));
+                        }
+                        (EntryCell::Write(incarnation, data), Some(accumulator)) => {
+                            // Deltas were applied. We must deserialize the value
                             // of the write and apply the aggregated delta accumulator.
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
                             let maybe_value = AggregatorValue::from_write(data.as_ref());
-                            if accumulator.is_none() || maybe_value.is_none() {
-                                // Resolve to the write if no deltas were applied in between
-                                // or if the WriteOp was deletion (MoveVM will observe 'deletion').
+
+                            if maybe_value.is_none() {
+                                // Resolve to the write if the WriteOp was deletion
+                                // (MoveVM will observe 'deletion').
                                 let write_version = (*idx, *incarnation);
                                 return Ok(Version(write_version, data.clone()));
                             }
 
                             return accumulator
-                                .unwrap()
                                 .apply_to(maybe_value.unwrap().into())
                                 .map_err(|_| DeltaApplicationFailure)
                                 .map(|result| Resolved(result));
                         }
-                        EntryCell::Delta(delta) => {
-                            match accumulator.as_mut() {
-                                Some(accumulator) => {
-                                    // Read hit a delta during traversing the
-                                    // block and aggregating other deltas. Merge
-                                    // two deltas together. If Delta application
-                                    // fails, we return a corresponding error, so that
-                                    // the speculative execution can also fail.
-                                    accumulator
-                                        .merge_with(*delta)
-                                        .map_err(|_| DeltaApplicationFailure)?;
-                                }
-                                None => {
-                                    // Read hit a delta and must start accumulating.
-                                    // Initialize the accumulator and continue traversal.
-                                    accumulator = Some(*delta)
-                                }
-                            }
+                        (EntryCell::Delta(delta), Some(accumulator)) => {
+                            // Read hit a delta during traversing the
+                            // block and aggregating other deltas. Merge
+                            // two deltas together. If Delta application
+                            // fails, we return a corresponding error, so that
+                            // the speculative execution can also fail.
+                            accumulator
+                                .merge_with(*delta)
+                                .map_err(|_| DeltaApplicationFailure)?;
+                        }
+                        (EntryCell::Delta(delta), None) => {
+                            // Read hit a delta and must start accumulating.
+                            // Initialize the accumulator and continue traversal.
+                            accumulator = Some(*delta)
                         }
                     }
                 }

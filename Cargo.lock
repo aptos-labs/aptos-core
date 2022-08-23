@@ -963,6 +963,7 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-infallible",
+ "aptos-state-view",
  "aptos-types",
  "arc-swap",
  "bcs",

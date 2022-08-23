@@ -165,8 +165,8 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             &log_context,
         )?;
 
-        // Apply deltas. TODO: refactor and don't return second value (converted deltas) at all.
-        let (output, _) = output_ext.into_transaction_output(&data_cache)?;
+        // Apply deltas.
+        let output = output_ext.into_transaction_output(&data_cache);
 
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());

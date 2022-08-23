@@ -551,11 +551,6 @@ impl TransactionsApi {
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
         let output = output_ext.into_transaction_output(&move_resolver);
-        debug_assert!(
-            matches!(output, Ok(_)),
-            "converting into transaction output failed"
-        );
-        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
@@ -568,16 +563,16 @@ impl TransactionsApi {
             zero_hash,
             zero_hash,
             None,
-            output.0.gas_used(),
+            output.gas_used(),
             exe_status,
         );
         let simulated_txn = TransactionOnChainData {
             version,
             transaction: aptos_types::transaction::Transaction::UserTransaction(txn),
             info,
-            events: output.0.events().to_vec(),
+            events: output.events().to_vec(),
             accumulator_root_hash: aptos_crypto::HashValue::default(),
-            changes: output.0.write_set().clone(),
+            changes: output.write_set().clone(),
         };
 
         match accept_type {

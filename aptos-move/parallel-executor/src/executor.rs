@@ -3,6 +3,7 @@
 
 use crate::{
     errors::*,
+    output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
     task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
@@ -356,13 +357,20 @@ where
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: Vec<T>,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<
+        (
+            Vec<E::Output>,
+            OutputDeltaResolver<<T as Transaction>::Key, <T as Transaction>::Value>,
+        ),
+        E::Error,
+    > {
+        let versioned_data_cache = MVHashMap::new();
+
         if signature_verified_block.is_empty() {
-            return Ok(vec![]);
+            return Ok((vec![], OutputDeltaResolver::new(versioned_data_cache)));
         }
 
         let num_txns = signature_verified_block.len();
-        let versioned_data_cache = MVHashMap::new();
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
@@ -408,7 +416,6 @@ where
             // Explicit async drops.
             drop(last_input_output);
             drop(signature_verified_block);
-            drop(versioned_data_cache);
             drop(scheduler);
         });
 
@@ -416,7 +423,10 @@ where
             Some(err) => Err(err),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
-                Ok(final_results)
+                Ok((
+                    final_results,
+                    OutputDeltaResolver::new(versioned_data_cache),
+                ))
             }
         }
     }

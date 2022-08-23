@@ -7,23 +7,24 @@ mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
-    data_cache::StateViewCache,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
+    output_delta_resolver::ResolvedData,
     task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_deps::move_core_types::vm_status::{StatusCode, VMStatus};
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 impl PTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -37,8 +38,13 @@ impl AptosTransactionOutput {
     pub fn new(output: TransactionOutputExt) -> Self {
         Self(output)
     }
+
     pub fn into(self) -> TransactionOutputExt {
         self.0
+    }
+
+    pub fn as_ref(&self) -> &TransactionOutputExt {
+        &self.0
     }
 }
 
@@ -85,26 +91,29 @@ impl ParallelAptosVM {
         )
         .execute_transactions_parallel(state_view, signature_verified_block)
         {
-            Ok(results) => {
-                // TODO: with more deltas, do this in parallel, and together with parallel
-                // execution's output processing. (Note: need to make DataCache trait
-                // to avoid circular dependencies).
-                let mut data_cache = StateViewCache::new(state_view);
+            Ok((results, delta_resolver)) => {
+                // TODO: with more deltas, collect keys in parallel (in parallel executor).
+                let mut aggregator_keys: HashMap<StateKey, anyhow::Result<ResolvedData>> =
+                    HashMap::new();
+
+                for res in results.iter() {
+                    let output_ext = AptosTransactionOutput::as_ref(res);
+                    for (key, _) in output_ext.delta_change_set().iter() {
+                        if !aggregator_keys.contains_key(&key) {
+                            aggregator_keys.insert(key.clone(), state_view.get_state_value(&key));
+                        }
+                    }
+                }
+
+                let materialized_deltas =
+                    delta_resolver.resolve(aggregator_keys.into_iter().collect(), results.len());
                 Ok((
                     results
                         .into_iter()
-                        .map(|out| {
-                            let output_ext = AptosTransactionOutput::into(out);
-                            let (output, delta_writes) = output_ext
-                                .into_transaction_output(&data_cache)
-                                .expect("Delta application failed");
-
-                            if !output.status().is_discarded() {
-                                data_cache.push_write_set(
-                                    &delta_writes.expect("Expected materialized delta writeset"),
-                                );
-                            }
-                            output
+                        .zip(materialized_deltas.into_iter())
+                        .map(|(res, delta_writes)| {
+                            let output_ext = AptosTransactionOutput::into(res);
+                            output_ext.output_with_delta_writes(WriteSetMut::new(delta_writes))
                         })
                         .collect(),
                     None,
