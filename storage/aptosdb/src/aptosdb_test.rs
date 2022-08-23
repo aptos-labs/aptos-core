@@ -289,6 +289,7 @@ pub fn test_state_merkle_pruning_impl(
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
+    #[ignore]
     #[test]
     fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
         test_state_merkle_pruning_impl(input);
