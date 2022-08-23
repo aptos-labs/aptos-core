@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS block_metadata_transactions;
+DROP TABLE IF EXISTS user_transactions;
+DROP TABLE IF EXISTS signatures;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS write_set_changes;
+DROP TABLE IF EXISTS move_modules;
+DROP TABLE IF EXISTS move_resources;
+DROP TABLE IF EXISTS table_items;
+DROP TABLE IF EXISTS table_metadatas;
+DROP TABLE IF EXISTS indexer_states;
+DROP TABLE IF EXISTS ledger_infos;
+DROP TABLE IF EXISTS transactions;

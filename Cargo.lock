@@ -1192,6 +1192,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-sf-indexer"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-protos",
+ "aptos-rest-client",
+ "aptos-types",
+ "async-stream",
+ "async-trait",
+ "bigdecimal",
+ "bytes 1.2.1",
+ "chrono",
+ "clap 3.2.17",
+ "diesel",
+ "diesel_migrations",
+ "field_count",
+ "futures",
+ "http",
+ "once_cell",
+ "pbjson",
+ "prost 0.10.4",
+ "prost-types 0.10.1",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde 1.0.144",
+ "serde_json",
+ "tokio",
+ "tokio-retry",
+ "tonic 0.7.2",
+ "url",
+]
+
+[[package]]
 name = "aptos-state-view"
 version = "0.1.0"
 dependencies = [
@@ -2623,8 +2660,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e57ff02e8ad8e06ab9731d5dc72dc23bef9200778eae1a89d555d8c42e5d4a86"
 dependencies = [
  "prost 0.11.0",
- "prost-types",
- "tonic",
+ "prost-types 0.11.1",
+ "tonic 0.8.0",
  "tracing-core",
 ]
 
@@ -2640,13 +2677,13 @@ dependencies = [
  "futures",
  "hdrhistogram",
  "humantime 2.1.0",
- "prost-types",
+ "prost-types 0.11.1",
  "serde 1.0.144",
  "serde_json",
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.8.0",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -7470,6 +7507,16 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
+dependencies = [
+ "bytes 1.2.1",
+ "prost 0.10.4",
+]
+
+[[package]]
+name = "prost-types"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
@@ -9510,6 +9557,42 @@ dependencies = [
  "indexmap",
  "itertools",
  "serde 1.0.144",
+]
+
+[[package]]
+name = "tonic"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be9d60db39854b30b835107500cf0aca0b0d14d6e1c3de124217c23a29c2ddb"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "axum",
+ "base64 0.13.0",
+ "bytes 1.2.1",
+ "flate2",
+ "futures-core",
+ "futures-util",
+ "h2",
+ "http",
+ "http-body",
+ "hyper",
+ "hyper-timeout",
+ "percent-encoding",
+ "pin-project",
+ "prost 0.10.4",
+ "prost-derive 0.10.1",
+ "rustls-native-certs",
+ "rustls-pemfile 1.0.1",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-stream",
+ "tokio-util 0.7.3",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+ "tracing-futures",
 ]
 
 [[package]]
