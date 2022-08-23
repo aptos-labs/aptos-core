@@ -38,13 +38,15 @@ use event_notifications::EventNotificationListener;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
+use rand::rngs::OsRng;
+use rand::Rng;
 use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
 pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStreamListener) {
     let (notification_sender, notification_receiver) =
         aptos_channel::new(QueueStyle::KLAST, 100, None);
-    let data_stream_listener = DataStreamListener::new(notification_receiver);
+    let data_stream_listener = DataStreamListener::new(create_random_u64(), notification_receiver);
 
     (notification_sender, data_stream_listener)
 }
@@ -129,6 +131,12 @@ pub fn create_epoch_state(epoch: u64) -> EpochState {
     let mut epoch_state = create_empty_epoch_state();
     epoch_state.epoch = epoch;
     epoch_state
+}
+
+/// Returns a random u64
+fn create_random_u64() -> u64 {
+    let mut rng = OsRng;
+    rng.gen()
 }
 
 /// Creates a test state value chunk with proof

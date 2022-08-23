@@ -41,16 +41,10 @@ module aptos_std::event {
     public fun guid<T: drop + store>(handle_ref: &EventHandle<T>): &GUID {
         &handle_ref.guid
     }
-    spec guid {
-        pragma intrinsic = false;
-    }
 
     /// Return the current counter associated with this EventHandle
     public fun counter<T: drop + store>(handle_ref: &EventHandle<T>): u64 {
         handle_ref.counter
-    }
-    spec counter {
-        pragma intrinsic = false;
     }
 
     /// Log `msg` as the `count`th event associated with the event stream identified by `guid`
@@ -67,22 +61,5 @@ module aptos_std::event {
     public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUID {
         let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
         guid
-    }
-
-    // ****************** SPECIFICATIONS *******************
-    spec module {} // switch documentation context to module
-
-    spec module {
-        /// Functions of the event module are mocked out using the intrinsic
-        /// pragma. They are implemented in the prover's prelude.
-        pragma intrinsic = true;
-
-        /// Determines equality between the guids of two event handles. Since fields of intrinsic
-        /// structs cannot be accessed, this function is provided.
-        fun spec_guid_eq<T>(h1: EventHandle<T>, h2: EventHandle<T>): bool {
-            // The implementation currently can just use native equality since the mocked prover
-            // representation does not have the `counter` field.
-            h1 == h2
-        }
     }
 }

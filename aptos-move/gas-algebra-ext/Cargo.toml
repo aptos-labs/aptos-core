@@ -7,8 +7,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-move-core-types = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "413955ea9246356b18af006584eb73283e9508da" }

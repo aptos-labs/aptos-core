@@ -13,3 +13,5 @@
 
 # Use Move syntax highlighter for Move IR code
 *.mvir linguist-language=Move
+
+**/src/pb/*.rs linguist-generated=true

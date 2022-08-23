@@ -22,12 +22,13 @@ const sidebars = {
 
     {
       type: "category",
-      label: "Aptos Quickstarts",
+      label: "Developer Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
       items: [
         "tutorials/first-transaction-sdk",
+        "tutorials/your-first-nft-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",

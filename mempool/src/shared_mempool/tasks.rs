@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
-use crate::shared_mempool::types::BatchId;
-use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
-        notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
+        notify_subscribers, BatchId, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
         SubmissionStatusBundle,
     },
+    thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -390,7 +389,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
     debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
-        QuorumStoreRequest::GetBatchRequest(max_batch_size, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
@@ -402,8 +401,8 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                 let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
-                let batch_size = cmp::max(max_batch_size, 1);
-                txns = mempool.get_batch(batch_size, exclude_transactions);
+                let max_txns = cmp::max(max_txns, 1);
+                txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
             counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
 

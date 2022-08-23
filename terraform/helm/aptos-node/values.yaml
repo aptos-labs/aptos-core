@@ -35,7 +35,7 @@ validator:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
     # -- Size of validator persistent storage
-    size: 512Gi
+    size: 300Gi
   # -- Log level for the validator
   rust_log: info
   # -- Remote log level for the validator
@@ -76,7 +76,7 @@ fullnode:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
     # -- Size of fullnode persistent storage
-    size: 512Gi
+    size: 300Gi
   # -- Log level for the fullnode
   rust_log: info
   # -- Remote log level for the fullnode

@@ -31,12 +31,18 @@ async fn test_block_request_no_txns() {
     consensus_to_quorum_store_sender
         .try_send(ConsensusRequest::GetBlockRequest(
             100,
+            1000,
             PayloadFilter::DirectMempool(vec![]),
             consensus_callback,
         ))
         .unwrap();
 
-    if let QuorumStoreRequest::GetBatchRequest(_max_batch_size, _exclude_txns, callback) = timeout(
+    if let QuorumStoreRequest::GetBatchRequest(
+        _max_batch_size,
+        _max_bytes,
+        _exclude_txns,
+        callback,
+    ) = timeout(
         Duration::from_millis(1_000),
         quorum_store_to_mempool_receiver.select_next_some(),
     )

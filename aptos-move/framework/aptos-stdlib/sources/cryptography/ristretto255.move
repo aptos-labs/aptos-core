@@ -694,6 +694,7 @@ module aptos_std::ristretto255 {
         test_point_add_assign_internal(3, 7);
     }
 
+    #[test_only]
     fun test_point_add_assign_internal(before_a_gap: u64, before_b_gap: u64) {
         // create extra RistrettoPoints here, so as to generate different PointStore layouts inside the native Rust implementation
         let c = before_a_gap;

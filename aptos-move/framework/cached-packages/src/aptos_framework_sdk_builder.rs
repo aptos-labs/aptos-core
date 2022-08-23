@@ -39,6 +39,16 @@ pub enum EntryFunctionCall {
         auth_key: AccountAddress,
     },
 
+    /// Offer rotation capability of this account to another address
+    /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
+    /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
+    /// The recipient address refers to the address that the account owner wants to give the rotation capability to.
+    AccountOfferRotationCapabilityEd25519 {
+        rotation_capability_sig_bytes: Vec<u8>,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     AccountRotateAuthenticationKey {
         new_auth_key: Vec<u8>,
     },
@@ -92,15 +102,6 @@ pub enum EntryFunctionCall {
         stake_pool: AccountAddress,
         proposal_id: u64,
         should_pass: bool,
-    },
-
-    /// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
-    /// size constraints.
-    CodePublishPackageChunk3Txn {
-        metadata_chunk1: Vec<u8>,
-        metadata_chunk2: Vec<u8>,
-        metadata_chunk3: Vec<u8>,
-        code: Vec<Vec<u8>>,
     },
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
@@ -265,6 +266,15 @@ impl EntryFunctionCall {
         use EntryFunctionCall::*;
         match self {
             AccountCreateAccount { auth_key } => account_create_account(auth_key),
+            AccountOfferRotationCapabilityEd25519 {
+                rotation_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_rotation_capability_ed25519(
+                rotation_capability_sig_bytes,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
@@ -299,17 +309,6 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
-            CodePublishPackageChunk3Txn {
-                metadata_chunk1,
-                metadata_chunk2,
-                metadata_chunk3,
-                code,
-            } => code_publish_package_chunk3_txn(
-                metadata_chunk1,
-                metadata_chunk2,
-                metadata_chunk3,
-                code,
-            ),
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -419,6 +418,33 @@ pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
         ident_str!("create_account").to_owned(),
         vec![],
         vec![bcs::to_bytes(&auth_key).unwrap()],
+    ))
+}
+
+/// Offer rotation capability of this account to another address
+/// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
+/// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
+/// The recipient address refers to the address that the account owner wants to give the rotation capability to.
+pub fn account_offer_rotation_capability_ed25519(
+    rotation_capability_sig_bytes: Vec<u8>,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability_ed25519").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
     ))
 }
 
@@ -584,33 +610,6 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
-        ],
-    ))
-}
-
-/// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
-/// size constraints.
-pub fn code_publish_package_chunk3_txn(
-    metadata_chunk1: Vec<u8>,
-    metadata_chunk2: Vec<u8>,
-    metadata_chunk3: Vec<u8>,
-    code: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("code").to_owned(),
-        ),
-        ident_str!("publish_package_chunk3_txn").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&metadata_chunk1).unwrap(),
-            bcs::to_bytes(&metadata_chunk2).unwrap(),
-            bcs::to_bytes(&metadata_chunk3).unwrap(),
-            bcs::to_bytes(&code).unwrap(),
         ],
     ))
 }
@@ -1091,6 +1090,20 @@ mod decoder {
         }
     }
 
+    pub fn account_offer_rotation_capability_ed25519(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferRotationCapabilityEd25519 {
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1183,21 +1196,6 @@ mod decoder {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn code_publish_package_chunk3_txn(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::CodePublishPackageChunk3Txn {
-                metadata_chunk1: bcs::from_bytes(script.args().get(0)?).ok()?,
-                metadata_chunk2: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_chunk3: bcs::from_bytes(script.args().get(2)?).ok()?,
-                code: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -1486,6 +1484,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_create_account),
         );
         map.insert(
+            "account_offer_rotation_capability_ed25519".to_string(),
+            Box::new(decoder::account_offer_rotation_capability_ed25519),
+        );
+        map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
         );
@@ -1516,10 +1518,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
-        );
-        map.insert(
-            "code_publish_package_chunk3_txn".to_string(),
-            Box::new(decoder::code_publish_package_chunk3_txn),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

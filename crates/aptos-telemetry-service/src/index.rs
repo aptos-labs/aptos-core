@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auth, context::Context, custom_event, error::ServiceError, prometheus_push_metrics};
+use crate::{
+    auth, context::Context, custom_event, error::ServiceError, log_ingest, prometheus_push_metrics,
+};
 use std::convert::Infallible;
 use warp::{
     body::BodyDeserializeError,
@@ -14,7 +16,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
     index(context.clone())
         .or(auth::auth(context.clone()))
         .or(custom_event::custom_event(context.clone()))
-        .or(prometheus_push_metrics::metrics_ingest(context))
+        .or(prometheus_push_metrics::metrics_ingest(context.clone()))
+        .or(log_ingest::log_ingest(context))
         .recover(handle_rejection)
 }
 

@@ -26,6 +26,10 @@ else
     exec python3 testsuite/forge.py test "$@"
 fi
 
+# available clusters to choose from
+# forge-1 is used for continuous testing exclusively
+FORGE_CLUSTERS=("aptos-forge-0" "aptos-forge-2")
+
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
@@ -175,9 +179,15 @@ get_dashboard_link() {
 
 print_output_files
 
+if [ -z "$FORGE_CLUSTER_NAME" ]; then
+    FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
+fi
+
+aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+
 # determine cluster name from kubectl context and set o11y resources
-FORGE_CLUSTER_NAME=$(kubectl config current-context | grep -oE 'aptos.*')
-echo "Using cluster ${FORGE_CLUSTER_NAME} from current kubectl context"
+echo "Using cluster ${FORGE_CLUSTER_NAME}"
+echo "Note: the current kubectl context has changed"
 # remove the "aptos-" prefix and add "net" suffix to get the chain name
 # as used by the deployment setup and as reported to o11y systems
 FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
@@ -257,7 +267,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
 
     # try to kill orphaned port-forwards
     if [ -z "$KEEP_ARGS" ]; then
-        ps -A | grep "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+        ps -A | grep "port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
         kill -9 $prometheus_port_forward_pid
     fi
 

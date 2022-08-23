@@ -6,33 +6,26 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use crate::move_tool::{init_move_dir, ArgWithType, FunctionArgType, IncludedArtifacts};
+use crate::move_tool::{init_move_dir, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::U64;
-use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
+use aptos_rest_client::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
-use move_deps::move_core_types::{
-    language_storage::TypeTag, transaction_argument::TransactionArgument,
-};
+use move_deps::move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    fmt::Formatter,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fmt::Formatter, fs, path::PathBuf};
 use tempfile::TempDir;
 
 /// Tool for on-chain governance
@@ -66,7 +59,8 @@ pub struct SubmitProposal {
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
-
+    #[clap(long)]
+    pub(crate) metadata_path: Option<PathBuf>,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -85,7 +79,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
 
         // Validate the proposal metadata
-        let (metadata, metadata_hash) = get_metadata(self.metadata_url.clone()).await?;
+        let (metadata, metadata_hash) = self.get_metadata().await?;
 
         println!(
             "{}\n\tMetadata Hash: {}\n\tScript Hash: {}",
@@ -98,18 +92,12 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         let txn = self
             .txn_options
-            .submit_entry_function(
-                AccountAddress::ONE,
-                "aptos_governance",
-                "create_proposal",
-                vec![],
-                vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&script_hash)?,
-                    bcs::to_bytes(&self.metadata_url.to_string())?,
-                    bcs::to_bytes(&metadata_hash.to_hex())?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                self.pool_address_args.pool_address,
+                script_hash.to_vec(),
+                self.metadata_url.to_string().as_bytes().to_vec(),
+                metadata_hash.to_hex().as_bytes().to_vec(),
+            ))
             .await?;
 
         if let Transaction::UserTransaction(inner) = txn {
@@ -147,6 +135,75 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 }
 
+impl SubmitProposal {
+    /// Retrieve metadata and validate it
+    async fn get_metadata(&self) -> CliTypedResult<(ProposalMetadata, HashValue)> {
+        let bytes = if let Some(path) = &self.metadata_path {
+            Self::get_metadata_from_file(path)?
+        } else {
+            Self::get_metadata_from_url(&self.metadata_url).await?
+        };
+
+        let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Metadata is not in a proper JSON format: {}",
+                err
+            ))
+        })?;
+        Url::parse(&metadata.source_code_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Source code URL {} is invalid {}",
+                metadata.source_code_url, err
+            ))
+        })?;
+        Url::parse(&metadata.discussion_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Discussion URL {} is invalid {}",
+                metadata.discussion_url, err
+            ))
+        })?;
+        let metadata_hash = HashValue::sha3_256_of(&bytes);
+        Ok((metadata, metadata_hash))
+    }
+
+    async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
+        let client = reqwest::ClientBuilder::default()
+            .tls_built_in_root_certs(true)
+            .build()
+            .map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to build HTTP client {}", err))
+            })?;
+        client
+            .get(metadata_url.clone())
+            .send()
+            .await
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to fetch metadata url {}: {}",
+                    metadata_url, err
+                ))
+            })?
+            .bytes()
+            .await
+            .map(|b| b.to_vec())
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to fetch metadata url {}: {}",
+                    metadata_url, err
+                ))
+            })
+    }
+
+    fn get_metadata_from_file(metadata_path: &PathBuf) -> CliTypedResult<Vec<u8>> {
+        fs::read(metadata_path).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to read metadata path {:?}: {}",
+                metadata_path, err
+            ))
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct CreateProposalEvent {
     proposal_id: U64,
@@ -161,49 +218,6 @@ struct ProposalSubmissionSummary {
     gas_price_per_unit: u64,
     sequence_number: u64,
     vm_status: String,
-}
-
-/// Retrieve metadata and validate it
-async fn get_metadata(metadata_url: Url) -> CliTypedResult<(ProposalMetadata, HashValue)> {
-    let client = reqwest::ClientBuilder::default()
-        .tls_built_in_root_certs(true)
-        .build()
-        .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
-    let bytes = client
-        .get(metadata_url.clone())
-        .send()
-        .await
-        .map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Failed to fetch metadata url {}: {}",
-                metadata_url, err
-            ))
-        })?
-        .bytes()
-        .await
-        .map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Failed to fetch metadata url {}: {}",
-                metadata_url, err
-            ))
-        })?;
-    let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-        CliError::CommandArgumentError(format!("Metadata is not in a proper JSON format: {}", err))
-    })?;
-    Url::parse(&metadata.source_code_url).map_err(|err| {
-        CliError::CommandArgumentError(format!(
-            "Source code URL {} is invalid {}",
-            metadata.source_code_url, err
-        ))
-    })?;
-    Url::parse(&metadata.discussion_url).map_err(|err| {
-        CliError::CommandArgumentError(format!(
-            "Discussion URL {} is invalid {}",
-            metadata.discussion_url, err
-        ))
-    })?;
-    let metadata_hash = HashValue::sha3_256_of(&bytes);
-    Ok((metadata, metadata_hash))
 }
 
 /// Submit a vote on a current proposal
@@ -254,17 +268,11 @@ impl CliCommand<Transaction> for SubmitVote {
         )?;
 
         self.txn_options
-            .submit_entry_function(
-                AccountAddress::ONE,
-                "aptos_governance",
-                "vote",
-                vec![],
-                vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&self.proposal_id)?,
-                    bcs::to_bytes(&vote)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::aptos_governance_vote(
+                self.pool_address_args.pool_address,
+                self.proposal_id,
+                vote,
+            ))
             .await
     }
 }
@@ -360,63 +368,12 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u64, u128, bool, hex, string, address]
-    ///
-    /// Example: `address:0x1 bool:true u8:0`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u64 u128 bool address vector true false signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileProposalArgs,
-}
-
-impl TryFrom<&ArgWithType> for TransactionArgument {
-    type Error = CliError;
-
-    fn try_from(arg: &ArgWithType) -> Result<Self, Self::Error> {
-        let txn_arg = match arg._ty {
-            FunctionArgType::Address => TransactionArgument::Address(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("address", err.to_string()))?,
-            ),
-            FunctionArgType::Bool => TransactionArgument::Bool(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("bool", err.to_string()))?,
-            ),
-            FunctionArgType::Hex => TransactionArgument::U8Vector(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
-            ),
-            FunctionArgType::String => TransactionArgument::U8Vector(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("string", err.to_string()))?,
-            ),
-            FunctionArgType::U128 => TransactionArgument::U128(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
-            ),
-            FunctionArgType::U64 => TransactionArgument::U64(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u64", err.to_string()))?,
-            ),
-            FunctionArgType::U8 => TransactionArgument::U8(
-                bcs::from_bytes(&arg.arg)
-                    .map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
-            ),
-        };
-
-        Ok(txn_arg)
-    }
 }
 
 #[async_trait]
@@ -429,23 +386,8 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
-        // TODO: Clean these up to be common with the run function in move
-        let args = self
-            .args
-            .iter()
-            .map(|arg_with_type| arg_with_type.try_into())
-            .collect::<Result<Vec<TransactionArgument>, CliError>>()?;
-
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        let txn = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+        let args = vec![TransactionArgument::U64(self.proposal_id)];
+        let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
             .submit_transaction(txn)

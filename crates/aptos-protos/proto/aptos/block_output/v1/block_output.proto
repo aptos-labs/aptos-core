@@ -11,8 +11,9 @@ import "aptos/util/timestamp/timestamp.proto";
 
 
 message BlockOutput {
-  repeated TransactionOutput transactions = 1;
-  uint64 height = 2;
+  uint64 height = 1;
+  repeated TransactionOutput transactions = 2;
+  uint32 chain_id = 3;
 }
 
 message TransactionOutput {
@@ -31,8 +32,9 @@ message TransactionInfoOutput {
   bytes hash = 1;
   string type = 2;
   uint64 version = 3;
-  bytes state_root_hash = 4;
+  bytes state_change_hash = 4;
   bytes event_root_hash = 5;
+  optional bytes state_checkpoint_hash = 13;
   uint64 gas_used = 6;
   bool success = 7;
   uint64 epoch = 8;
@@ -78,7 +80,7 @@ message SignatureOutput {
   bytes public_key = 5;
   bytes signature = 6;
   uint32 threshold = 7;
-  bytes bitmap = 8;
+  repeated uint32 public_key_indices = 8;
   uint32 multi_agent_index = 9;
   uint32 multi_sig_index = 10;
 }

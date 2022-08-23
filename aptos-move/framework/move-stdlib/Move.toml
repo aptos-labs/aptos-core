@@ -4,6 +4,3 @@ version = "1.5.0"
 
 [addresses]
 std = "0x1"
-
-[dev-addresses]
-std = "0x1"

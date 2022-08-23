@@ -210,7 +210,7 @@ impl BlockCache {
         } else {
             // TODO: We can alternatively scan backwards in time to find the hash
             // If for some reason the block doesn't get found, retry with block incomplete
-            Err(ApiError::BlockIncomplete)
+            Err(ApiError::BlockNotFound(None))
         }
     }
 }

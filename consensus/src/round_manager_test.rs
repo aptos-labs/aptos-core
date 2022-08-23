@@ -205,6 +205,7 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             1,
+            1000,
             10,
         );
 

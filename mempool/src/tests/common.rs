@@ -73,11 +73,11 @@ impl TestTransaction {
         &self,
         max_gas_amount: u64,
     ) -> SignedTransaction {
-        self.make_signed_transaction_impl(max_gas_amount, u64::max_value())
+        self.make_signed_transaction_impl(max_gas_amount, u64::MAX)
     }
 
     pub(crate) fn make_signed_transaction(&self) -> SignedTransaction {
-        self.make_signed_transaction_impl(100, u64::max_value())
+        self.make_signed_transaction_impl(100, u64::MAX)
     }
 
     fn make_signed_transaction_impl(
@@ -169,9 +169,10 @@ impl ConsensusMock {
     pub(crate) fn get_block(
         &mut self,
         mempool: &mut CoreMempool,
-        block_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(block_size, self.0.clone());
+        let block = mempool.get_batch(max_txns, max_bytes, self.0.clone());
         self.0 = self
             .0
             .union(

@@ -80,7 +80,7 @@ macro_rules! generate_error_traits {
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
-                ledger_info: &aptos_api_types::LedgerInfo
+                ledger_info: &aptos_api_types::LedgerInfo,
             ) -> Self where Self: Sized;
 
             // With an error code and no ledger info headers (special case)
@@ -352,7 +352,11 @@ macro_rules! generate_success_response {
                     AcceptType::Bcs => Ok(Self::from((
                         $crate::bcs_payload::Bcs(
                             bcs::to_bytes(&value)
-                                .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError, ledger_info))?
+                                .map_err(|e| E::internal_with_code(
+                                    e,
+                                    aptos_api_types::AptosErrorCode::InternalError,
+                                    ledger_info
+                                ))?
                         ),
                         ledger_info,
                         status
@@ -389,7 +393,11 @@ macro_rules! generate_success_response {
                Ok(Self::from((
                     $crate::bcs_payload::Bcs(
                         bcs::to_bytes(&value)
-                            .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError, ledger_info))?
+                            .map_err(|e| E::internal_with_code(
+                                e,
+                                aptos_api_types::AptosErrorCode::InternalError,
+                                ledger_info
+                            ))?
                     ),
                     ledger_info,
                     status
@@ -432,11 +440,19 @@ generate_error_traits!(
 );
 
 // Group these common errors together
-pub trait StdApiError: NotFoundError + GoneError + InternalError {}
-impl<T> StdApiError for T where T: NotFoundError + GoneError + InternalError {}
+pub trait StdApiError: NotFoundError + GoneError + InternalError + ServiceUnavailableError {}
+impl<T> StdApiError for T where
+    T: NotFoundError + GoneError + InternalError + ServiceUnavailableError
+{
+}
 
 // Generate an error response that only has options for 400 and 500.
-generate_error_response!(BasicError, (400, BadRequest), (500, Internal));
+generate_error_response!(
+    BasicError,
+    (400, BadRequest),
+    (500, Internal),
+    (503, ServiceUnavailable)
+);
 
 // This type just simplifies using BasicResponse and BasicError together.
 pub type BasicResult<T> = poem::Result<BasicResponse<T>, BasicError>;
@@ -447,7 +463,8 @@ generate_error_response!(
     (400, BadRequest),
     (404, NotFound),
     (410, Gone),
-    (500, Internal)
+    (500, Internal),
+    (503, ServiceUnavailable)
 );
 pub type BasicResultWith404<T> = poem::Result<BasicResponse<T>, BasicErrorWith404>;
 
