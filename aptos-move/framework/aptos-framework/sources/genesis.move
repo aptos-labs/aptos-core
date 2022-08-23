@@ -48,7 +48,9 @@ module aptos_framework::genesis {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
-        let (aptos_framework_account, framework_signer_cap) = account::create_aptos_framework_account();
+        let (aptos_framework_account, framework_signer_cap) = account::create_framework_reserved_account(@aptos_framework);
+        let (aptos_token_account, aptos_token_signer_cap) = account::create_framework_reserved_account(@0x3);
+
 
         // Initialize account configs on aptos framework account.
         account::initialize(
@@ -61,6 +63,7 @@ module aptos_framework::genesis {
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
+        aptos_governance::store_signer_cap(&aptos_token_account, @0x3, aptos_token_signer_cap);
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
@@ -196,6 +199,7 @@ module aptos_framework::genesis {
     #[test]
     fun test_setup() {
         setup();
-        assert!(account::exists_at(@aptos_framework), 0);
+        assert!(account::exists_at(@aptos_framework), 1);
+        assert!(account::exists_at(@0x3), 1);
     }
 }

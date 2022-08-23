@@ -29,7 +29,7 @@ module aptos_framework::system_addresses {
     }
 
     public fun is_aptos_framework_address(addr: address): bool {
-        addr == @aptos_framework
+        addr == @aptos_framework || addr == @0x3
     }
 
     /// Assert that the signer has the VM reserved address.
