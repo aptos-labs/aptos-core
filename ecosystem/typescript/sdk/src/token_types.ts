@@ -39,7 +39,11 @@ export interface TokenId {
   property_version: string;
 }
 
+/** server will return string for u64 */
+type U64 = string;
+
 export interface Token {
   id: TokenId;
-  amount: number;
+  /** server will return string for u64 */
+  amount: U64;
 }
