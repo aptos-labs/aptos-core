@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::delta_change_set::{deserialize, DeltaChangeSet};
+use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::write_set::TransactionWrite;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
-    write_set::WriteSetMut,
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use std::collections::btree_map;
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
 /// for aggregator (i.e. if we have seen a DeltaOp for the same access path).
@@ -40,8 +42,110 @@ impl ChangeSetExt {
         }
     }
 
+    pub fn delta_change_set(&self) -> &DeltaChangeSet {
+        &self.delta_change_set
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        self.change_set.write_set()
+    }
+
     pub fn into_inner(self) -> (DeltaChangeSet, ChangeSet) {
         (self.delta_change_set, self.change_set)
+    }
+
+    pub fn squash_delta_change_set(self, other: DeltaChangeSet) -> anyhow::Result<Self> {
+        use btree_map::Entry::*;
+        use WriteOp::*;
+
+        let (mut delta, change_set) = self.into_inner();
+        let (write_set, events) = change_set.into_inner();
+        let mut write_set = write_set.into_mut();
+
+        let delta_ops = delta.as_inner_mut();
+        let write_ops = write_set.as_inner_mut();
+
+        for (key, op) in other.into_iter() {
+            if let Some(r) = write_ops.get_mut(&key) {
+                match r {
+                    Creation(data) => {
+                        let val: u128 = bcs::from_bytes(data)?;
+                        *r = Creation(bcs::to_bytes(&op.apply_to(val)?)?);
+                    }
+                    Modification(data) => {
+                        let val: u128 = bcs::from_bytes(data)?;
+                        *r = Modification(bcs::to_bytes(&op.apply_to(val)?)?);
+                    }
+                    Deletion => {
+                        bail!("Failed to apply Aggregator delta -- value already deleted");
+                    }
+                }
+            } else {
+                match delta_ops.entry(key) {
+                    Occupied(entry) => {
+                        entry.into_mut().merge_with(op)?;
+                    }
+                    Vacant(entry) => {
+                        entry.insert(op);
+                    }
+                }
+            }
+        }
+
+        Ok(Self {
+            delta_change_set: delta,
+            change_set: ChangeSet::new(write_set.freeze()?, events),
+        })
+    }
+
+    pub fn squash_change_set(self, other: ChangeSet) -> anyhow::Result<Self> {
+        use btree_map::Entry::*;
+        use WriteOp::*;
+
+        let (mut delta, change_set) = self.into_inner();
+        let (write_set, mut events) = change_set.into_inner();
+        let mut write_set = write_set.into_mut();
+        let write_ops = write_set.as_inner_mut();
+
+        let (other_write_set, other_events) = other.into_inner();
+
+        for (key, op) in other_write_set.into_iter() {
+            match write_ops.entry(key) {
+                Occupied(mut entry) => {
+                    let r = entry.get_mut();
+                    match (&r, op) {
+                        (Modification(_) | Creation(_), Creation(_))
+                        | (Deletion, Deletion | Modification(_)) => {
+                            bail!("The given change sets cannot be squashed")
+                        }
+                        (Modification(_), Modification(data)) => *r = Modification(data),
+                        (Creation(_), Modification(data)) => *r = Creation(data),
+                        (Modification(_), Deletion) => *r = Deletion,
+                        (Deletion, Creation(data)) => *r = Modification(data),
+                        (Creation(_), Deletion) => {
+                            entry.remove();
+                        }
+                    }
+                }
+                Vacant(entry) => {
+                    delta.remove(entry.key());
+                    entry.insert(op);
+                }
+            }
+        }
+
+        events.extend(other_events);
+
+        Ok(Self {
+            delta_change_set: delta,
+            change_set: ChangeSet::new(write_set.freeze()?, events),
+        })
+    }
+
+    pub fn squash(self, other: Self) -> anyhow::Result<Self> {
+        let (delta_change_set, change_set) = other.into_inner();
+        self.squash_change_set(change_set)?
+            .squash_delta_change_set(delta_change_set)
     }
 }
 
@@ -118,13 +222,14 @@ impl TransactionOutputExt {
 
     fn merge_delta_writes(
         output: TransactionOutput,
-        mut delta_writes: WriteSetMut,
+        delta_writes: WriteSetMut,
     ) -> TransactionOutput {
         let (write_set, events, gas_used, status) = output.unpack();
         // We expect to have only a few delta changes, so add them to
         // the write set of the transaction.
-        let mut write_set_mut = write_set.into_mut();
-        write_set_mut.append(&mut delta_writes);
+        let write_set_mut = write_set.into_mut();
+        // TODO: Is it okay to panic here?
+        let write_set_mut = write_set_mut.squash(delta_writes).unwrap();
 
         TransactionOutput::new(write_set_mut.freeze().unwrap(), events, gas_used, status)
     }

@@ -9,7 +9,8 @@ use crate::{
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     counters::*,
-    data_cache::{AsMoveResolver, StateViewCache},
+    data_cache::{AsMoveResolver, IntoMoveResolver, StateViewCache},
+    delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
@@ -214,30 +215,74 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt>(
+    fn success_transaction_cleanup<S: MoveResolverExt + StateView>(
         &self,
-        mut session: SessionExt<S>,
+        storage: &S,
+        user_txn_change_set_ext: ChangeSetExt,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+        let storage_with_changes =
+            DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
+        // TODO: at this point we know that delta application failed
+        // (and it should have occurred in user transaction in general).
+        // We need to rerun the epilogue and charge gas. Currently, the use
+        // case of an aggregator is for gas fees (which are computed in
+        // the epilogue), and therefore this should never happen.
+        // Also, it is worth mentioning that current VM error handling is
+        // rather ugly and has a lot of legacy code. This makes proper error
+        // handling quite challenging.
+        let delta_write_set_mut = user_txn_change_set_ext
+            .delta_change_set()
+            .clone()
+            .try_into_write_set_mut(&storage)
+            .expect("something terrible happened when applying aggregator deltas");
+        let delta_write_set = delta_write_set_mut
+            .freeze()
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
+
+        let mut session = self
+            .0
+            .new_session(&storage_with_changes, SessionId::txn_meta(txn_data));
+
         self.0
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
 
+        let epilogue_change_set_ext = session
+            .finish()
+            .map_err(|e| e.into_vm_status())?
+            .into_change_set(&mut ())?;
+        let change_set_ext = user_txn_change_set_ext
+            .squash(epilogue_change_set_ext)
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
+        let (write_set, events) = change_set.into_inner();
+
+        let gas_used = txn_data
+            .max_gas_amount()
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount");
+
+        let txn_output = TransactionOutput::new(
+            write_set,
+            events,
+            gas_used.into(),
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        );
+
         Ok((
             VMStatus::Executed,
-            get_transaction_output(
-                &mut (),
-                session,
-                gas_meter.balance(),
-                txn_data,
-                ExecutionStatus::Success,
-            )?,
+            TransactionOutputExt::new(delta_change_set, txn_output),
         ))
     }
 
-    fn execute_script_or_entry_function<S: MoveResolverExt>(
+    fn execute_script_or_entry_function<S: MoveResolverExt + StateView>(
         &self,
+        storage: &S,
         mut session: SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -307,7 +352,18 @@ impl AptosVM {
 
             self.resolve_pending_code_publish(&mut session, gas_meter)?;
 
-            self.success_transaction_cleanup(session, gas_meter, txn_data, log_context)
+            let session_output = session.finish().map_err(|e| e.into_vm_status())?;
+            let change_set_ext = session_output.into_change_set(&mut ())?;
+
+            // charge for write set
+
+            self.success_transaction_cleanup(
+                storage,
+                change_set_ext,
+                gas_meter,
+                txn_data,
+                log_context,
+            )
         }
     }
 
@@ -393,8 +449,9 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules<S: MoveResolverExt>(
+    fn execute_modules<S: MoveResolverExt + StateView>(
         &self,
+        storage: &S,
         mut session: SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -424,7 +481,10 @@ impl AptosVM {
             &[txn_data.sender()],
         )?;
 
-        self.success_transaction_cleanup(session, gas_meter, txn_data, log_context)
+        let session_output = session.finish().map_err(|e| e.into_vm_status())?;
+        let change_set_ext = session_output.into_change_set(&mut ())?;
+
+        self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -486,7 +546,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
+    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
         &self,
         storage: &S,
         txn: &SignatureCheckedTransaction,
@@ -521,6 +581,7 @@ impl AptosVM {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => self
                 .execute_script_or_entry_function(
+                    storage,
                     session,
                     &mut gas_meter,
                     &txn_data,
@@ -528,7 +589,7 @@ impl AptosVM {
                     log_context,
                 ),
             TransactionPayload::ModuleBundle(m) => {
-                self.execute_modules(session, &mut gas_meter, &txn_data, m, log_context)
+                self.execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
             }
         };
 
@@ -959,7 +1020,7 @@ impl AptosSimulationVM {
     /*
     Executes a SignedTransaction without performing signature verification
      */
-    fn simulate_signed_transaction<S: MoveResolverExt>(
+    fn simulate_signed_transaction<S: MoveResolverExt + StateView>(
         &self,
         storage: &S,
         txn: &SignedTransaction,
@@ -990,6 +1051,7 @@ impl AptosSimulationVM {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => {
                 self.0.execute_script_or_entry_function(
+                    storage,
                     session,
                     &mut gas_meter,
                     &txn_data,
@@ -999,7 +1061,7 @@ impl AptosSimulationVM {
             }
             TransactionPayload::ModuleBundle(m) => {
                 self.0
-                    .execute_modules(session, &mut gas_meter, &txn_data, m, log_context)
+                    .execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
             }
         };
 

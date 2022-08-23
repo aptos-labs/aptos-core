@@ -5,6 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
+use std::collections::BTreeMap;
+
 use crate::module::AGGREGATOR_MODULE;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -208,13 +210,13 @@ pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
 /// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DeltaChangeSet {
-    delta_change_set: Vec<(StateKey, DeltaOp)>,
+    delta_change_set: BTreeMap<StateKey, DeltaOp>,
 }
 
 impl DeltaChangeSet {
     pub fn empty() -> Self {
         DeltaChangeSet {
-            delta_change_set: vec![],
+            delta_change_set: BTreeMap::new(),
         }
     }
 
@@ -222,26 +224,32 @@ impl DeltaChangeSet {
         self.delta_change_set.len()
     }
 
-    pub fn new(delta_change_set: Vec<(StateKey, DeltaOp)>) -> Self {
-        DeltaChangeSet { delta_change_set }
+    pub fn new(delta_change_set: impl IntoIterator<Item = (StateKey, DeltaOp)>) -> Self {
+        DeltaChangeSet {
+            delta_change_set: delta_change_set.into_iter().collect(),
+        }
     }
 
-    pub fn push(&mut self, delta: (StateKey, DeltaOp)) {
-        self.delta_change_set.push(delta);
+    pub fn insert(&mut self, delta: (StateKey, DeltaOp)) {
+        self.delta_change_set.insert(delta.0, delta.1);
     }
 
-    pub fn pop(&mut self) {
-        self.delta_change_set.pop();
+    pub fn remove(&mut self, key: &StateKey) -> Option<DeltaOp> {
+        self.delta_change_set.remove(key)
     }
 
     #[inline]
-    pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, DeltaOp)> {
+    pub fn iter(&self) -> ::std::collections::btree_map::Iter<'_, StateKey, DeltaOp> {
         self.into_iter()
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.delta_change_set.is_empty()
+    }
+
+    pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, DeltaOp> {
+        &mut self.delta_change_set
     }
 
     /// Consumes the delta change set and tries to materialize it. Returns a
@@ -263,8 +271,8 @@ impl DeltaChangeSet {
 }
 
 impl<'a> IntoIterator for &'a DeltaChangeSet {
-    type Item = &'a (StateKey, DeltaOp);
-    type IntoIter = ::std::slice::Iter<'a, (StateKey, DeltaOp)>;
+    type Item = (&'a StateKey, &'a DeltaOp);
+    type IntoIter = ::std::collections::btree_map::Iter<'a, StateKey, DeltaOp>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.iter()
@@ -273,7 +281,7 @@ impl<'a> IntoIterator for &'a DeltaChangeSet {
 
 impl ::std::iter::IntoIterator for DeltaChangeSet {
     type Item = (StateKey, DeltaOp);
-    type IntoIter = ::std::vec::IntoIter<(StateKey, DeltaOp)>;
+    type IntoIter = ::std::collections::btree_map::IntoIter<StateKey, DeltaOp>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.into_iter()
