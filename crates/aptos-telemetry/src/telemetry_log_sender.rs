@@ -35,7 +35,7 @@ impl TelemetryLogSender {
     fn drain_batch(&mut self) -> Vec<String> {
         let batch: Vec<_> = self.batch.drain(..).collect();
         self.current_bytes = 0;
-        return batch;
+        batch
     }
 
     pub(crate) fn add_to_batch(&mut self, log: String) -> Option<Vec<String>> {
