@@ -242,6 +242,10 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
     let package_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
         .join("api/move-test-package");
     let build_config = BuildConfig {
         generate_docs: false,
