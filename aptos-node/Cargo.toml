@@ -25,7 +25,7 @@ aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
-aptos-fh-stream = { path = "../fh-stream" }
+aptos-fh-stream = { path = "../ecosystem/sf-indexer/firehose-stream" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
