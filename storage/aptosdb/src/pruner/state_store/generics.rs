@@ -31,6 +31,6 @@ impl StaleNodeIndexSchemaTrait for StaleNodeIndexCrossEpochSchema {
     }
 
     fn name() -> &'static str {
-        "epoch_ending_state_merkle_pruner"
+        "epoch_snapshot_pruner"
     }
 }
