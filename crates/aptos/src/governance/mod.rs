@@ -59,6 +59,8 @@ pub struct SubmitProposal {
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
+    #[clap(long)]
+    pub(crate) metadata_path: Option<PathBuf>,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -77,7 +79,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
 
         // Validate the proposal metadata
-        let (metadata, metadata_hash) = get_metadata(self.metadata_url.clone()).await?;
+        let (metadata, metadata_hash) = self.get_metadata().await?;
 
         println!(
             "{}\n\tMetadata Hash: {}\n\tScript Hash: {}",
@@ -133,6 +135,75 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 }
 
+impl SubmitProposal {
+    /// Retrieve metadata and validate it
+    async fn get_metadata(&self) -> CliTypedResult<(ProposalMetadata, HashValue)> {
+        let bytes = if let Some(path) = &self.metadata_path {
+            Self::get_metadata_from_file(path)?
+        } else {
+            Self::get_metadata_from_url(&self.metadata_url).await?
+        };
+
+        let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Metadata is not in a proper JSON format: {}",
+                err
+            ))
+        })?;
+        Url::parse(&metadata.source_code_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Source code URL {} is invalid {}",
+                metadata.source_code_url, err
+            ))
+        })?;
+        Url::parse(&metadata.discussion_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Discussion URL {} is invalid {}",
+                metadata.discussion_url, err
+            ))
+        })?;
+        let metadata_hash = HashValue::sha3_256_of(&bytes);
+        Ok((metadata, metadata_hash))
+    }
+
+    async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
+        let client = reqwest::ClientBuilder::default()
+            .tls_built_in_root_certs(true)
+            .build()
+            .map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to build HTTP client {}", err))
+            })?;
+        client
+            .get(metadata_url.clone())
+            .send()
+            .await
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to fetch metadata url {}: {}",
+                    metadata_url, err
+                ))
+            })?
+            .bytes()
+            .await
+            .map(|b| b.to_vec())
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to fetch metadata url {}: {}",
+                    metadata_url, err
+                ))
+            })
+    }
+
+    fn get_metadata_from_file(metadata_path: &PathBuf) -> CliTypedResult<Vec<u8>> {
+        fs::read(metadata_path).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to read metadata path {:?}: {}",
+                metadata_path, err
+            ))
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct CreateProposalEvent {
     proposal_id: U64,
@@ -147,49 +218,6 @@ struct ProposalSubmissionSummary {
     gas_price_per_unit: u64,
     sequence_number: u64,
     vm_status: String,
-}
-
-/// Retrieve metadata and validate it
-async fn get_metadata(metadata_url: Url) -> CliTypedResult<(ProposalMetadata, HashValue)> {
-    let client = reqwest::ClientBuilder::default()
-        .tls_built_in_root_certs(true)
-        .build()
-        .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
-    let bytes = client
-        .get(metadata_url.clone())
-        .send()
-        .await
-        .map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Failed to fetch metadata url {}: {}",
-                metadata_url, err
-            ))
-        })?
-        .bytes()
-        .await
-        .map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Failed to fetch metadata url {}: {}",
-                metadata_url, err
-            ))
-        })?;
-    let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-        CliError::CommandArgumentError(format!("Metadata is not in a proper JSON format: {}", err))
-    })?;
-    Url::parse(&metadata.source_code_url).map_err(|err| {
-        CliError::CommandArgumentError(format!(
-            "Source code URL {} is invalid {}",
-            metadata.source_code_url, err
-        ))
-    })?;
-    Url::parse(&metadata.discussion_url).map_err(|err| {
-        CliError::CommandArgumentError(format!(
-            "Discussion URL {} is invalid {}",
-            metadata.discussion_url, err
-        ))
-    })?;
-    let metadata_hash = HashValue::sha3_256_of(&bytes);
-    Ok((metadata, metadata_hash))
 }
 
 /// Submit a vote on a current proposal
