@@ -6,6 +6,7 @@ import {
   Box,
   HStack,
   Tooltip,
+  Image,
   Text,
   useColorMode,
   useDisclosure,
@@ -15,7 +16,7 @@ import { secondaryBorderColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
-import indexColor from 'core/accountColors';
+import indexImage from 'core/accountImages';
 
 interface ButtonProps {
   onClick: MouseEventHandler<HTMLDivElement>;
@@ -23,15 +24,15 @@ interface ButtonProps {
 
 const AccountCircle = React.forwardRef((
   { onClick }: ButtonProps,
-  ref: LegacyRef<HTMLDivElement>,
+  ref: LegacyRef<HTMLImageElement>,
 ) => {
   const { activeAccount } = useGlobalStateContext();
-  const color = indexColor(activeAccount?.styleIndex ?? 0);
+  const picture = indexImage(activeAccount?.styleIndex ?? 0);
   return (
-    <Box
+    <Image
       height="40px"
       width="40px"
-      background={color}
+      src={picture}
       borderRadius="2rem"
       cursor="pointer"
       onClick={onClick}

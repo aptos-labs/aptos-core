@@ -46,6 +46,7 @@ export default function useAccounts() {
     : undefined;
 
   const initAccounts = async (password: string, firstAccount: Account) => {
+    setNewAccountStyleIndex(1);
     await setActivePublicAccount({
       address: firstAccount.address,
       publicKey: firstAccount.publicKey,

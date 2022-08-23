@@ -46,7 +46,7 @@ export default function ImportAccountPrivateKey() {
     } catch (err) {
       importAccountErrorToast();
     }
-  }, [addAccount, navigate]);
+  }, [addAccount, navigate, newAccountStyleIndex]);
 
   return (
     <AuthLayout routePath={PageRoutes.importWalletPrivateKey.path}>

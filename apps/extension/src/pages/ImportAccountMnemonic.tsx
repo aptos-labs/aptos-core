@@ -53,7 +53,7 @@ export default function ImportWalletMnemonic() {
       // eslint-disable-next-line no-console
       console.error('Invalid mnemonic, account not found');
     }
-  }, [addAccount, navigate]);
+  }, [addAccount, navigate, newAccountStyleIndex]);
 
   return (
     <AuthLayout routePath={PageRoutes.importWalletMnemonic.path}>
