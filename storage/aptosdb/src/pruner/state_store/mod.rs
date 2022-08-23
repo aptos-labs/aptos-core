@@ -206,36 +206,23 @@ impl StateMerklePruner {
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
 
-        let mut num_items = batch_size;
-        while num_items > 0 {
-            if let Some(item) = iter.next() {
-                let (index, _) = item?;
-                if index.stale_since_version > target_version {
-                    return Ok((indices, /*is_end_of_target_version=*/ true));
+        // over fetch by 1
+        for _ in 0..=batch_size {
+            if let Some((index, _)) = iter.next().transpose()? {
+                if index.stale_since_version <= target_version {
+                    indices.push(index);
+                    continue;
                 }
-                num_items -= 1;
-                indices.push(index);
-            } else {
-                // No more stale nodes.
-                break;
             }
+            break;
         }
 
-        // This is to deal with the case where number of items reaches 0 but there are still
-        // stale nodes in the indices.
-        if let Some(next_item) = iter.next() {
-            let (next_index, _) = next_item?;
-            if next_index.stale_since_version > target_version {
-                return Ok((indices, /*is_end_of_target_version=*/ true));
-            }
-        }
-
-        // This is to deal with the case where we reaches the end of the indices regardless of
-        // whether we have `num_items` in `indices`.
-        let mut is_end_of_target_version = true;
-        if let Some(last_index) = indices.last() {
-            is_end_of_target_version = last_index.stale_since_version == target_version;
-        }
+        let is_end_of_target_version = if indices.len() > batch_size {
+            indices.pop();
+            false
+        } else {
+            true
+        };
         Ok((indices, is_end_of_target_version))
     }
 }
