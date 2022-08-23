@@ -74,7 +74,7 @@ test(
       tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
     );
     aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    expect(aliceBalance).toBeNull();
 
     await ensureTxnSuccess(
       tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
@@ -86,7 +86,7 @@ test(
       tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
     );
     aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    expect(aliceBalance).toBeNull();
 
     await ensureTxnSuccess(
       tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),

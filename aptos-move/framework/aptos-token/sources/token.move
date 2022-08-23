@@ -505,6 +505,9 @@ module aptos_token::token {
         id: TokenId,
         amount: u64,
     ): Token acquires TokenStore {
+        // Always make sure the account has sufficient tokens to withdraw.
+        assert!(balance_of(account_addr, id) >= amount, EINSUFFICIENT_BALANCE);
+
         let token_store = borrow_global_mut<TokenStore>(account_addr);
         event::emit_event<WithdrawEvent>(
             &mut token_store.withdraw_events,
@@ -520,11 +523,13 @@ module aptos_token::token {
             error::not_found(EBALANCE_NOT_PUBLISHED),
         );
         let balance = &mut table::borrow_mut(tokens, id).amount;
-        if (id.property_version == 0) {
+        if (id.property_version == 0 && *balance > amount) {
             *balance = *balance - amount;
             Token{ id, amount, token_properties: property_map::empty() }
         } else {
-            // only 1 token per property_version > 0. we can directly extract from owner's token store
+            // we can directly extract from owner's token store if:
+            // 1. property_version > 0, since only 1 token is guaranteed for this case.
+            // 2. property_version == 0 and balance == amount.
             table::remove(tokens, id)
         }
     }
@@ -781,8 +786,6 @@ module aptos_token::token {
         amount: u64
     ) acquires Collections, TokenStore {
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
-        let owner_addr = signer::address_of(owner);
-        assert!(balance_of(owner_addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
         let creator_addr = token_id.token_data_id.creator;
         assert!(
             exists<Collections>(creator_addr),
@@ -795,21 +798,35 @@ module aptos_token::token {
             error::not_found(ETOKEN_NOT_PUBLISHED),
         );
 
-        let token_data = table::borrow_mut(
-            &mut collections.token_data,
-            token_id.token_data_id,
-        );
-
-        let token = withdraw_token(owner, token_id, amount);
-        token_data.supply = token_data.supply - token.amount;
-        let Token { id: _, amount: burned_amount, token_properties: _ } = token;
-
-        let token_store = borrow_global_mut<TokenStore>(owner_addr);
-
+        // Burn the tokens.
+        let Token { id: _, amount: burned_amount, token_properties: _ } = withdraw_token(owner, token_id, amount);
+        let token_store = borrow_global_mut<TokenStore>(signer::address_of(owner));
         event::emit_event<BurnTokenEvent>(
             &mut token_store.burn_events,
             BurnTokenEvent { id: token_id, amount: burned_amount},
         );
+
+        // Decrease the supply correspondingly by the amount of tokens burned.
+        let token_data = table::borrow_mut(
+            &mut collections.token_data,
+            token_id.token_data_id,
+        );
+        token_data.supply = token_data.supply - burned_amount;
+
+        // Delete the token_data if supply drops to 0.
+        if (token_data.supply == 0) {
+            let TokenData {
+                maximum: _,
+                largest_property_version: _,
+                supply: _,
+                uri: _,
+                royalty: _,
+                name: _,
+                description: _,
+                default_properties: _,
+                mutability_config: _,
+            } = table::remove(&mut collections.token_data, token_id.token_data_id);
+        };
     }
 
     public fun create_token_id(token_data_id: TokenDataId, property_version: u64): TokenId {

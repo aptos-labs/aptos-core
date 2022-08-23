@@ -453,7 +453,7 @@ test(
     expect((transaction as any)?.success).toBe(true);
 
     aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    expect(aliceBalance).toBeNull();
 
     const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
