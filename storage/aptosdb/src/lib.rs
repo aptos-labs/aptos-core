@@ -1024,6 +1024,39 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_gas_prices(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<u64>> {
+        const MAX_GAS_LOOKUP: u64 = 100_000;
+        gauged_api("get_gas_prices", || {
+            error_if_too_many_requested(limit, MAX_GAS_LOOKUP)?;
+
+            if start_version > ledger_version || limit == 0 {
+                return Ok(vec![]);
+            }
+
+            // This is just an estimation, so we cna just skip over errors
+            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
+            let txns = self
+                .transaction_store
+                .get_transaction_iter(start_version, limit as usize)?;
+            let gas_prices: Vec<_> = txns
+                .filter_map(|txn| {
+                    if let Ok(Transaction::UserTransaction(txn)) = txn {
+                        Some(txn.gas_unit_price())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            Ok(gas_prices)
+        })
+    }
+
     /// Get the first version that txn starts existent.
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
