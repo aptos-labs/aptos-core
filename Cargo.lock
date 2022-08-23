@@ -1135,6 +1135,7 @@ name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
  "aptos-crypto",
+ "aptos-rest-client",
  "aptos-types",
  "bcs",
  "cached-packages",
