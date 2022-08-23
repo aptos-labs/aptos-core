@@ -20,6 +20,6 @@ pub use cluster::Cluster;
 pub use emitter::{
     query_sequence_numbers,
     stats::{TxnStats, TxnStatsRate},
-    EmitJob, EmitJobRequest, EmitThreadParams, TxnEmitter,
+    EmitJob, EmitJobMode, EmitJobRequest, EmitModeParams, TxnEmitter,
 };
 pub use wrappers::emit_transactions_with_cluster;
