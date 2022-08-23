@@ -25,7 +25,7 @@ import { SubmitHandler, useForm } from 'react-hook-form';
 import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
 import { useAccountCoinBalance } from 'core/queries/account';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 // eslint-disable-next-line global-require
 window.Buffer = window.Buffer || require('buffer').Buffer;
@@ -34,7 +34,7 @@ export default function CreateNFTModal() {
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
 
   const collectionName: string | undefined = watch('collectionName');

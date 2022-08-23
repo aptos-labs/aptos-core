@@ -4,8 +4,6 @@
 import { useColorMode, VStack } from '@chakra-ui/react';
 import React from 'react';
 import HelpHeader from 'core/components/HelpHeader';
-import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
 import { secondaryBgColor } from 'core/colors';
 
 /**
@@ -14,16 +12,14 @@ import { secondaryBgColor } from 'core/colors';
 function Help() {
   const { colorMode } = useColorMode();
   return (
-    <AuthLayout routePath={PageRoutes.help.path}>
-      <VStack
-        bgColor={secondaryBgColor[colorMode]}
-        spacing={4}
-        width="100%"
-        height="100%"
-      >
-        <HelpHeader />
-      </VStack>
-    </AuthLayout>
+    <VStack
+      bgColor={secondaryBgColor[colorMode]}
+      spacing={4}
+      width="100%"
+      height="100%"
+    >
+      <HelpHeader />
+    </VStack>
   );
 }
 

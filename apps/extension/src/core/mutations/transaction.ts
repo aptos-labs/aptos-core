@@ -24,8 +24,8 @@ import {
   buildAccountTransferPayload,
   createRawTransaction,
 } from 'core/utils/transaction';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
-import { NodeUrl } from 'core/utils/network';
+import { useActiveAccount } from 'core/hooks/useAccounts';
+import { useNetworks } from 'core/hooks/useNetworks';
 
 export interface SubmitCoinTransferParams {
   amount: number,
@@ -37,7 +37,7 @@ export interface SubmitCoinTransferParams {
  * Get a raw coin transfer transaction factory for the current account
  */
 function useCreateCoinTransferTransaction() {
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   const { data: chainId } = useChainId();
   const { get: getSequenceNumber } = useSequenceNumber();
 
@@ -74,7 +74,8 @@ export function useCoinTransferSimulation({
   enabled,
   recipient,
 } : UseCoinTransferParams) {
-  const { aptosAccount, aptosClient } = useGlobalStateContext();
+  const { aptosAccount } = useActiveAccount();
+  const { aptosClient } = useNetworks();
   const { refetch: refetchSeqNumber } = useSequenceNumber();
   const createTxn = useCreateCoinTransferTransaction();
 
@@ -91,7 +92,7 @@ export function useCoinTransferSimulation({
       });
 
       const simulatedTxn = AptosClient.generateBCSSimulation(aptosAccount!, rawTxn);
-      const userTxns = (await aptosClient!.submitBCSSimulation(simulatedTxn)) as UserTransaction[];
+      const userTxns = (await aptosClient.submitBCSSimulation(simulatedTxn)) as UserTransaction[];
       const userTxn = userTxns[0];
       if (!userTxn.success) {
         // Miscellaneous error is probably associated with invalid sequence number
@@ -116,7 +117,8 @@ export function useCoinTransferSimulation({
  * Mutation for submitting a coin transfer transaction
  */
 export function useCoinTransferTransaction() {
-  const { activeNetwork, aptosAccount, aptosClient } = useGlobalStateContext();
+  const { aptosAccount } = useActiveAccount();
+  const { activeNetwork, aptosClient } = useNetworks();
   const {
     increment: incrementSeqNumber,
     refetch: refetchSeqNumber,
@@ -135,8 +137,8 @@ export function useCoinTransferTransaction() {
     const signedTxn = AptosClient.generateBCSTransaction(aptosAccount!, rawTxn);
 
     try {
-      const { hash } = await aptosClient!.submitSignedBCSTransaction(signedTxn);
-      return (await aptosClient!.waitForTransactionWithResult(hash) as UserTransaction);
+      const { hash } = await aptosClient.submitSignedBCSTransaction(signedTxn);
+      return (await aptosClient.waitForTransactionWithResult(hash) as UserTransaction);
     } catch (err: any) {
       if (err instanceof ApiError) {
         const errorMsg = (err.body as AptosError).message;
@@ -165,7 +167,7 @@ export function useCoinTransferTransaction() {
         amount,
         coinType,
         fromAddress: txn.sender,
-        network: activeNetwork?.nodeUrl as NodeUrl,
+        network: activeNetwork.nodeUrl,
         ...txn,
       };
 

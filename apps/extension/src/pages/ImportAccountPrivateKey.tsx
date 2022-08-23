@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useCallback } from 'react';
-import AuthLayout from 'core/layouts/AuthLayout';
-import Routes, { Routes as PageRoutes } from 'core/routes';
+import Routes from 'core/routes';
 import { ImportAccountPrivateKeyLayout, PrivateKeyFormValues } from 'core/layouts/AddAccountLayout';
 import ImportAccountPrivateKeyBody from 'core/components/ImportAccountPrivateKeyBody';
 import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { addAccount } = useGlobalStateContext();
+  const { addAccount } = useUnlockedAccounts();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,
@@ -48,17 +47,15 @@ export default function ImportAccountPrivateKey() {
   }, [addAccount, navigate]);
 
   return (
-    <AuthLayout routePath={PageRoutes.importWalletPrivateKey.path}>
-      <ImportAccountPrivateKeyLayout
-        headerValue="Import private key"
-        backPage={Routes.addAccount.path}
-        defaultValues={{
-          privateKey: '',
-        }}
-        onSubmit={onSubmit}
-      >
-        <ImportAccountPrivateKeyBody />
-      </ImportAccountPrivateKeyLayout>
-    </AuthLayout>
+    <ImportAccountPrivateKeyLayout
+      headerValue="Import private key"
+      backPage={Routes.addAccount.path}
+      defaultValues={{
+        privateKey: '',
+      }}
+      onSubmit={onSubmit}
+    >
+      <ImportAccountPrivateKeyBody />
+    </ImportAccountPrivateKeyLayout>
   );
 }

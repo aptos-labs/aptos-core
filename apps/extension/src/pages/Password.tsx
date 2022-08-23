@@ -17,8 +17,8 @@ import {
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { secondaryBgColor, textColor } from 'core/colors';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
-import ResetPasswordConfirmationModal from '../core/components/ResetPasswordConfirmationModal';
+import { useInitializedAccounts } from 'core/hooks/useAccounts';
+import ResetPasswordConfirmationModal from 'core/components/ResetPasswordConfirmationModal';
 
 interface FormValues {
   password: string;
@@ -26,7 +26,7 @@ interface FormValues {
 
 function Password() {
   const { colorMode } = useColorMode();
-  const { resetAccount, unlockAccounts } = useGlobalStateContext();
+  const { clearAccounts, unlockAccounts } = useInitializedAccounts();
   const { isOpen, onClose, onOpen } = useDisclosure();
 
   const {
@@ -49,13 +49,13 @@ function Password() {
     }
   };
 
-  const handleClickResetPassword = (e: React.MouseEvent<HTMLParagraphElement>) => {
+  const handleClickResetPassword = (e: React.MouseEvent) => {
     e.preventDefault();
     onOpen();
   };
 
   const handleConfirmResetPassword = async () => {
-    await resetAccount();
+    await clearAccounts();
     onClose();
   };
 

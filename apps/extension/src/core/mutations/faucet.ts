@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useNetworks } from 'core/hooks/useNetworks';
 import { useMutation, useQueryClient } from 'react-query';
 import { MaybeHexString } from 'aptos';
 import queryKeys from 'core/queries/queryKeys';
@@ -12,7 +12,7 @@ interface UseFundAccountParams {
 }
 
 export function useFundAccount() {
-  const { faucetClient } = useGlobalStateContext();
+  const { faucetClient } = useNetworks();
   const queryClient = useQueryClient();
 
   const fundAccount = faucetClient
@@ -25,14 +25,20 @@ export function useFundAccount() {
     ...other
   } = useMutation({
     mutationFn: fundAccount,
-    onSuccess: async (data, { address }: UseFundAccountParams) => {
-      await queryClient.invalidateQueries([
-        queryKeys.getAccountCoinBalance,
-        address,
-      ]);
+    onSuccess: async (result, { address }: UseFundAccountParams) => {
+      if (result) {
+        await queryClient.invalidateQueries([
+          queryKeys.getAccountCoinBalance,
+          address,
+        ]);
+      }
     },
   });
-  return { fundAccount: mutateAsync, isFunding: isLoading, ...other };
+  return {
+    fundAccount: fundAccount ? mutateAsync : undefined,
+    isFunding: isLoading,
+    ...other,
+  };
 }
 
 export default useFundAccount;

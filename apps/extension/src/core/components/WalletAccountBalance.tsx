@@ -7,12 +7,12 @@ import {
 import React from 'react';
 import { useAccountCoinBalance } from 'core/queries/account';
 import numeral from 'numeral';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { secondaryAddressFontColor } from 'core/colors';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 function WalletAccountBalance() {
   const { colorMode } = useColorMode();
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   const {
     data: coinBalance,
     isLoading,

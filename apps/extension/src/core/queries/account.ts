@@ -4,7 +4,8 @@
 import { AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import { ApiError } from 'aptos/dist/generated';
 
 export interface GetAccountResourcesProps {
@@ -49,11 +50,11 @@ interface UseAccountExistsProps {
 export const useAccountExists = ({
   address,
 }: UseAccountExistsProps) => {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery(
     [accountQueryKeys.getAccountExists, address],
-    async () => aptosClient!.getAccount(address!)
+    async () => aptosClient.getAccount(address!)
       .then(() => true)
       .catch(() => false),
     {
@@ -71,11 +72,11 @@ export function useAccountCoinBalance(
   address: string | undefined,
   options?: UseQueryOptions<number>,
 ) {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery<number>(
     [accountQueryKeys.getAccountCoinBalance, address],
-    async () => aptosClient!.getAccountResource(address!, aptosCoinStoreStructTag)
+    async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
       .then((res: any) => Number(res.data.coin.value))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
@@ -98,8 +99,9 @@ export function useAccountCoinBalance(
  * manually refetching.
  */
 export function useSequenceNumber() {
-  const { aptosAccount, aptosClient } = useGlobalStateContext();
-  const accountAddress = aptosAccount?.address()?.hex();
+  const { aptosAccount } = useActiveAccount();
+  const { aptosClient } = useNetworks();
+  const accountAddress = aptosAccount.address().hex();
   const queryClient = useQueryClient();
 
   const queryKey = [accountQueryKeys.getSequenceNumber];
@@ -108,7 +110,7 @@ export function useSequenceNumber() {
     if (!accountAddress) {
       return undefined;
     }
-    const account = await aptosClient!.getAccount(accountAddress!);
+    const account = await aptosClient.getAccount(accountAddress!);
     return BigInt(account.sequence_number);
   }, { enabled: false });
 

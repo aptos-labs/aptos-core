@@ -14,7 +14,7 @@ import { ChevronLeftIcon } from '@chakra-ui/icons';
 import { secondaryBorderColor, secondaryHoverBgColor, textColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import AvatarImage from 'core/accountImages';
 
 interface ButtonProps {
@@ -25,7 +25,7 @@ const AccountCircle = React.forwardRef((
   { onClick }: ButtonProps,
   ref: LegacyRef<HTMLImageElement>,
 ) => {
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   return (
     <Box
       height="32px"

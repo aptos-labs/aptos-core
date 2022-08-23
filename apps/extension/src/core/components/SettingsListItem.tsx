@@ -8,7 +8,7 @@ import {
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { secondaryGridHoverBgColor, secondaryGridBgColor, textColor } from 'core/colors';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
 
 interface BgColorDictType {
   dark: string;
@@ -34,7 +34,8 @@ export default function SettingsListItem({
 }: SettingsListItemProps) {
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
-  const { activeAccount, lockAccounts } = useGlobalStateContext();
+  const { activeAccount } = useActiveAccount();
+  const { lockAccounts } = useInitializedAccounts();
 
   const gridOnClick = async () => {
     // todo: Create an enum for these titles for more typed code
@@ -43,7 +44,9 @@ export default function SettingsListItem({
       // we should probably combine the toasts from the wallet drawer
       await lockAccounts();
     } else if (title === 'View on Explorer') {
-      const explorerAddress = activeAccount?.address ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}` : 'https://explorer.devnet.aptos.dev';
+      const explorerAddress = activeAccount?.address
+        ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}`
+        : 'https://explorer.devnet.aptos.dev';
       window.open(explorerAddress, '_blank');
     }
 

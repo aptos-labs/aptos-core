@@ -24,9 +24,9 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
-import { Network, defaultNetworks } from 'core/hooks/useGlobalState';
 import { DeleteIcon } from '@chakra-ui/icons';
 import { useNodeStatus } from 'core/queries/network';
+import { defaultNetworks, Network } from 'shared/types';
 
 type ConfirmationModalProps = Omit<ModalProps, 'children'> & {
   name: string,

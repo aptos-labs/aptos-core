@@ -21,7 +21,7 @@ import {
   secondaryGridHoverBgColor,
   timestampColor,
 } from 'core/colors';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatCoinName } from 'core/hooks/useTransactionDetails';
 
 /**
@@ -81,14 +81,14 @@ interface ActivityItemProps {
 
 export function ActivityItem({ transaction }: ActivityItemProps) {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useGlobalStateContext();
+  const { aptosAccount } = useActiveAccount();
 
   const typedPayload = transaction.payload as EntryFunctionPayload;
   const [recipient, amount]: string[] = typedPayload.arguments;
   const coinName = typedPayload.type_arguments[0]?.split('::').pop();
   const formattedCoinName = useMemo(() => formatCoinName(coinName), [coinName]);
 
-  const myAddress = aptosAccount!.address().toShortString();
+  const myAddress = aptosAccount.address().toShortString();
   const isSent = myAddress === transaction.sender;
   const otherAddress = isSent ? recipient : transaction.sender;
 

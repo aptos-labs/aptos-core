@@ -1,9 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { useQuery, UseQueryOptions } from 'react-query';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { AptosClient, FaucetClient } from 'aptos';
+import { useQuery, UseQueryOptions } from 'react-query';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { useActiveAccount } from 'core/hooks/useAccounts';
+
+export const networkQueryKeys = Object.freeze({
+  getChainId: 'getChainId',
+  getFaucetStatus: 'getFaucetStatus',
+  getNodeStatus: 'getNodeStatus',
+} as const);
 
 async function getIsNodeAvailable(nodeUrl: string) {
   const aptosClient = new AptosClient(nodeUrl);
@@ -44,12 +51,6 @@ async function getIsFaucetAvailable({
   }
 }
 
-export const networkQueryKeys = Object.freeze({
-  getChainId: 'getChainId',
-  getFaucetStatus: 'getFaucetStatus',
-  getNodeStatus: 'getNodeStatus',
-} as const);
-
 export function useNodeStatus(
   nodeUrl: string | undefined,
   options?: UseQueryOptions<boolean>,
@@ -74,7 +75,7 @@ export function useFaucetStatus(
   { faucetUrl, nodeUrl }: UseFaucetStatusProps,
   options?: UseQueryOptions<boolean>,
 ) {
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   const { data, ...rest } = useQuery<boolean>(
     [networkQueryKeys.getFaucetStatus, faucetUrl],
     async () => getIsFaucetAvailable({
@@ -95,11 +96,11 @@ export function useFaucetStatus(
  * which is required to BCD-encode a transaction locally
  */
 export function useChainId() {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery(
     [networkQueryKeys.getChainId],
-    () => aptosClient!.getChainId(),
+    () => aptosClient.getChainId(),
     {
       enabled: Boolean(aptosClient),
       staleTime: 60000,

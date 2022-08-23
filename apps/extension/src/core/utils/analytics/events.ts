@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { MaybeHexString } from 'aptos';
-import { NodeUrl } from '../network';
 
 interface EventSchema {
   [eventType: string]: {
@@ -253,7 +252,7 @@ export interface FaucetEventParams {
 
 export interface GeneralEventParams {
   error?: string;
-  network?: NodeUrl;
+  network?: string;
   txnHash?: string;
 }
 

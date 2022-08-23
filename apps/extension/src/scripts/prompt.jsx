@@ -19,7 +19,11 @@ import {
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { Permission, PromptMessage } from 'core/types/dappTypes';
-import { GlobalStateProvider, useGlobalStateContext } from "core/hooks/useGlobalState";
+import { AppStateProvider, useAppState } from 'core/hooks/useAppState';
+import {
+  AccountsProvider,
+  InitializedAccountsProvider,
+} from "core/hooks/useAccounts";
 import Password from 'pages/Password';
 import { AptosBlackLogo } from 'core/components/AptosLogo';
 
@@ -117,7 +121,15 @@ function PermissionsPrompt({ domain, imageURI, title, permission }) {
 
 function PromptState() {
   const [promptInfo, setPromptInfo] = useState(undefined);
-  const { areAccountsReady, areAccountsUnlocked } = useGlobalStateContext();
+
+  const {
+    accounts,
+    activeAccountAddress,
+    isAppStateReady,
+    encryptedAccounts,
+    encryptionKey,
+    salt,
+  } = useAppState();
 
   useEffect(() => {
     chrome.runtime.sendMessage(PromptMessage.LOADED, (response) => {
@@ -125,50 +137,60 @@ function PromptState() {
     });
   }, []);
 
-  if (!areAccountsReady || !promptInfo) {
+  if (!isAppStateReady || !promptInfo) {
     return null;
   }
 
   const {
     domain, imageURI, promptType, title,
   } = promptInfo;
-  switch (promptType.kind) {
-    case "permission":
-      if (areAccountsUnlocked) {
-        return PermissionsPrompt( { domain, imageURI, title, permission: promptType.permission } ); 
-      } else {
-        return (
+
+  const areAccountsInitialized = encryptedAccounts !== undefined && salt !== undefined;
+  const areAccountsUnlocked = encryptionKey !== undefined && accounts !== undefined;
+  const hasActiveAccount = activeAccountAddress !== undefined;
+  const noAccounts = promptType.kind === 'warning' || !areAccountsInitialized || !hasActiveAccount;
+
+  if (noAccounts) {
+    return (
+      <VStack
+        w="100vw"
+        h="100vh"
+        alignItems="center"
+        justifyContent="center"
+        padding={8}
+      >
+        <Center>
+          <Box width="75px">
+            <AptosBlackLogo />
+          </Box>
+        </Center>
+        <Heading textAlign="center">Petra</Heading>
+        <Text
+          textAlign="center"
+          pb={8}
+          fontSize="lg"
+        >
+          Please open the extension and create an account.
+        </Text>
+      </VStack>
+    );
+  } else if (!areAccountsUnlocked) {
+    return (
+      <AccountsProvider>
+        <InitializedAccountsProvider encryptedAccounts={encryptedAccounts} salt={salt}>
           <VStack w="100vw" h="100vh">
             <Password/>
           </VStack>
-        );
-      }
-    case "warning":
-      return (
-        <VStack 
-          w="100vw" 
-          h="100vh" 
-          alignItems="center" 
-          justifyContent="center"
-          padding={8}
-        >
-            <Center>
-              <Box width="75px">
-                <AptosBlackLogo />
-              </Box>
-            </Center>
-            <Heading textAlign="center">Petra</Heading>
-            <Text
-              textAlign="center"
-              pb={8}
-              fontSize="lg"
-            >
-              Please open the extension and create an account.
-            </Text>
-        </VStack>
-      )
-    default:
-      return null;
+        </InitializedAccountsProvider>
+      </AccountsProvider>
+    );
+  } else {
+    return <PermissionsPrompt
+      domain={domain}
+      imageURI={imageURI}
+      title={title}
+      permission={promptType.permission}
+    />;
   }
 }
 
@@ -176,9 +198,9 @@ const root = createRoot(document.getElementById('prompt'));
 root.render(
   <ChakraProvider theme={theme}>
     <StrictMode>
-      <GlobalStateProvider>
+      <AppStateProvider>
         <PromptState />
-      </GlobalStateProvider>
+      </AppStateProvider>
     </StrictMode>
   </ChakraProvider>,
 );

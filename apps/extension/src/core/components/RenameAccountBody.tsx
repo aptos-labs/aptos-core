@@ -8,17 +8,18 @@ import {
   FormErrorMessage,
 } from '@chakra-ui/react';
 import React from 'react';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
+import { useActiveAccount, useUnlockedAccounts } from 'core/hooks/useAccounts';
 
 interface AccountEditFormData {
   name: string,
 }
 
 export default function RenameAccountBody() {
-  const { activeAccount, renameAccount } = useGlobalStateContext();
+  const { renameAccount } = useUnlockedAccounts();
+  const { activeAccount } = useActiveAccount();
   const { address, name } = activeAccount!;
   const navigate = useNavigate();
 

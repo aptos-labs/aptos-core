@@ -14,11 +14,9 @@ import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
-import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
 import { secondaryTextColor } from 'core/colors';
 import { CredentialHeaderAndBodyProps } from 'core/components/CredentialsBody';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 export function CredentialRow({
   body,
@@ -45,24 +43,22 @@ export function CredentialRow({
 }
 
 function Account() {
-  const { activeAccount } = useGlobalStateContext();
+  const { activeAccount } = useActiveAccount();
   const mnemonic = activeAccount?.mnemonic;
 
   return (
-    <AuthLayout routePath={PageRoutes.settings.path}>
-      <WalletLayout title="Settings">
-        <VStack width="100%" paddingTop={8} px={4} pb={4} spacing={2}>
-          {
-            SettingsPaths(mnemonic !== undefined).map((value) => (
-              <SettingsListItem
-                key={value.path}
-                {...value}
-              />
-            ))
-          }
-        </VStack>
-      </WalletLayout>
-    </AuthLayout>
+    <WalletLayout title="Settings">
+      <VStack width="100%" paddingTop={8} px={4} pb={4} spacing={2}>
+        {
+          SettingsPaths(mnemonic !== undefined).map((value) => (
+            <SettingsListItem
+              key={value.path}
+              {...value}
+            />
+          ))
+        }
+      </VStack>
+    </WalletLayout>
   );
 }
 

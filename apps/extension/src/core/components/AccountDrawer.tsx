@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
 import { secondaryBorderColor } from 'core/colors';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount, useUnlockedAccounts } from 'core/hooks/useAccounts';
 import AccountDrawerItem from 'core/components/AccountDrawerItem';
 import ChakraLink from 'core/components/ChakraLink';
 import Routes from 'core/routes';
@@ -34,10 +34,10 @@ export default function AccountDrawer({ isOpen, onClose }: AccountDrawerProps) {
 
   const {
     accounts,
-    activeAccountAddress,
     removeAccount,
     switchAccount,
-  } = useGlobalStateContext();
+  } = useUnlockedAccounts();
+  const { activeAccountAddress } = useActiveAccount();
 
   const onSwitchAccount = (address: string) => {
     try {
@@ -66,7 +66,7 @@ export default function AccountDrawer({ isOpen, onClose }: AccountDrawerProps) {
         toastMessage = `Switching to account with address: ${firstAvailableAddress.substring(0, 6)}...`;
         setValue(firstAvailableAddress);
       } else {
-        toastMessage = `Using the same account with address: ${activeAccountAddress!.substring(0, 6)}...`;
+        toastMessage = `Using the same account with address: ${activeAccountAddress.substring(0, 6)}...`;
       }
       removeAccountToast(toastMessage);
 

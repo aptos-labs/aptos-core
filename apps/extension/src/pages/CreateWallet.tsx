@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useMemo } from 'react';
-import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
 import { OnboardingStateProvider, useOnboardingState } from 'core/hooks/useOnboardingState';
 import CreateWalletLayout, { OnboardingPage } from 'core/layouts/CreateWalletLayout';
 import CreatePasswordBody from 'core/components/CreatePasswordBody';
@@ -31,13 +29,11 @@ function NewWalletBody() {
 
 function CreateWallet() {
   return (
-    <AuthLayout routePath={PageRoutes.createWallet.path}>
-      <OnboardingStateProvider>
-        <CreateWalletLayout>
-          <NewWalletBody />
-        </CreateWalletLayout>
-      </OnboardingStateProvider>
-    </AuthLayout>
+    <OnboardingStateProvider>
+      <CreateWalletLayout>
+        <NewWalletBody />
+      </CreateWalletLayout>
+    </OnboardingStateProvider>
   );
 }
 

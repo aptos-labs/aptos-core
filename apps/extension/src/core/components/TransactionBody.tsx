@@ -20,7 +20,7 @@ import { collapseHexString } from 'core/utils/hex';
 import { HexString, MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import ChakraLink from 'core/components/ChakraLink';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import useTransactionDetails from 'core/hooks/useTransactionDetails';
 import Copyable from './Copyable';
 
@@ -39,7 +39,7 @@ function DetailItem({ children, label }: DetailItemProps) {
 }
 
 function TransactionBody() {
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
   const { version } = useParams();
 
   const txn = useTransactionDetails(version ? Number(version) : undefined);

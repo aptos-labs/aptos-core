@@ -9,8 +9,6 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
-import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
 import { useParams } from 'react-router-dom';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
 import { UserTransaction, EntryFunctionPayload } from 'aptos/dist/generated';
@@ -19,7 +17,7 @@ import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
 import { collapseHexString } from 'core/utils/hex';
 import TransactionList from 'core/components/TransactionList';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 function filterByRecipient(recipient: MaybeHexString) {
   return (txn: UserTransaction) => {
@@ -33,8 +31,8 @@ function sortTxnsByVersionDescending(lhs: UserTransaction, rhs: UserTransaction)
 }
 
 function useOtherAccountTransactions(theirAddress: string) {
-  const { aptosAccount } = useGlobalStateContext();
-  const myAddress = aptosAccount!.address().toShortString();
+  const { aptosAccount } = useActiveAccount();
+  const myAddress = aptosAccount.address().toShortString();
 
   // TODO: manage paging (waiting for indexer)
   const {
@@ -64,25 +62,23 @@ function Account() {
   const transactions = useOtherAccountTransactions(address!);
 
   return (
-    <AuthLayout routePath={PageRoutes.account.path}>
-      <WalletLayout title="Account" showBackButton>
-        <VStack width="100%" paddingTop={8} px={4} spacing={4}>
-          <Box w={20}>
-            <GraceHopperBoringAvatar type="beam" />
-          </Box>
-          <Heading fontSize="lg" fontWeight={500} mb={8}>
-            <Copyable value={address!}>
-              { collapseHexString(address!, 12) }
-            </Copyable>
-          </Heading>
+    <WalletLayout title="Account" showBackButton>
+      <VStack width="100%" paddingTop={8} px={4} spacing={4}>
+        <Box w={20}>
+          <GraceHopperBoringAvatar type="beam" />
+        </Box>
+        <Heading fontSize="lg" fontWeight={500} mb={8}>
+          <Copyable value={address!}>
+            { collapseHexString(address!, 12) }
+          </Copyable>
+        </Heading>
 
-          <Divider />
+        <Divider />
 
-          <Heading fontSize="lg">Between you</Heading>
-          <TransactionList transactions={transactions} />
-        </VStack>
-      </WalletLayout>
-    </AuthLayout>
+        <Heading fontSize="lg">Between you</Heading>
+        <TransactionList transactions={transactions} />
+      </VStack>
+    </WalletLayout>
   );
 }
 

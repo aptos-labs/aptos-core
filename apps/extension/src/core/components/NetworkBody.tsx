@@ -8,7 +8,7 @@ import {
   Button,
 } from '@chakra-ui/react';
 import React from 'react';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useNetworks } from 'core/hooks/useNetworks';
 import { useQueryClient } from 'react-query';
 import Routes from 'core/routes';
 import { AddIcon } from '@chakra-ui/icons';
@@ -22,7 +22,7 @@ export default function NetworkBody() {
     networks,
     removeNetwork,
     switchNetwork,
-  } = useGlobalStateContext();
+  } = useNetworks();
   const queryClient = useQueryClient();
 
   const onSwitchNetwork = async (networkName: string) => {

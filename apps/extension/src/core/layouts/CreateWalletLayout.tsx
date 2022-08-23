@@ -15,7 +15,7 @@ import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
 import { AptosAccount } from 'aptos';
 import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 
 zxcvbnOptions.setOptions(passwordOptions);
@@ -48,7 +48,7 @@ function NextButton({
   isImport = false,
 }: NextButtonProps) {
   const { watch } = useFormContext<CreateWalletFormValues>();
-  const { initAccounts } = useGlobalStateContext();
+  const { initAccounts } = useAccounts();
   const { fundAccount } = useFundAccount();
 
   const {
@@ -79,12 +79,16 @@ function NextButton({
         publicKeyHex,
       } = aptosAccount.toPrivateKeyObject();
 
-      await initAccounts(confirmPassword, {
+      const firstAccount = {
         address: address!,
         mnemonic,
         name: 'Wallet',
         privateKey: privateKeyHex,
         publicKey: publicKeyHex!,
+      };
+
+      await initAccounts(confirmPassword, {
+        [firstAccount.address]: firstAccount,
       });
 
       if (fundAccount) {

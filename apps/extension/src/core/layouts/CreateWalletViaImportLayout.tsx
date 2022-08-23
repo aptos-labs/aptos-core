@@ -19,7 +19,8 @@ import {
   importAccountErrorToast, importAccountNotFoundToast, importAccountToast, networkDoesNotExistToast,
 } from 'core/components/Toast';
 import { getAccountExists } from 'core/queries/account';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useAccounts } from 'core/hooks/useAccounts';
+import { useNetworks } from 'core/hooks/useNetworks';
 import { MnemonicFormValues } from './AddAccountLayout';
 
 zxcvbnOptions.setOptions(passwordOptions);
@@ -63,11 +64,11 @@ CreateWalletViaImportFormValues & MnemonicFormValues;
 function NextButton() {
   const { watch } = useFormContext<CreateWalletViaImportGeneralFormValues>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { activeNetwork } = useGlobalStateContext();
+  const { activeNetwork } = useNetworks();
 
   const {
     initAccounts,
-  } = useGlobalStateContext();
+  } = useAccounts();
 
   const {
     activeStep, nextStep, setActiveStep,
@@ -146,12 +147,16 @@ function NextButton() {
           }
 
           // initialize password and wallet
-          await initAccounts(confirmPassword, {
+          const firstAccount = {
             address: address!,
             mnemonic,
             name: 'Wallet',
             privateKey: privateKeyHex,
             publicKey: publicKeyHex!,
+          };
+
+          await initAccounts(confirmPassword, {
+            [firstAccount.address]: firstAccount,
           });
 
           setIsLoading(false);
@@ -194,11 +199,15 @@ function NextButton() {
           } = aptosAccount.toPrivateKeyObject();
 
           // initialize password and wallet
-          await initAccounts(confirmPassword, {
+          const firstAccount = {
             address: address!,
             name: 'Wallet',
             privateKey: privateKeyHex,
             publicKey: publicKeyHex!,
+          };
+
+          await initAccounts(confirmPassword, {
+            [firstAccount.address]: firstAccount,
           });
 
           setIsLoading(false);

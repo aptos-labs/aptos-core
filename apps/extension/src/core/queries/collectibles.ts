@@ -15,7 +15,8 @@ import { EntryFunctionPayload } from 'aptos/dist/generated';
 import {
   getEntryFunctionTransactions,
 } from 'core/queries/transaction';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
+import { useNetworks } from 'core/hooks/useNetworks';
 
 export const collectiblesQueryKeys = Object.freeze({
   getGalleryItems: 'getGalleryItems',
@@ -38,7 +39,8 @@ type CollectionDict = Record<string, TokenAttributes[]>;
 export function useGalleryItems(
   options?: UseQueryOptions<TokenAttributes[]>,
 ) {
-  const { activeAccountAddress, aptosClient } = useGlobalStateContext();
+  const { activeAccountAddress } = useActiveAccount();
+  const { aptosClient } = useNetworks();
 
   async function getGalleryItems() {
     const createTokenTxns = await getEntryFunctionTransactions(
@@ -121,7 +123,7 @@ async function getTokenData(aptosClient: AptosClient, tokenId: string) {
 }
 
 export const useTokenData = (tokenId: string | undefined) => {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery(
     [collectiblesQueryKeys.getTokenData, tokenId],

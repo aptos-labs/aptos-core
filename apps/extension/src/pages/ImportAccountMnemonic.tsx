@@ -2,19 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useCallback } from 'react';
-import AuthLayout from 'core/layouts/AuthLayout';
-import Routes, { Routes as PageRoutes } from 'core/routes';
+import Routes from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
 import { ImportAccountMnemonicLayout, MnemonicFormValues } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
 import { generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
-  const { addAccount } = useGlobalStateContext();
+  const { addAccount } = useUnlockedAccounts();
 
   const onSubmit = useCallback(async (
     mnemonicAll: MnemonicFormValues,
@@ -55,15 +54,13 @@ export default function ImportWalletMnemonic() {
   }, [addAccount, navigate]);
 
   return (
-    <AuthLayout routePath={PageRoutes.importWalletMnemonic.path}>
-      <ImportAccountMnemonicLayout
-        headerValue="Import mnemonic"
-        backPage={Routes.addAccount.path}
-        defaultValues={{}}
-        onSubmit={onSubmit}
-      >
-        <ImportAccountMnemonicBody />
-      </ImportAccountMnemonicLayout>
-    </AuthLayout>
+    <ImportAccountMnemonicLayout
+      headerValue="Import mnemonic"
+      backPage={Routes.addAccount.path}
+      defaultValues={{}}
+      onSubmit={onSubmit}
+    >
+      <ImportAccountMnemonicBody />
+    </ImportAccountMnemonicLayout>
   );
 }

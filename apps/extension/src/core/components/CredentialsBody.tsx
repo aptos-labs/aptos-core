@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { CredentialRow } from 'pages/Settings';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -50,7 +50,7 @@ export function CredentialHeaderAndBody({
 
 export default function CredentialsBody() {
   const { isOpen, onClose, onOpen } = useDisclosure();
-  const { activeAccount } = useGlobalStateContext();
+  const { activeAccount } = useActiveAccount();
   const { address, privateKey, publicKey } = activeAccount!;
 
   return (

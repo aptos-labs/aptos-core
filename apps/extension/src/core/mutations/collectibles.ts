@@ -10,10 +10,10 @@ import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
 import Analytics from 'core/utils/analytics/analytics';
 import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
-import { NodeUrl } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import { UserTransaction } from 'aptos/dist/generated';
 
 export const defaultRequestErrorAttributes = {
@@ -135,11 +135,8 @@ export const createTokenAndCollection = async (
 
 export const useCreateTokenAndCollection = () => {
   const queryClient = useQueryClient();
-  const {
-    activeNetwork,
-    aptosAccount,
-    aptosClient,
-  } = useGlobalStateContext();
+  const { aptosAccount } = useActiveAccount();
+  const { activeNetwork, aptosClient } = useNetworks();
 
   const createTokenAndCollectionOnSettled = useCallback(async (
     data: CombinedEventParams | undefined,
@@ -149,7 +146,7 @@ export const useCreateTokenAndCollection = () => {
     Analytics.event({
       eventType: collectiblesEvents.CREATE_NFT,
       params: {
-        network: activeNetwork!.nodeUrl as NodeUrl,
+        network: activeNetwork.nodeUrl,
         ...data,
       },
     });

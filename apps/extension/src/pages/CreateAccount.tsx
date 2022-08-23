@@ -2,23 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useMemo, useState } from 'react';
-import AuthLayout from 'core/layouts/AuthLayout';
-import Routes, { Routes as PageRoutes } from 'core/routes';
+import Routes from 'core/routes';
 import CreateAccountBody from 'core/components/CreateAccountBody';
 import { CreateAccountFormValues, CreateAccountLayout } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
 import { AptosAccount } from 'aptos';
 import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { createAccountErrorToast, createAccountToast } from 'core/components/Toast';
 
 function CreateAccount() {
   const navigate = useNavigate();
-  const {
-    addAccount,
-    faucetClient,
-  } = useGlobalStateContext();
+  const { addAccount } = useUnlockedAccounts();
   const { fundAccount } = useFundAccount();
   const newMnemonic = useMemo(() => generateMnemonic(), []);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -46,7 +42,7 @@ function CreateAccount() {
           publicKey: publicKeyHex!,
         });
 
-        if (faucetClient) {
+        if (fundAccount) {
           await fundAccount({ address: address!, amount: 0 });
         }
 
@@ -62,20 +58,18 @@ function CreateAccount() {
   };
 
   return (
-    <AuthLayout routePath={PageRoutes.createAccount.path}>
-      <CreateAccountLayout
-        headerValue="Create account"
-        backPage={Routes.addAccount.path}
-        defaultValues={{
-          mnemonic: newMnemonic.split(' '),
-          mnemonicString: newMnemonic,
-          secretRecoveryPhrase: false,
-        }}
-        onSubmit={onSubmit}
-      >
-        <CreateAccountBody isLoading={isLoading} />
-      </CreateAccountLayout>
-    </AuthLayout>
+    <CreateAccountLayout
+      headerValue="Create account"
+      backPage={Routes.addAccount.path}
+      defaultValues={{
+        mnemonic: newMnemonic.split(' '),
+        mnemonicString: newMnemonic,
+        secretRecoveryPhrase: false,
+      }}
+      onSubmit={onSubmit}
+    >
+      <CreateAccountBody isLoading={isLoading} />
+    </CreateAccountLayout>
   );
 }
 

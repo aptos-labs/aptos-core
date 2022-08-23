@@ -4,7 +4,7 @@
 import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { EntryFunctionPayload, UserTransaction } from 'aptos/dist/generated';
-import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { useNetworks } from 'core/hooks/useNetworks';
 import { accountNamespace, coinNamespace } from 'core/constants';
 
 export const transactionQueryKeys = Object.freeze({
@@ -19,7 +19,7 @@ export const transactionQueryKeys = Object.freeze({
  * Get successful user transactions for the specified account
  */
 export async function getUserTransactions(aptosClient: AptosClient, address: string) {
-  const transactions = await aptosClient!.getAccountTransactions(address!, { limit: 200 });
+  const transactions = await aptosClient.getAccountTransactions(address, { limit: 200 });
   return transactions
     .filter((t) => t.type === 'user_transaction')
     .map((t) => t as UserTransaction)
@@ -44,11 +44,11 @@ export function useUserTransactions(
   address: string | undefined,
   options?: UseQueryOptions<UserTransaction[]>,
 ) {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery<UserTransaction[]>(
     [transactionQueryKeys.getUserTransactions, address],
-    async () => getUserTransactions(aptosClient!, address!),
+    async () => getUserTransactions(aptosClient, address!),
     {
       ...options,
       enabled: Boolean(aptosClient && address) && options?.enabled,
@@ -60,12 +60,12 @@ export function useCoinTransferTransactions(
   address: string | undefined,
   options?: UseQueryOptions<UserTransaction[]>,
 ) {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery<UserTransaction[]>(
     [transactionQueryKeys.getCoinTransferTransactions, address],
     async () => getEntryFunctionTransactions(
-      aptosClient!,
+      aptosClient,
       address!,
       [`${coinNamespace}::transfer`, `${accountNamespace}::transfer`],
     ),
@@ -82,11 +82,11 @@ export const useTransaction = (
   version: number | undefined,
   options?: UseQueryOptions<UserTransaction>,
 ) => {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery<UserTransaction>(
     [transactionQueryKeys.getTransaction, version],
-    async () => aptosClient!.getTransactionByVersion(BigInt(version!)) as Promise<UserTransaction>,
+    async () => aptosClient.getTransactionByVersion(BigInt(version!)) as Promise<UserTransaction>,
     {
       ...options,
       enabled: Boolean(aptosClient && version) && options?.enabled,
@@ -98,7 +98,7 @@ export function useAccountLatestTransactionTimestamp(
   address?: string,
   options?: UseQueryOptions<Date | undefined>,
 ) {
-  const { aptosClient } = useGlobalStateContext();
+  const { aptosClient } = useNetworks();
 
   return useQuery<Date | undefined>(
     [
@@ -106,7 +106,7 @@ export function useAccountLatestTransactionTimestamp(
       address,
     ],
     async () => {
-      const txns = await aptosClient!.getAccountTransactions(address!, { limit: 1 });
+      const txns = await aptosClient.getAccountTransactions(address!, { limit: 1 });
       const latestTxn = (txns as UserTransaction[]).pop();
       return latestTxn && new Date(Number(latestTxn?.timestamp) / 1000);
     },
