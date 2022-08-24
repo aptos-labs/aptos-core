@@ -255,7 +255,7 @@ impl QuorumStoreWrapper {
                     self.proofs_for_consensus.remove(&digest);
                 }
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
-                    Payload::new_empty()
+                    Payload::empty()
                 } else {
                     debug!(
                         "QS: GetBlockRequest excluded len {}, block len {}",

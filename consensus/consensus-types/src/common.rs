@@ -38,7 +38,7 @@ pub enum Payload {
 }
 
 impl Payload {
-    pub fn new_empty() -> Self {
+    pub fn empty() -> Self {
         Payload::Empty
     }
 
