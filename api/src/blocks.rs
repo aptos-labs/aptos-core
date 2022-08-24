@@ -34,6 +34,8 @@ impl BlocksApi {
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_height")?;
+        self.context
+            .check_api_output_enabled("Get block by height", &accept_type)?;
         self.get_by_height(
             accept_type,
             block_height.0,
@@ -58,6 +60,8 @@ impl BlocksApi {
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_version")?;
+        self.context
+            .check_api_output_enabled("Get block by version", &accept_type)?;
         self.get_by_version(
             accept_type,
             version.0,

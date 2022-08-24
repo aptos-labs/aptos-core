@@ -45,6 +45,8 @@ impl EventsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
+        self.context
+            .check_api_output_enabled("Get events by event key", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
 
         // Ensure that account exists
@@ -79,6 +81,8 @@ impl EventsApi {
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         // TODO: Assert that Event represents u64s as strings.
         fail_point_poem("endpoint_get_events_by_event_handle")?;
+        self.context
+            .check_api_output_enabled("Get events by event handle", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
