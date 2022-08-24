@@ -18,12 +18,13 @@ use aptos_rest_client::aptos_api_types::{
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
+use field_count::FieldCount;
 use futures::future::Either;
 use serde::Serialize;
 
 static SECONDS_IN_10_YEARS: i64 = 60 * 60 * 24 * 365 * 10;
 
-#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(AsChangeset, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
@@ -277,9 +278,48 @@ impl Transaction {
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
+
+    pub fn from_transactions(
+        transactions: &[APITransaction],
+    ) -> (
+        Vec<Self>,
+        Vec<UserTransaction>,
+        Vec<BlockMetadataTransaction>,
+        Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
+    ) {
+        let mut txns = vec![];
+        let mut user_txns = vec![];
+        let mut bm_txns = vec![];
+        let mut events = vec![];
+        let mut wscs = vec![];
+        for (txn, user_or_bmt, maybe_event_list, maybe_wsc_list) in
+            transactions.iter().map(Self::from_transaction)
+        {
+            txns.push(txn);
+            match user_or_bmt {
+                Some(Either::Left(user_transaction_model)) => {
+                    user_txns.push(user_transaction_model);
+                }
+                Some(Either::Right(bmt_model)) => {
+                    bm_txns.push(bmt_model);
+                }
+                _ => (),
+            }
+            if let Some(mut event_list) = maybe_event_list {
+                events.append(&mut event_list);
+            }
+            if let Some(mut wsc_list) = maybe_wsc_list {
+                wscs.append(&mut wsc_list);
+            }
+        }
+        (txns, user_txns, bm_txns, events, wscs)
+    }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
@@ -320,7 +360,9 @@ impl UserTransaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
