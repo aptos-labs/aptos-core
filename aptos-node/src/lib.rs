@@ -133,17 +133,26 @@ impl AptosNodeArgs {
             )
             .expect("Test mode should start correctly");
         } else {
-            // Load the config file
+            // Get the config file path
             let config_path = self.config.expect("Config is required to launch node");
+            if !config_path.exists() {
+                panic!(
+                    "The node config file could not be found! Ensure the given path is correct: {:?}",
+                    config_path.display()
+                )
+            }
+
+            // A config file exists, attempt to parse the config
             let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
                 panic!(
-                    "Failed to load node config file! Given file path: {:?}. Error: {:?}",
-                    config_path, error
+                    "Failed to parse node config file! Given file path: {:?}. Error: {:?}",
+                    config_path.display(),
+                    error
                 )
             });
-            println!("Using node config {:?}", &config);
 
             // Start the node
+            println!("Using node config {:?}", &config);
             start(config, None).expect("Node should start correctly");
         };
     }

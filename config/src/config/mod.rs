@@ -132,13 +132,27 @@ impl WaypointConfig {
     pub fn waypoint(&self) -> Waypoint {
         let waypoint = match &self {
             WaypointConfig::FromConfig(waypoint) => Some(*waypoint),
-            WaypointConfig::FromFile(path) => {
-                let content = fs::read_to_string(path)
-                    .unwrap_or_else(|_| panic!("Failed to read waypoint file {}", path.display()));
-                Some(
-                    Waypoint::from_str(content.trim())
-                        .unwrap_or_else(|_| panic!("Failed to parse waypoint: {}", content.trim())),
-                )
+            WaypointConfig::FromFile(waypoint_path) => {
+                if !waypoint_path.exists() {
+                    panic!(
+                        "Waypoint file not found! Ensure the given path is correct: {:?}",
+                        waypoint_path.display()
+                    );
+                }
+                let content = fs::read_to_string(waypoint_path).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to read waypoint file {:?}. Error: {:?}",
+                        waypoint_path.display(),
+                        error
+                    )
+                });
+                Some(Waypoint::from_str(content.trim()).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to parse waypoint: {:?}. Error: {:?}",
+                        content.trim(),
+                        error
+                    )
+                }))
             }
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
@@ -255,8 +269,8 @@ impl NodeConfig {
     }
 
     /// Reads the config file and returns the configuration object in addition to doing some
-    /// post-processing of the config
-    /// Paths used in the config are either absolute or relative to the config location
+    /// post-processing of the config.
+    /// Paths used in the config are either absolute or relative to the config location.
     pub fn load<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
         let mut config = Self::load_config(&input_path)?;
 
@@ -420,11 +434,23 @@ impl NodeConfig {
 
 pub trait PersistableConfig: Serialize + DeserializeOwned {
     fn load_config<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let mut file = File::open(&path)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        // Open the file and read it into a string
+        let config_path_string = path.as_ref().to_str().unwrap().to_string();
+        let mut file = File::open(&path).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to open config file: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        file.read_to_string(&mut contents).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to read the config file into a string: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
+
+        // Parse the file string
         Self::parse(&contents)
     }
 
