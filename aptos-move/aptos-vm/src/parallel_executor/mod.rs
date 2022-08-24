@@ -8,9 +8,6 @@ use aptos_crypto::hash::DefaultHasher;
 use bcs::to_bytes;
 use concurrent_lru::sharded::LruCache;
 use rand::{thread_rng, Rng};
-use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
 
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
