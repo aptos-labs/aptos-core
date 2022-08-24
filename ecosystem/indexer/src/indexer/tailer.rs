@@ -57,7 +57,7 @@ pub fn remove_null_bytes_from_txn(txn: Arc<Transaction>) -> Arc<Transaction> {
 
 #[derive(Clone)]
 pub struct Tailer {
-    transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
+    pub transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
     processors: Vec<Arc<dyn TransactionProcessor>>,
     connection_pool: PgDbPool,
 }
