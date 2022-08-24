@@ -106,17 +106,28 @@ async fn main() -> std::io::Result<()> {
     info!("Starting fetcher...");
     tailer.transaction_fetcher.lock().await.start().await;
 
+    let start = chrono::Utc::now().naive_utc();
+
     info!("Indexing loop started!");
-    let mut processed: usize = starting_version as usize;
+    let mut version_processed: usize = starting_version as usize;
+    let mut total_processed: usize = 0;
     let mut base: usize = 0;
     loop {
         let res = tailer.process_next_batch(args.batch_size).await;
-        processed += res.len();
+        total_processed += res.len();
+        version_processed += res.len();
         if args.emit_every != 0 {
-            let new_base: usize = processed / args.emit_every;
+            let new_base: usize = version_processed / args.emit_every;
             if base != new_base {
                 base = new_base;
-                aptos_logger::info!("Indexer has processed {} versions", processed);
+                let num_millis =
+                    (chrono::Utc::now().naive_utc() - start).num_milliseconds() as f64 / 1000.0;
+                let tps = (total_processed as f64 / num_millis) as u64;
+                aptos_logger::info!(
+                    "Indexer has processed version {}. Overall average TPS: {}",
+                    version_processed,
+                    tps
+                );
             }
         }
     }
