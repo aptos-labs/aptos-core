@@ -23,7 +23,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
+use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -61,7 +61,7 @@ impl Context {
         }
     }
 
-    pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView>> {
+    pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
         self.db
             .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
@@ -70,7 +70,7 @@ impl Context {
     pub fn move_resolver_poem<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<RemoteStorageOwned<DbStateView>, E> {
+    ) -> Result<StorageAdapterOwned<DbStateView>, E> {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))

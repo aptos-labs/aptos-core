@@ -4,7 +4,7 @@
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
-    data_cache::RemoteStorage,
+    data_cache::StorageAdapter,
     logging::AdapterLogSchema,
     parallel_executor::{storage_wrapper::VersionedView, AptosTransactionOutput},
 };
@@ -45,7 +45,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
 
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &RemoteStorage::new(argument),
+            &StorageAdapter::new(argument),
         );
 
         Self {

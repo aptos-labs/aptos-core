@@ -26,7 +26,7 @@ use aptos_types::{
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::{AsMoveResolver, RemoteStorage};
+use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
 use move_deps::{
     move_core_types::{
         identifier::IdentStr,
@@ -92,7 +92,7 @@ impl Indexer {
 
     pub fn index_with_annotator(
         &self,
-        annotator: &MoveValueAnnotator<RemoteStorage<DbStateView>>,
+        annotator: &MoveValueAnnotator<StorageAdapter<DbStateView>>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -144,7 +144,7 @@ impl Indexer {
 
 struct TableInfoParser<'a> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, RemoteStorage<'a, DbStateView>>,
+    annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView>>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
 }
@@ -152,7 +152,7 @@ struct TableInfoParser<'a> {
 impl<'a> TableInfoParser<'a> {
     pub fn new(
         indexer: &'a Indexer,
-        annotator: &'a MoveValueAnnotator<RemoteStorage<DbStateView>>,
+        annotator: &'a MoveValueAnnotator<StorageAdapter<DbStateView>>,
     ) -> Self {
         Self {
             indexer,
