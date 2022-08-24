@@ -12,7 +12,7 @@ export class ApiError extends Error {
     public readonly request: ApiRequestOptions;
 
     constructor(request: ApiRequestOptions, response: ApiResult, message: string) {
-        super(message);
+        super(message + '\n' + JSON.stringify(response, null, 2));
 
         this.name = 'ApiError';
         this.url = response.url;
