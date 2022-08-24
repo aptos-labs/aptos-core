@@ -10,7 +10,7 @@
 #
 
 # Default to off
-USE_NEW_WRAPPER="${USE_NEW_WRAPPER:-true}"
+USE_NEW_WRAPPER="${USE_NEW_WRAPPER:-false}"
 
 # output files
 FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
