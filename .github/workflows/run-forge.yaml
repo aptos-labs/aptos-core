@@ -81,6 +81,7 @@ jobs:
         if: env.FORGE_ENABLED == 'true' && env.USE_NEW_WRAPPER == 'true'
         run: pip3 install click==8.1.3 psutil==5.9.1
       - name: Run pre-Forge checks
+        id: pre-forge
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
@@ -97,14 +98,22 @@ jobs:
           * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
-      - name: Post pre-Forge comment
+          # https://github.com/marketplace/actions/create-or-update-comment#setting-the-comment-body-from-a-file
+          pre_forge_comment_body="$(cat $FORGE_PRE_COMMENT.txt)"
+          pre_forge_comment_body="${pre_forge_comment_body//'%'/'%25'}"
+          pre_forge_comment_body="${pre_forge_comment_body//$'\n'/'%0A'}"
+          pre_forge_comment_body="${pre_forge_comment_body//$'\r'/'%0D'}" 
+          echo "::set-output name=pre_forge_comment_body::$pre_forge_comment_body"
+
+      - name: Create pre-Forge comment
         if: env.FORGE_ENABLED == 'true' && github.event.number != null
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: peter-evans/create-or-update-comment@v2
         with:
-          append: true
-          path: ${{ env.FORGE_PRE_COMMENT }}
+          issue-number: github.event.number
+          body: ${{ steps.pre-forge.outputs.pre_forge_comment_body }}
 
       - name: Run Forge
+        id: forge
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
@@ -124,6 +133,13 @@ jobs:
           * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
+          # https://github.com/marketplace/actions/create-or-update-comment#setting-the-comment-body-from-a-file
+          forge_comment_body="$(cat $FORGE_COMMENT.txt)"
+          forge_comment_body="${forge_comment_body//'%'/'%25'}"
+          forge_comment_body="${forge_comment_body//$'\n'/'%0A'}"
+          forge_comment_body="${forge_comment_body//$'\r'/'%0D'}" 
+          echo "::set-output name=forge_comment_body::$forge_comment_body"
+
           # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
           cat $FORGE_COMMENT >> $GITHUB_STEP_SUMMARY
 
@@ -131,14 +147,13 @@ jobs:
             exit $FORGE_EXIT_CODE
           fi
 
-      - name: Post forge result comment
-        # Post a Github comment if the run has not been cancelled and if we're running on a PR
-        if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
-        uses: marocchino/sticky-pull-request-comment@v2
+      - name: Create Forge result comment
+        if: env.FORGE_ENABLED == 'true' && github.event.number != null
+        uses: peter-evans/create-or-update-comment@v2
         with:
-          append: true
-          recreate: true
-          path: ${{ env.FORGE_COMMENT }}
+          issue-number: github.event.number
+          body: ${{ steps.forge.outputs.forge_comment_body }}
+
       - name: Post to a Slack channel
         # Post a Slack comment if the run has not been cancelled and the envs are set
         if: env.FORGE_ENABLED == 'true' && env.POST_TO_SLACK == 'true' && !cancelled()
