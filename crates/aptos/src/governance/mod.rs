@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
 };
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 use move_deps::{
     move_compiler::compiled_unit::CompiledUnitEnum,
@@ -97,18 +98,12 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         let txn = self
             .txn_options
-            .submit_entry_function(
-                AccountAddress::ONE,
-                "aptos_governance",
-                "create_proposal",
-                vec![],
-                vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&script_hash)?,
-                    bcs::to_bytes(&self.metadata_url.to_string())?,
-                    bcs::to_bytes(&metadata_hash.to_hex())?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                self.pool_address_args.pool_address,
+                script_hash.to_vec(),
+                self.metadata_url.to_string().as_bytes().to_vec(),
+                metadata_hash.to_hex().as_bytes().to_vec(),
+            ))
             .await?;
 
         if let Transaction::UserTransaction(inner) = txn {
