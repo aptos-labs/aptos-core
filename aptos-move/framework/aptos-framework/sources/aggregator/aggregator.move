@@ -24,7 +24,7 @@
 ///   operation which usually involves reading from the storage.
 ///
 /// destroy()
-///   Destriys and aggregator, also cleaning up storage if necessary.
+///   Destroys and aggregator, also cleaning up storage if necessary.
 ///
 /// Note that there is no constructor in `Aggregator` API. This is done on purpose.
 /// For every aggregator, we need to know where its value is stored on chain.
@@ -62,12 +62,10 @@
 /// parallelism in execution.
 module aptos_framework::aggregator {
 
-    /// When the value of aggregator (actual or accumulated) overflows (raised
-    /// by native code).
+    /// When the value of aggregator (actual or accumulated) overflows (raised by native code).
     const EAGGREGATOR_OVERFLOW: u64 = 1;
 
-    /// When the value of aggregator (actual or accumulated) underflows, i.e goes
-    /// below zero (raised by native code).
+    /// When the value of aggregator (actual or accumulated) underflows, i.e goes below zero (raised by native code).
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
     /// When aggregator feature is not supported (raised by native code).

@@ -67,7 +67,7 @@ module aptos_framework::optional_aggregator {
     public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator(limit)),
+                aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),
                 integer: option::none(),
             }
         } else {
@@ -116,7 +116,7 @@ module aptos_framework::optional_aggregator {
         let integer = option::extract(&mut optional_aggregator.integer);
         let limit = limit(&integer);
         destroy_integer(integer);
-        let aggregator = aggregator_factory::create_aggregator(limit);
+        let aggregator = aggregator_factory::create_aggregator_internal(limit);
         option::fill(&mut optional_aggregator.aggregator, aggregator);
         limit
     }
