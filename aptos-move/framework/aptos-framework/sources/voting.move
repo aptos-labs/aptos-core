@@ -87,6 +87,8 @@ module aptos_framework::voting {
 
         /// Whether the proposal has been resolved.
         is_resolved: bool,
+        /// Resolution timestamp if the proposal has been resolved. 0 otherwise.
+        resolution_time_secs: u64,
     }
 
     struct VotingForum<ProposalType: store> has key {
@@ -193,6 +195,7 @@ module aptos_framework::voting {
             yes_votes: 0,
             no_votes: 0,
             is_resolved: false,
+            resolution_time_secs: 0,
         });
 
         event::emit_event<CreateProposalEvent>(
@@ -257,6 +260,7 @@ module aptos_framework::voting {
 
         let resolved_early = can_be_resolved_early(proposal);
         proposal.is_resolved = true;
+        proposal.resolution_time_secs = timestamp::now_seconds();
 
         assert!(
             transaction_context::get_script_hash() == proposal.execution_hash,
