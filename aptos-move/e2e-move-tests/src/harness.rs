@@ -13,6 +13,7 @@ use cached_packages::aptos_stdlib;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
+    coin_supply::calculate_gas_fees,
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
@@ -104,6 +105,26 @@ impl MoveHarness {
             result.push(output.status().to_owned())
         }
         result
+    }
+
+    /// Runs a block of signed transactions and also tracks gas used.
+    pub fn run_block_and_track_gas_fees(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> (Vec<TransactionStatus>, u128) {
+        let mut result = vec![];
+        for output in self.executor.execute_block(txn_block.clone()).unwrap() {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+            result.push(output)
+        }
+
+        let gas_fees = calculate_gas_fees(&txn_block, &result);
+        (
+            result.into_iter().map(|o| o.status().to_owned()).collect(),
+            gas_fees,
+        )
     }
 
     /// Creates a transaction, based on provided payload.

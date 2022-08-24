@@ -15,7 +15,7 @@ fn mint_to_new_account() {
 
         let root = test_env.dr_account;
 
-        // Create and publish a sender with TXN_RESERVED coins, also not how
+        // Create and publish a sender with TXN_RESERVED coins, also note how
         // many were there before.
         let new_account = executor.create_raw_account_data(0, 0);
         executor.add_account_data(&new_account);

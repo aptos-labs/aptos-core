@@ -75,8 +75,7 @@ pub fn fetch_coin_supply(state_view: &impl StateView) -> anyhow::Result<u128> {
     match supply.aggregator {
         Some(agg) => {
             let key_bytes = agg.key.to_vec();
-            let state_key =
-                StateKey::table_item(TableHandle::from(TableHandle(agg.handle)), key_bytes);
+            let state_key = StateKey::table_item(TableHandle(agg.handle), key_bytes);
 
             let value_bytes = state_view.get_state_value(&state_key).unwrap().unwrap();
             Ok(deserialize(&value_bytes))

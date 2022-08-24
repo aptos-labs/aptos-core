@@ -9,7 +9,7 @@ use e2e_move_tests::{
     },
     assert_abort, assert_success, MoveHarness,
 };
-use language_e2e_tests::account::Account;
+use language_e2e_tests::{account::Account, coin_supply};
 
 mod common;
 
@@ -72,6 +72,7 @@ fn test_aggregators_e2e() {
 #[test]
 fn test_aggregator_lifetime() {
     let (mut h, acc) = setup();
+    let supply_before = coin_supply::fetch_coin_supply(h.executor.get_state_view()).unwrap();
 
     let txns = vec![
         new(&mut h, &acc, 0, 1500),
@@ -92,7 +93,8 @@ fn test_aggregator_lifetime() {
         // Aggregator has been destroyed and we cannot add this delta.
         add(&mut h, &acc, 0, 1),
     ];
-    let outputs = h.run_block(txns);
+    let (outputs, fees) = h.run_block_and_track_gas_fees(txns);
+
     // 2 materializations should have failed.
     assert_abort!(outputs[10], 131073);
     assert_abort!(outputs[11], 131074);
@@ -106,6 +108,10 @@ fn test_aggregator_lifetime() {
     // Aggregator is destroyed (abort code from `table::borrow` failure).
     assert_success!(outputs[13]);
     assert_abort!(outputs[14], 25863);
+
+    // Also, make sure gas fees were burnt.
+    let supply_after = coin_supply::fetch_coin_supply(h.executor.get_state_view()).unwrap();
+    assert_eq!(supply_before, supply_after + fees);
 }
 
 #[test]
