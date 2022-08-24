@@ -22,7 +22,6 @@ proptest-derive = "0.3.0"
 rand = "0.7.3"
 serde = { version = "1.0.137", default-features = false }
 
-aptos-aggregator = { path = "../aptos-aggregator" }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
