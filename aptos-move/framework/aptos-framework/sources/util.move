@@ -1,6 +1,7 @@
 /// Utility functions used by the framework modules.
 module aptos_framework::util {
     friend aptos_framework::code;
+    friend aptos_framework::byte_conversions;
     friend aptos_framework::gas_schedule;
 
     /// Native function to deserialize a type T.
