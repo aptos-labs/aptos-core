@@ -56,6 +56,7 @@ impl MoveStructType for CoinInfo {
 
 impl MoveResource for CoinInfo {}
 
+/// Returns CoinInfo resource for AptosCoin.
 pub fn fetch_coin_info(state_view: &impl StateView) -> anyhow::Result<CoinInfo> {
     let addr = AccountAddress::ONE;
     let account_access_path =
@@ -69,6 +70,7 @@ pub fn fetch_coin_info(state_view: &impl StateView) -> anyhow::Result<CoinInfo> 
     Ok(bcs::from_bytes(&blob).unwrap())
 }
 
+/// Returns the total supply of AptosCoin.
 pub fn fetch_coin_supply(state_view: &impl StateView) -> anyhow::Result<u128> {
     let coin_info = fetch_coin_info(state_view)?;
     let supply = coin_info.supply.expect("total supply is not tracked");
