@@ -119,7 +119,7 @@ module aptos_token::marketplace_utils {
         guid::id(&gid)
     }
 
-    public fun buy_internal<CoinType>(coin_owner: &signer, listing: Listing<CoinType>) {
+    public fun buy_internal<CoinType>(coin_owner: &signer, listing: Listing<CoinType>): u64 {
         assert!(listing.instant_sale, EINVALID_BUY_NOT_INSTANT_SALE);
         let coin_owner_address = signer::address_of(coin_owner);
 
@@ -130,6 +130,7 @@ module aptos_token::marketplace_utils {
         let token = token::withdraw_with_event_internal(listing.owner, listing.token_id, listing.amount);
         coin::transfer<CoinType>(coin_owner, listing.owner, total_amount);
         token::direct_deposit(signer::address_of(coin_owner), token);
+        total_amount
     }
 
     public entry fun buy<CoinType>(coin_owner: &signer, token_owner_address: address, id_creation_number: u64) acquires ListingRecords {
