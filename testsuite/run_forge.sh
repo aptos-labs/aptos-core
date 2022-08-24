@@ -182,7 +182,12 @@ if [ -z "$FORGE_CLUSTER_NAME" ]; then
     FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
 fi
 
-aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+context=$(kubectl config current-context)
+echo $context | grep $FORGE_CLUSTER_NAME
+if [ "$?" -ne 0 ]; then
+    echo "WARN: current context is not set to ${FORGE_CLUSTER_NAME}. Switching to ${FORGE_CLUSTER_NAME}..."
+    aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+fi
 
 # determine cluster name from kubectl context and set o11y resources
 echo "Using cluster ${FORGE_CLUSTER_NAME}"

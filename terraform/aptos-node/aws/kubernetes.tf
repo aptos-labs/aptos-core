@@ -100,6 +100,7 @@ resource "kubernetes_namespace" "tigera-operator" {
 }
 
 resource "helm_release" "calico" {
+  count      = var.enable_calico ? 1 : 0
   name       = "calico"
   repository = "https://docs.projectcalico.org/charts"
   chart      = "tigera-operator"
