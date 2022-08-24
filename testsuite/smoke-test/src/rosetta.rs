@@ -120,7 +120,7 @@ async fn test_network() {
         status.genesis_block_identifier
     );
     assert_eq!(
-        Some(status.genesis_block_identifier),
+        status.genesis_block_identifier,
         status.oldest_block_identifier,
     );
 }
@@ -458,7 +458,7 @@ async fn test_block() {
             .block(&request)
             .await
             .expect("Should be able to get blocks that are already known");
-        let block = response.block.expect("Every response should have a block");
+        let block = response.block;
         let actual_block = rest_client
             .get_block_by_height(block_height, true)
             .await
@@ -532,10 +532,7 @@ async fn parse_block_transactions(
         let actual_txn_info = actual_txn
             .transaction_info()
             .expect("Actual transaction should not be pending and have transaction info");
-        let txn_metadata = transaction
-            .metadata
-            .as_ref()
-            .expect("Metadata must always be present in a block");
+        let txn_metadata = transaction.metadata;
 
         // Ensure transaction identifier is correct
         assert_eq!(
@@ -786,7 +783,7 @@ async fn parse_operations(
 
     assert!(
         has_gas_op
-            || transaction.metadata.unwrap().transaction_type == TransactionType::Genesis
+            || transaction.metadata.transaction_type == TransactionType::Genesis
             || transaction.operations.is_empty(),
         "Must have a gas operation at least in a transaction except for Genesis",
     );
@@ -885,7 +882,7 @@ async fn test_invalid_transaction_gas_charged() {
         .block(&BlockRequest::by_index(chain_id, block_info.block_height.0))
         .await
         .unwrap();
-    let block_with_transfer = block_with_transfer.block.unwrap();
+    let block_with_transfer = block_with_transfer.block;
     // Verify failed txn
     let rosetta_txn = block_with_transfer
         .transactions
@@ -914,7 +911,7 @@ fn assert_transfer_transaction(
         rosetta_txn.transaction_identifier.hash
     );
 
-    let rosetta_txn_metadata = rosetta_txn.metadata.as_ref().unwrap();
+    let rosetta_txn_metadata = rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
     assert_eq!(rosetta_txn.operations.len(), 3);

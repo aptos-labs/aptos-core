@@ -18,9 +18,6 @@ pub struct Error {
     pub code: u32,
     /// Message that always matches the error code
     pub message: String,
-    /// Possible generic information about an error code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
     /// Whether a call can retry on the error
     pub retriable: bool,
     /// Specific details of the error e.g. stack trace

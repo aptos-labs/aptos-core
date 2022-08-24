@@ -161,7 +161,8 @@ impl ApiError {
         }
     }
 
-    pub fn message(&self) -> String {
+    /// This value must be fixed, so it's all static strings
+    pub fn message(&self) -> &'static str {
         match self {
             ApiError::BlockParameterConflict => {
                 "Block parameter conflict. Must provide either hash or index but not both"
@@ -198,7 +199,6 @@ impl ApiError {
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
         }
-        .to_string()
     }
 
     pub fn details(self) -> Option<ErrorDetails> {
@@ -240,7 +240,7 @@ impl ApiError {
 
 impl From<ApiError> for types::Error {
     fn from(error: ApiError) -> Self {
-        let message = error.message();
+        let message = error.message().to_string();
         let code = error.code();
         let retriable = error.retriable();
         let details = error.details();
@@ -249,7 +249,6 @@ impl From<ApiError> for types::Error {
             code,
             retriable,
             details,
-            description: None,
         }
     }
 }

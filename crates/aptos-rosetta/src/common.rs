@@ -137,7 +137,7 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
 }
 
 const DEFAULT_COIN: &str = "APT";
-const DEFAULT_DECIMALS: u64 = 8;
+const DEFAULT_DECIMALS: u8 = 8;
 
 pub fn native_coin() -> Currency {
     Currency {

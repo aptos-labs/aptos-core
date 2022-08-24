@@ -85,11 +85,7 @@ impl BlockRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockResponse {
     /// The block requested.  This should always be populated for a given valid version
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block: Option<Block>,
-    /// Transactions that weren't included in the block
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub other_transactions: Option<Vec<TransactionIdentifier>>,
+    pub block: Block,
 }
 
 /// Request to combine signatures and an unsigned transaction for submission as a
@@ -140,8 +136,7 @@ pub struct ConstructionDeriveResponse {
     /// The account identifier of the account if the [`aptos_types::account_address::AccountAddress`] can be derived.
     ///
     /// This will always return a value, though it might not match onchain information.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_identifier: Option<AccountIdentifier>,
+    pub account_identifier: AccountIdentifier,
 }
 
 /// Request to hash a transaction
@@ -168,8 +163,6 @@ pub struct ConstructionMetadataRequest {
     ///
     /// This comes verbatim from a preprocess request
     pub options: MetadataOptions,
-    /// Set of public keys related to the private keys signing the transaction eventually
-    pub public_keys: Vec<PublicKey>,
 }
 
 /// A set of operations to tell us which metadata to lookup onchain
@@ -201,8 +194,7 @@ pub struct ConstructionMetadataResponse {
     /// Metadata that will be passed to Payloads to create a transaction
     pub metadata: ConstructionMetadata,
     /// A suggested gas fee based on the current state of the network
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggested_fee: Option<Vec<Amount>>,
+    pub suggested_fee: Vec<Amount>,
 }
 
 /// Metadata required to construct a transaction
@@ -290,13 +282,6 @@ pub struct ConstructionPreprocessRequest {
     pub network_identifier: NetworkIdentifier,
     /// Operations that make up an `InternalOperation`
     pub operations: Vec<Operation>,
-    /// Max gas price in the native coin
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee: Option<Vec<Amount>>,
-    /// Gas price per unit, must be an integer
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggested_fee_multiplier: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<PreprocessMetadata>,
 }
 
@@ -319,11 +304,9 @@ pub struct PreprocessMetadata {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionPreprocessResponse {
     /// Metadata to be sent verbatim to the Metadata API
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<MetadataOptions>,
+    pub options: MetadataOptions,
     /// List of who needs to be signing this transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub required_public_keys: Option<Vec<AccountIdentifier>>,
+    pub required_public_keys: Vec<AccountIdentifier>,
 }
 
 /// Request to submit a signed transaction
@@ -432,8 +415,7 @@ pub struct NetworkStatusResponse {
     /// Genesis block
     pub genesis_block_identifier: BlockIdentifier,
     /// Oldest version that is available after pruning.  Assumed to be genesis block if not present
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oldest_block_identifier: Option<BlockIdentifier>,
+    pub oldest_block_identifier: BlockIdentifier,
     /// Sync status if a node needs to catch up
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_status: Option<SyncStatus>,
