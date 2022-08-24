@@ -167,6 +167,11 @@ const sidebars = {
       link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
+    {
+      type: 'link',
+      label: 'REST API Docs', // The link label
+      href: '/api/latest-api.html', // The internal path
+    },
     "reference/telemetry",
     "aptos-white-paper",
     "reference/glossary",
