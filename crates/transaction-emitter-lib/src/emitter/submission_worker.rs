@@ -111,7 +111,7 @@ impl SubmissionWorker {
             .await
             {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(30)),
+                    SampleRate::Duration(Duration::from_secs(120)),
                     warn!("[{:?}] Failed to submit request: {:?}", self.client, e)
                 );
             }
@@ -214,7 +214,7 @@ impl SubmissionWorker {
                         .record_data_point(latency, num_committed);
                 }
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(60)),
+                    SampleRate::Duration(Duration::from_secs(120)),
                     warn!(
                         "[{:?}] Transactions were not committed before expiration: {:?}",
                         self.client, uncommitted
@@ -258,13 +258,13 @@ pub async fn submit_transactions(
         .fetch_add(txns.len() as u64, Ordering::Relaxed);
     match client.submit_batch_bcs(txns).await {
         Err(e) => sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
+            SampleRate::Duration(Duration::from_secs(120)),
             warn!("[{:?}] Failed to submit batch request: {:?}", client, e)
         ),
         Ok(v) => {
             for f in v.into_inner().transaction_failures {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(60)),
+                    SampleRate::Duration(Duration::from_secs(120)),
                     warn!(
                         "[{:?}] Failed to submit a request within a batch: {:?}",
                         client, f

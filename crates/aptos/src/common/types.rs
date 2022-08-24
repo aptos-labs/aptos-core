@@ -1093,8 +1093,17 @@ impl TransactionOptions {
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        let sender_key = self.private_key()?;
-        Ok(account_address_from_public_key(&sender_key.public_key()))
+        // If private key flags are specified, do not use the profile's account address
+        if self
+            .private_key_options
+            .extract_private_key_cli(self.encoding_options.encoding)?
+            .is_some()
+        {
+            let sender_key = self.private_key()?;
+            Ok(account_address_from_public_key(&sender_key.public_key()))
+        } else {
+            self.profile_options.account_address()
+        }
     }
 
     /// Submit a transaction
