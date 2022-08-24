@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::accept_type::AcceptType;
 use crate::response::{
-    block_not_found_by_height, block_not_found_by_version, block_pruned_by_height,
-    version_not_found, version_pruned, InternalError, ServiceUnavailableError, StdApiError,
+    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
+    InternalError, ServiceUnavailableError, StdApiError,
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
@@ -38,7 +40,7 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    node_config: NodeConfig,
+    pub node_config: NodeConfig,
     gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
@@ -587,6 +589,26 @@ impl Context {
             gas_estimation.median_gas_price = gas_prices[mid];
             Ok(gas_estimation.median_gas_price)
         }
+    }
+
+    pub fn check_api_output_enabled<E: ForbiddenError>(
+        &self,
+        api_name: &'static str,
+        accept_type: &AcceptType,
+    ) -> Result<(), E> {
+        match accept_type {
+            AcceptType::Json => {
+                if !self.node_config.api.json_output_enabled {
+                    return Err(json_api_disabled(api_name));
+                }
+            }
+            AcceptType::Bcs => {
+                if !self.node_config.api.bcs_output_enabled {
+                    return Err(bcs_api_disabled(api_name));
+                }
+            }
+        }
+        Ok(())
     }
 }
 
