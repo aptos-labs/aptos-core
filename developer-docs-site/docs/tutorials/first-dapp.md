@@ -362,7 +362,7 @@ To call this function, we need to use the `window.aptos` API provided by the wal
 ```javascript
 {
   type: "entry_function_payload",
-  function: "<address>message::set_message",
+  function: "<address>::message::set_message",
   arguments: ["<hex encoded utf-8 message>"],
   type_arguments: []
 }

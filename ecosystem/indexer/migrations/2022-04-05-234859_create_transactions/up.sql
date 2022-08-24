@@ -68,7 +68,7 @@ CREATE TABLE transactions
        "gas_unit_price":"1",
        "expiration_timestamp_secs":"1649713172",
        "payload":{
-          "type":"script_function_payload",
+          "type":"entry_function_payload",
           "function":"0x1::aptos_coin::mint",
           "type_arguments":[
 
