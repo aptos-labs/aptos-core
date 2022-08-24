@@ -109,12 +109,10 @@ async fn network_options(
         operation_types,
         errors,
         historical_balance_lookup: true,
-        timestamp_start_index: None,
+        timestamp_start_index: 1,
         call_methods: vec![],
         balance_exemptions: vec![],
         mempool_coins: false,
-        block_hash_case: None,
-        transaction_hash_case: None,
     };
 
     let response = NetworkOptionsResponse { version, allow };
@@ -161,7 +159,7 @@ async fn network_status(
         current_block_identifier,
         current_block_timestamp: current_block.timestamp,
         genesis_block_identifier,
-        oldest_block_identifier: Some(oldest_block_identifier),
+        oldest_block_identifier,
         sync_status: None,
         peers: vec![],
     };

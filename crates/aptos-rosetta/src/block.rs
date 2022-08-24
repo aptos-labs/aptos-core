@@ -51,10 +51,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     let block = build_block(parent_transaction, block).await?;
 
-    Ok(BlockResponse {
-        block: Some(block),
-        other_transactions: None,
-    })
+    Ok(BlockResponse { block })
 }
 
 /// Build up the transaction, which should contain the `operations` as the change set
