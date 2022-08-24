@@ -10,7 +10,7 @@ use crate::{Swarm, SwarmExt};
 
 #[derive(Default, Clone, Debug, Serialize)]
 pub struct SuccessCriteria {
-    avg_tps: usize,
+    pub avg_tps: usize,
     max_latency_ms: usize,
     wait_for_all_nodes_to_catchup: Option<Duration>,
 }
