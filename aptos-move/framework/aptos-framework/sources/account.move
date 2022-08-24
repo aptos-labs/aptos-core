@@ -468,12 +468,16 @@ module aptos_framework::account {
         register_coin<AptosCoin>(auth_key);
     }
 
+    /// Creates the address for a resource account.
+    public fun create_resource_account_address(source_addr: &address, seed: vector<u8>): address {
+        let bytes = bcs::to_bytes(source_addr);
+        vector::append(&mut bytes, seed);
+        create_address(hash::sha3_256(bytes))
+    }
+
     /// A resource account is used to manage resources independent of an account managed by a user.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        let bytes = bcs::to_bytes(&signer::address_of(source));
-        vector::append(&mut bytes, seed);
-        let addr = create_address(hash::sha3_256(bytes));
-
+        let addr = create_resource_account_address(&signer::address_of(source), seed);
         let signer = create_account_internal(copy addr);
         let signer_cap = SignerCapability { account: addr };
         (signer, signer_cap)
