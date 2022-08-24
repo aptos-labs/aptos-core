@@ -9,6 +9,7 @@ use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
+    account_config::CoinInfoResource,
     state_store::state_key::StateKey,
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
@@ -78,6 +79,13 @@ impl FakeDataStore {
     /// Adds an [`AccountData`] to this data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
         let write_set = account_data.to_writeset();
+        self.add_write_set(&write_set)
+    }
+
+    /// Adds CoinInfo to this data store.
+    pub fn add_coin_info(&mut self) {
+        let coin_info = CoinInfoResource::random(u128::MAX);
+        let write_set = coin_info.to_writeset();
         self.add_write_set(&write_set)
     }
 

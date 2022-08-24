@@ -41,7 +41,7 @@ module aptos_framework::aggregator_factory {
 
     /// Struct that creates aggregators.
     struct AggregatorFactory has key {
-        phantom_table: Table<u128, u128>,
+        phantom_table: Table<address, u128>,
     }
 
     /// Can only be called during genesis.
