@@ -320,7 +320,7 @@ fn publishing_fixed_params() {
         let output = ParallelTransactionExecutor::<
             Transaction<KeyType<[u8; 32]>, [u8; 32]>,
             Task<KeyType<[u8; 32]>, [u8; 32]>,
-        >::new(&thread_pool, concurrencu_level)
+        >::new(&thread_pool, thread_pool.current_num_threads())
         .execute_transactions_parallel((), transactions.clone());
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
