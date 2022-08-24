@@ -193,8 +193,9 @@ impl ParallelAptosVM {
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         let dedupped_transactions = dedup(&transactions);
-        let signature_verified_block: Vec<PreprocessedTransaction> = dedupped_transactions
+        let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
+            .filter(|tx| !CACHE.insert(tx))
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
