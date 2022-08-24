@@ -236,7 +236,10 @@ async fn account_has_balance(
     expected_sequence_number: u64,
 ) -> anyhow::Result<u64> {
     let response = get_balance(rosetta_client, chain_id, account, None).await?;
-    assert_eq!(expected_sequence_number, response.metadata.sequence_number);
+    assert_eq!(
+        expected_sequence_number,
+        response.metadata.sequence_number.0
+    );
 
     if response.balances.iter().any(|amount| {
         amount.currency == native_coin() && amount.value == expected_balance.to_string()

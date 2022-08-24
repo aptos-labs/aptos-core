@@ -6,6 +6,7 @@ use crate::types::{
     NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
     SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
 };
+use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +43,7 @@ pub struct AccountBalanceResponse {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountBalanceMetadata {
     /// Sequence number of the account
-    pub sequence_number: u64,
+    pub sequence_number: U64,
 }
 /// Reqyest a block (version) on the account
 ///
@@ -173,15 +174,17 @@ pub struct MetadataOptions {
     /// The operation to run at a high level (e.g. CreateAccount/Transfer)
     pub internal_operation: InternalOperation,
     /// Maximum total gas units willing to pay for the transaction
-    pub max_gas_amount: Option<u64>,
-    /// Multiplier how much more willing to pay for the fees
-    pub gas_price_per_unit: Option<u64>,
-    /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiry_time_secs: Option<u64>,
+    pub max_gas_amount: Option<U64>,
+    /// Multiplier how much more willing to pay for the fees
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_price_per_unit: Option<U64>,
+    /// Number of seconds from payloads call time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry_time_secs: Option<U64>,
     /// Sequence number of the request
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sequence_number: Option<u64>,
+    pub sequence_number: Option<U64>,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -201,14 +204,14 @@ pub struct ConstructionMetadataResponse {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionMetadata {
     /// Sequence number of the sending account
-    pub sequence_number: u64,
+    pub sequence_number: U64,
     /// Maximum gas willing to pay for the transaction
-    pub max_gas_amount: u64,
+    pub max_gas_amount: U64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
-    pub gas_price_per_unit: u64,
-    /// Expiry time of the transaction in unix epoch seconds
+    pub gas_price_per_unit: U64,
+    /// Expiry time of the transaction in seconds from the payloads request, defaults to 30 seconds
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiry_time_secs: Option<u64>,
+    pub expiry_time_secs: Option<U64>,
 }
 
 /// Request to parse a signed or unsigned transaction into operations
@@ -282,6 +285,7 @@ pub struct ConstructionPreprocessRequest {
     pub network_identifier: NetworkIdentifier,
     /// Operations that make up an `InternalOperation`
     pub operations: Vec<Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<PreprocessMetadata>,
 }
 
@@ -289,13 +293,13 @@ pub struct ConstructionPreprocessRequest {
 pub struct PreprocessMetadata {
     /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiry_time_secs: Option<u64>,
+    pub expiry_time_secs: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sequence_number: Option<u64>,
+    pub sequence_number: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_gas_amount: Option<u64>,
+    pub max_gas_amount: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gas_price: Option<u64>,
+    pub gas_price: Option<U64>,
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]

@@ -288,10 +288,10 @@ impl RosettaClient {
                 network_identifier: network_identifier.clone(),
                 operations,
                 metadata: Some(PreprocessMetadata {
-                    expiry_time_secs: Some(expiry_time_secs),
-                    sequence_number,
-                    max_gas_amount: Some(max_gas_amount),
-                    gas_price: Some(gas_price),
+                    expiry_time_secs: Some(expiry_time_secs.into()),
+                    sequence_number: sequence_number.map(|inner| inner.into()),
+                    max_gas_amount: Some(max_gas_amount.into()),
+                    gas_price: Some(gas_price.into()),
                 }),
             })
             .await?;

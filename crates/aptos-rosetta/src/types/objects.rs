@@ -165,6 +165,7 @@ pub struct Operation {
     pub operation_type: String,
     /// Status of operation.  Must be populated if the transaction is in the past.  If submitting
     /// new transactions, it must NOT be populated.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// AccountIdentifier should be provided to point at which account the change is
     #[serde(skip_serializing_if = "Option::is_none")]
