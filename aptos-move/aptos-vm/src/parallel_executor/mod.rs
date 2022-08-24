@@ -21,6 +21,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use move_deps::move_core_types::vm_status::{StatusCode, VMStatus};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 
 impl PTransaction for PreprocessedTransaction {
@@ -58,6 +59,14 @@ impl PTransactionOutput for AptosTransactionOutput {
     }
 }
 
+static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_cpus::get())
+        .thread_name(|index| format!("parallel_executor_{}", index))
+        .build()
+        .unwrap()
+});
+
 fn dedup(raw: Vec<Transaction>) -> Vec<Transaction> {
     raw
 }
@@ -80,7 +89,7 @@ impl ParallelAptosVM {
             .collect();
 
         match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
-            concurrency_level,
+            &RAYON_EXEC_POOL,
         )
         .execute_transactions_parallel(state_view, signature_verified_block)
         {

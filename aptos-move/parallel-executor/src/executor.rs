@@ -93,40 +93,20 @@ impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Send + Sync>
     }
 }
 
-pub struct ParallelTransactionExecutor<T: Transaction, E: ExecutorTask> {
+pub struct ParallelTransactionExecutor<'a, T: Transaction, E: ExecutorTask> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     phantom: PhantomData<(T, E)>,
-    thread_pool: ThreadPool,
+    thread_pool: &'a ThreadPool,
 }
 
-impl<T, E> ParallelTransactionExecutor<T, E>
+impl<'b, T, E> ParallelTransactionExecutor<'b, T, E>
 where
     T: Transaction,
     E: ExecutorTask<T = T>,
 {
-    /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
-    /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize) -> Self {
-        assert!(
-            concurrency_level > 1 && concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 2 and number of CPUs",
-            concurrency_level
-        );
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(concurrency_level)
-            .thread_name(|index| format!("parallel_executor_{}", index))
-            .build()
-            .unwrap();
-        Self {
-            concurrency_level,
-            phantom: PhantomData,
-            thread_pool,
-        }
-    }
-
-    pub fn new3(thread_pool: ThreadPool) -> Self {
+    pub fn new(thread_pool: &'b ThreadPool) -> Self {
         Self {
             concurrency_level: thread_pool.current_num_threads(),
             phantom: PhantomData,

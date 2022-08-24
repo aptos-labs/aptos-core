@@ -45,10 +45,15 @@ where
     }
 
     let mut ret = true;
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency_level)
+        .thread_name(|index| format!("parallel_executor_{}", index))
+        .build()
+        .unwrap();
     for _ in 0..num_repeat {
         let output =
             ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
-                num_cpus::get(),
+                &thread_pool,
             )
             .execute_transactions_parallel((), transactions.clone());
 
@@ -266,11 +271,17 @@ fn publishing_fixed_params() {
         }
     };
 
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency_level)
+        .thread_name(|index| format!("parallel_executor_{}", index))
+        .build()
+        .unwrap();
+
     // Confirm still no intersection
     let output = ParallelTransactionExecutor::<
         Transaction<KeyType<[u8; 32]>, [u8; 32]>,
         Task<KeyType<[u8; 32]>, [u8; 32]>,
-    >::new(num_cpus::get())
+    >::new(&thread_pool)
     .execute_transactions_parallel((), transactions.clone());
     assert_ok!(output);
 
@@ -301,11 +312,17 @@ fn publishing_fixed_params() {
         }
     };
 
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency_level)
+        .thread_name(|index| format!("parallel_executor_{}", index))
+        .build()
+        .unwrap();
+
     for _ in 0..200 {
         let output = ParallelTransactionExecutor::<
             Transaction<KeyType<[u8; 32]>, [u8; 32]>,
             Task<KeyType<[u8; 32]>, [u8; 32]>,
-        >::new(num_cpus::get())
+        >::new(&thread_pool)
         .execute_transactions_parallel((), transactions.clone());
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

@@ -19,7 +19,13 @@ where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + Eq + 'static,
 {
-    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(concurrency_level)
+        .thread_name(|index| format!("parallel_executor_{}", index))
+        .build()
+        .unwrap();
+
+    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(&thread_pool)
         .execute_transactions_parallel((), transactions.clone());
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
