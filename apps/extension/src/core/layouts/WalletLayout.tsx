@@ -28,13 +28,13 @@ export default function WalletLayout({
 
   const templateRows = useMemo(() => {
     if (hasWalletFooter && hasWalletHeader) {
-      return '84px 1fr 60px';
+      return '70px 1fr 60px';
     }
     if (hasWalletFooter) {
       return '1fr 40px';
     }
     if (hasWalletHeader) {
-      return '84px 1fr';
+      return '70px 1fr';
     }
     return '1fr';
   }, [hasWalletHeader, hasWalletFooter]);

@@ -85,7 +85,6 @@ function NextButton({
         name: 'Wallet',
         privateKey: privateKeyHex,
         publicKey: publicKeyHex!,
-        styleIndex: 0,
       });
 
       if (fundAccount) {

@@ -35,7 +35,7 @@ function CopyAddressButton() {
   return (
     <Tooltip label={hasCopied ? 'Copied!' : 'Copy Address'} closeDelay={300}>
       <IconButton
-        fontSize="24px"
+        fontSize="20px"
         icon={<BiCopy />}
         aria-label="Copy Address"
         bg="clear"

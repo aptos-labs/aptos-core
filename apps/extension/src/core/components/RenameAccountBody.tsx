@@ -42,9 +42,10 @@ export default function RenameAccountBody() {
       <FormControl isInvalid={errors.name !== undefined}>
         <Input
           placeholder="Insert account name"
+          required
           {...register('name', {
             maxLength: { message: 'Too long', value: 20 },
-            required: 'Please insert a valid name',
+
           })}
         />
         <FormErrorMessage>{ errors.name?.message }</FormErrorMessage>

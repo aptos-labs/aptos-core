@@ -6,17 +6,16 @@ import {
   Box,
   HStack,
   Tooltip,
-  Image,
   Text,
   useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon } from '@chakra-ui/icons';
-import { secondaryBorderColor } from 'core/colors';
+import { secondaryBorderColor, secondaryHoverBgColor, textColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
-import indexImage from 'core/accountImages';
+import AvatarImage from 'core/accountImages';
 
 interface ButtonProps {
   onClick: MouseEventHandler<HTMLDivElement>;
@@ -26,32 +25,36 @@ const AccountCircle = React.forwardRef((
   { onClick }: ButtonProps,
   ref: LegacyRef<HTMLImageElement>,
 ) => {
-  const { activeAccount } = useGlobalStateContext();
-  const picture = indexImage(activeAccount?.styleIndex ?? 0);
+  const { activeAccountAddress } = useGlobalStateContext();
   return (
-    <Image
-      height="40px"
-      width="40px"
-      src={picture}
+    <Box
+      height="32px"
+      width="32px"
       borderRadius="2rem"
       cursor="pointer"
       onClick={onClick}
       ref={ref}
-    />
+    >
+      <AvatarImage
+        size={32}
+        address={activeAccountAddress ?? ''}
+      />
+    </Box>
   );
 });
 
 function BackButton({ onClick }: ButtonProps) {
+  const { colorMode } = useColorMode();
   return (
     <Box
-      height="44px"
-      width="44px"
-      background="#F2F4F8"
+      height="36px"
+      width="36px"
+      background={secondaryHoverBgColor[colorMode]}
       borderRadius="0.5rem"
       cursor="pointer"
       onClick={onClick}
     >
-      <ChevronLeftIcon color="#333333" width="100%" height="100%" />
+      <ChevronLeftIcon color={textColor[colorMode]} width="100%" height="100%" />
     </Box>
   );
 }
@@ -71,13 +74,17 @@ export default function WalletHeader({
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
 
+  const backOnClick = () => {
+    navigate(-1);
+  };
+
   return (
     <Box>
       <HStack
         maxW="100%"
         width="100%"
         py={4}
-        height="84px"
+        height="70px"
         borderBottomColor={secondaryBorderColor[colorMode]}
         borderBottomWidth="1px"
         justifyContent="space-between"
@@ -86,10 +93,10 @@ export default function WalletHeader({
         <HStack>
           {(showBackButton)
             ? (
-              <BackButton onClick={() => navigate(-1)} />
+              <BackButton onClick={backOnClick} />
             )
             : null}
-          <Text fontSize="xl" fontWeight="semibold">
+          <Text fontSize={20} fontWeight={500}>
             {title}
           </Text>
         </HStack>

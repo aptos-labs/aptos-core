@@ -14,7 +14,7 @@ import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
-  const { addAccount, newAccountStyleIndex } = useGlobalStateContext();
+  const { addAccount } = useGlobalStateContext();
 
   const onSubmit = useCallback(async (
     mnemonicAll: MnemonicFormValues,
@@ -43,7 +43,6 @@ export default function ImportWalletMnemonic() {
         name: 'Wallet',
         privateKey: privateKeyHex,
         publicKey: publicKeyHex!,
-        styleIndex: newAccountStyleIndex ?? 0,
       });
 
       importAccountToast();
@@ -53,7 +52,7 @@ export default function ImportWalletMnemonic() {
       // eslint-disable-next-line no-console
       console.error('Invalid mnemonic, account not found');
     }
-  }, [addAccount, navigate, newAccountStyleIndex]);
+  }, [addAccount, navigate]);
 
   return (
     <AuthLayout routePath={PageRoutes.importWalletMnemonic.path}>

@@ -5,7 +5,7 @@ import { usePersistentStorageState } from 'core/hooks/useStorageState';
 import useEncryptedAccounts from 'core/hooks/useEncryptedStorageState';
 import { AptosAccount, HexString } from 'aptos';
 import { Account, PublicAccount } from 'core/types/stateTypes';
-import { WALLET_STATE_ACCOUNT_ADDRESS_KEY, WALLET_STATE_STYLE_INDEX_KEY } from 'core/constants';
+import { WALLET_STATE_ACCOUNT_ADDRESS_KEY } from 'core/constants';
 import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
 /**
@@ -30,15 +30,7 @@ export default function useAccounts() {
     isActivePublicAccountReady,
   ] = usePersistentStorageState<PublicAccount>(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
 
-  const [
-    newAccountStyleIndex,
-    setNewAccountStyleIndex,
-    isNewAccountStyleIndexReady,
-  ] = usePersistentStorageState<number>(WALLET_STATE_STYLE_INDEX_KEY);
-
-  const areAccountsReady = (isEncryptedStateReady
-                            && isActivePublicAccountReady
-                            && isNewAccountStyleIndexReady);
+  const areAccountsReady = (isEncryptedStateReady && isActivePublicAccountReady);
   const activeAccountAddress = activePublicAccount?.address;
 
   const activeAccount = accounts && activeAccountAddress
@@ -46,7 +38,6 @@ export default function useAccounts() {
     : undefined;
 
   const initAccounts = async (password: string, firstAccount: Account) => {
-    setNewAccountStyleIndex(1);
     await setActivePublicAccount({
       address: firstAccount.address,
       publicKey: firstAccount.publicKey,
@@ -56,7 +47,6 @@ export default function useAccounts() {
   };
 
   const addAccount = async (account: Account) => {
-    await setNewAccountStyleIndex((newAccountStyleIndex ?? 0) + 1);
     const newAccounts = { ...accounts!, [account.address]: account };
     await update(newAccounts);
     await setActivePublicAccount({
@@ -119,7 +109,6 @@ export default function useAccounts() {
     areAccountsUnlocked,
     initAccounts,
     lockAccounts,
-    newAccountStyleIndex,
     removeAccount,
     renameAccount,
     resetAccount,

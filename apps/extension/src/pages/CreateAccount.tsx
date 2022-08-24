@@ -18,7 +18,6 @@ function CreateAccount() {
   const {
     addAccount,
     faucetClient,
-    newAccountStyleIndex,
   } = useGlobalStateContext();
   const { fundAccount } = useFundAccount();
   const newMnemonic = useMemo(() => generateMnemonic(), []);
@@ -45,7 +44,6 @@ function CreateAccount() {
           name: 'Wallet',
           privateKey: privateKeyHex,
           publicKey: publicKeyHex!,
-          styleIndex: newAccountStyleIndex ?? 0,
         });
 
         if (faucetClient) {
