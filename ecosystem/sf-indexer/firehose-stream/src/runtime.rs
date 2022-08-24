@@ -11,7 +11,7 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::{debug, error, warn};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use aptos_vm::data_cache::RemoteStorageOwned;
+use aptos_vm::data_cache::StorageAdapterOwned;
 use extractor::Transaction as TransactionPB;
 use futures::channel::mpsc::channel;
 use prost::Message;
@@ -58,7 +58,7 @@ pub fn bootstrap(
 
 pub struct FirehoseStreamer {
     pub context: Arc<Context>,
-    pub resolver: Arc<RemoteStorageOwned<DbStateView>>,
+    pub resolver: Arc<StorageAdapterOwned<DbStateView>>,
     pub current_block_height: u64,
     pub current_epoch: u64,
     // This is only ever used for testing

@@ -4,7 +4,7 @@
 use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
-    data_cache::RemoteStorage,
+    data_cache::StorageAdapter,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
@@ -53,7 +53,7 @@ pub struct AptosVMImpl {
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new<S: StateView>(state: &S) -> Self {
-        let storage = RemoteStorage::new(state);
+        let storage = StorageAdapter::new(state);
 
         // TODO(Gas): this should not panic
         let gas_params = GasSchedule::fetch_config(&storage).and_then(|gas_schedule| {
@@ -81,7 +81,7 @@ impl AptosVMImpl {
             metadata_cache: Default::default(),
         };
         vm.version = Version::fetch_config(&storage);
-        vm.chain_account_info = Self::get_chain_specific_account_info(&RemoteStorage::new(state));
+        vm.chain_account_info = Self::get_chain_specific_account_info(&StorageAdapter::new(state));
         vm
     }
 
@@ -489,10 +489,10 @@ impl<'a> AptosVMInternals<'a> {
     pub fn with_txn_data_cache<T, S: StateView>(
         self,
         state_view: &S,
-        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, RemoteStorage<S>>) -> T,
+        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, StorageAdapter<S>>) -> T,
         session_id: SessionId,
     ) -> T {
-        let remote_storage = RemoteStorage::new(state_view);
+        let remote_storage = StorageAdapter::new(state_view);
         let session = self.move_vm().new_session(&remote_storage, session_id);
         f(session)
     }
@@ -511,7 +511,8 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let (delta_change_set, change_set) = session_out.into_change_set(ap_cache)?.into_inner();
+    let change_set_ext = session_out.into_change_set(ap_cache)?;
+    let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 
     let txn_output = TransactionOutput::new(
