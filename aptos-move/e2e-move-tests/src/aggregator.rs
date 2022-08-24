@@ -7,7 +7,7 @@ use language_e2e_tests::account::Account;
 use std::path::PathBuf;
 
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
-    let mut harness = MoveHarness::new_mainnet();
+    let mut harness = MoveHarness::new();
     let account = harness.new_account_at(AccountAddress::ONE);
     harness.publish_package(&account, &path);
     harness.run_entry_function(
