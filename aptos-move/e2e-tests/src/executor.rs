@@ -96,6 +96,8 @@ impl FakeExecutor {
             no_parallel_exec: false,
         };
         executor.apply_write_set(write_set);
+        // As a set effect, also allow module bundle txns. TODO: Remove
+        aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
     }
 

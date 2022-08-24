@@ -63,6 +63,7 @@ use move_deps::{
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
     convert::{AsMut, AsRef},
@@ -71,6 +72,12 @@ use std::{
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
+
+/// Remove this once the bundle is removed from the code.
+static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
+pub fn allow_module_bundle_for_test() {
+    MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
+}
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -458,6 +465,9 @@ impl AptosVM {
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+        if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
+            return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+        }
         fail_point!("move_adapter::execute_module", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
