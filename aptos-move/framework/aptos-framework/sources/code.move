@@ -68,6 +68,9 @@ module aptos_framework::code {
     /// Cannot delete a module that was published in the same package
     const EMODULE_MISSING: u64 = 0x4;
 
+    /// Creating a package with incompatible upgrade policy is disabled.
+    const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x5;
+
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
     /// The developer is responsible for not breaking memory layout of any resources he already
@@ -108,6 +111,12 @@ module aptos_framework::code {
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
     public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+        // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
+        assert!(
+            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
+            error::invalid_argument(EINCOMPATIBLE_POLICY_DISABLED),
+        );
+
         let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
             move_to(owner, PackageRegistry{packages: vector::empty()})
