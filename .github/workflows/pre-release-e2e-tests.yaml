@@ -1,5 +1,5 @@
 
-name: Run forge shadow testing
+name: Run forge release blocking
 
 permissions:
   issues: write
