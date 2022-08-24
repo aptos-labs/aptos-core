@@ -51,7 +51,7 @@ pub trait PrunerManager: Debug + Sync {
         }
 
         // Assuming no big pruning chunks will be issued by a test.
-        const TIMEOUT: Duration = Duration::from_secs(10);
+        const TIMEOUT: Duration = Duration::from_secs(60);
         let end = Instant::now() + TIMEOUT;
 
         while Instant::now() < end {
