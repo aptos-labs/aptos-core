@@ -8,6 +8,8 @@ slug: "whats-new-in-docs"
 ## 24 August 2022
 
 - The Korean language version of the [Aptos White Paper](aptos-white-paper#full-pdf-versions) is posted.
+- Typescript and Rust are added to the [first transaction tutorial](/tutorials/your-first-transaction-sdk).
+- A [new tutorial](/tutorials/your-first-nft-sdk) is added that shows you how to use the Typescript / Python SDKs to create your own NFT collection and token and how to offer and claim that token.
 
 ## 16 August 2022
 
@@ -21,7 +23,7 @@ slug: "whats-new-in-docs"
 
 ## 08 August 2022
 
-- A new document for the [exploratory Move transactional testing](/guides/move-guides/guide-move-transactional-testing) is posted. 
+- A new document for the [exploratory Move transactional testing](/guides/move-guides/guide-move-transactional-testing) is posted.
 
 ## 07 August 2022
 

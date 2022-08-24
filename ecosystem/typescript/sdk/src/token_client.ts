@@ -43,7 +43,7 @@ export class TokenClient {
       TxnBuilderTypes.AccountAddress.fromHex(account.address()),
       BigInt(sequnceNumber),
       payload,
-      500000n,
+      2000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 20),
       new TxnBuilderTypes.ChainId(chainId),
@@ -64,13 +64,14 @@ export class TokenClient {
    * @param maxAmount Maximum number of `token_data` allowed within this collection
    * @returns A hash of transaction
    */
+  // :!:>createCollection
   async createCollection(
     account: AptosAccount,
     name: string,
     description: string,
     uri: string,
     maxAmount: BCS.AnyNumber = MAX_U64_BIG_INT,
-  ): Promise<string> {
+  ): Promise<string> { // <:!:createCollection
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::create_collection_script",
       [],
@@ -97,6 +98,7 @@ export class TokenClient {
    * @param property_types the type of property values
    * @returns A hash of transaction
    */
+  // :!:>createToken
   async createToken(
     account: AptosAccount,
     collectionName: string,
@@ -111,7 +113,7 @@ export class TokenClient {
     property_keys: Array<string> = [],
     property_values: Array<string> = [],
     property_types: Array<string> = [],
-  ): Promise<Gen.HexEncodedBytes> {
+  ): Promise<Gen.HexEncodedBytes> { // <:!:createToken
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::create_token_script",
       [],
@@ -282,13 +284,14 @@ export class TokenClient {
     collectionName: string,
     tokenName: string,
   ): Promise<TokenTypes.TokenData> {
+    const creatorHex = creator instanceof HexString ? creator.hex() : creator;
     const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
-      creator,
+      creatorHex,
       "0x3::token::Collections",
     );
     const { handle } = collection.data.token_data;
     const tokenDataId = {
-      creator,
+      creator: creatorHex,
       collection: collectionName,
       name: tokenName,
     };
@@ -349,7 +352,7 @@ export class TokenClient {
    */
   async getTokenBalanceForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
     const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
-      account,
+      account instanceof HexString ? account.hex() : account,
       "0x3::token::TokenStore",
     );
     const { handle } = tokenStore.data.tokens;

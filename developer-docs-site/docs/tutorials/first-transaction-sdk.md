@@ -118,7 +118,7 @@ The `transfer-coin` example code uses helper functions to interact with the [RES
   <TabItem value="typescript" label="Typescript">
 
 :::tip See the full example
-See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
+See [`transfer_coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
   </TabItem>
   <TabItem value="python" label="Python">
@@ -137,9 +137,9 @@ See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/exa
 
 ### Step 4.1: Initializing the Clients
 
-In the first step, the `transfer-coin` example initializes both the REST and faucet clients.
+In the first step, the `transfer-coin` example initializes both the API and faucet clients.
 
-- The REST client interacts with the REST API, and
+- The API client interacts with the REST API, and
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
