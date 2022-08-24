@@ -179,7 +179,7 @@ pub struct MetadataOptions {
     /// Multiplier how much more willing to pay for the fees
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_price_per_unit: Option<U64>,
-    /// Number of seconds from payloads call time
+    /// Unix timestamp of expiry time
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
     /// Sequence number of the request
@@ -209,7 +209,7 @@ pub struct ConstructionMetadata {
     pub max_gas_amount: U64,
     /// Multiplier e.g. how much each unit of gas is worth in the native coin
     pub gas_price_per_unit: U64,
-    /// Expiry time of the transaction in seconds from the payloads request, defaults to 30 seconds
+    /// Unix timestamp of expiry time, defaults to 30 seconds from the payload request
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiry_time_secs: Option<U64>,
 }
