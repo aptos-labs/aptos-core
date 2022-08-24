@@ -185,7 +185,7 @@ async fn test_table_item_parsing_works() {
     let expected_items: HashMap<String, String> = HashMap::from([
         (json!(2).to_string(), json!(3).to_string()),
         (json!("abc").to_string(), json!("abc").to_string()),
-        (json!(1).to_string(), json!(1).to_string()),
+        (json!("0x1").to_string(), json!("0x1").to_string()),
         (
             json!(["abc", "abc"]).to_string(),
             json!(["abc", "abc"]).to_string(),

@@ -35,10 +35,10 @@ return values: 0
 task 3 'view'. lines 11-11:
 key 0x3::token::Collections {
     collection_data: store 0x1::table::Table<0x1::string::String, 0x3::token::CollectionData> {
-        handle: 44c774c1e065ff68111080ab3dd887ecd0ceb8fa05f34c2d09d75f6aedb1c40
+        handle: 5adf7712b6186bb577ebd9e2067ef3d46014f5bb5fa1c457f51a334295affe9a
     }
     token_data: store 0x1::table::Table<0x3::token::TokenDataId, 0x3::token::TokenData> {
-        handle: 97a40f0bc2ae2108dc8a2993035ea9d730a22e08cc878ee0e572ca4fbf50b849
+        handle: 630c3a2b1a1f2a5a9d112eb98bfe1b35265a16f1482e6224950abd8ad4c76d52
     }
     create_collection_events: store 0x1::event::EventHandle<0x3::token::CreateCollectionEvent> {
         counter: 1

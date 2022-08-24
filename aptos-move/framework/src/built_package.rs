@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error_map::generate_error_map;
-use crate::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
+use crate::natives::code::{ModuleMetadata, MoveOption, PackageMetadata, UpgradePolicy};
 use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
@@ -181,6 +181,7 @@ impl BuiltPackage {
                 name,
                 source,
                 source_map,
+                extension: MoveOption::default(),
             })
         }
         Ok(PackageMetadata {
@@ -190,6 +191,7 @@ impl BuiltPackage {
             source_digest,
             manifest,
             modules,
+            extension: MoveOption::default(),
         })
     }
 }

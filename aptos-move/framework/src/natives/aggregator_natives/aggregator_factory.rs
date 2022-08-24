@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::aggregator_extension::AggregatorID;
+use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
+use aptos_types::account_address::AccountAddress;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::gas_algebra::InternalGas,
@@ -49,20 +50,17 @@ fn native_new_aggregator(
 
     // Every aggregator instance uses a unique key in its id. Here we can reuse
     // the strategy from `table` implementation: taking hash of transaction and
-    // number of aggregator instances created so far and truncating them to
-    // 128 bits.
-    let txn_hash_buffer = u128::to_be_bytes(aggregator_context.txn_hash());
-    let num_aggregators_buffer = u128::to_be_bytes(aggregator_data.num_aggregators());
+    // number of aggregator instances created so far.
+    let num_aggregators_len = aggregator_data.num_aggregators() as u32;
 
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
-    hasher.update(&txn_hash_buffer);
-    hasher.update(&num_aggregators_buffer);
-    let hash = hasher.finish();
-
-    // TODO: Using u128 is not enough, and it should be u256 instead. For now,
-    // just take first 16 bytes of the hash.
-    let bytes = &hash.to_vec()[..16];
-    let key = u128::from_be_bytes(bytes.try_into().expect("not enough bytes"));
+    hasher.update(&aggregator_context.txn_hash());
+    hasher.update(&num_aggregators_len.to_be_bytes());
+    let hash = hasher.finish().to_vec();
+    let key = AggregatorHandle(
+        AccountAddress::from_bytes(&hash)
+            .map_err(|_| extension_error("unable to create aggregator key"))?,
+    );
 
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
@@ -71,7 +69,7 @@ fn native_new_aggregator(
         gas_params.base,
         smallvec![Value::struct_(Struct::pack(vec![
             Value::address(handle.0),
-            Value::u128(key),
+            Value::address(key.0),
             Value::u128(limit),
         ]))],
     ))

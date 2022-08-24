@@ -543,6 +543,7 @@ impl RoundManager {
         let recipient = self
             .proposer_election
             .get_valid_proposer(proposal_round + 1);
+
         info!(
             self.new_log(LogEvent::Vote).remote_peer(recipient),
             "{}", vote

@@ -21,9 +21,9 @@ use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
-    LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionOnChainData, UserTransaction, U64,
+    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation, HashValue,
+    HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionOnChainData, UserTransaction, U64,
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
@@ -263,6 +263,36 @@ impl TransactionsApi {
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
         self.get_signing_message(&accept_type, data.0)
+    }
+
+    /// Estimate gas price
+    #[oai(
+        path = "/estimate_gas_price",
+        method = "get",
+        operation_id = "estimate_gas_price",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+        fail_point_poem("endpoint_encode_submission")?;
+        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+        let estimated_gas_price = self.context.estimate_gas_price(&latest_ledger_info)?;
+
+        let gas_estimation = GasEstimation {
+            gas_estimate: estimated_gas_price,
+        };
+
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }
 
@@ -628,11 +658,6 @@ impl TransactionsApi {
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
         let output = output_ext.into_transaction_output(&move_resolver);
-        debug_assert!(
-            matches!(output, Ok(_)),
-            "converting into transaction output failed"
-        );
-        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,

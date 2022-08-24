@@ -1,6 +1,6 @@
 <% content_for(:page_title, 'Account Settings') %>
 <h3 class="text-4xl mb-8 font-display font-light">Profile</h3>
-<%= form_with(model: @user, url: settings_profile_url, builder: AptosFormBuilder) do |f| %>
+<%= form_with(model: @user, url: settings_profile_path, builder: AptosFormBuilder) do |f| %>
   <% if @user.errors.any? %>
     <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700">

@@ -37,7 +37,6 @@ use move_deps::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::btree_map::Entry,
-    convert::TryInto,
     ops::{Deref, DerefMut},
 };
 
@@ -87,12 +86,8 @@ impl SessionId {
         Self::Void
     }
 
-    pub fn as_uuid(&self) -> u128 {
-        u128::from_be_bytes(
-            self.hash().as_ref()[..16]
-                .try_into()
-                .expect("Slice to array conversion failed."),
-        )
+    pub fn as_uuid(&self) -> HashValue {
+        self.hash()
     }
 }
 
@@ -205,7 +200,7 @@ impl SessionOutput {
 
         for (id, change) in aggregator_change_set.changes {
             let AggregatorID { handle, key } = id;
-            let key_bytes = serialize(&key);
+            let key_bytes = key.0.to_vec();
             let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
             match change {

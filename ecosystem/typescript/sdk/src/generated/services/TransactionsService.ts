@@ -3,6 +3,7 @@
 /* eslint-disable */
 import type { Address } from '../models/Address';
 import type { EncodeSubmissionRequest } from '../models/EncodeSubmissionRequest';
+import type { GasEstimation } from '../models/GasEstimation';
 import type { HashValue } from '../models/HashValue';
 import type { HexEncodedBytes } from '../models/HexEncodedBytes';
 import type { PendingTransaction } from '../models/PendingTransaction';
@@ -201,6 +202,18 @@ export class TransactionsService {
             url: '/transactions/encode_submission',
             body: requestBody,
             mediaType: 'application/json',
+        });
+    }
+
+    /**
+     * Estimate gas price
+     * @returns GasEstimation
+     * @throws ApiError
+     */
+    public estimateGasPrice(): CancelablePromise<GasEstimation> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/estimate_gas_price',
         });
     }
 

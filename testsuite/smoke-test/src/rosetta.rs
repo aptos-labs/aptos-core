@@ -277,7 +277,7 @@ async fn test_block() {
     let rest_client = validator.rest_client();
 
     // Mapping of account to block and balance mappings
-    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, u64>>::new();
+    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, i128>>::new();
 
     // Wait until the Rosetta service is ready
     let request = NetworkRequest {
@@ -521,7 +521,7 @@ async fn test_block() {
 /// Parse the transactions in each block
 async fn parse_block_transactions(
     block: &aptos_rosetta::types::Block,
-    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
     actual_txns: &[Transaction],
     current_version: &mut u64,
 ) {
@@ -567,6 +567,12 @@ async fn parse_block_transactions(
         )
         .await;
 
+        for (_, account_balance) in balances.iter() {
+            if let Some(amount) = account_balance.get(current_version) {
+                assert!(*amount >= 0, "Amount shouldn't be negative!")
+            }
+        }
+
         // Increment to next version
         *current_version += 1;
     }
@@ -575,7 +581,7 @@ async fn parse_block_transactions(
 /// Parse the individual operations in a transaction
 async fn parse_operations(
     block_height: u64,
-    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
     transaction: &aptos_rosetta::types::Transaction,
     actual_txn: &Transaction,
 ) {
@@ -611,7 +617,7 @@ async fn parse_operations(
                     let account_balances = balances.entry(account).or_default();
 
                     if account_balances.is_empty() {
-                        account_balances.insert(block_height, 0u64);
+                        account_balances.insert(block_height, 0i128);
                     } else {
                         panic!("Account already has a balance when being created!");
                     }
@@ -652,7 +658,7 @@ async fn parse_operations(
                         u64::parse(&amount.value).expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
-                    let new_balance = *latest_balance + delta;
+                    let new_balance = *latest_balance + delta as i128;
                     account_balances.insert(block_height, new_balance);
                 } else {
                     assert_eq!(
@@ -697,7 +703,7 @@ async fn parse_operations(
                     .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
-                    let new_balance = *latest_balance - delta;
+                    let new_balance = *latest_balance - delta as i128;
                     account_balances.insert(block_height, new_balance);
                 } else {
                     assert_eq!(
@@ -756,7 +762,7 @@ async fn parse_operations(
                 .expect("Should be able to parse amount value");
 
                 // Subtract with panic on overflow in case of a negative balance
-                let new_balance = *latest_balance - delta;
+                let new_balance = *latest_balance - delta as i128;
                 account_balances.insert(block_height, new_balance);
 
                 match actual_txn {
@@ -790,7 +796,7 @@ async fn parse_operations(
 async fn check_balances(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    balances: BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    balances: BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
 ) {
     // TODO: Check some random times that arent on changes?
     for (account, account_balances) in balances {
@@ -822,6 +828,7 @@ async fn check_balances(
             assert_eq!(
                 expected_balance,
                 u64::parse(&balance.value).expect("Should have a balance from account balance")
+                    as i128
             );
         }
     }

@@ -77,6 +77,11 @@ variable "db_max_allocated_storage" {
   default     = 500
 }
 
+variable "db_iops" {
+  description = "IOPS for the RDS DB"
+  default     = 0
+}
+
 variable "db_parameter_group_family" {
   description = "Parameter group family name for the RDS DB. Must be compatible with the db_engine and db_engine_version. https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBInstanceParamGroups.html"
   default     = "postgres14"

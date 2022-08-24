@@ -79,6 +79,10 @@ impl StateSnapshotCommitter {
                             Some(&node_hashes),
                             version,
                             base_version,
+                            self.state_db
+                                .get_previous_epoch_ending(version)
+                                .unwrap()
+                                .map(|(v, _e)| v),
                         )
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender

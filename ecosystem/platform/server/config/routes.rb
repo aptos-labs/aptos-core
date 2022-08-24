@@ -22,7 +22,16 @@ Rails.application.routes.draw do
       confirmations: 'users/confirmations'
     }
   }
+
+  # Administration
   ActiveAdmin.routes(self)
+  constraints(lambda { |request|
+    user = request.env['warden'].user
+    user.respond_to?(:is_root?) && user.is_root?
+  }) do
+    # Feature flags
+    mount Flipper::UI.app(Flipper) => '/flipper'
+  end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -38,6 +47,8 @@ Rails.application.routes.draw do
   get 'settings', to: redirect('/settings/profile')
   get 'settings/profile'
   patch 'settings/profile', to: 'settings#profile_update'
+  get 'settings/notifications'
+  patch 'settings/notifications', to: 'settings#notifications_update'
   get 'settings/connections'
   delete 'settings/connections', to: 'settings#connections_delete'
   delete 'settings/delete_account', to: 'settings#delete_account'

@@ -3,6 +3,12 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
+use aptos_logger::telemetry_log_writer::TelemetryLog;
+use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
+use aptos_types::chain_id::ChainId;
+use futures::channel::mpsc;
 use futures::future;
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -22,11 +28,6 @@ use tokio::{
 };
 use uuid::Uuid;
 
-use aptos_config::config::NodeConfig;
-use aptos_logger::prelude::*;
-use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::ChainId;
-
 use crate::constants::{
     ENV_APTOS_DISABLE_EXPERIMENTAL_PUSH_METRICS, ENV_TELEMETRY_SERVICE_URL,
     PROMETHEUS_PUSH_METRICS_FREQ_SECS,
@@ -44,6 +45,7 @@ use crate::{
     network_metrics::create_network_metric_telemetry_event,
     sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender,
 };
 
 const IP_ADDRESS_KEY: &str = "IP_ADDRESS";
@@ -77,6 +79,7 @@ pub fn start_telemetry_service(
     node_config: NodeConfig,
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
 ) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
@@ -91,9 +94,20 @@ pub fn start_telemetry_service(
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");
 
+    let telemetry_svc_url =
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
+
+    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
+
+    if let Some(rx) = remote_log_rx {
+        let telemetry_log_sender = TelemetryLogSender::new(telemetry_sender.clone());
+        telemetry_runtime.spawn(telemetry_log_sender.start(rx));
+    }
+
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);
     telemetry_runtime.handle().spawn(spawn_telemetry_service(
+        telemetry_sender,
         peer_id,
         chain_id,
         node_config,
@@ -125,16 +139,12 @@ where
 
 /// Spawns the dedicated telemetry service that operates periodically
 async fn spawn_telemetry_service(
+    telemetry_sender: TelemetrySender,
     peer_id: String,
     chain_id: ChainId,
     node_config: NodeConfig,
     build_info: BTreeMap<String, String>,
 ) {
-    let telemetry_svc_url =
-        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
-
-    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
-
     // Send build information once (only on startup)
     send_build_information(
         peer_id.clone(),
