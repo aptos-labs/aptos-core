@@ -134,53 +134,6 @@ impl ConcurrentTxnCache {
 static CACHE: Lazy<ConcurrentTxnCache> =
     Lazy::new(|| ConcurrentTxnCache::new(70000, CacheOption::LruCache_CryptoHashAsKey));
 
-struct Collector {
-    should_clone: bool,
-    items: Mutex<Vec<Transaction>>,
-    counter: AtomicU64,
-}
-
-impl Collector {
-    pub fn new(should_clone: bool) -> Collector {
-        Collector {
-            should_clone,
-            items: Mutex::new(Vec::new()),
-            counter: AtomicU64::new(0),
-        }
-    }
-
-    pub fn push(&self, tx: &Transaction) {
-        if self.should_clone {
-            self.items.lock().unwrap().push(tx.clone());
-        } else {
-            self.counter.fetch_add(1_u64, Ordering::SeqCst);
-        }
-    }
-    pub fn get_total(&self) -> usize {
-        if self.should_clone {
-            self.items.lock().unwrap().len()
-        } else {
-            self.counter.fetch_add(0_u64, Ordering::SeqCst) as usize
-        }
-    }
-}
-
-fn dedup(raw: &Vec<Transaction>) -> Vec<Transaction> {
-    let mut collector = Collector::new(true);
-    RAYON_EXEC_POOL.install(|| {
-        raw.par_chunks(100).for_each(|chunk| {
-            for tx in chunk {
-                let in_cache = CACHE.insert(tx); //Almost no-op.
-                if !in_cache {
-                    collector.push(tx);
-                }
-            }
-        })
-    });
-    let x = collector.items.lock().unwrap().deref().to_vec();
-    x
-}
-
 pub struct ParallelAptosVM();
 
 impl ParallelAptosVM {
@@ -192,7 +145,6 @@ impl ParallelAptosVM {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
-        let dedupped_transactions = dedup(&transactions);
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
             .filter(|tx| !CACHE.insert(tx))
@@ -212,8 +164,7 @@ impl ParallelAptosVM {
                 None,
             )),
             Err(err @ Error::ModulePathReadWrite) => {
-                let output =
-                    AptosVM::execute_block_and_keep_vm_status(dedupped_transactions, state_view)?;
+                let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
                 Ok((
                     output
                         .into_iter()
