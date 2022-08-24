@@ -195,7 +195,11 @@ impl Tailer {
     }
 
     pub async fn set_fetcher_version(&self, version: u64) -> u64 {
-        self.transaction_fetcher.lock().await.set_version(version);
+        self.transaction_fetcher
+            .lock()
+            .await
+            .set_version(version)
+            .await;
         aptos_logger::info!("Will start fetching from version {}", version);
         version
     }
@@ -305,10 +309,12 @@ mod test {
 
     #[async_trait::async_trait]
     impl TransactionFetcherTrait for FakeFetcher {
-        fn set_version(&mut self, version: u64) {
-            self.version = version;
-            // Super hacky way of mocking chain_id
-            self.chain_id = version as u8;
+        async fn fetch_next(&mut self) -> Transaction {
+            unimplemented!();
+        }
+
+        async fn fetch_version(&self, _version: u64) -> Transaction {
+            unimplemented!();
         }
 
         async fn fetch_ledger_info(&mut self) -> State {
@@ -323,12 +329,14 @@ mod test {
             }
         }
 
-        async fn fetch_next(&mut self) -> Transaction {
-            unimplemented!();
+        async fn set_version(&mut self, version: u64) {
+            self.version = version;
+            // Super hacky way of mocking chain_id
+            self.chain_id = version as u8;
         }
 
-        async fn fetch_version(&self, _version: u64) -> Transaction {
-            unimplemented!();
+        async fn start(&mut self) {
+            // do nothing
         }
     }
 

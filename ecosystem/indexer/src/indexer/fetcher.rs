@@ -86,6 +86,7 @@ impl Fetcher {
 
             for batch in res {
                 for transaction in batch {
+                    self.current_version = transaction.version().unwrap();
                     self.transactions_sender.send(transaction).await.unwrap();
                 }
             }
