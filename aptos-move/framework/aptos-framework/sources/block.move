@@ -136,7 +136,7 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
-        state_storage::on_new_block();
+        state_storage::on_new_block(reconfiguration::current_epoch());
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
