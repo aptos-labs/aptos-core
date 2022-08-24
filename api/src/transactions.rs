@@ -13,9 +13,9 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
-    transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError, BasicError,
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-    InsufficientStorageError, InternalError, ServiceUnavailableError,
+    api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError,
+    BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
+    BasicResultWith404, InsufficientStorageError, InternalError, ServiceUnavailableError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
@@ -40,6 +40,7 @@ generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
+    (403, Forbidden),
     (413, PayloadTooLarge),
     (500, Internal),
     (503, ServiceUnavailable),
@@ -197,6 +198,9 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
         fail_point_poem("endpoint_submit_transaction")?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit transaction"));
+        }
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.create(&accept_type, ledger_info, signed_transaction)
@@ -223,6 +227,9 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
+        if !self.context.node_config.api.transaction_simulation_enabled {
+            return Err(api_disabled("Simulate transaction"));
+        }
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.simulate(&accept_type, ledger_info, signed_transaction)
@@ -262,6 +269,9 @@ impl TransactionsApi {
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
+        if !self.context.node_config.api.encode_submission_enabled {
+            return Err(api_disabled("Encode submission"));
+        }
         self.get_signing_message(&accept_type, data.0)
     }
 

@@ -107,6 +107,8 @@ pub enum AptosErrorCode {
     WebFrameworkError = 601,
     /// BCS format is not supported on this API.
     BcsNotSupported = 602,
+    /// API Disabled
+    ApiDisabled = 603,
 }
 
 impl AptosErrorCode {

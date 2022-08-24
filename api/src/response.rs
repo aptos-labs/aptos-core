@@ -433,6 +433,7 @@ generate_error_traits!(
     BadRequest,
     Gone,
     NotFound,
+    Forbidden,
     PayloadTooLarge,
     Internal,
     InsufficientStorage,
@@ -450,6 +451,7 @@ impl<T> StdApiError for T where
 generate_error_response!(
     BasicError,
     (400, BadRequest),
+    (403, Forbidden),
     (500, Internal),
     (503, ServiceUnavailable)
 );
@@ -461,6 +463,7 @@ pub type BasicResult<T> = poem::Result<BasicResponse<T>, BasicError>;
 generate_error_response!(
     BasicErrorWith404,
     (400, BadRequest),
+    (403, Forbidden),
     (404, NotFound),
     (410, Gone),
     (500, Internal),
@@ -479,6 +482,13 @@ pub fn build_not_found<S: Display, E: NotFoundError>(
         &format!("{} not found by {}", resource, identifier),
         error_code,
         ledger_info,
+    )
+}
+
+pub fn api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
+    E::forbidden_with_code_no_info(
+        &format!("{} is disabled on this endpoint", identifier),
+        AptosErrorCode::ApiDisabled,
     )
 }
 

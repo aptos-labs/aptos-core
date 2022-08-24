@@ -38,7 +38,7 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    node_config: NodeConfig,
+    pub node_config: NodeConfig,
     gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
