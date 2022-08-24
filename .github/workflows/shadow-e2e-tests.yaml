@@ -17,7 +17,7 @@ jobs:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      # Run for 5 minutes
+      FORGE_NAMESPACE: forge-shadow
       FORGE_RUNNER_DURATION_SECS: 300
       FORGE_RUNNER_TPS_THRESHOLD: 1000
       FORGE_TEST_SUITE: chaos
