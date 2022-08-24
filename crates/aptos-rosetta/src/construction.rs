@@ -35,7 +35,7 @@ use crate::{
 };
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
-    signing_message,
+    signing_message, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::debug;
 use aptos_sdk::{
@@ -247,34 +247,6 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
-    // Determine max gas by simulation if it isn't provided
-    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
-        max_gas.0
-    } else {
-        let transaction_factory = TransactionFactory::new(server_context.chain_id)
-            .with_gas_unit_price(1)
-            .with_max_gas_amount(u64::MAX);
-
-        let (txn_payload, sender) = request.options.internal_operation.payload()?;
-        let unsigned_transaction = transaction_factory
-            .payload(txn_payload)
-            .sender(sender)
-            .sequence_number(sequence_number)
-            .build();
-        let signed_transaction = SignedTransaction::new(
-            unsigned_transaction,
-            Ed25519PublicKey::try_from([0u8; 64].as_ref()).unwrap(),
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-        );
-
-        rest_client
-            .simulate_bcs(&signed_transaction)
-            .await?
-            .into_inner()
-            .info
-            .gas_used()
-    };
-
     // Determine the gas price (either provided from upstream, or through estimation)
     let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
         gas_price.0
@@ -284,6 +256,59 @@ async fn construction_metadata(
             .await?
             .into_inner()
             .gas_estimate
+    };
+
+    // Determine max gas by simulation if it isn't provided
+    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
+        max_gas.0
+    } else {
+        let transaction_factory = TransactionFactory::new(server_context.chain_id)
+            .with_gas_unit_price(gas_price_per_unit)
+            .with_max_gas_amount(1_000_000);
+
+        let (txn_payload, sender) = request.options.internal_operation.payload()?;
+        let unsigned_transaction = transaction_factory
+            .payload(txn_payload)
+            .sender(sender)
+            .sequence_number(sequence_number)
+            .build();
+
+        let public_key = if let Some(public_key) = request
+            .options
+            .public_keys
+            .as_ref()
+            .and_then(|inner| inner.first())
+        {
+            Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
+                ApiError::InvalidInput(Some(format!(
+                    "Public key provided is not parsable {:?}",
+                    err
+                )))
+            })?
+        } else {
+            return Err(ApiError::InvalidInput(Some(
+                "Must provide public_keys with max_gas_amount".to_string(),
+            )));
+        };
+        let signed_transaction = SignedTransaction::new(
+            unsigned_transaction,
+            public_key,
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+        );
+
+        let request = rest_client
+            .simulate_bcs(&signed_transaction)
+            .await?
+            .into_inner();
+
+        if request.info.status().is_success() {
+            request.info.gas_used()
+        } else {
+            return Err(ApiError::VmError(Some(format!(
+                "Transaction simulation for gas failed with {:?}",
+                request.info.status()
+            ))));
+        }
     };
 
     let suggested_fee = Amount {
@@ -606,6 +631,10 @@ async fn construction_preprocess(
                 .metadata
                 .as_ref()
                 .and_then(|inner| inner.sequence_number),
+            public_keys: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.public_keys.clone()),
         },
         required_public_keys,
     })

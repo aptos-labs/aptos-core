@@ -320,13 +320,14 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         None,
+        None,
+        None,
     )
     .await
     .unwrap()
     .request
     .sequence_number
     .0;
-
     transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -335,6 +336,8 @@ async fn test_block() {
         account_id_0,
         20,
         Duration::from_secs(5),
+        None,
+        None,
         None,
     )
     .await
@@ -348,6 +351,8 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         Some(seq_no_0 + 1),
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -361,6 +366,8 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         None,
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -372,6 +379,8 @@ async fn test_block() {
         account_id_0,
         20,
         Duration::from_secs(5),
+        None,
+        None,
         None,
     )
     .await
@@ -389,6 +398,8 @@ async fn test_block() {
         AccountAddress::from_hex_literal("0x99").unwrap(),
         Duration::from_secs(5),
         Some(seq_no_3 + 1),
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -403,12 +414,46 @@ async fn test_block() {
         Duration::from_secs(5),
         // Test the default behavior
         None,
+        None,
+        Some(2),
     )
     .await
     .unwrap();
 
+    // This one will fail because expiration is in the past
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(0),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap_err();
+
+    // This one will fail because gas is too low
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(5),
+        None,
+        Some(1),
+        None,
+    )
+    .await
+    .unwrap_err();
+
     // This one will fail
-    let final_txn = transfer_and_wait(
+    let maybe_final_txn = transfer_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -417,9 +462,18 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         None,
+        Some(100000),
+        None,
     )
     .await
     .unwrap_err();
+
+    let final_txn = match maybe_final_txn {
+        ErrorWrapper::BeforeSubmission(err) => {
+            panic!("Failed prior to submission of transaction {:?}", err)
+        }
+        ErrorWrapper::AfterSubmission(txn) => txn,
+    };
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1072,6 +1126,8 @@ async fn create_account_and_wait(
     new_account: AccountAddress,
     txn_expiry_duration: Duration,
     sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
@@ -1081,6 +1137,8 @@ async fn create_account_and_wait(
             new_account,
             expiry_time.as_secs(),
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
         .expect("Expect transfer to successfully submit to mempool")
@@ -1097,7 +1155,9 @@ async fn transfer_and_wait(
     amount: u64,
     txn_expiry_duration: Duration,
     sequence_number: Option<u64>,
-) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .transfer(
@@ -1107,11 +1167,15 @@ async fn transfer_and_wait(
             amount,
             expiry_time.as_secs(),
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
-        .expect("Expect transfer to successfully submit to mempool")
+        .map_err(ErrorWrapper::BeforeSubmission)?
         .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn wait_for_transaction(
@@ -1151,4 +1215,10 @@ fn expiry_time(txn_expiry_duration: Duration) -> Duration {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .saturating_add(txn_expiry_duration)
+}
+
+#[derive(Debug)]
+pub enum ErrorWrapper {
+    BeforeSubmission(anyhow::Error),
+    AfterSubmission(Box<UserTransaction>),
 }

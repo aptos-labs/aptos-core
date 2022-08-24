@@ -837,6 +837,7 @@ impl TransactionsApi {
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
+            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         };
 
