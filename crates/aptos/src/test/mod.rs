@@ -658,6 +658,7 @@ impl CliTestFramework {
         filter: Option<&str>,
     ) -> CliTypedResult<&'static str> {
         TestPackage {
+            instruction_execution_bound: 100_000,
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
         }

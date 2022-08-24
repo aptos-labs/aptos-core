@@ -236,6 +236,15 @@ pub struct TestPackage {
 
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+
+    /// Bound the number of instructions that can be executed by any one test.
+    #[clap(
+        name = "instructions",
+        default_value = "100000",
+        short = 'i',
+        long = "instructions"
+    )]
+    pub instruction_execution_bound: u64,
 }
 
 #[async_trait]
@@ -256,7 +265,8 @@ impl CliCommand<&'static str> for TestPackage {
             config,
             UnitTestingConfig {
                 filter: self.filter,
-                ..UnitTestingConfig::default_with_bound(Some(100_000))
+                instruction_execution_bound: Some(self.instruction_execution_bound),
+                ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
