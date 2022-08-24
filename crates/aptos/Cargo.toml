@@ -71,6 +71,7 @@ vm-genesis = { path = "../../aptos-move/vm-genesis" }
 [features]
 default = []
 fuzzing = []
+no-upload-proposal = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"

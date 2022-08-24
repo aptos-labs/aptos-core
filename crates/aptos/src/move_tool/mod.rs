@@ -137,7 +137,7 @@ impl CliCommand<()> for InitPackage {
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            "devnet",
+            Some("devnet".to_string()),
             addresses,
             self.prompt_options,
         )
@@ -147,7 +147,7 @@ impl CliCommand<()> for InitPackage {
 pub fn init_move_dir(
     package_dir: &Path,
     name: &str,
-    rev: &str,
+    rev: Option<String>,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<()> {
@@ -159,18 +159,22 @@ pub fn init_move_dir(
             .as_path(),
     )?;
 
+    // Add the framework dependency if it's provided
     let mut dependencies = BTreeMap::new();
-    dependencies.insert(
-        "AptosFramework".to_string(),
-        Dependency {
-            local: None,
-            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-            rev: Some(rev.to_string()),
-            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-            aptos: None,
-            address: None,
-        },
-    );
+    if let Some(rev) = rev {
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: None,
+                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+                rev: Some(rev),
+                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+                aptos: None,
+                address: None,
+            },
+        );
+    }
+
     let manifest = MovePackageManifest {
         package: PackageInfo {
             name: name.to_string(),
