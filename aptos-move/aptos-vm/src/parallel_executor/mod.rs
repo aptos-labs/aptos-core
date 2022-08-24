@@ -4,6 +4,14 @@
 mod storage_wrapper;
 mod vm_wrapper;
 
+use aptos_crypto::hash::DefaultHasher;
+use bcs::to_bytes;
+use concurrent_lru::sharded::LruCache;
+use rand::{thread_rng, Rng};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
@@ -15,6 +23,9 @@ use aptos_parallel_executor::{
     task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
 };
 use aptos_state_view::StateView;
+use aptos_types::transaction::Transaction::{
+    BlockMetadata, GenesisTransaction, StateCheckpoint, UserTransaction,
+};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
@@ -67,8 +78,107 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-fn dedup(raw: Vec<Transaction>) -> Vec<Transaction> {
-    raw
+pub struct ConcurrentTxnCache {
+    state: LruCache<[u8; 32], u64>,
+    cache_option: CacheOption,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CacheOption {
+    LruCache_CryptoHashAsKey,
+    LruCache_ExistingFieldAsKey,
+}
+
+impl ConcurrentTxnCache {
+    fn new(cache_size: usize, cache_option: CacheOption) -> ConcurrentTxnCache {
+        ConcurrentTxnCache {
+            state: LruCache::new(cache_size as u64),
+            cache_option,
+        }
+    }
+
+    pub fn get_key(&self, item: &Transaction) -> [u8; 32] {
+        match self.cache_option {
+            LruCache_CryptoHashAsKey => {
+                let bytes = to_bytes(item).unwrap();
+                let mut hasher = DefaultHasher::new(b"CacheTesting");
+                hasher.update(&bytes);
+                hasher.finish().get_bytes()
+            }
+            LruCache_ExistingFieldAsKey => {
+                let mut ret = [0_u8; 32];
+                let (account_bytes, seq_num_bytes) = match item {
+                    UserTransaction(x) => {
+                        (x.sender().into_bytes(), x.sequence_number().to_le_bytes())
+                    }
+                    GenesisTransaction(x) => ([0_u8; 32], [0_u8; 8]),
+                    BlockMetadata(x) => ([0_u8; 32], [0_u8; 8]),
+                    StateCheckpoint(x) => ([0_u8; 32], [0_u8; 8]),
+                };
+                ret[..24].copy_from_slice(&account_bytes[0..24]);
+                ret[24..32].copy_from_slice(&seq_num_bytes[0..8]);
+                ret
+            }
+        }
+    }
+
+    /// return whether the entry exists.
+    pub fn insert(&self, item: &Transaction) -> bool {
+        let nonce = thread_rng().gen::<u64>();
+        let entry = self.state.get_or_init(self.get_key(item), 1, |_e| nonce);
+        let hit = *entry.value() != nonce;
+        hit
+    }
+}
+
+static CACHE: Lazy<ConcurrentTxnCache> =
+    Lazy::new(|| ConcurrentTxnCache::new(70000, CacheOption::LruCache_CryptoHashAsKey));
+
+struct Collector {
+    should_clone: bool,
+    items: Mutex<Vec<Transaction>>,
+    counter: AtomicU64,
+}
+
+impl Collector {
+    pub fn new(should_clone: bool) -> Collector {
+        Collector {
+            should_clone,
+            items: Mutex::new(Vec::new()),
+            counter: AtomicU64::new(0),
+        }
+    }
+
+    pub fn push(&self, tx: &Transaction) {
+        if self.should_clone {
+            self.items.lock().unwrap().push(tx.clone());
+        } else {
+            self.counter.fetch_add(1_u64, Ordering::SeqCst);
+        }
+    }
+    pub fn get_total(&self) -> usize {
+        if self.should_clone {
+            self.items.lock().unwrap().len()
+        } else {
+            self.counter.fetch_add(0_u64, Ordering::SeqCst) as usize
+        }
+    }
+}
+
+fn dedup(raw: &Vec<Transaction>) -> Vec<Transaction> {
+    let mut collector = Collector::new(true);
+    RAYON_EXEC_POOL.install(|| {
+        raw.par_chunks(100).for_each(|chunk| {
+            for tx in chunk {
+                let in_cache = CACHE.insert(tx); //Almost no-op.
+                if !in_cache {
+                    collector.push(tx);
+                }
+            }
+        })
+    });
+    let x = collector.items.lock().unwrap().deref().to_vec();
+    x
 }
 
 pub struct ParallelAptosVM();
@@ -82,7 +192,7 @@ impl ParallelAptosVM {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
-        let dedupped_transactions = dedup(transactions);
+        let dedupped_transactions = dedup(&transactions);
         let signature_verified_block: Vec<PreprocessedTransaction> = dedupped_transactions
             .par_iter()
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
