@@ -1,5 +1,4 @@
 import React from 'react';
-
 import {
   Box,
   Button,
@@ -16,7 +15,7 @@ import {
 } from '@chakra-ui/react';
 
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { secondaryBgColor, secondaryMainTextColor } from 'core/colors';
+import { secondaryBgColor, textColor } from 'core/colors';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
 import ResetPasswordConfirmationModal from '../core/components/ResetPasswordConfirmationModal';
@@ -76,7 +75,7 @@ function Password() {
               : <AptosBlackLogo />
           }
         </Box>
-        <Text fontSize="4xl" fontWeight="700" color={secondaryMainTextColor[colorMode]}>
+        <Text fontSize="4xl" fontWeight="700" color={textColor[colorMode]}>
           Welcome back
         </Text>
       </Center>
@@ -105,7 +104,6 @@ function Password() {
               isOpen={isOpen}
               onClose={onClose}
             />
-
             <Input
               autoComplete="false"
               variant="filled"
