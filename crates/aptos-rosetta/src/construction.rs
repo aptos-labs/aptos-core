@@ -241,7 +241,7 @@ async fn construction_metadata(
     }
 
     let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
-        sequence_number
+        sequence_number.0
     } else {
         // Retrieve the sequence number from the rest server if one wasn't provided
         response.inner().sequence_number
@@ -249,7 +249,7 @@ async fn construction_metadata(
 
     // Determine max gas by simulation if it isn't provided
     let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
-        max_gas
+        max_gas.0
     } else {
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(1)
@@ -277,7 +277,7 @@ async fn construction_metadata(
 
     // Determine the gas price (either provided from upstream, or through estimation)
     let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
-        gas_price
+        gas_price.0
     } else {
         rest_client
             .estimate_gas_price()
@@ -287,15 +287,15 @@ async fn construction_metadata(
     };
 
     let suggested_fee = Amount {
-        value: format!("-{}", gas_price_per_unit * max_gas_amount),
+        value: format!("-{}", gas_price_per_unit.saturating_mul(max_gas_amount)),
         currency: native_coin(),
     };
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
-            sequence_number,
-            max_gas_amount,
-            gas_price_per_unit,
+            sequence_number: sequence_number.into(),
+            max_gas_amount: max_gas_amount.into(),
+            gas_price_per_unit: gas_price_per_unit.into(),
             expiry_time_secs: request.options.expiry_time_secs,
         },
         suggested_fee: vec![suggested_fee],
@@ -547,18 +547,20 @@ async fn construction_payloads(
 
     // Build the transaction and make it ready for signing
     let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
-        .with_gas_unit_price(metadata.gas_price_per_unit)
-        .with_max_gas_amount(metadata.max_gas_amount);
+        .with_gas_unit_price(metadata.gas_price_per_unit.0)
+        .with_max_gas_amount(metadata.max_gas_amount.0);
+
+    // Default expiry is 30 seconds from right now
     if let Some(expiry_time_secs) = metadata.expiry_time_secs {
         transaction_factory =
-            transaction_factory.with_transaction_expiration_time(expiry_time_secs);
+            transaction_factory.with_transaction_expiration_time(expiry_time_secs.0);
     }
 
     let sequence_number = metadata.sequence_number;
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
         .sender(sender)
-        .sequence_number(sequence_number)
+        .sequence_number(sequence_number.0)
         .build();
 
     let signing_message = hex::encode(signing_message(&unsigned_transaction));
