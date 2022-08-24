@@ -54,6 +54,8 @@ impl AccountsApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
+        self.context
+            .check_api_output_enabled("Get account", &accept_type)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.account(&accept_type)
     }
@@ -79,6 +81,8 @@ impl AccountsApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
+        self.context
+            .check_api_output_enabled("Get account resources", &accept_type)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.resources(&accept_type)
     }
@@ -104,6 +108,8 @@ impl AccountsApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
+        self.context
+            .check_api_output_enabled("Get account modules", &accept_type)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.modules(&accept_type)
     }
