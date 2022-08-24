@@ -81,6 +81,13 @@ impl FakeDataStore {
         self.add_write_set(&write_set)
     }
 
+    /// Adds CoinInfo to this data store.
+    pub fn add_coin_info(&mut self) {
+        let coin_info = CoinInfoResource::random(u128::MAX);
+        let write_set = coin_info.to_writeset();
+        self.add_write_set(&write_set)
+    }
+
     /// Adds a [`CompiledModule`] to this data store.
     ///
     /// Does not do any sort of verification on the module.
