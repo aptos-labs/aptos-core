@@ -39,13 +39,12 @@ module aptos_framework::aptos_coin {
     public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        // TODO: set monitor_supply to true.
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
             8, /* decimals */
-            false, /* monitor_supply */
+            true, /* monitor_supply */
         );
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
@@ -149,7 +148,11 @@ module aptos_framework::aptos_coin {
     }
 
     #[test_only]
+    use aptos_framework::aggregator_factory;
+
+    #[test_only]
     public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+        aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
         initialize(aptos_framework)
     }
 }

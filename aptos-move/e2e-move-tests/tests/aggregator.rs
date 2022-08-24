@@ -22,7 +22,7 @@ fn test_aggregators_e2e() {
     let (mut h, acc) = setup();
     let block_size = 1000;
 
-    // Create many aggregators with deterministic limit;
+    // Create many aggregators with deterministic limit.
     let txns: Vec<SignedTransaction> = (0..block_size)
         .map(|i| new(&mut h, &acc, i, (i as u128) * 100000))
         .collect();
