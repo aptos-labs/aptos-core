@@ -29,7 +29,7 @@ The payload for instructing the blockchain to perform a transfer is:
 
 ```
 {
-  "type": "script_function_payload",
+  "type": "entry_function_payload",
   "function": "0x1::Coin::transfer",
   "type_arguments": ["0x1::aptos_coin::AptosCoin"],
   "arguments": [
@@ -48,7 +48,7 @@ The payload for instructing the blockchain to create a new account is:
 
 ```
 {
-  "type": "script_function_payload",
+  "type": "entry_function_payload",
   "function": "0x1::AptosAccount::create_account",
   "type_arguments": [],
   "arguments": [

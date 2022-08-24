@@ -302,7 +302,7 @@ More information can be gathered from the transaction that generated the event. 
       "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "1000"
     ],
-    "type": "script_function_payload"
+    "type": "entry_function_payload"
   },
   "events": [
     {
