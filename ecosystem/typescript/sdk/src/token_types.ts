@@ -1,5 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+
 export interface TokenData {
   /** Unique name within this creator's account for this Token's collection */
   collection: string;
