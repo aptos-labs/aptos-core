@@ -992,7 +992,7 @@ fi
 
 install_python3
 pip3 install pre-commit
-pre-commit install
+~/.local/bin/pre-commit install
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
 cat <<EOF
