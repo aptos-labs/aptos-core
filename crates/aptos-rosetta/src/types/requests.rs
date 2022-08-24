@@ -185,6 +185,9 @@ pub struct MetadataOptions {
     /// Sequence number of the request
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<U64>,
+    /// Public keys to sign simulated transaction.  Must be present if max_gas_amount is not provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_keys: Option<Vec<PublicKey>>,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -300,6 +303,8 @@ pub struct PreprocessMetadata {
     pub max_gas_amount: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_price: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_keys: Option<Vec<PublicKey>>,
 }
 
 /// Response for direct input into a [`ConstructionMetadataRequest`]
