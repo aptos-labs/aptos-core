@@ -4,8 +4,7 @@
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
-    coin_supply::fetch_coin_supply, gas_costs::TXN_RESERVED, test_with_different_versions,
-    versioning::CURRENT_RELEASE_VERSIONS,
+    gas_costs::TXN_RESERVED, test_with_different_versions, versioning::CURRENT_RELEASE_VERSIONS,
 };
 
 #[test]
@@ -19,7 +18,7 @@ fn mint_to_new_account() {
         // many were there before.
         let new_account = executor.create_raw_account_data(0, 0);
         executor.add_account_data(&new_account);
-        let supply_before = fetch_coin_supply(executor.get_state_view()).unwrap();
+        let supply_before = executor.read_coin_supply().unwrap();
 
         let mint_amount = TXN_RESERVED;
         let txn = root.transaction().payload(aptos_stdlib::aptos_coin_mint(*new_account.address(), mint_amount)).sequence_number(0).sign();
@@ -27,7 +26,7 @@ fn mint_to_new_account() {
 
         // Check that supply changed.
         executor.apply_write_set(output.write_set());
-        let supply_after = fetch_coin_supply(executor.get_state_view()).unwrap();
+        let supply_after = executor.read_coin_supply().unwrap();
         assert_eq!(supply_after, supply_before + (mint_amount as u128));
 
         assert_eq!(

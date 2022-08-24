@@ -11,7 +11,6 @@ use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
 
 pub mod account;
 pub mod account_universe;
-pub mod coin_supply;
 pub mod common_transactions;
 pub mod compile;
 pub mod data_store;

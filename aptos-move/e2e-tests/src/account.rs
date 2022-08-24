@@ -9,7 +9,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{self, AccountResource, CoinStoreResource},
+    account_config::{self, AccountResource, CoinInfoResource, CoinStoreResource},
     chain_id::ChainId,
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
@@ -129,6 +129,13 @@ impl Account {
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
         self.make_access_path(CoinStoreResource::struct_tag())
+    }
+
+    /// Returns the AccessPath that describes the Account's CoinInfo resource instance.
+    ///
+    /// Use this to retrieve or publish the Account CoinInfo blob.
+    pub fn make_coin_info_access_path(&self) -> AccessPath {
+        self.make_access_path(CoinInfoResource::struct_tag())
     }
 
     pub fn make_access_path(&self, tag: StructTag) -> AccessPath {

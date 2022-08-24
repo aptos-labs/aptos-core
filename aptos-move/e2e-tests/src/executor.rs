@@ -25,7 +25,8 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
-        new_block_event_key, AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS,
+        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
+        CORE_CODE_ADDRESS,
     },
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet, Version},
@@ -278,6 +279,29 @@ impl FakeExecutor {
     /// Reads the CoinStore resource value for an account from this executor's data store.
     pub fn read_coin_store_resource(&self, account: &Account) -> Option<CoinStoreResource> {
         self.read_coin_store_resource_at_address(account.address())
+    }
+
+    /// Reads supply from CoinInfo resource value from this executor's data store.
+    pub fn read_coin_supply(&self) -> Option<u128> {
+        self.read_coin_info_resource()
+            .expect("coin info must exist in data store")
+            .supply()
+            .as_ref()
+            .map(|o| match o.aggregator.as_ref() {
+                Some(aggregator) => {
+                    let state_key = aggregator.state_key();
+                    let value_bytes = self
+                        .read_state_value(&state_key)
+                        .expect("aggregator value must exist in data store");
+                    bcs::from_bytes(&value_bytes).unwrap()
+                }
+                None => o.integer.as_ref().unwrap().value,
+            })
+    }
+
+    /// Reads the CoinInfo resource value from this executor's data store.
+    pub fn read_coin_info_resource(&self) -> Option<CoinInfoResource> {
+        self.read_resource(&AccountAddress::ONE)
     }
 
     /// Reads the CoinStore resource value for an account under the given address from this executor's
