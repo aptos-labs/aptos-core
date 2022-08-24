@@ -79,13 +79,14 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
                 None => info!("Genesis completed running"),
             }
             info!("Genesis status: {:?}", status);
-            match status.succeeded {
-                Some(_) => {
-                    info!("Genesis done");
-                    Ok(())
-                }
-                None => bail!("Genesis did not succeed"),
-            }
+            // match status.succeeded {
+            //     Some(_) => {
+            //         info!("Genesis done");
+            //         Ok(())
+            //     }
+            //     None => bail!("Genesis did not succeed"),
+            // }
+            bail!("Genesis did not succeed")
         })
     })
     .await
