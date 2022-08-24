@@ -26,6 +26,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::timestamp;
@@ -377,11 +378,16 @@ module aptos_framework::aptos_governance {
 
     /// Return the voting power a stake pool has with respect to governance proposals.
     fun get_voting_power(pool_address: address): u64 {
-        let (active, _, pending_active, pending_inactive) = stake::get_stake(pool_address);
-        // We calculate the voting power as total non-inactive stakes of the pool. Even if the validator is not in the
-        // active validator set, as long as they have a lockup (separately checked in create_proposal and voting), their
-        // stake would still count in their voting power for governance proposals.
-        active + pending_active + pending_inactive
+        let allow_validator_set_change = staking_config::get_allow_validator_set_change(&staking_config::get());
+        if (allow_validator_set_change) {
+            let (active, _, pending_active, pending_inactive) = stake::get_stake(pool_address);
+            // We calculate the voting power as total non-inactive stakes of the pool. Even if the validator is not in the
+            // active validator set, as long as they have a lockup (separately checked in create_proposal and voting), their
+            // stake would still count in their voting power for governance proposals.
+            active + pending_active + pending_inactive
+        } else {
+            stake::get_current_epoch_voting_power(pool_address)
+        }
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
@@ -539,6 +545,7 @@ module aptos_framework::aptos_governance {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Initialize the governance.
+        staking_config::initialize_for_test(aptos_framework, 0, 1000, 2000, true, 0, 1, 100);
         initialize(aptos_framework, 10, 100, 1000);
         store_signer_cap(
             aptos_framework,
