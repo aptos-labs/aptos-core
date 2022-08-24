@@ -22,7 +22,7 @@ See below for a summary description of how a proposal comes to exist and when it
 alt="Proposal voting flow"
 sources={{
     light: useBaseUrl('/img/docs/voting-resolution-flow.svg'),
-    dark: useBaseUrl('/img/docs/voting-resolution-flow.svg'),
+    dark: useBaseUrl('/img/docs/voting-resolution-flow-dark.svg'),
   }}
 />
 
