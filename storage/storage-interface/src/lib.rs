@@ -455,12 +455,7 @@ pub trait DbReader: Send + Sync {
         &self,
         ledger_version: Version,
     ) -> Result<TransactionAccumulatorSummary> {
-        let genesis_consistency_proof =
-            self.get_accumulator_consistency_proof(None, ledger_version)?;
-        TransactionAccumulatorSummary::try_from_genesis_proof(
-            genesis_consistency_proof,
-            ledger_version,
-        )
+        unimplemented!()
     }
 
     /// Returns total number of leaves in state store at given version.
