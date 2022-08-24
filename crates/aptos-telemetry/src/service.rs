@@ -329,7 +329,7 @@ fn spawn_telemetry_event_sender(
                     );
                     metrics::increment_telemetry_successes(&event_name);
                 } else {
-                    error!(
+                    debug!(
                         "Failed to send telemetry event! Status: {}, event: {}.",
                         response.status(),
                         event_name
@@ -339,7 +339,7 @@ fn spawn_telemetry_event_sender(
                 }
             }
             Err(error) => {
-                error!(
+                debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );

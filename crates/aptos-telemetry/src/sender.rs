@@ -10,7 +10,7 @@ use aptos_crypto::{
     x25519,
 };
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, error};
+use aptos_logger::debug;
 use aptos_telemetry_service::types::{
     auth::{AuthRequest, AuthResponse},
     telemetry::TelemetryDump,
@@ -129,7 +129,7 @@ impl TelemetrySender {
 
     pub(crate) async fn try_push_prometheus_metrics(&self) {
         self.push_prometheus_metrics().await.map_or_else(
-            |e| error!("Failed to push Prometheus Metrics: {}", e),
+            |e| debug!("Failed to push Prometheus Metrics: {}", e),
             |_| debug!("Prometheus Metrics pushed successfully."),
         );
     }
@@ -153,11 +153,11 @@ impl TelemetrySender {
                 }
                 Err(error) => {
                     increment_log_ingest_failures_by(batch.len() as u64);
-                    error!("Failed send log of length: {} with error: {}", len, error);
+                    debug!("Failed send log of length: {} with error: {}", len, error);
                 }
             }
         } else {
-            error!("Failed json serde of batch: {:?}", batch);
+            debug!("Failed json serde of batch: {:?}", batch);
         }
     }
 
@@ -214,7 +214,7 @@ impl TelemetrySender {
                 metrics::increment_telemetry_service_successes(&event_name);
             }
             Err(error) => {
-                error!("Failed to send telemetry event: Error: {}", error);
+                debug!("Failed to send telemetry event: Error: {}", error);
                 metrics::increment_telemetry_service_failures(&event_name);
             }
         }
@@ -345,7 +345,7 @@ impl TelemetrySender {
         let resp = match error_for_status_with_body(response).await {
             Ok(response) => Ok(response.json::<AuthResponse>().await?),
             Err(err) => {
-                error!(
+                debug!(
                     "[telemetry-client] Error sending authentication request: {}",
                     err,
                 );
