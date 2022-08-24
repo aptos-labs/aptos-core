@@ -376,11 +376,11 @@ impl CliTestFramework {
 
     pub async fn analyze_validator_performance(
         &self,
-        start_epoch: Option<u64>,
-        end_epoch: Option<u64>,
+        start_epoch: Option<i64>,
+        end_epoch: Option<i64>,
     ) -> CliTypedResult<()> {
         AnalyzeValidatorPerformance {
-            start_epoch,
+            start_epoch: start_epoch.unwrap_or(-2),
             end_epoch,
             rest_options: self.rest_options(),
             profile_options: Default::default(),
