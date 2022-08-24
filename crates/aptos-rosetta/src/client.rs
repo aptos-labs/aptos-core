@@ -139,7 +139,6 @@ impl RosettaClient {
             .body(serde_json::to_string(request)?)
             .send()
             .await?;
-
         if !response.status().is_success() {
             let error: Error = response.json().await?;
             return Err(anyhow!("Failed API with: {:?}", error));
@@ -155,6 +154,8 @@ impl RosettaClient {
         new_account: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -166,11 +167,14 @@ impl RosettaClient {
         let operations = vec![Operation::create_account(0, None, new_account, sender)];
 
         self.submit_operations(
+            sender,
             network_identifier.clone(),
             &keys,
             operations,
             expiry_time_secs,
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
     }
@@ -183,6 +187,8 @@ impl RosettaClient {
         amount: u64,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -197,11 +203,14 @@ impl RosettaClient {
         ];
 
         self.submit_operations(
+            sender,
             network_identifier.clone(),
             &keys,
             operations,
             expiry_time_secs,
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
     }
@@ -221,19 +230,23 @@ impl RosettaClient {
     /// Submits the operations to the blockchain
     async fn submit_operations(
         &self,
+        sender: AccountAddress,
         network_identifier: NetworkIdentifier,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
         operations: Vec<Operation>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         // Retrieve txn metadata
         let (metadata, public_keys) = self
             .metadata_for_ops(
+                sender,
                 network_identifier.clone(),
                 operations.clone(),
-                10000,
-                1,
+                max_gas,
+                gas_unit_price,
                 expiry_time_secs,
                 sequence_number,
                 keys,
@@ -274,10 +287,11 @@ impl RosettaClient {
     /// Retrieves the metadata for the set of operations
     async fn metadata_for_ops(
         &self,
+        sender: AccountAddress,
         network_identifier: NetworkIdentifier,
         operations: Vec<Operation>,
-        max_gas_amount: u64,
-        gas_price: u64,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
@@ -290,8 +304,14 @@ impl RosettaClient {
                 metadata: Some(PreprocessMetadata {
                     expiry_time_secs: Some(expiry_time_secs.into()),
                     sequence_number: sequence_number.map(|inner| inner.into()),
-                    max_gas_amount: Some(max_gas_amount.into()),
-                    gas_price: Some(gas_price.into()),
+                    max_gas_amount: max_gas.map(|inner| inner.into()),
+                    gas_price: gas_unit_price.map(|inner| inner.into()),
+                    public_keys: Some(vec![keys
+                        .get(&sender)
+                        .unwrap()
+                        .public_key()
+                        .try_into()
+                        .unwrap()]),
                 }),
             })
             .await?;
