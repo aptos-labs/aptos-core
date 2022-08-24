@@ -49,10 +49,6 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
-    AccountRotateAuthenticationKey {
-        new_auth_key: Vec<u8>,
-    },
-
     /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
     /// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
     /// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
@@ -270,9 +266,6 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
-            AccountRotateAuthenticationKey { new_auth_key } => {
-                account_rotate_authentication_key(new_auth_key)
-            }
             AccountRotateAuthenticationKeyEd25519 {
                 curr_sig_bytes,
                 new_sig_bytes,
@@ -437,21 +430,6 @@ pub fn account_offer_rotation_capability_ed25519(
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
-    ))
-}
-
-pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("rotate_authentication_key").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&new_auth_key).unwrap()],
     ))
 }
 
@@ -1080,18 +1058,6 @@ mod decoder {
         }
     }
 
-    pub fn account_rotate_authentication_key(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountRotateAuthenticationKey {
-                new_auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn account_rotate_authentication_key_ed25519(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1450,10 +1416,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_rotation_capability_ed25519".to_string(),
             Box::new(decoder::account_offer_rotation_capability_ed25519),
-        );
-        map.insert(
-            "account_rotate_authentication_key".to_string(),
-            Box::new(decoder::account_rotate_authentication_key),
         );
         map.insert(
             "account_rotate_authentication_key_ed25519".to_string(),
