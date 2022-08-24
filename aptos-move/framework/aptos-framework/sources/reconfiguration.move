@@ -54,7 +54,7 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(aptos_framework)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(aptos_framework)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             aptos_framework,
             Configuration {

@@ -13,7 +13,6 @@ use aptos_types::{
     account_view::AccountView,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    event::EventKey,
     test_helpers::transaction_test_helpers::block,
     transaction::{
         Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
@@ -421,7 +420,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new(2, account1.address()),
+            &account1.sent_event_key(),
             0,
             Order::Ascending,
             10,
@@ -433,7 +432,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new(2, account1.address()),
+            &account1.sent_event_key(),
             10,
             Order::Ascending,
             10,
@@ -445,7 +444,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new(1, account3.address()),
+            &account3.received_event_key(),
             u64::MAX,
             Order::Descending,
             10,
@@ -462,7 +461,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new(1, account3.address()),
+            &account3.received_event_key(),
             6,
             Order::Descending,
             10,
