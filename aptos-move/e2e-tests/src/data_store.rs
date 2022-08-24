@@ -9,6 +9,7 @@ use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
+    account_config::CoinInfoResource,
     state_store::state_key::StateKey,
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},

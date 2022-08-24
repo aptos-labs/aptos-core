@@ -247,6 +247,11 @@ impl FakeExecutor {
         self.data_store.add_account_data(account_data)
     }
 
+    /// Adds coin info to this executor's data store.
+    pub fn add_coin_info(&mut self) {
+        self.data_store.add_coin_info()
+    }
+
     /// Adds a module to this executor's data store.
     ///
     /// Does not do any sort of verification on the module.
