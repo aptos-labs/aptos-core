@@ -109,7 +109,7 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 11, account_address: d1126ce48bd65fb72190dbd9a6eaa65ba973f1e1664ac0cfba4db1d071fd0c36 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("stake"), name: Identifier("DistributeRewardsEvent"), type_params: [] }), event_data: "d1126ce48bd65fb72190dbd9a6eaa65ba973f1e1664ac0cfba4db1d071fd0c367504000000000000" },
                 ContractEvent { key: EventKey { creation_number: 1, account_address: 0000000000000000000000000000000000000000000000000000000000000001 }, index: 1, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("reconfiguration"), name: Identifier("NewEpochEvent"), type_params: [] }), event_data: "0200000000000000" },
             ],
-            gas_used: 6,
+            gas_used: 156,
             status: Keep(
                 Success,
             ),

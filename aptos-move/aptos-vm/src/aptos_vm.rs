@@ -362,7 +362,9 @@ impl AptosVM {
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext = session_output.into_change_set(&mut ())?;
 
-            // charge for write set
+            // Charge gas for write set
+            gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+            // TODO(Gas): Charge for aggregator writes
 
             self.success_transaction_cleanup(
                 storage,
@@ -493,6 +495,10 @@ impl AptosVM {
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
         let change_set_ext = session_output.into_change_set(&mut ())?;
+
+        // Charge gas for write set
+        gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+        // TODO(Gas): Charge for aggregator writes
 
         self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
     }
