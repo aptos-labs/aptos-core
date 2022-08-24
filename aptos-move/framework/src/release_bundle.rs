@@ -4,6 +4,7 @@
 use crate::built_package::BuiltPackage;
 use crate::natives::code::PackageMetadata;
 use crate::path_in_crate;
+use anyhow::Context;
 use aptos_types::account_address::AccountAddress;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
@@ -50,13 +51,15 @@ impl ReleaseBundle {
 
     /// Read a release bundle from a file.
     pub fn read(file: PathBuf) -> anyhow::Result<ReleaseBundle> {
-        let content = std::fs::read(file)?;
+        let content =
+            std::fs::read(&file).with_context(|| format!("while reading `{}`", file.display()))?;
         Ok(bcs::from_bytes::<ReleaseBundle>(&content)?)
     }
 
     /// Write a release bundle to file
     pub fn write(&self, path: PathBuf) -> anyhow::Result<()> {
-        std::fs::write(path, bcs::to_bytes(self)?)?;
+        std::fs::write(&path, bcs::to_bytes(self)?)
+            .with_context(|| format!("while writing `{}`", path.display()))?;
         Ok(())
     }
 

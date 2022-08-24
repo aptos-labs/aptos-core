@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use crate::{
     lru_node_cache::LruNodeCache, metrics::NODE_CACHE_SECONDS,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
@@ -122,6 +123,7 @@ impl StateMerkleDb {
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
+        previous_epoch_ending_version: Option<Version>,
     ) -> Result<(SchemaBatch, HashValue)> {
         let (new_root_hash, tree_update_batch) = {
             let _timer = OTHER_TIMERS_SECONDS
@@ -166,7 +168,17 @@ impl StateMerkleDb {
                 .collect::<Vec<_>>()
                 .par_iter()
                 .with_min_len(128)
-                .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
+                .map(|row| {
+                    if previous_epoch_ending_version.is_some()
+                        && row.node_key.version() <= previous_epoch_ending_version.unwrap()
+                    {
+                        // These are processed by the epoch snapshot pruner.
+                        batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
+                    } else {
+                        // These are processed by the state merkle pruner.
+                        batch.put::<StaleNodeIndexSchema>(row, &())
+                    }
+                })
                 .collect::<Result<Vec<()>>>()?;
         }
 

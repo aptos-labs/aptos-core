@@ -5,6 +5,7 @@
 
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
+use aptos_logger::telemetry_log_writer::TelemetryLog;
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc;
@@ -78,7 +79,7 @@ pub fn start_telemetry_service(
     node_config: NodeConfig,
     chain_id: ChainId,
     build_info: BTreeMap<String, String>,
-    remote_log_rx: Option<mpsc::Receiver<String>>,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
 ) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
@@ -328,7 +329,7 @@ fn spawn_telemetry_event_sender(
                     );
                     metrics::increment_telemetry_successes(&event_name);
                 } else {
-                    error!(
+                    debug!(
                         "Failed to send telemetry event! Status: {}, event: {}.",
                         response.status(),
                         event_name
@@ -338,7 +339,7 @@ fn spawn_telemetry_event_sender(
                 }
             }
             Err(error) => {
-                error!(
+                debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );

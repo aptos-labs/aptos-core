@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::executor::MVHashMapView;
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
     access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
 };
@@ -80,13 +81,16 @@ pub trait TransactionOutput: Send + Sync {
     /// Type of transaction and its associated key and value.
     type T: Transaction;
 
-    /// Get the side effect of a transaction from its output.
+    /// Get the writes of a transaction from its output.
     fn get_writes(
         &self,
     ) -> Vec<(
         <Self::T as Transaction>::Key,
         <Self::T as Transaction>::Value,
     )>;
+
+    /// Get the deltas of a transaction from its output.
+    fn get_deltas(&self) -> Vec<(<Self::T as Transaction>::Key, DeltaOp)>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;

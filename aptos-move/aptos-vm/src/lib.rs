@@ -113,6 +113,7 @@ pub mod foreign_contracts;
 mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
+mod delta_state_view;
 mod errors;
 pub mod logging;
 pub mod move_vm_ext;

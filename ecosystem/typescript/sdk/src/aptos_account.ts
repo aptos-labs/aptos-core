@@ -4,6 +4,8 @@
 import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { Buffer } from "buffer/"; // the trailing slash is important!
+import { derivePath } from "ed25519-hd-key";
+import * as bip39 from "@scure/bip39";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 
@@ -31,6 +33,39 @@ export class AptosAccount {
 
   static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
+  }
+
+  /**
+   * Test derive path
+   */
+  static isValidPath = (path: string): boolean => {
+    if (!/^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path)) {
+      return false;
+    }
+    return true;
+  };
+
+  /**
+   * Creates new account with bip44 path and mnemonics,
+   * @param path. (e.g. m/44'/637'/0'/0'/0')
+   * Detailed description: {@link https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki}
+   * @param mnemonics.
+   * @returns AptosAccount
+   */
+  static fromDerivePath(path: string, mnemonics: string): AptosAccount {
+    if (!AptosAccount.isValidPath(path)) {
+      throw new Error("Invalid derivation path");
+    }
+
+    const normalizeMnemonics = mnemonics
+      .trim()
+      .split(/\s+/)
+      .map((part) => part.toLowerCase())
+      .join(" ");
+
+    const { key } = derivePath(path, Buffer.from(bip39.mnemonicToSeedSync(normalizeMnemonics)).toString("hex"));
+
+    return new AptosAccount(new Uint8Array(key));
   }
 
   /**

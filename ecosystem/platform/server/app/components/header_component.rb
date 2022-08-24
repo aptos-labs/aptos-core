@@ -34,7 +34,11 @@ class HeaderComponent < ViewComponent::Base
       NavItem.new('#', 'About', 'About Aptos'),
       [
         NavItem.new('/currents', 'Currents', 'Aptos Currents'),
-        NavItem.new('/careers', 'Careers', 'Aptos Careers')
+        NavItem.new('/careers', 'Careers', 'Aptos Careers'),
+        NavItem.new(
+          'https://aptos.dev/papers/whitepaper.pdf',
+          'Whitepaper', 'Aptos Whitepaper'
+        )
       ]
     )
   ].freeze

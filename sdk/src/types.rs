@@ -16,6 +16,10 @@ use crate::{
 use aptos_types::event::EventKey;
 pub use aptos_types::*;
 
+/// LocalAccount represents an account on the Aptos blockchain. Internally it
+/// holds the private / public key pair and the address of the account. You can
+/// use this struct to help transact with the blockchain, e.g. by generating a
+/// new account and signing transactions.
 #[derive(Debug)]
 pub struct LocalAccount {
     /// Address of the account.
@@ -27,6 +31,9 @@ pub struct LocalAccount {
 }
 
 impl LocalAccount {
+    /// Create a new representation of an account locally. Note: This function
+    /// does not actually create an account on the Aptos blockchain, just a
+    /// local representation.
     pub fn new<T: Into<AccountKey>>(address: AccountAddress, key: T, sequence_number: u64) -> Self {
         Self {
             address,
@@ -35,6 +42,9 @@ impl LocalAccount {
         }
     }
 
+    /// Generate a new account locally. Note: This function does not actually
+    /// create an account on the Aptos blockchain, it just generates a new
+    /// account locally.
     pub fn generate<R>(rng: &mut R) -> Self
     where
         R: ::rand_core::RngCore + ::rand_core::CryptoRng,

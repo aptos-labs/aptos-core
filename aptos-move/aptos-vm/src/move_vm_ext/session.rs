@@ -35,11 +35,7 @@ use move_deps::{
     move_vm_runtime::session::Session,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::btree_map::Entry,
-    convert::TryInto,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -87,12 +83,8 @@ impl SessionId {
         Self::Void
     }
 
-    pub fn as_uuid(&self) -> u128 {
-        u128::from_be_bytes(
-            self.hash().as_ref()[..16]
-                .try_into()
-                .expect("Slice to array conversion failed."),
-        )
+    pub fn as_uuid(&self) -> HashValue {
+        self.hash()
     }
 }
 
@@ -153,6 +145,29 @@ pub struct SessionOutput {
     pub aggregator_change_set: AggregatorChangeSet,
 }
 
+// TODO: Move this into the Move repo.
+fn squash_table_change_sets(
+    base: &mut TableChangeSet,
+    other: TableChangeSet,
+) -> Result<(), VMStatus> {
+    base.new_tables.extend(other.new_tables);
+    for removed_table in &base.removed_tables {
+        base.new_tables.remove(removed_table);
+    }
+    // There's chance that a table is added in `self`, and an item is added to that table in
+    // `self`, and later the item is deleted in `other`, netting to a NOOP for that item,
+    // but this is an tricky edge case that we don't expect to happen too much, it doesn't hurt
+    // too much to just keep the deletion. It's safe as long as we do it that way consistently.
+    base.removed_tables.extend(other.removed_tables.into_iter());
+    for (handle, changes) in other.changes.into_iter() {
+        let my_changes = base.changes.entry(handle).or_insert(TableChange {
+            entries: Default::default(),
+        });
+        my_changes.entries.extend(changes.entries.into_iter());
+    }
+    Ok(())
+}
+
 impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
         self,
@@ -177,7 +192,7 @@ impl SessionOutput {
                     Delete => WriteOp::Deletion,
                     New(blob) | Modify(blob) => WriteOp::Modification(blob),
                 };
-                write_set_mut.push((StateKey::AccessPath(ap), op))
+                write_set_mut.insert((StateKey::AccessPath(ap), op))
             }
 
             for (name, blob_op) in modules {
@@ -188,7 +203,7 @@ impl SessionOutput {
                     Modify(blob) => WriteOp::Modification(blob),
                 };
 
-                write_set_mut.push((StateKey::AccessPath(ap), op))
+                write_set_mut.insert((StateKey::AccessPath(ap), op))
             }
         }
 
@@ -196,27 +211,29 @@ impl SessionOutput {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 match value_op {
-                    Delete => write_set_mut.push((state_key, WriteOp::Deletion)),
-                    New(bytes) => write_set_mut.push((state_key, WriteOp::Creation(bytes))),
-                    Modify(bytes) => write_set_mut.push((state_key, WriteOp::Modification(bytes))),
+                    Delete => write_set_mut.insert((state_key, WriteOp::Deletion)),
+                    New(bytes) => write_set_mut.insert((state_key, WriteOp::Creation(bytes))),
+                    Modify(bytes) => {
+                        write_set_mut.insert((state_key, WriteOp::Modification(bytes)))
+                    }
                 }
             }
         }
 
         for (id, change) in aggregator_change_set.changes {
             let AggregatorID { handle, key } = id;
-            let key_bytes = serialize(&key);
+            let key_bytes = key.0.to_vec();
             let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = WriteOp::Modification(serialize(&value));
-                    write_set_mut.push((state_key, write_op));
+                    write_set_mut.insert((state_key, write_op));
                 }
-                AggregatorChange::Merge(delta_op) => delta_change_set.push((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = WriteOp::Deletion;
-                    write_set_mut.push((state_key, write_op));
+                    write_set_mut.insert((state_key, write_op));
                 }
             }
         }
@@ -245,64 +262,11 @@ impl SessionOutput {
         self.events.extend(other.events.into_iter());
 
         // Squash the table changes.
-        self.table_change_set
-            .new_tables
-            .extend(other.table_change_set.new_tables);
-        for removed_table in &self.table_change_set.removed_tables {
-            self.table_change_set.new_tables.remove(removed_table);
-        }
-        // There's chance that a table is added in `self`, and an item is added to that table in
-        // `self`, and later the item is deleted in `other`, netting to a NOOP for that item,
-        // but this is an tricky edge case that we don't expect to happen too much, it doesn't hurt
-        // too much to just keep the deletion. It's safe as long as we do it that way consistently.
-        self.table_change_set
-            .removed_tables
-            .extend(other.table_change_set.removed_tables.into_iter());
-        for (handle, changes) in other.table_change_set.changes.into_iter() {
-            let my_changes = self
-                .table_change_set
-                .changes
-                .entry(handle)
-                .or_insert(TableChange {
-                    entries: Default::default(),
-                });
-            my_changes.entries.extend(changes.entries.into_iter());
-        }
+        squash_table_change_sets(&mut self.table_change_set, other.table_change_set)?;
 
         // Squash aggregator changes.
-        for (other_id, other_change) in other.aggregator_change_set.changes {
-            match self.aggregator_change_set.changes.entry(other_id) {
-                // If something was changed only in `other` session, add it.
-                Entry::Vacant(entry) => {
-                    entry.insert(other_change);
-                }
-                // Otherwise, we might need to aggregate deltas.
-                Entry::Occupied(mut entry) => {
-                    use AggregatorChange::*;
-
-                    let entry_mut = entry.get_mut();
-                    match (*entry_mut, other_change) {
-                        (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
-                        (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
-                        (Write(data), Merge(delta)) => {
-                            let new_data = delta
-                                .apply_to(data)
-                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Write(new_data);
-                        }
-                        (Merge(mut delta1), Merge(delta2)) => {
-                            delta1
-                                .merge_with(delta2)
-                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Merge(delta1)
-                        }
-                        // Hashing properties guarantee that aggregator keys should
-                        // not collide, making this case impossible.
-                        (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
-                    }
-                }
-            }
-        }
+        self.aggregator_change_set
+            .squash(other.aggregator_change_set)?;
 
         Ok(())
     }

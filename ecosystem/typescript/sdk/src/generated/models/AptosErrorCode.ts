@@ -26,4 +26,5 @@ export enum AptosErrorCode {
     INTERNAL_ERROR = 'internal_error',
     WEB_FRAMEWORK_ERROR = 'web_framework_error',
     BCS_NOT_SUPPORTED = 'bcs_not_supported',
+    API_DISABLED = 'api_disabled',
 }

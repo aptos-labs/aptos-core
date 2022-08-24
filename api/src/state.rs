@@ -60,6 +60,8 @@ impl StateApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
+        self.context
+            .check_api_output_enabled("Get account resource", &accept_type)?;
         self.resource(
             &accept_type,
             address.0,
@@ -91,6 +93,8 @@ impl StateApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         fail_point_poem("endpoint_get_account_module")?;
+        self.context
+            .check_api_output_enabled("Get account module", &accept_type)?;
         self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 
@@ -117,6 +121,8 @@ impl StateApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         fail_point_poem("endpoint_get_table_item")?;
+        self.context
+            .check_api_output_enabled("Get table item", &accept_type)?;
         self.table_item(
             &accept_type,
             table_handle.0,

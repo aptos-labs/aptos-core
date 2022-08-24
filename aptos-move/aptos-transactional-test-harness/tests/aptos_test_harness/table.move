@@ -10,7 +10,7 @@
 
 //# view --address Alice  --resource 0x3::token::Collections
 
-//# view_table --table_handle 0x44c774c1e065ff68111080ab3dd887ecd0ceb8fa05f34c2d09d75f6aedb1c40 --key_type 0x1::string::String --value_type 0x3::token::CollectionData --key_value "aptos_punks"
+//# view_table --table_handle 0x5adf7712b6186bb577ebd9e2067ef3d46014f5bb5fa1c457f51a334295affe9a --key_type 0x1::string::String --value_type 0x3::token::CollectionData --key_value "aptos_punks"
 
 // Alice offers tokens to Bob
 //# run --signers Alice --args @Bob @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 1 --show-events -- 0x3::token_transfers::offer_script
@@ -18,4 +18,4 @@
 // Bob accepts tokens from Alice
 //# run --signers Bob --args @Alice @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 --show-events -- 0x3::token_transfers::claim_script
 
-//# view_table --table_handle 0x97a40f0bc2ae2108dc8a2993035ea9d730a22e08cc878ee0e572ca4fbf50b849 --key_type 0x3::token::TokenDataId --value_type 0x3::token::TokenData --key_value {"creator":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","collection":"aptos_punks","name":"geek_token"}
+//# view_table --table_handle 0x630c3a2b1a1f2a5a9d112eb98bfe1b35265a16f1482e6224950abd8ad4c76d52 --key_type 0x3::token::TokenDataId --value_type 0x3::token::TokenData --key_value {"creator":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","collection":"aptos_punks","name":"geek_token"}

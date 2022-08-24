@@ -6,6 +6,7 @@ use crate::{
     scheduler::{Incarnation, TxnIndex, Version},
     task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
 };
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::access_path::AccessPath;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -20,15 +21,23 @@ use std::{
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;
+type KeySet<T> = HashSet<<<T as TransactionOutput>::T as Transaction>::Key>;
 
-// If an entry was read from the multi-version data-structure, then kind is
-// MVHashMap(txn_idx, incarnation), with transaction index and incarnation number
-// of the execution associated with the write of the entry. Otherwise, if the read
-// occured from storage, and kind is set to Storage.
+/// Information about the read which is used by validation.
 #[derive(Clone, PartialEq)]
 enum ReadKind {
-    MVHashMap(TxnIndex, Incarnation),
+    /// Read returned a value from the multi-version data-structure, with index
+    /// and incarnation number of the execution associated with the write of
+    /// that entry.
+    Version(TxnIndex, Incarnation),
+    /// Read resolved a delta.
+    Resolved(u128),
+    /// Read returned a delta and needs to go to storage.
+    Unresolved(DeltaOp),
+    /// Read occurred from storage.
     Storage,
+    /// Read triggered a delta application failure.
+    DeltaApplicationFailure,
 }
 
 #[derive(Clone)]
@@ -39,10 +48,24 @@ pub struct ReadDescriptor<K> {
 }
 
 impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
         Self {
             access_path,
-            kind: ReadKind::MVHashMap(txn_idx, incarnation),
+            kind: ReadKind::Version(txn_idx, incarnation),
+        }
+    }
+
+    pub fn from_resolved(access_path: K, value: u128) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Resolved(value),
+        }
+    }
+
+    pub fn from_unresolved(access_path: K, delta: DeltaOp) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Unresolved(delta),
         }
     }
 
@@ -50,6 +73,13 @@ impl<K: ModulePath> ReadDescriptor<K> {
         Self {
             access_path,
             kind: ReadKind::Storage,
+        }
+    }
+
+    pub fn from_delta_application_failure(access_path: K) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::DeltaApplicationFailure,
         }
     }
 
@@ -64,12 +94,27 @@ impl<K: ModulePath> ReadDescriptor<K> {
     // Does the read descriptor describe a read from MVHashMap w. a specified version.
     pub fn validate_version(&self, version: Version) -> bool {
         let (txn_idx, incarnation) = version;
-        self.kind == ReadKind::MVHashMap(txn_idx, incarnation)
+        self.kind == ReadKind::Version(txn_idx, incarnation)
+    }
+
+    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
+    pub fn validate_resolved(&self, value: u128) -> bool {
+        self.kind == ReadKind::Resolved(value)
+    }
+
+    // Does the read descriptor describe a read from MVHashMap w. an unresolved delta.
+    pub fn validate_unresolved(&self, delta: DeltaOp) -> bool {
+        self.kind == ReadKind::Unresolved(delta)
     }
 
     // Does the read descriptor describe a read from storage.
     pub fn validate_storage(&self) -> bool {
         self.kind == ReadKind::Storage
+    }
+
+    // Does the read descriptor describe to a read with a delta application failure.
+    pub fn validate_delta_application_failure(&self) -> bool {
+        self.kind == ReadKind::DeltaApplicationFailure
     }
 }
 
@@ -169,17 +214,18 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         self.inputs[txn_idx].load_full()
     }
 
-    // Extracts a set of paths written during execution from transaction output.
-    pub fn write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> HashSet<<<T as TransactionOutput>::T as Transaction>::Key> {
+    // Extracts a set of paths written or updated during execution from transaction
+    // output: (modified by writes, modified by deltas).
+    pub fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
         match &self.outputs[txn_idx].load_full() {
             None => HashSet::new(),
             Some(txn_output) => match txn_output.as_ref() {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    t.get_writes().into_iter().map(|(k, _)| k).collect()
-                }
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
+                    .get_writes()
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .chain(t.get_deltas().into_iter().map(|(k, _)| k))
+                    .collect(),
                 ExecutionStatus::Abort(_) => HashSet::new(),
             },
         }

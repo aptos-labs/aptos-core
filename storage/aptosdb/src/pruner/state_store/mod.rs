@@ -1,43 +1,48 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pruner::pruner_metadata::{PrunerMetadata, PrunerTag};
+use crate::pruner::pruner_metadata::PrunerMetadata;
+use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
 use crate::pruner_metadata::PrunerMetadataSchema;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils,
-    OTHER_TIMERS_SECONDS,
+    pruner::db_pruner::DBPruner, utils, StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
+use aptos_infallible::Mutex;
+use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::error;
 use aptos_types::transaction::{AtomicVersion, Version};
+use schemadb::schema::KeyCodec;
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::{atomic::Ordering, Arc};
 
+pub mod generics;
 pub(crate) mod state_value_pruner;
+
 #[cfg(test)]
 mod test;
 
 pub const STATE_MERKLE_PRUNER_NAME: &str = "state_merkle_pruner";
 
-#[derive(Debug)]
 /// Responsible for pruning the state tree.
-pub struct StateMerklePruner {
+#[derive(Debug)]
+pub struct StateMerklePruner<S> {
     /// State DB.
     state_merkle_db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
-    min_readable_version: AtomicVersion,
-    /// Keeps track of if the target version has been fully pruned to see if there is pruning
-    /// pending.
-    pruned_to_the_end_of_target_version: AtomicBool,
+    /// 1. min readable version
+    /// 2. if things before that version fully cleaned
+    progress: Mutex<(Version, bool)>,
+    _phantom: std::marker::PhantomData<S>,
 }
 
-impl DBPruner for StateMerklePruner {
+impl<S: StaleNodeIndexSchemaTrait> DBPruner for StateMerklePruner<S>
+where
+    StaleNodeIndex: KeyCodec<S>,
+{
     fn name(&self) -> &'static str {
         STATE_MERKLE_PRUNER_NAME
     }
@@ -46,7 +51,7 @@ impl DBPruner for StateMerklePruner {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
-        let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
+        let min_readable_version = self.min_readable_version();
         let target_version = self.target_version();
 
         return match self.prune_state_merkle(min_readable_version, target_version, batch_size, None)
@@ -66,14 +71,15 @@ impl DBPruner for StateMerklePruner {
     fn initialize_min_readable_version(&self) -> Result<Version> {
         Ok(self
             .state_merkle_db
-            .get::<PrunerMetadataSchema>(&PrunerTag::StateMerklePruner)?
+            .get::<PrunerMetadataSchema>(&S::tag())?
             .map_or(0, |pruned_until_version| match pruned_until_version {
                 PrunerMetadata::LatestVersion(version) => version,
             }))
     }
 
     fn min_readable_version(&self) -> Version {
-        self.min_readable_version.load(Ordering::Relaxed)
+        let (version, _) = *self.progress.lock();
+        version
     }
 
     fn set_target_version(&self, target_version: Version) {
@@ -84,57 +90,35 @@ impl DBPruner for StateMerklePruner {
         self.target_version.load(Ordering::Relaxed)
     }
 
+    // used only by blanket `initialize()`, use the underlying implementation instead elsewhere.
     fn record_progress(&self, min_readable_version: Version) {
-        self.min_readable_version
-            .store(min_readable_version, Ordering::Relaxed);
-        PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["state_store"])
-            .set(min_readable_version as i64);
+        self.record_progress_impl(min_readable_version, false /* is_fully_pruned */);
     }
 
     fn is_pruning_pending(&self) -> bool {
-        self.target_version() > self.min_readable_version()
-            || !self
-                .pruned_to_the_end_of_target_version
-                .load(Ordering::Relaxed)
+        let (min_readable_version, fully_pruned) = *self.progress.lock();
+        self.target_version() > min_readable_version || !fully_pruned
     }
 
     /// (For tests only.) Updates the minimal readable version kept by pruner.
     fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
+        self.record_progress_impl(version, true /* is_fully_pruned */);
     }
 }
 
-impl StateMerklePruner {
+impl<S: StaleNodeIndexSchemaTrait> StateMerklePruner<S>
+where
+    StaleNodeIndex: KeyCodec<S>,
+{
     pub fn new(state_merkle_db: Arc<DB>) -> Self {
         let pruner = StateMerklePruner {
             state_merkle_db,
             target_version: AtomicVersion::new(0),
-            min_readable_version: AtomicVersion::new(0),
-            pruned_to_the_end_of_target_version: AtomicBool::new(false),
+            progress: Mutex::new((0, true)),
+            _phantom: std::marker::PhantomData,
         };
         pruner.initialize();
         pruner
-    }
-
-    /// Prunes the genesis state and saves the db alterations to the given change set
-    pub fn prune_genesis(state_merkle_db: Arc<DB>, batch: &mut SchemaBatch) -> Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let state_pruner = utils::create_state_pruner(state_merkle_db);
-        state_pruner.set_target_version(target_version);
-
-        let min_readable_version = state_pruner.min_readable_version.load(Ordering::Relaxed);
-        let target_version = state_pruner.target_version();
-        state_pruner.prune_state_merkle(
-            min_readable_version,
-            target_version,
-            max_version,
-            Some(batch),
-        )?;
-
-        Ok(())
     }
 
     // If the existing schema batch is not none, this function only adds items need to be
@@ -151,9 +135,7 @@ impl StateMerklePruner {
         let (indices, is_end_of_target_version) =
             self.get_stale_node_indices(min_readable_version, target_version, batch_size)?;
         if indices.is_empty() {
-            self.pruned_to_the_end_of_target_version
-                .store(is_end_of_target_version, Ordering::Relaxed);
-            self.record_progress(target_version);
+            self.record_progress_impl(target_version, is_end_of_target_version);
             Ok(target_version)
         } else {
             let _timer = OTHER_TIMERS_SECONDS
@@ -166,17 +148,17 @@ impl StateMerklePruner {
             if let Some(existing_schema_batch) = existing_schema_batch {
                 indices.into_iter().try_for_each(|index| {
                     existing_schema_batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
-                    existing_schema_batch.delete::<StaleNodeIndexSchema>(&index)
+                    existing_schema_batch.delete::<S>(&index)
                 })?;
             } else {
                 let batch = SchemaBatch::new();
                 indices.into_iter().try_for_each(|index| {
                     batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
-                    batch.delete::<StaleNodeIndexSchema>(&index)
+                    batch.delete::<S>(&index)
                 })?;
 
                 batch.put::<PrunerMetadataSchema>(
-                    &PrunerTag::StateMerklePruner,
+                    &S::tag(),
                     &PrunerMetadata::LatestVersion(new_min_readable_version),
                 )?;
 
@@ -187,11 +169,16 @@ impl StateMerklePruner {
             // TODO(zcc): recording progress after writing schemas might provide wrong answers to
             // API calls when they query min_readable_version while the write_schemas are still in
             // progress.
-            self.record_progress(new_min_readable_version);
-            self.pruned_to_the_end_of_target_version
-                .store(is_end_of_target_version, Ordering::Relaxed);
+            self.record_progress_impl(new_min_readable_version, is_end_of_target_version);
             Ok(new_min_readable_version)
         }
+    }
+
+    fn record_progress_impl(&self, min_readable_version: Version, is_fully_pruned: bool) {
+        *self.progress.lock() = (min_readable_version, is_fully_pruned);
+        PRUNER_LEAST_READABLE_VERSION
+            .with_label_values(&["state_store"])
+            .set(min_readable_version as i64);
     }
 
     fn get_stale_node_indices(
@@ -201,10 +188,11 @@ impl StateMerklePruner {
         batch_size: usize,
     ) -> Result<(Vec<StaleNodeIndex>, bool)> {
         let mut indices = Vec::new();
-        let mut iter = self
-            .state_merkle_db
-            .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
-        iter.seek(&start_version)?;
+        let mut iter = self.state_merkle_db.iter::<S>(ReadOptions::default())?;
+        iter.seek(&StaleNodeIndex {
+            stale_since_version: start_version,
+            node_key: NodeKey::new_empty_path(0),
+        })?;
 
         // over fetch by 1
         for _ in 0..=batch_size {
@@ -224,5 +212,28 @@ impl StateMerklePruner {
             true
         };
         Ok((indices, is_end_of_target_version))
+    }
+}
+
+impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
+    /// Prunes the genesis state and saves the db alterations to the given change set
+    pub fn prune_genesis(state_merkle_db: Arc<DB>, batch: &mut SchemaBatch) -> Result<()> {
+        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
+        let max_version = 1; // We should only be pruning a single version
+
+        let state_pruner =
+            utils::create_state_pruner::<StaleNodeIndexCrossEpochSchema>(state_merkle_db);
+        state_pruner.set_target_version(target_version);
+
+        let min_readable_version = state_pruner.min_readable_version();
+        let target_version = state_pruner.target_version();
+        state_pruner.prune_state_merkle(
+            min_readable_version,
+            target_version,
+            max_version,
+            Some(batch),
+        )?;
+
+        Ok(())
     }
 }

@@ -1,13 +1,15 @@
 module hello_blockchain::message {
-    use std::string;
     use std::error;
-    use aptos_std::event;
     use std::signer;
+    use std::string;
+    use aptos_std::event;
 
+//:!:>resource
     struct MessageHolder has key {
         message: string::String,
         message_change_events: event::EventHandle<MessageChangeEvent>,
     }
+//<:!:resource
 
     struct MessageChangeEvent has drop, store {
         from_message: string::String,
@@ -22,9 +24,8 @@ module hello_blockchain::message {
         *&borrow_global<MessageHolder>(addr).message
     }
 
-    public entry fun set_message(account: signer, message_bytes: vector<u8>)
+    public entry fun set_message(account: signer, message: string::String)
     acquires MessageHolder {
-        let message = string::utf8(message_bytes);
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
@@ -45,7 +46,7 @@ module hello_blockchain::message {
     #[test(account = @0x1)]
     public entry fun sender_can_set_message(account: signer) acquires MessageHolder {
         let addr = signer::address_of(&account);
-        set_message(account,  b"Hello, Blockchain");
+        set_message(account,  string::utf8(b"Hello, Blockchain"));
 
         assert!(
           get_message(addr) == string::utf8(b"Hello, Blockchain"),

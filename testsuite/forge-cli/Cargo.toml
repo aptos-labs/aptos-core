@@ -21,8 +21,8 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
-
 framework = { path = "../../aptos-move/framework" }
+serde_yaml = "0.8.24"
 testcases = { path = "../testcases" }
 
 [[bin]]

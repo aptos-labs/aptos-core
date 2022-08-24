@@ -38,7 +38,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    data_cache::{AsMoveResolver, RemoteStorage},
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
@@ -520,7 +520,7 @@ impl FakeExecutor {
                 AbstractValueSizeGasParameters::zeros(),
             )
             .unwrap();
-            let remote_view = RemoteStorage::new(&self.data_store);
+            let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
@@ -563,7 +563,7 @@ impl FakeExecutor {
             AbstractValueSizeGasParameters::zeros(),
         )
         .unwrap();
-        let remote_view = RemoteStorage::new(&self.data_store);
+        let remote_view = StorageAdapter::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function_bypass_visibility(

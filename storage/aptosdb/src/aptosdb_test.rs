@@ -1,15 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
-use std::{sync::Arc, time::Duration};
-
-use aptos_config::config::{
-    LedgerPrunerConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
-};
-use proptest::prelude::*;
-
 use crate::{
     get_first_seq_num_and_limit,
     pruner::{
@@ -17,9 +8,12 @@ use crate::{
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, PrunerManager, ROCKSDB_PROPERTIES,
+    AptosDB, PrunerManager, StaleNodeIndexSchema, ROCKSDB_PROPERTIES,
 };
-
+use aptos_config::config::{
+    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
+    StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
@@ -30,6 +24,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{ExecutionStatus, TransactionInfo},
 };
+use proptest::prelude::*;
+use std::collections::HashSet;
+use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
@@ -94,13 +91,12 @@ fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
-        let state_pruner = StatePrunerManager::new(
+        let state_pruner = StatePrunerManager::<StaleNodeIndexSchema>::new(
             Arc::clone(&aptos_db.state_merkle_db),
             StateMerklePrunerConfig {
                 enable,
                 prune_window: 20,
                 batch_size: 1,
-                user_pruning_window_offset: 0,
             },
         );
         assert_eq!(state_pruner.is_pruner_enabled(), enable);
@@ -134,7 +130,7 @@ fn test_error_if_version_pruned() {
         db.error_if_state_merkle_pruned("State", 4)
             .unwrap_err()
             .to_string(),
-        "State at version 4 is pruned, min available version is 5."
+        "Version 4 is not epoch ending."
     );
     assert!(db.error_if_state_merkle_pruned("State", 5).is_ok());
     assert_eq!(
@@ -203,7 +199,7 @@ fn test_rocksdb_properties_reporter() {
 pub fn test_state_merkle_pruning_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
-    // set up DB with state prune window 5
+    // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
     let db = AptosDB::open(
         &tmp_dir,
@@ -219,7 +215,11 @@ pub fn test_state_merkle_pruning_impl(
                 enable: true,
                 prune_window: 5,
                 batch_size: 1,
-                user_pruning_window_offset: 0,
+            },
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
+                enable: true,
+                prune_window: 10,
+                batch_size: 1,
             },
         },
         RocksdbConfigs::default(),
@@ -257,21 +257,41 @@ pub fn test_state_merkle_pruning_impl(
         let is_epoch_ending = ledger_info_with_sigs.ledger_info().ends_epoch();
         snapshot_versions.push((last_version, is_epoch_ending));
 
-        let state_min_readable = last_version.saturating_sub(5);
-        let non_pruned_versions: Vec<_> = snapshot_versions
+        let state_merkle_min_readable = last_version.saturating_sub(5);
+        let epoch_snapshot_min_readable = last_version.saturating_sub(10);
+        let snapshots: Vec<_> = snapshot_versions
             .iter()
-            .filter(|(v, _is_epoch_ending)| *v >= state_min_readable)
+            .filter(|(v, _is_epoch_ending)| *v >= state_merkle_min_readable)
             .map(|(v, _)| *v)
             .collect();
-        let pruner = &db.state_store.state_db.state_pruner;
+        let epoch_snapshots: Vec<_> = snapshot_versions
+            .iter()
+            .filter(|(v, is_epoch_ending)| *is_epoch_ending && *v >= epoch_snapshot_min_readable)
+            .map(|(v, _)| *v)
+            .collect();
+
         // Prune till the oldest snapshot readable.
+        let pruner = &db.state_store.state_db.state_pruner;
+        let epoch_snapshot_pruner = &db.state_store.state_db.epoch_snapshot_pruner;
         pruner
             .pruner_worker
-            .set_target_db_version(non_pruned_versions.first().cloned().unwrap());
+            .set_target_db_version(*snapshots.first().unwrap());
+        epoch_snapshot_pruner
+            .pruner_worker
+            .set_target_db_version(std::cmp::min(
+                *snapshots.first().unwrap(),
+                *epoch_snapshots.first().unwrap_or(&Version::MAX),
+            ));
         pruner.wait_for_pruner().unwrap();
+        epoch_snapshot_pruner.wait_for_pruner().unwrap();
 
         // Check strictly that all trees in the window accessible and all those nodes not needed
         // must be gone.
+        let non_pruned_versions: HashSet<_> = snapshots
+            .into_iter()
+            .chain(epoch_snapshots.into_iter())
+            .collect();
+
         let expected_nodes: HashSet<_> = non_pruned_versions
             .iter()
             .flat_map(|v| db.state_store.get_all_jmt_nodes_referenced(*v).unwrap())
@@ -282,6 +302,7 @@ pub fn test_state_merkle_pruning_impl(
             .unwrap()
             .into_iter()
             .collect();
+
         assert_eq!(expected_nodes, all_nodes);
     }
 }

@@ -958,3 +958,8 @@ impl TransactionSigningMessage {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct GasEstimation {
+    pub gas_estimate: u64,
+}

@@ -84,6 +84,9 @@ impl StateMerkleBatchCommitter {
                     self.state_db
                         .state_pruner
                         .maybe_set_pruner_target_db_version(current_version);
+                    self.state_db
+                        .epoch_snapshot_pruner
+                        .maybe_set_pruner_target_db_version(current_version);
 
                     self.check_usage_consistency(&state_delta).unwrap();
                 }

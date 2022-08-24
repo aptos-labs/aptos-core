@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::accept_type::AcceptType;
 use crate::response::{
-    block_not_found_by_height, block_not_found_by_version, block_pruned_by_height,
-    version_not_found, version_pruned, InternalError, ServiceUnavailableError, StdApiError,
+    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
+    InternalError, ServiceUnavailableError, StdApiError,
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
@@ -23,8 +25,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
+use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
+use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -37,7 +40,8 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    node_config: NodeConfig,
+    pub node_config: NodeConfig,
+    gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
 impl Context {
@@ -52,10 +56,14 @@ impl Context {
             db,
             mp_sender,
             node_config,
+            gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
+                last_updated_version: 0,
+                median_gas_price: 1,
+            })),
         }
     }
 
-    pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView>> {
+    pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
         self.db
             .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
@@ -64,7 +72,7 @@ impl Context {
     pub fn move_resolver_poem<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<RemoteStorageOwned<DbStateView>, E> {
+    ) -> Result<StorageAdapterOwned<DbStateView>, E> {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
@@ -540,4 +548,71 @@ impl Context {
                 })
         }
     }
+
+    pub fn estimate_gas_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
+        // The search size
+        const SEARCH_SIZE: u64 = 100_000;
+        let oldest_search_version = std::cmp::max(
+            ledger_info.ledger_version.0.saturating_sub(SEARCH_SIZE),
+            ledger_info.oldest_ledger_version.0,
+        );
+
+        // If it's cached, let's use that
+        {
+            let gas_estimation = self.gas_estimation.read().unwrap();
+
+            if gas_estimation.last_updated_version > oldest_search_version {
+                return Ok(gas_estimation.median_gas_price);
+            }
+        }
+
+        // Otherwise, get the estimated amount from storage
+        {
+            let mut gas_estimation = self.gas_estimation.write().unwrap();
+
+            // If this has been updated by a different thread, use that instead
+            if gas_estimation.last_updated_version > oldest_search_version {
+                return Ok(gas_estimation.median_gas_price);
+            }
+            let mut gas_prices: Vec<u64> = self
+                .db
+                .get_gas_prices(
+                    oldest_search_version,
+                    SEARCH_SIZE,
+                    ledger_info.ledger_version.0,
+                )
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+                })?;
+            gas_prices.sort();
+            let mid = gas_prices.len() / 2;
+            gas_estimation.median_gas_price = gas_prices[mid];
+            Ok(gas_estimation.median_gas_price)
+        }
+    }
+
+    pub fn check_api_output_enabled<E: ForbiddenError>(
+        &self,
+        api_name: &'static str,
+        accept_type: &AcceptType,
+    ) -> Result<(), E> {
+        match accept_type {
+            AcceptType::Json => {
+                if !self.node_config.api.json_output_enabled {
+                    return Err(json_api_disabled(api_name));
+                }
+            }
+            AcceptType::Bcs => {
+                if !self.node_config.api.bcs_output_enabled {
+                    return Err(bcs_api_disabled(api_name));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct GasEstimationCache {
+    last_updated_version: u64,
+    median_gas_price: u64,
 }

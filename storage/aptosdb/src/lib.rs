@@ -109,6 +109,8 @@ use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
     state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
 };
+use crate::stale_node_index::StaleNodeIndexSchema;
+use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
@@ -266,10 +268,15 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
+        let epoch_snapshot_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            pruner_config.epoch_snapshot_pruner_config.into(),
+        );
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             state_pruner,
+            epoch_snapshot_pruner,
             target_snapshot_size,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
@@ -821,14 +828,26 @@ impl AptosDB {
             .state_db
             .state_pruner
             .get_min_readable_version();
-        ensure!(
-            version >= min_readable_version,
-            "{} at version {} is pruned, min available version is {}.",
-            data_type,
-            version,
-            min_readable_version
-        );
-        Ok(())
+        if version >= min_readable_version {
+            return Ok(());
+        }
+
+        let min_readable_epoch_snapshot_version = self
+            .state_store
+            .state_db
+            .epoch_snapshot_pruner
+            .get_min_readable_version();
+        if version >= min_readable_epoch_snapshot_version {
+            self.ledger_store.ensure_epoch_ending(version)
+        } else {
+            bail!(
+                "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
+                data_type,
+                version,
+                min_readable_version,
+                min_readable_epoch_snapshot_version,
+            )
+        }
     }
 }
 
@@ -1002,6 +1021,39 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
+        })
+    }
+
+    fn get_gas_prices(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<u64>> {
+        const MAX_GAS_LOOKUP: u64 = 100_000;
+        gauged_api("get_gas_prices", || {
+            error_if_too_many_requested(limit, MAX_GAS_LOOKUP)?;
+
+            if start_version > ledger_version || limit == 0 {
+                return Ok(vec![]);
+            }
+
+            // This is just an estimation, so we cna just skip over errors
+            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
+            let txns = self
+                .transaction_store
+                .get_transaction_iter(start_version, limit as usize)?;
+            let gas_prices: Vec<_> = txns
+                .filter_map(|txn| {
+                    if let Ok(Transaction::UserTransaction(txn)) = txn {
+                        Some(txn.gas_unit_price())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            Ok(gas_prices)
         })
     }
 

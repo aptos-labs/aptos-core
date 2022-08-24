@@ -3,6 +3,17 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::epoch_by_version::EpochByVersionSchema;
+use crate::{
+    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
+    schema::state_value::StateValueSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
+    state_store::buffered_state::BufferedState,
+    version_data::{VersionData, VersionDataSchema},
+    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
+    StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -31,16 +42,6 @@ use storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
-use crate::{
-    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    schema::state_value::StateValueSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
-    state_merkle_db::StateMerkleDb,
-    state_store::buffered_state::BufferedState,
-    version_data::{VersionData, VersionDataSchema},
-    AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
-};
-
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
@@ -57,10 +58,11 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 #[derive(Debug)]
-pub struct StateDb {
+pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub state_pruner: StatePrunerManager,
+    pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
 #[derive(Debug)]
@@ -169,6 +171,22 @@ impl StateDb {
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
+
+    /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
+    /// ends an epoch, return one epoch early than that.
+    pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
+        if version == 0 {
+            return Ok(None);
+        }
+        let prev_version = version - 1;
+
+        let mut iter = self
+            .ledger_db
+            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
+        // Search for the end of the previous epoch.
+        iter.seek_for_prev(&prev_version)?;
+        iter.next().transpose()
+    }
 }
 
 impl DbReader for StateStore {
@@ -235,7 +253,8 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
-        state_pruner: StatePrunerManager,
+        state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+        epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         target_snapshot_size: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -248,6 +267,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             state_pruner,
+            epoch_snapshot_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
@@ -573,6 +593,7 @@ impl StateStore {
             node_hashes,
             version,
             base_version,
+            None, // previous epoch ending version
         )?;
         self.state_merkle_db.write_schemas(batch)?;
         Ok(hash)

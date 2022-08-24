@@ -13,17 +13,17 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
-    transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError, BasicError,
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-    InsufficientStorageError, InternalError, ServiceUnavailableError,
+    api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError,
+    BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
+    BasicResultWith404, InsufficientStorageError, InternalError, ServiceUnavailableError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
-    LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionOnChainData, UserTransaction, U64,
+    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation, HashValue,
+    HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionOnChainData, UserTransaction, U64,
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
@@ -40,6 +40,7 @@ generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
+    (403, Forbidden),
     (413, PayloadTooLarge),
     (500, Internal),
     (503, ServiceUnavailable),
@@ -92,6 +93,8 @@ impl TransactionsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_transactions")?;
+        self.context
+            .check_api_output_enabled("Get transactions", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list(&accept_type, page)
     }
@@ -123,6 +126,8 @@ impl TransactionsApi {
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_hash")?;
+        self.context
+            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
         self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
             .await
     }
@@ -142,6 +147,8 @@ impl TransactionsApi {
         txn_version: Path<U64>,
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_version")?;
+        self.context
+            .check_api_output_enabled("Get transactions by version", &accept_type)?;
         self.get_transaction_by_version_inner(&accept_type, txn_version.0)
             .await
     }
@@ -163,6 +170,8 @@ impl TransactionsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_accounts_transactions")?;
+        self.context
+            .check_api_output_enabled("Get account transactions", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list_by_account(&accept_type, page, address.0)
     }
@@ -197,6 +206,11 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
         fail_point_poem("endpoint_submit_transaction")?;
+        self.context
+            .check_api_output_enabled("Submit transaction", &accept_type)?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit transaction"));
+        }
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.create(&accept_type, ledger_info, signed_transaction)
@@ -223,6 +237,11 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
+        self.context
+            .check_api_output_enabled("Simulate transaction", &accept_type)?;
+        if !self.context.node_config.api.transaction_simulation_enabled {
+            return Err(api_disabled("Simulate transaction"));
+        }
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         self.simulate(&accept_type, ledger_info, signed_transaction)
@@ -262,7 +281,44 @@ impl TransactionsApi {
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
+        self.context
+            .check_api_output_enabled("Encode submission", &accept_type)?;
+        if !self.context.node_config.api.encode_submission_enabled {
+            return Err(api_disabled("Encode submission"));
+        }
         self.get_signing_message(&accept_type, data.0)
+    }
+
+    /// Estimate gas price
+    #[oai(
+        path = "/estimate_gas_price",
+        method = "get",
+        operation_id = "estimate_gas_price",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+        fail_point_poem("endpoint_encode_submission")?;
+        self.context
+            .check_api_output_enabled("Estimate gas price", &accept_type)?;
+        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+        let estimated_gas_price = self.context.estimate_gas_price(&latest_ledger_info)?;
+
+        let gas_estimation = GasEstimation {
+            gas_estimate: estimated_gas_price,
+        };
+
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }
 
@@ -628,11 +684,6 @@ impl TransactionsApi {
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
         let output = output_ext.into_transaction_output(&move_resolver);
-        debug_assert!(
-            matches!(output, Ok(_)),
-            "converting into transaction output failed"
-        );
-        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,

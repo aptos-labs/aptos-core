@@ -74,14 +74,13 @@ fn verify_state_in_store(
 fn create_state_pruner_manager(
     state_merkle_db: &Arc<DB>,
     prune_batch_size: usize,
-) -> StatePrunerManager {
+) -> StatePrunerManager<StaleNodeIndexSchema> {
     StatePrunerManager::new(
         Arc::clone(state_merkle_db),
         StateMerklePrunerConfig {
             enable: true,
             prune_window: 0,
             batch_size: prune_batch_size,
-            user_pruning_window_offset: 0,
         },
     )
 }
@@ -343,14 +342,15 @@ fn test_worker_quit_eagerly() {
     );
 
     {
-        let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
+        let state_pruner = utils::create_state_pruner::<StaleNodeIndexSchema>(Arc::clone(
+            &aptos_db.state_merkle_db,
+        ));
         let worker = StatePrunerWorker::new(
             state_pruner,
             StateMerklePrunerConfig {
                 enable: true,
                 prune_window: 1,
                 batch_size: 100,
-                user_pruning_window_offset: 0,
             },
         );
         worker.set_target_db_version(/*target_db_version=*/ 1);
