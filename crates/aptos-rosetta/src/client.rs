@@ -262,19 +262,13 @@ impl RosettaClient {
         network_identifier: NetworkIdentifier,
         public_key: PublicKey,
     ) -> anyhow::Result<AccountIdentifier> {
-        if let ConstructionDeriveResponse {
-            account_identifier: Some(account_id),
-        } = self
+        Ok(self
             .derive(&ConstructionDeriveRequest {
                 network_identifier,
                 public_key,
             })
             .await?
-        {
-            Ok(account_id)
-        } else {
-            return Err(anyhow!("Failed to find account address for key"));
-        }
+            .account_identifier)
     }
 
     /// Retrieves the metadata for the set of operations
@@ -293,8 +287,6 @@ impl RosettaClient {
             .preprocess(&ConstructionPreprocessRequest {
                 network_identifier: network_identifier.clone(),
                 operations,
-                max_fee: None,
-                suggested_fee_multiplier: None,
                 metadata: Some(PreprocessMetadata {
                     expiry_time_secs: Some(expiry_time_secs),
                     sequence_number,
@@ -306,32 +298,21 @@ impl RosettaClient {
 
         // Process the required public keys
         let mut public_keys = Vec::new();
-        if let Some(accounts) = preprocess_response.required_public_keys {
-            for account in accounts {
-                if let Some(key) = keys.get(&account.account_address()?) {
-                    public_keys.push(key.public_key().try_into()?);
-                } else {
-                    return Err(anyhow!("No public key found for account"));
-                }
+        for account in preprocess_response.required_public_keys {
+            if let Some(key) = keys.get(&account.account_address()?) {
+                public_keys.push(key.public_key().try_into()?);
+            } else {
+                return Err(anyhow!("No public key found for account"));
             }
-        } else {
-            return Err(anyhow!("No public keys found required for transaction"));
-        };
+        }
 
         // Request the metadata
-        if let Some(options) = preprocess_response.options {
-            self.metadata(&ConstructionMetadataRequest {
-                network_identifier,
-                options,
-                public_keys: public_keys.clone(),
-            })
-            .await
-            .map(|response| (response, public_keys))
-        } else {
-            Err(anyhow!(
-                "No metadata options returned from preprocess response"
-            ))
-        }
+        self.metadata(&ConstructionMetadataRequest {
+            network_identifier,
+            options: preprocess_response.options,
+        })
+        .await
+        .map(|response| (response, public_keys))
     }
 
     /// Build an unsigned transaction
@@ -393,10 +374,7 @@ impl RosettaClient {
 
         // Sign the payload if it matches the unsigned transaction
         for payload in unsigned_response.payloads.into_iter() {
-            let account = payload
-                .account_identifier
-                .as_ref()
-                .expect("Must have an account");
+            let account = &payload.account_identifier;
             let private_key = keys
                 .get(&account.account_address()?)
                 .expect("Should have a private key");

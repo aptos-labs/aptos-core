@@ -27,7 +27,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        native_coin, to_hex_lower, with_context,
+        native_coin, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -35,8 +35,7 @@ use crate::{
 };
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::CryptoHash,
-    signing_message, ValidCryptoMaterialStringExt,
+    signing_message,
 };
 use aptos_logger::debug;
 use aptos_sdk::{
@@ -49,8 +48,7 @@ use aptos_sdk::{
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
-        authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
-        Transaction::UserTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
 use std::convert::TryFrom;
@@ -194,14 +192,11 @@ async fn construction_derive(
 
     let public_key: Ed25519PublicKey =
         decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
-    let address = to_hex_lower(&AuthenticationKey::ed25519(&public_key).derived_address());
+    let address = AuthenticationKey::ed25519(&public_key).derived_address();
 
-    let account_identifier = Some(AccountIdentifier {
-        address,
-        sub_account: None,
-    });
-
-    Ok(ConstructionDeriveResponse { account_identifier })
+    Ok(ConstructionDeriveResponse {
+        account_identifier: address.into(),
+    })
 }
 
 /// Construction hash command (OFFLINE)
@@ -216,11 +211,11 @@ async fn construction_hash(
     debug!("/construction/hash {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let signed_transaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let hash = to_hex_lower(&UserTransaction(signed_transaction).hash());
+    let signed_transaction: SignedTransaction =
+        decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
     Ok(TransactionIdentifierResponse {
-        transaction_identifier: TransactionIdentifier { hash },
+        transaction_identifier: signed_transaction.committed_hash().into(),
     })
 }
 
@@ -266,19 +261,11 @@ async fn construction_metadata(
             .sender(sender)
             .sequence_number(sequence_number)
             .build();
-        let signed_transaction = if let Some(public_key) = request.public_keys.first() {
-            SignedTransaction::new(
-                unsigned_transaction,
-                Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
-                    ApiError::InvalidInput(Some(format!("Failed to parse public key {:?}", err)))
-                })?,
-                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-            )
-        } else {
-            return Err(ApiError::InvalidInput(Some(
-                "No public key given in metadata call".to_string(),
-            )));
-        };
+        let signed_transaction = SignedTransaction::new(
+            unsigned_transaction,
+            Ed25519PublicKey::try_from([0u8; 64].as_ref()).unwrap(),
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+        );
 
         rest_client
             .simulate_bcs(&signed_transaction)
@@ -311,7 +298,7 @@ async fn construction_metadata(
             gas_price_per_unit,
             expiry_time_secs: request.options.expiry_time_secs,
         },
-        suggested_fee: Some(vec![suggested_fee]),
+        suggested_fee: vec![suggested_fee],
     })
 }
 
@@ -576,10 +563,9 @@ async fn construction_payloads(
 
     let signing_message = hex::encode(signing_message(&unsigned_transaction));
     let payload = SigningPayload {
-        address: None,
-        account_identifier: Some(AccountIdentifier::from(sender)),
+        account_identifier: AccountIdentifier::from(sender),
         hex_bytes: signing_message,
-        signature_type: Some(SignatureType::Ed25519),
+        signature_type: SignatureType::Ed25519,
     };
 
     // Transaction is both the unsigned transaction and the payload
@@ -605,7 +591,7 @@ async fn construction_preprocess(
     let required_public_keys = vec![internal_operation.sender().into()];
 
     Ok(ConstructionPreprocessResponse {
-        options: Some(MetadataOptions {
+        options: MetadataOptions {
             internal_operation,
             max_gas_amount: request
                 .metadata
@@ -620,8 +606,8 @@ async fn construction_preprocess(
                 .metadata
                 .as_ref()
                 .and_then(|inner| inner.sequence_number),
-        }),
-        required_public_keys: Some(required_public_keys),
+        },
+        required_public_keys,
     })
 }
 
@@ -642,8 +628,6 @@ async fn construction_submit(
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
     let response = rest_client.submit(&txn).await?;
     Ok(ConstructionSubmitResponse {
-        transaction_identifier: TransactionIdentifier {
-            hash: to_hex_lower(&response.inner().hash),
-        },
+        transaction_identifier: response.inner().hash.into(),
     })
 }

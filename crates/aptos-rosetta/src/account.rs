@@ -277,7 +277,7 @@ impl CoinCache {
         struct CoinInfo {
             name: String,
             symbol: String,
-            decimals: U64,
+            decimals: u8,
         }
 
         let struct_tag = match coin {
@@ -318,7 +318,7 @@ impl CoinCache {
 
             Ok(Some(Currency {
                 symbol: coin_info.symbol,
-                decimals: coin_info.decimals.0,
+                decimals: coin_info.decimals,
                 metadata: Some(CurrencyMetadata {
                     move_type: struct_tag.to_string(),
                 }),
