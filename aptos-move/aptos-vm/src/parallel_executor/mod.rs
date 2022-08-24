@@ -147,12 +147,13 @@ impl ParallelAptosVM {
         // sequentially while executing the transactions.
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
-            .filter(|tx| !CACHE.insert(tx))
+            .filter(|txn| !CACHE.insert(txn))
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
         match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
             &RAYON_EXEC_POOL,
+            concurrency_level,
         )
         .execute_transactions_parallel(state_view, signature_verified_block)
         {

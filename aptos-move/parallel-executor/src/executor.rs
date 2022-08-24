@@ -106,9 +106,9 @@ where
     T: Transaction,
     E: ExecutorTask<T = T>,
 {
-    pub fn new(thread_pool: &'b ThreadPool) -> Self {
+    pub fn new(thread_pool: &'b ThreadPool, concurrency_level: usize) -> Self {
         Self {
-            concurrency_level: thread_pool.current_num_threads(),
+            concurrency_level,
             phantom: PhantomData,
             thread_pool,
         }

@@ -105,12 +105,12 @@ where
     pub(crate) fn run(self) {
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
-            .thread_name(|index| format!("parallel_executor_{}", index))
             .build()
             .unwrap();
         let output =
             ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
                 &thread_pool,
+                thread_pool.current_num_threads(),
             )
             .execute_transactions_parallel((), self.transactions.clone());
 

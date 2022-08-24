@@ -46,14 +46,14 @@ where
 
     let mut ret = true;
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(concurrency_level)
-        .thread_name(|index| format!("parallel_executor_{}", index))
+        .num_threads(num_cpus::get())
         .build()
         .unwrap();
     for _ in 0..num_repeat {
         let output =
             ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
                 &thread_pool,
+                thread_pool.current_num_threads(),
             )
             .execute_transactions_parallel((), transactions.clone());
 
@@ -272,8 +272,7 @@ fn publishing_fixed_params() {
     };
 
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(concurrency_level)
-        .thread_name(|index| format!("parallel_executor_{}", index))
+        .num_threads(num_cpus::get())
         .build()
         .unwrap();
 
@@ -281,7 +280,7 @@ fn publishing_fixed_params() {
     let output = ParallelTransactionExecutor::<
         Transaction<KeyType<[u8; 32]>, [u8; 32]>,
         Task<KeyType<[u8; 32]>, [u8; 32]>,
-    >::new(&thread_pool)
+    >::new(&thread_pool, thread_pool.current_num_threads())
     .execute_transactions_parallel((), transactions.clone());
     assert_ok!(output);
 
@@ -313,8 +312,7 @@ fn publishing_fixed_params() {
     };
 
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(concurrency_level)
-        .thread_name(|index| format!("parallel_executor_{}", index))
+        .num_threads(num_cpus::get())
         .build()
         .unwrap();
 
@@ -322,7 +320,7 @@ fn publishing_fixed_params() {
         let output = ParallelTransactionExecutor::<
             Transaction<KeyType<[u8; 32]>, [u8; 32]>,
             Task<KeyType<[u8; 32]>, [u8; 32]>,
-        >::new(&thread_pool)
+        >::new(&thread_pool, concurrencu_level)
         .execute_transactions_parallel((), transactions.clone());
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

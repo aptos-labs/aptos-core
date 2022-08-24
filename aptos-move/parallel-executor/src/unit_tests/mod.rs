@@ -20,13 +20,16 @@ where
     V: Send + Sync + Debug + Clone + Eq + 'static,
 {
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(concurrency_level)
+        .num_threads(num_cpus::get())
         .thread_name(|index| format!("parallel_executor_{}", index))
         .build()
         .unwrap();
 
-    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(&thread_pool)
-        .execute_transactions_parallel((), transactions.clone());
+    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(
+        &thread_pool,
+        thread_pool.current_num_threads(),
+    )
+    .execute_transactions_parallel((), transactions.clone());
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
