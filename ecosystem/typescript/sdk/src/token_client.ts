@@ -8,7 +8,7 @@ import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
 import { BCS, TxnBuilderTypes, TransactionBuilderABI } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
-import { TOKEN_ABIS } from "./token_client_abis";
+import { TOKEN_ABIS } from "./abis";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
