@@ -44,8 +44,9 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-retrier = { path = "../../crates/aptos-retrier" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
+aptosdb = { path = "../../storage/aptosdb" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
-
 framework = { path = "../../aptos-move/framework" }
 inspection-service = { path = "../../crates/inspection-service" }
+state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }

@@ -34,6 +34,8 @@ struct Args {
     options: Options,
     #[structopt(long)]
     num_validators: Option<usize>,
+    #[structopt(long)]
+    num_validator_fullnodes: Option<usize>,
     #[structopt(flatten)]
     success_criteria: SuccessCriteriaArgs,
     #[structopt(
@@ -208,18 +210,25 @@ fn main() -> Result<()> {
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
             let mut test_suite = get_test_suite(args.suite.as_ref())?;
+
+            // Identify the number of validators and fullnodes to run
             if let Some(num_validators) = args.num_validators {
-                match NonZeroUsize::new(num_validators) {
-                    Some(num_validators) => {
-                        test_suite = test_suite.with_initial_validator_count(num_validators)
-                    }
-                    None => {
+                let num_validators_non_zero =
+                    NonZeroUsize::new(num_validators).expect("--num-validators must be positive!");
+                test_suite = test_suite.with_initial_validator_count(num_validators_non_zero);
+
+                // Verify the number of fullnodes is less than the validators
+                if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+                    if num_validator_fullnodes > num_validators {
                         return Err(format_err!(
-                            "--num-validators must be positive! Given: {:?}!",
-                            num_validators
-                        ))
+                            "Cannot have more fullnodes than validators! Fullnodes: {:?}, validators: {:?}.",
+                            num_validator_fullnodes, num_validators
+                        ));
                     }
                 }
+            }
+            if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+                test_suite = test_suite.with_initial_fullnode_count(num_validator_fullnodes)
             }
 
             // Run the test suite

@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
-};
+use crate::smoke_test_environment::SwarmBuilder;
+use crate::test_utils::{assert_balance, create_and_fund_account, transfer_coins};
 use aptos_config::{
     config::{DiscoveryMethod, NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
 use aptos_types::network_address::{NetworkAddress, Protocol};
-use forge::{NodeExt, Swarm, SwarmExt};
+use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     collections::HashSet,
     net::Ipv4Addr,
@@ -21,17 +19,10 @@ const MAX_WAIT_SECS: u64 = 60;
 
 #[tokio::test]
 async fn test_full_node_basic_flow() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-
-    let version = swarm.versions().max().unwrap();
+    let mut swarm = local_swarm_with_fullnodes(1, 1).await;
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let vfn_peer_id = swarm
-        .add_validator_fullnode(
-            &version,
-            NodeConfig::default_for_validator_full_node(),
-            validator_peer_id,
-        )
-        .unwrap();
+    let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
+    let version = swarm.versions().max().unwrap();
     let pfn_peer_id = swarm
         .add_full_node(&version, NodeConfig::default_for_public_full_node())
         .unwrap();
@@ -116,21 +107,9 @@ async fn test_full_node_basic_flow() {
 
 #[tokio::test]
 async fn test_vfn_failover() {
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = local_swarm_with_fullnodes(4, 4).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
 
-    let mut vfns = Vec::new();
-    for validator_peer_id in swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>() {
-        let version = swarm.versions().max().unwrap();
-        let vfn = swarm
-            .add_validator_fullnode(
-                &version,
-                NodeConfig::default_for_validator_full_node(),
-                validator_peer_id,
-            )
-            .unwrap();
-        vfns.push(vfn);
-    }
     for fullnode in swarm.full_nodes_mut() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
@@ -153,8 +132,9 @@ async fn test_vfn_failover() {
 
     // set up client
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let vfn_peer_ids = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
     let validator = validator_peer_ids[1];
-    let vfn_client = swarm.full_node(vfns[1]).unwrap().rest_client();
+    let vfn_client = swarm.full_node(vfn_peer_ids[1]).unwrap().rest_client();
 
     // submit client requests directly to VFN of dead V
     swarm.validator_mut(validator).unwrap().stop();
@@ -186,19 +166,11 @@ async fn test_vfn_failover() {
 
 #[tokio::test]
 async fn test_private_full_node() {
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    let transaction_factory = swarm.chain_info().transaction_factory();
-    let version = swarm.versions().max().unwrap();
+    let mut swarm = local_swarm_with_fullnodes(4, 1).await;
+    let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
 
-    // Add a single vfn to connect to
-    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let vfn_peer_id = swarm
-        .add_validator_fullnode(
-            &version,
-            NodeConfig::default_for_validator_full_node(),
-            validator_peer_id,
-        )
-        .unwrap();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
     // Here we want to add two swarms, a private full node, followed by a user full node connected to it
     let mut private_config = NodeConfig::default_for_public_full_node();
     let private_network = private_config.full_node_networks.first_mut().unwrap();
@@ -222,6 +194,7 @@ async fn test_private_full_node() {
     );
 
     // Now we need to connect the VFNs to the private swarm
+    let version = swarm.versions().max().unwrap();
     add_node_to_seeds(
         &mut private_config,
         swarm.fullnode(vfn_peer_id).unwrap().config(),
@@ -331,4 +304,12 @@ fn add_node_to_seeds(
     };
 
     dest_network_config.seeds.insert(seed_peer_id, seed_peer);
+}
+
+async fn local_swarm_with_fullnodes(num_validators: usize, num_fullnodes: usize) -> LocalSwarm {
+    SwarmBuilder::new_local(num_validators)
+        .with_num_fullnodes(num_fullnodes)
+        .with_aptos()
+        .build()
+        .await
 }

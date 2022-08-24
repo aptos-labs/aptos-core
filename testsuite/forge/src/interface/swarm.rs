@@ -288,15 +288,22 @@ pub trait SwarmExt: Swarm {
     /// that version. Once done, we can guarantee that all transactions committed before invocation
     /// of this function are available at all the nodes in the swarm
     async fn wait_for_all_nodes_to_catchup(&self, deadline: Instant) -> Result<()> {
+        let highest_synced_version = self.get_highest_synced_version().await?;
+        self.wait_for_all_nodes_to_catchup_to_version(highest_synced_version, deadline)
+            .await
+    }
+
+    /// Returns the highest synced version of the swarm
+    async fn get_highest_synced_version(&self) -> Result<u64> {
         let clients = self
             .validators()
             .map(|node| node.rest_client())
             .chain(self.full_nodes().map(|node| node.rest_client()))
             .collect::<Vec<_>>();
-
         if clients.is_empty() {
-            bail!("no nodes available")
+            bail!("No nodes are available!")
         }
+
         let mut latest_version = 0u64;
         for c in clients {
             latest_version = latest_version.max(
@@ -306,8 +313,6 @@ pub trait SwarmExt: Swarm {
                     .unwrap_or(0),
             );
         }
-
-        self.wait_for_all_nodes_to_catchup_to_version(latest_version, deadline)
-            .await
+        Ok(latest_version)
     }
 }

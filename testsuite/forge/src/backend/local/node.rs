@@ -4,11 +4,14 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
 };
+use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
+use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -243,7 +246,36 @@ impl Node for LocalNode {
     }
 
     fn clear_storage(&mut self) -> Result<()> {
-        todo!()
+        // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
+        let node_config = self.config();
+        let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
+        let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
+        let secure_storage_db_path = node_config.storage.dir().join(SECURE_STORAGE_DB_NAME);
+        let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
+
+        // Verify the files exist
+        assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
+        assert!(state_sync_db_path.as_path().exists());
+        if self.config.base.role.is_validator() {
+            assert!(secure_storage_db_path.as_path().exists());
+        }
+
+        info!(
+            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}) for node {:?}",
+            ledger_db_path.as_path(),
+            state_db_path.as_path(),
+            secure_storage_db_path.as_path(),
+            state_sync_db_path.as_path(),
+            self.name
+        );
+        fs::remove_dir_all(ledger_db_path).unwrap();
+        fs::remove_dir_all(state_db_path).unwrap();
+        fs::remove_dir_all(state_sync_db_path).unwrap();
+        if self.config.base.role.is_validator() {
+            fs::remove_dir_all(secure_storage_db_path).unwrap();
+        }
+
+        Ok(())
     }
 
     async fn health_check(&mut self) -> Result<(), HealthCheckError> {

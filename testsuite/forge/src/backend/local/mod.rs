@@ -3,6 +3,7 @@
 
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, Context};
+use aptos_config::config::NodeConfig;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use framework::ReleaseBundle;
@@ -113,6 +114,7 @@ impl LocalFactory {
         &self,
         rng: R,
         number_of_validators: NonZeroUsize,
+        number_of_fullnodes: usize,
         version: &Version,
         genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
@@ -122,6 +124,7 @@ impl LocalFactory {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
+        // Build the swarm
         let mut swarm = LocalSwarm::build(
             rng,
             number_of_validators,
@@ -134,10 +137,24 @@ impl LocalFactory {
             guard,
         )?;
 
+        // Launch the swarm
         swarm
             .launch()
             .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
+
+        // Add and launch the fullnodes
+        let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        for validator_peer_id in validator_peer_ids.iter().take(number_of_fullnodes) {
+            let _ = swarm
+                .add_validator_fullnode(
+                    version,
+                    NodeConfig::default_for_validator_full_node(),
+                    *validator_peer_id,
+                )
+                .unwrap();
+        }
+        swarm.wait_all_alive(Duration::from_secs(60)).await?;
 
         Ok(swarm)
     }
@@ -153,8 +170,7 @@ impl Factory for LocalFactory {
         &self,
         rng: &mut StdRng,
         num_validators: NonZeroUsize,
-        // TODO: support fullnodes in local forge
-        _num_fullnodes: usize,
+        num_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
@@ -174,7 +190,16 @@ impl Factory for LocalFactory {
         let guard = ActiveNodesGuard::grab(1, Arc::new(Mutex::new(0))).await;
 
         let swarm = self
-            .new_swarm_with_version(rng, num_validators, version, framework, None, None, guard)
+            .new_swarm_with_version(
+                rng,
+                num_validators,
+                num_fullnodes,
+                version,
+                framework,
+                None,
+                None,
+                guard,
+            )
             .await?;
 
         Ok(Box::new(swarm))
