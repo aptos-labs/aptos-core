@@ -21,3 +21,6 @@ application.register("refresh", RefreshController)
 
 import ShakeController from "./shake_controller"
 application.register("shake", ShakeController)
+
+import VisibilityController from "./visibility_controller"
+application.register("visibility", VisibilityController)
