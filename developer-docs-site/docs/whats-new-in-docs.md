@@ -5,6 +5,10 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
+## 24 August 2022
+
+- The Korean language version of the [Aptos White Paper](aptos-white-paper#full-pdf-versions) is posted.
+
 ## 16 August 2022
 
 - A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction-sdk) is posted.
