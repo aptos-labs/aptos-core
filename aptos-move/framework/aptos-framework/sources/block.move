@@ -20,7 +20,8 @@ module aptos_framework::block {
         /// Time period between epochs.
         epoch_interval: u64,
         /// Handle where events with the time of new blocks are emitted
-        new_block_events: EventHandle<Self::NewBlockEvent>,
+        new_block_events: EventHandle<NewBlockEvent>,
+        update_epoch_interval_events: EventHandle<UpdateEpochIntervalEvent>,
     }
 
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
@@ -34,6 +35,12 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         /// On-chain time during the block at the given height
         time_microseconds: u64,
+    }
+
+    /// Event emitted when a proposal is created.
+    struct UpdateEpochIntervalEvent has drop, store {
+        old_epoch_interval: u64,
+        new_epoch_interval: u64,
     }
 
     /// The number of new block events does not equal the current block height.
@@ -53,7 +60,8 @@ module aptos_framework::block {
             BlockResource {
                 height: 0,
                 epoch_interval: epoch_interval_microsecs,
-                new_block_events: event::new_event_handle<Self::NewBlockEvent>(aptos_framework),
+                new_block_events: event::new_event_handle<NewBlockEvent>(aptos_framework),
+                update_epoch_interval_events: event::new_event_handle<UpdateEpochIntervalEvent>(aptos_framework),
             }
         );
     }
@@ -67,8 +75,14 @@ module aptos_framework::block {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(new_epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
-        let block_metadata = borrow_global_mut<BlockResource>(@aptos_framework);
-        block_metadata.epoch_interval = new_epoch_interval;
+        let block_resource = borrow_global_mut<BlockResource>(@aptos_framework);
+        let old_epoch_interval = block_resource.epoch_interval;
+        block_resource.epoch_interval = new_epoch_interval;
+
+        event::emit_event<UpdateEpochIntervalEvent>(
+            &mut block_resource.update_epoch_interval_events,
+            UpdateEpochIntervalEvent { old_epoch_interval, new_epoch_interval },
+        );
     }
 
     /// Return epoch interval in seconds.
