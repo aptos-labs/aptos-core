@@ -25,6 +25,7 @@ module aptos_framework::account {
         authentication_key: vector<u8>,
         sequence_number: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
+        key_rotation_events: EventHandle<KeyRotationEvent>,
         rotation_capability_offer: CapabilityOffer<RotationCapability>,
         signer_capability_offer: CapabilityOffer<SignerCapability>,
     }
@@ -67,6 +68,12 @@ module aptos_framework::account {
     struct RotationCapabilityOfferProofChallenge has drop {
         sequence_number: u64,
         recipient_address: address,
+    }
+
+    struct KeyRotationEvent has drop, store {
+        address_of_rotator: address,
+        from: address,
+        to: address,
     }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -164,6 +171,7 @@ module aptos_framework::account {
                 authentication_key,
                 sequence_number: 0,
                 coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
+                key_rotation_events: event::new_event_handle<KeyRotationEvent>(&new_account),
                 rotation_capability_offer: CapabilityOffer { for: option::none() },
                 signer_capability_offer: CapabilityOffer { for: option::none() },
             }
@@ -259,6 +267,19 @@ module aptos_framework::account {
 
         // Update the account with the new authentication key
         account_resource.authentication_key = new_auth_key;
+
+        // Emit event upon key rotation
+        let account = borrow_global_mut<Account>(addr);
+        event::emit_event<KeyRotationEvent>(
+            &mut account.key_rotation_events,
+            KeyRotationEvent {
+                // Address of rotator may be different from the addr of the account
+                // once we allow key rotation on behalf of another account
+                address_of_rotator: addr,
+                from: addr,
+                to: new_address,
+            },
+        );
     }
 
     /// Offer rotation capability of this account to another address
