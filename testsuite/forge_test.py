@@ -11,7 +11,7 @@ from .forge import (
     AwsError, FakeTime, ForgeFormatter, ForgeResult, ForgeState,
     Git, K8sForgeRunner, assert_aws_token_expiration, find_recent_images,
     format_pre_comment, get_dashboard_link, get_humio_logs_link,
-    get_validator_logs_link, list_eks_clusters, main, ForgeContext, LocalForgeRunner, FakeShell,
+    get_validator_logs_link, list_eks_clusters, list_jobs, main, ForgeContext, LocalForgeRunner, FakeShell,
     FakeFilesystem, RunResult, FakeProcesses
 )
 
@@ -39,7 +39,9 @@ class AssertFixtureMixin:
             test_str,
             fixture,
             f"Fixture {fixture_name} does not match"
-            "\nRerun with FOREGE_WRITE_FIXTURES=true to update the fixtures"
+            "\n"
+            f"Wrote to {str(temp)} for comparison"
+            "\nRerun with FORGE_WRITE_FIXTURES=true to update the fixtures"
         )
 
 
@@ -130,7 +132,6 @@ class ForgeRunnerTests(unittest.TestCase):
                 'f --namespace potato --port-forward',
                 RunResult(0, b"orange"),
             ),
-            ('kubectl get pods -n potato', RunResult(0, b"debugging_output")),
         ]))
         filesystem = SpyFilesystem({}, {})
         context = fake_context(shell, filesystem)
@@ -150,7 +151,6 @@ class ForgeRunnerTests(unittest.TestCase):
             ("kubectl wait -n default --timeout=5m --for=condition=Ready pod/potato-1659078000-asdf", RunResult(0, b"")),
             ("kubectl logs -n default -f potato-1659078000-asdf", RunResult(0, b"")),
             ("kubectl get pod -n default potato-1659078000-asdf -o jsonpath='{.status.phase}'", RunResult(0, b"Succeeded")),
-            ('kubectl get pods -n potato', RunResult(0, b"debugging_output")),
         ]))
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
         template_fixture = get_fixture_path("forge-test-runner-template.fixture")
@@ -184,7 +184,7 @@ class TestAWSTokenExpiration(unittest.TestCase):
 
 
 class TestFindRecentImage(unittest.TestCase):
-    def testFindRecentImage(self):
+    def testFindRecentImage(self) -> None:
         shell = SpyShell(OrderedDict([
             ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
             ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=potato", RunResult(1, b"")),
@@ -196,7 +196,7 @@ class TestFindRecentImage(unittest.TestCase):
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
-    def testDidntFindRecentImage(self):
+    def testDidntFindRecentImage(self) -> None:
         shell = SpyShell(OrderedDict([
             ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
             ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab", RunResult(1, b"")),
@@ -209,7 +209,7 @@ class TestFindRecentImage(unittest.TestCase):
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
 
-    def testReport(self):
+    def testReport(self) -> None:
         filesystem = SpyFilesystem({"test": b"banana"}, {})
         context = fake_context(filesystem=filesystem)
         result = ForgeResult.from_args(ForgeState.PASS, "test")
@@ -219,19 +219,19 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem.assert_reads(self)
         filesystem.assert_writes(self)
 
-    def testHumioLogLink(self):
+    def testHumioLogLink(self) -> None:
         self.assertFixture(
             get_humio_logs_link("forge-pr-2983"),
             "testHumioLogLink.fixture"
         )
 
-    def testValidatorLogsLink(self):
+    def testValidatorLogsLink(self) -> None:
         self.assertFixture(
             get_validator_logs_link("aptos-perry", "perrynet", True),
             "testValidatorLogsLink.fixture",
         )
 
-    def testDashboardLink(self):
+    def testDashboardLink(self) -> None:
         self.assertFixture(
             get_dashboard_link(
                 "aptos-forge-1",
@@ -242,7 +242,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             "testDashboardLink.fixture",
         )
 
-    def testFormatPreComment(self):
+    def testFormatPreComment(self) -> None:
         context = fake_context()
         self.assertFixture(
             format_pre_comment(context),
@@ -254,7 +254,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
 
-    def testMain(self):
+    def testMain(self) -> None:
         runner = CliRunner()
         with runner.isolated_filesystem():
             os.mkdir(".git")
@@ -269,22 +269,25 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 "--forge-report", "temp-report",
                 "--forge-pre-comment", "temp-pre-comment",
                 "--forge-comment", "temp-comment",
+                "--github-step-summary", "temp-step-summary",
             ], catch_exceptions=False)
             self.assertEqual(
-                os.listdir("."),
-                ['temp-report', 'testsuite', 'temp-pre-comment', '.git', 'temp-comment'],
+                sorted(os.listdir(".")),
+                sorted(['temp-report', 'testsuite', 'temp-pre-comment', '.git', 'temp-comment', 'temp-step-summary']),
             )
             report = Path("temp-report").read_text()
             pre_comment = Path("temp-pre-comment").read_text()
             comment = Path("temp-comment").read_text()
+            step_summary = Path("temp-comment").read_text()
         self.assertFixture(result.output, "testMain.fixture")
         self.assertFixture(pre_comment, "testMainPreComment.fixture")
         self.assertFixture(report, "testMainReport.fixture")
         self.assertFixture(comment, "testMainComment.fixture")
+        self.assertFixture(step_summary, "testMainComment.fixture")
 
 
 class TestListClusters(unittest.TestCase):
-    def testListClusters(self):
+    def testListClusters(self) -> None:
         fake_clusters = (
             json.dumps({
                 "clusters": [
@@ -301,7 +304,7 @@ class TestListClusters(unittest.TestCase):
         self.assertEqual(clusters, ["aptos-forge-banana-1", "aptos-forge-potato-2"])
         shell.assert_commands(self)
 
-    def testListClustersFails(self):
+    def testListClustersFails(self) -> None:
         with self.assertRaises(Exception):
             shell = SpyShell(OrderedDict([
                 ("Blah", RunResult(0, b"")),

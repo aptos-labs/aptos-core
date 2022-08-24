@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import json
 import multiprocessing
+
+
+# Using fork can crash the subprocess, use spawn instead
+multiprocessing.set_start_method('spawn')
+
+
 from optparse import Option
 import os
 import pwd
@@ -15,9 +21,9 @@ import textwrap
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Generator, List, Optional, Sequence, Tuple, TypedDict, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, TypedDict, Union
 
 
 @dataclass
@@ -26,9 +32,12 @@ class RunResult:
     output: bytes
 
     def unwrap(self) -> bytes:
-        if self.exit_code != 0:
+        if not self.succeeded():
             raise Exception(self.output.decode("utf-8"))
         return self.output
+
+    def succeeded(self) -> bool:
+        return self.exit_code == 0
 
 
 class Shell:
@@ -123,6 +132,9 @@ class Filesystem:
     def mkstemp(self) -> str:
         raise NotImplementedError()
 
+    def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
+        raise NotImplementedError()
+
 
 class FakeFilesystem(Filesystem):
     def write(self, filename: str, contents: bytes) -> None:
@@ -133,6 +145,9 @@ class FakeFilesystem(Filesystem):
 
     def mkstemp(self) -> str:
         return "temp"
+
+    def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
+        return
 
 
 class LocalFilesystem(Filesystem):
@@ -146,6 +161,9 @@ class LocalFilesystem(Filesystem):
 
     def mkstemp(self) -> str:
         return tempfile.mkstemp()[1]
+
+    def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
+        resource.setrlimit(resource_type, (soft, hard))
 
 # o11y resources
 INTERN_ES_DEFAULT_INDEX = "90037930-aafc-11ec-acce-2d961187411f"
@@ -193,20 +211,33 @@ class Process:
     def kill(self) -> None:
         raise NotImplementedError()
 
+    def ppid(self) -> int:
+        raise NotImplementedError()
+
 
 @dataclass
 class FakeProcess(Process):
     _name: str
+    _ppid: int
 
     def name(self) -> str:
         return self._name
 
     def kill(self) -> None:
-        print("killing {self._name}")
+        print(f"killing {self._name}")
+
+    def ppid(self) -> int:
+        return self._ppid
 
 
 class Processes:
     def processes(self) -> Generator[Process, None, None]:
+        raise NotImplementedError()
+
+    def get_pid(self) -> int:
+        raise NotImplementedError()
+
+    def spawn(self, target: Callable[[], None]) -> Process:
         raise NotImplementedError()
 
 
@@ -221,15 +252,46 @@ class SystemProcess(Process):
         self.process.kill()
 
 
+@dataclass
+class MultiProcessingProcess(Process):
+    process: multiprocessing.Process
+
+    def name(self) -> str:
+        return self.process.name
+
+    def ppid(self) -> int:
+        # Since we spawn this process for all intents and purposes we are its
+        # parent process
+        return os.getpid()
+
+    def kill(self) -> None:
+        self.process.terminate()
+        self.process.join()
+
+
 class SystemProcesses(Processes):
     def processes(self) -> Generator[Process, None, None]:
         for process in psutil.process_iter():
             yield SystemProcess(process)
 
+    def get_pid(self) -> int:
+        return os.getpid()
+
+    def spawn(self, target: Callable[[], None]) -> Process:
+        process = multiprocessing.Process(daemon=True, target=target)
+        process.start()
+        return MultiProcessingProcess(process)
+
 
 class FakeProcesses(Processes):
     def processes(self) -> Generator[Process, None, None]:
-        yield FakeProcess("concensus")
+        yield FakeProcess("concensus", 1)
+
+    def get_pid(self) -> int:
+        return 2
+
+    def spawn(self, target: Callable[[], None]) -> Process:
+        return FakeProcess("child", 2)
 
 
 class ForgeState(Enum):
@@ -275,7 +337,16 @@ class ForgeResult:
         result = cls()
         result.state = ForgeState.RUNNING
         result._start_time = context.time.now()
-        yield result
+        try:
+            yield result
+        except Exception as e:
+            result.set_state(ForgeState.FAIL)
+            result.set_debugging_output(
+                "Error: {}\nDebugging Output:{}\n".format(
+                    str(e),
+                    dump_forge_state(context.shell, context.forge_namespace)
+                )
+            )
         result._end_time = context.time.now()
         if result.state not in (ForgeState.PASS, ForgeState.FAIL, ForgeState.SKIP):
             raise Exception("Forge result never entered terminal state")
@@ -585,14 +656,20 @@ def dump_forge_state(shell: Shell, forge_namespace: str) -> str:
         return f"Failed to get debugging output: {e}"
 
 
+def find_the_killer(shell: Shell, forge_namespace) -> str:
+    killer = shell.run([
+        "kubectl", "get", "pod",
+        "-l", f"forge-namespace={forge_namespace}",
+        "-o", "jsonpath={.items[0].metadata.name}",
+    ]).output.decode()
+    return f"Likely killed by {killer}"
+
+
 class LocalForgeRunner(ForgeRunner):
     def run(self, context: ForgeContext) -> ForgeResult:
-        # Set rlimit to unlimited
-        resource.setrlimit(resource.RLIMIT_NOFILE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-        # Using fork can crash the subprocess, use spawn instead
-        multiprocessing.set_start_method('spawn')
-        port_forward_process = multiprocessing.Process(daemon=True, target=prometheus_port_forward)
-        port_forward_process.start()
+        # Set rlimit to unlimited for txn emitter locally
+        context.filesystem.rlimit(resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+        port_forward_process = context.processes.spawn(prometheus_port_forward)
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run([
                 "cargo", "run", "-p", "forge-cli",
@@ -611,22 +688,17 @@ class LocalForgeRunner(ForgeRunner):
                 *context.keep_args,
                 *context.haproxy_args,
             ], stream_output=True)
-            forge_result.set_debugging_output(dump_forge_state(context.shell, context.forge_namespace))
-            try:
-                forge_result.set_output(result.unwrap().decode())
-                forge_result.set_state(ForgeState.PASS)
-            except Exception as e:
-                forge_result.set_output(str(e))
-                forge_result.set_state(ForgeState.FAIL)
+            forge_result.set_output(result.output.decode())
+            forge_result.set_state(ForgeState.PASS if result.succeeded() else ForgeState.FAIL)
 
         # Kill port forward unless we're keeping them
         if not context.keep_args:
             # Kill all processess with kubectl in the name
-            for process in psutil.process_iter():
-                if 'kubectl' in process.name():
+            for process in context.processes.processes():
+                if 'kubectl' in process.name() and process.ppid() == context.processes.get_pid():
+                    print("Killing", process)
                     process.kill()
-            port_forward_process.terminate()
-            port_forward_process.join()
+            port_forward_process.kill()
 
         return forge_result
 
@@ -676,7 +748,9 @@ class K8sForgeRunner(ForgeRunner):
             ]).unwrap()
             forge_logs = context.shell.run([
                 "kubectl", "logs", "-n", "default", "-f", forge_pod_name
-            ], stream_output=True).unwrap()
+            ], stream_output=True)
+
+            forge_result.set_output(forge_logs.output.decode())
 
             state = None
             attempts = 100
@@ -684,7 +758,7 @@ class K8sForgeRunner(ForgeRunner):
                 # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
                 forge_status = context.shell.run([
                     "kubectl", "get", "pod", "-n", "default", forge_pod_name, "-o", "jsonpath='{.status.phase}'"
-                ]).unwrap().decode().lower()
+                ]).output.decode().lower()
 
                 if "running" in forge_status:
                     continue
@@ -692,6 +766,7 @@ class K8sForgeRunner(ForgeRunner):
                     state = ForgeState.PASS
                 elif re.findall(r"not\s*found", forge_status, re.IGNORECASE):
                     state = ForgeState.SKIP
+                    forge_result.set_debugging_output(find_the_killer(context.shell, context.forge_namespace))
                 else:
                     state = ForgeState.FAIL
 
@@ -699,9 +774,7 @@ class K8sForgeRunner(ForgeRunner):
                 if attempts <= 0:
                     raise Exception("Exhausted attempt to get forge pod status")
 
-            forge_result.set_output(forge_logs.decode())
             forge_result.set_state(state)
-            forge_result.set_debugging_output(dump_forge_state(context.shell, context.forge_namespace))
 
         return forge_result
 
@@ -900,12 +973,13 @@ def test(
             update_aws_auth(shell, aws_auth_script)
             aws_account_num = get_aws_account_num(shell)
 
-    if aws_auth_script and aws_token_expiration:
+    if aws_auth_script and aws_token_expiration and not dry_run:
         assert_aws_token_expiration(os.getenv("AWS_TOKEN_EXPIRATION", aws_token_expiration))
 
     assert aws_account_num is not None, "AWS account number is required"
 
     # Perform cluster selection
+    current_cluster = None
     if not forge_cluster_name:
         if interactive:
             current_cluster = get_current_cluster_name(shell)
@@ -925,13 +999,13 @@ def test(
             click.confirm("Continue?", abort=True)
         else:
             return
+
     set_current_cluster(shell, forge_cluster_name)
 
     if forge_namespace is None:
         forge_namespace = f"forge-{get_current_user()}-{time.epoch()}"
 
     assert forge_namespace is not None, "Forge namespace is required"
-
 
     default_latest_image, second_latest_image = list(find_recent_images(shell, git, 2))
     if forge_test_suite == "compat":
@@ -943,6 +1017,10 @@ def test(
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
+
+    assert image_tag is not None, "Image tag is required"
+    assert forge_image_tag is not None, "Forge image tag is required"
+    assert upgrade_image_tag is not None, "Upgrade image tag is required"
 
     context = ForgeContext(
         shell=shell,
@@ -984,27 +1062,96 @@ def test(
             ForgeResult.empty(),
             [ForgeFormatter(forge_pre_comment, lambda *_: pre_comment)],
         )
+
     if forge_runner_mode == 'pre-forge':
         return
 
-    forge_runner = forge_runner_mapping[forge_runner_mode]()
-    result = forge_runner.run(context)
+    try:
+        forge_runner = forge_runner_mapping[forge_runner_mode]()
+        result = forge_runner.run(context)
+        
+        print(result.format())
+        if not result.succeeded():
+            print(result.debugging_output)
 
-    print(result.format())
+        outputs = []
+        if forge_output:
+            outputs.append(ForgeFormatter(forge_output, lambda *_: result.output))
+        if forge_report:
+            outputs.append(ForgeFormatter(forge_report, format_report))
+        if forge_comment:
+            outputs.append(ForgeFormatter(forge_comment, format_comment))
+        if github_step_summary:
+            outputs.append(ForgeFormatter(github_step_summary, format_comment))
+        context.report(result, outputs)
 
-    outputs = []
-    if forge_output:
-        outputs.append(ForgeFormatter(forge_output, lambda *_: result.output))
-    if forge_report:
-        outputs.append(ForgeFormatter(forge_report, format_report))
-    if forge_comment:
-        outputs.append(ForgeFormatter(forge_comment, format_comment))
-    if github_step_summary:
-        outputs.append(ForgeFormatter(github_step_summary, format_comment))
-    context.report(result, outputs)
+        if not result.succeeded() and forge_blocking == "true":
+            raise SystemExit(1)
 
-    if not result.succeeded() and forge_blocking == "true":
-        raise SystemExit(1)
+    except Exception as e:
+        raise Exception("Forge state:\n" + dump_forge_state(shell, forge_namespace)) from e
+
+
+@dataclass
+class ForgeJob:
+    name: str
+    phase: str
+
+    @classmethod
+    def from_pod(cls, pod: Dict[str, Any]) -> ForgeJob:
+        return cls(name=pod["metadata"]["name"], phase=pod["status"]["phase"])
+
+    def running(self):
+        return self.phase == "Running"
+
+    def succeeded(self):
+        return self.phase == "Succeeded"
+
+    def failed(self):
+        return self.phase == "Failed"
+
+
+def get_forge_jobs(shell: Shell) -> Generator[ForgeJob, None, None]:
+    pod_result = shell.run([
+        "kubectl", "get", "pods", "-n", "default", "-o", "json"
+    ]).unwrap().decode()
+    pods = json.loads(pod_result)["items"]
+    for pod in pods:
+        if pod["metadata"]["name"].startswith("forge-"):
+            yield ForgeJob.from_pod(pod)
+
+
+@main.command("list-jobs")
+@click.option("--phase", multiple=True, help="Only show jobs in this phase")
+@click.option("--regex", help="Only show jobs matching this regex")
+def list_jobs(
+    phase: List[str],
+    regex: str,
+) -> None:
+    """List all available clusters"""
+    shell = LocalShell()
+    old_cluster = get_current_cluster_name(shell)
+    pattern = re.compile(regex or ".*")
+    try:
+        for cluster in list_eks_clusters(shell):
+            set_current_cluster(shell, cluster)
+            print("Cluster:", cluster)
+            for job in get_forge_jobs(shell):
+                if not pattern.match(job.name) or phase and job.phase not in phase:
+                    continue
+                if job.succeeded():
+                    fg = "green"
+                elif job.failed():
+                    fg = "red"
+                elif job.running():
+                    fg = "yellow"
+                else:
+                    fg = "white"
+
+                click.secho(f"{job.name} {job.phase}", fg=fg)
+    except Exception as e:
+        set_current_cluster(shell, old_cluster)
+        raise e
 
 
 if __name__ == "__main__":
