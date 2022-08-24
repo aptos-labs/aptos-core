@@ -15,7 +15,7 @@ module hello_blockchain::message_tests {
     public entry fun sender_can_set_message() {
         let account = get_account();
         let addr = signer::address_of(&account);
-        message::set_message(account,  b"Hello, Blockchain");
+        message::set_message(account,  string::utf8(b"Hello, Blockchain"));
 
         assert!(
           message::get_message(addr) == string::utf8(b"Hello, Blockchain"),
