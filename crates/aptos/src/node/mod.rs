@@ -717,12 +717,12 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
 #[derive(Parser)]
 pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
-    #[clap(long)]
-    pub start_epoch: Option<u64>,
+    #[clap(long, default_value = "-2")]
+    pub start_epoch: i64,
 
     /// Last epoch to analyze
     #[clap(long)]
-    pub end_epoch: Option<u64>,
+    pub end_epoch: Option<i64>,
 
     /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
     #[clap(arg_enum, long)]
@@ -760,7 +760,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
         let client = self.rest_options.client(&self.profile_options.profile)?;
 
         let epochs =
-            FetchMetadata::fetch_new_block_events(&client, self.start_epoch, self.end_epoch)
+            FetchMetadata::fetch_new_block_events(&client, Some(self.start_epoch), self.end_epoch)
                 .await?;
         let mut stats = HashMap::new();
 
@@ -770,7 +770,11 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             let epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
             if print_detailed {
-                println!("Detailed table for epoch {}:", epoch_info.epoch);
+                println!(
+                    "Detailed table for {}epoch {}:",
+                    if epoch_info.partial { "partial " } else { "" },
+                    epoch_info.epoch
+                );
                 AnalyzeValidators::print_detailed_epoch_table(
                     &epoch_stats,
                     Some((
@@ -784,7 +788,9 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
                     true,
                 );
             }
-            stats.insert(epoch_info.epoch, epoch_stats);
+            if !epoch_info.partial {
+                stats.insert(epoch_info.epoch, epoch_stats);
+            }
         }
 
         if stats.is_empty() {
