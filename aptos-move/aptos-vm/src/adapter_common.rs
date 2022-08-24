@@ -166,7 +166,7 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
         )?;
 
         // Apply deltas.
-        let output = output_ext.into_transaction_output(&data_cache)?;
+        let output = output_ext.into_transaction_output(&data_cache);
 
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());

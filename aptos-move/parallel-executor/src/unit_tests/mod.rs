@@ -7,6 +7,7 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_types::write_set::TransactionWrite;
 use rand::random;
 use std::{
@@ -21,32 +22,151 @@ where
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions);
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-    assert!(baseline.check_output(&output))
+    baseline.assert_output(&output, None);
+}
+
+fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
+    ValueType((0..4).map(|_| (random::<u8>())).collect(), !delete_value)
+}
+
+#[test]
+fn delta_counters() {
+    let key = KeyType(random::<[u8; 32]>(), false);
+    let mut transactions = vec![Transaction::Write {
+        incarnation: Arc::new(AtomicUsize::new(0)),
+        reads: vec![vec![]],
+        writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+    }];
+
+    for _ in 0..50 {
+        transactions.push(Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+        });
+    }
+
+    transactions.push(Transaction::Write {
+        incarnation: Arc::new(AtomicUsize::new(0)),
+        reads: vec![vec![]],
+        writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+    });
+
+    for _ in 0..50 {
+        transactions.push(Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_sub(2, u128::MAX))])],
+        });
+    }
+
+    run_and_assert(transactions)
+}
+
+#[test]
+fn deleted_aggregator() {
+    let key = KeyType(random::<[u8; 32]>(), false);
+    let transactions = vec![
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![]],
+            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![]],
+            writes_and_deltas: vec![(vec![(key, random_value(true))], vec![])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![]],
+            writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+        },
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key]],
+            writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+        },
+    ];
+
+    run_and_assert(transactions)
+}
+
+#[test]
+fn delta_chains() {
+    let mut transactions = vec![];
+    // Generate a series of transactions add and subtract from an aggregator.
+
+    let keys: Vec<KeyType<[u8; 32]>> = (0..10)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
+
+    for i in 0..500 {
+        transactions.push(
+            Transaction::Write::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+                incarnation: Arc::new(AtomicUsize::new(0)),
+                reads: vec![keys.clone()],
+                writes_and_deltas: vec![(
+                    vec![],
+                    keys.iter()
+                        .enumerate()
+                        .filter_map(|(j, k)| match (i + j) % 2 == 0 {
+                            true => Some((
+                                *k,
+                                // Deterministic pattern for adds/subtracts.
+                                DeltaOp::new(
+                                    if (i % 2 == 0) == (j < 5) {
+                                        DeltaUpdate::Plus(10)
+                                    } else {
+                                        DeltaUpdate::Minus(1)
+                                    },
+                                    // below params irrelevant for this test.
+                                    u128::MAX,
+                                    0,
+                                    0,
+                                ),
+                            )),
+                            false => None,
+                        })
+                        .collect(),
+                )],
+            },
+        )
+    }
+
+    run_and_assert(transactions)
 }
 
 const TOTAL_KEY_NUM: u64 = 50;
 const WRITES_PER_KEY: u64 = 100;
 
-fn random_value() -> ValueType<Vec<u8>> {
-    ValueType((0..4).map(|_| random::<u8>()).collect())
-}
-
 #[test]
 fn cycle_transactions() {
     let mut transactions = vec![];
-    // For every key in `TOTAL_KEY_NUM`, generate a series transaction that will assign a value to
-    // this key.
+    // For every key in `TOTAL_KEY_NUM`, generate a series of transactions that will assign a
+    // value to this key.
     for _ in 0..TOTAL_KEY_NUM {
         let key = random::<[u8; 32]>();
         for _ in 0..WRITES_PER_KEY {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![KeyType(key, false)]],
-                writes: vec![vec![(KeyType(key, false), random_value())]],
+                writes_and_deltas: vec![(vec![(KeyType(key, false), random_value(false))], vec![])],
             })
         }
     }
@@ -67,14 +187,14 @@ fn one_reads_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
             })
         }
         // One transaction reading the write results of every prior transactions in the block.
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![keys.clone()],
-            writes: vec![vec![]],
+            writes_and_deltas: vec![(vec![], vec![])],
         })
     }
     run_and_assert(transactions)
@@ -91,17 +211,19 @@ fn one_writes_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
             })
         }
         // One transaction writing to the write results of every prior transactions in the block.
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![keys.clone()],
-            writes: vec![keys
-                .iter()
-                .map(|key| (*key, random_value()))
-                .collect::<Vec<_>>()],
+            writes_and_deltas: vec![(
+                keys.iter()
+                    .map(|key| (*key, random_value(false)))
+                    .collect::<Vec<_>>(),
+                vec![],
+            )],
         })
     }
     run_and_assert(transactions)
@@ -119,7 +241,7 @@ fn early_aborts() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
             })
         }
         // One transaction that triggers an abort
@@ -140,7 +262,7 @@ fn early_skips() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
             })
         }
         // One transaction that triggers an abort
