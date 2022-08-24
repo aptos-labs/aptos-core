@@ -27,7 +27,6 @@ use kube::{
 use rand::Rng;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::path::PathBuf;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -387,10 +386,6 @@ fn get_node_default_helm_path() -> String {
     } else {
         "/aptos/terraform/aptos-node-default-values.yaml".to_string()
     }
-}
-
-fn get_current_working_dir() -> std::io::Result<PathBuf> {
-    env::current_dir()
 }
 
 pub async fn install_testnet_resources(
