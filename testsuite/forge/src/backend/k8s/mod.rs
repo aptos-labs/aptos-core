@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, Result, Swarm, Version};
+use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
@@ -97,6 +97,8 @@ impl Factory for K8sFactory {
         genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
         cleanup_duration: Duration,
+        genesis_config_fn: Option<GenesisConfigFn>,
+        node_config_fn: Option<NodeConfigFn>,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
@@ -139,6 +141,8 @@ impl Factory for K8sFactory {
                 genesis_modules_path,
                 self.use_port_forward,
                 self.enable_haproxy,
+                genesis_config_fn,
+                node_config_fn,
             )
             .await
             {

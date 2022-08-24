@@ -1,0 +1,27 @@
+validator:
+  enableNetworkPolicy: false
+  rust_log: debug,hyper=off
+
+fullnode:
+  # at most one VFN per validator, depending on numFullnodeGroups
+  groups:
+  - name: fullnode
+    replicas: 1
+  rust_log: debug,hyper=off
+
+# make all services internal ClusterIP and open all ports
+service:
+  validator:
+    external:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true
+
+  fullnode:
+    external:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true
+
+# always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
+loadTestGenesis: false
