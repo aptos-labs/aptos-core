@@ -628,11 +628,6 @@ impl TransactionsApi {
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
         let output = output_ext.into_transaction_output(&move_resolver);
-        debug_assert!(
-            matches!(output, Ok(_)),
-            "converting into transaction output failed"
-        );
-        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,

@@ -973,9 +973,12 @@ name = "aptos-parallel-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-aggregator",
  "aptos-infallible",
+ "aptos-state-view",
  "aptos-types",
  "arc-swap",
+ "bcs",
  "claim",
  "criterion",
  "crossbeam",
@@ -6249,6 +6252,10 @@ dependencies = [
 name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-types",
+ "bcs",
  "crossbeam",
  "dashmap",
  "proptest",

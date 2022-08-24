@@ -8,6 +8,7 @@ use crate::{
         ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
 };
+use aptos_aggregator::delta_change_set::serialize;
 use claim::assert_ok;
 use num_cpus;
 use proptest::{
@@ -26,8 +27,7 @@ fn run_transactions<K, V>(
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
     module_access: (bool, bool),
-) -> bool
-where
+) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
     Vec<u8>: From<V>,
@@ -45,24 +45,23 @@ where
         *transactions.get_mut(i.index(length)).unwrap() = Transaction::SkipRest;
     }
 
-    let mut ret = true;
     for _ in 0..num_repeat {
         let output = ParallelTransactionExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
             continue;
         }
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions);
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
 
-        ret = ret && baseline.check_output(&output);
+        baseline.assert_output(&output, None);
     }
-    ret
 }
 
 proptest! {
@@ -74,7 +73,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -84,7 +83,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -94,7 +93,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -104,7 +103,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 
     #[test]
@@ -114,7 +113,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
     }
 }
 
@@ -134,14 +133,100 @@ fn dynamic_read_writes() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen,
         vec![],
         vec![],
         100,
         (false, false),
-    ));
+    );
+}
+
+#[test]
+fn deltas_writes_mixed() {
+    let mut runner = TestRunner::default();
+    let num_txns = 1000;
+
+    let universe = vec(any::<[u8; 32]>(), 50)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        num_txns,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    let transactions: Vec<_> = transaction_gen
+        .into_iter()
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true))
+        .collect();
+
+    for _ in 0..20 {
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
+
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+        baseline.assert_output(&output, None);
+    }
+}
+
+#[test]
+fn deltas_resolver() {
+    let mut runner = TestRunner::default();
+    let num_txns = 1000;
+
+    let universe = vec(any::<[u8; 32]>(), 50)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        num_txns,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    // Do not allow deletes as that would panic in resolver.
+    let transactions: Vec<_> = transaction_gen
+        .into_iter()
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
+        .collect();
+
+    for _ in 0..20 {
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone());
+
+        let (output, delta_resolver) = output.unwrap();
+        // Should not be possible to overflow or underflow, as each delta is at
+        // most 100 in the tests.
+        let storage_delta_val = 100001;
+        let resolved = delta_resolver.resolve(
+            (15..50)
+                .map(|i| {
+                    (
+                        KeyType(universe[i], false),
+                        Ok(Some(serialize(&storage_delta_val))),
+                    )
+                })
+                .collect(),
+            num_txns,
+        );
+
+        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
+        baseline.assert_output(&Ok(output), Some(storage_delta_val));
+    }
 }
 
 #[test]
@@ -161,14 +246,14 @@ fn dynamic_read_writes_contended() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen,
         vec![],
         vec![],
         100,
         (false, false),
-    ));
+    );
 }
 
 #[test]
@@ -187,30 +272,23 @@ fn module_publishing_fallback() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    run_transactions(
         &universe,
         transaction_gen.clone(),
         vec![],
         vec![],
         2,
         (false, true),
-    ));
-    assert!(run_transactions(
+    );
+    run_transactions(
         &universe,
         transaction_gen.clone(),
         vec![],
         vec![],
         2,
         (false, true),
-    ));
-    assert!(run_transactions(
-        &universe,
-        transaction_gen,
-        vec![],
-        vec![],
-        2,
-        (true, true),
-    ));
+    );
+    run_transactions(&universe, transaction_gen, vec![], vec![], 2, (true, true));
 }
 
 fn publishing_fixed_params() {
@@ -245,21 +323,22 @@ fn publishing_fixed_params() {
         Transaction::Write {
             incarnation,
             reads,
-            writes,
+            writes_and_deltas,
         } => {
-            let mut new_writes = vec![];
-            for incarnation_writes in writes {
+            let mut new_writes_and_deltas = vec![];
+            for (incarnation_writes, incarnation_deltas) in writes_and_deltas {
                 assert!(!incarnation_writes.is_empty());
                 let val = incarnation_writes[0].1.clone();
                 let insert_idx = indices[1].index(incarnation_writes.len());
                 incarnation_writes.insert(insert_idx, (KeyType(universe[42], true), val));
-                new_writes.push(incarnation_writes.clone());
+                new_writes_and_deltas
+                    .push((incarnation_writes.clone(), incarnation_deltas.clone()));
             }
 
             Transaction::Write {
                 incarnation: incarnation.clone(),
                 reads: reads.clone(),
-                writes: new_writes,
+                writes_and_deltas: new_writes_and_deltas,
             }
         }
         _ => {
@@ -281,7 +360,7 @@ fn publishing_fixed_params() {
         Transaction::Write {
             incarnation,
             reads,
-            writes,
+            writes_and_deltas,
         } => {
             let mut new_reads = vec![];
             for incarnation_reads in reads {
@@ -294,7 +373,7 @@ fn publishing_fixed_params() {
             Transaction::Write {
                 incarnation: incarnation.clone(),
                 reads: new_reads,
-                writes: writes.clone(),
+                writes_and_deltas: writes_and_deltas.clone(),
             }
         }
         _ => {
@@ -307,7 +386,8 @@ fn publishing_fixed_params() {
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), transactions.clone());
+        .execute_transactions_parallel((), transactions.clone())
+        .map(|(res, _)| res);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }
