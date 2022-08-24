@@ -18,6 +18,7 @@ module aptos_framework::account {
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
+    friend aptos_framework::resource_account;
 
     /// Resource representing an account.
     struct Account has key, store {
@@ -183,11 +184,7 @@ module aptos_framework::account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
-    public entry fun rotate_authentication_key(account: &signer, new_auth_key: vector<u8>) acquires Account {
-        rotate_authentication_key_internal(account, new_auth_key);
-    }
-
-    public fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
+    public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_ALREADY_EXISTS));
         assert!(
