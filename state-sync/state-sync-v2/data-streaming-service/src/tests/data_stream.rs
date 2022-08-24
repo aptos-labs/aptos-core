@@ -71,6 +71,7 @@ async fn test_stream_blocked() {
         // Process the data responses and force a data re-fetch
         data_stream
             .process_data_responses(global_data_summary.clone())
+            .await
             .unwrap();
 
         // If we're sent a data notification, verify it's an end of stream notification!
@@ -130,6 +131,7 @@ async fn test_stream_garbage_collection() {
         // Process the data response
         data_stream
             .process_data_responses(global_data_summary.clone())
+            .await
             .unwrap();
 
         // Process the data response
@@ -199,6 +201,7 @@ async fn test_stream_data_error() {
     // Process the responses and verify the data client request was resent to the network
     data_stream
         .process_data_responses(global_data_summary)
+        .await
         .unwrap();
     assert_none!(stream_listener.select_next_some().now_or_never());
     verify_client_request_resubmitted(&mut data_stream, client_request);
@@ -236,6 +239,7 @@ async fn test_stream_invalid_response() {
     // Process the responses and verify the data client request was resent to the network
     data_stream
         .process_data_responses(global_data_summary)
+        .await
         .unwrap();
     assert_none!(stream_listener.select_next_some().now_or_never());
     verify_client_request_resubmitted(&mut data_stream, client_request);
@@ -270,6 +274,7 @@ async fn test_epoch_stream_out_of_order_responses() {
     set_epoch_ending_response_in_queue(&mut data_stream, 1);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     assert_none!(stream_listener.select_next_some().now_or_never());
 
@@ -277,6 +282,7 @@ async fn test_epoch_stream_out_of_order_responses() {
     set_epoch_ending_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     for _ in 0..2 {
         verify_epoch_ending_notification(
@@ -292,6 +298,7 @@ async fn test_epoch_stream_out_of_order_responses() {
     set_epoch_ending_response_in_queue(&mut data_stream, 2);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     verify_epoch_ending_notification(
         &mut stream_listener,
@@ -305,6 +312,7 @@ async fn test_epoch_stream_out_of_order_responses() {
     set_epoch_ending_response_in_queue(&mut data_stream, 2);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     for _ in 0..3 {
         verify_epoch_ending_notification(
@@ -342,6 +350,7 @@ async fn test_state_stream_out_of_order_responses() {
     set_num_state_values_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
 
     // Verify at least six requests have been made
@@ -355,6 +364,7 @@ async fn test_state_stream_out_of_order_responses() {
     set_state_value_response_in_queue(&mut data_stream, 1);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     assert_none!(stream_listener.select_next_some().now_or_never());
 
@@ -362,6 +372,7 @@ async fn test_state_stream_out_of_order_responses() {
     set_state_value_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     for _ in 0..2 {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -377,6 +388,7 @@ async fn test_state_stream_out_of_order_responses() {
     set_state_value_response_in_queue(&mut data_stream, 2);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     assert_matches!(
@@ -390,6 +402,7 @@ async fn test_state_stream_out_of_order_responses() {
     set_state_value_response_in_queue(&mut data_stream, 2);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     for _ in 0..3 {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -430,6 +443,7 @@ async fn test_stream_listener_dropped() {
     set_epoch_ending_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     verify_epoch_ending_notification(
         &mut stream_listener,
@@ -449,6 +463,7 @@ async fn test_stream_listener_dropped() {
     set_epoch_ending_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap_err();
     let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
     assert_eq!(sent_notifications.len(), 2);
@@ -457,6 +472,7 @@ async fn test_stream_listener_dropped() {
     set_epoch_ending_response_in_queue(&mut data_stream, 0);
     data_stream
         .process_data_responses(global_data_summary.clone())
+        .await
         .unwrap();
     let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
     assert_eq!(sent_notifications.len(), 2);
