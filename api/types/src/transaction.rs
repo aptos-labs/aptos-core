@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
+    Address, AptosError, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
@@ -345,6 +345,17 @@ pub struct SubmitTransactionRequest {
     pub user_transaction_request: UserTransactionRequestInner,
 
     pub signature: TransactionSignature,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct TransactionsBatchSubmissionResult {
+    pub transaction_failures: Vec<TransactionsBatchSingleSubmissionFailure>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct TransactionsBatchSingleSubmissionFailure {
+    pub error: AptosError,
+    pub transaction_index: usize,
 }
 
 // TODO: Rename this to remove the Inner when we cut over.

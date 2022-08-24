@@ -31,6 +31,8 @@ mod storage;
 mod transaction;
 #[cfg(test)]
 mod txn_broadcast;
+#[cfg(test)]
+mod txn_emitter;
 
 #[cfg(test)]
 mod smoke_test_environment;

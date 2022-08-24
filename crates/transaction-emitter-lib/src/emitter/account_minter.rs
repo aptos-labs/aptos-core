@@ -8,8 +8,9 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
+use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -27,7 +28,7 @@ use core::{
 use futures::future::try_join_all;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -340,6 +341,11 @@ pub fn create_and_fund_account_request(
     ))
 }
 
+struct SubmittingTxnState {
+    pub txns: Vec<SignedTransaction>,
+    pub failures: Vec<Option<AptosError>>,
+}
+
 pub async fn execute_and_wait_transactions(
     client: &RestClient,
     account: &mut LocalAccount,
@@ -353,15 +359,75 @@ pub async fn execute_and_wait_transactions(
         account.address()
     );
 
-    let pending_txns: Vec<Response<PendingTransaction>> = try_join_all(
-        txns.iter()
-            .map(|t| RETRY_POLICY.retry(move || client.submit(t))),
-    )
-    .await?;
+    async fn submit_batch(
+        client: &RestClient,
+        state_mutex: &Mutex<SubmittingTxnState>,
+    ) -> Result<()> {
+        let (indices, txns) = {
+            let state = state_mutex.lock();
 
-    for pt in pending_txns {
+            let mut indices = Vec::new();
+            let mut txns = Vec::new();
+            for (i, txn) in state.txns.iter().enumerate() {
+                if state.failures.get(i).map(|r| r.is_some()).unwrap_or(true) {
+                    indices.push(i);
+                    txns.push(txn.clone());
+                }
+            }
+            (indices, txns)
+        };
+
+        let results = client.submit_batch_bcs(&txns).await.unwrap().into_inner();
+        let mut failures = results
+            .transaction_failures
+            .into_iter()
+            .map(|f| (f.transaction_index, f.error))
+            .collect::<HashMap<_, _>>();
+        let mut state = state_mutex.lock();
+        for (request_idx, input_idx) in indices.iter().enumerate() {
+            let value = failures.remove(&request_idx);
+            if state.failures.len() == *input_idx {
+                // We need to fill it up on the first call:
+                state.failures.push(value);
+            } else {
+                state.failures[*input_idx] = value;
+            }
+        }
+
+        if state.failures.iter().any(|r| r.is_some()) {
+            Err(format_err!(""))
+        } else {
+            Ok(())
+        }
+    }
+
+    let state_mutex = Mutex::new(SubmittingTxnState {
+        txns,
+        failures: vec![],
+    });
+    let state_ref = &state_mutex;
+    RETRY_POLICY
+        .retry(move || submit_batch(client, state_ref))
+        .await
+        .map_err(|e| {
+            format_err!(
+                "Failed to submit transactions: {:?}, {}",
+                state_mutex
+                    .lock()
+                    .failures
+                    .iter()
+                    .enumerate()
+                    .filter(|(_idx, r)| r.is_some())
+                    .collect::<Vec<_>>(),
+                e
+            )
+        })?;
+
+    let state = state_mutex.into_inner();
+
+    for txn in state.txns.iter() {
         client
-            .wait_for_transaction(&pt.into_inner())
+            .wait_for_signed_transaction_bcs(txn)
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }
