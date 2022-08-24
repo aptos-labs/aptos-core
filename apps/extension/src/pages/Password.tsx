@@ -1,19 +1,25 @@
 import React from 'react';
+
 import {
   Box,
   Button,
   Center,
+  Flex,
   FormControl,
   FormLabel,
   Input,
-  useColorMode,
-  VStack,
   Text,
+  useColorMode,
+  useDisclosure,
+  VStack,
+  chakra,
 } from '@chakra-ui/react';
+
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { secondaryBgColor } from 'core/colors';
+import { secondaryBgColor, secondaryMainTextColor } from 'core/colors';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import ResetPasswordConfirmationModal from '../core/components/ResetPasswordConfirmationModal';
 
 interface FormValues {
   password: string;
@@ -21,7 +27,8 @@ interface FormValues {
 
 function Password() {
   const { colorMode } = useColorMode();
-  const { unlockAccounts } = useGlobalStateContext();
+  const { resetAccount, unlockAccounts } = useGlobalStateContext();
+  const { isOpen, onClose, onOpen } = useDisclosure();
 
   const {
     formState: { errors },
@@ -43,6 +50,16 @@ function Password() {
     }
   };
 
+  const handleClickResetPassword = (e: React.MouseEvent<HTMLParagraphElement>) => {
+    e.preventDefault();
+    onOpen();
+  };
+
+  const handleConfirmResetPassword = async () => {
+    await resetAccount();
+    onClose();
+  };
+
   return (
     <VStack
       bgColor={secondaryBgColor[colorMode]}
@@ -51,21 +68,43 @@ function Password() {
       width="100%"
       height="100%"
     >
-      <Center>
-        <Box width="75px" pb={4}>
+      <Center h="100%" display="flex" flexDir="column">
+        <Box width="100%" pb={4} px={20}>
           {
             (colorMode === 'dark')
               ? <AptosWhiteLogo />
               : <AptosBlackLogo />
           }
         </Box>
+        <Text fontSize="4xl" fontWeight="700" color={secondaryMainTextColor[colorMode]}>
+          Welcome back
+        </Text>
       </Center>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <chakra.form onSubmit={handleSubmit(onSubmit)} width="100%" p={6}>
         <VStack gap={4}>
-          <FormControl display="flex" flexDir="column" isRequired alignItems="center">
-            <FormLabel requiredIndicator={<span />} fontSize="lg" fontWeight={500} pb={2}>
-              Enter your password
-            </FormLabel>
+          <FormControl display="flex" flexDir="column" isRequired>
+            <Flex flexDirection="row">
+              <FormLabel
+                requiredIndicator={<span />}
+                fontSize="sm"
+                fontWeight={500}
+                flex={1}
+              >
+                Password
+              </FormLabel>
+              <FormLabel
+                requiredIndicator={<span />}
+                fontSize="sm"
+                fontWeight={500}
+              >
+                <Text cursor="pointer" as="u" onClick={handleClickResetPassword} fontWeight={500} fontSize="sm">Reset password</Text>
+              </FormLabel>
+            </Flex>
+            <ResetPasswordConfirmationModal
+              onConfirm={handleConfirmResetPassword}
+              isOpen={isOpen}
+              onClose={onClose}
+            />
 
             <Input
               autoComplete="false"
@@ -87,7 +126,7 @@ function Password() {
             Unlock
           </Button>
         </VStack>
-      </form>
+      </chakra.form>
     </VStack>
   );
 }

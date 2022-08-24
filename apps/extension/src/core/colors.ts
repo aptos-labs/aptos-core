@@ -8,6 +8,11 @@ export const textColor = {
   light: 'black',
 };
 
+export const secondaryMainTextColor = {
+  dark: 'black.400',
+  light: 'black.400',
+};
+
 export const secondaryAddressFontColor = {
   dark: 'gray.400',
   light: 'gray.500',

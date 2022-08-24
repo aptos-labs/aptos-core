@@ -13,6 +13,7 @@ import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
  */
 export default function useAccounts() {
   const {
+    clear,
     initialize: initEncryptedState,
     isInitialized: areAccountsInitialized,
     isReady: isEncryptedStateReady,
@@ -87,6 +88,11 @@ export default function useAccounts() {
     }
   };
 
+  const resetAccount = async () => {
+    await setActivePublicAccount(undefined);
+    await clear();
+  };
+
   const aptosAccount = activeAccount ? new AptosAccount(
     HexString.ensure(activeAccount.privateKey).toUint8Array(),
     activeAccount.address,
@@ -105,6 +111,7 @@ export default function useAccounts() {
     lockAccounts,
     removeAccount,
     renameAccount,
+    resetAccount,
     switchAccount,
     unlockAccounts,
   };

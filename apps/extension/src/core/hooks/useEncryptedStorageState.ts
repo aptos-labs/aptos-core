@@ -140,7 +140,14 @@ export default function useEncryptedStorageState() {
     await setValue(undefined);
   };
 
+  const clear = async () => {
+    await setEncryptedState(undefined);
+    await setEncryptionKey(undefined);
+    await setValue(undefined);
+  };
+
   return {
+    clear,
     initialize,
     isInitialized,
     isReady,
