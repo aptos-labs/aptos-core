@@ -120,6 +120,7 @@ async fn test_get_account_module_not_found() {
     context.check_golden_output(resp);
 }
 
+#[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_table_item() {
     let mut context = new_test_context(current_function_name!());
