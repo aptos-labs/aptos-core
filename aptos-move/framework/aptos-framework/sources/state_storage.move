@@ -34,7 +34,6 @@ module aptos_framework::state_storage {
         usage: Usage,
     }
 
-
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
