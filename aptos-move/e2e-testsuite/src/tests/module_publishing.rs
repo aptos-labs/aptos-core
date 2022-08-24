@@ -8,6 +8,9 @@ use language_e2e_tests::{
 };
 use move_deps::move_core_types::vm_status::StatusCode;
 
+// TODO: ignoring most tests for now as bundle publishing is no longer available. Want to resurrect
+// or rewrite for new publishin approach
+
 // A module with an address different from the sender's address should be rejected
 #[test]
 fn bad_module_address() {
