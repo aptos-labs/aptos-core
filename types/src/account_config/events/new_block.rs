@@ -116,6 +116,7 @@ pub struct BlockResource {
     height: u64,
     epoch_interval: u64,
     new_block_events: EventHandle,
+    update_epoch_interval_events: EventHandle,
 }
 
 impl BlockResource {
