@@ -100,7 +100,9 @@ async fn account_balance(
     Ok(AccountBalanceResponse {
         block_identifier: block_info.block_id,
         balances: amounts,
-        metadata: AccountBalanceMetadata { sequence_number },
+        metadata: AccountBalanceMetadata {
+            sequence_number: sequence_number.into(),
+        },
     })
 }
 
