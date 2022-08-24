@@ -1,4 +1,4 @@
-name: Continuous E2E Compat Test
+name: Continuous E2E Performance Test
 
 permissions:
   issues: write
@@ -10,15 +10,14 @@ on:
     - cron: "0 */3 * * *"
 
 jobs:
-  run-forge-compat:
+  # Performance test in an optimal setting
+  run-forge-performance:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-compat
+      FORGE_NAMESPACE: forge-state-sync-perf
       FORGE_CLUSTER_NAME: aptos-forge-big-1
-      # Run for 5 minutes
-      FORGE_RUNNER_DURATION_SECS: 300
-      # This will upgrade from devnet to the latest main
-      FORGE_TEST_SUITE: compat
-      IMAGE_TAG: devnet
+      # Run for 30 minutes
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: state_sync
       POST_TO_SLACK: true

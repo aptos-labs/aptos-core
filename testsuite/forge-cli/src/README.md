@@ -33,4 +33,11 @@ To see all tool usage options, run:
 cargo run -p forge-cli --help
 ```
 
+To also run fullnodes inside the swarm, use the `--num-validator-fullnodes` flag, e.g.,:
+```
+cargo run -p forge-cli -- --suite "run_forever" --num-validators 3 --num-validator-fullnodes 1 test local-swarm
+```
+
+
+
 // TODO: add more detailed usage information. There's a lot more that users can do!
