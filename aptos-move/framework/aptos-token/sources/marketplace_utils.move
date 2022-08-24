@@ -119,18 +119,19 @@ module aptos_token::marketplace_utils {
         guid::id(&gid)
     }
 
-    public fun buy_internal<CoinType>(coin_owner: &signer, listing: Listing<CoinType>): u64 {
+    public fun buy_internal<CoinType>(coin_owner: &signer, listing: Listing<CoinType>): (u64, u64) {
         assert!(listing.instant_sale, EINVALID_BUY_NOT_INSTANT_SALE);
         let coin_owner_address = signer::address_of(coin_owner);
 
         let total_amount = listing.min_price * listing.amount;
+        let token_amount = listing.amount;
         assert!(timestamp::now_seconds() <= listing.expiration_sec, EEXPIRED_LISTING);
         assert!(coin::balance<CoinType>(coin_owner_address) >= total_amount, EBUYER_NOT_HAVING_ENOUGH_COINS);
 
         let token = token::withdraw_with_event_internal(listing.owner, listing.token_id, listing.amount);
         coin::transfer<CoinType>(coin_owner, listing.owner, total_amount);
         token::direct_deposit(signer::address_of(coin_owner), token);
-        total_amount
+        (total_amount, token_amount)
     }
 
     public entry fun buy<CoinType>(coin_owner: &signer, token_owner_address: address, id_creation_number: u64) acquires ListingRecords {
@@ -140,6 +141,15 @@ module aptos_token::marketplace_utils {
         assert!(table::contains(token_owner_records, listing_id), ELISTING_NOT_EXIST);
         let listing = table::borrow(token_owner_records, listing_id);
         buy_internal(coin_owner, *listing);
+    }
+
+    public fun get_listing<CoinType>(token_owner_address: address, id_creation_number: u64): Listing<CoinType> acquires ListingRecords {
+        assert!(exists<ListingRecords<CoinType>>(token_owner_address), ELISTING_RECORDS_NOT_EXIST);
+        let token_owner_records = &borrow_global<ListingRecords<CoinType>>(token_owner_address).records;
+        let listing_id = guid::create_id(token_owner_address, id_creation_number);
+        assert!(table::contains(token_owner_records, listing_id), ELISTING_NOT_EXIST);
+        let listing = table::borrow(token_owner_records, listing_id);
+        *listing
     }
 
     public fun get_listing_id<CoinType>(list: &Listing<CoinType>): ID {
