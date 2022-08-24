@@ -40,6 +40,15 @@
                   "creation_num": "2"
                 }
               }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
+                }
+              }
             }
           }
         },
@@ -292,6 +301,15 @@
                 "id": {
                   "addr": "0x1",
                   "creation_num": "2"
+                }
+              }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
                 }
               }
             }
@@ -548,6 +566,15 @@
                   "creation_num": "2"
                 }
               }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
+                }
+              }
             }
           }
         },
@@ -800,6 +827,15 @@
                 "id": {
                   "addr": "0x1",
                   "creation_num": "2"
+                }
+              }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
                 }
               }
             }
@@ -1056,6 +1092,15 @@
                   "creation_num": "2"
                 }
               }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
+                }
+              }
             }
           }
         },
@@ -1308,6 +1353,15 @@
                 "id": {
                   "addr": "0x1",
                   "creation_num": "2"
+                }
+              }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
                 }
               }
             }
@@ -1564,6 +1618,15 @@
                   "creation_num": "2"
                 }
               }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
+                }
+              }
             }
           }
         },
@@ -1816,6 +1879,15 @@
                 "id": {
                   "addr": "0x1",
                   "creation_num": "2"
+                }
+              }
+            },
+            "update_epoch_interval_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0x1",
+                  "creation_num": "3"
                 }
               }
             }
