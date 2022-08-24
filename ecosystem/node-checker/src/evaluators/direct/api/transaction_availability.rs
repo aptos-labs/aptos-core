@@ -8,13 +8,13 @@ use crate::{
     evaluators::EvaluatorType,
 };
 use anyhow::Result;
-use aptos_rest_client::{aptos_api_types::TransactionInfo, Client as AptosRestClient, Transaction};
+use aptos_rest_client::{aptos_api_types::TransactionData, Client as AptosRestClient};
 use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 
-const TRANSACTIONS_ENDPOINT: &str = "/transactions";
+const TRANSACTIONS_ENDPOINT: &str = "/transactions/by_version";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct TransactionAvailabilityEvaluatorArgs {}
@@ -34,15 +34,15 @@ impl TransactionAvailabilityEvaluator {
     async fn get_transaction_by_version(
         client: &AptosRestClient,
         version: u64,
-    ) -> Result<Transaction, ApiEvaluatorError> {
+    ) -> Result<TransactionData, ApiEvaluatorError> {
         Ok(client
-            .get_transaction_by_version(version)
+            .get_transaction_by_version_bcs(version)
             .await
             .map_err(|e| {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
                     anyhow::Error::from(e).context(format!(
-                        "The node API failed to return the requested transaction with version: {}",
+                        "The node API failed to return the requested transaction at version: {}",
                         version
                     )),
                 )
@@ -50,19 +50,21 @@ impl TransactionAvailabilityEvaluator {
             .into_inner())
     }
 
-    /// Helper to get transaction info from a transaction.
-    fn unwrap_transaction_info(
-        transaction: Transaction,
-    ) -> Result<TransactionInfo, ApiEvaluatorError> {
-        transaction
-            .transaction_info()
-            .map_err(|e| {
-                ApiEvaluatorError::EndpointError(
-                    "/transactions".to_string(),
-                    e.context("The node API returned a transaction with no info".to_string()),
-                )
-            })
-            .map(|info| info.clone())
+    /// Helper to get the accumulator root hash from an on chain transaction
+    /// as returned by the API.
+    fn unwrap_accumulator_root_hash(
+        transaction_data: &TransactionData,
+    ) -> Result<&aptos_crypto::HashValue, ApiEvaluatorError> {
+        match transaction_data {
+            TransactionData::OnChain(on_chain) => Ok(&on_chain.accumulator_root_hash),
+            wildcard => Err(ApiEvaluatorError::EndpointError(
+                TRANSACTIONS_ENDPOINT.to_string(),
+                anyhow::anyhow!(
+                    "The API unexpectedly returned a transaction that was not an on-chain transaction: {:?}",
+                    wildcard
+                ),
+            ))
+        }
     }
 }
 
@@ -115,21 +117,24 @@ impl Evaluator for TransactionAvailabilityEvaluator {
         // to each other, we should be able to pull the same transaction from
         // both nodes.
 
-        let baseline_client =
-            AptosRestClient::new(input.baseline_node_information.node_address.get_api_url());
+        let baseline_client = input
+            .baseline_node_information
+            .node_address
+            .get_api_client(std::time::Duration::from_secs(4));
 
-        let latest_baseline_transaction_info = Self::unwrap_transaction_info(
-            Self::get_transaction_by_version(&baseline_client, latest_shared_version).await?,
-        )?;
+        let latest_baseline_transaction =
+            Self::get_transaction_by_version(&baseline_client, latest_shared_version).await?;
+        let latest_baseline_accumulator_root_hash =
+            Self::unwrap_accumulator_root_hash(&latest_baseline_transaction)?;
 
         let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
         let evaluation =
             match Self::get_transaction_by_version(&target_client, latest_shared_version).await {
                 Ok(latest_target_transaction) => {
-                    match Self::unwrap_transaction_info(latest_target_transaction) {
-                        Ok(latest_target_transaction_info) => {
-                            if latest_baseline_transaction_info.accumulator_root_hash
-                                == latest_target_transaction_info.accumulator_root_hash
+                    match Self::unwrap_accumulator_root_hash(&latest_target_transaction) {
+                        Ok(latest_target_accumulator_root_hash) => {
+                            if latest_baseline_accumulator_root_hash
+                                == latest_target_accumulator_root_hash
                             {
                                 self.build_evaluation_result(
                                     "Target node produced valid recent transaction".to_string(),
@@ -154,8 +159,8 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     accumulator root hash of the transaction ({}) was different \
                                     compared to the baseline ({}).",
                                         latest_shared_version,
-                                        latest_target_transaction_info.accumulator_root_hash,
-                                        latest_baseline_transaction_info.accumulator_root_hash,
+                                        latest_target_accumulator_root_hash,
+                                        latest_baseline_accumulator_root_hash,
                                     ),
                                 )
                             }
