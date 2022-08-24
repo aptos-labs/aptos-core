@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics;
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
-    metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
     },
@@ -21,6 +21,7 @@ use aptos_types::{
         Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
     },
 };
+use async_trait::async_trait;
 use data_streaming_service::data_notification::NotificationId;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
@@ -41,11 +42,12 @@ use tokio::{
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
+#[async_trait]
 pub trait StorageSynchronizerInterface {
     /// Applies a batch of transaction outputs.
     ///
     /// Note: this assumes that the ledger infos have already been verified.
-    fn apply_transaction_outputs(
+    async fn apply_transaction_outputs(
         &mut self,
         notification_id: NotificationId,
         output_list_with_proof: TransactionOutputListWithProof,
@@ -56,7 +58,7 @@ pub trait StorageSynchronizerInterface {
     /// Executes a batch of transactions.
     ///
     /// Note: this assumes that the ledger infos have already been verified.
-    fn execute_transactions(
+    async fn execute_transactions(
         &mut self,
         notification_id: NotificationId,
         transaction_list_with_proof: TransactionListWithProof,
@@ -227,8 +229,8 @@ impl<
     }
 
     /// Notifies the executor of new data chunks
-    fn notify_executor(&mut self, storage_data_chunk: StorageDataChunk) -> Result<(), Error> {
-        if let Err(error) = self.executor_notifier.try_send(storage_data_chunk) {
+    async fn notify_executor(&mut self, storage_data_chunk: StorageDataChunk) -> Result<(), Error> {
+        if let Err(error) = self.executor_notifier.send(storage_data_chunk).await {
             Err(Error::UnexpectedError(format!(
                 "Failed to send storage data chunk to executor: {:?}",
                 error
@@ -240,12 +242,13 @@ impl<
     }
 }
 
+#[async_trait]
 impl<
         ChunkExecutor: ChunkExecutorTrait + 'static,
         MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
     > StorageSynchronizerInterface for StorageSynchronizer<ChunkExecutor, MetadataStorage>
 {
-    fn apply_transaction_outputs(
+    async fn apply_transaction_outputs(
         &mut self,
         notification_id: NotificationId,
         output_list_with_proof: TransactionOutputListWithProof,
@@ -258,10 +261,10 @@ impl<
             target_ledger_info,
             end_of_epoch_ledger_info,
         );
-        self.notify_executor(storage_data_chunk)
+        self.notify_executor(storage_data_chunk).await
     }
 
-    fn execute_transactions(
+    async fn execute_transactions(
         &mut self,
         notification_id: NotificationId,
         transaction_list_with_proof: TransactionListWithProof,
@@ -274,7 +277,7 @@ impl<
             target_ledger_info,
             end_of_epoch_ledger_info,
         );
-        self.notify_executor(storage_data_chunk)
+        self.notify_executor(storage_data_chunk).await
     }
 
     fn initialize_state_synchronizer(
@@ -387,6 +390,10 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
+                    let timer = metrics::start_timer(
+                        &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
+                        metrics::STORAGE_SYNCHRONIZER_EXECUTE_CHUNK,
+                    );
                     let num_transactions = transactions_with_proof.transactions.len();
                     let result = chunk_executor.execute_chunk(
                         transactions_with_proof,
@@ -407,6 +414,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_transactions as u64,
                         );
                     }
+                    drop(timer);
                     (notification_id, result)
                 }
                 StorageDataChunk::TransactionOutputs(
@@ -415,6 +423,10 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
+                    let timer = metrics::start_timer(
+                        &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
+                        metrics::STORAGE_SYNCHRONIZER_APPLY_CHUNK,
+                    );
                     let num_outputs = outputs_with_proof.transactions_and_outputs.len();
                     let result = chunk_executor.apply_chunk(
                         outputs_with_proof,
@@ -435,6 +447,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_outputs as u64,
                         );
                     }
+                    drop(timer);
                     (notification_id, result)
                 }
                 storage_data_chunk => {
@@ -448,7 +461,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             // Notify the committer of new executed chunks
             match result {
                 Ok(()) => {
-                    if let Err(error) = committer_notifier.try_send(notification_id) {
+                    if let Err(error) = committer_notifier.send(notification_id).await {
                         let error = format!("Failed to notify the committer! Error: {:?}", error);
                         send_storage_synchronizer_error(
                             error_notification_sender.clone(),
@@ -498,6 +511,10 @@ fn spawn_committer<
     let committer = async move {
         while let Some(notification_id) = committer_listener.next().await {
             // Commit the executed chunk
+            let timer = metrics::start_timer(
+                &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
+                metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
+            );
             match chunk_executor.commit_chunk() {
                 Ok(notification) => {
                     // Log the event and update the metrics
@@ -543,6 +560,7 @@ fn spawn_committer<
                     .await;
                 }
             };
+            drop(timer);
             decrement_pending_data_chunks(pending_transaction_chunks.clone());
         }
     };

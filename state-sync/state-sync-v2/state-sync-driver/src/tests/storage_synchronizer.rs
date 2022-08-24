@@ -78,6 +78,7 @@ async fn test_apply_transaction_outputs() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get a mempool and event notification. Also verify that there's no pending data.
@@ -113,6 +114,7 @@ async fn test_apply_transaction_outputs_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data
@@ -145,6 +147,7 @@ async fn test_commit_chunk_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data
@@ -191,6 +194,7 @@ async fn test_execute_transactions() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get a mempool and event notification. Also verify that there's no pending data.
@@ -226,6 +230,7 @@ async fn test_execute_transactions_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data

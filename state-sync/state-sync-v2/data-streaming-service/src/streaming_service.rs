@@ -84,7 +84,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
                     self.refresh_global_data_summary();
                 }
                 _ = progress_check_interval.select_next_some() => {
-                    self.check_progress_of_all_data_streams();
+                    self.check_progress_of_all_data_streams().await;
                 }
             }
         }
@@ -255,11 +255,11 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     }
 
     /// Ensures that all existing data streams are making progress
-    fn check_progress_of_all_data_streams(&mut self) {
+    async fn check_progress_of_all_data_streams(&mut self) {
         // Drive the progress of each stream
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
-            if let Err(error) = self.update_progress_of_data_stream(data_stream_id) {
+            if let Err(error) = self.update_progress_of_data_stream(data_stream_id).await {
                 if matches!(error, Error::NoDataToFetch(_)) {
                     sample!(
                         SampleRate::Duration(Duration::from_secs(NO_DATA_TO_FETCH_LOG_FREQ_SECS)),
@@ -287,7 +287,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Ensures that a data stream has in-flight data requests and handles
     /// any new responses that have arrived since we last checked.
-    fn update_progress_of_data_stream(
+    async fn update_progress_of_data_stream(
         &mut self,
         data_stream_id: &DataStreamId,
     ) -> Result<(), Error> {
@@ -324,7 +324,9 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
             );
         } else {
             // Process any data client requests that have received responses
-            data_stream.process_data_responses(global_data_summary)?;
+            data_stream
+                .process_data_responses(global_data_summary)
+                .await?;
         }
 
         Ok(())
@@ -420,7 +422,7 @@ mod streaming_service_tests {
         // should detect the dropped listeners and remove the streams).
         let timeout_deadline = Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
         while Instant::now() < timeout_deadline {
-            streaming_service.check_progress_of_all_data_streams();
+            streaming_service.check_progress_of_all_data_streams().await;
             if streaming_service.get_all_data_stream_ids().is_empty() {
                 return; // All streams were dropped!
             }
@@ -516,7 +518,7 @@ mod streaming_service_tests {
                 let timeout_deadline =
                     Instant::now().add(Duration::from_secs(MAX_STREAM_WAIT_SECS));
                 while Instant::now() < timeout_deadline {
-                    streaming_service.check_progress_of_all_data_streams();
+                    streaming_service.check_progress_of_all_data_streams().await;
                     if let Ok(data_notification) = timeout(
                         Duration::from_secs(1),
                         data_stream_listener.select_next_some(),

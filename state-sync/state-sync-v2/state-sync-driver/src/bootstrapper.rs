@@ -1096,12 +1096,14 @@ impl<
                     let num_transaction_outputs = transaction_outputs_with_proof
                         .transactions_and_outputs
                         .len();
-                    self.storage_synchronizer.apply_transaction_outputs(
-                        notification_id,
-                        transaction_outputs_with_proof,
-                        proof_ledger_info,
-                        end_of_epoch_ledger_info,
-                    )?;
+                    self.storage_synchronizer
+                        .apply_transaction_outputs(
+                            notification_id,
+                            transaction_outputs_with_proof,
+                            proof_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await?;
                     num_transaction_outputs
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -1117,12 +1119,14 @@ impl<
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     let num_transactions = transaction_list_with_proof.transactions.len();
-                    self.storage_synchronizer.execute_transactions(
-                        notification_id,
-                        transaction_list_with_proof,
-                        proof_ledger_info,
-                        end_of_epoch_ledger_info,
-                    )?;
+                    self.storage_synchronizer
+                        .execute_transactions(
+                            notification_id,
+                            transaction_list_with_proof,
+                            proof_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await?;
                     num_transactions
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(

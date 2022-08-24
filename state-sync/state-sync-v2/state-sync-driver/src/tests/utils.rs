@@ -30,11 +30,11 @@ use aptos_types::{
     waypoint::Waypoint,
     write_set::WriteSet,
 };
-use channel::{aptos_channel, aptos_channel::Sender, message_queues::QueueStyle};
 use data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
 };
 use event_notifications::EventNotificationListener;
+use futures::channel::mpsc;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
@@ -43,9 +43,8 @@ use rand::Rng;
 use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
-pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStreamListener) {
-    let (notification_sender, notification_receiver) =
-        aptos_channel::new(QueueStyle::KLAST, 100, None);
+pub fn create_data_stream_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {
+    let (notification_sender, notification_receiver) = mpsc::channel(100);
     let data_stream_listener = DataStreamListener::new(create_random_u64(), notification_receiver);
 
     (notification_sender, data_stream_listener)
