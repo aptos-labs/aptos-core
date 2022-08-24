@@ -30,7 +30,7 @@ impl Default for LoggerConfig {
             enable_backtrace: false,
             is_async: true,
             level: Level::Info,
-            console_port: Some(6669),
+            console_port: None,
             enable_telemetry_remote_log: true,
             enable_telemetry_flush: true,
             telemetry_level: Level::Error,

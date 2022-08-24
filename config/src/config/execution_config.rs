@@ -18,7 +18,6 @@ pub struct ExecutionConfig {
     #[serde(skip)]
     pub genesis: Option<Transaction>,
     pub genesis_file_location: PathBuf,
-    pub network_timeout_ms: u64,
     pub concurrency_level: u16,
     pub num_proof_reading_threads: u16,
 }
@@ -44,8 +43,6 @@ impl Default for ExecutionConfig {
         ExecutionConfig {
             genesis: None,
             genesis_file_location: PathBuf::new(),
-            // Default value of 30 seconds for the network timeout.
-            network_timeout_ms: 30_000,
             // Parallel execution by default.
             concurrency_level: 8,
             num_proof_reading_threads: 32,
