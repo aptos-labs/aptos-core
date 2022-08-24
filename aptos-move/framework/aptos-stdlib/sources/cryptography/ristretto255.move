@@ -82,7 +82,7 @@ module aptos_std::ristretto255 {
 
     /// This struct represents a scalar as a little-endian byte encoding of an integer in $\mathbb{Z}_\ell$, which is
     /// stored in `data`. Here, \ell denotes the order of the scalar field (and the underlying elliptic curve group).
-    struct Scalar has key, copy, store, drop {
+    struct Scalar has copy, store, drop {
         data: vector<u8>
     }
 
