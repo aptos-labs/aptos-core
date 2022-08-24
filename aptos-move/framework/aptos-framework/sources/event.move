@@ -30,6 +30,9 @@ module aptos_std::event {
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit_event<T: drop + store>(handle_ref: &mut EventHandle<T>, msg: T) {
         write_to_event_store<T>(bcs::to_bytes(&handle_ref.guid), handle_ref.counter, msg);
+        spec {
+            assume handle_ref.counter + 1 <= MAX_U64;
+        };
         handle_ref.counter = handle_ref.counter + 1;
     }
 
