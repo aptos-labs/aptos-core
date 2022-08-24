@@ -48,6 +48,7 @@ impl<'t> NetworkContext<'t> {
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }
+
     pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
         self.success_criteria
             .check_for_success(stats, window, self.swarm)

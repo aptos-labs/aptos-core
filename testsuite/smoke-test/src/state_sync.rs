@@ -6,15 +6,11 @@ use crate::{
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use std::{
-    fs,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -593,27 +589,7 @@ async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAcc
 
 /// Stops the specified validator and deletes storage
 fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
-    // Stop the validator
-    swarm.validator_mut(validator).unwrap().stop();
-
-    // Delete the validator storage
-    let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
-    let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-    let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
-    info!(
-        "Deleting ledger, state and state sync db paths ({:?}, {:?}, {:?}) for validator {:?}",
-        ledger_db_path.as_path(),
-        state_db_path.as_path(),
-        state_sync_db_path.as_path(),
-        validator
-    );
-    assert!(
-        ledger_db_path.as_path().exists()
-            && state_db_path.as_path().exists()
-            && state_sync_db_path.as_path().exists()
-    );
-    fs::remove_dir_all(ledger_db_path).unwrap();
-    fs::remove_dir_all(state_db_path).unwrap();
-    fs::remove_dir_all(state_sync_db_path).unwrap();
+    let validator = swarm.validator_mut(validator).unwrap();
+    validator.stop();
+    validator.clear_storage().unwrap();
 }

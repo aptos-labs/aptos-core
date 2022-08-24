@@ -2,16 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, Test};
-use rand::{
-    rngs::{OsRng, StdRng},
-    seq::IteratorRandom,
-    Rng, SeedableRng,
-};
-use std::{thread, time::Instant};
+use aptos_logger::info;
+use forge::{get_highest_synced_version, NetworkContext, NetworkTest, Result, SwarmExt, Test};
+use std::time::Instant;
 use tokio::{runtime::Runtime, time::Duration};
 
-const STATE_SYNC_COMMITTED_COUNTER_NAME: &str = "aptos_state_sync_version.synced";
+const MAX_FULLNODE_LAG_SECS: u64 = 10; // Max amount of lag (in seconds) that fullnodes should adhere to
 
 pub struct StateSyncPerformance;
 
@@ -23,87 +19,97 @@ impl Test for StateSyncPerformance {
 
 impl NetworkTest for StateSyncPerformance {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
-        let mut rng = StdRng::from_seed(OsRng.gen());
-        let duration = Duration::from_secs(30);
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
+        let emit_txn_duration = ctx.global_job.duration; // How long we'll emit txns for
+        let fullnode_sync_duration = emit_txn_duration.saturating_mul(2); // Limits state sync to half txn throughput
+
+        // Generate some traffic through the fullnodes
+        info!(
+            "Generating the initial traffic for {:?} seconds.",
+            emit_txn_duration.as_secs()
+        );
         let all_fullnodes = ctx
             .swarm()
             .full_nodes()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
+        let txn_stat = generate_traffic(ctx, &all_fullnodes, emit_txn_duration, 1)?;
 
-        // 1. pick one fullnode to stop
-        let fullnode_id = all_fullnodes.iter().choose(&mut rng).unwrap();
-        runtime.block_on(ctx.swarm().full_node_mut(*fullnode_id).unwrap().stop())?;
+        // Wait for all nodes to catch up. We time bound this to ensure
+        // fullnodes don't fall too far behind the validators.
+        info!("Waiting for the validators and fullnodes to be synchronized.");
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(async {
+            ctx.swarm()
+                .wait_for_all_nodes_to_catchup(
+                    Instant::now() + Duration::from_secs(MAX_FULLNODE_LAG_SECS),
+                )
+                .await
+        })?;
 
-        // 2. emit txn to validators
-        generate_traffic(ctx, &all_validators, duration, 1)?;
+        // Stop and reset all fullnodes
+        info!("Deleting all fullnode data!");
+        for fullnode_id in &all_fullnodes {
+            let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
+            runtime.block_on(async { fullnode.stop().await })?;
+            fullnode.clear_storage()?;
+        }
 
-        // 3. read the validator synced version
-        let validator_id = all_validators.iter().choose(&mut rng).unwrap();
-        let validator = ctx.swarm().validator(*validator_id).unwrap();
-        let validator_metric_port = validator.expose_metric()?;
-        let validator_synced_version = validator
-            .counter(STATE_SYNC_COMMITTED_COUNTER_NAME, validator_metric_port)
-            .unwrap_or(0.0);
-        if validator_synced_version == 0.0 {
+        // Fetch the highest synced version from the swarm
+        let highest_synced_version = runtime.block_on(async {
+            get_highest_synced_version(&ctx.swarm().get_clients_with_names())
+                .await
+                .unwrap_or(0)
+        });
+        if highest_synced_version == 0 {
             return Err(anyhow::format_err!(
-                "Validator synced zero transactions! Something has gone wrong!"
+                "The swarm has synced 0 versions! Something has gone wrong!"
             ));
         }
-        println!(
-            "The validator is now synced at version: {}",
-            validator_synced_version
-        );
+        info!("Syncing to target version at: {:?}", highest_synced_version);
 
-        // 4. restart the fullnode so that it starts state syncing to catch up
-        let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
-        // do data cleanup
-        fullnode.clear_storage()?;
-        println!("The fullnode is going to restart");
-        runtime.block_on(fullnode.start())?;
-        println!(
-            "The fullnode is now up. Waiting for it to state sync to the expected version: {}",
-            validator_synced_version
-        );
-        let start_instant = Instant::now();
-        let fullnode_metric_port = fullnode.expose_metric()?;
-        while fullnode
-            .counter(STATE_SYNC_COMMITTED_COUNTER_NAME, fullnode_metric_port)
-            .unwrap_or(0.0)
-            < validator_synced_version
-        {
-            thread::sleep(Duration::from_secs(1));
+        // Restart the fullnodes so they start syncing from a fresh state
+        for fullnode_id in &all_fullnodes {
+            let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
+            runtime.block_on(async { fullnode.start().await })?;
         }
-        println!(
-            "The fullnode has caught up to version: {}",
-            validator_synced_version
-        );
+
+        // Wait for all fullnodes to catch up to the highest synced version
+        info!("Restarting all the fullnodes and waiting for them to catchup.");
+        let timer = Instant::now();
+        runtime.block_on(async {
+            ctx.swarm()
+                .wait_for_all_nodes_to_catchup(Instant::now() + fullnode_sync_duration)
+                .await
+        })?;
+        let duration_to_state_sync = timer.elapsed();
+        let seconds_to_state_sync = duration_to_state_sync.as_secs();
 
         // Calculate the state sync throughput
-        let time_to_state_sync = start_instant.elapsed().as_secs();
-        if time_to_state_sync == 0 {
+        if seconds_to_state_sync == 0 {
             return Err(anyhow::format_err!(
                 "The time taken to state sync was 0 seconds! Something has gone wrong!"
             ));
         }
-        let state_sync_throughput = validator_synced_version as u64 / time_to_state_sync;
+        let state_sync_throughput = highest_synced_version as u64 / seconds_to_state_sync;
+
+        // Report the state sync results
         let state_sync_throughput_message =
-            format!("State sync throughput : {} txn/sec", state_sync_throughput,);
-        println!("Time to state sync: {:?} secs", time_to_state_sync);
-        // Display the state sync throughput and report the results
-        println!("{}", state_sync_throughput_message);
+            format!("State sync throughput : {} txn/sec", state_sync_throughput);
+        info!(
+            "Measured state sync throughput: {:?}",
+            state_sync_throughput_message
+        );
         ctx.report.report_text(state_sync_throughput_message);
         ctx.report.report_metric(
             self.name(),
             "state_sync_throughput",
             state_sync_throughput as f64,
         );
+
+        // Ensure we meet the success criteria.
+        // TODO: check_for_success is not really generic enough to check
+        // properties outside of txn_stat. This should be improved.
+        ctx.check_for_success(&txn_stat, &duration_to_state_sync)?;
 
         Ok(())
     }

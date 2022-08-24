@@ -3833,6 +3833,7 @@ dependencies = [
  "aptos-retrier",
  "aptos-sdk",
  "aptos-secure-storage",
+ "aptosdb",
  "async-trait",
  "cached-packages",
  "either",
@@ -3854,6 +3855,7 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "serde_yaml 0.8.26",
+ "state-sync-driver",
  "structopt 0.3.26",
  "tempfile",
  "termcolor",
@@ -8804,7 +8806,6 @@ dependencies = [
  "aptos-vault-client",
  "aptos-vm",
  "aptos-writeset-generator",
- "aptosdb",
  "async-trait",
  "backup-cli",
  "base64 0.13.0",
@@ -8825,7 +8826,6 @@ dependencies = [
  "reqwest",
  "serde_json",
  "serde_yaml 0.8.26",
- "state-sync-driver",
  "tokio",
 ]
 

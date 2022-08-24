@@ -310,6 +310,12 @@ pub async fn wait_for_all_nodes_to_catchup(
     if clients.is_empty() {
         bail!("no nodes available")
     }
+    let highest_synced_version = get_highest_synced_version(clients).await?;
+    wait_for_all_nodes_to_catchup_to_version(clients, highest_synced_version, deadline).await
+}
+
+/// Returns the highest synced version of the given clients
+pub async fn get_highest_synced_version(clients: &[(String, RestClient)]) -> Result<u64> {
     let mut latest_version = 0u64;
     for (_, c) in clients {
         latest_version = latest_version.max(
@@ -319,6 +325,5 @@ pub async fn wait_for_all_nodes_to_catchup(
                 .unwrap_or(0),
         );
     }
-
-    wait_for_all_nodes_to_catchup_to_version(clients, latest_version, deadline).await
+    Ok(latest_version)
 }
