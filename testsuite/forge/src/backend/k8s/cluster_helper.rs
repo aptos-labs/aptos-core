@@ -385,7 +385,7 @@ fn get_node_default_helm_path() -> String {
     if forge_run_mode.eq("local") {
         "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml".to_string()
     } else {
-        "/aptos/terraform/helm/aptos-node-default-values.yaml".to_string()
+        "/aptos/terraform/aptos-node-default-values.yaml".to_string()
     }
 }
 
