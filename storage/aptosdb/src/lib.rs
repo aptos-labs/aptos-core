@@ -400,7 +400,9 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_latest_version_option()?.map_or(0, |v| v + 1);
+        let ledger_next_version = self
+            .get_latest_transaction_info_option()?
+            .map_or(0, |(v, _)| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
