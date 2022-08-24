@@ -75,7 +75,7 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-pub struct ConcurrentTxnCache {
+struct CacheWrapper {
     state: LruCache<[u8; 32], u64>,
     cache_option: CacheOption,
 }
@@ -86,9 +86,9 @@ enum CacheOption {
     LruCache_ExistingFieldAsKey,
 }
 
-impl ConcurrentTxnCache {
-    fn new(cache_size: usize, cache_option: CacheOption) -> ConcurrentTxnCache {
-        ConcurrentTxnCache {
+impl CacheWrapper {
+    fn new(cache_size: usize, cache_option: CacheOption) -> CacheWrapper {
+        CacheWrapper {
             state: LruCache::new(cache_size as u64),
             cache_option,
         }
@@ -128,8 +128,8 @@ impl ConcurrentTxnCache {
     }
 }
 
-static CACHE: Lazy<ConcurrentTxnCache> =
-    Lazy::new(|| ConcurrentTxnCache::new(70000, CacheOption::LruCache_CryptoHashAsKey));
+static CACHE: Lazy<CacheWrapper> =
+    Lazy::new(|| CacheWrapper::new(70000, CacheOption::LruCache_CryptoHashAsKey));
 
 pub struct ParallelAptosVM();
 
@@ -178,3 +178,19 @@ impl ParallelAptosVM {
         }
     }
 }
+
+// #[test]
+// fn rati_test() {
+//     let cache : CacheWrapper<&str, u64> = CacheWrapper::new(70000, 256);
+//     assert_eq!(1_u64, *cache.get_or_init("k1", 1, |k|1_u64).value());
+//     assert_eq!(2_u64, *cache.get_or_init("k2", 1, |k|2_u64).value());
+//     assert_eq!(1_u64, *cache.get_or_init("k1", 1, |k|3_u64).value());
+//     assert_eq!(4_u64, *cache.get_or_init("k3", 1, |k|4_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k4", 1, |k|5_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k5", 1, |k|5_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k6", 1, |k|5_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k7", 1, |k|5_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k8", 1, |k|5_u64).value());
+//     assert_eq!(5_u64, *cache.get_or_init("k9", 1, |k|5_u64).value());
+//     assert_eq!(6_u64, *cache.get_or_init("k1", 1, |k|6_u64).value());
+// }
