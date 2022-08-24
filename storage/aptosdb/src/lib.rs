@@ -1561,7 +1561,7 @@ impl DbWriter for AptosDB {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 ensure!(
                     base_state_version == buffered_state.current_state().base_version,
-                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state{:?}",
+                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
                     base_state_version,
                     buffered_state.current_state().base_version,
                     buffered_state.current_state().current_version,
