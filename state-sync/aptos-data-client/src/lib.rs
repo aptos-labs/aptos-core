@@ -161,7 +161,7 @@ pub enum ResponseError {
 /// This trait provides a simple feedback mechanism for users of the Data Client
 /// to alert it to bad responses so that the peers responsible for providing this
 /// data can be penalized.
-pub trait ResponseCallback: fmt::Debug + Send + 'static {
+pub trait ResponseCallback: fmt::Debug + Send + Sync + 'static {
     // TODO(philiphayes): ideally this would take a `self: Box<Self>`, i.e.,
     // consume the callback, which better communicates that you should only report
     // an error once. however, the current state-sync-v2 code makes this difficult...

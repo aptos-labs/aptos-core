@@ -31,7 +31,7 @@ use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
     streaming_client::NotificationFeedback,
 };
-use futures::{channel::oneshot, FutureExt};
+use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
 
@@ -211,7 +211,7 @@ async fn test_data_stream_state_values() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
@@ -257,7 +257,7 @@ async fn test_data_stream_state_values() {
         notification_id,
         data_payload: DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
@@ -286,7 +286,7 @@ async fn test_data_stream_transactions() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
@@ -328,7 +328,7 @@ async fn test_data_stream_transactions() {
         notification_id,
         data_payload: DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
@@ -357,7 +357,7 @@ async fn test_data_stream_transaction_outputs() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
@@ -401,7 +401,7 @@ async fn test_data_stream_transaction_outputs() {
             TransactionOutputListWithProof::new_empty(),
         ),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
@@ -530,7 +530,7 @@ async fn test_snapshot_sync_existing_state() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     mock_streaming_client
@@ -604,7 +604,7 @@ async fn test_snapshot_sync_existing_state() {
         notification_id,
         data_payload: DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get an invalid payload error
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
@@ -831,7 +831,7 @@ async fn test_waypoint_mismatch() {
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
-    let (notification_sender, data_stream_listener) = create_data_stream_listener();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
     let data_stream_id = data_stream_listener.data_stream_id;
     mock_streaming_client
         .expect_get_all_epoch_ending_ledger_infos()
@@ -870,7 +870,7 @@ async fn test_waypoint_mismatch() {
         notification_id,
         data_payload: DataPayload::EpochEndingLedgerInfos(invalid_ledger_info),
     };
-    notification_sender.push((), data_notification).unwrap();
+    notification_sender.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = drive_progress(&mut bootstrapper, &global_data_summary, false)

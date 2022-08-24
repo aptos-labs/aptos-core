@@ -27,6 +27,7 @@ use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
     streaming_client::NotificationFeedback,
 };
+use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
 use storage_service_types::Epoch;
@@ -128,7 +129,7 @@ async fn test_data_stream_transactions_with_target() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
@@ -182,7 +183,7 @@ async fn test_data_stream_transactions_with_target() {
             TransactionOutputListWithProof::new_empty(),
         ),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = continuous_syncer
@@ -213,7 +214,7 @@ async fn test_data_stream_transaction_outputs() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
     let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
@@ -266,7 +267,7 @@ async fn test_data_stream_transaction_outputs() {
             transaction_output_with_proof,
         ),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = continuous_syncer
