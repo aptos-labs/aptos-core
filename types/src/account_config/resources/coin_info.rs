@@ -16,6 +16,7 @@ use move_deps::move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Rust representation of Aggregator Move struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Aggregator {
     handle: AccountAddress,
@@ -28,24 +29,28 @@ impl Aggregator {
         Self { handle, key, limit }
     }
 
+    /// Helper function to return the state key where the actual value is stored.
     pub fn state_key(&self) -> StateKey {
         let key_bytes = self.key.to_vec();
         StateKey::table_item(TableHandle(self.handle), key_bytes)
     }
 }
 
+/// Rust representation of Integer Move struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Integer {
     pub value: u128,
     limit: u128,
 }
 
+/// Rust representation of OptionalAggregator Move struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OptionalAggregator {
     pub aggregator: Option<Aggregator>,
     pub integer: Option<Integer>,
 }
 
+/// Rust representation of CoinInfo Move resource.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CoinInfoResource {
     name: Vec<u8>,
@@ -70,12 +75,17 @@ impl CoinInfoResource {
         &self.supply
     }
 
+    /// Returns a new CoinInfo instance. Aggregator that tracks supply is
+    /// initialized with random handle/key. This function is useful if we
+    /// want to add CoinInfo to the fake data store.
     pub fn random(limit: u128) -> Self {
         let handle = AccountAddress::random();
         let key = AccountAddress::random();
         CoinInfoResource::new(handle, key, limit)
     }
 
+    /// Returns a new CoinInfo instance. This function is useful if we want to
+    /// add CoinInfo to the fake data store.
     pub fn new(handle: AccountAddress, key: AccountAddress, limit: u128) -> Self {
         let aggregator = OptionalAggregator {
             aggregator: Some(Aggregator::new(handle, key, limit)),
@@ -89,6 +99,8 @@ impl CoinInfoResource {
         }
     }
 
+    /// Returns a writeset corresponding to the creation of CoinInfo in Move.
+    /// This can be passed to data store for testing total supply.
     pub fn to_writeset(&self) -> WriteSet {
         let tag = ResourceKey::new(AccountAddress::ONE, CoinInfoResource::struct_tag());
         let ap = AccessPath::resource_access_path(tag);
@@ -101,6 +113,8 @@ impl CoinInfoResource {
             .as_ref()
             .unwrap()
             .state_key();
+
+        // We store CoinInfo and aggregatable value separately.
         let write_set = vec![
             (
                 StateKey::AccessPath(ap),
