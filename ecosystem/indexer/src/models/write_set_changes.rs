@@ -6,10 +6,13 @@ use aptos_rest_client::aptos_api_types::{
     DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
     WriteSetChange as APIWriteSetChange, WriteTableItem,
 };
+use field_count::FieldCount;
 use serde::Serialize;
 use serde_json::json;
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[diesel(table_name = "write_set_changes")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(transaction_hash, hash)]

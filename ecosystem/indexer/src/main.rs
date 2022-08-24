@@ -104,7 +104,12 @@ async fn main() -> std::io::Result<()> {
     }
 
     info!("Starting fetcher...");
-    tailer.transaction_fetcher.lock().await.start().await;
+    tailer
+        .transaction_fetcher
+        .lock()
+        .await
+        .start()
+        .await;
 
     let start = chrono::Utc::now().naive_utc();
 
@@ -113,9 +118,9 @@ async fn main() -> std::io::Result<()> {
     let mut total_processed: usize = 0;
     let mut base: usize = 0;
     loop {
-        let res = tailer.process_next_batch(args.batch_size).await;
-        total_processed += res.len();
-        version_processed += res.len();
+        tailer.process_next_batch(args.batch_size).await;
+        total_processed += args.batch_size as usize;
+        version_processed += args.batch_size as usize;
         if args.emit_every != 0 {
             let new_base: usize = version_processed / args.emit_every;
             if base != new_base {

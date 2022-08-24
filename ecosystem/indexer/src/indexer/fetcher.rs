@@ -5,6 +5,7 @@ use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_rest_client::{Client as RestClient, State, Transaction};
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use serde_json::Value;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use url::Url;
@@ -22,14 +23,14 @@ pub struct Fetcher {
     chain_id: u8,
     current_version: u64,
     highest_known_version: u64,
-    transactions_sender: mpsc::Sender<Transaction>,
+    transactions_sender: mpsc::Sender<Vec<Transaction>>,
 }
 
 impl Fetcher {
     pub fn new(
         client: RestClient,
         current_version: u64,
-        transactions_sender: mpsc::Sender<Transaction>,
+        transactions_sender: mpsc::Sender<Vec<Transaction>>,
     ) -> Self {
         Self {
             client,
@@ -85,10 +86,8 @@ impl Fetcher {
             });
 
             for batch in res {
-                for transaction in batch {
-                    self.current_version = transaction.version().unwrap();
-                    self.transactions_sender.send(transaction).await.unwrap();
-                }
+                self.current_version = batch.last().unwrap().version().unwrap();
+                self.transactions_sender.send(batch).await.unwrap();
             }
         }
     }
@@ -109,7 +108,7 @@ async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transacti
         match res {
             Ok(response) => {
                 FETCHED_TRANSACTION.inc();
-                return response.into_inner();
+                return remove_null_bytes_from_txns(response.into_inner());
             }
             Err(err) => {
                 let err_str = err.to_string();
@@ -146,14 +145,14 @@ pub struct TransactionFetcher {
     starting_version: u64,
     client: RestClient,
     fetcher_handle: Option<JoinHandle<()>>,
-    transactions_sender: Option<mpsc::Sender<Transaction>>,
-    transaction_receiver: mpsc::Receiver<Transaction>,
+    transactions_sender: Option<mpsc::Sender<Vec<Transaction>>>,
+    transaction_receiver: mpsc::Receiver<Vec<Transaction>>,
 }
 
 impl TransactionFetcher {
     pub fn new(node_url: Url, starting_version: Option<u64>) -> Self {
         let (transactions_sender, transaction_receiver) =
-            mpsc::channel::<Transaction>(TRANSACTION_CHANNEL_SIZE);
+            mpsc::channel::<Vec<Transaction>>(TRANSACTION_CHANNEL_SIZE);
 
         let client = RestClient::new(node_url);
 
@@ -169,10 +168,10 @@ impl TransactionFetcher {
 
 #[async_trait::async_trait]
 impl TransactionFetcherTrait for TransactionFetcher {
-    /// Fetches the next version based on its internal version counter
+    /// Fetches the next batch based on its internal version counter
     /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
     /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
-    async fn fetch_next(&mut self) -> Transaction {
+    async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
         self.transaction_receiver.next().await.unwrap()
     }
 
@@ -230,10 +229,46 @@ impl TransactionFetcherTrait for TransactionFetcher {
     }
 }
 
+pub fn string_null_byte_replacement(value: &mut str) -> String {
+    value.replace('\u{0000}', "").replace("\\u0000", "")
+}
+
+pub fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
+    match sub_json {
+        Value::Array(array) => {
+            for item in array {
+                recurse_remove_null_bytes_from_json(item);
+            }
+        }
+        Value::Object(object) => {
+            for (_key, value) in object {
+                recurse_remove_null_bytes_from_json(value);
+            }
+        }
+        Value::String(str) => {
+            if !str.is_empty() {
+                let replacement = string_null_byte_replacement(str);
+                *str = replacement;
+            }
+        }
+        _ => {}
+    }
+}
+
+pub fn remove_null_bytes_from_txns(txns: Vec<Transaction>) -> Vec<Transaction> {
+    txns.iter()
+        .map(|txn| {
+            let mut txn_json = serde_json::to_value(txn).unwrap();
+            recurse_remove_null_bytes_from_json(&mut txn_json);
+            serde_json::from_value::<Transaction>(txn_json).unwrap()
+        })
+        .collect::<Vec<Transaction>>()
+}
+
 /// For mocking TransactionFetcher in tests
 #[async_trait::async_trait]
 pub trait TransactionFetcherTrait: Send + Sync {
-    async fn fetch_next(&mut self) -> Transaction;
+    async fn fetch_next_batch(&mut self) -> Vec<Transaction>;
 
     async fn fetch_version(&self, version: u64) -> Transaction;
 
