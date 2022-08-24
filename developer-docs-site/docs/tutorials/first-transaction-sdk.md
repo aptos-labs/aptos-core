@@ -15,7 +15,7 @@ This tutorial introduces the Aptos SDKs and how to generate, submit, and verify 
 
 * [Official Aptos Typescript SDK][typescript-sdk]
 * [Official Aptos Python SDK][python-sdk]
-* Official Aptos Rust SDK — *TBA*
+* [Official Aptos Rust SDK][rust-sdk]
 
 ## Step 2: Run the Example
 
@@ -63,7 +63,15 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+  Navigate to the Rust SDK directory:
+  ```sh
+  cd ~/aptos-core/sdk
+  ```
+
+  Run the `transfer-coin` example:
+  ```sh
+  cargo run --example transfer-coin
+  ```
   </TabItem>
 </Tabs>
 
@@ -96,7 +104,7 @@ The above output demonstrates that the `transfer-coin` example executes the foll
   * The funding and creation of Alice's account from a faucet.
   * The creation of Bob's account from a faucet.
 * The transferring of 1000 coins from Alice to Bob.
-* The 4 coins of gas paid for by Alice to make that tansfer.
+* The 4 coins of gas paid for by Alice to make that transfer.
 * Another transfer of 1000 coins from Alice to Bob.
 * The additional 4 coins of gas paid for by Alice to make that transfer.
 
@@ -106,9 +114,26 @@ Next, see below a walk-through of the Python SDK functions that are used to acco
 
 The `transfer-coin` example code uses helper functions to interact with the [REST API][rest_spec]. This section reviews each of the calls and gives insights into functionality.
 
-:::tip See the example full listing
-See the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+:::tip See the full example
+See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/transfer_coin.ts) for the complete code as you follow the below steps.
 :::
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+:::tip See the full example
+See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) for the complete code as you follow the below steps.
+:::
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+:::tip See the full example
+See [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/sdk/examples/transfer-coin.rs) for the complete code as you follow the below steps.
+:::
+  </TabItem>
+</Tabs>
 
 ### Step 4.1: Initializing the Clients
 
@@ -148,15 +173,27 @@ The [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/p
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1a
+```
+
+Using the API client we can create a `CoinClient`, which we use for common coin operations such as transferring coins and checking balances.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1b
+```
+
+In the example we initialize the URL values as such:
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_1c
+```
   </TabItem>
 </Tabs>
 
 :::tip
 
 By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
-  - `APTOS_NODE_URL` and
-  - `APTOS_FAUCET_URL`.
+  - `APTOS_NODE_URL`
+  - `APTOS_FAUCET_URL`
 :::
 
 ### Step 4.2: Creating local accounts
@@ -178,7 +215,9 @@ The next step is to create two accounts locally. [Accounts][account_basics] repr
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_2
+```
   </TabItem>
 </Tabs>
 
@@ -201,7 +240,9 @@ In Aptos, each account must have an on-chain representation in order to support 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_3
+```
   </TabItem>
 </Tabs>
 
@@ -239,7 +280,16 @@ def account_balance(self, account_address: str) -> int:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_4
+```
+
+Behind the scenes, the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
+```rust
+let balance = self
+    .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
+    .await?;
+```
   </TabItem>
 </Tabs>
 
@@ -292,7 +342,23 @@ Breaking the above down into pieces:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_5
+```
+
+Behind the scenes the Rust SDK generates, signs, and submits a transaction:
+```rust
+:!: static/sdks/rust/src/coin_client.rs section_1
+```
+
+Breaking the above down into pieces:
+1. First, we fetch the chain ID, necessary for building the transaction payload.
+1. `transfer` internally is a `EntryFunction` in the [Coin Move module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move#L412), i.e. an entry function in Move that is directly callable.
+1. The Move function is stored on the coin module: `0x1::coin`.
+1. Because the Coin module can be used by other coins, the transfer must explicitly use a `TypeTag` to define which coin to transfer.
+1. The transaction arguments, such as `to_account` and `amount`, must be encoded as BCS to use with the `TransactionBuilder`.
+
+
   </TabItem>
 </Tabs>
 
@@ -319,11 +385,16 @@ The transaction hash can be used to query the status of a transaction:
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-In progress.
+The transaction hash can be used to query the status of a transaction:
+
+```rust
+:!: static/sdks/rust/examples/transfer-coin.rs section_6
+```
   </TabItem>
 </Tabs>
 
 [account_basics]: /concepts/basics-accounts
-[python-sdk]: /sdks/python-sdk
 [typescript-sdk]: /sdks/typescript-sdk
+[python-sdk]: /sdks/python-sdk
+[rust-sdk]: /sdks/rust-sdk
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

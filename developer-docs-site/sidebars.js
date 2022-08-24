@@ -148,7 +148,13 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: ["sdks/typescript-sdk", "sdks/aptos-sdk-overview", "sdks/transactions-with-ts-sdk", "sdks/python-sdk"],
+      items: [
+        "sdks/aptos-sdk-overview",
+        "sdks/typescript-sdk",
+        "sdks/transactions-with-ts-sdk",
+        "sdks/python-sdk",
+        "sdks/rust-sdk",
+      ],
     },
     {
       type: "category",
