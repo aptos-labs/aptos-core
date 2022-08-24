@@ -170,7 +170,7 @@ const sidebars = {
     {
       type: 'link',
       label: 'REST API Docs', // The link label
-      href: '/api/latest-api.html', // The internal path
+      href: '/api/latest-api.html#/', // The internal path
     },
     "reference/telemetry",
     "aptos-white-paper",
