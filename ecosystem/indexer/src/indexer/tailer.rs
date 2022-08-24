@@ -181,14 +181,19 @@ impl Tailer {
     pub async fn process_next_batch(
         &self,
         batch_size: u8,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
+    ) -> (
+        usize,
+        Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>,
+    ) {
         let txns = self
             .transaction_fetcher
             .lock()
             .await
             .fetch_next_batch()
             .await;
-        self.process_transactions(txns).await
+        let num_txns = txns.len();
+        let res = self.process_transactions(txns).await;
+        (num_txns, res)
         // let mut tasks = vec![];
         // let transactions = self
         //     .transaction_fetcher
