@@ -216,6 +216,7 @@ resource "helm_release" "external-dns" {
 }
 
 resource "helm_release" "testnet-addons" {
+  count       = var.enable_forge ? 0 : 1
   name        = "testnet-addons"
   chart       = local.testnet_addons_helm_chart_path
   max_history = 5
