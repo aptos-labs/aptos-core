@@ -416,15 +416,6 @@ pub async fn install_testnet_resources(
     let new_era = generate_new_era();
 
     // get forge override helm values and cache it
-
-    println!(
-        "current working directory is {}",
-        get_current_working_dir().unwrap().to_str().unwrap()
-    );
-    println!(
-        "Current node default helm path is {}",
-        get_node_default_helm_path()
-    );
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
