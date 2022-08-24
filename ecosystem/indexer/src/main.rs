@@ -103,6 +103,9 @@ async fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
+    info!("Starting fetcher...");
+    tailer.transaction_fetcher.lock().await.start().await;
+
     info!("Indexing loop started!");
     let mut processed: usize = starting_version as usize;
     let mut base: usize = 0;
