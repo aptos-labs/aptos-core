@@ -1,0 +1,24 @@
+
+name: Run forge shadow testing
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every hour - TODO: Decrease the frequency once things stabilizes
+    - cron: "*/10 * * * *"
+
+jobs:
+  # Run a faster chaos forge to quickly surface correctness failures
+  run-shadow-forge:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-shadow
+      FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_RUNNER_TPS_THRESHOLD: 1000
+      FORGE_TEST_SUITE: chaos
+      USE_NEW_WRAPPER: true

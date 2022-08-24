@@ -10,7 +10,7 @@
 #
 
 # Default to off
-WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+USE_NEW_WRAPPER="${USE_NEW_WRAPPER:-false}"
 
 # output files
 FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
@@ -18,12 +18,11 @@ FORGE_REPORT="${FORGE_REPORT:-$(mktemp)}"
 FORGE_PRE_COMMENT="${FORGE_PRE_COMMENT:-$(mktemp)}"
 FORGE_COMMENT="${FORGE_COMMENT:-$(mktemp)}"
 
-if [[ $WRAPPER_KILLSWITCH = true ]]; then
-    echo "Using current forge wrapper"
-else
+if [[ $USE_NEW_WRAPPER = true ]]; then
     echo "Running new forge wrapper"
-    export FORGE_INSTALL_DEPENDENCIES=yeet
     exec python3 testsuite/forge.py test "$@"
+else
+    echo "Using current forge wrapper"
 fi
 
 # available clusters to choose from
