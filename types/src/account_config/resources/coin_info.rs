@@ -108,7 +108,7 @@ impl CoinInfoResource {
             ),
             (
                 value_state_key,
-                WriteOp::Modification(bcs::to_bytes(&(0 as u128)).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&0_u128).unwrap()),
             ),
         ];
         WriteSetMut::new(write_set).freeze().unwrap()
