@@ -1,11 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::AbstractValueSizeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::account_address::AccountAddress;
-use aptos_vm::natives::aptos_natives;
-use move_deps::move_cli::base::test::run_move_unit_tests;
+use aptos_vm::natives;
 use move_deps::move_unit_test::UnitTestingConfig;
+use move_deps::{
+    move_cli::base::test::run_move_unit_tests,
+    move_vm_runtime::native_functions::NativeFunctionTable,
+};
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
@@ -33,14 +36,19 @@ pub fn run_tests_for_pkg(
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),
         // TODO(Gas): we may want to switch to non-zero costs in the future
-        aptos_natives(
-            aptos_gas::NativeGasParameters::zeros(),
-            AbstractValueSizeGasParameters::zeros(),
-        ),
+        aptos_test_natives(),
         /* compute_coverage */ false,
         &mut std::io::stdout(),
     )
     .unwrap();
+}
+
+pub fn aptos_test_natives() -> NativeFunctionTable {
+    natives::configure_for_unit_test();
+    natives::aptos_natives(
+        NativeGasParameters::zeros(),
+        AbstractValueSizeGasParameters::zeros(),
+    )
 }
 
 #[test]
