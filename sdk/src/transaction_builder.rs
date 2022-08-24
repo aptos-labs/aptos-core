@@ -26,6 +26,22 @@ pub struct TransactionBuilder {
 }
 
 impl TransactionBuilder {
+    pub fn new(
+        payload: TransactionPayload,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        Self {
+            payload,
+            chain_id,
+            expiration_timestamp_secs,
+            max_gas_amount: 4000,
+            gas_unit_price: 1,
+            sender: None,
+            sequence_number: None,
+        }
+    }
+
     pub fn sender(mut self, sender: AccountAddress) -> Self {
         self.sender = Some(sender);
         self
