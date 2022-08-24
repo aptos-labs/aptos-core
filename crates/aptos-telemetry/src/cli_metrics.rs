@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{service, utils};
-use aptos_logger::error;
+use aptos_logger::debug;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use std::{collections::BTreeMap, time::Duration};
 
@@ -39,7 +39,7 @@ pub async fn send_cli_telemetry_event(
     // event is processed before terminating the cli command).
     let join_handle = service::send_telemetry_event_with_ip(user_id, None, telemetry_event).await;
     if let Err(error) = join_handle.await {
-        error!(
+        debug!(
             "Failed to send telemetry event with join error: {:?}",
             error
         );
