@@ -20,9 +20,6 @@ use aptos_parallel_executor::{
     task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
 };
 use aptos_state_view::StateView;
-use aptos_types::transaction::Transaction::{
-    BlockMetadata, GenesisTransaction, StateCheckpoint, UserTransaction,
-};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
@@ -77,12 +74,6 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 
 struct LruCache16ShardWrapper {
     state: LruCache<[u8; 32], u64>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum CacheOption {
-    LruCache_CryptoHashAsKey,
-    LruCache_ExistingFieldAsKey,
 }
 
 impl LruCache16ShardWrapper {

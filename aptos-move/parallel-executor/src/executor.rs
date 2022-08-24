@@ -9,8 +9,6 @@ use crate::{
 };
 use aptos_infallible::Mutex;
 use mvhashmap::MVHashMap;
-use num_cpus;
-use once_cell::sync::Lazy;
 use rayon::ThreadPool;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
