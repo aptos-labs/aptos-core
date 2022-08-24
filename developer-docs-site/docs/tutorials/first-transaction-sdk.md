@@ -7,7 +7,7 @@ sidebar_position: 0
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Your First Transaction
+# Your First Transaction using the SDK
 
 This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos Blockchain.
 
@@ -21,7 +21,7 @@ This tutorial introduces the Aptos SDKs and how to generate, submit, and verify 
 
 Each SDK provides an examples directory. This tutorial covers the `transfer-coin` example.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 In the SDK directory run: `python -m examples.transfer-coin`
@@ -77,7 +77,7 @@ The example file leverages helper functions to interact with the [REST API][rest
 
 In the first step, the example initializes both the REST and Faucet clients. The REST client interacts with the REST API, whereas the Faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
@@ -108,7 +108,7 @@ The URLs for both services by default, point to our devnet services. However, th
 
 The next step is to create two accounts from the locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
@@ -129,7 +129,7 @@ In progress.
 
 In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
@@ -150,7 +150,7 @@ In progress.
 
 In this step, the SDK translates a single call into the process of querying a resource and reading a field from that resource.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
@@ -180,7 +180,7 @@ In progress.
 
 Like the previous step, this is another helper step that constructs a transaction that transfers the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the ensuing step to check on the transaction status. Aptos does perform a handful of validation checks on submission and if any of those fail, the user will instead be given an error. These validations include the transaction signature, unused sequence number, and submitting the transaction to the appropriate chain.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
@@ -213,7 +213,7 @@ In progress.
 
 The transaction hash can be used to query the status of a transaction:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 ```python
