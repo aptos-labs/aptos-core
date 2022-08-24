@@ -183,40 +183,41 @@ impl Tailer {
         batch_size: u8,
     ) -> (
         usize,
-        Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>,
+        Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>>,
     ) {
-        let txns = self
+        let transactions = self
             .transaction_fetcher
             .lock()
             .await
             .fetch_next_batch()
             .await;
-        let num_txns = txns.len();
-        let res = self.process_transactions(txns).await;
-        (num_txns, res)
-        // let mut tasks = vec![];
+        let num_txns = transactions.len();
+        //let res = self.process_transactions(txns).await;
+        //(num_txns, res)
+        let mut tasks = vec![];
         // let transactions = self
         //     .transaction_fetcher
         //     .lock()
         //     .await
         //     .fetch_next_batch()
         //     .await;
-        // let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
-        // for ind in 0..num_batches {
-        //     let self2 = self.clone();
-        //     let (start_index, end_index) = (
-        //         ind * batch_size as usize,
-        //         std::cmp::min((ind + 1) * batch_size as usize, transactions.len()),
-        //     );
-        //     let mut txns = vec![];
-        //     for t in &transactions[start_index..end_index] {
-        //         txns.push(t.clone());
-        //     }
-        //     let task = tokio::task::spawn(async move { self2.process_transactions(txns).await });
-        //     tasks.push(task);
-        // }
-        // let results = await_tasks(tasks).await;
-        // results
+        let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
+        for ind in 0..num_batches {
+            let self2 = self.clone();
+            let (start_index, end_index) = (
+                ind * batch_size as usize,
+                std::cmp::min((ind + 1) * batch_size as usize, transactions.len()),
+            );
+            let mut txns = vec![];
+            for t in &transactions[start_index..end_index] {
+                txns.push(t.clone());
+            }
+            let task = tokio::task::spawn(async move { self2.process_transactions(txns).await });
+            tasks.push(task);
+        }
+        let results: Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> =
+            await_tasks(tasks).await;
+        (num_txns, results)
     }
 
     pub async fn process_transactions(
