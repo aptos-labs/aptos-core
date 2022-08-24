@@ -266,8 +266,7 @@ class RestClient:
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
-
-    # <:!:bcs_transfer
+# <:!:bcs_transfer
 
     #
     # Token transaction wrappers

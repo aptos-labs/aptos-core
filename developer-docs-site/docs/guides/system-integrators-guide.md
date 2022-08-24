@@ -44,14 +44,14 @@ REST API service: https://fullnode.devnet.aptoslabs.com/v1
 ### SDKs
 
 Aptos currently has two SDKs:
-1. [Python](/sdks/python-sdk)
-2. [Typescript](/sdks/transactions-with-ts-sdk)
+1. [Typescript](/sdks/typescript-sdk)
+2. [Python](/sdks/python-sdk)
 
 
 ### Other Areas
 
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
-* [Typescript SDK](../transactions-with-ts-sdk)
+* [Typescript SDK](../sdks/typescript-sdk)
 * [Python SDK](../sdks/python-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
