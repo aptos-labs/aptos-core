@@ -22,7 +22,7 @@ pub struct NetworkContext<'t> {
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
     pub global_job: EmitJobRequest,
-    success_criteria: SuccessCriteria,
+    pub success_criteria: SuccessCriteria,
     runtime: Runtime,
 }
 
@@ -51,6 +51,7 @@ impl<'t> NetworkContext<'t> {
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }
+
     pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
         self.runtime.block_on(
             self.success_criteria
