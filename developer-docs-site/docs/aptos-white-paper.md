@@ -47,4 +47,12 @@ management protocols.
 sharding of a validator and homogeneous state sharding provides the potential for horizontal
 throughput scalability without adding additional complexity for node operators.
 
-Click [here for the full PDF of the Aptos White Paper](/papers/2022.08.11.10.00.aptos_whitepaper.pdf).
+## Full PDF versions
+
+:::tip Full PDF versions
+
+- **English**: Click [here for the full PDF of the Aptos White Paper](/papers/Aptos-Whitepaper.pdf).
+- **Korean**: Click [here for the Korean version full PDF of the Aptos White Paper](/papers/whitepaper-korean.pdf).
+:::
+
+
