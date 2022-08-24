@@ -31,8 +31,10 @@ paths:
       tags:
       - Accounts
       summary: Get account
-      description: Return high level information about an account such as its sequence
-        number.
+      description: |-
+        Return the authentication key and the sequence number for an account
+        address. Optionally, a ledger version can be specified. If the ledger
+        version is not specified in the request, the latest ledger version is used.
       parameters:
       - name: address
         schema:
@@ -363,8 +365,8 @@ paths:
       - Accounts
       summary: Get account resources
       description: |-
-        This endpoint returns all account resources at a given address at a
-        specific ledger version (AKA transaction version). If the ledger
+        This endpoint returns all the account resources at a given address at a
+        specific ledger version (i.e., transaction version). If the ledger
         version is not specified in the request, the latest ledger version is used.
 
         The Aptos nodes prune account state history, via a configurable time window (link).

@@ -40,7 +40,9 @@ pub struct AccountsApi {
 impl AccountsApi {
     /// Get account
     ///
-    /// Return high level information about an account such as its sequence number.
+    /// Return the authentication key and the sequence number for an account 
+    /// address. Optionally, a ledger version can be specified. If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
     #[oai(
         path = "/accounts/:address",
         method = "get",
@@ -62,8 +64,8 @@ impl AccountsApi {
 
     /// Get account resources
     ///
-    /// This endpoint returns all account resources at a given address at a
-    /// specific ledger version (AKA transaction version). If the ledger
+    /// This endpoint returns all the account resources at a given address at a
+    /// specific ledger version (i.e., transaction version). If the ledger
     /// version is not specified in the request, the latest ledger version is used.
     ///
     /// The Aptos nodes prune account state history, via a configurable time window (link).

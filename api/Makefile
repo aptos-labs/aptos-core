@@ -29,7 +29,7 @@ test-api-spec-v1:
 	$(call test_api_spec,spec.yaml)
 
 serve:
-	cd doc && python -m http.server 8888
+	cd doc && python3 -m http.server 8888
 
 define test_api_spec
 	- pkill aptos-node
