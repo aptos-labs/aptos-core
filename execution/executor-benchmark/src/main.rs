@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig};
+use aptos_config::config::{
+    EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
+};
 use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
 use std::path::PathBuf;
@@ -13,7 +15,10 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[derive(Debug, StructOpt)]
 struct PrunerOpt {
     #[structopt(long)]
-    enable_state_store_pruner: bool,
+    enable_state_pruner: bool,
+
+    #[structopt(long)]
+    enable_epoch_snapshot_pruner: bool,
 
     #[structopt(long)]
     enable_ledger_pruner: bool,
@@ -22,23 +27,33 @@ struct PrunerOpt {
     state_prune_window: u64,
 
     #[structopt(long, default_value = "100000")]
+    epoch_snapshot_prune_window: u64,
+
+    #[structopt(long, default_value = "100000")]
     ledger_prune_window: u64,
 
     #[structopt(long, default_value = "500")]
     ledger_pruning_batch_size: usize,
 
     #[structopt(long, default_value = "500")]
-    state_store_pruning_batch_size: usize,
+    state_pruning_batch_size: usize,
+
+    #[structopt(long, default_value = "500")]
+    epoch_snapshot_pruning_batch_size: usize,
 }
 
 impl PrunerOpt {
     fn pruner_config(&self) -> PrunerConfig {
         PrunerConfig {
             state_merkle_pruner_config: StateMerklePrunerConfig {
-                enable: self.enable_state_store_pruner,
+                enable: self.enable_state_pruner,
                 prune_window: self.state_prune_window,
-                batch_size: self.state_store_pruning_batch_size,
-                user_pruning_window_offset: 0,
+                batch_size: self.state_pruning_batch_size,
+            },
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig {
+                enable: self.enable_epoch_snapshot_pruner,
+                prune_window: self.epoch_snapshot_prune_window,
+                batch_size: self.epoch_snapshot_pruning_batch_size,
             },
             ledger_pruner_config: LedgerPrunerConfig {
                 enable: self.enable_ledger_pruner,

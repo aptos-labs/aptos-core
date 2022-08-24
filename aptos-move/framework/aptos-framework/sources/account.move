@@ -39,10 +39,8 @@ module aptos_framework::account {
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
         module_prologue_name: vector<u8>,
-        writeset_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
-        writeset_epilogue_name: vector<u8>,
     }
 
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
@@ -84,16 +82,14 @@ module aptos_framework::account {
     const ECANNOT_RESERVED_ADDRESS: u64 = 5;
     /// Transaction exceeded its allocated max gas
     const EOUT_OF_GAS: u64 = 6;
-    /// Writesets are not allowed
-    const EWRITESET_NOT_ALLOWED: u64 = 7;
     /// Specified current public key is not correct
-    const EWRONG_CURRENT_PUBLIC_KEY: u64 = 8;
+    const EWRONG_CURRENT_PUBLIC_KEY: u64 = 7;
     /// Specified proof of knowledge required to prove ownership of a public key is invalid
-    const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 9;
+    const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 8;
     /// The caller does not have a digital-signature-based capability to call this function
-    const ENO_CAPABILITY: u64 = 10;
+    const ENO_CAPABILITY: u64 = 9;
     // The caller does not have a valid rotation capability offer from the other account
-    const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 11;
+    const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -105,9 +101,8 @@ module aptos_framework::account {
     const PROLOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
     const PROLOGUE_ETRANSACTION_EXPIRED: u64 = 1006;
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
-    const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1008;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1009;
-    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1010;
+    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
+    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 
     #[test_only]
     public fun create_address_for_test(bytes: vector<u8>): address {
@@ -117,36 +112,26 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
+    /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
-        account: &signer,
-        module_addr: address,
-        module_name: vector<u8>,
+        aptos_framework: &signer,
         script_prologue_name: vector<u8>,
         module_prologue_name: vector<u8>,
-        writeset_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
-        writeset_epilogue_name: vector<u8>,
     ) {
-        system_addresses::assert_aptos_framework(account);
+        system_addresses::assert_aptos_framework(aptos_framework);
 
-        move_to(account, ChainSpecificAccountInfo {
-            module_addr,
-            module_name,
+        move_to(aptos_framework, ChainSpecificAccountInfo {
+            module_addr: @aptos_framework,
+            module_name: b"account",
             script_prologue_name,
             module_prologue_name,
-            writeset_prologue_name,
             multi_agent_prologue_name,
             user_epilogue_name,
-            writeset_epilogue_name,
         });
-    }
 
-    // This should only be called during genesis.
-    public(friend) fun create_address_map(aptos_framework_account: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework_account);
-
-        move_to(aptos_framework_account, OriginatingAddress {
+        move_to(aptos_framework, OriginatingAddress {
             address_map: table::new(),
         });
     }
@@ -202,10 +187,7 @@ module aptos_framework::account {
         rotate_authentication_key_internal(account, new_auth_key);
     }
 
-    public fun rotate_authentication_key_internal(
-        account: &signer,
-        new_auth_key: vector<u8>,
-    ) acquires Account {
+    public fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_ALREADY_EXISTS));
         assert!(
@@ -403,16 +385,6 @@ module aptos_framework::account {
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
-    fun writeset_prologue(
-        _sender: signer,
-        _txn_sequence_number: u64,
-        _txn_public_key: vector<u8>,
-        _txn_expiration_time: u64,
-        _chain_id: u8,
-    ) {
-        assert!(false, error::invalid_argument(PROLOGUE_EINVALID_WRITESET_SENDER));
-    }
-
     fun multi_agent_script_prologue(
         sender: signer,
         txn_sequence_number: u64,
@@ -446,14 +418,6 @@ module aptos_framework::account {
             );
             i = i + 1;
         }
-    }
-
-    fun writeset_epilogue(
-        _core_resource: signer,
-        _txn_sequence_number: u64,
-        _should_trigger_reconfiguration: bool,
-    ) {
-        assert!(false, error::invalid_argument(EWRITESET_NOT_ALLOWED));
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
@@ -505,10 +469,7 @@ module aptos_framework::account {
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
-    public fun create_resource_account(
-        source: &signer,
-        seed: vector<u8>,
-    ): (signer, SignerCapability) {
+    public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
         let bytes = bcs::to_bytes(&signer::address_of(source));
         vector::append(&mut bytes, seed);
         let addr = create_address(hash::sha3_256(bytes));
@@ -664,7 +625,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 9)]
+    #[expected_failure(abort_code = 8)]
     public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
         let pk_with_scheme = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         vector::push_back(&mut pk_with_scheme, 0);
@@ -697,7 +658,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, charlie=@0x567)]
-    #[expected_failure(abort_code = 11)]
+    #[expected_failure(abort_code = 10)]
     public entry fun test_invalid_accept_rotation_capability(bob: signer, charlie: signer) acquires Account {
         let pk_with_scheme = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         vector::push_back(&mut pk_with_scheme, 0);

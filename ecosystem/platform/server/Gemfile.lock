@@ -193,10 +193,16 @@ GEM
     ffi-compiler (1.0.1)
       ffi (>= 1.0.0)
       rake
-    flipper (0.24.1)
-    flipper-active_record (0.24.1)
+    flipper (0.25.1)
+    flipper-active_record (0.25.1)
       activerecord (>= 4.2, < 8)
-      flipper (~> 0.24.1)
+      flipper (~> 0.25.1)
+    flipper-ui (0.25.1)
+      erubi (>= 1.0.0, < 2.0.0)
+      flipper (~> 0.25.1)
+      rack (>= 1.4, < 3)
+      rack-protection (>= 1.5.3, <= 2.3.0)
+      sanitize (< 7)
     formtastic (4.0.0)
       actionpack (>= 5.2.0)
     formtastic_i18n (0.7.0)
@@ -279,7 +285,7 @@ GEM
       mime-types-data (~> 3.2015)
     mime-types-data (3.2022.0105)
     mini_mime (1.1.2)
-    minitest (5.16.2)
+    minitest (5.16.3)
     mocha (1.14.0)
     msgpack (1.5.4)
     multi_json (1.15.0)
@@ -439,6 +445,9 @@ GEM
     ruby-progressbar (1.11.0)
     ruby2_keywords (0.0.5)
     rubyzip (2.3.2)
+    sanitize (6.0.0)
+      crass (~> 1.0.2)
+      nokogiri (>= 1.12.0)
     selenium-webdriver (4.3.0)
       childprocess (>= 0.5, < 5.0)
       rexml (~> 3.2, >= 3.2.5)
@@ -514,8 +523,9 @@ DEPENDENCIES
   erb_lint
   factory_bot_rails
   faker
-  flipper (~> 0.24.1)
-  flipper-active_record (~> 0.24.1)
+  flipper (~> 0.25.1)
+  flipper-active_record (~> 0.25.1)
+  flipper-ui (~> 0.25.1)
   hiredis (~> 0.6.3)
   httparty
   jbuilder

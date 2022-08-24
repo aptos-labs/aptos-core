@@ -5,6 +5,8 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
+use std::collections::BTreeMap;
+
 use crate::module::AGGREGATOR_MODULE;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -168,10 +170,18 @@ impl std::fmt::Debug for DeltaOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.update {
             DeltaUpdate::Plus(value) => {
-                write!(f, "+{} ensures result <= {}", value, self.limit)
+                write!(
+                    f,
+                    "+{} ensures 0 <= result <= {}, range [-{}, {}]",
+                    value, self.limit, self.min_negative, self.max_positive
+                )
             }
             DeltaUpdate::Minus(value) => {
-                write!(f, "-{} ensures 0 <= result", value)
+                write!(
+                    f,
+                    "-{} ensures 0 <= result <= {}, range [-{}, {}]",
+                    value, self.limit, self.min_negative, self.max_positive
+                )
             }
         }
     }
@@ -187,34 +197,59 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
     bcs::from_bytes(value_bytes).expect("unexpected deserialization error in aggregator")
 }
 
+// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
+}
+
+// Helper for tests, #[cfg(test)] doesn't work for cross-crate.
+pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
+}
+
 /// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DeltaChangeSet {
-    delta_change_set: Vec<(StateKey, DeltaOp)>,
+    delta_change_set: BTreeMap<StateKey, DeltaOp>,
 }
 
 impl DeltaChangeSet {
     pub fn empty() -> Self {
         DeltaChangeSet {
-            delta_change_set: vec![],
+            delta_change_set: BTreeMap::new(),
         }
     }
 
-    pub fn new(delta_change_set: Vec<(StateKey, DeltaOp)>) -> Self {
-        DeltaChangeSet { delta_change_set }
+    pub fn len(&self) -> usize {
+        self.delta_change_set.len()
     }
 
-    pub fn push(&mut self, delta: (StateKey, DeltaOp)) {
-        self.delta_change_set.push(delta);
+    pub fn new(delta_change_set: impl IntoIterator<Item = (StateKey, DeltaOp)>) -> Self {
+        DeltaChangeSet {
+            delta_change_set: delta_change_set.into_iter().collect(),
+        }
     }
 
-    pub fn pop(&mut self) {
-        self.delta_change_set.pop();
+    pub fn insert(&mut self, delta: (StateKey, DeltaOp)) {
+        self.delta_change_set.insert(delta.0, delta.1);
+    }
+
+    pub fn remove(&mut self, key: &StateKey) -> Option<DeltaOp> {
+        self.delta_change_set.remove(key)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> ::std::collections::btree_map::Iter<'_, StateKey, DeltaOp> {
+        self.into_iter()
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.delta_change_set.is_empty()
+    }
+
+    pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, DeltaOp> {
+        &mut self.delta_change_set
     }
 
     /// Consumes the delta change set and tries to materialize it. Returns a
@@ -235,9 +270,18 @@ impl DeltaChangeSet {
     }
 }
 
+impl<'a> IntoIterator for &'a DeltaChangeSet {
+    type Item = (&'a StateKey, &'a DeltaOp);
+    type IntoIter = ::std::collections::btree_map::Iter<'a, StateKey, DeltaOp>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.delta_change_set.iter()
+    }
+}
+
 impl ::std::iter::IntoIterator for DeltaChangeSet {
     type Item = (StateKey, DeltaOp);
-    type IntoIter = ::std::vec::IntoIter<(StateKey, DeltaOp)>;
+    type IntoIter = ::std::collections::btree_map::IntoIter<StateKey, DeltaOp>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.into_iter()
@@ -252,17 +296,9 @@ mod tests {
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
-    fn addition(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::new(DeltaUpdate::Plus(value), limit, 0, 0)
-    }
-
-    fn subtraction(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::new(DeltaUpdate::Minus(value), limit, 0, 0)
-    }
-
     #[test]
     fn test_delta_addition() {
-        let add5 = addition(5, 100);
+        let add5 = delta_add(5, 100);
         assert_ok_eq!(add5.apply_to(0), 5);
         assert_ok_eq!(add5.apply_to(5), 10);
         assert_ok_eq!(add5.apply_to(95), 100);
@@ -272,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_delta_subtraction() {
-        let sub5 = subtraction(5, 100);
+        let sub5 = delta_sub(5, 100);
         assert_err!(sub5.apply_to(0));
         assert_err!(sub5.apply_to(1));
 
@@ -284,12 +320,12 @@ mod tests {
     fn test_delta_merge() {
         use DeltaUpdate::*;
 
-        let mut v = addition(5, 20);
-        let add20 = addition(20, 20);
-        let sub15 = subtraction(15, 20);
-        let add7 = addition(7, 20);
-        let mut sub1 = subtraction(1, 20);
-        let sub20 = subtraction(20, 20);
+        let mut v = delta_add(5, 20);
+        let add20 = delta_add(20, 20);
+        let sub15 = delta_sub(15, 20);
+        let add7 = delta_add(7, 20);
+        let mut sub1 = delta_sub(1, 20);
+        let sub20 = delta_sub(20, 20);
 
         // Overflow on merge.
         assert_err!(v.merge_with(add20)); // 25
@@ -332,7 +368,7 @@ mod tests {
     #[test]
     fn test_failed_delta_application() {
         let state_view = FakeView::default();
-        let delta_op = addition(10, 1000);
+        let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &*KEY),
             Err(VMStatus::Error(StatusCode::STORAGE_ERROR))
@@ -345,8 +381,8 @@ mod tests {
         state_view.data.insert(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should succeed!
-        let add_op = addition(100, 200);
-        let sub_op = subtraction(100, 200);
+        let add_op = delta_add(100, 200);
+        let sub_op = delta_sub(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &*KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
@@ -361,8 +397,8 @@ mod tests {
         state_view.data.insert(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should fail!
-        let add_op = addition(15, 100);
-        let sub_op = subtraction(101, 1000);
+        let add_op = delta_add(15, 100);
+        let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
             add_op.try_into_write_op(&state_view, &*KEY),

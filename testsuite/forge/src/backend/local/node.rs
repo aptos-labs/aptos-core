@@ -3,9 +3,12 @@
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_logger::debug;
-use aptos_sdk::types::{account_address::AccountAddress, PeerId};
+use aptos_sdk::{
+    crypto::ed25519::Ed25519PrivateKey,
+    types::{account_address::AccountAddress, PeerId},
+};
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -40,13 +43,19 @@ pub struct LocalNode {
     version: LocalVersion,
     process: Option<Process>,
     name: String,
+    account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     peer_id: AccountAddress,
     directory: PathBuf,
     config: NodeConfig,
 }
 
 impl LocalNode {
-    pub fn new(version: LocalVersion, name: String, directory: PathBuf) -> Result<Self> {
+    pub fn new(
+        version: LocalVersion,
+        name: String,
+        directory: PathBuf,
+        account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
+    ) -> Result<Self> {
         let config_path = directory.join("node.yaml");
         let config = NodeConfig::load(&config_path)
             .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
@@ -58,6 +67,7 @@ impl LocalNode {
             version,
             process: None,
             name,
+            account_private_key,
             peer_id,
             directory,
             config,
@@ -78,6 +88,10 @@ impl LocalNode {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn account_private_key(&self) -> &Option<ConfigKey<Ed25519PrivateKey>> {
+        &self.account_private_key
     }
 
     pub fn start(&mut self) -> Result<()> {

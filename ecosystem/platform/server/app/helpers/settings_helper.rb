@@ -8,8 +8,9 @@ module SettingsHelper
 
   def sidebar_items
     [
-      SidebarItem.new(settings_profile_url, 'Profile'),
-      SidebarItem.new(settings_connections_url, 'Connections')
+      SidebarItem.new(settings_profile_path, 'Profile'),
+      SidebarItem.new(settings_notifications_path, 'Notifications'),
+      SidebarItem.new(settings_connections_path, 'Connections')
     ]
   end
 end

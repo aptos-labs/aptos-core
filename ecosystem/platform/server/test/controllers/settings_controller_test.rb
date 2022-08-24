@@ -34,6 +34,21 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'foobar@example.org', @user.unconfirmed_email
   end
 
+  test 'notification settings page' do
+    get settings_notifications_path
+    assert_response :success
+  end
+
+  test 'update notification settings' do
+    patch settings_notifications_path(@user),
+          params: { notification_preference: { node_upgrade_notification: true,
+                                               governance_proposal_notification: false } }
+
+    prefs = @user.notification_preferences.where(delivery_method: :email).first
+    assert prefs.node_upgrade_notification
+    refute prefs.governance_proposal_notification
+  end
+
   test 'connections settings page' do
     get settings_connections_url
     assert_response :success

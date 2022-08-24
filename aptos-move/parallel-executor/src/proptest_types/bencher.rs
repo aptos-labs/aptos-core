@@ -99,7 +99,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions);
+        let expected_output = ExpectedOutput::generate_baseline(&transactions, None);
 
         Self {
             transactions,
@@ -112,8 +112,9 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), self.transactions.clone());
+        .execute_transactions_parallel((), self.transactions.clone())
+        .map(|(res, _)| res);
 
-        assert!(self.expected_output.check_output(&output));
+        self.expected_output.assert_output(&output, None);
     }
 }

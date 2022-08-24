@@ -221,13 +221,13 @@ $ aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/he
 The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
 ```move
-module HelloBlockchain::Message {
+module HelloBlockchain::message {
 ```
 
 becomes:
 
 ```move
-module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message {
+module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message {
 ```
 
 This makes it possible to publish the module for the given account (in this case our wallet account, `0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`).
@@ -298,7 +298,7 @@ You can also verify that the module was published by going to the [Aptos Explore
         },
         {
           "name": "message_change_events",
-          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
+          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message::MessageChangeEvent>"
         }
       ]
     }
@@ -362,7 +362,7 @@ To call this function, we need to use the `window.aptos` API provided by the wal
 ```javascript
 {
   type: "entry_function_payload",
-  function: "<address>::Message::set_message",
+  function: "<address>::message::set_message",
   arguments: ["<hex encoded utf-8 message>"],
   type_arguments: []
 }
@@ -388,7 +388,7 @@ Using this function, our transaction payload becomes:
 ```javascript
 {
   type: "entry_function_payload",
-  function: "<address>::Message::set_message",
+  function: "<address>::message::set_message",
   arguments: [stringToHex(message)],
   type_arguments: []
 }
@@ -419,7 +419,7 @@ function App() {
     const message = ref.current.value;
     const transaction = {
       type: "entry_function_payload",
-      function: `${address}::Message::set_message`,
+      function: `${address}::message::set_message`,
       arguments: [stringToHex(message)],
       type_arguments: [],
     };
@@ -463,12 +463,12 @@ To retrieve the message, we will:
 
 - First use `AptosClient.getAccountResources()` function to fetch the account's resources and store them in state.
 
-- Then we will look for one whose `type` is `MessageHolder`. The full type is `$address::Message::MessageHolder` as it is part of the `$address::Message` module.
+- Then we will look for one whose `type` is `MessageHolder`. The full type is `$address::message::MessageHolder` as it is part of the `$address::message` module.
 
   In our example it is:
 
   ```typescript
-   0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageHolder
+   0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message::MessageHolder
   ```
 
 - We will use this for the initial value of the `<textarea>`.
@@ -485,7 +485,7 @@ function App() {
     if (!address) return;
     client.getAccountResources(address).then(setResourdces);
   }, [address]);
-  const resourceType = `${address}::Message::MessageHolder`;
+  const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);
   const data = resource?.data as {message: string} | undefined;
   const message = data?.message;

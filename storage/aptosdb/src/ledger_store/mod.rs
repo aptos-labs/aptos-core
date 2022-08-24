@@ -217,6 +217,13 @@ impl LedgerStore {
         })
     }
 
+    pub fn ensure_epoch_ending(&self, version: Version) -> Result<()> {
+        self.db
+            .get::<EpochByVersionSchema>(&version)?
+            .ok_or_else(|| format_err!("Version {} is not epoch ending.", version))?;
+        Ok(())
+    }
+
     /// Get transaction info at `version` with proof towards root of ledger at `ledger_version`.
     pub fn get_transaction_info_with_proof(
         &self,

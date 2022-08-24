@@ -20,8 +20,8 @@ module aptos_framework::transaction_fee {
     }
 
     /// Only called during genesis.
-    public(friend) fun store_aptos_coin_burn_cap(account: &signer, burn_cap: BurnCapability<AptosCoin>) {
-        system_addresses::assert_aptos_framework(account);
-        move_to(account, AptosCoinCapabilities { burn_cap })
+    public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
     }
 }

@@ -6,8 +6,8 @@ module aptos_framework::aggregator_tests {
 
     #[test(account = @aptos_framework)]
     fun test_can_add_and_sub_and_read(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = aggregator_factory::create_aggregator(/*limit=*/1000);
+        aggregator_factory::initialize_aggregator_factory_for_test(&account);
+        let aggregator = aggregator_factory::create_aggregator(&account, 1000);
 
         aggregator::add(&mut aggregator, 12);
         assert!(aggregator::read(&aggregator) == 12, 0);
@@ -29,8 +29,8 @@ module aptos_framework::aggregator_tests {
     #[test(account = @aptos_framework)]
     #[expected_failure(abort_code = 0x020001)]
     fun test_overflow(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = aggregator_factory::create_aggregator(/*limit=*/10);
+        aggregator_factory::initialize_aggregator_factory_for_test(&account);
+        let aggregator = aggregator_factory::create_aggregator(&account, 10);
 
         // Overflow!
         aggregator::add(&mut aggregator, 12);
@@ -41,8 +41,8 @@ module aptos_framework::aggregator_tests {
     #[test(account = @aptos_framework)]
     #[expected_failure(abort_code = 0x020002)]
     fun test_underflow(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = aggregator_factory::create_aggregator(/*limit=*/10);
+        aggregator_factory::initialize_aggregator_factory_for_test(&account);
+        let aggregator = aggregator_factory::create_aggregator(&account, 10);
 
         // Underflow!
         aggregator::sub(&mut aggregator, 100);

@@ -5,6 +5,7 @@
 
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_build_info::build_information;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
@@ -16,6 +17,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
+use aptos_logger::telemetry_log_writer::TelemetryLog;
 use aptos_logger::{prelude::*, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
@@ -36,7 +38,7 @@ use data_streaming_service::{
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use framework::ReleaseBundle;
-use futures::channel::mpsc::channel;
+use futures::channel::mpsc;
 use hex::FromHex;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
@@ -68,6 +70,7 @@ use tokio::runtime::{Builder, Runtime};
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
+const TELEMETRY_LOG_INGEST_BUFFER_SIZE: usize = 128;
 
 /// Runs an aptos fullnode or validator
 #[derive(Clone, Debug, Parser)]
@@ -167,6 +170,8 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
+        .telemetry_level(config.logger.telemetry_level)
+        .enable_telemetry_flush(config.logger.enable_telemetry_flush)
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
@@ -175,7 +180,13 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
     if let Some(log_file) = log_file {
         logger.printer(Box::new(FileWriter::new(log_file)));
     }
-    let _logger = Some(logger.build());
+    let mut remote_log_rx = None;
+    if config.logger.enable_telemetry_remote_log {
+        let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
+        logger.remote_log_tx(tx);
+        remote_log_rx = Some(rx);
+    }
+    let _logger = logger.build();
 
     // Let's now log some important information, since the logger is set up
     info!(config = config, "Loaded AptosNode config");
@@ -191,7 +202,8 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config)?;
+    let _node_handle = setup_environment(config, remote_log_rx)?;
+
     let term = Arc::new(AtomicBool::new(false));
 
     while !term.load(Ordering::Acquire) {
@@ -469,7 +481,10 @@ fn setup_state_sync_storage_service(
     Ok(storage_service_runtime)
 }
 
-pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle> {
+pub fn setup_environment(
+    node_config: NodeConfig,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
     thread::spawn(move || {
@@ -657,7 +672,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         db_rw.clone(),
     )?;
 
-    let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
+    let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
     let api_runtime = bootstrap_api(
         &node_config,
@@ -672,7 +687,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
-        channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
+        mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
     instant = Instant::now();
     let mempool = aptos_mempool::bootstrap(
@@ -725,9 +740,14 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
 
+    let build_info = build_information!();
     // Create the telemetry service
-    let telemetry_runtime =
-        aptos_telemetry::service::start_telemetry_service(node_config.clone(), chain_id);
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id,
+        build_info,
+        remote_log_rx,
+    );
 
     Ok(AptosHandle {
         _api: api_runtime,

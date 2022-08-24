@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
+
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
@@ -44,8 +46,12 @@ fn test_mock_vm_different_senders() {
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
         let sender = txn.as_signed_user_txn().unwrap().sender();
         assert_eq!(
-            output.write_set().iter().cloned().collect::<Vec<_>>(),
-            vec![
+            output
+                .write_set()
+                .iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            [
                 (
                     StateKey::AccessPath(balance_ap(sender)),
                     WriteOp::Modification(amount.to_le_bytes().to_vec())
@@ -55,6 +61,8 @@ fn test_mock_vm_different_senders() {
                     WriteOp::Modification(1u64.to_le_bytes().to_vec())
                 ),
             ]
+            .into_iter()
+            .collect()
         );
     }
 }
@@ -73,8 +81,12 @@ fn test_mock_vm_same_sender() {
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
-            output.write_set().iter().cloned().collect::<Vec<_>>(),
-            vec![
+            output
+                .write_set()
+                .iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            [
                 (
                     StateKey::AccessPath(balance_ap(sender)),
                     WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
@@ -84,6 +96,8 @@ fn test_mock_vm_same_sender() {
                     WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
                 ),
             ]
+            .into_iter()
+            .collect()
         );
     }
 }
@@ -108,9 +122,9 @@ fn test_mock_vm_payment() {
             .unwrap()
             .write_set()
             .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-        vec![
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect::<BTreeMap<_, _>>(),
+        [
             (
                 StateKey::AccessPath(balance_ap(gen_address(0))),
                 WriteOp::Modification(50u64.to_le_bytes().to_vec())
@@ -124,5 +138,7 @@ fn test_mock_vm_payment() {
                 WriteOp::Modification(150u64.to_le_bytes().to_vec())
             ),
         ]
+        .into_iter()
+        .collect()
     );
 }

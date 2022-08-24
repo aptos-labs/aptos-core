@@ -19,9 +19,34 @@ class SettingsController < ApplicationController
                else
                  'User profile updated'
                end
-      redirect_to settings_profile_url, notice:
+      redirect_to settings_profile_path, notice:
     else
       render :profile, status: :unprocessable_entity
+    end
+  end
+
+  def notifications
+    @email_preferences = current_user.notification_preferences.where(delivery_method: :email).first ||
+                         NotificationPreference.new(user: current_user, delivery_method: :email)
+  end
+
+  def notifications_update
+    email_params = params.fetch(:notification_preference, {}).permit(:node_upgrade_notification,
+                                                                     :governance_proposal_notification)
+
+    @email_preferences = current_user.notification_preferences.where(delivery_method: :email).first ||
+                         NotificationPreference.new(user: current_user, delivery_method: :email, **email_params)
+
+    success = if @email_preferences.persisted?
+                @email_preferences.update(email_params)
+              else
+                @email_preferences.save
+              end
+
+    if success
+      redirect_to settings_notifications_path, notice: 'Notification settings updated.'
+    else
+      render :notifications, status: :unprocessable_entity
     end
   end
 
@@ -45,7 +70,7 @@ class SettingsController < ApplicationController
       flash[:alert] = 'Cannot remove the last connection'
       render :connections, status: :unprocessable_entity
     elsif authorization.destroy
-      redirect_to settings_connections_url, notice: 'Connection removed'
+      redirect_to settings_connections_path, notice: 'Connection removed'
     else
       flash[:alert] = 'Unable to remove connection'
       render :connections, status: :unprocessable_entity

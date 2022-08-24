@@ -5,9 +5,13 @@ use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
 };
+use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
-use move_deps::move_table_extension::TableResolver;
-use std::{cell::RefCell, collections::BTreeMap};
+use move_deps::{move_binary_format::errors::Location, move_table_extension::TableResolver};
+use std::{
+    cell::RefCell,
+    collections::{btree_map, BTreeMap},
+};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug)]
@@ -32,7 +36,7 @@ pub struct AggregatorChangeSet {
 /// Note: table resolver is reused for fine-grained storage access.
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
-    txn_hash: u128,
+    txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
 }
@@ -40,7 +44,7 @@ pub struct NativeAggregatorContext<'a> {
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: u128, resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
         Self {
             txn_hash,
             resolver,
@@ -49,7 +53,7 @@ impl<'a> NativeAggregatorContext<'a> {
     }
 
     /// Returns the hash of transaction associated with this context.
-    pub fn txn_hash(&self) -> u128 {
+    pub fn txn_hash(&self) -> [u8; 32] {
         self.txn_hash
     }
 
@@ -96,9 +100,49 @@ impl<'a> NativeAggregatorContext<'a> {
     }
 }
 
+impl AggregatorChangeSet {
+    pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
+        for (other_id, other_change) in other.changes {
+            match self.changes.entry(other_id) {
+                // If something was changed only in `other` session, add it.
+                btree_map::Entry::Vacant(entry) => {
+                    entry.insert(other_change);
+                }
+                // Otherwise, we might need to aggregate deltas.
+                btree_map::Entry::Occupied(mut entry) => {
+                    use AggregatorChange::*;
+
+                    let entry_mut = entry.get_mut();
+                    match (*entry_mut, other_change) {
+                        (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
+                        (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
+                        (Write(data), Merge(delta)) => {
+                            let new_data = delta
+                                .apply_to(data)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Write(new_data);
+                        }
+                        (Merge(mut delta1), Merge(delta2)) => {
+                            delta1
+                                .merge_with(delta2)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Merge(delta1)
+                        }
+                        // Hashing properties guarantee that aggregator keys should
+                        // not collide, making this case impossible.
+                        (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_aggregator::aggregator_extension::AggregatorHandle;
     use aptos_types::account_address::AccountAddress;
     use claim::assert_matches;
     use move_deps::move_table_extension::TableHandle;
@@ -116,6 +160,11 @@ mod test {
     }
 
     fn test_id(key: u128) -> AggregatorID {
+        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
+            .iter()
+            .flat_map(|b| b.to_vec())
+            .collect();
+        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
         AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 
@@ -156,7 +205,7 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let context = NativeAggregatorContext::new(0, &EmptyStorage);
+        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage);
         use AggregatorChange::*;
 
         test_set_up(&context);
