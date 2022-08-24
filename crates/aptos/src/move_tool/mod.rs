@@ -15,9 +15,7 @@ use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{
     create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
 };
-use crate::move_tool::manifest::{
-    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
-};
+use crate::move_tool::manifest::{ManifestNamedAddress, MovePackageManifest, PackageInfo};
 use crate::{
     common::{
         types::{
@@ -137,7 +135,6 @@ impl CliCommand<()> for InitPackage {
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            "devnet",
             addresses,
             self.prompt_options,
         )
@@ -147,7 +144,6 @@ impl CliCommand<()> for InitPackage {
 pub fn init_move_dir(
     package_dir: &Path,
     name: &str,
-    rev: &str,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<()> {
@@ -159,18 +155,6 @@ pub fn init_move_dir(
             .as_path(),
     )?;
 
-    let mut dependencies = BTreeMap::new();
-    dependencies.insert(
-        "AptosFramework".to_string(),
-        Dependency {
-            local: None,
-            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-            rev: Some(rev.to_string()),
-            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-            aptos: None,
-            address: None,
-        },
-    );
     let manifest = MovePackageManifest {
         package: PackageInfo {
             name: name.to_string(),
@@ -178,7 +162,7 @@ pub fn init_move_dir(
             author: None,
         },
         addresses,
-        dependencies,
+        dependencies: BTreeMap::new(),
     };
 
     write_to_file(

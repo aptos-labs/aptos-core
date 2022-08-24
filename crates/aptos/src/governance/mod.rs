@@ -10,7 +10,7 @@ use crate::move_tool::{init_move_dir, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::U64;
+use aptos_rest_client::aptos_api_types::{MoveStructTag, WriteResource, WriteSetChange, U64};
 use aptos_rest_client::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -244,12 +244,12 @@ pub struct SubmitVote {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SubmitVote {
+impl CliCommand<TransactionSummary> for SubmitVote {
     fn command_name(&self) -> &'static str {
         "SubmitVote"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let (vote_str, vote) = match (self.yes, self.no) {
             (true, false) => ("Yes", true),
             (false, true) => ("No", false),
@@ -274,6 +274,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 vote,
             ))
             .await
+            .map(TransactionSummary::from)
     }
 }
 
@@ -297,7 +298,6 @@ impl std::fmt::Display for ProposalMetadata {
 
 fn compile_in_temp_dir(
     script_path: &Path,
-    git_revision: &str,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
@@ -307,13 +307,7 @@ fn compile_in_temp_dir(
 
     // Initialize a move directory
     let package_dir = temp_dir.path();
-    init_move_dir(
-        package_dir,
-        "Proposal",
-        git_revision,
-        BTreeMap::new(),
-        prompt_options,
-    )?;
+    init_move_dir(package_dir, "Proposal", BTreeMap::new(), prompt_options)?;
 
     // Insert the new script
     let sources_dir = package_dir.join("sources");
@@ -368,8 +362,10 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
+    /// Proposal Id being executed
     #[clap(long)]
     pub(crate) proposal_id: u64,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -403,10 +399,6 @@ pub struct CompileProposalArgs {
     #[clap(long, parse(from_os_str))]
     pub script_path: PathBuf,
 
-    /// Git hash or branch of the framework in aptos core
-    #[clap(long)]
-    pub framework_git_rev: String,
-
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
 }
@@ -428,7 +420,7 @@ impl CompileProposalArgs {
         }
 
         // Compile script
-        compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
+        compile_in_temp_dir(script_path, self.prompt_options)
     }
 }
 
@@ -458,12 +450,12 @@ pub struct GenerateUpgradeProposal {
 }
 
 #[async_trait]
-impl CliCommand<&'static str> for GenerateUpgradeProposal {
+impl CliCommand<()> for GenerateUpgradeProposal {
     fn command_name(&self) -> &'static str {
         "GenerateUpgradeProposal"
     }
 
-    async fn execute(self) -> CliTypedResult<&'static str> {
+    async fn execute(self) -> CliTypedResult<()> {
         let GenerateUpgradeProposal {
             move_options,
             account,
@@ -475,6 +467,6 @@ impl CliCommand<&'static str> for GenerateUpgradeProposal {
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
         release.generate_script_proposal(account, output)?;
-        Ok("success")
+        Ok(())
     }
 }
