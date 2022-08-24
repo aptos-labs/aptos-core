@@ -546,22 +546,20 @@ async fn construction_payloads(
     let (txn_payload, sender) = operation.payload()?;
 
     // Build the transaction and make it ready for signing
-    let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
+    let transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit.0)
         .with_max_gas_amount(metadata.max_gas_amount.0);
 
-    // Default expiry is 30 seconds from right now
-    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
-        transaction_factory =
-            transaction_factory.with_transaction_expiration_time(expiry_time_secs.0);
-    }
-
-    let sequence_number = metadata.sequence_number;
-    let unsigned_transaction = transaction_factory
+    let mut txn_builder = transaction_factory
         .payload(txn_payload)
         .sender(sender)
-        .sequence_number(sequence_number.0)
-        .build();
+        .sequence_number(metadata.sequence_number.0);
+
+    // Default expiry is 30 seconds from right now
+    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
+        txn_builder = txn_builder.expiration_timestamp_secs(expiry_time_secs.0)
+    }
+    let unsigned_transaction = txn_builder.build();
 
     let signing_message = hex::encode(signing_message(&unsigned_transaction));
     let payload = SigningPayload {
