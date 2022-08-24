@@ -75,9 +75,8 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-struct CacheWrapper {
+struct LruCache16ShardWrapper {
     state: LruCache<[u8; 32], u64>,
-    cache_option: CacheOption,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -86,40 +85,22 @@ enum CacheOption {
     LruCache_ExistingFieldAsKey,
 }
 
-impl CacheWrapper {
-    fn new(cache_size: usize, cache_option: CacheOption) -> CacheWrapper {
-        CacheWrapper {
-            state: LruCache::new(cache_size as u64),
-            cache_option,
+impl LruCache16ShardWrapper {
+    fn new(cache_size_per_shard: usize) -> LruCache16ShardWrapper {
+        LruCache16ShardWrapper {
+            state: LruCache::new(cache_size_per_shard as u64),
         }
     }
 
     pub fn get_key(&self, item: &Transaction) -> [u8; 32] {
-        match self.cache_option {
-            LruCache_CryptoHashAsKey => {
-                let bytes = to_bytes(item).unwrap();
-                let mut hasher = DefaultHasher::new(b"CacheTesting");
-                hasher.update(&bytes);
-                hasher.finish().get_bytes()
-            }
-            LruCache_ExistingFieldAsKey => {
-                let mut ret = [0_u8; 32];
-                let (account_bytes, seq_num_bytes) = match item {
-                    UserTransaction(x) => {
-                        (x.sender().into_bytes(), x.sequence_number().to_le_bytes())
-                    }
-                    GenesisTransaction(x) => ([0_u8; 32], [0_u8; 8]),
-                    BlockMetadata(x) => ([0_u8; 32], [0_u8; 8]),
-                    StateCheckpoint(x) => ([0_u8; 32], [0_u8; 8]),
-                };
-                ret[..24].copy_from_slice(&account_bytes[0..24]);
-                ret[24..32].copy_from_slice(&seq_num_bytes[0..8]);
-                ret
-            }
-        }
+        let bytes = to_bytes(item).unwrap();
+        let mut hasher = DefaultHasher::new(b"CacheTesting");
+        hasher.update(&bytes);
+        hasher.finish().get_bytes()
     }
 
-    /// return whether the entry exists.
+    /// return whether the item exists (cache hit).
+    /// NOTE: false cache miss is possible.
     pub fn insert(&self, item: &Transaction) -> bool {
         let nonce = thread_rng().gen::<u64>();
         let entry = self.state.get_or_init(self.get_key(item), 1, |_e| nonce);
@@ -128,8 +109,10 @@ impl CacheWrapper {
     }
 }
 
-static CACHE: Lazy<CacheWrapper> =
-    Lazy::new(|| CacheWrapper::new(70000, CacheOption::LruCache_CryptoHashAsKey));
+const CACHE_SIZE_PER_SHARD: usize = 4096;
+
+static CACHE: Lazy<LruCache16ShardWrapper> =
+    Lazy::new(|| LruCache16ShardWrapper::new(CACHE_SIZE_PER_SHARD));
 
 pub struct ParallelAptosVM();
 
@@ -178,19 +161,3 @@ impl ParallelAptosVM {
         }
     }
 }
-
-// #[test]
-// fn rati_test() {
-//     let cache : CacheWrapper<&str, u64> = CacheWrapper::new(70000, 256);
-//     assert_eq!(1_u64, *cache.get_or_init("k1", 1, |k|1_u64).value());
-//     assert_eq!(2_u64, *cache.get_or_init("k2", 1, |k|2_u64).value());
-//     assert_eq!(1_u64, *cache.get_or_init("k1", 1, |k|3_u64).value());
-//     assert_eq!(4_u64, *cache.get_or_init("k3", 1, |k|4_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k4", 1, |k|5_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k5", 1, |k|5_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k6", 1, |k|5_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k7", 1, |k|5_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k8", 1, |k|5_u64).value());
-//     assert_eq!(5_u64, *cache.get_or_init("k9", 1, |k|5_u64).value());
-//     assert_eq!(6_u64, *cache.get_or_init("k1", 1, |k|6_u64).value());
-// }
