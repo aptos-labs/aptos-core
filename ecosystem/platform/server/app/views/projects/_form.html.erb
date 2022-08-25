@@ -73,34 +73,49 @@
     </div>
   </div>
 
-  <div class="mb-16">
+  <%= content_tag :div, class: 'mb-16', data: { controller: 'project-images', project_images_thumbnail_url_value: project.thumbnail.attached? ? url_for(project.thumbnail) : nil, project_images_screenshot_urls_value: project.screenshots.attached? ? project.screenshots.map { |screenshot| url_for(screenshot) } : nil } do %>
     <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Media</h3>
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
     <div class="mb-6">
       <%= form.label :thumbnail, 'Thumbnail', class: 'font-mono uppercase block mb-2' %>
-      <%= form.file_field :thumbnail %>
-      <%= content_tag :button, class: 'w-48 h-48 bg-neutral-800 border-neutral-700 border-2 border-dashed rounded-xl flex items-center justify-center text-neutral-500 hover:text-neutral-400 focus:text-neutral-400 cursor-pointer' do %>
-        <%= render IconComponent.new(:upload, size: :large) %>
+      <%= form.label :thumbnail, class: 'flex flex-col justify-center items-center w-48 h-48 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 bg-contain bg-no-repeat bg-center' do %>
+        <div class="flex flex-col justify-center items-center pt-5 pb-6">
+          <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
+          <p class="text-sm text-neutral-400"><span class="font-semibold">Click to upload</span></p>
+          <p class="text-sm text-neutral-400">or drag and drop</p>
+        </div>
+        <%= form.file_field :thumbnail, accept: 'image/*', class: 'hidden', data: { project_images_target: 'thumbnail', action: 'project-images#thumbnailChange' } %>
       <% end %>
     </div>
 
     <div class="mb-6">
       <%= form.label :screenshots, 'Screenshot Gallery', class: 'font-mono uppercase block mb-2' %>
-      <%= form.file_field :screenshots %>
-      <%= content_tag :button, class: 'w-full h-96 bg-neutral-800 border-neutral-700 border-2 border-dashed rounded-xl flex items-center justify-center text-neutral-500 hover:text-neutral-400 focus:text-neutral-400 cursor-pointer' do %>
-        <div class="w-96 flex flex-col gap-4 items-center">
-          <%= render IconComponent.new(:upload, size: :large) %>
-          <p class="font-light text-neutral-400">Upload at least one image, 1920 x 1080px / aspect ratio of 16:9, max. 5MB each.</p>
+      <%= form.label :screenshots, class: 'flex flex-col justify-center items-center w-full h-64 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 mb-8' do %>
+        <div class="flex flex-col justify-center items-center pt-5 pb-6">
+          <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
+          <p class="mb-2 text-sm text-neutral-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+          <p class="text-xs text-neutral-400">SVG, PNG, JPG or GIF (MAX. 1920x1080px)</p>
         </div>
+        <%= form.file_field :screenshots, name: 'project[screenshots][]', accept: 'image/*', class: 'hidden', data: { action: 'project-images#screenshotsChange' } %>
       <% end %>
+      <div class="grid grid-cols-5 gap-8" data-project-images-target="screenshotPreviews">
+      </div>
+      <template data-project-images-target="screenshotPreviewTemplate">
+        <div>
+          <img class="w-full h-auto mb-4 rounded-lg">
+          <button class="font-semibold text-neutral-200" data-action="project-images#removeScreenshotPreview">
+            Remove
+          </button>
+        </div>
+      </template>
     </div>
 
     <div class="mb-6 max-w-prose">
       <%= form.label :youtube_url, 'Video', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :youtube_url, placeholder: 'YouTube video URL' %>
     </div>
-  </div>
+  <% end %>
 
   <div class="mb-16">
     <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Project Members</h3>

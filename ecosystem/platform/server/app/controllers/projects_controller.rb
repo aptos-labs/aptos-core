@@ -54,9 +54,6 @@ class ProjectsController < ApplicationController
 
     return unless check_recaptcha
 
-    @project.thumbnail.attach(params[:thumbnail])
-    @project.screenshots.attach(params[:screenshots])
-
     if @project.save
       redirect_to project_url(@project), notice: 'Project was successfully created.'
     else
@@ -70,9 +67,6 @@ class ProjectsController < ApplicationController
 
     @project = Project.find(params[:id])
     return head :forbidden unless @project.user_id == current_user.id
-
-    @project.thumbnail.attach(params[:thumbnail])
-    @project.screenshots.attach(params[:screenshots])
 
     if @project.update(project_params)
       redirect_to project_url(@project), notice: 'Project was successfully updated.'
