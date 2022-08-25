@@ -191,10 +191,15 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
 
-    let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
+    let emitter_mode = EmitJobMode::ConstTps { tps: 6000 }; // EmitJobMode::create(args.mempool_backlog, args.target_tps);
 
     let global_emit_job_request = EmitJobRequest::default()
-        .duration(Duration::from_secs(args.duration_secs as u64))
+        .duration(Duration::from_secs(3600)) //  args.duration_secs as u64))
+        .transaction_mix(vec![
+            (TransactionType::P2P, 80),
+            (TransactionType::AccountGeneration, 15),
+            (TransactionType::NftMint, 5),
+        ])
         .mode(emitter_mode);
 
     let success_criteria = SuccessCriteria::new(
@@ -468,6 +473,9 @@ fn land_blocking_test_suite() -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(&[&PerformanceBenchmarkWithFN])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
