@@ -1306,6 +1306,27 @@ module aptos_framework::stake {
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
     }
 
+    #[test_only]
+    public fun join_validator_set_for_test(
+        operator: &signer,
+        pool_address: address,
+        should_end_epoch: bool,
+    ) acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        join_validator_set(operator, pool_address);
+        if (should_end_epoch) {
+            end_epoch();
+        }
+    }
+
+    #[test_only]
+    public fun fast_forward_to_unlock(pool_address: address)
+    acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let expiration_time = get_lockup_secs(pool_address);
+        timestamp::update_global_time_for_test_secs(expiration_time);
+        end_epoch();
+    }
+
     // Convenient function for setting up all required stake initializations.
     #[test_only]
     public fun initialize_for_test_custom(
@@ -2442,5 +2463,11 @@ module aptos_framework::stake {
         account::create_account_for_test(addr);
         coin::register<AptosCoin>(validator);
         initialize_stake_owner(validator, 0, addr, addr);
+    }
+
+    #[test_only]
+    public fun with_rewards(amount: u64): u64 {
+        let (numerator, denominator) = staking_config::get_reward_rate(&staking_config::get());
+        amount + amount * numerator / denominator
     }
 }

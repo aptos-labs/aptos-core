@@ -175,6 +175,21 @@ module aptos_std::pool_u64 {
         redeemed_coins
     }
 
+    /// Transfer shares from `shareholder_1` to `shareholder_2`.
+    public fun transfer_shares(
+        pool: &mut Pool,
+        shareholder_1: address,
+        shareholder_2: address,
+        shares_to_transfer: u64,
+    ) {
+        assert!(contains(pool, shareholder_1), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+        assert!(shares(pool, shareholder_1) >= shares_to_transfer, error::invalid_argument(EINSUFFICIENT_SHARES));
+        if (shares_to_transfer == 0) return;
+
+        deduct_shares(pool, shareholder_1, shares_to_transfer);
+        add_shares(pool, shareholder_2, shares_to_transfer);
+    }
+
     /// Directly deduct `shareholder`'s number of shares in `pool` and return the number of remaining shares.
     fun deduct_shares(pool: &mut Pool, shareholder: address, num_shares: u64): u64 {
         assert!(contains(pool, shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
@@ -496,6 +511,18 @@ module aptos_std::pool_u64 {
         assert!(shareholders_count(&pool) == 2, 0);
         deduct_shares(&mut pool, @1, 1);
         assert!(shareholders_count(&pool) == 1, 1);
+        destroy_pool(pool);
+    }
+
+    #[test]
+    public entry fun test_transfer_shares() {
+        let pool = create(2);
+        add_shares(&mut pool, @1, 2);
+        add_shares(&mut pool, @2, 2);
+        assert!(shareholders_count(&pool) == 2, 0);
+        transfer_shares(&mut pool, @1, @2, 1);
+        assert!(shares(&pool, @1) == 1, 0);
+        assert!(shares(&pool, @2) == 3, 0);
         destroy_pool(pool);
     }
 
