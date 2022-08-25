@@ -1,20 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{to_hex_lower, Y2K_MS};
+use crate::common::{BlockHash, Y2K_MS};
 use crate::{
     common::{
         check_network, get_block_index_from_request, get_timestamp, handle_request, with_context,
     },
-    error::{ApiError, ApiResult},
+    error::ApiResult,
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_types::chain_id::ChainId;
 use std::sync::Arc;
-use std::{collections::BTreeMap, sync::RwLock};
 use warp::Filter;
 
 pub fn block_route(
@@ -87,13 +85,11 @@ async fn build_block(
 
 /// Retrieves a block by its index
 async fn get_block_by_index(
-    block_cache: &BlockCache,
+    block_cache: &BlockRetriever,
     block_height: u64,
     chain_id: ChainId,
 ) -> ApiResult<(BlockIdentifier, aptos_rest_client::aptos_api_types::Block)> {
-    let block = block_cache
-        .get_block_by_height(block_height, true, chain_id)
-        .await?;
+    let block = block_cache.get_block_by_height(block_height, true).await?;
 
     // For the genesis block, we populate parent_block_identifier with the
     // same genesis block. Refer to
@@ -103,7 +99,7 @@ async fn get_block_by_index(
     } else {
         // Retrieve the previous block's identifier
         let prev_block = block_cache
-            .get_block_by_height(block_height - 1, false, chain_id)
+            .get_block_by_height(block_height - 1, false)
             .await?;
         let prev_block_id = BlockIdentifier::from_block(&prev_block, chain_id);
 
@@ -137,36 +133,13 @@ impl BlockInfo {
 
 /// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
 #[derive(Debug)]
-pub struct BlockCache {
-    blocks: RwLock<BTreeMap<u64, BlockInfo>>,
-    hashes: RwLock<BTreeMap<HashValue, u64>>,
+pub struct BlockRetriever {
     rest_client: Arc<aptos_rest_client::Client>,
 }
 
-impl BlockCache {
+impl BlockRetriever {
     pub fn new(rest_client: Arc<aptos_rest_client::Client>) -> Self {
-        let mut blocks = BTreeMap::new();
-        let mut hashes = BTreeMap::new();
-
-        let genesis_hash = HashValue::zero();
-        let block_info = BlockInfo {
-            block_id: BlockIdentifier {
-                index: 0,
-                hash: to_hex_lower(&genesis_hash),
-            },
-            timestamp: Y2K_MS,
-            last_version: 0,
-        };
-        // Genesis is always index 0
-        blocks.insert(0, block_info);
-        hashes.insert(genesis_hash, 0);
-
-        // Insert the genesis block
-        BlockCache {
-            blocks: RwLock::new(blocks),
-            hashes: RwLock::new(hashes),
-            rest_client,
-        }
+        BlockRetriever { rest_client }
     }
 
     pub async fn get_block_info_by_height(
@@ -174,13 +147,19 @@ impl BlockCache {
         height: u64,
         chain_id: ChainId,
     ) -> ApiResult<BlockInfo> {
-        // If we cached it, get the information associated
-        if let Some(info) = self.blocks.read().unwrap().get(&height) {
-            return Ok(info.clone());
+        // Genesis block is hardcoded
+        if height == 0 {
+            return Ok(BlockInfo {
+                block_id: BlockIdentifier {
+                    index: 0,
+                    hash: BlockHash::from((chain_id, 0)).to_string(),
+                },
+                timestamp: Y2K_MS,
+                last_version: 0,
+            });
         }
 
-        // Do this not in an else to allow function to be Send
-        let block = self.get_block_by_height(height, false, chain_id).await?;
+        let block = self.get_block_by_height(height, false).await?;
         Ok(BlockInfo::from_block(&block, chain_id))
     }
 
@@ -188,43 +167,13 @@ impl BlockCache {
         &self,
         height: u64,
         with_transactions: bool,
-        chain_id: ChainId,
     ) -> ApiResult<aptos_rest_client::aptos_api_types::Block> {
         let block = self
             .rest_client
             .get_block_by_height(height, with_transactions)
             .await?
             .into_inner();
-        let block_id = BlockInfo::from_block(&block, chain_id);
-        self.blocks
-            .write()
-            .unwrap()
-            .insert(block.block_height.0, block_id);
-        self.hashes
-            .write()
-            .unwrap()
-            .insert(block.block_hash, block.block_height.0);
 
         Ok(block)
-    }
-
-    /// Retrieve the block info for the hash
-    ///
-    /// This is particularly bad, since there's no index on this value.  It can only be derived
-    /// from the cache, otherwise it needs to fail immediately.  This cache will need to be saved
-    /// somewhere for these purposes.
-    ///
-    /// We could use the BlockMetadata transaction's hash rather than the block hash as a hack,
-    /// and that is always indexed
-    ///
-    /// TODO: Improve reliability
-    pub fn get_block_height_by_hash(&self, hash: &HashValue) -> ApiResult<u64> {
-        if let Some(height) = self.hashes.read().unwrap().get(hash) {
-            Ok(*height)
-        } else {
-            // TODO: We can alternatively scan backwards in time to find the hash
-            // If for some reason the block doesn't get found, retry with block incomplete
-            Err(ApiError::BlockNotFound(None))
-        }
     }
 }
