@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error_map::generate_error_map;
-use crate::natives::code::{ModuleMetadata, MoveOption, PackageMetadata, UpgradePolicy};
+use crate::natives::any::Any;
+use crate::natives::code::{
+    ModuleMetadata, MoveOption, PackageDep, PackageDeps, PackageMetadata, UpgradePolicy,
+};
 use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
@@ -20,7 +23,7 @@ use move_deps::move_package::source_package::manifest_parser::{
 };
 use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
@@ -184,6 +187,31 @@ impl BuiltPackage {
                 extension: MoveOption::default(),
             })
         }
+        let deps = self
+            .package
+            .deps_compiled_units
+            .iter()
+            .map(|(name, unit)| {
+                let package_name = name.as_str().to_string();
+                let account = match &unit.unit {
+                    CompiledUnit::Module(m) => AccountAddress::new(m.address.into_bytes()),
+                    _ => panic!("script not a dependency"),
+                };
+                PackageDep {
+                    account,
+                    package_name,
+                }
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let extension = MoveOption::some(Any::pack(
+            "0x1::code::PackageDeps",
+            PackageDeps {
+                deps,
+                extension: MoveOption::none(),
+            },
+        ));
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
@@ -191,7 +219,7 @@ impl BuiltPackage {
             source_digest,
             manifest,
             modules,
-            extension: MoveOption::default(),
+            extension,
         })
     }
 }

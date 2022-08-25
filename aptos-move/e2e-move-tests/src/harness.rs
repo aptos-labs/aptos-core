@@ -185,6 +185,7 @@ impl MoveHarness {
         let metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
+        eprintln!("*** PUBLISHING {:?}", metadata);
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(

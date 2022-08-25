@@ -34,7 +34,25 @@ pub struct MoveOption<T> {
 
 impl<T> Default for MoveOption<T> {
     fn default() -> Self {
+        MoveOption::none()
+    }
+}
+
+impl<T> MoveOption<T> {
+    pub fn none() -> Self {
         Self { value: vec![] }
+    }
+
+    pub fn some(x: T) -> Self {
+        Self { value: vec![x] }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.value.is_empty()
+    }
+
+    pub fn is_some(&self) -> bool {
+        !self.value.is_empty()
     }
 }
 
@@ -53,15 +71,30 @@ pub struct PackageMetadata {
     pub upgrade_policy: UpgradePolicy,
     pub upgrade_number: u64,
     pub source_digest: String,
+    #[serde(with = "serde_bytes")]
     pub manifest: Vec<u8>,
     pub modules: Vec<ModuleMetadata>,
+    pub extension: MoveOption<Any>, // expecting PackageDeps
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PackageDeps {
+    pub deps: Vec<PackageDep>,
     pub extension: MoveOption<Any>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct PackageDep {
+    pub account: AccountAddress,
+    pub package_name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
     pub name: String,
+    #[serde(with = "serde_bytes")]
     pub source: Vec<u8>,
+    #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
     pub extension: MoveOption<Any>,
 }
