@@ -3,11 +3,23 @@
 
 import { AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
-import { aptosCoinStoreStructTag } from 'core/constants';
+import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { ApiError } from 'aptos/dist/generated';
 
+/**
+ * QUERY KEYS
+ */
+export const accountQueryKeys = Object.freeze({
+  getAccountCoinBalance: 'getAccountCoinBalance',
+  getAccountExists: 'getAccountExists',
+  getAccountStakeBalance: 'getAccountStakeBalance',
+  getAccountStakeInfo: 'getAccountStakeInfo',
+  getSequenceNumber: 'getSequenceNumber',
+} as const);
+
+// ------------------------------------------------------------------------- //
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
   nodeUrl: string;
@@ -33,12 +45,6 @@ export const getAccountExists = async ({
     return false;
   }
 };
-
-export const accountQueryKeys = Object.freeze({
-  getAccountCoinBalance: 'getAccountCoinBalance',
-  getAccountExists: 'getAccountExists',
-  getSequenceNumber: 'getSequenceNumber',
-} as const);
 
 interface UseAccountExistsProps {
   address?: MaybeHexString;
@@ -127,4 +133,73 @@ export function useSequenceNumber() {
     ),
     refetch,
   };
+}
+
+/**
+ * Query stake balance for the specified account
+ * @param address account address of the balance to be queried
+ * @param options query options
+ */
+export function useAccountStakeBalance(
+  address: string | undefined,
+  options?: UseQueryOptions<number>,
+) {
+  const { aptosClient } = useNetworks();
+
+  return useQuery<number>(
+    [accountQueryKeys.getAccountStakeBalance, address],
+    async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
+      .then((res: any) => Number(res.data.active.value))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          return 0;
+        }
+        throw err;
+      }),
+    {
+      enabled: Boolean(address),
+      ...options,
+    },
+  );
+}
+
+interface StakeInfo {
+  delegatedVoter: MaybeHexString;
+  locked_until_secs: string;
+  operatorAddress: MaybeHexString;
+  value: number;
+}
+
+/**
+ * Query stake info for the specified account
+ * @param address account address of the balance to be queried
+ * @param options query options
+ * @returns {StakeInfo}
+ */
+export function useAccountStakeInfo(
+  address: string | undefined,
+  options?: UseQueryOptions<StakeInfo>,
+) {
+  const { aptosClient } = useNetworks();
+
+  return useQuery<StakeInfo>(
+    [accountQueryKeys.getAccountStakeInfo, address],
+    async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
+      .then((res: any) => ({
+        delegatedVoter: res.data.delegated_voter,
+        locked_until_secs: res.data.locked_until_secs,
+        operatorAddress: res.data.operator_address,
+        value: Number(res.data.active.value),
+      }))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          throw err;
+        }
+        throw err;
+      }),
+    {
+      enabled: Boolean(address),
+      ...options,
+    },
+  );
 }
