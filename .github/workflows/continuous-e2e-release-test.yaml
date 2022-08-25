@@ -13,10 +13,13 @@ on:
 jobs:
   # Run a faster chaos forge to quickly surface correctness failures
   run-release-blocking-forge:
+    # Set the job timeout to 12 hours, however run for 10 hours
+    timeout-minutes: 720
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-release-blocking
+      # Run for 10 hours
       FORGE_RUNNER_DURATION_SECS: 36000
       FORGE_RUNNER_TPS_THRESHOLD: 5000
       FORGE_TEST_SUITE: land_blocking
