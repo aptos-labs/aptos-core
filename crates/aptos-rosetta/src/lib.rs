@@ -7,7 +7,7 @@
 
 use crate::{
     account::CoinCache,
-    block::BlockCache,
+    block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
 };
@@ -52,7 +52,7 @@ pub struct RosettaContext {
     /// Coin cache for looking up Currency details
     pub coin_cache: Arc<CoinCache>,
     /// Block index cache
-    pub block_cache: Option<Arc<BlockCache>>,
+    pub block_cache: Option<Arc<BlockRetriever>>,
     pub accounts: Arc<Mutex<BTreeMap<AccountAddress, SequenceNumber>>>,
 }
 
@@ -65,7 +65,7 @@ impl RosettaContext {
         }
     }
 
-    fn block_cache(&self) -> ApiResult<Arc<BlockCache>> {
+    fn block_cache(&self) -> ApiResult<Arc<BlockRetriever>> {
         if let Some(ref block_cache) = self.block_cache {
             Ok(block_cache.clone())
         } else {
@@ -105,7 +105,7 @@ pub async fn bootstrap_async(
         let rest_client = rest_client.map(Arc::new);
         let block_cache = rest_client
             .as_ref()
-            .map(|rest_client| Arc::new(BlockCache::new(rest_client.clone())));
+            .map(|rest_client| Arc::new(BlockRetriever::new(rest_client.clone())));
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),
