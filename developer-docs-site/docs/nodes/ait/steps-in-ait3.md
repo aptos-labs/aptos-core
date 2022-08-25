@@ -124,7 +124,7 @@ Proceed to the below steps only if you are selected to participate in the AIT-3.
 
 2. Create another wallet address for the voter. See [the above Step 4: Create the wallet using Petra](#create-wallet) to create a wallet on Petra. This step is optional. You can use the owner wallet account as voter wallet as well. However, the best practice is to have a dedicate voting account so that you do not need to access your owner key frequently for governance operations.
 
-3. <span id="stake-delegate">**Next you will stake and delegate.**</span>
+3. <span id="stake-delegate"><b>Next you will stake and delegate.</b></span>
 
   :::tip Read the Staking document
 
