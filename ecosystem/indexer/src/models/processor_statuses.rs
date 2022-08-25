@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{
-    indexer::{errors::TransactionProcessingError, processing_result::ProcessingResult},
-    schema::processor_statuses as processor_statuss,
+    indexer::errors::TransactionProcessingError, schema::processor_statuses as processor_statuss,
 };
 use bigdecimal::FromPrimitive;
+use field_count::FieldCount;
 
-#[derive(AsChangeset, Debug, Insertable, Queryable)]
+#[derive(AsChangeset, Debug, FieldCount, Insertable, Queryable)]
+#[changeset_options(treat_none_as_null = "true")]
 #[diesel(table_name = processor_statuses)]
 pub struct ProcessorStatus {
     pub name: &'static str,
@@ -28,23 +29,29 @@ impl ProcessorStatus {
         }
     }
 
-    pub fn from_processing_result_ok(processing_result: &ProcessingResult) -> Self {
-        Self::new(
-            processing_result.name,
-            processing_result.version,
-            true,
-            None,
+    pub fn from_transaction_processing_err(tpe: &TransactionProcessingError) -> Vec<Self> {
+        let (error, start_version, end_version, name) = tpe.inner();
+        Self::from_versions(
+            name,
+            *start_version,
+            *end_version,
+            false,
+            Some(error.to_string()),
         )
     }
 
-    pub fn from_transaction_processing_err(tpe: &TransactionProcessingError) -> Self {
-        let (error, version, name) = tpe.inner();
-
-        Self::new(name, *version, false, Some(error.to_string()))
-    }
-
-    pub fn for_mark_started(name: &'static str, version: u64) -> Self {
-        Self::new(name, version, false, None)
+    pub fn from_versions(
+        name: &'static str,
+        start_version: u64,
+        end_version: u64,
+        success: bool,
+        details: Option<String>,
+    ) -> Vec<Self> {
+        let mut status: Vec<Self> = vec![Self::new(name, start_version, success, details.clone())];
+        for version in start_version + 1..end_version {
+            status.push(Self::new(name, version, success, details.clone()));
+        }
+        status
     }
 }
 
