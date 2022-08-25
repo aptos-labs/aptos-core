@@ -8,7 +8,9 @@ use merlin::Transcript;
 use rand::{thread_rng, Rng};
 use std::convert::TryFrom;
 
-use crate::bulletproofs::{APTOS_MOVE_DOMAIN_SEPARATION_TAG, MAX_RANGE_BITS};
+use crate::bulletproofs::MAX_RANGE_BITS;
+
+const APTOS_MOVE_DOMAIN_SEPARATION_TAG: &[u8; 17] = b"AptosBulletproofs";
 
 #[test]
 #[ignore]
@@ -88,4 +90,13 @@ pub fn test_valid_bulletproof_verifies() {
     let success = range_proof.verify_single(&bg, &pg, &mut t_ver, &comm.compress(), MAX_RANGE_BITS);
 
     assert!(success.is_ok());
+}
+
+#[test]
+#[ignore]
+fn print_rand_base() {
+    println!(
+        "Default PedersenGens's blinding factor hex: {}",
+        hex::encode(PedersenGens::default().B_blinding.compress().to_bytes())
+    );
 }

@@ -114,7 +114,7 @@ impl GasParameters {
             },
             bulletproofs: cryptography::bulletproofs::GasParameters {
                 per_bulletproof_deserialize: 0.into(),
-                per_bulletproof_verify: 0.into(),
+                per_bit_bulletproof_verify: 0.into(),
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {

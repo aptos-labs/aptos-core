@@ -183,3 +183,4 @@ lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x" }
+merlin = { git = "https://github.com/aptos-labs/merlin", rev = "3454ccc85e37355c729ba40e6dac6e867ddf59f5" }

@@ -429,8 +429,8 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hkdf 0.10.0",
- "more-asserts",
  "merlin",
+ "more-asserts",
  "once_cell",
  "proptest",
  "proptest-derive",
@@ -5456,8 +5456,7 @@ dependencies = [
 [[package]]
 name = "merlin"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58c38e2799fc0978b65dfff8023ec7843e2330bb462f19198840b34b6582397d"
+source = "git+https://github.com/aptos-labs/merlin?rev=3454ccc85e37355c729ba40e6dac6e867ddf59f5#3454ccc85e37355c729ba40e6dac6e867ddf59f5"
 dependencies = [
  "byteorder",
  "keccak",

@@ -5,7 +5,7 @@ use crate::natives::cryptography::ristretto255_point::{
     get_point_handle, NativeRistrettoPointContext,
 };
 use crate::natives::util::make_native_from_func;
-use aptos_crypto::bulletproofs::{APTOS_MOVE_DOMAIN_SEPARATION_TAG, MAX_RANGE_BITS};
+use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
 use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
@@ -36,11 +36,12 @@ fn native_verify_single(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());
-    debug_assert!(args.len() == 5);
+    debug_assert!(args.len() == 6);
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow_mut();
 
+    let dst = pop_arg!(args, Vec<u8>);
     let bit_length = pop_arg!(args, u64) as usize;
     let proof_bytes = pop_arg!(args, Vec<u8>);
     let rand_base_handle = get_point_handle(&pop_arg!(args, StructRef))?;
@@ -56,7 +57,7 @@ fn native_verify_single(
         B_blinding: *rand_base,
     };
 
-    gas_params.verify_bulletproof(&comm_point, &pg, &proof_bytes[..], bit_length)
+    gas_params.verify_bulletproof(&comm_point, &pg, &proof_bytes[..], bit_length, dst)
 }
 
 fn native_verify_single_default_ck(
@@ -66,8 +67,9 @@ fn native_verify_single_default_ck(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());
-    debug_assert!(args.len() == 3);
+    debug_assert!(args.len() == 4);
 
+    let dst = pop_arg!(args, Vec<u8>);
     let bit_length = pop_arg!(args, u64) as usize;
     let proof_bytes = pop_arg!(args, Vec<u8>);
     let comm_bytes = pop_arg!(args, Vec<u8>);
@@ -78,6 +80,7 @@ fn native_verify_single_default_ck(
         &BULLETPROOF_PEDERSEN_GENERATORS,
         &proof_bytes[..],
         bit_length,
+        dst,
     )
 }
 
@@ -88,7 +91,7 @@ fn native_verify_single_default_ck(
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub per_bulletproof_deserialize: InternalGasPerArg,
-    pub per_bulletproof_verify: InternalGasPerArg,
+    pub per_bit_bulletproof_verify: InternalGasPerArg,
 }
 
 impl GasParameters {
@@ -100,6 +103,7 @@ impl GasParameters {
         pc_gens: &PedersenGens,
         proof_bytes: &[u8],
         bit_length: usize,
+        dst: Vec<u8>,
     ) -> PartialVMResult<NativeResult> {
         static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
             Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 1));
@@ -116,10 +120,10 @@ impl GasParameters {
             }
         };
 
-        // TODO: cost depends on num_bits... proof size is log(num_bits) and verification time is O(num_bits) IIRC?
-        cost += self.per_bulletproof_verify * NumArgs::one();
+        // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
+        cost += self.per_bit_bulletproof_verify * NumArgs::new(bit_length as u64);
 
-        let mut ver_trans = Transcript::new(APTOS_MOVE_DOMAIN_SEPARATION_TAG);
+        let mut ver_trans = Transcript::new(dst.as_slice());
 
         let success = range_proof
             .verify_single(

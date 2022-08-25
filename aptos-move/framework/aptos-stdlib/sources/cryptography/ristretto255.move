@@ -166,6 +166,12 @@ module aptos_std::ristretto255 {
         }
     }
 
+    /// DEPRECATED: Use the more clearly-named `new_point_from_sha2_512`
+    ///
+    /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
+    public fun new_point_from_sha512(sha512: vector<u8>): RistrettoPoint {
+        new_point_from_sha2_512(sha512)
+    }
 
     /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA2-512.
     public fun new_point_from_sha2_512(sha2_512_input: vector<u8>): RistrettoPoint {
@@ -304,7 +310,14 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Hashes the input to a uniformly-at-random Scalar via SHA2_512
+    /// DEPRECATED: Use the more clearly-named `new_scalar_from_sha2_512`
+    ///
+    /// Hashes the input to a uniformly-at-random Scalar via SHA2-512
+    public fun new_scalar_from_sha512(sha512_input: vector<u8>): Scalar {
+        new_scalar_from_sha2_512(sha512_input)
+    }
+
+    /// Hashes the input to a uniformly-at-random Scalar via SHA2-512
     public fun new_scalar_from_sha2_512(sha2_512_input: vector<u8>): Scalar {
         Scalar {
             data: scalar_from_sha2_512_internal(sha2_512_input)
