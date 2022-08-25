@@ -793,6 +793,7 @@ impl CliTestFramework {
                 .unwrap(),
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
+            prompt_options: PromptOptions::yes(),
             ..Default::default()
         }
     }
