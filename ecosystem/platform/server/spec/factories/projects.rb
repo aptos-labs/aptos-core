@@ -18,7 +18,7 @@ FactoryBot.define do
     youtube_url { Faker::Internet.url(host: 'www.youtube.com') }
     thumbnail { Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') }
     public { true }
-    project_categories { build_list :project_category, 2 }
+    project_categories { build_list(:project_category, 3).uniq(&:category_id) }
     project_members { build_list :project_member, 3 }
     screenshots { 4.times.map { |_| Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') } }
   end

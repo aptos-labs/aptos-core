@@ -16,6 +16,7 @@ move-stdlib = { git = "https://github.com/move-language/move", rev = "f204998519
 move-table-extension = { git = "https://github.com/move-language/move", rev = "f20499851934cd51f81b390954a292ca1bd419b8" }
 move-vm-types = { git = "https://github.com/move-language/move", rev = "f20499851934cd51f81b390954a292ca1bd419b8" }
 
+aptos-types = { path = "../../types" }
 framework = { path = "../framework" }
 gas-algebra-ext = { path = "../gas-algebra-ext" }
 

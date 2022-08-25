@@ -307,7 +307,7 @@ export class TokenClient {
   /**
    * Queries token balance for the token creator
    */
-  async getTokenBalance(
+  async getToken(
     creator: MaybeHexString,
     collectionName: string,
     tokenName: string,
@@ -318,7 +318,7 @@ export class TokenClient {
       collection: collectionName,
       name: tokenName,
     };
-    return this.getTokenBalanceForAccount(creator, {
+    return this.getTokenForAccount(creator, {
       token_data_id: tokenDataId,
       property_version,
     });
@@ -347,7 +347,7 @@ export class TokenClient {
    * }
    * ```
    */
-  async getTokenBalanceForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
+  async getTokenForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
     const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
       account,
       "0x3::token::TokenStore",
@@ -360,6 +360,16 @@ export class TokenClient {
       key: tokenId,
     };
 
-    return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    try {
+      return await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
+    } catch (error) {
+      if (error.status === 404) {
+        return {
+          id: tokenId,
+          amount: "0",
+        };
+      }
+      return error;
+    }
   }
 }

@@ -34,11 +34,6 @@ impl DbReader for MockDbReaderWriter {
         }
     }
 
-    fn get_latest_version_option(&self) -> Result<Option<Version>> {
-        // return a dummy version for tests
-        Ok(Some(1))
-    }
-
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
         Ok(Some(1))

@@ -16,7 +16,7 @@
           <% projects.each do |project| %>
             <div class="border border-neutral-100 rounded-xl">
               <div class="flex p-8 gap-8">
-                <img src="<%= project.thumbnail_url %>" class="overflow-hidden rounded-lg bg-neutral-800 w-20 h-20">
+                <img src="<%= url_for(project.thumbnail) %>" class="overflow-hidden rounded-lg bg-neutral-800 w-20 h-20">
                 <div class="flex-1">
                   <h4 class="text-lg mb-2">
                     <%= link_to project.title, project_path(project) %>

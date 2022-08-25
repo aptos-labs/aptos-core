@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
 use std::{convert::Infallible, sync::Arc};
 
 use crate::validator_cache::PeerSetCache;
@@ -9,6 +10,7 @@ use crate::{
     TelemetryServiceConfig,
 };
 use aptos_crypto::noise;
+use aptos_types::chain_id::ChainId;
 use gcp_bigquery_client::Client as BQClient;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use warp::Filter;
@@ -18,6 +20,7 @@ pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     validator_cache: PeerSetCache,
     vfn_cache: PeerSetCache,
+    configured_chains: HashSet<ChainId>,
 
     pub gcp_bq_client: Option<BQClient>,
     pub gcp_bq_config: GCPBigQueryConfig,
@@ -40,10 +43,16 @@ impl Context {
         humio_client: humio::IngestClient,
     ) -> Self {
         let private_key = config.server_private_key.private_key();
+        let configured_chains = config
+            .trusted_full_node_addresses
+            .iter()
+            .map(|(chain_id, _)| *chain_id)
+            .collect();
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
             validator_cache,
             vfn_cache,
+            configured_chains,
 
             gcp_bq_client: gcp_bigquery_client,
             gcp_bq_config: config.gcp_bq_config.clone(),
@@ -71,5 +80,14 @@ impl Context {
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {
         self.noise_config.clone()
+    }
+
+    pub fn configured_chains(&self) -> &HashSet<ChainId> {
+        &self.configured_chains
+    }
+
+    #[cfg(test)]
+    pub fn configured_chains_mut(&mut self) -> &mut HashSet<ChainId> {
+        &mut self.configured_chains
     }
 }

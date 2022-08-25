@@ -3,16 +3,15 @@
 
 use crate::common::native_coin;
 use crate::types::{
-    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, Amount, BlockRequest,
-    BlockResponse, ConstructionCombineRequest, ConstructionCombineResponse,
-    ConstructionDeriveRequest, ConstructionDeriveResponse, ConstructionHashRequest,
-    ConstructionMetadata, ConstructionMetadataRequest, ConstructionMetadataResponse,
-    ConstructionParseRequest, ConstructionParseResponse, ConstructionPayloadsRequest,
-    ConstructionPayloadsResponse, ConstructionPreprocessRequest, ConstructionPreprocessResponse,
-    ConstructionSubmitRequest, ConstructionSubmitResponse, Error, MetadataRequest,
-    NetworkIdentifier, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
-    NetworkStatusResponse, Operation, PreprocessMetadata, PublicKey, Signature, SignatureType,
-    TransactionIdentifier, TransactionIdentifierResponse,
+    AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockRequest, BlockResponse,
+    ConstructionCombineRequest, ConstructionCombineResponse, ConstructionDeriveRequest,
+    ConstructionDeriveResponse, ConstructionHashRequest, ConstructionMetadata,
+    ConstructionMetadataRequest, ConstructionMetadataResponse, ConstructionParseRequest,
+    ConstructionParseResponse, ConstructionPayloadsRequest, ConstructionPayloadsResponse,
+    ConstructionPreprocessRequest, ConstructionPreprocessResponse, ConstructionSubmitRequest,
+    ConstructionSubmitResponse, Error, MetadataRequest, NetworkIdentifier, NetworkListResponse,
+    NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse, Operation, PreprocessMetadata,
+    PublicKey, Signature, SignatureType, TransactionIdentifier, TransactionIdentifierResponse,
 };
 use anyhow::anyhow;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -140,7 +139,6 @@ impl RosettaClient {
             .body(serde_json::to_string(request)?)
             .send()
             .await?;
-
         if !response.status().is_success() {
             let error: Error = response.json().await?;
             return Err(anyhow!("Failed API with: {:?}", error));
@@ -156,6 +154,8 @@ impl RosettaClient {
         new_account: AccountAddress,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -167,11 +167,14 @@ impl RosettaClient {
         let operations = vec![Operation::create_account(0, None, new_account, sender)];
 
         self.submit_operations(
+            sender,
             network_identifier.clone(),
             &keys,
             operations,
             expiry_time_secs,
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
     }
@@ -184,6 +187,8 @@ impl RosettaClient {
         amount: u64,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -198,11 +203,14 @@ impl RosettaClient {
         ];
 
         self.submit_operations(
+            sender,
             network_identifier.clone(),
             &keys,
             operations,
             expiry_time_secs,
             sequence_number,
+            max_gas,
+            gas_unit_price,
         )
         .await
     }
@@ -222,19 +230,23 @@ impl RosettaClient {
     /// Submits the operations to the blockchain
     async fn submit_operations(
         &self,
+        sender: AccountAddress,
         network_identifier: NetworkIdentifier,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
         operations: Vec<Operation>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         // Retrieve txn metadata
         let (metadata, public_keys) = self
             .metadata_for_ops(
+                sender,
                 network_identifier.clone(),
                 operations.clone(),
-                10000,
-                1,
+                max_gas,
+                gas_unit_price,
                 expiry_time_secs,
                 sequence_number,
                 keys,
@@ -263,75 +275,64 @@ impl RosettaClient {
         network_identifier: NetworkIdentifier,
         public_key: PublicKey,
     ) -> anyhow::Result<AccountIdentifier> {
-        if let ConstructionDeriveResponse {
-            account_identifier: Some(account_id),
-        } = self
+        Ok(self
             .derive(&ConstructionDeriveRequest {
                 network_identifier,
                 public_key,
             })
             .await?
-        {
-            Ok(account_id)
-        } else {
-            return Err(anyhow!("Failed to find account address for key"));
-        }
+            .account_identifier)
     }
 
     /// Retrieves the metadata for the set of operations
     async fn metadata_for_ops(
         &self,
+        sender: AccountAddress,
         network_identifier: NetworkIdentifier,
         operations: Vec<Operation>,
-        max_fee: u64,
-        fee_multiplier: u32,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         keys: &HashMap<AccountAddress, &Ed25519PrivateKey>,
     ) -> anyhow::Result<(ConstructionMetadataResponse, Vec<PublicKey>)> {
         // Request the given operation with the given gas constraints
-        let amount = val_to_amount(max_fee, false);
         let preprocess_response = self
             .preprocess(&ConstructionPreprocessRequest {
                 network_identifier: network_identifier.clone(),
                 operations,
-                max_fee: Some(vec![amount]),
-                suggested_fee_multiplier: Some(fee_multiplier as f64),
                 metadata: Some(PreprocessMetadata {
-                    expiry_time_secs: Some(expiry_time_secs),
-                    sequence_number,
+                    expiry_time_secs: Some(expiry_time_secs.into()),
+                    sequence_number: sequence_number.map(|inner| inner.into()),
+                    max_gas_amount: max_gas.map(|inner| inner.into()),
+                    gas_price: gas_unit_price.map(|inner| inner.into()),
+                    public_keys: Some(vec![keys
+                        .get(&sender)
+                        .unwrap()
+                        .public_key()
+                        .try_into()
+                        .unwrap()]),
                 }),
             })
             .await?;
 
         // Process the required public keys
         let mut public_keys = Vec::new();
-        if let Some(accounts) = preprocess_response.required_public_keys {
-            for account in accounts {
-                if let Some(key) = keys.get(&account.account_address()?) {
-                    public_keys.push(key.public_key().try_into()?);
-                } else {
-                    return Err(anyhow!("No public key found for account"));
-                }
+        for account in preprocess_response.required_public_keys {
+            if let Some(key) = keys.get(&account.account_address()?) {
+                public_keys.push(key.public_key().try_into()?);
+            } else {
+                return Err(anyhow!("No public key found for account"));
             }
-        } else {
-            return Err(anyhow!("No public keys found required for transaction"));
-        };
+        }
 
         // Request the metadata
-        if let Some(options) = preprocess_response.options {
-            self.metadata(&ConstructionMetadataRequest {
-                network_identifier,
-                options,
-                public_keys: public_keys.clone(),
-            })
-            .await
-            .map(|response| (response, public_keys))
-        } else {
-            Err(anyhow!(
-                "No metadata options returned from preprocess response"
-            ))
-        }
+        self.metadata(&ConstructionMetadataRequest {
+            network_identifier,
+            options: preprocess_response.options,
+        })
+        .await
+        .map(|response| (response, public_keys))
     }
 
     /// Build an unsigned transaction
@@ -393,10 +394,7 @@ impl RosettaClient {
 
         // Sign the payload if it matches the unsigned transaction
         for payload in unsigned_response.payloads.into_iter() {
-            let account = payload
-                .account_identifier
-                .as_ref()
-                .expect("Must have an account");
+            let account = &payload.account_identifier;
             let private_key = keys
                 .get(&account.account_address()?)
                 .expect("Should have a private key");
@@ -468,20 +466,5 @@ impl RosettaClient {
             })
             .await?
             .transaction_identifier)
-    }
-}
-
-/// Converts a value to a Rosetta [`Amount`]
-///
-/// Only works with the native coin
-fn val_to_amount(amount: u64, withdraw: bool) -> Amount {
-    let value = if withdraw {
-        format!("-{}", amount)
-    } else {
-        amount.to_string()
-    };
-    Amount {
-        value,
-        currency: native_coin(),
     }
 }

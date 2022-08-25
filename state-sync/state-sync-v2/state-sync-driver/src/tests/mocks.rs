@@ -225,8 +225,6 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_latest_version_option(&self) -> Result<Option<Version>>;
-
         fn get_latest_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
@@ -424,8 +422,9 @@ mock! {
 // This automatically creates a MockStorageSynchronizer.
 mock! {
     pub StorageSynchronizer {}
+    #[async_trait]
     impl StorageSynchronizerInterface for StorageSynchronizer {
-        fn apply_transaction_outputs(
+        async fn apply_transaction_outputs(
             &mut self,
             notification_id: NotificationId,
             output_list_with_proof: TransactionOutputListWithProof,
@@ -433,7 +432,7 @@ mock! {
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> Result<(), crate::error::Error>;
 
-        fn execute_transactions(
+        async fn execute_transactions(
             &mut self,
             notification_id: NotificationId,
             transaction_list_with_proof: TransactionListWithProof,

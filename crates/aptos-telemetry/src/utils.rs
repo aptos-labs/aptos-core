@@ -14,11 +14,8 @@ pub const BUILD_CHAIN_ID: &str = "build_chain_id";
 
 /// Collects and sends the build information via telemetry
 pub(crate) async fn create_build_info_telemetry_event(
-    chain_id: String,
-    mut build_info: BTreeMap<String, String>,
+    build_info: BTreeMap<String, String>,
 ) -> TelemetryEvent {
-    build_info.insert(BUILD_CHAIN_ID.into(), chain_id);
-
     // Create and return a new telemetry event
     TelemetryEvent {
         name: APTOS_NODE_BUILD_INFORMATION.into(),

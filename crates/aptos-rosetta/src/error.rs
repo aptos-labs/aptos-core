@@ -22,6 +22,7 @@ pub enum ApiError {
     InvalidTransferOperations(Option<&'static str>),
     InvalidSignatureType,
     InvalidMaxGasFees,
+    MaxGasFeeTooLow,
     InvalidGasMultiplier,
     InvalidOperations,
     MissingPayloadMetadata,
@@ -69,6 +70,7 @@ impl ApiError {
             InvalidTransferOperations(None),
             InvalidSignatureType,
             InvalidMaxGasFees,
+            MaxGasFeeTooLow,
             InvalidGasMultiplier,
             InvalidOperations,
             MissingPayloadMetadata,
@@ -106,13 +108,14 @@ impl ApiError {
             InvalidTransferOperations(_) => 5,
             InvalidSignatureType => 6,
             InvalidMaxGasFees => 7,
-            InvalidGasMultiplier => 8,
-            InvalidOperations => 9,
-            MissingPayloadMetadata => 10,
-            UnsupportedCurrency(_) => 11,
-            UnsupportedSignatureCount(_) => 12,
-            NodeIsOffline => 13,
-            TransactionParseError(_) => 14,
+            MaxGasFeeTooLow => 8,
+            InvalidGasMultiplier => 9,
+            InvalidOperations => 10,
+            MissingPayloadMetadata => 11,
+            UnsupportedCurrency(_) => 12,
+            UnsupportedSignatureCount(_) => 13,
+            NodeIsOffline => 14,
+            TransactionParseError(_) => 15,
             InternalError(_) => AptosErrorCode::InternalError.as_u32(),
             AccountNotFound(_) => AptosErrorCode::AccountNotFound.as_u32(),
             ResourceNotFound(_) => AptosErrorCode::ResourceNotFound.as_u32(),
@@ -158,7 +161,8 @@ impl ApiError {
         }
     }
 
-    pub fn message(&self) -> String {
+    /// This value must be fixed, so it's all static strings
+    pub fn message(&self) -> &'static str {
         match self {
             ApiError::BlockParameterConflict => {
                 "Block parameter conflict. Must provide either hash or index but not both"
@@ -171,6 +175,7 @@ impl ApiError {
             ApiError::AccountNotFound(_) => "Account not found",
             ApiError::InvalidSignatureType => "Invalid signature type",
             ApiError::InvalidMaxGasFees => "Invalid max gas fee",
+            ApiError::MaxGasFeeTooLow => "Max fee is lower than the estimated cost of the transaction",
             ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
             ApiError::InvalidOperations => "Invalid operations",
             ApiError::MissingPayloadMetadata => "Payload metadata is missing",
@@ -194,7 +199,6 @@ impl ApiError {
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
         }
-        .to_string()
     }
 
     pub fn details(self) -> Option<ErrorDetails> {
@@ -236,7 +240,7 @@ impl ApiError {
 
 impl From<ApiError> for types::Error {
     fn from(error: ApiError) -> Self {
-        let message = error.message();
+        let message = error.message().to_string();
         let code = error.code();
         let retriable = error.retriable();
         let details = error.details();
@@ -245,7 +249,6 @@ impl From<ApiError> for types::Error {
             code,
             retriable,
             details,
-            description: None,
         }
     }
 }

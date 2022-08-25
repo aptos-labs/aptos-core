@@ -287,13 +287,6 @@ pub trait DbReader: Send + Sync {
             .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
     }
 
-    /// Returns the latest version, None for non-bootstrapped DB.
-    fn get_latest_version_option(&self) -> Result<Option<Version>> {
-        Ok(self
-            .get_latest_ledger_info_option()?
-            .map(|li| li.ledger_info().version()))
-    }
-
     /// Returns the latest version, error on on non-bootstrapped DB.
     fn get_latest_version(&self) -> Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
@@ -462,12 +455,7 @@ pub trait DbReader: Send + Sync {
         &self,
         ledger_version: Version,
     ) -> Result<TransactionAccumulatorSummary> {
-        let genesis_consistency_proof =
-            self.get_accumulator_consistency_proof(None, ledger_version)?;
-        TransactionAccumulatorSummary::try_from_genesis_proof(
-            genesis_consistency_proof,
-            ledger_version,
-        )
+        unimplemented!()
     }
 
     /// Returns total number of leaves in state store at given version.

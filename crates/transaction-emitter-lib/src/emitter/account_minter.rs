@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::emitter::wait_for_single_account_sequence;
 use crate::{
     emitter::{MAX_TXNS, MAX_TXN_BATCH_SIZE, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_numbers, EmitJobRequest,
@@ -10,7 +11,9 @@ use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
+use aptos_rest_client::aptos_api_types::TransactionOnChainData;
+use aptos_rest_client::error::RestError;
+use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient, Response};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -28,6 +31,7 @@ use core::{
 use futures::future::try_join_all;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
+use std::time::Duration;
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
@@ -257,6 +261,11 @@ where
 {
     let mut i = 0;
     let mut accounts = vec![];
+
+    // Wait for source account to exist, this can happen because the corresponding REST endpoint might
+    // not be up to date with the latest ledger state and requires some time for syncing.
+    wait_for_single_account_sequence(&client, &source_account, Duration::from_secs(30)).await?;
+
     while i < num_new_accounts {
         let batch_size = min(
             max_num_accounts_per_batch as usize,
@@ -425,9 +434,16 @@ pub async fn execute_and_wait_transactions(
 
     let state = state_mutex.into_inner();
 
+    async fn wait_for_signed_transactions_bcs(
+        client: &RestClient,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, RestError> {
+        client.wait_for_signed_transaction_bcs(txn).await
+    }
+
     for txn in state.txns.iter() {
-        client
-            .wait_for_signed_transaction_bcs(txn)
+        RETRY_POLICY
+            .retry(move || wait_for_signed_transactions_bcs(client, txn))
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }

@@ -651,6 +651,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
     assert_eq!(txns.as_array().unwrap().len(), 2);
 }
 
+#[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
     let context = new_test_context(current_function_name!());

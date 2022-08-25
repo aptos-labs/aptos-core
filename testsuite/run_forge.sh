@@ -27,7 +27,7 @@ fi
 
 # available clusters to choose from
 # forge-1 is used for continuous testing exclusively
-FORGE_CLUSTERS=("aptos-forge-0" "aptos-forge-2")
+FORGE_CLUSTERS=("aptos-forge-big-0" "aptos-forge-big-1" "aptos-forge-0")
 
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
