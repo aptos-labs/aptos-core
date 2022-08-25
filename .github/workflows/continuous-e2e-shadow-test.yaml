@@ -1,4 +1,3 @@
-
 name: Continuous E2E Shadow Test
 
 permissions:
@@ -8,7 +7,6 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    # Run every hour - TODO: Decrease the frequency once things stabilizes
     - cron: "*/10 * * * *"
 
 jobs:
