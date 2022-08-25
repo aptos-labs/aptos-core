@@ -71,7 +71,7 @@ impl TelemetrySender {
         let mut response = request_builder
             .try_clone()
             .expect("Could not clone request_builder")
-            .bearer_auth(token)
+            .bearer_auth(token.clone())
             .send()
             .await?;
         // do 1 retry if the first attempt failed
@@ -90,8 +90,6 @@ impl TelemetrySender {
     ) -> Result<(), anyhow::Error> {
         debug!("Sending Prometheus Metrics");
 
-        let token = self.get_auth_token().await?;
-
         let scraped_metrics =
             prometheus::TextEncoder::new().encode_to_string(&registry.gather())?;
 
@@ -104,7 +102,6 @@ impl TelemetrySender {
                 self.client
                     .post(format!("{}/push-metrics", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
-                    .bearer_auth(token)
                     .body(compressed_bytes),
             )
             .await;

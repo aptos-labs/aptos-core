@@ -4,6 +4,7 @@
 use crate::{auth::with_auth, context::Context, types::auth::Claims};
 use aptos_config::config::PeerRole;
 use aptos_logger::{debug, error};
+use reqwest::StatusCode;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -12,7 +13,7 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::Unknown],
+            vec![PeerRole::Validator, PeerRole::ValidatorFullNode],
         ))
         .and(warp::body::bytes())
         .and_then(handle_metrics_ingest)
@@ -26,13 +27,15 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     let extra_labels = vec![
         format!("peer_id={}", claims.peer_id),
-        format!("peer_role={}", claims.peer_role as u16),
+        format!("peer_role={}", claims.peer_role.as_str()),
         format!("chain_name={}", claims.chain_id),
         format!("namespace={}", "telemetry-service"),
         format!(
             "kubernetes_pod_name={}/{}",
-            claims.peer_role as u16, claims.peer_id
+            claims.peer_role.as_str(),
+            claims.peer_id
         ),
+        format!("role={}", claims.peer_role.as_str()),
     ];
 
     let res = context
@@ -57,5 +60,5 @@ pub async fn handle_metrics_ingest(
         }
     }
 
-    Ok(reply::reply())
+    Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
 }

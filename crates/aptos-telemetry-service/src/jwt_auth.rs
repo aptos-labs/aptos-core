@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::PeerRole;
+use aptos_logger::error;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
@@ -49,7 +50,10 @@ pub async fn authorize_jwt(
         &context.jwt_decoding_key,
         &Validation::new(Algorithm::HS512),
     )
-    .map_err(|_| reject::custom(ServiceError::unauthorized("invalid authorization token")))?;
+    .map_err(|e| {
+        error!("unable to authorize jwt token: {}", e);
+        reject::custom(ServiceError::unauthorized("invalid authorization token"))
+    })?;
 
     let claims = decoded.claims;
 
@@ -87,6 +91,7 @@ pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<
         Ok(v) => v,
         Err(_) => return Err(reject::reject()),
     };
+    let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
         .get(..BEARER.len())
         .unwrap_or_default()
