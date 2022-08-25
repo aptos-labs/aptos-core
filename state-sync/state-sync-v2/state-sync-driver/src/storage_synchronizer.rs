@@ -428,11 +428,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         metrics::STORAGE_SYNCHRONIZER_APPLY_CHUNK,
                     );
                     let num_outputs = outputs_with_proof.transactions_and_outputs.len();
-                    let result = chunk_executor.apply_chunk(
-                        outputs_with_proof,
-                        &target_ledger_info,
-                        end_of_epoch_ledger_info.as_ref(),
-                    );
+                    let chunk_executor_clone = chunk_executor.clone();
+                    // `spawn_blocking` so that the heavy synchronous function call doesn't
+                    // block the aysnc thread.
+                    let result = tokio::task::spawn_blocking(move || {
+                        chunk_executor_clone.apply_chunk(
+                            outputs_with_proof,
+                            &target_ledger_info,
+                            end_of_epoch_ledger_info.as_ref(),
+                        )
+                    })
+                    .await
+                    .expect("spawn_blocking(apply_chunk) failed.");
                     if result.is_ok() {
                         info!(
                             LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
@@ -515,7 +522,14 @@ fn spawn_committer<
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
             );
-            match chunk_executor.commit_chunk() {
+            let chunk_executor_clone = chunk_executor.clone();
+            let commit_fut = move || chunk_executor_clone.commit_chunk();
+            // `spawn_blocking` so that the heavy synchronous function call doesn't
+            // block the aysnc thread.
+            let result = tokio::task::spawn_blocking(commit_fut)
+                .await
+                .expect("spawn_blocking(commit_chunk) failed.");
+            match result {
                 Ok(notification) => {
                     // Log the event and update the metrics
                     info!(
