@@ -84,6 +84,13 @@ Rails.application.routes.draw do
   # Projects
   resources :projects
 
+  # User profiles
+  resources :users, only: %i[show] do
+    get 'projects'
+    get 'activity'
+    get 'rewards'
+  end
+
   # Static pages
   get 'community', to: 'static_page#community'
   get 'incentivized-testnet', to: 'static_page#incentivized_testnet'
