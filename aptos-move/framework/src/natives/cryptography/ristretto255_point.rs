@@ -45,7 +45,7 @@ impl Display for RistrettoPointHandle {
 /// value which is passed into session functions, so its accessible from natives of this extension.
 #[derive(Tid)]
 pub struct NativeRistrettoPointContext {
-    point_data: RefCell<PointStore>,
+    pub point_data: RefCell<PointStore>,
 }
 
 //
@@ -55,7 +55,7 @@ pub struct NativeRistrettoPointContext {
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
-struct PointStore {
+pub struct PointStore {
     points: Vec<RistrettoPoint>,
 }
 
@@ -78,25 +78,25 @@ impl NativeRistrettoPointContext {
 
 impl PointStore {
     /// Re-sets a RistrettoPoint that was previously allocated.
-    fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
+    pub fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
         self.points[handle.0 as usize] = point
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
+    pub fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
         //&self.points[handle.0 as usize]
         self.points.get(handle.0 as usize).unwrap()
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
+    pub fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
         //&mut self.points[handle.0 as usize]
         self.points.get_mut(handle.0 as usize).unwrap()
     }
 
     /// Returns mutable references to two different Ristretto points in the vector using split_at_mut.
     /// Note that Rust's linear types prevent us from simply returning `(&mut points[i], &mut points[j])`.
-    fn get_two_muts(
+    pub fn get_two_muts(
         &mut self,
         a: &RistrettoPointHandle,
         b: &RistrettoPointHandle,
@@ -223,6 +223,25 @@ pub(crate) fn native_point_decompress(
         cost,
         smallvec![Value::u64(id), Value::bool(true)],
     ))
+}
+
+pub(crate) fn native_point_clone(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(ty_args.len(), 0);
+    assert_eq!(args.len(), 1);
+    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+    let mut point_data = point_context.point_data.borrow_mut();
+    let handle = pop_arg!(args, u64);
+    let cost = gas_params.point_clone * NumArgs::one();
+    let point = point_data.get_point(&RistrettoPointHandle(handle));
+    let clone = *point;
+    let result_handle = point_data.add_point(clone);
+
+    Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
 
 pub(crate) fn native_point_compress(
@@ -462,7 +481,7 @@ pub(crate) fn native_basepoint_double_mul(
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
 
-pub(crate) fn native_new_point_from_sha512(
+pub(crate) fn native_new_point_from_sha2_512(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -477,8 +496,8 @@ pub(crate) fn native_new_point_from_sha512(
     let bytes = pop_arg!(args, Vec<u8>);
 
     let cost = gas_params.point_from_64_uniform_bytes * NumArgs::one()
-        + gas_params.sha512_per_hash * NumArgs::one()
-        + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64);
+        + gas_params.sha2_512_per_hash * NumArgs::one()
+        + gas_params.sha2_512_per_byte * NumBytes::new(bytes.len() as u64);
 
     let result_handle = point_data.add_point(RistrettoPoint::hash_from_bytes::<Sha512>(&bytes));
 
@@ -560,7 +579,7 @@ pub(crate) fn native_multi_scalar_mul(
 // =========================================================================================
 // Helpers
 
-fn get_point_handle(move_point: &StructRef) -> PartialVMResult<RistrettoPointHandle> {
+pub fn get_point_handle(move_point: &StructRef) -> PartialVMResult<RistrettoPointHandle> {
     let field_ref = move_point
         .borrow_field(HANDLE_FIELD_INDEX)?
         .value_as::<Reference>()?;

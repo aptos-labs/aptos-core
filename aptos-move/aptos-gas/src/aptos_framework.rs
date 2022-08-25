@@ -53,8 +53,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case
-    [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 1],
-    [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 1],
+    [.ristretto255.sha2_512_per_byte, "ristretto255.scalar_sha512_per_byte", 1],
+    [.ristretto255.sha2_512_per_hash, "ristretto255.scalar_sha512_per_hash", 1],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 1],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 1],
@@ -67,6 +67,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.scalar_neg, "ristretto255.scalar_neg", 1],
     [.ristretto255.scalar_sub, "ristretto255.scalar_sub", 1],
     [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
+
+    [.bulletproofs.per_bulletproof_deserialize, ".bulletproofs.per_bulletproof_deserialize", 1],
+    [.bulletproofs.per_bulletproof_verify, "bulletproofs.per_proof_verify", 1],
 
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],
