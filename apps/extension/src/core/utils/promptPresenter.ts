@@ -12,14 +12,14 @@ export default class PromptPresenter {
     return tabs[0];
   }
 
-  static isPromptActive(): Promise<boolean> {
-    const { id } = chrome.runtime;
-    return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
-        const foundTab = tabs.find((tab) => tab.url?.includes(id));
-        resolve(foundTab !== undefined);
-      });
+  static async isPromptActive() {
+    const { id: extensionId } = chrome.runtime;
+    const tabs = await chrome.tabs.query({});
+    const foundTab = tabs.find((tab) => {
+      const url = tab.url ? new URL(tab.url) : undefined;
+      return url?.hostname === extensionId && url?.pathname === '/prompt.html';
     });
+    return foundTab !== undefined;
   }
 
   static async promptUser(promptType: PromptType): Promise<boolean> {

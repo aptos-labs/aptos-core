@@ -6,7 +6,7 @@ import constate from 'constate';
 import { randomBytes, secretbox } from 'tweetnacl';
 import pbkdf2 from 'pbkdf2';
 
-import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
+import { triggerAccountChange } from 'core/utils/providerEvents';
 import { AptosAccount, HexString } from 'aptos';
 import { useAppState } from 'core/hooks/useAppState';
 import {
@@ -207,8 +207,11 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
       encryptedAccounts: newEncryptedAccounts,
     });
     await updateSessionState({ accounts: newAccounts });
-
-    await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
+    const publicAccount = {
+      address: account.address,
+      publicKey: account.publicKey,
+    };
+    await triggerAccountChange(publicAccount);
   };
 
   const removeAccount = async (address: string) => {
@@ -228,7 +231,14 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
         activeAccountPublicKey: firstAvailableAccount?.publicKey,
         encryptedAccounts: newEncryptedAccounts,
       });
-      await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
+
+      const publicAccount = firstAvailableAccount !== undefined
+        ? {
+          address: firstAvailableAccount.address,
+          publicKey: firstAvailableAccount.publicKey,
+        }
+        : undefined;
+      await triggerAccountChange(publicAccount);
     } else {
       await updatePersistentState({ encryptedAccounts: newEncryptedAccounts });
     }
@@ -250,11 +260,16 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
   };
 
   const switchAccount = async (address: string) => {
+    const publicKey = accounts[address]?.publicKey;
+    const publicAccount = address !== undefined && publicKey !== undefined
+      ? { address, publicKey }
+      : undefined;
+
     await updatePersistentState({
       activeAccountAddress: address,
-      activeAccountPublicKey: accounts[address]?.publicKey,
+      activeAccountPublicKey: publicAccount?.publicKey,
     });
-    await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
+    await triggerAccountChange(publicAccount);
   };
 
   return {

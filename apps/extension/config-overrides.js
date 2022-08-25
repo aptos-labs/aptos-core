@@ -1,4 +1,5 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
+/* eslint-disable import/no-extraneous-dependencies */
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 // This will be populated with craPaths when `paths` callback is called
@@ -123,6 +124,19 @@ module.exports = {
       makeHtmlPlugin('main', 'index.html'),
       makeHtmlPlugin('prompt', 'prompt.html'),
     );
+
+    // endregion
+
+    // region Add fallback plugins
+
+    if (isEnvProduction) {
+      // The `Buffer` class is available as built-in global when running the webpack dev server,
+      // but is not imported automatically in builds. This makes sure that
+      // `import { Buffer } from 'buffer'` is added to every entry point.
+      config.plugins.push(new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+      }));
+    }
 
     // endregion
 

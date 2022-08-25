@@ -6,7 +6,7 @@ import constate from 'constate';
 import { useMemo } from 'react';
 
 import { useAppState } from 'core/hooks/useAppState';
-import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
+import { triggerNetworkChange } from 'core/utils/providerEvents';
 import {
   defaultCustomNetworks,
   defaultNetworkName,
@@ -21,6 +21,7 @@ import {
  */
 export const [NetworksProvider, useNetworks] = constate(() => {
   const {
+    activeAccountAddress,
     updatePersistentState,
     ...appState
   } = useAppState();
@@ -39,7 +40,7 @@ export const [NetworksProvider, useNetworks] = constate(() => {
         activeNetworkName: network.name,
         customNetworks: newCustomNetworks,
       });
-      await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+      await triggerNetworkChange(activeAccountAddress, { networkName: network.name });
     } else {
       await updatePersistentState({ customNetworks: newCustomNetworks });
     }
@@ -62,7 +63,7 @@ export const [NetworksProvider, useNetworks] = constate(() => {
         activeNetworkName: firstAvailableNetworkName,
         customNetworks: newCustomNetworks,
       });
-      await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+      await triggerNetworkChange(activeAccountAddress, { networkName: firstAvailableNetworkName });
     } else {
       await updatePersistentState({ customNetworks: newCustomNetworks });
     }
@@ -70,7 +71,7 @@ export const [NetworksProvider, useNetworks] = constate(() => {
 
   const switchNetwork = async (networkName: string) => {
     await updatePersistentState({ activeNetworkName: networkName });
-    await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+    await triggerNetworkChange(activeAccountAddress, { networkName });
   };
 
   const aptosClient = useMemo(

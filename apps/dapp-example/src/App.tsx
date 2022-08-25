@@ -18,7 +18,23 @@ function App() {
   };
 
   useEffect(() => {
-    window.aptos.on('accountChanged', async (account: any) => {
+    async function fetchStatus() {
+      const isAlreadyConnected = await window.aptos.isConnected();
+      setIsConnected(isAlreadyConnected);
+      if (isAlreadyConnected) {
+        const [activeAccount, activeNetworkName] = await Promise.all([
+          window.aptos.account(),
+          window.aptos.network(),
+        ]);
+        setAddress(activeAccount.address);
+        setNetwork(activeNetworkName);
+      } else {
+        setAddress(undefined);
+        setNetwork(undefined);
+      }
+    }
+
+    window.aptos.onAccountChange(async (account: any) => {
       if (account.address) {
         setIsConnected(true);
         setAddress(account.address);
@@ -26,22 +42,14 @@ function App() {
       } else {
         setIsConnected(false);
         setAddress(undefined);
+        setNetwork(undefined);
       }
     });
 
-    window.aptos.on('networkChanged', (newNetwork: string) => {
-      setNetwork(newNetwork);
+    window.aptos.onNetworkChange((params: any) => {
+      setNetwork(params.networkName);
     });
 
-    const fetchStatus = async () => {
-      const flag = await window.aptos.isConnected();
-      if (flag) {
-        const account = await window.aptos.account();
-        setAddress(account.address);
-        setNetwork(await window.aptos.network());
-      }
-      setIsConnected(flag);
-    };
     fetchStatus();
   }, []);
 
@@ -52,10 +60,11 @@ function App() {
       setAddress(undefined);
       setNetwork(undefined);
     } else {
-      const result = await window.aptos.connect();
+      const activeAccount = await window.aptos.connect();
+      const activeNetworkName = await window.aptos.network();
       setIsConnected(true);
-      setAddress(result.address);
-      setNetwork(await window.aptos.network());
+      setAddress(activeAccount.address);
+      setNetwork(activeNetworkName);
     }
   };
 

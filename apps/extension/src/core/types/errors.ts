@@ -28,11 +28,11 @@ export const DappErrorType = Object.freeze({
   INTERNAL_ERROR: new DappError(-30001, 'Internal Error', 'Internal Error'),
   NO_ACCOUNTS: new DappError(4000, 'No Accounts', 'No accounts found'),
   UNAUTHORIZED: new DappError(4100, 'Unauthorized', 'The requested method and/or account has not been authorized by the user.'),
-  UNSUPPORRTED: new DappError(4200, 'Unsupoorted', 'The provider does not support the requested method.'),
+  UNSUPPORTED: new DappError(4200, 'Unsupported', 'The provider does not support the requested method.'),
   USER_REJECTION: new DappError(4001, 'Rejected', 'The user rejected the request'),
 });
 
-export function TransactionError(error: Error): DappError {
+export function makeTransactionError(error: Error): DappError {
   let message = 'Transaction failed';
   const anyError = error as any;
   if (anyError.body && anyError.body.message) {
