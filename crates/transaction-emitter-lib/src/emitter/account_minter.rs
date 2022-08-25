@@ -434,7 +434,7 @@ pub async fn execute_and_wait_transactions(
 
     let state = state_mutex.into_inner();
 
-    async fn wait_for_signed_transactions_bsc(
+    async fn wait_for_signed_transactions_bcs(
         client: &RestClient,
         txn: &SignedTransaction,
     ) -> Result<Response<TransactionOnChainData>, RestError> {
@@ -443,7 +443,7 @@ pub async fn execute_and_wait_transactions(
 
     for txn in state.txns.iter() {
         RETRY_POLICY
-            .retry(move || wait_for_signed_transactions_bsc(client, txn))
+            .retry(move || wait_for_signed_transactions_bcs(client, txn))
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }
