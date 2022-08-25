@@ -3,9 +3,9 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable class-methods-use-this */
-import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
-import { AccountAddress } from "./account_address";
-import { Identifier } from "./identifier";
+import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs/index.js";
+import { AccountAddress } from "./account_address.js";
+import { Identifier } from "./identifier.js";
 
 export abstract class TypeTag {
   abstract serialize(serializer: Serializer): void;

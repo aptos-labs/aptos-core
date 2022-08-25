@@ -6,8 +6,8 @@ import * as SHA3 from "js-sha3";
 import { Buffer } from "buffer/"; // the trailing slash is important!
 import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
-import { HexString, MaybeHexString } from "./hex_string";
-import * as Gen from "./generated/index";
+import { HexString, MaybeHexString } from "./hex_string.js";
+import * as Gen from "./generated/index.js";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
-import { Bytes, Deserializer, Seq, Serializer, Uint8 } from "../bcs";
-import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
+import { Bytes, Deserializer, Seq, Serializer, Uint8 } from "../bcs/index.js";
+import { Ed25519PublicKey, Ed25519Signature } from "./ed25519.js";
 
 /**
  * MultiEd25519 currently supports at most 32 signatures.

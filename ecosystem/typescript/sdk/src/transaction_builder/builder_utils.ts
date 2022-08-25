@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "../hex_string";
+import { HexString } from "../hex_string.js";
 import {
   TypeTag,
   TypeTagBool,
@@ -21,8 +21,8 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
-} from "./aptos_types";
-import { Serializer } from "./bcs";
+} from "./aptos_types/index.js";
+import { Serializer } from "./bcs/index.js";
 
 function assertType(val: any, types: string[] | string, message?: string) {
   if (!types?.includes(typeof val)) {

@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
 import * as SHA3 from "js-sha3";
-import { HexString } from "../../hex_string";
+import { HexString } from "../../hex_string.js";
 import {
   Deserializer,
   Serializer,
@@ -18,11 +18,11 @@ import {
   deserializeVector,
   serializeVector,
   bcsToBytes,
-} from "../bcs";
-import { AccountAddress } from "./account_address";
-import { TransactionAuthenticator } from "./authenticator";
-import { Identifier } from "./identifier";
-import { TypeTag } from "./type_tag";
+} from "../bcs/index.js";
+import { AccountAddress } from "./account_address.js";
+import { TransactionAuthenticator } from "./authenticator.js";
+import { Identifier } from "./identifier.js";
+import { TypeTag } from "./type_tag.js";
 
 export class RawTransaction {
   /**

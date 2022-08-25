@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Bytes, Deserializer, Serializer } from "../bcs";
+import { Bytes, Deserializer, Serializer } from "../bcs/index.js";
 
 export class Ed25519PublicKey {
   static readonly LENGTH: number = 32;

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from "./aptos_account";
-import { AptosClient } from "./aptos_client";
-import * as Gen from "./generated/index";
-import { HexString } from "./hex_string";
-import { BCS, TransactionBuilderABI } from "./transaction_builder";
-import { COIN_ABIS } from "./abis";
+import { AptosAccount } from "./aptos_account.js";
+import { AptosClient } from "./aptos_client.js";
+import * as Gen from "./generated/index.js";
+import { HexString } from "./hex_string.js";
+import { BCS, TransactionBuilderABI } from "./transaction_builder/index.js";
+import { COIN_ABIS } from "./abis.js";
 
 export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
 

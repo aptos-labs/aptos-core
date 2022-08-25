@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Deserializer, Serializer } from "../bcs";
+import { Deserializer, Serializer } from "../bcs/index.js";
 
 export class Identifier {
   constructor(public value: string) {}

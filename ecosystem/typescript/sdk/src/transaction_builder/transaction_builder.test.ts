@@ -3,10 +3,10 @@
 
 /* eslint-disable max-len */
 import * as Nacl from "tweetnacl";
-import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";
-import { HexString } from "../hex_string";
+import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs/index.js";
+import { HexString } from "../hex_string.js";
 
-import { TransactionBuilderEd25519, TransactionBuilder } from "./index";
+import { TransactionBuilderEd25519, TransactionBuilder } from "./index.js";
 import {
   AccountAddress,
   ChainId,
@@ -24,7 +24,7 @@ import {
   TransactionPayloadScript,
   TransactionPayloadEntryFunction,
   TypeTagStruct,
-} from "./aptos_types";
+} from "./aptos_types/index.js";
 
 const ADDRESS_1 = "0x1222";
 const ADDRESS_2 = "0xdd";

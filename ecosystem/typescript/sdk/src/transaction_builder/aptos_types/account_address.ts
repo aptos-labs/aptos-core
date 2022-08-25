@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString, MaybeHexString } from "../../hex_string";
-import { Serializer, Deserializer, Bytes } from "../bcs";
+import { HexString, MaybeHexString } from "../../hex_string.js";
+import { Serializer, Deserializer, Bytes } from "../bcs/index.js";
 
 export class AccountAddress {
   static readonly LENGTH: number = 32;

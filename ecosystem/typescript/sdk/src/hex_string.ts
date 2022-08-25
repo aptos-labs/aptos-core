@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Buffer } from "buffer/"; // the trailing slash is important!
-import { HexEncodedBytes } from "./generated";
+import { HexEncodedBytes } from "./generated/index.js";
 
 // eslint-disable-next-line no-use-before-define
 export type MaybeHexString = HexString | string | HexEncodedBytes;

@@ -1,14 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from "./aptos_account";
-import { AptosClient } from "./aptos_client";
-import * as TokenTypes from "./token_types";
-import * as Gen from "./generated/index";
-import { HexString, MaybeHexString } from "./hex_string";
-import { BCS, TxnBuilderTypes, TransactionBuilderABI } from "./transaction_builder";
-import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
-import { TOKEN_ABIS } from "./abis";
+import { AptosAccount } from "./aptos_account.js";
+import { AptosClient } from "./aptos_client.js";
+import * as TokenTypes from "./token_types.js";
+import * as Gen from "./generated/index.js";
+import { HexString, MaybeHexString } from "./hex_string.js";
+import { BCS, TxnBuilderTypes, TransactionBuilderABI } from "./transaction_builder/index.js";
+import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts.js";
+import { TOKEN_ABIS } from "./abis.js";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens

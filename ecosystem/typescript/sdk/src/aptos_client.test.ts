@@ -1,19 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "./aptos_client";
-import * as Gen from "./generated/index";
-import { FAUCET_URL, NODE_URL } from "./util.test";
-import { FaucetClient } from "./faucet_client";
-import { AptosAccount } from "./aptos_account";
+import { AptosClient } from "./aptos_client.js";
+import * as Gen from "./generated/index.js";
+import { FAUCET_URL, NODE_URL } from "./util.test.js";
+import { FaucetClient } from "./faucet_client.js";
+import { AptosAccount } from "./aptos_account.js";
 import {
   TxnBuilderTypes,
   TransactionBuilderMultiEd25519,
   BCS,
   TransactionBuilder,
   TransactionBuilderRemoteABI,
-} from "./transaction_builder";
-import { TokenClient } from "./token_client";
+} from "./transaction_builder/index.js";
+import { TokenClient } from "./token_client.js";
 
 const account = "0x1::account::Account";
 

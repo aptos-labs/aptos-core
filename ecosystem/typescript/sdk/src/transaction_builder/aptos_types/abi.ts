@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
+import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs/index.js";
 
-import { ModuleId } from "./transaction";
+import { ModuleId } from "./transaction.js";
 
-import { TypeTag } from "./type_tag";
+import { TypeTag } from "./type_tag.js";
 
 export class TypeArgumentABI {
   /**

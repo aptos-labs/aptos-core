@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "./aptos_client";
-import { FAUCET_URL, NODE_URL } from "./util.test";
-import { FaucetClient } from "./faucet_client";
-import { AptosAccount } from "./aptos_account";
-import { CoinClient } from "./coin_client";
+import { AptosClient } from "./aptos_client.js";
+import { FAUCET_URL, NODE_URL } from "./util.test.js";
+import { FaucetClient } from "./faucet_client.js";
+import { AptosAccount } from "./aptos_account.js";
+import { CoinClient } from "./coin_client.js";
 
 test(
   "transferCoins and checkBalance works",

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { FaucetClient } from "./faucet_client";
-import { AptosAccount } from "./aptos_account";
-import { AptosClient } from "./aptos_client";
-import { TokenClient } from "./token_client";
+import { FaucetClient } from "./faucet_client.js";
+import { AptosAccount } from "./aptos_account.js";
+import { AptosClient } from "./aptos_client.js";
+import { TokenClient } from "./token_client.js";
 
-import { NODE_URL, FAUCET_URL } from "./util.test";
+import { NODE_URL, FAUCET_URL } from "./util.test.js";
 
 test(
   "full tutorial nft token flow",

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable no-bitwise */
-import { MAX_U32_NUMBER } from "./consts";
-import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from "./types";
+import { MAX_U32_NUMBER } from "./consts.js";
+import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from "./types.js";
 
 export class Deserializer {
   private buffer: ArrayBuffer;

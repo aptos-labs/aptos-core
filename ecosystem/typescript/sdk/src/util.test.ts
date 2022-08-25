@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "./aptos_client";
+import { AptosClient } from "./aptos_client.js";
 
 export const NODE_URL = process.env.APTOS_NODE_URL;
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL;

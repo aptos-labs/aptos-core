@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "./hex_string";
+import { HexString } from "./hex_string.js";
 
 const withoutPrefix = "007711b4d0";
 const withPrefix = `0x${withoutPrefix}`;

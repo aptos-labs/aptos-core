@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AccountAddress } from "../aptos_types";
-import { Deserializer } from "./deserializer";
+import { AccountAddress } from "../aptos_types/index.js";
+import { Deserializer } from "./deserializer.js";
 import {
   bcsSerializeBool,
   bcsSerializeBytes,
@@ -17,8 +17,8 @@ import {
   deserializeVector,
   serializeVector,
   serializeVectorWithFunc,
-} from "./helper";
-import { Serializer } from "./serializer";
+} from "./helper.js";
+import { Serializer } from "./serializer.js";
 
 test("serializes and deserializes a vector of serializables", () => {
   const address0 = AccountAddress.fromHex("0x1");

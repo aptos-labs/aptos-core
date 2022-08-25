@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /** Faucet creates and funds accounts. This is a thin wrapper around that. */
-import { AptosClient } from "./aptos_client";
-import { OpenAPIConfig } from "./generated";
-import { AxiosHttpRequest } from "./generated/core/AxiosHttpRequest";
-import { HexString, MaybeHexString } from "./hex_string";
+import { AptosClient } from "./aptos_client.js";
+import { OpenAPIConfig } from "./generated/index.js";
+import { AxiosHttpRequest } from "./generated/core/AxiosHttpRequest.js";
+import { HexString, MaybeHexString } from "./hex_string.js";
 
 /**
  * Class for requsting tokens from faucet

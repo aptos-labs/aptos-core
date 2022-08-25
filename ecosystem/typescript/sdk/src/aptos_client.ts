@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Memoize } from "typescript-memoize";
-import { HexString, MaybeHexString } from "./hex_string";
-import { fixNodeUrl, sleep } from "./util";
-import { AptosAccount } from "./aptos_account";
-import * as Gen from "./generated/index";
+import { HexString, MaybeHexString } from "./hex_string.js";
+import { fixNodeUrl, sleep } from "./util.js";
+import { AptosAccount } from "./aptos_account.js";
+import * as Gen from "./generated/index.js";
 import {
   TxnBuilderTypes,
   TransactionBuilderEd25519,
   BCS,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
-} from "./transaction_builder";
+} from "./transaction_builder/index.js";
 
 /**
  * Provides methods for retrieving data from Aptos node.

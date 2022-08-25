@@ -25,12 +25,12 @@ import {
   TransactionPayloadEntryFunction,
   TransactionPayloadScript,
   ModuleId,
-} from "./aptos_types";
-import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
-import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "./aptos_types/abi";
-import { HexString, MaybeHexString } from "../hex_string";
-import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
-import * as Gen from "../generated/index";
+} from "./aptos_types/index.js";
+import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs/index.js";
+import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "./aptos_types/abi.js";
+import { HexString, MaybeHexString } from "../hex_string.js";
+import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils.js";
+import * as Gen from "../generated/index.js";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as SHA3 from "js-sha3";
-import { HexString } from "../../hex_string";
-import { Bytes } from "../bcs";
-import { MultiEd25519PublicKey } from "./multi_ed25519";
+import { HexString } from "../../hex_string.js";
+import { Bytes } from "../bcs/index.js";
+import { MultiEd25519PublicKey } from "./multi_ed25519.js";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate

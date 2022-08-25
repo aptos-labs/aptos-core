@@ -41,9 +41,9 @@ import {
   TransactionPayloadModuleBundle,
   ModuleBundle,
   Module,
-} from "./aptos_types";
-import { HexString } from "../hex_string";
-import { TransactionBuilderEd25519 } from "./builder";
+} from "./aptos_types/index.js";
+import { HexString } from "../hex_string.js";
+import { TransactionBuilderEd25519 } from "./builder.js";
 
 // eslint-disable-next-line operator-linebreak
 const VECTOR_FILES_ROOT_DIR =

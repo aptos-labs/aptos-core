@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "../../hex_string";
-import { Deserializer } from "../bcs";
-import { ScriptABI, EntryFunctionABI, TransactionScriptABI } from "./abi";
-import { TypeTagAddress, TypeTagU64 } from "./type_tag";
+import { HexString } from "../../hex_string.js";
+import { Deserializer } from "../bcs/index.js";
+import { ScriptABI, EntryFunctionABI, TransactionScriptABI } from "./abi.js";
+import { TypeTagAddress, TypeTagU64 } from "./type_tag.js";
 
 // eslint-disable-next-line operator-linebreak
 const SCRIPT_FUNCTION_ABI =

@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "./aptos_client";
-import { FaucetClient } from "./faucet_client";
-import { AptosAccount } from "./aptos_account";
-import { HexString } from "./hex_string";
-import * as Gen from "./generated/index";
+import { AptosClient } from "./aptos_client.js";
+import { FaucetClient } from "./faucet_client.js";
+import { AptosAccount } from "./aptos_account.js";
+import { HexString } from "./hex_string.js";
+import * as Gen from "./generated/index.js";
 
-import { NODE_URL, FAUCET_URL } from "./util.test";
+import { NODE_URL, FAUCET_URL } from "./util.test.js";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
