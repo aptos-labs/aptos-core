@@ -7,7 +7,7 @@
   required_providers {
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 1.6"
+      version = "~> 2.27.0"
     }
     azurerm = {
       source  = "hashicorp/azurerm"
