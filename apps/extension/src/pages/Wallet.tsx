@@ -28,6 +28,7 @@ import ChakraLink from 'core/components/ChakraLink';
 import { useNodeStatus } from 'core/queries/network';
 import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import WalletAccountStake from 'core/components/WalletAccountStake';
 
 function CopyAddressButton() {
   const { activeAccountAddress } = useActiveAccount();
@@ -79,6 +80,16 @@ function Wallet() {
             </HStack>
           </Flex>
         </Flex>
+        <ChakraLink width="100%" to={Routes.stake.path}>
+          <Button
+            py={12}
+            width="100%"
+            rightIcon={<ChevronRightIcon />}
+            justifyContent="space-between"
+          >
+            <WalletAccountStake />
+          </Button>
+        </ChakraLink>
         <ChakraLink width="100%" to={Routes.activity.path}>
           <Button
             py={6}

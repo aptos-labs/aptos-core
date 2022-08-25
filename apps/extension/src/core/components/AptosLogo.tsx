@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { useColorMode } from '@chakra-ui/react';
 import React from 'react';
 
 export function AptosBlackLogo() {
@@ -23,4 +24,9 @@ export function AptosWhiteLogo() {
       <path className="b" d="M240.84,407.11h-63.03c-4.94,0-9.64-2.12-12.91-5.81l-17.19-19.43c-2.56-2.9-6.25-4.55-10.11-4.55s-7.55,1.66-10.11,4.55l-14.75,16.67c-4.83,5.45-11.76,8.58-19.05,8.58h-.98c43.91,47.05,106.44,76.5,175.87,76.5s131.95-29.45,175.87-76.5H240.84Z" />
     </svg>
   );
+}
+
+export function AptosLogo() {
+  const { colorMode } = useColorMode();
+  return (colorMode === 'dark') ? <AptosWhiteLogo /> : <AptosBlackLogo />;
 }
