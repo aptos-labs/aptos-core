@@ -121,7 +121,7 @@ impl Tailer {
                 for version in errored_versions {
                     let txn = self2.get_txn(version).await;
                     if processor2
-                        .process_transactions_with_status(vec![txn.into()])
+                        .process_transactions_with_status(vec![txn])
                         .await
                         .is_ok()
                     {
@@ -830,10 +830,8 @@ mod test {
             }
         )).unwrap();
 
-        tailer
-            .process_transactions(vec![message_txn.clone()])
-            .await
-            .unwrap();
+        let txns = crate::indexer::fetcher::remove_null_bytes_from_txns(vec![message_txn.clone()]);
+        tailer.process_transactions(txns).await.unwrap();
 
         let (_conn_pool, tailer) = setup_indexer().unwrap();
         tailer.set_fetcher_version(4).await;
