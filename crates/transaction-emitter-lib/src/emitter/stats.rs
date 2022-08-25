@@ -17,6 +17,7 @@ pub struct TxnStats {
     pub committed: u64,
     pub expired: u64,
     pub latency: u64,
+    pub latency_samples: u64,
     pub latency_buckets: AtomicHistogramSnapshot,
 }
 
@@ -49,10 +50,10 @@ impl TxnStats {
             submitted: self.submitted / window_secs,
             committed: self.committed / window_secs,
             expired: self.expired / window_secs,
-            latency: if self.committed == 0 {
+            latency: if self.latency_samples == 0 {
                 0u64
             } else {
-                self.latency / self.committed
+                self.latency / self.latency_samples
             },
             p99_latency: self.latency_buckets.percentile(99, 100),
         }
@@ -78,6 +79,7 @@ impl Sub for &TxnStats {
             committed: self.committed - other.committed,
             expired: self.expired - other.expired,
             latency: self.latency - other.latency,
+            latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
         }
     }
@@ -89,6 +91,7 @@ pub struct StatsAccumulator {
     pub committed: AtomicU64,
     pub expired: AtomicU64,
     pub latency: AtomicU64,
+    pub latency_samples: AtomicU64,
     pub latencies: Arc<AtomicHistogramAccumulator>,
 }
 
@@ -99,6 +102,7 @@ impl StatsAccumulator {
             committed: self.committed.load(Ordering::Relaxed),
             expired: self.expired.load(Ordering::Relaxed),
             latency: self.latency.load(Ordering::Relaxed),
+            latency_samples: self.latency_samples.load(Ordering::Relaxed),
             latency_buckets: self.latencies.snapshot(),
         }
     }
@@ -270,6 +274,7 @@ mod test {
             committed: 10,
             expired: 0,
             latency: 0,
+            latency_samples: 0,
             latency_buckets: histogram.snapshot(),
         };
         let res = stat.latency_buckets.percentile(9, 10);
