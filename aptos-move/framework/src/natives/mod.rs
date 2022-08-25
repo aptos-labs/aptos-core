@@ -38,6 +38,7 @@ pub struct GasParameters {
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
     pub ristretto255: cryptography::ristretto255::GasParameters,
+    pub bulletproofs: cryptography::bulletproofs::GasParameters,
     pub hash: hash::GasParameters,
     pub type_info: type_info::GasParameters,
     pub util: util::GasParameters,
@@ -87,6 +88,7 @@ impl GasParameters {
                 basepoint_mul: 0.into(),
                 basepoint_double_mul: 0.into(),
                 point_add: 0.into(),
+                point_clone: 0.into(),
                 point_compress: 0.into(),
                 point_decompress: 0.into(),
                 point_equals: 0.into(),
@@ -106,9 +108,15 @@ impl GasParameters {
                 scalar_neg: 0.into(),
                 sha512_per_byte: 0.into(),
                 sha512_per_hash: 0.into(),
+                sha2_512_per_byte: 0.into(),
+                sha2_512_per_hash: 0.into(),
                 scalar_sub: 0.into(),
                 point_parse_arg: 0.into(),
                 scalar_parse_arg: 0.into(),
+            },
+            bulletproofs: cryptography::bulletproofs::GasParameters {
+                per_rangeproof_deserialize: 0.into(),
+                per_bit_rangeproof_verify: 0.into(),
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {
@@ -200,6 +208,10 @@ pub fn all_natives(
     add_natives_from_module!(
         "ristretto255",
         cryptography::ristretto255::make_all(gas_params.ristretto255)
+    );
+    add_natives_from_module!(
+        "bulletproofs",
+        cryptography::bulletproofs::make_all(gas_params.bulletproofs)
     );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
