@@ -1,11 +1,11 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { ApiRequestOptions } from './ApiRequestOptions';
-import { BaseHttpRequest } from './BaseHttpRequest';
-import type { CancelablePromise } from './CancelablePromise';
-import type { OpenAPIConfig } from './OpenAPI';
-import { request as __request } from './request';
+import type { ApiRequestOptions } from './ApiRequestOptions.js';
+import { BaseHttpRequest } from './BaseHttpRequest.js';
+import type { CancelablePromise } from './CancelablePromise.js';
+import type { OpenAPIConfig } from './OpenAPI.js';
+import { request as __request } from './request.js';
 
 export class AxiosHttpRequest extends BaseHttpRequest {
 

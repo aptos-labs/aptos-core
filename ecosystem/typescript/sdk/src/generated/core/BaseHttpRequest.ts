@@ -1,9 +1,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { ApiRequestOptions } from './ApiRequestOptions';
-import type { CancelablePromise } from './CancelablePromise';
-import type { OpenAPIConfig } from './OpenAPI';
+import type { ApiRequestOptions } from './ApiRequestOptions.js';
+import type { CancelablePromise } from './CancelablePromise.js';
+import type { OpenAPIConfig } from './OpenAPI.js';
 
 export abstract class BaseHttpRequest {
 

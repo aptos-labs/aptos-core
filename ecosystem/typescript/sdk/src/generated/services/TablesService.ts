@@ -1,13 +1,13 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Address } from '../models/Address';
-import type { MoveValue } from '../models/MoveValue';
-import type { TableItemRequest } from '../models/TableItemRequest';
-import type { U64 } from '../models/U64';
+import type { Address } from '../models/Address.js';
+import type { MoveValue } from '../models/MoveValue.js';
+import type { TableItemRequest } from '../models/TableItemRequest.js';
+import type { U64 } from '../models/U64.js';
 
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 
 export class TablesService {
 

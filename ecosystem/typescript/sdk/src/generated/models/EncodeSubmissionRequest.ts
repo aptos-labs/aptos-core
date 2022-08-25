@@ -2,9 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { TransactionPayload } from './TransactionPayload';
-import type { U64 } from './U64';
+import type { Address } from './Address.js';
+import type { TransactionPayload } from './TransactionPayload.js';
+import type { U64 } from './U64.js';
 
 export type EncodeSubmissionRequest = {
     sender: Address;

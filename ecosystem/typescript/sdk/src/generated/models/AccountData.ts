@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { HexEncodedBytes } from './HexEncodedBytes';
-import type { U64 } from './U64';
+import type { HexEncodedBytes } from './HexEncodedBytes.js';
+import type { U64 } from './U64.js';
 
 export type AccountData = {
     sequence_number: U64;

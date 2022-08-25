@@ -1,16 +1,16 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { AccountData } from '../models/AccountData';
-import type { Address } from '../models/Address';
-import type { IdentifierWrapper } from '../models/IdentifierWrapper';
-import type { MoveModuleBytecode } from '../models/MoveModuleBytecode';
-import type { MoveResource } from '../models/MoveResource';
-import type { MoveStructTag } from '../models/MoveStructTag';
-import type { U64 } from '../models/U64';
+import type { AccountData } from '../models/AccountData.js';
+import type { Address } from '../models/Address.js';
+import type { IdentifierWrapper } from '../models/IdentifierWrapper.js';
+import type { MoveModuleBytecode } from '../models/MoveModuleBytecode.js';
+import type { MoveResource } from '../models/MoveResource.js';
+import type { MoveStructTag } from '../models/MoveStructTag.js';
+import type { U64 } from '../models/U64.js';
 
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 
 export class AccountsService {
 

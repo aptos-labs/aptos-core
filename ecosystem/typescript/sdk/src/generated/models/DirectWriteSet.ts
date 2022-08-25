@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Event } from './Event';
-import type { WriteSetChange } from './WriteSetChange';
+import type { Event } from './Event.js';
+import type { WriteSetChange } from './WriteSetChange.js';
 
 export type DirectWriteSet = {
     changes: Array<WriteSetChange>;

@@ -2,10 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { IdentifierWrapper } from './IdentifierWrapper';
-import type { MoveAbility } from './MoveAbility';
-import type { MoveStructField } from './MoveStructField';
-import type { MoveStructGenericTypeParam } from './MoveStructGenericTypeParam';
+import type { IdentifierWrapper } from './IdentifierWrapper.js';
+import type { MoveAbility } from './MoveAbility.js';
+import type { MoveStructField } from './MoveStructField.js';
+import type { MoveStructGenericTypeParam } from './MoveStructGenericTypeParam.js';
 
 export type MoveStruct = {
     name: IdentifierWrapper;

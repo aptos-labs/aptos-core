@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { AptosError } from './AptosError';
+import type { AptosError } from './AptosError.js';
 
 export type TransactionsBatchSingleSubmissionFailure = {
     error: AptosError;

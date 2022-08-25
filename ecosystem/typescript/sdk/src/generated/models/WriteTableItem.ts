@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { DecodedTableData } from './DecodedTableData';
-import type { HexEncodedBytes } from './HexEncodedBytes';
+import type { DecodedTableData } from './DecodedTableData.js';
+import type { HexEncodedBytes } from './HexEncodedBytes.js';
 
 export type WriteTableItem = {
     state_key_hash: string;

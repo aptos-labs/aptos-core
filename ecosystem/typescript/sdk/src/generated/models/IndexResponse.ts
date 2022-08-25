@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { RoleType } from './RoleType';
-import type { U64 } from './U64';
+import type { RoleType } from './RoleType.js';
+import type { U64 } from './U64.js';
 
 /**
  * The struct holding all data returned to the client by the

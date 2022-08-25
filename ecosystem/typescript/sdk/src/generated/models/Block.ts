@@ -2,9 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { HashValue } from './HashValue';
-import type { Transaction } from './Transaction';
-import type { U64 } from './U64';
+import type { HashValue } from './HashValue.js';
+import type { Transaction } from './Transaction.js';
+import type { U64 } from './U64.js';
 
 export type Block = {
     block_height: U64;

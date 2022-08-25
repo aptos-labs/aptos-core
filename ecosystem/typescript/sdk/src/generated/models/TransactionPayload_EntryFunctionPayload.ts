@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { EntryFunctionPayload } from './EntryFunctionPayload';
+import type { EntryFunctionPayload } from './EntryFunctionPayload.js';
 
 export type TransactionPayload_EntryFunctionPayload = ({
     type: string;

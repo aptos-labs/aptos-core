@@ -1,20 +1,20 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Address } from '../models/Address';
-import type { EncodeSubmissionRequest } from '../models/EncodeSubmissionRequest';
-import type { GasEstimation } from '../models/GasEstimation';
-import type { HashValue } from '../models/HashValue';
-import type { HexEncodedBytes } from '../models/HexEncodedBytes';
-import type { PendingTransaction } from '../models/PendingTransaction';
-import type { SubmitTransactionRequest } from '../models/SubmitTransactionRequest';
-import type { Transaction } from '../models/Transaction';
-import type { TransactionsBatchSubmissionResult } from '../models/TransactionsBatchSubmissionResult';
-import type { U64 } from '../models/U64';
-import type { UserTransaction } from '../models/UserTransaction';
+import type { Address } from '../models/Address.js';
+import type { EncodeSubmissionRequest } from '../models/EncodeSubmissionRequest.js';
+import type { GasEstimation } from '../models/GasEstimation.js';
+import type { HashValue } from '../models/HashValue.js';
+import type { HexEncodedBytes } from '../models/HexEncodedBytes.js';
+import type { PendingTransaction } from '../models/PendingTransaction.js';
+import type { SubmitTransactionRequest } from '../models/SubmitTransactionRequest.js';
+import type { Transaction } from '../models/Transaction.js';
+import type { TransactionsBatchSubmissionResult } from '../models/TransactionsBatchSubmissionResult.js';
+import type { U64 } from '../models/U64.js';
+import type { UserTransaction } from '../models/UserTransaction.js';
 
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 
 export class TransactionsService {
 

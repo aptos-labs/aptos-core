@@ -2,13 +2,13 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { Event } from './Event';
-import type { HashValue } from './HashValue';
-import type { TransactionPayload } from './TransactionPayload';
-import type { TransactionSignature } from './TransactionSignature';
-import type { U64 } from './U64';
-import type { WriteSetChange } from './WriteSetChange';
+import type { Address } from './Address.js';
+import type { Event } from './Event.js';
+import type { HashValue } from './HashValue.js';
+import type { TransactionPayload } from './TransactionPayload.js';
+import type { TransactionSignature } from './TransactionSignature.js';
+import type { U64 } from './U64.js';
+import type { WriteSetChange } from './WriteSetChange.js';
 
 export type UserTransaction = {
     version: U64;

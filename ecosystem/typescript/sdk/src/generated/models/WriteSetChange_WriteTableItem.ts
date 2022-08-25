@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { WriteTableItem } from './WriteTableItem';
+import type { WriteTableItem } from './WriteTableItem.js';
 
 export type WriteSetChange_WriteTableItem = ({
     type: string;

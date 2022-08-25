@@ -2,10 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { IdentifierWrapper } from './IdentifierWrapper';
-import type { MoveFunctionGenericTypeParam } from './MoveFunctionGenericTypeParam';
-import type { MoveFunctionVisibility } from './MoveFunctionVisibility';
-import type { MoveType } from './MoveType';
+import type { IdentifierWrapper } from './IdentifierWrapper.js';
+import type { MoveFunctionGenericTypeParam } from './MoveFunctionGenericTypeParam.js';
+import type { MoveFunctionVisibility } from './MoveFunctionVisibility.js';
+import type { MoveType } from './MoveType.js';
 
 export type MoveFunction = {
     name: IdentifierWrapper;

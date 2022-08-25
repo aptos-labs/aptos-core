@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { AptosErrorCode } from './AptosErrorCode';
+import type { AptosErrorCode } from './AptosErrorCode.js';
 
 /**
  * This is the generic struct we use for all API errors, it contains a string

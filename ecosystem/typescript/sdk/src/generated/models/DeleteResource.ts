@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { MoveStructTag } from './MoveStructTag';
+import type { Address } from './Address.js';
+import type { MoveStructTag } from './MoveStructTag.js';
 
 export type DeleteResource = {
     address: Address;

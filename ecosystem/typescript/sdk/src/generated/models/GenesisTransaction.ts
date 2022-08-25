@@ -2,11 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Event } from './Event';
-import type { GenesisPayload } from './GenesisPayload';
-import type { HashValue } from './HashValue';
-import type { U64 } from './U64';
-import type { WriteSetChange } from './WriteSetChange';
+import type { Event } from './Event.js';
+import type { GenesisPayload } from './GenesisPayload.js';
+import type { HashValue } from './HashValue.js';
+import type { U64 } from './U64.js';
+import type { WriteSetChange } from './WriteSetChange.js';
 
 export type GenesisTransaction = {
     version: U64;

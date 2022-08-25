@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { MoveStructTag } from './MoveStructTag';
-import type { MoveStructValue } from './MoveStructValue';
+import type { MoveStructTag } from './MoveStructTag.js';
+import type { MoveStructValue } from './MoveStructValue.js';
 
 export type MoveResource = {
     type: MoveStructTag;

@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { EntryFunctionId } from './EntryFunctionId';
-import type { MoveType } from './MoveType';
+import type { EntryFunctionId } from './EntryFunctionId.js';
+import type { MoveType } from './MoveType.js';
 
 export type EntryFunctionPayload = {
     function: EntryFunctionId;

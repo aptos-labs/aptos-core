@@ -2,11 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { IdentifierWrapper } from './IdentifierWrapper';
-import type { MoveFunction } from './MoveFunction';
-import type { MoveModuleId } from './MoveModuleId';
-import type { MoveStruct } from './MoveStruct';
+import type { Address } from './Address.js';
+import type { IdentifierWrapper } from './IdentifierWrapper.js';
+import type { MoveFunction } from './MoveFunction.js';
+import type { MoveModuleId } from './MoveModuleId.js';
+import type { MoveStruct } from './MoveStruct.js';
 
 export type MoveModule = {
     address: Address;

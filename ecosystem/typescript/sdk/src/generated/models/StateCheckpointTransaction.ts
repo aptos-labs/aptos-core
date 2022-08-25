@@ -2,9 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { HashValue } from './HashValue';
-import type { U64 } from './U64';
-import type { WriteSetChange } from './WriteSetChange';
+import type { HashValue } from './HashValue.js';
+import type { U64 } from './U64.js';
+import type { WriteSetChange } from './WriteSetChange.js';
 
 export type StateCheckpointTransaction = {
     version: U64;

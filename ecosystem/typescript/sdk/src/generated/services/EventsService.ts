@@ -1,15 +1,15 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Address } from '../models/Address';
-import type { EventKey } from '../models/EventKey';
-import type { IdentifierWrapper } from '../models/IdentifierWrapper';
-import type { MoveStructTag } from '../models/MoveStructTag';
-import type { U64 } from '../models/U64';
-import type { VersionedEvent } from '../models/VersionedEvent';
+import type { Address } from '../models/Address.js';
+import type { EventKey } from '../models/EventKey.js';
+import type { IdentifierWrapper } from '../models/IdentifierWrapper.js';
+import type { MoveStructTag } from '../models/MoveStructTag.js';
+import type { U64 } from '../models/U64.js';
+import type { VersionedEvent } from '../models/VersionedEvent.js';
 
-import type { CancelablePromise } from '../core/CancelablePromise';
-import type { BaseHttpRequest } from '../core/BaseHttpRequest';
+import type { CancelablePromise } from '../core/CancelablePromise.js';
+import type { BaseHttpRequest } from '../core/BaseHttpRequest.js';
 
 export class EventsService {
 

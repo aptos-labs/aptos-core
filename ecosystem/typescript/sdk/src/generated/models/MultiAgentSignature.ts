@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { AccountSignature } from './AccountSignature';
-import type { Address } from './Address';
+import type { AccountSignature } from './AccountSignature.js';
+import type { Address } from './Address.js';
 
 export type MultiAgentSignature = {
     sender: AccountSignature;

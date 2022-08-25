@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { DeletedTableData } from './DeletedTableData';
-import type { HexEncodedBytes } from './HexEncodedBytes';
+import type { DeletedTableData } from './DeletedTableData.js';
+import type { HexEncodedBytes } from './HexEncodedBytes.js';
 
 export type DeleteTableItem = {
     state_key_hash: string;

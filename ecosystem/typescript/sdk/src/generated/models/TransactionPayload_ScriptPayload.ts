@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ScriptPayload } from './ScriptPayload';
+import type { ScriptPayload } from './ScriptPayload.js';
 
 export type TransactionPayload_ScriptPayload = ({
     type: string;

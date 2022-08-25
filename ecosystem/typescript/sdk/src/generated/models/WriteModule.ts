@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { MoveModuleBytecode } from './MoveModuleBytecode';
+import type { Address } from './Address.js';
+import type { MoveModuleBytecode } from './MoveModuleBytecode.js';
 
 export type WriteModule = {
     address: Address;

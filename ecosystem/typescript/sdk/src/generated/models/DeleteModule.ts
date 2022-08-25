@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { MoveModuleId } from './MoveModuleId';
+import type { Address } from './Address.js';
+import type { MoveModuleId } from './MoveModuleId.js';
 
 export type DeleteModule = {
     address: Address;

@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ModuleBundlePayload } from './ModuleBundlePayload';
+import type { ModuleBundlePayload } from './ModuleBundlePayload.js';
 
 export type TransactionPayload_ModuleBundlePayload = ({
     type: string;

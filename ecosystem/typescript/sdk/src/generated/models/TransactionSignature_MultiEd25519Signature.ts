@@ -2,7 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { MultiEd25519Signature } from './MultiEd25519Signature';
+import type { MultiEd25519Signature } from './MultiEd25519Signature.js';
 
 export type TransactionSignature_MultiEd25519Signature = ({
     type: string;

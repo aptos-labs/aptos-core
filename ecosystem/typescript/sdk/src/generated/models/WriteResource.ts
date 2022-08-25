@@ -2,8 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { MoveResource } from './MoveResource';
+import type { Address } from './Address.js';
+import type { MoveResource } from './MoveResource.js';
 
 export type WriteResource = {
     address: Address;

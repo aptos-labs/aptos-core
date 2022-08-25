@@ -2,11 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { Address } from './Address';
-import type { HashValue } from './HashValue';
-import type { TransactionPayload } from './TransactionPayload';
-import type { TransactionSignature } from './TransactionSignature';
-import type { U64 } from './U64';
+import type { Address } from './Address.js';
+import type { HashValue } from './HashValue.js';
+import type { TransactionPayload } from './TransactionPayload.js';
+import type { TransactionSignature } from './TransactionSignature.js';
+import type { U64 } from './U64.js';
 
 export type PendingTransaction = {
     hash: HashValue;
