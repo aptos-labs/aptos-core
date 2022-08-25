@@ -1,24 +1,31 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_view::DbStateView;
-use crate::{proof_fetcher::ProofFetcher, DbReader};
+use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
-use aptos_state_view::{StateView, StateViewId};
+use aptos_state_view::{state_storage_usage::StateStorageUsage, StateView, StateViewId};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
     write_set::WriteSet,
 };
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("kv_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -104,13 +111,20 @@ impl CachedStateView {
     }
 
     pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
-        write_sets
-            .iter()
-            .flat_map(|write_set| write_set.iter())
-            .map(|(key, _)| key)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .try_for_each(|key| self.get_state_value(key).map(|_| ()))
+        IO_POOL.scope(|s| {
+            write_sets
+                .iter()
+                .flat_map(|write_set| write_set.iter())
+                .map(|(key, _)| key)
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .for_each(|key| {
+                    s.spawn(move |_| {
+                        self.get_state_value(key).expect("Must succeed.");
+                    })
+                });
+        });
+        Ok(())
     }
 
     pub fn into_state_cache(self) -> StateCache {
