@@ -4,9 +4,8 @@ validator:
   name:
 
 monitoring:
-  fullKubernetesScrape: true
-  useKubeStateMetrics: false
   prometheus:
+    fullKubernetesScrape: false
     deleteWal: false
     remote_write:
       enabled: false
