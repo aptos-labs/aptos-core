@@ -37,3 +37,7 @@
 # Owners for the `SDKs`
 /ecosystem/typescript/sdk @jjleng @gregnazario @banool
 /ecosystem/python/sdk @davidiw @gregnazario @banool
+# Owner for token_standard and related tutorials
+/aptos-move/framework/aptos-token @areshand
+/developer-docs-site/docs/tutorials @areshand
+
