@@ -167,11 +167,11 @@ You will test the voting feature in this step.
 The next steps can only be taken AFTER you have [initialized the Staking Pool](#stake-delegate).
 :::
 
-## Reset owner account
+## Reset operator account
 1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
 2. Make sure the wallet is connected with your **owner** account.
-3. Provide the **new owner** address in the input that says **New Owner Address**
-4. click the **CHANGE OWNER** button. You will see a green snackbar indicating that the transaction is successful.
+3. Provide the **new operator** address in the input that says **New Operator Address**
+4. click the **CHANGE OPERATOR** button. You will see a green snackbar indicating that the transaction is successful.
 
 ## Reset voter account
 1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
@@ -179,7 +179,7 @@ The next steps can only be taken AFTER you have [initialized the Staking Pool](#
 3. Provide the **new voter** address in the input that says **New Voter Address**
 4. click the **CHANGE VOTER** button. You will see a green snackbar indicating that the transaction is successful.
 
-## Increase Lockup duration
+## Increase lockup duration
 1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
 2. Make sure the wallet is connected with your **owner** account.
 3. click the **INCREASE LOCKUP** button. You will see a green snackbar indicating that the transaction is successful.
