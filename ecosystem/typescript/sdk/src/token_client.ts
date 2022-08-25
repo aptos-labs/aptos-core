@@ -6,7 +6,7 @@ import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
-import { BCS, TxnBuilderTypes, TransactionBuilderABI } from "./transaction_builder";
+import { BCS, TransactionBuilderABI } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
 import { TOKEN_ABIS } from "./abis";
 
@@ -28,41 +28,13 @@ export class TokenClient {
   }
 
   /**
-   * Brings together methods for generating, signing and submitting transaction
-   * @param account AptosAccount which will sign a transaction
-   * @param payload Transaction payload. It depends on transaction type you want to send
-   * @returns Promise that resolves to transaction hash
-   */
-  async submitTransactionHelper(account: AptosAccount, payload: TxnBuilderTypes.TransactionPayload) {
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      this.aptosClient.getAccount(account.address()),
-      this.aptosClient.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
-      BigInt(sequnceNumber),
-      payload,
-      500000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 20),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
-
-    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
-    const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
-
-    return transactionRes.hash;
-  }
-
-  /**
    * Creates a new NFT collection within the specified account
    * @param account AptosAccount where collection will be created
    * @param name Collection name
    * @param description Collection description
    * @param uri URL to additional info about collection
    * @param maxAmount Maximum number of `token_data` allowed within this collection
-   * @returns A hash of transaction
+   * @returns The hash of the transaction submitted to the API
    */
   async createCollection(
     account: AptosAccount,
@@ -77,7 +49,7 @@ export class TokenClient {
       [name, description, uri, maxAmount, [false, false, false]],
     );
 
-    return this.submitTransactionHelper(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
   }
 
   /**
@@ -95,7 +67,7 @@ export class TokenClient {
    * @param property_keys the property keys for storing on-chain properties
    * @param property_values the property values to be stored on-chain
    * @param property_types the type of property values
-   * @returns A hash of transaction
+   * @returns The hash of the transaction submitted to the API
    */
   async createToken(
     account: AptosAccount,
@@ -111,7 +83,7 @@ export class TokenClient {
     property_keys: Array<string> = [],
     property_values: Array<string> = [],
     property_types: Array<string> = [],
-  ): Promise<Gen.HexEncodedBytes> {
+  ): Promise<string> {
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::create_token_script",
       [],
@@ -132,7 +104,7 @@ export class TokenClient {
       ],
     );
 
-    return this.submitTransactionHelper(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
   }
 
   /**
@@ -144,7 +116,7 @@ export class TokenClient {
    * @param name Token name
    * @param amount Amount of tokens which will be transfered
    * @param property_version the version of token PropertyMap with a default value 0.
-   * @returns A hash of transaction
+   * @returns The hash of the transaction submitted to the API
    */
   async offerToken(
     account: AptosAccount,
@@ -161,7 +133,7 @@ export class TokenClient {
       [receiver, creator, collectionName, name, property_version, amount],
     );
 
-    return this.submitTransactionHelper(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
   }
 
   /**
@@ -172,7 +144,7 @@ export class TokenClient {
    * @param collectionName Name of collection where token is stored
    * @param name Token name
    * @param property_version the version of token PropertyMap with a default value 0.
-   * @returns A hash of transaction
+   * @returns The hash of the transaction submitted to the API
    */
   async claimToken(
     account: AptosAccount,
@@ -188,7 +160,7 @@ export class TokenClient {
       [sender, creator, collectionName, name, property_version],
     );
 
-    return this.submitTransactionHelper(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
   }
 
   /**
@@ -199,7 +171,7 @@ export class TokenClient {
    * @param collectionName Name of collection where token is strored
    * @param name Token name
    * @param property_version the version of token PropertyMap with a default value 0.
-   * @returns A hash of transaction
+   * @returns The hash of the transaction submitted to the API
    */
   async cancelTokenOffer(
     account: AptosAccount,
@@ -215,7 +187,7 @@ export class TokenClient {
       [receiver, creator, collectionName, name, property_version],
     );
 
-    return this.submitTransactionHelper(account, payload);
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
   }
 
   /**

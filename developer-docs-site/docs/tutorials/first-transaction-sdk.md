@@ -304,14 +304,14 @@ Like the previous step, this is another helper step that constructs a transactio
 :!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_5
 ```
 
-Behind the scenes, the `transfer` function generates a transaction payload and has the client sign, send, and wait for it:
+Behind the scenes, the `transfer` function generates a transaction payload and has the client generate, sign, and send a transaction containing it:
 ```ts
 :!: static/sdks/typescript/src/coin_client.ts transfer
 ```
 
-Within the client, <code>generateSignSendWaitForTransaction</code> is doing this:
+Within the client, `generateSignSubmitTransaction` is doing this:
 ```ts
-:!: static/sdks/typescript/src/aptos_client.ts generateSignSendWaitForTransactionInner
+:!: static/sdks/typescript/src/aptos_client.ts generateSignSubmitTransactionInner
 ```
 
 Breaking the above down into pieces:
@@ -364,28 +364,28 @@ Breaking the above down into pieces:
 
 ### Step 4.6: Waiting for transaction resolution
 
+The transaction hash can be used to query the status of a transaction:
+
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-In Typescript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
-
-You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
 ```ts
-:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6a
+```
+
+You can set `checkSuccess` to true when calling `waitForTransaction` if you'd like it to throw if the transaction was not committed successfully. Otherwise you must check this yourself.
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6b
 ```
 
   </TabItem>
   <TabItem value="python" label="Python">
-
-The transaction hash can be used to query the status of a transaction:
 
 ```python
 :!: static/sdks/python/examples/transfer-coin.py section_6
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
-
-The transaction hash can be used to query the status of a transaction:
 
 ```rust
 :!: static/sdks/rust/examples/transfer-coin.rs section_6
