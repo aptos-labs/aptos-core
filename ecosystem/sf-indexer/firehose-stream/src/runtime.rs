@@ -176,16 +176,31 @@ impl FirehoseStreamer {
         let mut curr_version = block_start_version;
         for onchain_txn in transactions {
             let txn_version = onchain_txn.version;
-            let txn = self
-                .resolver
-                .as_converter(self.context.db.clone())
-                .try_into_onchain_transaction(block_timestamp, onchain_txn)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Could not convert onchain transaction version {} into transaction: {:?}",
-                        txn_version, e
-                    )
-                });
+            let mut txn: Option<Transaction> = None;
+            let mut retries = 0;
+            while txn.is_none() {
+                match self
+                    .resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_onchain_transaction(block_timestamp, onchain_txn.clone())
+                {
+                    Ok(transaction) => {
+                        txn = Some(transaction);
+                    }
+                    Err(err) => {
+                        if retries == 0 {
+                            aptos_logger::debug!(
+                                "Could not convert onchain transaction, trying again with updated resolver",
+                            );
+                        } else {
+                            panic!("Could not convert onchain transaction, error: {:?}", err);
+                        }
+                        retries += 1;
+                        self.resolver = Arc::new(self.context.move_resolver().unwrap());
+                    }
+                }
+            }
+            let txn = txn.unwrap();
             if !self.validate_transaction_type(curr_version == block_start_version, &txn) {
                 error!(
                             "Block {} failed validation: first transaction has to be block metadata or genesis",

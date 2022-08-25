@@ -595,15 +595,17 @@ pub fn convert_transaction(
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
+            let expiration_timestamp_secs = Some(convert_timestamp_secs(std::cmp::min(
+                ut.request.expiration_timestamp_secs.0,
+                chrono::NaiveDateTime::MAX.timestamp() as u64,
+            )));
             extractor::transaction::TxnData::User(extractor::UserTransaction {
                 request: Some(extractor::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
                     sequence_number: ut.request.sequence_number.0,
                     max_gas_amount: ut.request.max_gas_amount.0,
                     gas_unit_price: ut.request.gas_unit_price.0,
-                    expiration_timestamp_secs: Some(convert_timestamp_secs(
-                        ut.request.expiration_timestamp_secs.0,
-                    )),
+                    expiration_timestamp_secs,
                     payload: Some(convert_transaction_payload(&ut.request.payload)),
                     signature: convert_transaction_signature(&ut.request.signature),
                 }),
