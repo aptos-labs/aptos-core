@@ -1,8 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliError, CliTypedResult, TransactionOptions, TransactionSummary,
+use std::collections::BTreeMap;
+
+use crate::common::{
+    types::{
+        CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileConfig,
+        TransactionOptions, TransactionSummary,
+    },
+    utils::read_line,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
@@ -43,12 +49,12 @@ pub struct RotateKey {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for RotateKey {
+impl CliCommand<()> for RotateKey {
     fn command_name(&self) -> &'static str {
         "RotateKey"
     }
 
-    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+    async fn execute(self) -> CliTypedResult<()> {
         let key = self.new_private_key.as_bytes().to_vec();
         let new_private_key = self
             .txn_options
@@ -83,7 +89,8 @@ impl CliCommand<TransactionSummary> for RotateKey {
         let rotation_proof_signed_by_new_private_key =
             new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
 
-        self.txn_options
+        let txn_summary = self
+            .txn_options
             .submit_transaction(aptos_stdlib::account_rotate_authentication_key_ed25519(
                 rotation_proof_signed_by_current_private_key
                     .to_bytes()
@@ -99,6 +106,64 @@ impl CliCommand<TransactionSummary> for RotateKey {
                 new_private_key.public_key().to_bytes().to_vec(),
             ))
             .await
-            .map(TransactionSummary::from)
+            .map(TransactionSummary::from)?;
+
+        let string = serde_json::to_string_pretty(&txn_summary)
+            .map_err(|err| CliError::UnableToParse("trasaction summary", err.to_string()))?;
+
+        eprintln!("{}", string);
+
+        if let Some(txn_success) = txn_summary.success {
+            if !txn_success {
+                return Err(CliError::ApiError(
+                    "transaction was not executed successfully".to_string(),
+                ));
+            }
+        } else {
+            return Err(CliError::UnexpectedError(
+                "Mailformed transaction response".to_string(),
+            ));
+        }
+
+        // Asks user if they want to create a new Profile. Overriding profile is a bit of risky, we create a new one
+        // instead.
+
+        // Default is Yes
+        eprintln!("Do you want to create a profile with the new private key? [Yes | no]");
+        let should_create_profile = read_line("Should create a profile")?.trim().to_string();
+
+        if should_create_profile.to_lowercase() == "no" {
+            return Ok(());
+        }
+
+        eprintln!("Enter the name for the profile");
+        let profile_name = read_line("Profile name")?.trim().to_string();
+
+        if profile_name.is_empty() {
+            return Ok(());
+        }
+
+        let profile_config = ProfileConfig {
+            private_key: Some(new_private_key.clone()),
+            public_key: Some(new_private_key.public_key()),
+            ..self.txn_options.profile_options.profile()?
+        };
+
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+
+        if config.profiles.is_none() {
+            // This should not happen. The command requires a profile exist to rotate key
+            config.profiles = Some(BTreeMap::new());
+        }
+        config
+            .profiles
+            .as_mut()
+            .unwrap()
+            .insert(profile_name.clone(), profile_config);
+        config.save()?;
+
+        eprintln!("Profile {} is saved.", profile_name);
+
+        Ok(())
     }
 }

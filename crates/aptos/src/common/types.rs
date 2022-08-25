@@ -355,24 +355,28 @@ pub struct ProfileOptions {
 
 impl ProfileOptions {
     pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
-        if let Some(profile) =
-            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
-        {
-            if let Some(account) = profile.account {
-                return Ok(account);
-            }
+        let profile = self.profile()?;
+        if let Some(account) = profile.account {
+            return Ok(account);
         }
 
         Err(CliError::ConfigNotFoundError(self.profile.clone()))
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        let profile = self.profile()?;
+        if let Some(public_key) = profile.public_key {
+            return Ok(public_key);
+        }
+
+        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+    }
+
+    pub fn profile(&self) -> CliTypedResult<ProfileConfig> {
         if let Some(profile) =
             CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
         {
-            if let Some(public_key) = profile.public_key {
-                return Ok(public_key);
-            }
+            return Ok(profile);
         }
 
         Err(CliError::ConfigNotFoundError(self.profile.clone()))
