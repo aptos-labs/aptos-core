@@ -11,14 +11,16 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
-use aptos_crypto::HashValue;
 use aptos_protos::block_output::v1::{
     transaction_output::TxnData, BlockMetadataTransactionOutput, TransactionInfoOutput,
     TransactionOutput, UserTransactionOutput,
 };
 use aptos_protos::util::timestamp::Timestamp;
+use aptos_rest_client::aptos_api_types::HexEncodedBytes;
 use field_count::FieldCount;
 use serde::Serialize;
+
+static SECONDS_IN_10_YEARS: i64 = 60 * 60 * 24 * 365 * 10;
 
 #[derive(Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(version)]
@@ -103,26 +105,19 @@ impl Transaction {
         Self {
             version: info.version as i64,
             block_height: info.block_height as i64,
-            hash: HashValue::from_slice(info.hash.clone())
-                .unwrap()
-                .to_string(),
+            hash: HexEncodedBytes::from(info.hash.clone()).to_string(),
             type_,
             payload,
-            state_change_hash: HashValue::from_slice(info.state_change_hash.clone())
-                .unwrap()
-                .to_string(),
-            event_root_hash: HashValue::from_slice(info.event_root_hash.clone())
-                .unwrap()
-                .to_string(),
+            state_change_hash: HexEncodedBytes::from(info.state_change_hash.clone()).to_string(),
+            event_root_hash: HexEncodedBytes::from(info.event_root_hash.clone()).to_string(),
             state_checkpoint_hash: info
                 .state_checkpoint_hash
                 .clone()
-                .map(|hash| HashValue::from_slice(hash).unwrap().to_string()),
+                .map(|hash| HexEncodedBytes::from(hash).to_string()),
             gas_used: u64_to_bigdecimal(info.gas_used),
             success: info.success,
             vm_status: info.vm_status.clone(),
-            accumulator_root_hash: HashValue::from_slice(info.accumulator_root_hash.clone())
-                .unwrap()
+            accumulator_root_hash: HexEncodedBytes::from(info.accumulator_root_hash.clone())
                 .to_string(),
             inserted_at: chrono::Utc::now().naive_utc(),
             num_events: num_events as i64,
@@ -262,6 +257,11 @@ pub type TransactionModel = Transaction;
 pub type UserTransactionModel = UserTransaction;
 
 fn parse_proto_timestamp(ts: &Timestamp, version: u64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
-        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+    let seconds_in_10_years = chrono::offset::Utc::now().timestamp() + SECONDS_IN_10_YEARS;
+
+    chrono::NaiveDateTime::from_timestamp_opt(
+        std::cmp::min(ts.seconds, seconds_in_10_years),
+        ts.nanos as u32,
+    )
+    .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
