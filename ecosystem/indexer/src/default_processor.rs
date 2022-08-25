@@ -16,10 +16,8 @@ use crate::{
 };
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
-use diesel::Connection;
 use field_count::FieldCount;
-use futures::future::Either;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
@@ -120,7 +118,7 @@ fn insert_to_db(
     bm_txns: Vec<BlockMetadataTransactionModel>,
     events: Vec<EventModel>,
     wscs: Vec<WriteSetChangeModel>,
-) -> Result<(), Error> {
+) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         "[{}] inserting versions {} to {}",
         name,
@@ -129,7 +127,7 @@ fn insert_to_db(
     );
     conn.build_transaction()
         .read_write()
-        .run::<_, Error, _>(|| {
+        .run::<_, diesel::result::Error, _>(|| {
             insert_transactions(conn, &txns);
             insert_user_transactions(conn, &user_txns);
             insert_block_metadata_transactions(conn, &bm_txns);
