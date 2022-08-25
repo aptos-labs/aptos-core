@@ -3,12 +3,17 @@
 
 import {
   Center,
-  Grid, Icon, Text, useColorMode,
+  Grid, Icon, Text, useColorMode, Flex,
 } from '@chakra-ui/react';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { secondaryGridHoverBgColor, secondaryGridBgColor, textColor } from 'core/colors';
 import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
+import { settingsItemLabel } from 'core/constants';
+import Browser from 'core/utils/browser';
+import {
+  secondaryGridHoverBgColor,
+  textColor, secondaryAddressFontColor,
+} from 'core/colors';
 
 interface BgColorDictType {
   dark: string;
@@ -16,20 +21,26 @@ interface BgColorDictType {
 }
 
 export interface SettingsListItemProps {
-  bgColorDict?: BgColorDictType;
+  DividerComponent?: any | undefined;
+  externalLink?: string | null;
   hoverBgColorDict?: BgColorDictType;
-  icon: any | undefined;
+  iconAfter?: any | undefined;
+  iconBefore?: any | undefined;
+  network?: any;
   path: string | null;
   textColorDict?: BgColorDictType;
   title: string;
 }
 
 export default function SettingsListItem({
-  bgColorDict = secondaryGridBgColor,
   hoverBgColorDict = secondaryGridHoverBgColor,
   textColorDict = textColor,
-  icon,
+  externalLink,
+  iconAfter,
+  iconBefore,
   path,
+  network,
+  DividerComponent,
   title,
 }: SettingsListItemProps) {
   const navigate = useNavigate();
@@ -39,7 +50,7 @@ export default function SettingsListItem({
 
   const gridOnClick = async () => {
     // todo: Create an enum for these titles for more typed code
-    if (title === 'Lock wallet' && activeAccount) {
+    if (title === settingsItemLabel.LOCK_WALLET && activeAccount) {
       // todo: add toasts for removing the account
       // we should probably combine the toasts from the wallet drawer
       await lockAccounts();
@@ -53,33 +64,78 @@ export default function SettingsListItem({
     if (path) {
       navigate(path);
     }
+
+    if (externalLink) {
+      Browser.redirect(externalLink);
+    }
   };
 
+  const renderTitle = useMemo(() => {
+    if (title === settingsItemLabel.NETWORK) {
+      return (
+        <Flex gap={2}>
+          Network
+          <Text color={secondaryAddressFontColor[colorMode]}>{(network?.name)}</Text>
+        </Flex>
+      );
+    }
+
+    return title;
+  }, [network, title, colorMode]);
+
+  const templateColumns = useMemo(() => {
+    if (iconBefore && iconAfter) {
+      return '32px 1fr 32px';
+    } if (iconBefore) {
+      return '32px 1fr';
+    }
+    return '1fr 32px';
+  }, [iconBefore, iconAfter]);
+
   return (
-    <Grid
-      templateColumns="32px 1fr"
-      p={4}
-      width="100%"
-      cursor="pointer"
-      onClick={gridOnClick}
-      gap={2}
-      bgColor={bgColorDict[colorMode]}
-      borderRadius=".5rem"
-      _hover={{
-        bgColor: hoverBgColorDict[colorMode],
-      }}
-    >
-      <Center width="100%">
-        <Icon
-          fontSize="xl"
-          borderColor={textColorDict[colorMode]}
+    <>
+      <Grid
+        templateColumns={templateColumns}
+        p={4}
+        width="100%"
+        cursor="pointer"
+        onClick={gridOnClick}
+        gap={2}
+        borderRadius=".5rem"
+        _hover={{
+          bgColor: hoverBgColorDict[colorMode],
+        }}
+      >
+        {iconBefore ? (
+          <Center width="100%">
+            <Icon
+              fontSize="xl"
+              borderColor={textColorDict[colorMode]}
+              color={textColorDict[colorMode]}
+              as={iconBefore}
+            />
+          </Center>
+        ) : null}
+        <Text
           color={textColorDict[colorMode]}
-          as={icon}
-        />
-      </Center>
-      <Text color={textColorDict[colorMode]} fontWeight={600} fontSize="md">
-        {title}
-      </Text>
-    </Grid>
+          fontWeight={600}
+          fontSize="md"
+        >
+          {renderTitle}
+        </Text>
+        {iconAfter
+          ? (
+            <Center width="100%">
+              <Icon
+                fontSize="xl"
+                borderColor={textColorDict[colorMode]}
+                color={secondaryAddressFontColor[colorMode]}
+                as={iconAfter}
+              />
+            </Center>
+          ) : null}
+      </Grid>
+      {DividerComponent ? <DividerComponent /> : null}
+    </>
   );
 }

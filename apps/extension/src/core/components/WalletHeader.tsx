@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { LegacyRef, MouseEventHandler } from 'react';
+import React from 'react';
 import {
   Box,
   HStack,
@@ -15,34 +15,7 @@ import { ArrowBackIcon } from '@chakra-ui/icons';
 import { secondaryBorderColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
-import { useActiveAccount } from 'core/hooks/useAccounts';
-import AvatarImage from 'core/accountImages';
-
-interface ButtonProps {
-  onClick: MouseEventHandler<HTMLDivElement>;
-}
-
-const AccountCircle = React.forwardRef((
-  { onClick }: ButtonProps,
-  ref: LegacyRef<HTMLImageElement>,
-) => {
-  const { activeAccountAddress } = useActiveAccount();
-  return (
-    <Box
-      height="32px"
-      width="32px"
-      borderRadius="2rem"
-      cursor="pointer"
-      onClick={onClick}
-      ref={ref}
-    >
-      <AvatarImage
-        size={32}
-        address={activeAccountAddress ?? ''}
-      />
-    </Box>
-  );
-});
+import AccountCircle from 'core/components/AccountCircle';
 
 interface WalletHeaderProps {
   accessoryButton?: React.ReactNode,

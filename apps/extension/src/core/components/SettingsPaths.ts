@@ -1,13 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { BiNetworkChart } from '@react-icons/all-files/bi/BiNetworkChart';
-import { FaKey } from '@react-icons/all-files/fa/FaKey';
-import { FaKeyboard } from '@react-icons/all-files/fa/FaKeyboard';
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
-import { BiLink } from '@react-icons/all-files/bi/BiLink';
+import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
+// import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
+import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
+import { MdWifiTethering } from '@react-icons/all-files/md/MdWifiTethering';
 import Routes from 'core/routes';
-import { FaEdit } from '@react-icons/all-files/fa/FaEdit';
+import { settingsItemLabel } from 'core/constants';
+import { Divider } from '@chakra-ui/react';
 import { SettingsListItemProps } from './SettingsListItem';
 
 export const signOutSecondaryGridBgColor = {
@@ -20,51 +21,71 @@ export const signOutSecondaryGridHoverBgColor = {
   light: 'red.400',
 };
 
-export const signOutSecondaryTextColor = {
+export const secondaryGridHoverTextColor = {
   dark: 'white',
-  light: 'white',
+  light: 'black',
 };
 
 function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
   const items: SettingsListItemProps[] = [
     {
-      icon: FaEdit,
-      path: Routes.rename_account.path,
-      title: 'Change account name',
-    },
-    {
-      icon: FaKey,
-      path: Routes.credentials.path,
-      title: 'Credentials',
-    },
-    {
-      icon: BiNetworkChart,
+      iconAfter: FiChevronRight,
+      iconBefore: MdWifiTethering,
       path: Routes.network.path,
-      title: 'Network',
+      title: settingsItemLabel.NETWORK,
+    },
+    // TODO: implement later
+    // {
+    //   DividerComponent: Divider,
+    //   iconAfter: FiChevronRight,
+    //   iconBefore: BsShieldFill,
+    //   path: null,
+    //   title: 'Security and Privacy',
+    // },
+    {
+      externalLink: 'https://discord.gg/rGRFrgFT',
+      iconBefore: AiFillQuestionCircle,
+      path: null,
+      title: settingsItemLabel.HELP_SUPPORT,
     },
     {
-      icon: BiLink,
-      path: null,
-      title: 'View on Explorer',
+      DividerComponent: Divider,
+      iconBefore: FaLock,
+      path: Routes.wallet.path,
+      title: settingsItemLabel.LOCK_WALLET,
+    },
+    {
+      iconAfter: FiChevronRight,
+      path: Routes.credentials.path,
+      title: settingsItemLabel.SHOW_CREDENTIALS,
     },
   ];
 
   if (hasMnemonic) {
     items.push({
-      icon: FaKeyboard,
+      iconAfter: FiChevronRight,
       path: Routes.recovery_phrase.path,
-      title: 'Show Recovery Phrase',
+      title: settingsItemLabel.SECRET_RECOVERY_PHRASE,
     });
   }
 
-  items.push({
-    bgColorDict: signOutSecondaryGridBgColor,
-    hoverBgColorDict: signOutSecondaryGridHoverBgColor,
-    icon: FaLock,
-    path: Routes.wallet.path,
-    textColorDict: signOutSecondaryTextColor,
-    title: 'Lock wallet',
-  });
+  // TODO: implement later
+  // items = items.concat(
+  //   [
+  //     {
+  //       iconAfter: FiChevronRight,
+  //       path: null,
+  //       title: 'Switch account',
+  //     },
+  //     {
+  //       path: null,
+  //       textColorDict: {
+  //         dark: 'red.400',
+  //         light: 'red.400',
+  //       },
+  //       title: 'Remove account',
+  //     }],
+  // );
 
   return items;
 }

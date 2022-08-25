@@ -14,3 +14,11 @@ export const validStorageUris = [
   'ipfs.io',
   'arweave.net',
 ];
+
+export const settingsItemLabel = {
+  HELP_SUPPORT: 'Help & Support',
+  LOCK_WALLET: 'Lock wallet',
+  NETWORK: 'Network',
+  SECRET_RECOVERY_PHRASE: 'Show secret recovery phrase',
+  SHOW_CREDENTIALS: 'Show credentials',
+};

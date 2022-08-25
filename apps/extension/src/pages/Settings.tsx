@@ -16,6 +16,8 @@ import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
 import { secondaryTextColor } from 'core/colors';
 import { CredentialHeaderAndBodyProps } from 'core/components/CredentialsBody';
+import AccountView from 'core/components/AccountView';
+import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
 export function CredentialRow({
@@ -44,19 +46,22 @@ export function CredentialRow({
 
 function Account() {
   const { activeAccount } = useActiveAccount();
+  const { activeNetwork } = useNetworks();
   const mnemonic = activeAccount?.mnemonic;
 
   return (
     <WalletLayout title="Settings">
       <VStack width="100%" paddingTop={8} px={4} pb={4} spacing={2}>
+        <AccountView />
         {
-          SettingsPaths(mnemonic !== undefined).map((value) => (
-            <SettingsListItem
-              key={value.path}
-              {...value}
-            />
-          ))
-        }
+            SettingsPaths(mnemonic !== undefined).map((value) => (
+              <SettingsListItem
+                key={value.path}
+                network={activeNetwork}
+                {...value}
+              />
+            ))
+          }
       </VStack>
     </WalletLayout>
   );

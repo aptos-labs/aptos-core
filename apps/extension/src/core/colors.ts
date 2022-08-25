@@ -47,6 +47,11 @@ export const secondaryBgColor = {
   light: 'white',
 };
 
+export const accountViewBgColor = {
+  dark: 'gray.600',
+  light: 'gray.200',
+};
+
 export const secondaryBorderColor = {
   dark: 'whiteAlpha.200',
   light: 'blackAlpha.200',

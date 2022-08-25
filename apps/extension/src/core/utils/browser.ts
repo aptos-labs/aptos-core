@@ -27,4 +27,12 @@ export default class Browser {
     }
     return chrome.tabs;
   }
+
+  public static redirect(url: string) {
+    if (this.isDev()) {
+      window.location.assign(url);
+    } else {
+      chrome.tabs.update({ url });
+    }
+  }
 }
