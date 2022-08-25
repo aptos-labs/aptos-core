@@ -40,6 +40,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 1],
 
     [.ristretto255.point_add, "ristretto255.point_add", 1],
+    [.ristretto255.point_clone, "ristretto255.point_clone", 1],
     [.ristretto255.point_compress, "ristretto255.point_compress", 1],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 1],
     [.ristretto255.point_equals, "ristretto255.point_equals", 1],
@@ -69,7 +70,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
 
     [.bulletproofs.per_bulletproof_deserialize, ".bulletproofs.per_bulletproof_deserialize", 1],
-    [.bulletproofs.per_bulletproof_verify, "bulletproofs.per_proof_verify", 1],
+    [.bulletproofs.per_bit_bulletproof_verify, "bulletproofs.per_proof_verify", 1],
 
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],

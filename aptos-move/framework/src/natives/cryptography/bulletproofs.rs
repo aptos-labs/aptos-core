@@ -88,7 +88,7 @@ fn native_verify_single_default_ck(
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub per_bulletproof_deserialize: InternalGasPerArg,
-    pub per_bulletproof_verify: InternalGasPerArg,
+    pub per_bit_bulletproof_verify: InternalGasPerArg,
 }
 
 impl GasParameters {
@@ -116,8 +116,8 @@ impl GasParameters {
             }
         };
 
-        // TODO: cost depends on num_bits... proof size is log(num_bits) and verification time is O(num_bits) IIRC?
-        cost += self.per_bulletproof_verify * NumArgs::one();
+        // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
+        cost += self.per_bit_bulletproof_verify * NumArgs::new(bit_length as u64);
 
         let mut ver_trans = Transcript::new(APTOS_MOVE_DOMAIN_SEPARATION_TAG);
 
