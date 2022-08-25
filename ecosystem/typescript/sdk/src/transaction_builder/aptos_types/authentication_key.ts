@@ -40,7 +40,7 @@ export class AuthenticationKey {
     bytes.set([AuthenticationKey.MULTI_ED25519_SCHEME], pubKeyBytes.length);
 
     const hash = SHA3.sha3_256.create();
-    hash.update(Buffer.from(bytes));
+    hash.update(bytes);
 
     return new AuthenticationKey(new Uint8Array(hash.arrayBuffer()));
   }
