@@ -3,7 +3,6 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
 use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::PersistableConfig;
@@ -193,15 +192,7 @@ async fn test_account_balance() {
     // Send money, and expect the gas and fees to show up accordingly
     const TRANSFER_AMOUNT: u64 = 5000;
     let response = cli
-        .transfer_coins(
-            0,
-            1,
-            TRANSFER_AMOUNT,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_coins(0, 1, TRANSFER_AMOUNT, None)
         .await
         .unwrap();
     account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
@@ -215,14 +206,7 @@ async fn test_account_balance() {
 
     // Failed transaction spends gas
     let _ = cli
-        .transfer_invalid_addr(
-            0,
-            TRANSFER_AMOUNT,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_invalid_addr(0, TRANSFER_AMOUNT, None)
         .await
         .unwrap_err();
 
@@ -1068,14 +1052,7 @@ async fn test_invalid_transaction_gas_charged() {
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;
     let _ = cli
-        .transfer_invalid_addr(
-            0,
-            TRANSFER_AMOUNT,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_invalid_addr(0, TRANSFER_AMOUNT, None)
         .await
         .unwrap_err();
 

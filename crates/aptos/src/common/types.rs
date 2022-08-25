@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::prompt_yes_with_override;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
@@ -14,21 +15,25 @@ use crate::{
     config::GlobalConfig,
     genesis::git::from_yaml,
 };
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::transaction::{authenticator::AuthenticationKey, TransactionPayload};
+use aptos_types::transaction::{
+    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -40,6 +45,8 @@ use std::{
     time::Instant,
 };
 use thiserror::Error;
+
+const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -498,7 +505,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]
@@ -1034,12 +1041,8 @@ impl FaucetOptions {
     }
 }
 
-// TODO(Gas): double check if this is correct
-pub const DEFAULT_MAX_GAS: u64 = 1_000;
-pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
-
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Eq, Parser, PartialEq)]
+#[derive(Debug, Default, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -1048,8 +1051,10 @@ pub struct GasOptions {
     /// be used as a multiplier for the amount of coins willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
-    #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
-    pub gas_unit_price: u64,
+    ///
+    /// Without a value, it will determine the price based on the current estimated price
+    #[clap(long)]
+    pub gas_unit_price: Option<u64>,
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
@@ -1059,17 +1064,10 @@ pub struct GasOptions {
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
     /// a maximum price of 100 coins.
-    #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
-    pub max_gas: u64,
-}
-
-impl Default for GasOptions {
-    fn default() -> Self {
-        GasOptions {
-            gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas: DEFAULT_MAX_GAS,
-        }
-    }
+    ///
+    /// Without a value, it will determine the price based on simulating the current transaction
+    #[clap(long)]
+    pub max_gas: Option<u64>,
 }
 
 /// Common options for interacting with an account for a validator
@@ -1085,6 +1083,8 @@ pub struct TransactionOptions {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) gas_options: GasOptions,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
 }
 
 impl TransactionOptions {
@@ -1129,10 +1129,42 @@ impl TransactionOptions {
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
 
+        // Ask to confirm price if the gas unit price is estimated above the lowest value when
+        // it is automatically estimated
+        let ask_to_confirm_price;
+        let gas_unit_price = if let Some(gas_unit_price) = self.gas_options.gas_unit_price {
+            ask_to_confirm_price = false;
+            gas_unit_price
+        } else {
+            let gas_unit_price = client.estimate_gas_price().await?.into_inner().gas_estimate;
+
+            ask_to_confirm_price = gas_unit_price > 1;
+            gas_unit_price
+        };
+
+        let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
+            max_gas
+        } else {
+            let simulated_txn = self
+                .simulate_transaction(payload.clone(), Some(gas_unit_price))
+                .await?;
+            if !simulated_txn.info.success {
+                return Err(CliError::ApiError(format!(
+                    "Simulated transaction failed with status {}",
+                    simulated_txn.info.vm_status
+                )));
+            }
+            simulated_txn.info.gas_used.0
+        };
+
+        if ask_to_confirm_price {
+            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
+        }
+
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-            .with_gas_unit_price(self.gas_options.gas_unit_price)
-            .with_max_gas_amount(self.gas_options.max_gas);
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
@@ -1142,6 +1174,70 @@ impl TransactionOptions {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
 
         Ok(response.into_inner())
+    }
+
+    pub async fn simulate_transaction(
+        &self,
+        payload: TransactionPayload,
+        gas_price: Option<u64>,
+    ) -> CliTypedResult<UserTransaction> {
+        let sender_key = self.private_key()?;
+        let client = self.rest_client()?;
+
+        // Get sender address
+        let sender_address = self.sender_address()?;
+
+        // Get sequence number for account
+        let sequence_number = get_sequence_number(&client, sender_address).await?;
+
+        // Estimate gas price if necessary
+        let gas_price = if let Some(gas_price) = gas_price {
+            gas_price
+        } else {
+            self.estimate_gas_price().await?
+        };
+        // Simulate transaction
+        // To get my known possible max gas, I need to get my current balance
+        let account_balance = client
+            .get_account_balance(sender_address)
+            .await?
+            .into_inner()
+            .coin
+            .value
+            .0;
+        let max_possible_gas = std::cmp::min(account_balance / gas_price, MAX_POSSIBLE_GAS_UNITS);
+
+        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+            .with_gas_unit_price(gas_price)
+            .with_max_gas_amount(max_possible_gas);
+
+        let unsigned_transaction = transaction_factory
+            .payload(payload)
+            .sender(sender_address)
+            .sequence_number(sequence_number)
+            .build();
+
+        let signed_transaction = SignedTransaction::new(
+            unsigned_transaction,
+            sender_key.public_key(),
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+        );
+        let txns = client.simulate(&signed_transaction).await?.into_inner();
+        Ok(txns.first().unwrap().clone())
+    }
+
+    pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
+        let client = self.rest_client()?;
+        client
+            .estimate_gas_price()
+            .await
+            .map(|inner| inner.into_inner().gas_estimate)
+            .map_err(|err| {
+                CliError::UnexpectedError(format!(
+                    "Failed to retrieve gas price estimate {:?}",
+                    err
+                ))
+            })
     }
 }
 

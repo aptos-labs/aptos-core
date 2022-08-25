@@ -3,7 +3,6 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::account::create::DEFAULT_FUNDED_COINS;
-use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
 use aptos_keygen::KeyGen;
 
 #[tokio::test]
@@ -20,15 +19,7 @@ async fn test_account_flow() {
 
     let transfer_amount = 100;
     let response = cli
-        .transfer_coins(
-            0,
-            1,
-            transfer_amount,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_coins(0, 1, transfer_amount, None)
         .await
         .unwrap();
     let expected_sender_amount =
