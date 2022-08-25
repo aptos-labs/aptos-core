@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::schema::metadatas;
+use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize, Clone)]
+#[derive(
+    Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize, Clone,
+)]
 #[diesel(table_name = "metadata")]
 #[primary_key(token_id)]
 pub struct Metadata {
