@@ -4,9 +4,10 @@
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
 use bigdecimal::{BigDecimal, FromPrimitive};
+use field_count::FieldCount;
 use serde::Serialize;
 
-#[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(table_name = "events")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(key, sequence_number)]
