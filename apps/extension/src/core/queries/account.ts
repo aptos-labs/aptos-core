@@ -163,9 +163,9 @@ export function useAccountStakeBalance(
   );
 }
 
-interface StakeInfo {
+export interface StakeInfo {
   delegatedVoter: MaybeHexString;
-  locked_until_secs: string;
+  lockedUntilSecs: string;
   operatorAddress: MaybeHexString;
   value: number;
 }
@@ -187,7 +187,7 @@ export function useAccountStakeInfo(
     async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
       .then((res: any) => ({
         delegatedVoter: res.data.delegated_voter,
-        locked_until_secs: res.data.locked_until_secs,
+        lockedUntilSecs: res.data.locked_until_secs,
         operatorAddress: res.data.operator_address,
         value: Number(res.data.active.value),
       }))

@@ -82,7 +82,7 @@ function Wallet() {
         </Flex>
         <ChakraLink width="100%" to={Routes.stake.path}>
           <Button
-            py={12}
+            py={10}
             width="100%"
             rightIcon={<ChevronRightIcon />}
             justifyContent="space-between"

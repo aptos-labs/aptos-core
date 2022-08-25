@@ -14,6 +14,7 @@ function WalletAccountStake() {
   const { colorMode } = useColorMode();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { activeAccountAddress } = useActiveAccount();
+  // TODO: switch address to activeAccountAddress
   const {
     data: stakeBalance,
     isLoading,

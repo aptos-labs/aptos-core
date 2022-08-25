@@ -11,7 +11,7 @@ import StakeBody from 'core/components/StakeBody';
 function Stake() {
   return (
     <WalletLayout title="Stake">
-      <VStack width="100%" paddingTop={8} px={4}>
+      <VStack width="100%" px={4}>
         <StakeBody />
       </VStack>
     </WalletLayout>
