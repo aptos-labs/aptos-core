@@ -40,6 +40,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135],
+    [.ristretto255.point_clone, "ristretto255.point_clone", 150],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300],
