@@ -130,6 +130,7 @@ module aptos_token::token_transfers {
 
         let creator_addr = signer::address_of(&creator);
         let owner_addr = signer::address_of(&owner);
+        aptos_framework::account::create_account_for_test(owner_addr);
         offer(&creator, owner_addr, token_id, 1);
         claim(&owner, creator_addr, token_id);
 
@@ -147,7 +148,9 @@ module aptos_token::token_transfers {
 
         let creator_addr = signer::address_of(&creator);
         let owner0_addr = signer::address_of(&owner0);
+        aptos_framework::account::create_account_for_test(owner0_addr);
         let owner1_addr = signer::address_of(&owner1);
+        aptos_framework::account::create_account_for_test(owner1_addr);
 
         offer(&creator, owner0_addr, token_id, 1);
         assert!(table_with_length::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
@@ -172,6 +175,7 @@ module aptos_token::token_transfers {
 
         let collection_name = string::utf8(b"Hello, World");
         let collection_mutation_setting = vector<bool>[false, false, false];
+        aptos_framework::account::create_account_for_test(signer::address_of(creator));
 
         token::create_collection(
             creator,

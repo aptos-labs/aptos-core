@@ -1,11 +1,12 @@
 /// This module provides the foundation for Tokens.
 module aptos_token::token {
-    use std::string::String;
     use std::error;
-    use aptos_std::event::{Self, EventHandle};
     use std::signer;
+    use std::string::String;
     use std::vector;
 
+    use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
     friend aptos_token::bid;
@@ -449,10 +450,10 @@ module aptos_token::token {
                 TokenStore {
                     tokens: table::new(),
                     direct_transfer: false,
-                    deposit_events: event::new_event_handle<DepositEvent>(account),
-                    withdraw_events: event::new_event_handle<WithdrawEvent>(account),
-                    burn_events: event::new_event_handle<BurnTokenEvent>(account),
-                    mutate_token_property_events: event::new_event_handle<MutateTokenPropertyMapEvent>(account),
+                    deposit_events: account::new_event_handle<DepositEvent>(account),
+                    withdraw_events: account::new_event_handle<WithdrawEvent>(account),
+                    burn_events: account::new_event_handle<BurnTokenEvent>(account),
+                    mutate_token_property_events: account::new_event_handle<MutateTokenPropertyMapEvent>(account),
                 },
             );
         }
@@ -555,9 +556,9 @@ module aptos_token::token {
                 Collections{
                     collection_data: table::new(),
                     token_data: table::new(),
-                    create_collection_events: event::new_event_handle<CreateCollectionEvent>(creator),
-                    create_token_data_events: event::new_event_handle<CreateTokenDataEvent>(creator),
-                    mint_token_events: event::new_event_handle<MintTokenEvent>(creator),
+                    create_collection_events: account::new_event_handle<CreateCollectionEvent>(creator),
+                    create_token_data_events: account::new_event_handle<CreateTokenDataEvent>(creator),
+                    mint_token_events: account::new_event_handle<MintTokenEvent>(creator),
                 },
             )
         };
@@ -891,11 +892,16 @@ module aptos_token::token {
 
     // ****************** TEST-ONLY FUNCTIONS **************
 
+    #[test_only]
+    use std::string;
+
     #[test(creator = @0x1, owner = @0x2)]
     public fun create_withdraw_deposit_token(
         creator: signer,
         owner: signer
     ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(&creator));
+        account::create_account_for_test(signer::address_of(&owner));
         let token_id = create_collection_and_token(&creator, 1, 1, 1);
 
         let token = withdraw_token(&creator, token_id, 1);
@@ -907,6 +913,8 @@ module aptos_token::token {
         creator: signer,
         owner: signer
     ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(&creator));
+        account::create_account_for_test(signer::address_of(&owner));
         let token_id = create_collection_and_token(&creator, 2, 5, 5);
 
         let token_0 = withdraw_token(&creator, token_id, 1);
@@ -920,7 +928,7 @@ module aptos_token::token {
     #[test(creator = @0x1)]
     #[expected_failure] // (abort_code = 5)]
     public entry fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
-        use std::string;
+        account::create_account_for_test(signer::address_of(&creator));
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
         let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ b"10", b"5" ];
@@ -950,6 +958,8 @@ module aptos_token::token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(&creator));
+        account::create_account_for_test(signer::address_of(&owner));
         let token_id = create_collection_and_token(&creator, 2, 2, 2);
         direct_transfer(&creator, &owner, token_id, 1);
         let token = withdraw_token(&owner, token_id, 1);
@@ -1012,6 +1022,7 @@ module aptos_token::token {
 
     #[test(creator = @0xFF)]
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(&creator));
         create_collection_and_token(&creator, 1, 2, 1);
         let collections = borrow_global<Collections>(signer::address_of(&creator));
         assert!(event::counter(&collections.create_collection_events) == 1, 1);
@@ -1019,6 +1030,8 @@ module aptos_token::token {
 
     #[test(creator = @0xAF)]
     fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
         create_collection_and_token(creator, 2, 4, 4);
         let token_data_id = create_token_data_id(
             signer::address_of(creator),
@@ -1033,9 +1046,12 @@ module aptos_token::token {
 
         assert!(balance_of(signer::address_of(creator), token_id) == 3, 1);
     }
+
     #[test(creator = @0xAF, owner = @0xBB)]
     fun test_mutate_token_property(creator: &signer, owner: &signer) acquires Collections, TokenStore {
-        use std::string;
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);
@@ -1102,7 +1118,8 @@ module aptos_token::token {
     #[test(creator = @0xAF, owner = @0xBB)]
     #[expected_failure(abort_code = 3)]
     fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
-        use std::string;
+        account::create_account_for_test(signer::address_of(creator));
+
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, 2, 4, 4);
         assert!(token_id.property_version == 0, 1);

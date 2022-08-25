@@ -190,7 +190,7 @@ mod tests {
         }
         if let Some(entry_function) = EntryFunctionCall::decode(txn.payload()) {
             match entry_function {
-                EntryFunctionCall::AccountCreateAccount {
+                EntryFunctionCall::AptosAccountCreateAccount {
                     auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();

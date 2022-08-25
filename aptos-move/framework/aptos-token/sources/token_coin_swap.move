@@ -3,13 +3,14 @@
 /// 2. List token for swapping with a targeted CoinType.
 /// 3. Execute the swapping
 module aptos_token::token_coin_swap {
-    use aptos_std::event::{Self, EventHandle};
     use std::signer;
     use std::string::String;
     use aptos_std::table::{Self, Table};
-    use aptos_framework::coin;
-    use aptos_framework::timestamp;
     use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::account;
+    use aptos_framework::coin;
+    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::timestamp;
     use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;
@@ -177,8 +178,8 @@ module aptos_token::token_coin_swap {
         if ( !exists<TokenListings<CoinType>>(addr) ) {
             let token_listing = TokenListings<CoinType>{
                 listings: table::new<TokenId, TokenCoinSwap<CoinType>>(),
-                listing_events: event::new_event_handle<TokenListingEvent>(token_owner),
-                swap_events: event::new_event_handle<TokenSwapEvent>(token_owner),
+                listing_events: account::new_event_handle<TokenListingEvent>(token_owner),
+                swap_events: account::new_event_handle<TokenSwapEvent>(token_owner),
 
             };
             move_to(token_owner, token_listing);
@@ -258,7 +259,9 @@ module aptos_token::token_coin_swap {
     public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, aptos_framework: signer) acquires TokenStoreEscrow, TokenListings {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(10000000);
+        aptos_framework::account::create_account_for_test(signer::address_of(&token_owner));
         let token_id = token::create_collection_and_token(&token_owner, 100, 100, 100);
+        aptos_framework::account::create_account_for_test(signer::address_of(&coin_owner));
         token::initialize_token_store(&coin_owner);
         coin::create_fake_money(&coin_owner, &token_owner, 100);
 

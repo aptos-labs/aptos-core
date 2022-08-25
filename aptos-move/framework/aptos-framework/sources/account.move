@@ -5,26 +5,25 @@ module aptos_framework::account {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
-    use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info::{Self, TypeInfo};
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::chain_id;
-    use aptos_framework::coin;
     use aptos_framework::byte_conversions;
+    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::guid;
     use aptos_framework::system_addresses;
-    use aptos_framework::timestamp;
-    use aptos_framework::transaction_fee;
     use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
 
-    friend aptos_framework::coins;
+    friend aptos_framework::aptos_account;
+    friend aptos_framework::coin;
     friend aptos_framework::genesis;
     friend aptos_framework::resource_account;
+    friend aptos_framework::transaction_validation;
 
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
+        guid_creation_num: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
         rotation_capability_offer: CapabilityOffer<RotationCapability>,
         signer_capability_offer: CapabilityOffer<SignerCapability>,
@@ -32,17 +31,6 @@ module aptos_framework::account {
 
     struct CoinRegisterEvent has drop, store {
         type_info: TypeInfo,
-    }
-
-    /// This holds information that will be picked up by the VM to call the
-    /// correct chain-specific prologue and epilogue functions
-    struct ChainSpecificAccountInfo has key {
-        module_addr: address,
-        module_name: vector<u8>,
-        script_prologue_name: vector<u8>,
-        module_prologue_name: vector<u8>,
-        multi_agent_prologue_name: vector<u8>,
-        user_epilogue_name: vector<u8>,
     }
 
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
@@ -95,40 +83,11 @@ module aptos_framework::account {
     ///
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
 
-    /// Prologue errors. These are separated out from the other errors in this
-    /// module since they are mapped separately to major VM statuses, and are
-    /// important to the semantics of the system.
-    const PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY: u64 = 1001;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
-    const PROLOGUE_EACCOUNT_DOES_NOT_EXIST: u64 = 1004;
-    const PROLOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
-    const PROLOGUE_ETRANSACTION_EXPIRED: u64 = 1006;
-    const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
-    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
-
     native fun create_signer(addr: address): signer;
 
     /// Only called during genesis to initialize system resources for this module.
-    public(friend) fun initialize(
-        aptos_framework: &signer,
-        script_prologue_name: vector<u8>,
-        module_prologue_name: vector<u8>,
-        multi_agent_prologue_name: vector<u8>,
-        user_epilogue_name: vector<u8>,
-    ) {
+    public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-
-        move_to(aptos_framework, ChainSpecificAccountInfo {
-            module_addr: @aptos_framework,
-            module_name: b"account",
-            script_prologue_name,
-            module_prologue_name,
-            multi_agent_prologue_name,
-            user_epilogue_name,
-        });
-
         move_to(aptos_framework, OriginatingAddress {
             address_map: table::new(),
         });
@@ -137,7 +96,7 @@ module aptos_framework::account {
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
     /// is returned. This way, the caller of this function can publish additional resources under
     /// `new_address`.
-    public(friend) fun create_account_internal(new_address: address): signer {
+    public(friend) fun create_account(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
         assert!(
@@ -148,19 +107,30 @@ module aptos_framework::account {
         create_account_unchecked(new_address)
     }
 
+    #[test_only]
+    public fun create_account_for_test(new_address: address): signer {
+        create_account_unchecked(new_address)
+    }
+
     fun create_account_unchecked(new_address: address): signer {
         let new_account = create_signer(new_address);
-        let authentication_key = bcs::to_bytes(&new_address);
+        let authentication_key = byte_conversions::from_address(&new_address);
         assert!(
             vector::length(&authentication_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
+
+        let guid_creation_num = 0;
+        let guid = guid::create(new_address, &mut guid_creation_num);
+        let coin_register_events = event::new_event_handle<CoinRegisterEvent>(guid);
+
         move_to(
             &new_account,
             Account {
                 authentication_key,
                 sequence_number: 0,
-                coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
+                guid_creation_num,
+                coin_register_events,
                 rotation_capability_offer: CapabilityOffer { for: option::none() },
                 signer_capability_offer: CapabilityOffer { for: option::none() },
             }
@@ -173,8 +143,24 @@ module aptos_framework::account {
         exists<Account>(addr)
     }
 
+    public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
+        borrow_global<Account>(addr).guid_creation_num
+    }
+
     public fun get_sequence_number(addr: address) : u64 acquires Account {
         borrow_global<Account>(addr).sequence_number
+    }
+
+    public(friend) fun increment_sequence_number(addr: address) acquires Account {
+        let account_resource = borrow_global_mut<Account>(addr);
+        let old_sequence_number = account_resource.sequence_number;
+
+        assert!(
+            (old_sequence_number as u128) < MAX_U64,
+            error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)
+        );
+
+        account_resource.sequence_number = old_sequence_number + 1;
     }
 
     public fun get_authentication_key(addr: address) : vector<u8> acquires Account {
@@ -262,7 +248,12 @@ module aptos_framework::account {
     /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
     /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
     /// The recipient address refers to the address that the account owner wants to give the rotation capability to.
-    public entry fun offer_rotation_capability_ed25519(account: &signer, rotation_capability_sig_bytes: vector<u8>, account_public_key_bytes: vector<u8>, recipient_address: address) acquires Account {
+    public entry fun offer_rotation_capability_ed25519(
+        account: &signer,
+        rotation_capability_sig_bytes: vector<u8>,
+        account_public_key_bytes: vector<u8>,
+        recipient_address: address,
+    ) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr) && exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
@@ -274,11 +265,13 @@ module aptos_framework::account {
         assert!(verify_authentication_key_matches_ed25519_public_key(account_resource.authentication_key, account_public_key_bytes), EWRONG_CURRENT_PUBLIC_KEY);
 
         //  Construct a RotationCapabilityOfferProofChallenge struct
+        std::debug::print(account_resource);
         let rotation_capability_offer_proof_challenge = RotationCapabilityOfferProofChallenge {
             sequence_number: account_resource.sequence_number,
             recipient_address,
         };
 
+        std::debug::print(&account_resource.sequence_number);
         // Verify a digital-signature-based capability that assures us this rotation capability offer was intended by the account owner
         assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, rotation_capability_offer_proof_challenge), EINVALID_PROOF_OF_KNOWLEDGE);
 
@@ -305,162 +298,9 @@ module aptos_framework::account {
         rotation_capability
     }
 
-    fun prologue_common(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_authentication_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) acquires Account {
-        assert!(
-            timestamp::now_seconds() < txn_expiration_time,
-            error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
-        );
-        let transaction_sender = signer::address_of(&sender);
-        assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
-        assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-        let sender_account = borrow_global<Account>(transaction_sender);
-        assert!(
-            txn_authentication_key == *&sender_account.authentication_key,
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        );
-        assert!(
-            (txn_sequence_number as u128) < MAX_U64,
-            error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
-        );
-
-        assert!(
-            txn_sequence_number >= sender_account.sequence_number,
-            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
-        );
-
-        // [PCA12]: Check that the transaction's sequence number matches the
-        // current sequence number. Otherwise sequence number is too new by [PCA11].
-        assert!(
-            txn_sequence_number == sender_account.sequence_number,
-            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-        );
-        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(
-            coin::is_account_registered<AptosCoin>(transaction_sender),
-            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
-        let balance = coin::balance<AptosCoin>(transaction_sender);
-        assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Prologues and epilogues
-    ///////////////////////////////////////////////////////////////////////////
-    fun module_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) acquires Account {
-        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
-    }
-
-    fun script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        _script_hash: vector<u8>,
-    ) acquires Account {
-        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
-    }
-
-    fun multi_agent_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) acquires Account {
-        prologue_common(sender, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
-
-        let num_secondary_signers = vector::length(&secondary_signer_addresses);
-
-        assert!(
-            vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,
-            error::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
-        );
-
-        let i = 0;
-        while (i < num_secondary_signers) {
-            let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
-            assert!(exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-
-            let signer_account = borrow_global<Account>(secondary_address);
-            let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
-            assert!(
-                signer_public_key_hash == *&signer_account.authentication_key,
-                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-            );
-            i = i + 1;
-        }
-    }
-
-    /// Epilogue function is run after a transaction is successfully executed.
-    /// Called by the Adapter
-    fun epilogue(
-        account: signer,
-        _txn_sequence_number: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64
-    ) acquires Account {
-        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
-        let gas_used = txn_max_gas_units - gas_units_remaining;
-
-        assert!(
-            (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
-            error::out_of_range(EOUT_OF_GAS)
-        );
-        let transaction_fee_amount = txn_gas_price * gas_used;
-        let addr = signer::address_of(&account);
-        // it's important to maintain the error code consistent with vm
-        // to do failed transaction cleanup.
-        assert!(
-            coin::balance<AptosCoin>(addr) >= transaction_fee_amount,
-            error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
-        transaction_fee::burn_fee(addr, transaction_fee_amount);
-
-        let old_sequence_number = get_sequence_number(addr);
-
-        assert!(
-            (old_sequence_number as u128) < MAX_U64,
-            error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)
-        );
-
-        // Increment sequence number
-        let account_resource = borrow_global_mut<Account>(addr);
-        account_resource.sequence_number = old_sequence_number + 1;
-    }
-
     ///////////////////////////////////////////////////////////////////////////
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
-
-    public entry fun create_account(auth_key: address) acquires Account {
-        let signer = create_account_internal(auth_key);
-        coin::register<AptosCoin>(&signer);
-        register_coin<AptosCoin>(auth_key);
-    }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
@@ -468,7 +308,7 @@ module aptos_framework::account {
         vector::append(&mut bytes, seed);
         let addr = byte_conversions::to_address(hash::sha3_256(bytes));
 
-        let signer = create_account_internal(copy addr);
+        let signer = create_account_unchecked(copy addr);
         let signer_cap = SignerCapability { account: addr };
         (signer, signer_cap)
     }
@@ -493,11 +333,22 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
-    public entry fun transfer(source: &signer, to: address, amount: u64) acquires Account {
-        if(!exists<Account>(to)) {
-            create_account(to)
-        };
-        coin::transfer<AptosCoin>(source, to, amount)
+    ///////////////////////////////////////////////////////////////////////////
+    /// GUID management methods.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
+        let addr = signer::address_of(account_signer);
+        let account = borrow_global_mut<Account>(addr);
+        guid::create(addr, &mut account.guid_creation_num)
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// GUID management methods.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> acquires Account {
+        event::new_event_handle(create_guid(account))
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -527,7 +378,6 @@ module aptos_framework::account {
     public entry fun test_create_resource_account(user: signer) {
         let (resource_account, _) = create_resource_account(&user, x"01");
         assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
-        coin::register<AptosCoin>(&resource_account);
     }
 
     #[test_only]
@@ -540,7 +390,6 @@ module aptos_framework::account {
 
         let resource_account_from_cap = create_signer_with_capability(&signer_cap);
         assert!(&resource_account == &resource_account_from_cap, 1);
-        coin::register<AptosCoin>(&resource_account_from_cap);
 
         move_to(&resource_account_from_cap, DummyResource { });
         borrow_global<DummyResource>(signer::address_of(&resource_account));
@@ -552,7 +401,7 @@ module aptos_framework::account {
 
     #[test_only]
     /// Increment sequence number of account at address `addr`
-    public fun increment_sequence_number(
+    public fun increment_sequence_number_for_test(
         addr: address,
     ) acquires Account {
         let acct = borrow_global_mut<Account>(addr);
@@ -581,7 +430,7 @@ module aptos_framework::account {
         create_account(addr); // Initialize account resource
         // Assert sequence number intializes to 0
         assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
-        increment_sequence_number(addr); // Increment sequence number
+        increment_sequence_number_for_test(addr); // Increment sequence number
         // Assert correct mock value post-increment
         assert!(borrow_global<Account>(addr).sequence_number == 1, 1);
         set_sequence_number(addr, 10); // Set mock sequence number
@@ -592,26 +441,6 @@ module aptos_framework::account {
     ///////////////////////////////////////////////////////////////////////////
     // Test account helpers
     ///////////////////////////////////////////////////////////////////////////
-
-    #[test(alice = @0xa11ce, core = @0x1)]
-    public fun test_transfer(alice: signer, core: signer) acquires Account {
-        let bob = byte_conversions::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
-        let carol = byte_conversions::to_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
-
-        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
-        create_account(signer::address_of(&alice));
-        coin::deposit(signer::address_of(&alice), coin::mint(10000, &mint_cap));
-        transfer(&alice, bob, 500);
-        assert!(coin::balance<AptosCoin>(bob) == 500, 0);
-        transfer(&alice, carol, 500);
-        assert!(coin::balance<AptosCoin>(carol) == 500, 1);
-        transfer(&alice, carol, 1500);
-        assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
-
-        coin::destroy_burn_cap(burn_cap);
-        coin::destroy_mint_cap(mint_cap);
-        let _bob = bob;
-    }
 
     #[test(alice = @0xa11ce)]
     #[expected_failure(abort_code = 65537)]
@@ -647,13 +476,13 @@ module aptos_framework::account {
 
     #[test(bob = @0x345)]
     public entry fun test_valid_accept_rotation_capability(bob: signer) acquires Account {
-        let pk_with_scheme = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        let pk_with_scheme = copy pk;
         vector::push_back(&mut pk_with_scheme, 0);
         let alice_address = byte_conversions::to_address(hash::sha3_256(pk_with_scheme));
         let alice = create_account_unchecked(alice_address);
         create_account(signer::address_of(&bob));
 
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let valid_signature = x"68f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
         offer_rotation_capability_ed25519(&alice, valid_signature, pk, signer::address_of(&bob));
 
@@ -667,14 +496,14 @@ module aptos_framework::account {
     #[test(bob = @0x345, charlie=@0x567)]
     #[expected_failure(abort_code = 10)]
     public entry fun test_invalid_accept_rotation_capability(bob: signer, charlie: signer) acquires Account {
-        let pk_with_scheme = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        let pk_with_scheme = copy pk;
         vector::push_back(&mut pk_with_scheme, 0);
         let alice_address = byte_conversions::to_address(hash::sha3_256(pk_with_scheme));
         let alice = create_account_unchecked(alice_address);
         create_account(signer::address_of(&bob));
         create_account(signer::address_of(&charlie));
 
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let valid_signature = x"68f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
         offer_rotation_capability_ed25519(&alice, valid_signature, pk, signer::address_of(&bob));
 
