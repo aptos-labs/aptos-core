@@ -90,8 +90,17 @@ pub struct EmitArgs {
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
 
-    #[clap(long, arg_enum, default_value = "p2p", ignore_case = true)]
-    pub transaction_type: TransactionType,
+    #[clap(
+        long,
+        arg_enum,
+        default_value = "p2p",
+        min_values = 1,
+        ignore_case = true
+    )]
+    pub transaction_type: Vec<TransactionType>,
+
+    #[clap(long, min_values = 0)]
+    pub transaction_type_weights: Vec<usize>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
