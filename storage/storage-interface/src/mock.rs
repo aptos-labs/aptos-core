@@ -58,7 +58,8 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource = AccountResource::new(0, vec![], EventHandle::random(0));
+    let account_resource =
+        AccountResource::new(0, vec![], EventHandle::random(0), EventHandle::random(0));
 
     AccountState::new(
         AccountAddress::random(),
