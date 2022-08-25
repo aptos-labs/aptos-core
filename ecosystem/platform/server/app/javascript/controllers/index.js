@@ -13,6 +13,9 @@ application.register("dialog", DialogController)
 import HeaderController from "./header_controller"
 application.register("header", HeaderController)
 
+import ProjectImagesController from "./project_images_controller"
+application.register("project-images", ProjectImagesController)
+
 import RecaptchaController from "./recaptcha_controller"
 application.register("recaptcha", RecaptchaController)
 
