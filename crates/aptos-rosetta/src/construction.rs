@@ -219,6 +219,8 @@ async fn construction_hash(
     })
 }
 
+const MAX_GAS_UNITS_PER_REQUEST: u64 = 1_000_000;
+
 /// Construction metadata command
 ///
 /// Retrieve sequence number for submitting transactions
@@ -262,9 +264,19 @@ async fn construction_metadata(
     let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
         max_gas.0
     } else {
+        let account_balance = rest_client
+            .get_account_balance(address)
+            .await
+            .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
+            .into_inner();
+
+        let maximum_possible_gas = std::cmp::min(
+            account_balance.coin.value.0 / gas_price_per_unit,
+            MAX_GAS_UNITS_PER_REQUEST,
+        );
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(gas_price_per_unit)
-            .with_max_gas_amount(1_000_000);
+            .with_max_gas_amount(maximum_possible_gas);
 
         let (txn_payload, sender) = request.options.internal_operation.payload()?;
         let unsigned_transaction = transaction_factory

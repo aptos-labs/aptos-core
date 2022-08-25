@@ -302,9 +302,9 @@ async fn test_block() {
     let account_id_3 = cli.account_id(3);
 
     cli.fund_account(0, Some(10000000)).await.unwrap();
-    cli.fund_account(1, Some(10000000)).await.unwrap();
-    cli.fund_account(2, Some(10000000)).await.unwrap();
-    cli.fund_account(3, Some(10000000)).await.unwrap();
+    cli.fund_account(1, Some(650000)).await.unwrap();
+    cli.fund_account(2, Some(50000)).await.unwrap();
+    cli.fund_account(3, Some(20000)).await.unwrap();
 
     let private_key_0 = cli.private_key(0);
     let private_key_1 = cli.private_key(1);
@@ -319,7 +319,7 @@ async fn test_block() {
         account_id_1,
         20,
         Duration::from_secs(5),
-        None,
+        Some(0),
         None,
         None,
     )
@@ -380,8 +380,8 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         None,
-        None,
-        None,
+        Some(20000),
+        Some(1),
     )
     .await
     .unwrap()
