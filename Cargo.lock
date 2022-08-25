@@ -644,6 +644,7 @@ dependencies = [
 name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
+ "aptos-types",
  "framework",
  "gas-algebra-ext",
  "move-binary-format",

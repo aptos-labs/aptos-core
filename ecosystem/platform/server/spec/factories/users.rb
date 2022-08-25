@@ -8,6 +8,7 @@ FactoryBot.define do
     username { Faker::Internet.username(specifier: 3..20, separators: %w[- _]) }
     password { Faker::Internet.password }
     email { Faker::Internet.email }
+    bio { Faker::Lorem.paragraph }
     confirmed_at { Date.new }
 
     factory :admin_user do

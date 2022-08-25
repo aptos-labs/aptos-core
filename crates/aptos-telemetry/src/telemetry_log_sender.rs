@@ -59,7 +59,7 @@ impl TelemetryLogSender {
         match log {
             TelemetryLog::Log(log) => {
                 if let Some(batch) = self.add_to_batch(log) {
-                    self.sender.send_logs(batch).await;
+                    self.sender.try_send_logs(batch).await;
                 }
             }
             TelemetryLog::Flush(tx) => {
@@ -72,11 +72,12 @@ impl TelemetryLogSender {
     pub async fn flush_batch(&mut self) {
         if !self.batch.is_empty() {
             let drained = self.drain_batch();
-            self.sender.send_logs(drained).await;
+            self.sender.try_send_logs(drained).await;
         }
     }
 
     pub async fn start(mut self, mut rx: mpsc::Receiver<TelemetryLog>) {
+        debug!("Started Telemetry Log Sender");
         let mut interval = IntervalStream::new(interval(MAX_BATCH_TIME)).fuse();
 
         loop {

@@ -15,8 +15,8 @@ use crate::{
     },
     tests::utils::{create_ledger_info, initialize_logger},
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
 use claim::assert_ok;
+use futures::channel::mpsc;
 use futures::{executor::block_on, FutureExt, StreamExt};
 use std::thread::JoinHandle;
 
@@ -284,12 +284,8 @@ fn spawn_service_and_respond_with_error(
 }
 
 /// Creates and returns a new data stream sender and listener pair.
-fn new_data_stream_sender_listener() -> (
-    channel::aptos_channel::Sender<(), DataNotification>,
-    DataStreamListener,
-) {
-    let (notification_sender, notification_receiver) =
-        aptos_channel::new(QueueStyle::KLAST, 1, None);
+fn new_data_stream_sender_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {
+    let (notification_sender, notification_receiver) = mpsc::channel(100);
     let data_stream_listener = DataStreamListener::new(0, notification_receiver);
 
     (notification_sender, data_stream_listener)

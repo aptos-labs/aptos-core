@@ -17,6 +17,9 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'view all projects' do
+    3.times do
+      FactoryBot.create(:project, user: FactoryBot.create(:user))
+    end
     sign_out @user
     get projects_path
     assert_response :success

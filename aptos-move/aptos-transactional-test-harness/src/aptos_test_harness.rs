@@ -947,5 +947,7 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: remove once bundles removed
+    aptos_vm::aptos_vm::allow_module_bundle_for_test();
     run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

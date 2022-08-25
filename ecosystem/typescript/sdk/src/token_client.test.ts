@@ -65,7 +65,7 @@ test(
 
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
-    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
     const tokenData = await tokenClient.getTokenData(alice.address().hex(), collectionName, tokenName);
     expect(tokenData.name).toBe(tokenName);
@@ -73,26 +73,26 @@ test(
     await ensureTxnSuccess(
       tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
     await ensureTxnSuccess(
       tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
     await ensureTxnSuccess(
       tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
     await ensureTxnSuccess(
       tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),
     );
 
-    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,

@@ -1,4 +1,5 @@
 # TODO(rustielin): make option to specify node config for each validator/fullnode
+{{- if not .Values.overrideNodeConfig }}
 {{- range $i, $e := until (int .Values.numValidators) }}
 ---
 # make the validator index available in tpl using $.Values.i 
@@ -11,4 +12,5 @@ metadata:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
 data:
 {{ tpl ($.Files.Glob "files/configs/*.yaml").AsConfig $ | indent 2 }}
+{{- end }}
 {{- end }}

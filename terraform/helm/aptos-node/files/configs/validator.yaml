@@ -2,6 +2,7 @@ base:
   role: validator
   waypoint:
     from_file: /opt/aptos/genesis/waypoint.txt
+{{- if $.Values.validator.config.base -}}{{- toYaml $.Values.validator.config.base | nindent 4 -}}{{- end }}
 
 consensus:
   safety_rules:
@@ -16,44 +17,23 @@ consensus:
         waypoint:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
-  sync_only: {{ $.Values.validator.config.sync_only | default false}}
-  {{- if $.Values.validator.config.round_initial_timeout_ms }}
-  round_initial_timeout_ms: {{ $.Values.validator.config.round_initial_timeout_ms }}
-  {{- end }}
-  {{- if $.Values.validator.config.max_block_size }}
-  max_block_size: {{ $.Values.validator.config.max_block_size}}
-  {{- end }}
-  {{- if $.Values.validator.config.quorum_store_poll_count }}
-  quorum_store_poll_count: {{ $.Values.validator.config.quorum_store_poll_count}}
-  {{- end }}
+{{- if $.Values.validator.config.consensus -}}{{- toYaml $.Values.validator.config.consensus | nindent 4 -}}{{- end }}
 
+{{ if $.Values.validator.config.storage -}}
 storage:
-  storage_pruner_config:
-    ledger_pruner_config:
-      enable: {{ $.Values.validator.config.enable_ledger_pruner }}
-      prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
-      batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
-    state_merkle_pruner_config:
-      enable: {{ $.Values.validator.config.enable_state_store_pruner }}
-      prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
-      batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
+{{- toYaml $.Values.validator.config.storage | nindent 4 -}}
+{{- end }}
 
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
-  concurrency_level: {{ int $.Values.validator.config.concurrency_level }}
+{{- if $.Values.validator.config.execution -}}{{- toYaml $.Values.validator.config.execution | nindent 4 -}}{{- end }}
 
 validator_network:
   discovery_method: "onchain"
-  {{- if $.Values.validator.config.networking_runtime_thread }}
-  runtime_threads: {{ $.Values.validator.config.networking_runtime_thread}}
-  {{- end }}
-  mutual_authentication: true
-  {{- if $.Values.haproxy.config.send_proxy_protocol }}
-  enable_proxy_protocol: true
-  {{- end }}
   identity:
     type: "from_file"
     path: /opt/aptos/genesis/validator-identity.yaml
+{{- if $.Values.validator.config.validator_network -}}{{- toYaml $.Values.validator.config.validator_network | nindent 4 -}}{{- end }}
 
 full_node_networks:
 - network_id:
@@ -63,7 +43,9 @@ full_node_networks:
     type: "from_config"
     key: "b0f405a3e75516763c43a2ae1d70423699f34cd68fa9f8c6bb2d67aa87d0af69"
     peer_id: "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
+{{- if $.Values.validator.config.full_node_networks -}}{{- toYaml $.Values.validator.config.full_node_networks | nindent 2 -}}{{- end }}
 
 api:
   enabled: true
   address: "0.0.0.0:8080"
+{{- if $.Values.validator.config.api -}}{{- toYaml $.Values.validator.config.api | nindent 4 -}}{{- end }}

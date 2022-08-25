@@ -6,5 +6,5 @@
 class Category < ApplicationRecord
   has_many :projects, through: :project_categories
 
-  validates :title, presence: true, length: { maximum: 140 }
+  validates :title, uniqueness: true, presence: true, length: { maximum: 140 }
 end
