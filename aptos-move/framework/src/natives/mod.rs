@@ -19,9 +19,16 @@ use aggregator_natives::{aggregator, aggregator_factory};
 use cryptography::ed25519;
 use gas_algebra_ext::AbstractValueSize;
 
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::natives::function::NativeResult;
 use move_vm_types::values::Value;
+
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 pub mod status {
     // Failure in parsing a struct type tag
@@ -37,6 +44,7 @@ pub struct GasParameters {
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
     pub ristretto255: cryptography::ristretto255::GasParameters,
+    pub bulletproofs: cryptography::bulletproofs::GasParameters,
     pub hash: hash::GasParameters,
     pub type_info: type_info::GasParameters,
     pub util: util::GasParameters,
@@ -86,6 +94,7 @@ impl GasParameters {
                 basepoint_mul: 0.into(),
                 basepoint_double_mul: 0.into(),
                 point_add: 0.into(),
+                point_clone: 0.into(),
                 point_compress: 0.into(),
                 point_decompress: 0.into(),
                 point_equals: 0.into(),
@@ -105,9 +114,16 @@ impl GasParameters {
                 scalar_neg: 0.into(),
                 sha512_per_byte: 0.into(),
                 sha512_per_hash: 0.into(),
+                sha2_512_per_byte: 0.into(),
+                sha2_512_per_hash: 0.into(),
                 scalar_sub: 0.into(),
                 point_parse_arg: 0.into(),
                 scalar_parse_arg: 0.into(),
+            },
+            bulletproofs: cryptography::bulletproofs::GasParameters {
+                base: 0.into(),
+                per_byte_rangeproof_deserialize: 0.into(),
+                per_bit_rangeproof_verify: 0.into(),
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {
@@ -168,6 +184,22 @@ impl GasParameters {
     }
 }
 
+pub fn all_test_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
+    let mut natives = vec![];
+
+    macro_rules! add_natives_from_module {
+        ($module_name: expr, $natives: expr) => {
+            natives.extend(
+                $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
+            );
+        };
+    }
+
+    add_natives_from_module!("bulletproofs", cryptography::bulletproofs::make_all_test());
+
+    make_table_from_iter(framework_addr, natives)
+}
+
 pub fn all_natives(
     framework_addr: AccountAddress,
     gas_params: GasParameters,
@@ -199,6 +231,10 @@ pub fn all_natives(
     add_natives_from_module!(
         "ristretto255",
         cryptography::ristretto255::make_all(gas_params.ristretto255)
+    );
+    add_natives_from_module!(
+        "bulletproofs",
+        cryptography::bulletproofs::make_all(gas_params.bulletproofs)
     );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
@@ -232,4 +268,49 @@ pub fn patch_table_module(table: NativeFunctionTable) -> NativeFunctionTable {
         .into_iter()
         .map(|(m, _, f, i)| (m, Identifier::new("table").unwrap(), f, i))
         .collect()
+}
+
+/// Wraps a test-only native function inside an Arc<UnboxedNativeFunction>.
+pub fn make_test_only_native_from_func(
+    func: fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
+) -> NativeFunction {
+    Arc::new(func)
+}
+
+/// Wraps a native function inside an Arc<UnboxedNativeFunction>, additionally passing it the gas parameters.
+pub fn make_native_from_func<T: std::marker::Send + std::marker::Sync + 'static>(
+    gas_params: T,
+    func: fn(&T, &mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
+) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| func(&gas_params, context, ty_args, args))
+}
+
+/// Used to pop a Vec<Vec<u8>> argument off the stack.
+#[macro_export]
+macro_rules! pop_vec_arg {
+    ($arguments:ident, $t:ty) => {{
+        // Replicating the code from pop_arg! here
+        use move_vm_types::natives::function::{PartialVMError, StatusCode};
+        let value_vec = match $arguments.pop_back().map(|v| v.value_as::<Vec<Value>>()) {
+            None => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                ))
+            }
+            Some(Err(e)) => return Err(e),
+            Some(Ok(v)) => v,
+        };
+
+        // Pop each Value from the popped Vec<Value>, cast it as a Vec<u8>, and push it to a Vec<Vec<u8>>
+        let mut vec_vec = vec![];
+        for value in value_vec {
+            let vec = match value.value_as::<$t>() {
+                Err(e) => return Err(e),
+                Ok(v) => v,
+            };
+            vec_vec.push(vec);
+        }
+
+        vec_vec
+    }};
 }

@@ -6,6 +6,7 @@ use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::Version};
 use aptos_vm::AptosVM;
 use cached_packages::aptos_stdlib;
 
+/// TODO: This is not used anywhere. Should we remove it?
 pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     let account = Account::new_genesis_account(CORE_CODE_ADDRESS);
     let txn = account
@@ -16,6 +17,6 @@ pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     executor.new_block();
     executor.execute_and_apply(txn);
 
-    let new_vm = AptosVM::new(executor.get_state_view());
+    let new_vm = AptosVM::new(executor.get_state_view(), false);
     assert_eq!(new_vm.internals().version().unwrap(), version);
 }

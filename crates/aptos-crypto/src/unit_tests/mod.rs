@@ -3,6 +3,7 @@
 
 mod bcs_test;
 mod bls12381_test;
+mod bulletproofs_test;
 mod compat_test;
 mod cross_test;
 mod cryptohasher;
