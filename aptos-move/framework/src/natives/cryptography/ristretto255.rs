@@ -17,6 +17,7 @@ pub struct GasParameters {
     pub basepoint_double_mul: InternalGasPerArg,
 
     pub point_add: InternalGasPerArg,
+    pub point_clone: InternalGasPerArg,
     pub point_compress: InternalGasPerArg,
     pub point_decompress: InternalGasPerArg,
     pub point_equals: InternalGasPerArg,
@@ -27,8 +28,8 @@ pub struct GasParameters {
     pub point_sub: InternalGasPerArg,
     pub point_parse_arg: InternalGasPerArg,
 
-    pub sha512_per_byte: InternalGasPerByte,
-    pub sha512_per_hash: InternalGasPerArg,
+    pub sha2_512_per_byte: InternalGasPerByte,
+    pub sha2_512_per_hash: InternalGasPerArg,
 
     pub scalar_add: InternalGasPerArg,
     pub scalar_reduced_from_32_bytes: InternalGasPerArg,
@@ -65,6 +66,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
                 gas_params.clone(),
                 ristretto255_point::native_point_decompress,
             ),
+        ),
+        (
+            "point_clone_internal",
+            make_native_from_func(gas_params.clone(), ristretto255_point::native_point_clone),
         ),
         (
             "point_compress_internal",
@@ -105,10 +110,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             ),
         ),
         (
-            "new_point_from_sha512_internal",
+            "new_point_from_sha2_512_internal",
             make_native_from_func(
                 gas_params.clone(),
-                ristretto255_point::native_new_point_from_sha512,
+                ristretto255_point::native_new_point_from_sha2_512,
             ),
         ),
         (
@@ -140,10 +145,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             ),
         ),
         (
-            "scalar_from_sha512_internal",
+            "scalar_from_sha2_512_internal",
             make_native_from_func(
                 gas_params.clone(),
-                ristretto255_scalar::native_scalar_from_sha512,
+                ristretto255_scalar::native_scalar_from_sha2_512,
             ),
         ),
         (

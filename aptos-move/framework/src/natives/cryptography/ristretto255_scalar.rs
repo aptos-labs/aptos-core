@@ -62,7 +62,7 @@ pub(crate) fn native_scalar_invert(
     ))
 }
 
-pub(crate) fn native_scalar_from_sha512(
+pub(crate) fn native_scalar_from_sha2_512(
     gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -73,8 +73,8 @@ pub(crate) fn native_scalar_from_sha512(
 
     let bytes = pop_arg!(arguments, Vec<u8>);
     let cost = gas_params.scalar_uniform_from_64_bytes * NumArgs::one()
-        + gas_params.sha512_per_hash * NumArgs::one()
-        + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64);
+        + gas_params.sha2_512_per_hash * NumArgs::one()
+        + gas_params.sha2_512_per_byte * NumBytes::new(bytes.len() as u64);
     let s = Scalar::hash_from_bytes::<Sha512>(bytes.as_slice());
 
     Ok(NativeResult::ok(

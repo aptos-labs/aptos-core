@@ -167,10 +167,10 @@ module aptos_std::ristretto255 {
     }
 
 
-    /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
-    public fun new_point_from_sha512(sha512: vector<u8>): RistrettoPoint {
+    /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA2-512.
+    public fun new_point_from_sha2_512(sha2_512_input: vector<u8>): RistrettoPoint {
         RistrettoPoint {
-            handle: new_point_from_sha512_internal(sha512)
+            handle: new_point_from_sha2_512_internal(sha2_512_input)
         }
     }
 
@@ -192,6 +192,12 @@ module aptos_std::ristretto255 {
         // RistrettoPoint
         let (handle, _) = point_decompress_internal(point.data);
         RistrettoPoint { handle }
+    }
+
+    public fun point_clone(point: &RistrettoPoint): RistrettoPoint {
+        RistrettoPoint {
+            handle: point_clone_internal(point.handle)
+        }
     }
 
     /// Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage.
@@ -221,10 +227,10 @@ module aptos_std::ristretto255 {
         point
     }
 
-    /// Returns (a * some_point + b * base_point), where base_point is the Ristretto basepoint encoded in `BASE_POINT`.
-    public fun basepoint_double_mul(a: &Scalar, some_point: &RistrettoPoint, b: &Scalar): RistrettoPoint {
+    /// Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoint encoded in `BASE_POINT`.
+    public fun basepoint_double_mul(a: &Scalar, a_base: &RistrettoPoint, b: &Scalar): RistrettoPoint {
         RistrettoPoint {
-            handle: basepoint_double_mul_internal(a.data, some_point, b.data)
+            handle: basepoint_double_mul_internal(a.data, a_base, b.data)
         }
     }
 
@@ -298,10 +304,10 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Hashes the input to a uniformly-at-random Scalar via SHA512
-    public fun new_scalar_from_sha512(sha512_input: vector<u8>): Scalar {
+    /// Hashes the input to a uniformly-at-random Scalar via SHA2_512
+    public fun new_scalar_from_sha2_512(sha2_512_input: vector<u8>): Scalar {
         Scalar {
-            data: scalar_from_sha512_internal(sha512_input)
+            data: scalar_from_sha2_512_internal(sha2_512_input)
         }
     }
 
@@ -457,7 +463,7 @@ module aptos_std::ristretto255 {
     // Only used internally for implementing CompressedRistretto and RistrettoPoint
     //
 
-    native fun new_point_from_sha512_internal(sha512: vector<u8>): u64;
+    native fun new_point_from_sha2_512_internal(sha2_512_input: vector<u8>): u64;
 
     native fun new_point_from_64_uniform_bytes_internal(bytes: vector<u8>): u64;
 
@@ -467,6 +473,7 @@ module aptos_std::ristretto255 {
 
     native fun point_decompress_internal(maybe_non_canonical_bytes: vector<u8>): (u64, bool);
 
+    native fun point_clone_internal(point_handle: u64): u64;
     native fun point_compress_internal(point: &RistrettoPoint): vector<u8>;
 
     native fun point_mul_internal(point: &RistrettoPoint, a: vector<u8>, in_place: bool): u64;
@@ -501,7 +508,7 @@ module aptos_std::ristretto255 {
 
     native fun scalar_invert_internal(bytes: vector<u8>): vector<u8>;
 
-    native fun scalar_from_sha512_internal(sha512_input: vector<u8>): vector<u8>;
+    native fun scalar_from_sha2_512_internal(sha2_512_input: vector<u8>): vector<u8>;
 
     native fun scalar_mul_internal(a_bytes: vector<u8>, b_bytes: vector<u8>): vector<u8>;
 
@@ -551,7 +558,7 @@ module aptos_std::ristretto255 {
 
     // Generated in curve25519-dalek via:
     // ```
-    //     let mut hasher = Sha512::default();
+    //     let mut hasher = sha2::Sha512::default();
     //     hasher.update(b"bello!");
     //     let s = Scalar::from_hash(hasher);
     //     println!("scalar: {:x?}", s.to_bytes());
@@ -867,19 +874,19 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_multi_scalar_mul_many() {
         let scalars = vector[
-            new_scalar_from_sha512(b"1"),
-            new_scalar_from_sha512(b"2"),
-            new_scalar_from_sha512(b"3"),
-            new_scalar_from_sha512(b"4"),
-            new_scalar_from_sha512(b"5"),
+            new_scalar_from_sha2_512(b"1"),
+            new_scalar_from_sha2_512(b"2"),
+            new_scalar_from_sha2_512(b"3"),
+            new_scalar_from_sha2_512(b"4"),
+            new_scalar_from_sha2_512(b"5"),
         ];
 
         let points = vector[
-            new_point_from_sha512(b"1"),
-            new_point_from_sha512(b"2"),
-            new_point_from_sha512(b"3"),
-            new_point_from_sha512(b"4"),
-            new_point_from_sha512(b"5"),
+            new_point_from_sha2_512(b"1"),
+            new_point_from_sha2_512(b"2"),
+            new_point_from_sha2_512(b"3"),
+            new_point_from_sha2_512(b"4"),
+            new_point_from_sha2_512(b"5"),
         ];
 
         let expected = std::option::extract(&mut new_point_from_bytes(x"c4a98fbe6bd0f315a0c150858aec8508be397443093e955ef982e299c1318928"));
@@ -889,11 +896,11 @@ module aptos_std::ristretto255 {
     }
 
     #[test]
-    fun test_new_point_from_sha512() {
+    fun test_new_point_from_sha2_512() {
         let msg = b"To really appreciate architecture, you may even need to commit a murder";
         let expected = option::extract(&mut new_point_from_bytes(x"baaa91eb43e5e2f12ffc96347e14bc458fdb1772b2232b08977ee61ea9f84e31"));
 
-        assert!(point_equals(&expected, &new_point_from_sha512(msg)), 1);
+        assert!(point_equals(&expected, &new_point_from_sha2_512(msg)), 1);
     }
 
     #[test]
@@ -962,7 +969,7 @@ module aptos_std::ristretto255 {
         assert!(scalar_is_zero(&scalar_one()) == false, 1);
 
         // Pick a random scalar by hashing from some "random" bytes
-        let s = new_scalar_from_sha512(x"deadbeef");
+        let s = new_scalar_from_sha2_512(x"deadbeef");
 
         // Technically, there is a negligible probability (i.e., 1/2^\ell) that the hashed s is zero or one
         assert!(scalar_is_zero(&s) == false, 1);
@@ -983,7 +990,7 @@ module aptos_std::ristretto255 {
         assert!(scalar_is_one(&scalar_zero()) == false, 1);
 
         // Pick a random scalar by hashing from some "random" bytes
-        let s = new_scalar_from_sha512(x"deadbeef");
+        let s = new_scalar_from_sha2_512(x"deadbeef");
         let inv = scalar_invert(&s);
 
         // Technically, there is a negligible probability (i.e., 1/2^\ell) that s was zero and the call above returned None
@@ -997,7 +1004,7 @@ module aptos_std::ristretto255 {
     }
 
     #[test]
-    fun test_scalar_from_sha512() {
+    fun test_scalar_from_sha2_512() {
         // Test a specific message hashes correctly to the field
         let str: vector<u8> = vector[];
         std::vector::append(&mut str, b"To really appreciate architecture, you may even need to commit a murder.");
@@ -1007,7 +1014,7 @@ module aptos_std::ristretto255 {
         std::vector::append(&mut str, b"perhaps all architecture, rather than being about functional standards, is");
         std::vector::append(&mut str, b"about love and death.");
 
-        let s = new_scalar_from_sha512(str);
+        let s = new_scalar_from_sha2_512(str);
 
         let expected : vector<u8> = vector[
             21,  88, 208, 252,  63, 122, 210, 152,
