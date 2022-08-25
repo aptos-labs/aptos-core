@@ -38,6 +38,8 @@ spec:
     spec:
       containers:
       - name: http
+        resources:
+          {{- toYaml .Values.autoscaler.resources | nindent 10 }}
         image: pierrezemb/gostatic
         imagePullPolicy: IfNotPresent
         args: ["-port", "8080", "-enable-health"]
