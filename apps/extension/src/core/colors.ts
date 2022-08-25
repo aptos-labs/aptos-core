@@ -72,6 +72,11 @@ export const secondaryHoverBgColor = {
   light: 'gray.200',
 };
 
+export const secondaryBackButtonBgColor = {
+  dark: 'gray.600',
+  light: 'gray.100',
+};
+
 export const secondaryGridHoverBgColor = {
   dark: 'gray.600',
   light: 'gray.200',

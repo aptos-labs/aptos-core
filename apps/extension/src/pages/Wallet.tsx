@@ -45,6 +45,7 @@ function CopyAddressButton() {
           transform: 'scale(0.90)',
         }}
         onClick={onCopy}
+        variant="ghost"
       />
     </Tooltip>
   );

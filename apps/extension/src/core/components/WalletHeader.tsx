@@ -9,9 +9,10 @@ import {
   Text,
   useColorMode,
   useDisclosure,
+  IconButton,
 } from '@chakra-ui/react';
-import { ChevronLeftIcon } from '@chakra-ui/icons';
-import { secondaryBorderColor, secondaryHoverBgColor, textColor } from 'core/colors';
+import { ArrowBackIcon } from '@chakra-ui/icons';
+import { secondaryBorderColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountDrawer from 'core/components/AccountDrawer';
 import { useActiveAccount } from 'core/hooks/useAccounts';
@@ -42,22 +43,6 @@ const AccountCircle = React.forwardRef((
     </Box>
   );
 });
-
-function BackButton({ onClick }: ButtonProps) {
-  const { colorMode } = useColorMode();
-  return (
-    <Box
-      height="36px"
-      width="36px"
-      background={secondaryHoverBgColor[colorMode]}
-      borderRadius="0.5rem"
-      cursor="pointer"
-      onClick={onClick}
-    >
-      <ChevronLeftIcon color={textColor[colorMode]} width="100%" height="100%" />
-    </Box>
-  );
-}
 
 interface WalletHeaderProps {
   accessoryButton?: React.ReactNode,
@@ -90,13 +75,22 @@ export default function WalletHeader({
         justifyContent="space-between"
         padding={4}
       >
-        <HStack>
-          {(showBackButton)
-            ? (
-              <BackButton onClick={backOnClick} />
-            )
-            : null}
-          <Text fontSize={20} fontWeight={500}>
+        <HStack spacing={4}>
+          {
+            (showBackButton) ? (
+              <IconButton
+                size="lg"
+                aria-label="back"
+                colorScheme="teal"
+                icon={<ArrowBackIcon fontSize={26} />}
+                variant="filled"
+                onClick={backOnClick}
+                bgColor="gray.100"
+                borderRadius="1rem"
+              />
+            ) : null
+          }
+          <Text fontSize={22} fontWeight={600}>
             {title}
           </Text>
         </HStack>

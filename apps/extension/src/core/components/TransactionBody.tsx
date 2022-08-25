@@ -7,6 +7,7 @@ import {
   Box,
   Button,
   Center,
+  Flex,
   HStack,
   Spinner,
   Text,
@@ -66,19 +67,22 @@ function TransactionBody() {
       px={4}
       alignItems="stretch"
     >
-      <Button
-        fontSize="sm"
-        fontWeight={400}
-        as="a"
-        target="_blank"
-        rightIcon={<ExternalLinkIcon />}
-        variant="unstyled"
-        cursor="pointer"
-        href={explorerAddress}
-        alignSelf="end"
-      >
-        View on explorer
-      </Button>
+      <Flex alignItems="flex-start" width="100%" pb={4}>
+        <Button
+          fontSize="md"
+          fontWeight={400}
+          as="a"
+          target="_blank"
+          rightIcon={<ExternalLinkIcon />}
+          variant="link"
+          cursor="pointer"
+          href={explorerAddress}
+          alignSelf="end"
+        >
+          View on explorer
+        </Button>
+      </Flex>
+
       {
         !txn
           ? (

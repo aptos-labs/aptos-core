@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -12,13 +12,19 @@ import {
   useDisclosure,
   VStack,
   chakra,
+  Heading,
+  InputGroup,
+  Icon,
+  InputRightElement,
 } from '@chakra-ui/react';
 
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { secondaryBgColor, textColor } from 'core/colors';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
+import { AiFillEyeInvisible } from '@react-icons/all-files/ai/AiFillEyeInvisible';
+import { AiFillEye } from '@react-icons/all-files/ai/AiFillEye';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
-import ResetPasswordConfirmationModal from 'core/components/ResetPasswordConfirmationModal';
+import ResetPasswordConfirmationModal from '../core/components/ResetPasswordConfirmationModal';
 
 interface FormValues {
   password: string;
@@ -28,6 +34,7 @@ function Password() {
   const { colorMode } = useColorMode();
   const { clearAccounts, unlockAccounts } = useInitializedAccounts();
   const { isOpen, onClose, onOpen } = useDisclosure();
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   const {
     formState: { errors },
@@ -49,14 +56,17 @@ function Password() {
     }
   };
 
-  const handleClickResetPassword = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleClickResetPassword = () => {
     onOpen();
   };
 
   const handleConfirmResetPassword = async () => {
     await clearAccounts();
     onClose();
+  };
+
+  const handleClickShowPassword = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -67,17 +77,23 @@ function Password() {
       width="100%"
       height="100%"
     >
-      <Center h="100%" display="flex" flexDir="column">
-        <Box width="100%" pb={4} px={20}>
+      <Center
+        w="100%"
+        pt={8}
+        h="100%"
+        display="flex"
+        flexDir="column"
+      >
+        <Box width="72px" pb={4}>
           {
             (colorMode === 'dark')
               ? <AptosWhiteLogo />
               : <AptosBlackLogo />
           }
         </Box>
-        <Text fontSize="4xl" fontWeight="700" color={textColor[colorMode]}>
+        <Heading fontSize="3xl" fontWeight="600" color={textColor[colorMode]}>
           Welcome back
-        </Text>
+        </Heading>
       </Center>
       <chakra.form onSubmit={handleSubmit(onSubmit)} width="100%" p={6}>
         <VStack gap={4}>
@@ -85,32 +101,52 @@ function Password() {
             <Flex flexDirection="row">
               <FormLabel
                 requiredIndicator={<span />}
-                fontSize="sm"
+                fontSize="md"
                 fontWeight={500}
                 flex={1}
               >
                 Password
               </FormLabel>
-              <FormLabel
-                requiredIndicator={<span />}
-                fontSize="sm"
+              <Button
+                cursor="pointer"
+                onClick={handleClickResetPassword}
                 fontWeight={500}
+                fontSize="md"
+                colorScheme="teal"
+                variant="link"
               >
-                <Text cursor="pointer" as="u" onClick={handleClickResetPassword} fontWeight={500} fontSize="sm">Reset password</Text>
-              </FormLabel>
+                Reset password
+              </Button>
             </Flex>
             <ResetPasswordConfirmationModal
               onConfirm={handleConfirmResetPassword}
               isOpen={isOpen}
               onClose={onClose}
             />
-            <Input
-              autoComplete="false"
-              variant="filled"
-              placeholder="Password..."
-              type="password"
-              {...register('password')}
-            />
+            <InputGroup>
+              <Input
+                autoComplete="false"
+                variant="filled"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password..."
+                maxLength={64}
+                {...register('password')}
+              />
+              <InputRightElement width="3rem">
+                <Button
+                  tabIndex={-3}
+                  borderRadius="100%"
+                  variant="ghost"
+                  h="1.75rem"
+                  size="sm"
+                  onClick={handleClickShowPassword}
+                >
+                  {showPassword
+                    ? <Icon as={AiFillEyeInvisible} />
+                    : <Icon as={AiFillEye} />}
+                </Button>
+              </InputRightElement>
+            </InputGroup>
             {
               errors.password && (
                 <Text fontSize="sm" color="red.400">
@@ -119,10 +155,11 @@ function Password() {
               )
             }
           </FormControl>
-
-          <Button width="100%" type="submit" colorScheme="teal">
-            Unlock
-          </Button>
+          <Box w="100%" pb={4}>
+            <Button py={6} width="100%" type="submit" colorScheme="teal">
+              Unlock
+            </Button>
+          </Box>
         </VStack>
       </chakra.form>
     </VStack>
