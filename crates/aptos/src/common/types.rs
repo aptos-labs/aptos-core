@@ -6,7 +6,7 @@ use crate::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
             chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_sequence_number, read_from_file, start_logger, to_common_result,
+            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
@@ -360,6 +360,18 @@ impl ProfileOptions {
         {
             if let Some(account) = profile.account {
                 return Ok(account);
+            }
+        }
+
+        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+    }
+
+    pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        if let Some(profile) =
+            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+        {
+            if let Some(public_key) = profile.public_key {
+                return Ok(public_key);
             }
         }
 
@@ -1080,7 +1092,7 @@ pub struct TransactionOptions {
 
 impl TransactionOptions {
     /// Retrieves the private key
-    fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
+    pub(crate) fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
         self.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
@@ -1106,6 +1118,21 @@ impl TransactionOptions {
         }
     }
 
+    /// Gets the auth key by account address. We need to fetch the auth key from Rest API rather than creating an
+    /// auth key out of the public key.
+    pub(crate) async fn auth_key(
+        &self,
+        sender_address: AccountAddress,
+    ) -> CliTypedResult<AuthenticationKey> {
+        let client = self.rest_client()?;
+        get_auth_key(&client, sender_address).await
+    }
+
+    pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
+        let client = self.rest_client()?;
+        get_sequence_number(&client, sender_address).await
+    }
+
     /// Submit a transaction
     pub async fn submit_transaction(
         &self,
@@ -1118,7 +1145,7 @@ impl TransactionOptions {
         let sender_address = self.sender_address()?;
 
         // Get sequence number for account
-        let sequence_number = get_sequence_number(&client, sender_address).await?;
+        let sequence_number = self.sequence_number(sender_address).await?;
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
