@@ -9,36 +9,59 @@ import TabItem from '@theme/TabItem';
 
 # Your First Transaction using the SDK
 
-This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos Blockchain.
+This tutorial introduces the Aptos SDKs and how to generate, submit, and verify transactions submitted to the Aptos Blockchain. We will be running the `transfer-coin` example.
 
 ## Step 1: Pick an SDK
 
+* [Official Aptos Typescript SDK][typescript-sdk]
 * [Official Aptos Python SDK][python-sdk]
-* Official Aptos Typescript SDK — *TBA*
 * Official Aptos Rust SDK — *TBA*
 
 ## Step 2: Run the Example
 
-Each SDK provides an examples directory. For the Python SDK, the examples directory is located here: `https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples`. 
-
-This tutorial covers the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/transfer-coin.py) example.
-
-<Tabs groupId="sdk-examples">
-  <TabItem value="python" label="Python">
-
-Run the `transfer-coin` example in the Python SDK directory, i.e., `/path/to/aptos-core/ecosystem/python/sdk`. For example:
-
-```python
-cd /path/to/aptos-core/ecosystem/python/sdk
-python3 -m examples.transfer-coin
+Clone `aptos-core`:
+```sh
+git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 ```
 
+
+<Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+  Navigate to the Typescript SDK examples directory:
+  ```sh
+  cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
+  ```
+
+  Install the necessary dependencies:
+  ```
+  yarn install
+  ```
+
+  Run the `transfer_coin` example:
+  ```sh
+  yarn run transfer_coin
+  ```
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+  Navigate to the Python SDK directory:
+  ```sh
+  cd ~/aptos-core/ecosystem/python/sdk
+  ```
+
+  Install the necessary dependencies:
+  ```
+  curl -sSL https://install.python-poetry.org | python3
+  poetry update
+  ```
+
+  Run the `transfer-coin` example:
+  ```sh
+  poetry run python -m examples.transfer-coin
+  ```
   </TabItem>
   <TabItem value="rust" label="Rust">
-
-In progress.
-  </TabItem>
-  <TabItem value="typescript" label="Typescript">
 
 In progress.
   </TabItem>
@@ -89,12 +112,28 @@ See the [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/main/eco
 
 ### Step 4.1: Initializing the Clients
 
-In the first step, the `transfer-coin` example initializes both the REST and faucet clients. 
+In the first step, the `transfer-coin` example initializes both the REST and faucet clients.
 
 - The REST client interacts with the REST API, and
 - The faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1
+```
+
+Using the API client we can create a `CoinClient`, which we use for common coin operations such as transferring coins and checking balances.
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_1a
+```
+
+`common.ts` initializes the URL values as such:
+```ts
+:!: static/sdks/typescript/examples/typescript/common.ts section_1
+```
+  </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -111,24 +150,26 @@ The [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/p
 
 In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
-
-In progress.
-  </TabItem>
 </Tabs>
 
 :::tip
 
-By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables: 
+By default the URLs for both the services point to Aptos devnet services. However, they can be configured with the following environment variables:
   - `APTOS_NODE_URL` and
   - `APTOS_FAUCET_URL`.
 :::
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts from the locally. [Accounts][account_basics] represent both on-chain and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_2
+```
+  </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -139,10 +180,6 @@ The next step is to create two accounts from the locally. [Accounts][account_bas
 
 In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
-
-In progress.
-  </TabItem>
 </Tabs>
 
 ### Step 4.3: Creating blockchain accounts
@@ -150,6 +187,12 @@ In progress.
 In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's account:
 
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_3
+```
+  </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -160,10 +203,6 @@ In Aptos, each account must have an on-chain representation in order to support 
 
 In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
-
-In progress.
-  </TabItem>
 </Tabs>
 
 ### Step 4.4: Reading balances
@@ -171,6 +210,18 @@ In progress.
 In this step, the Python SDK translates a single call into the process of querying a resource and reading a field from that resource.
 
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_4
+```
+
+Behind the scenes, the `checkBalance` function in `CoinClient` in the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
+
+```ts
+:!: static/sdks/typescript/src/coin_client.ts checkBalance
+```
+  </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -190,10 +241,6 @@ def account_balance(self, account_address: str) -> int:
 
 In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
-
-In progress.
-  </TabItem>
 </Tabs>
 
 ### Step 4.5: Transferring
@@ -201,6 +248,29 @@ In progress.
 Like the previous step, this is another helper step that constructs a transaction which transfers the coins from Alice to Bob. For correctly generated transactions, the API will return a transaction hash that can be used in the subsequent step to check on the transaction status. The Aptos blockchain does perform a handful of validation checks on submission and if any of those fail, the user will instead be given an error. These validations include the transaction signature, unused sequence number, and submitting the transaction to the appropriate chain.
 
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_5
+```
+
+Behind the scenes, the `transfer` function generates a transaction payload and has the client sign, send, and wait for it:
+```ts
+:!: static/sdks/typescript/src/coin_client.ts transfer
+```
+
+Within the client, <code>generateSignSendWaitForTransaction</code> is doing this:
+```ts
+:!: static/sdks/typescript/src/aptos_client.ts generateSignSendWaitForTransactionInner
+```
+
+Breaking the above down into pieces:
+1. `transfer` internally is a `EntryFunction` in the [Coin Move module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move#L412), i.e. an entry function in Move that is directly callable.
+1. The Move function is stored on the coin module: `0x1::coin`.
+1. Because the Coin module can be used by other coins, the transfer must explicitly specify which coin type to transfer. If not specified with `coinType` it defaults to `0x1::aptos_coin::AptosCoin`.
+
+
+  </TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -212,19 +282,15 @@ Behind the scenes the Python SDK generates, signs, and submits a transaction:
 :!: static/sdks/python/aptos_sdk/client.py bcs_transfer
 ```
 
-where:
+Breaking the above down into pieces:
+1. `transfer` internally is a `EntryFunction` in the [Coin Move module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move#L412), i.e. an entry function in Move that is directly callable.
+1. The Move function is stored on the coin module: `0x1::coin`.
+1. Because the Coin module can be used by other coins, the transfer must explicitly use a `TypeTag` to define which coin to transfer.
+1. The transaction arguments must be placed into `TransactionArgument`s with type specifiers (`Serializer.{type}`), that will serialize the value into the appropriate type at transaction generation time.
 
-1. The function `transfer` is internally a `EntryFunction`, i.e., an entry function in Move that is directly callable.
-2. The Move function is stored on the coin module: `0x1::coin`.
-3. Because the `coin` module can be used by other coins, the transfer must explicitly use a `TypeTag` to define which coin to transfer.
-4. The transaction arguments must be placed into `TransactionArgument`s with type specifiers (`Serializer.{type}`), that will serialize the value into the appropriate type at transaction generation time.
 
-</TabItem>
-<TabItem value="rust" label="Rust">
-
-In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
+  <TabItem value="rust" label="Rust">
 
 In progress.
   </TabItem>
@@ -232,10 +298,20 @@ In progress.
 
 ### Step 4.6: Waiting for transaction resolution
 
-The transaction hash can be used to query the status of a transaction:
-
 <Tabs groupId="sdk-examples">
+  <TabItem value="typescript" label="Typescript">
+
+In Typescript, just calling `coinClient.transfer` is sufficient to wait for the transaction to complete. The function will return the `Transaction` returned by the API once it is processed (either successfully or unsuccessfully) or throw an error if processing time exceeds the timeout.
+
+You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
+```ts
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6
+```
+
+  </TabItem>
   <TabItem value="python" label="Python">
+
+The transaction hash can be used to query the status of a transaction:
 
 ```python
 :!: static/sdks/python/examples/transfer-coin.py section_6
@@ -245,12 +321,9 @@ The transaction hash can be used to query the status of a transaction:
 
 In progress.
   </TabItem>
-  <TabItem value="typescript" label="Typescript">
-
-In progress.
-  </TabItem>
 </Tabs>
 
 [account_basics]: /concepts/basics-accounts
 [python-sdk]: /sdks/python-sdk
+[typescript-sdk]: /sdks/typescript-sdk
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

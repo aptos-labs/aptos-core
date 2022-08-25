@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "run-s basic bcs_transaction multisig_transaction",
-    "basic": "ts-node index.ts",
+    "test": "run-s transfer_coin bcs_transaction multisig_transaction",
+    "transfer_coin": "ts-node transfer_coin.ts",
     "bcs_transaction": "ts-node bcs_transaction.ts",
     "multisig_transaction": "ts-node multisig_transaction.ts"
   },

@@ -42,6 +42,7 @@ export class CoinClient {
    * the client should submit and wait for the transaction.
    * @returns Promise that resolves to the response from the API
    */
+  // :!:>transfer
   async transfer(
     from: AptosAccount,
     to: AptosAccount,
@@ -63,7 +64,7 @@ export class CoinClient {
       [to.address(), amount],
     );
     return this.aptosClient.generateSignSendWaitForTransaction(from, payload, extraArgs);
-  }
+  } // <:!:transfer
 
   /**
    * Generate, submit, and wait for a transaction to transfer AptosCoin from
@@ -76,6 +77,7 @@ export class CoinClient {
    * @param extraArgs Extra args for checking the balance.
    * @returns Promise that resolves to the balance as a bigint.
    */
+  // :!:>checkBalance
   async checkBalance(
     account: AptosAccount,
     extraArgs?: {
@@ -88,5 +90,5 @@ export class CoinClient {
     const resources = await this.aptosClient.getAccountResources(account.address());
     const accountResource = resources.find((r) => r.type === typeTag);
     return BigInt((accountResource!.data as any).coin.value);
-  }
+  } // <:!:checkBalance
 }
