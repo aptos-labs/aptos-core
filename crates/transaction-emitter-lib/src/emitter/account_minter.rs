@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::emitter::{wait_for_account_exists, wait_for_single_account_sequence};
 use crate::{
     emitter::{MAX_TXNS, MAX_TXN_BATCH_SIZE, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_numbers, EmitJobRequest,
@@ -28,6 +29,7 @@ use core::{
 use futures::future::try_join_all;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
+use std::time::Duration;
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
@@ -257,6 +259,11 @@ where
 {
     let mut i = 0;
     let mut accounts = vec![];
+
+    // Wait for source account to exist, this can happen because the corresponding REST endpoint might
+    // not be up to date with the latest ledger state and requires some time for syncing.
+    wait_for_single_account_sequence(&client, &source_account, Duration::from_secs(30)).await?;
+
     while i < num_new_accounts {
         let batch_size = min(
             max_num_accounts_per_batch as usize,
