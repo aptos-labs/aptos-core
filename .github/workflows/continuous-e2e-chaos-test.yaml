@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 */3 * * *"
+
+jobs:
   # Test under sub optimal circumstances (network delay / loss)
   run-forge-chaos:
     uses: ./.github/workflows/run-forge.yaml
