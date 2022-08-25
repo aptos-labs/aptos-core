@@ -84,6 +84,8 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
+# streamingfast indexer
+COPY --link --from=builder /aptos/dist/aptos-sf-indexer /usr/local/bin/aptos-sf-indexer
 
 ENV RUST_LOG_FORMAT=json
 

@@ -51,11 +51,11 @@ where
     <T as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
 {
     let debug = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
-    aptos_logger::debug!("Executing query: {:?}", debug);
+    aptos_logger::debug!(debug = debug, "Executing query");
     let res = query.execute(conn);
     if res.is_err() {
         let e = res.as_ref().err().unwrap();
-        aptos_logger::error!("Error running query: {:?}\n{}", e, debug);
+        aptos_logger::error!(debug = debug, "Error running query. Error: {:?}", e);
     }
     res
 }
