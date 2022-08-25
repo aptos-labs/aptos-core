@@ -13,7 +13,7 @@ jobs:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-chaos
+      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn
       FORGE_CLUSTER_NAME: aptos-forge-1
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
