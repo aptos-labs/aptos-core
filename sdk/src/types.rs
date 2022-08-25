@@ -130,11 +130,11 @@ impl LocalAccount {
     }
 
     pub fn received_event_key(&self) -> EventKey {
-        EventKey::new(1, self.address)
+        EventKey::new(2, self.address)
     }
 
     pub fn sent_event_key(&self) -> EventKey {
-        EventKey::new(2, self.address)
+        EventKey::new(3, self.address)
     }
 }
 

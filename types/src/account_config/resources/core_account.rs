@@ -20,6 +20,7 @@ pub struct AccountResource {
     sequence_number: u64,
     guid_creation_num: u64,
     coin_register_events: EventHandle,
+    key_rotation_events: EventHandle,
     rotation_capability_offer: Option<AccountAddress>,
     signer_capability_offer: Option<AccountAddress>,
 }
@@ -30,12 +31,14 @@ impl AccountResource {
         sequence_number: u64,
         authentication_key: Vec<u8>,
         coin_register_events: EventHandle,
+        key_rotation_events: EventHandle,
     ) -> Self {
         AccountResource {
             authentication_key,
             sequence_number,
             guid_creation_num: 0,
             coin_register_events,
+            key_rotation_events,
             rotation_capability_offer: None,
             signer_capability_offer: None,
         }
@@ -53,6 +56,10 @@ impl AccountResource {
 
     pub fn coin_register_events(&self) -> &EventHandle {
         &self.coin_register_events
+    }
+
+    pub fn key_rotation_events(&self) -> &EventHandle {
+        &self.key_rotation_events
     }
 
     pub fn guid_creation_num(&self) -> u64 {

@@ -99,7 +99,7 @@ impl MoveStructType for NewBlockEvent {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new(2, CORE_CODE_ADDRESS)
+    EventKey::new(3, CORE_CODE_ADDRESS)
 }
 
 /// The path to the new block event handle under a Block::BlockResource resource.
