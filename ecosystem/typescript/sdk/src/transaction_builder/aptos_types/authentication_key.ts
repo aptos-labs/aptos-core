@@ -35,7 +35,7 @@ export class AuthenticationKey {
   static fromMultiEd25519PublicKey(publicKey: MultiEd25519PublicKey): AuthenticationKey {
     const bytes = new Uint8Array([...publicKey.toBytes(), AuthenticationKey.MULTI_ED25519_SCHEME]);
     const hash = SHA3.sha3_256.create();
-    hash.update(Buffer.from(bytes));
+    hash.update(bytes);
 
     return new AuthenticationKey(new Uint8Array(hash.arrayBuffer()));
   }

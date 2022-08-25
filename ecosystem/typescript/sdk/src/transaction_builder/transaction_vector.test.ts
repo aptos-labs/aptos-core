@@ -11,6 +11,7 @@
 import path from "path";
 import * as Nacl from "tweetnacl";
 import fs from "fs";
+import { bytesToHex } from "@movingco/bytes-to-hex";
 import {
   AccountAddress,
   ChainId,
@@ -156,7 +157,7 @@ function sign(rawTxn: RawTransaction, privateKey: string): string {
     publicKey,
   );
 
-  return Buffer.from(txnBuilder.sign(rawTxn)).toString("hex");
+  return bytesToHex(txnBuilder.sign(rawTxn));
 }
 
 type IRawTxn = {
