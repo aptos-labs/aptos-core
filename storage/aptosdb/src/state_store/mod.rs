@@ -35,8 +35,13 @@ use aptos_types::{
     transaction::Version,
 };
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use once_cell::sync::Lazy;
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    sync::Arc,
+};
 use storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
@@ -56,6 +61,14 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT_INTERVAL_IN_VERSION
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("kv_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 #[derive(Debug)]
 pub(crate) struct StateDb {
@@ -518,7 +531,36 @@ impl StateStore {
 
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
-        let mut cache = HashMap::<StateKey, (Version, Option<StateValue>)>::new();
+        let cache = Arc::new(Mutex::new(
+            HashMap::<StateKey, (Version, Option<StateValue>)>::new(),
+        ));
+
+        if let Some(base_version) = base_version {
+            let key_set = value_state_sets
+                .iter()
+                .flat_map(|value_state_set| value_state_set.iter())
+                .map(|(key, _)| key)
+                .collect::<HashSet<_>>();
+            IO_POOL.scope(|s| {
+                for key in key_set {
+                    let cache = cache.clone();
+                    s.spawn(move |_| {
+                        let _timer = OTHER_TIMERS_SECONDS
+                            .with_label_values(&["put_stats_and_indices__get_state_value"])
+                            .start_timer();
+                        let version_and_value = self
+                            .state_db
+                            .get_state_value_with_version_by_version(key, base_version)
+                            .expect("Must succeed.");
+                        if let Some((version, value)) = version_and_value {
+                            cache.lock().insert(key.clone(), (version, Some(value)));
+                        } else {
+                            cache.lock().insert(key.clone(), (base_version, None));
+                        }
+                    });
+                }
+            });
+        }
 
         // calculate total state size in bytes
         for (idx, kvs) in value_state_sets.iter().enumerate() {
@@ -540,15 +582,9 @@ impl StateStore {
                 }
 
                 let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
-                    cache.insert(key.clone(), (version, value.clone()))
+                    cache.lock().insert(key.clone(), (version, value.clone()))
                 {
                     old_value_opt.map(|value| (old_version, value))
-                } else if let Some(base_version) = base_version {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["put_stats_and_indices/get_state_value"])
-                        .start_timer();
-                    self.state_db
-                        .get_state_value_with_version_by_version(key, base_version)?
                 } else {
                     None
                 };
