@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
+use aptos::common::types::GasOptions;
 use aptos::move_tool::MemberId;
 use aptos::test::CliTestFramework;
 use aptos_logger::info;
@@ -102,7 +103,18 @@ async fn test_move_publish_flow() {
     // Let's publish it
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
-    let _ = match cli.publish_package(0, None, named_addresses, false).await {
+    let _ = match cli
+        .publish_package(
+            0,
+            Some(GasOptions {
+                gas_unit_price: 1,
+                max_gas: 10_0000,
+            }),
+            named_addresses,
+            false,
+        )
+        .await
+    {
         Ok(response) => response,
         Err(err) => panic!("Should not have failed to publish package {:?}", err),
     };

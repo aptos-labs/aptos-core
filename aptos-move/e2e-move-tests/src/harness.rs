@@ -112,13 +112,13 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> SignedTransaction {
-        // We initialize for some reason with 10, so use 10 as the first value here too
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = *seq_no_ref;
         *seq_no_ref += 1;
         account
             .transaction()
             .sequence_number(seq_no)
+            .max_gas_amount(1_000_000)
             .gas_unit_price(1)
             .payload(payload)
             .sign()
