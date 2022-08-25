@@ -162,7 +162,7 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        tokio::spawn(async move {
+        spawn_named!(&format!("retry request")[..], async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
