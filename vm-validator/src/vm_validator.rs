@@ -53,7 +53,7 @@ impl VMValidator {
             .latest_state_checkpoint_view()
             .expect("Get db view cannot fail");
 
-        let vm = AptosVM::new_for_validation(&db_state_view);
+        let vm = AptosVM::new_for_validation(&db_state_view, false);
         VMValidator {
             db_reader,
             state_view: db_state_view.into(),
@@ -79,7 +79,7 @@ impl TransactionValidation for VMValidator {
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = AptosVM::new_for_validation(&self.state_view);
+        self.vm = AptosVM::new_for_validation(&self.state_view, false);
         Ok(())
     }
 

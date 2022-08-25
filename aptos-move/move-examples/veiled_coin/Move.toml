@@ -1,0 +1,12 @@
+[package]
+name = "Examples"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+veiled_coin = "_"

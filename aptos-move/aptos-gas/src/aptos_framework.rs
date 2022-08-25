@@ -40,6 +40,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135],
+    [.ristretto255.point_clone, "ristretto255.point_clone", 150],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300],
@@ -50,11 +51,13 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.point_sub, "ristretto255.point_sub", 2_130],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 150],
 
-
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case
     [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 60],
     [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 3_240],
+
+    [.ristretto255.sha2_512_per_byte, "ristretto255.sha2_512_per_byte", 60],
+    [.ristretto255.sha2_512_per_hash, "ristretto255.sha2_512_per_hash", 3_240],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 770],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 710],
@@ -73,6 +76,10 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.hash.keccak256.base, optional "hash.keccak256.base", 4000],
     [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 45],
+
+    [.bulletproofs.base, "bulletproofs.base", 3000],
+    [.bulletproofs.per_byte_rangeproof_deserialize, "bulletproofs.per_byte_rangeproof_deserialize", 500],
+    [.bulletproofs.per_bit_rangeproof_verify, "bulletproofs.per_bit_rangeproof_verify", 500],
 
     [.type_info.type_of.base, "type_info.type_of.base", 300],
     // TODO(Gas): the on-chain name is wrong...

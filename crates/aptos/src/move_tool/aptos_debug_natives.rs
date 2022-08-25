@@ -14,5 +14,5 @@ pub fn aptos_debug_natives(
     natives::configure_for_unit_test();
     // Return all natives -- build with the 'testing' feature, therefore containing
     // debug related functions.
-    natives::aptos_natives(gas_parameters, abs_val_size_gas_params)
+    natives::aptos_natives(gas_parameters, abs_val_size_gas_params, true)
 }

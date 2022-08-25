@@ -129,7 +129,8 @@ impl ParallelAptosVM {
                 ))
             }
             Err(err @ Error::ModulePathReadWrite) => {
-                let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
+                let output =
+                    AptosVM::execute_block_and_keep_vm_status(transactions, state_view, false)?;
                 Ok((
                     output
                         .into_iter()

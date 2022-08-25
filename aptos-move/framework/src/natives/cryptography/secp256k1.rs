@@ -1,13 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/***************************************************************************************************
- * native fun secp256k1_recover
- *
- *   gas cost: base_cost +? ecdsa_recover
- *
- **************************************************************************************************/
-use crate::natives::util::make_native_from_func;
+use crate::natives::make_native_from_func;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -24,6 +18,12 @@ pub mod abort_codes {
     pub const NFE_DESERIALIZE: u64 = 0x01_0001;
 }
 
+/***************************************************************************************************
+ * native fun secp256k1_recover
+ *
+ *   gas cost: base_cost +? ecdsa_recover
+ *
+ **************************************************************************************************/
 fn native_ecdsa_recover(
     gas_params: &GasParameters,
     _context: &mut NativeContext,
