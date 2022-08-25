@@ -173,11 +173,9 @@ pub async fn get_block_index_from_request(
 ) -> ApiResult<u64> {
     Ok(match partial_block_identifier {
         Some(PartialBlockIdentifier {
-            index: Some(_),
+            index: Some(block_index),
             hash: Some(_),
-        }) => {
-            return Err(ApiError::BlockParameterConflict);
-        }
+        }) => block_index,
         // Lookup by block index
         Some(PartialBlockIdentifier {
             index: Some(block_index),
