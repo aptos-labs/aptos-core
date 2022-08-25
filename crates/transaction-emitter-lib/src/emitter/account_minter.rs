@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::emitter::{wait_for_account_exists, wait_for_single_account_sequence};
+use crate::emitter::wait_for_single_account_sequence;
 use crate::{
     emitter::{MAX_TXNS, MAX_TXN_BATCH_SIZE, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_numbers, EmitJobRequest,
