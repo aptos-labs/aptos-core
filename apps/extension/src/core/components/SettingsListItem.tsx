@@ -8,8 +8,11 @@ import {
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
+<<<<<<< HEAD
 import { settingsItemLabel } from 'core/constants';
 import Browser from 'core/utils/browser';
+=======
+>>>>>>> 1a3d097 (WAL-101 Redesign Settings screen)
 import {
   secondaryGridHoverBgColor,
   textColor, secondaryAddressFontColor,

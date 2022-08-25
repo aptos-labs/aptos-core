@@ -3,11 +3,11 @@
 
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
-// import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
-import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
-import { MdWifiTethering } from '@react-icons/all-files/md/MdWifiTethering';
+import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
 import Routes from 'core/routes';
 import { settingsItemLabel } from 'core/constants';
+import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
+import { MdWifiTethering } from '@react-icons/all-files/md/MdWifiTethering';
 import { Divider } from '@chakra-ui/react';
 import { SettingsListItemProps } from './SettingsListItem';
 
@@ -27,21 +27,20 @@ export const secondaryGridHoverTextColor = {
 };
 
 function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
-  const items: SettingsListItemProps[] = [
+  let items: SettingsListItemProps[] = [
     {
       iconAfter: FiChevronRight,
       iconBefore: MdWifiTethering,
       path: Routes.network.path,
       title: settingsItemLabel.NETWORK,
     },
-    // TODO: implement later
-    // {
-    //   DividerComponent: Divider,
-    //   iconAfter: FiChevronRight,
-    //   iconBefore: BsShieldFill,
-    //   path: null,
-    //   title: 'Security and Privacy',
-    // },
+    {
+      DividerComponent: Divider,
+      iconAfter: FiChevronRight,
+      iconBefore: BsShieldFill,
+      path: null,
+      title: 'Security and Privacy',
+    },
     {
       externalLink: 'https://discord.gg/rGRFrgFT',
       iconBefore: AiFillQuestionCircle,
@@ -69,23 +68,22 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
     });
   }
 
-  // TODO: implement later
-  // items = items.concat(
-  //   [
-  //     {
-  //       iconAfter: FiChevronRight,
-  //       path: null,
-  //       title: 'Switch account',
-  //     },
-  //     {
-  //       path: null,
-  //       textColorDict: {
-  //         dark: 'red.400',
-  //         light: 'red.400',
-  //       },
-  //       title: 'Remove account',
-  //     }],
-  // );
+  items = items.concat(
+    [
+      {
+        iconAfter: FiChevronRight,
+        path: null,
+        title: 'Switch account',
+      },
+      {
+        path: null,
+        textColorDict: {
+          dark: 'red.400',
+          light: 'red.400',
+        },
+        title: 'Remove account',
+      }],
+  );
 
   return items;
 }
