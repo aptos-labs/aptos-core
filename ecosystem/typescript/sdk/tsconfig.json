@@ -13,7 +13,5 @@
     "target": "es2020",
     "pretty": true
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as SHA3 from "js-sha3";
-import { Buffer } from "buffer/";
 import { MemoizeExpiring } from "typescript-memoize";
 import {
   Ed25519PublicKey,
@@ -68,16 +67,16 @@ export class TransactionBuilder<F extends SigningFn> {
   static getSigningMessage(rawTxn: AnyRawTransaction): SigningMessage {
     const hash = SHA3.sha3_256.create();
     if (rawTxn instanceof RawTransaction) {
-      hash.update(Buffer.from(RAW_TRANSACTION_SALT));
+      hash.update(RAW_TRANSACTION_SALT);
     } else if (rawTxn instanceof MultiAgentRawTransaction) {
-      hash.update(Buffer.from(RAW_TRANSACTION_WITH_DATA_SALT));
+      hash.update(RAW_TRANSACTION_WITH_DATA_SALT);
     } else {
       throw new Error("Unknown transaction type.");
     }
 
     const prefix = new Uint8Array(hash.arrayBuffer());
 
-    return Buffer.from([...prefix, ...bcsToBytes(rawTxn)]);
+    return Uint8Array.from([...prefix, ...bcsToBytes(rawTxn)]);
   }
 }
 
