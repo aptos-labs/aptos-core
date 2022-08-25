@@ -45,7 +45,7 @@ impl Display for RistrettoPointHandle {
 /// value which is passed into session functions, so its accessible from natives of this extension.
 #[derive(Tid)]
 pub struct NativeRistrettoPointContext {
-    point_data: RefCell<PointStore>,
+    pub point_data: RefCell<PointStore>,
 }
 
 //
@@ -55,7 +55,7 @@ pub struct NativeRistrettoPointContext {
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
-struct PointStore {
+pub struct PointStore {
     points: Vec<RistrettoPoint>,
 }
 
@@ -78,25 +78,25 @@ impl NativeRistrettoPointContext {
 
 impl PointStore {
     /// Re-sets a RistrettoPoint that was previously allocated.
-    fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
+    pub fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
         self.points[handle.0 as usize] = point
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
+    pub fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
         //&self.points[handle.0 as usize]
         self.points.get(handle.0 as usize).unwrap()
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
+    pub fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
         //&mut self.points[handle.0 as usize]
         self.points.get_mut(handle.0 as usize).unwrap()
     }
 
     /// Returns mutable references to two different Ristretto points in the vector using split_at_mut.
     /// Note that Rust's linear types prevent us from simply returning `(&mut points[i], &mut points[j])`.
-    fn get_two_muts(
+    pub fn get_two_muts(
         &mut self,
         a: &RistrettoPointHandle,
         b: &RistrettoPointHandle,
@@ -223,6 +223,25 @@ pub(crate) fn native_point_decompress(
         cost,
         smallvec![Value::u64(id), Value::bool(true)],
     ))
+}
+
+pub(crate) fn native_point_clone(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(ty_args.len(), 0);
+    assert_eq!(args.len(), 1);
+    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+    let mut point_data = point_context.point_data.borrow_mut();
+    let handle = pop_as_ristretto_handle(&mut args)?;
+    let cost = gas_params.point_clone * NumArgs::one();
+    let point = point_data.get_point(&handle);
+    let clone = *point;
+    let result_handle = point_data.add_point(clone);
+
+    Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
 
 pub(crate) fn native_point_compress(
@@ -462,6 +481,7 @@ pub(crate) fn native_basepoint_double_mul(
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
 
+// NOTE: This was supposed to be more clearly named with *_sha2_512_*
 pub(crate) fn native_new_point_from_sha512(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -477,8 +497,8 @@ pub(crate) fn native_new_point_from_sha512(
     let bytes = pop_arg!(args, Vec<u8>);
 
     let cost = gas_params.point_from_64_uniform_bytes * NumArgs::one()
-        + gas_params.sha512_per_hash * NumArgs::one()
-        + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64);
+        + gas_params.sha2_512_per_hash * NumArgs::one()
+        + gas_params.sha2_512_per_byte * NumBytes::new(bytes.len() as u64);
 
     let result_handle = point_data.add_point(RistrettoPoint::hash_from_bytes::<Sha512>(&bytes));
 
@@ -500,6 +520,38 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     let slice = pop_64_byte_slice(&mut args)?;
     let cost = gas_params.point_from_64_uniform_bytes * NumArgs::one();
     let result_handle = point_data.add_point(RistrettoPoint::from_uniform_bytes(&slice));
+
+    Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
+}
+
+pub(crate) fn native_double_scalar_mul(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(args.len(), 4);
+
+    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+    let mut point_data = point_context.point_data.borrow_mut();
+
+    let scalar2 = pop_scalar_from_bytes(&mut args)?;
+    let scalar1 = pop_scalar_from_bytes(&mut args)?;
+    let handle2 = pop_as_ristretto_handle(&mut args)?;
+    let handle1 = pop_as_ristretto_handle(&mut args)?;
+
+    let points = vec![
+        point_data.get_point(&handle1),
+        point_data.get_point(&handle2),
+    ];
+
+    let scalars = vec![scalar1, scalar2];
+
+    let result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter());
+
+    let cost = gas_params.multi_scalar_mul_gas(2);
+
+    let result_handle = point_data.add_point(result);
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
@@ -544,13 +596,9 @@ pub(crate) fn native_multi_scalar_mul(
 
     let result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter());
 
-    // NOTE: The variable-time multiscalar multiplication (MSM) algorithm for a size-n MSM employed in curve25519 is:
-    //  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
-    //  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
-    // For simplicity, we estimate the complexity as O(n / log_2 n)
     let cost = gas_params.scalar_parse_arg * NumArgs::new(num as u64)
         + gas_params.point_parse_arg * NumArgs::new(num as u64)
-        + gas_params.point_mul * NumArgs::new((num as f64 / f64::log2(num as f64)).ceil() as u64);
+        + gas_params.multi_scalar_mul_gas(num);
 
     let result_handle = point_data.add_point(result);
 
@@ -560,7 +608,7 @@ pub(crate) fn native_multi_scalar_mul(
 // =========================================================================================
 // Helpers
 
-fn get_point_handle(move_point: &StructRef) -> PartialVMResult<RistrettoPointHandle> {
+pub fn get_point_handle(move_point: &StructRef) -> PartialVMResult<RistrettoPointHandle> {
     let field_ref = move_point
         .borrow_field(HANDLE_FIELD_INDEX)?
         .value_as::<Reference>()?;
@@ -581,6 +629,13 @@ pub fn get_point_handle_from_struct(move_point: Value) -> PartialVMResult<Ristre
 /// Pops a RistrettoPointHandle off the argument stack
 fn pop_ristretto_handle(args: &mut VecDeque<Value>) -> PartialVMResult<RistrettoPointHandle> {
     get_point_handle(&pop_arg!(args, StructRef))
+}
+
+/// Pops a RistrettoPointHandle off the argument stack
+fn pop_as_ristretto_handle(args: &mut VecDeque<Value>) -> PartialVMResult<RistrettoPointHandle> {
+    let handle = pop_arg!(args, u64);
+
+    Ok(RistrettoPointHandle(handle))
 }
 
 /// Checks if 32 bytes were given as input and, if so, returns Some(CompressedRistretto).
