@@ -13,12 +13,6 @@ function validate(hexString: HexString) {
   expect(hexString.noPrefix()).toBe(withoutPrefix);
 }
 
-test("from/to buffer", () => {
-  const hs = new HexString(withPrefix);
-  expect(hs.toBuffer().toString("hex")).toBe(withoutPrefix);
-  expect(HexString.fromBuffer(hs.toBuffer()).hex()).toBe(withPrefix);
-});
-
 test("from/to Uint8Array", () => {
   const hs = new HexString(withoutPrefix);
   expect(HexString.fromUint8Array(hs.toUint8Array()).hex()).toBe(withPrefix);
