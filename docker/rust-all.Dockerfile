@@ -1,13 +1,13 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:buster-20220228@sha256:fd510d85d7e0691ca551fe08e8a2516a86c7f24601a940a299b5fe5cdd22c03a AS debian-base
+FROM debian:buster-20220822@sha256:faa416b9eeda2cbdb796544422eedd698e716dbd99841138521a94db51bf6123 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.61-buster AS rust-base
+FROM rust:1.63.0-buster@sha256:0110d1b4193029735f1db1c0ed661676ed4b6f705b11b1ebe95c655b52e6906f AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 
