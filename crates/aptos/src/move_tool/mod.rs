@@ -137,7 +137,8 @@ impl CliCommand<()> for InitPackage {
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            Some("devnet".to_string()),
+            // TODO(@davidiw) return back to main once lands and then cherry-pick for devnet
+            Some("conversions".to_string()),
             addresses,
             self.prompt_options,
         )
@@ -166,7 +167,8 @@ pub fn init_move_dir(
             "AptosFramework".to_string(),
             Dependency {
                 local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+                // TODO(@davidiw) return back to aptos-core once lands
+                git: Some("https://github.com/davidiw/aptos-core.git".to_string()),
                 rev: Some(rev),
                 subdir: Some("aptos-move/framework/aptos-framework".to_string()),
                 aptos: None,

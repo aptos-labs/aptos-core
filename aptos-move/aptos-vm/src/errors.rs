@@ -3,7 +3,7 @@
 
 use crate::logging::AdapterLogSchema;
 use aptos_logger::prelude::*;
-use aptos_types::account_config::ChainSpecificAccountInfo;
+use aptos_types::account_config::TransactionValidation;
 use move_deps::{
     move_binary_format::errors::VMError,
     move_core_types::vm_status::{StatusCode, VMStatus},
@@ -46,15 +46,16 @@ fn error_split(code: u64) -> (u8, u64) {
 /// Any non-abort non-execution code is considered an invariant violation, specifically
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_prologue_error(
-    chain_specific_info: &ChainSpecificAccountInfo,
+    transaction_validation: &TransactionValidation,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let status = error.into_vm_status();
+    println!("{:?}", status);
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if !chain_specific_info.is_account_module_abort(&location) =>
+            if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();
@@ -66,6 +67,7 @@ pub fn convert_prologue_error(
             VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
         }
         VMStatus::MoveAbort(location, code) => {
+            println!("{:?} {:?}", location, code);
             let new_major_status = match error_split(code) {
                 // Invalid authentication key
                 (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
@@ -117,7 +119,7 @@ pub fn convert_prologue_error(
 /// Any other errors are mapped to the invariant violation
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_epilogue_error(
-    chain_specific_info: &ChainSpecificAccountInfo,
+    transaction_validation: &TransactionValidation,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
@@ -125,7 +127,7 @@ pub fn convert_epilogue_error(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if !chain_specific_info.is_account_module_abort(&location) =>
+            if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();

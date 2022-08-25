@@ -25,6 +25,7 @@
               }
             }
           },
+          "guid_creation_num": "3",
           "rotation_capability_offer": {
             "for": {
               "vec": []

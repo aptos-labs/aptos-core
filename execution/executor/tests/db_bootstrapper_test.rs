@@ -144,7 +144,7 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::account_create_account(*account)),
+        Some(aptos_stdlib::aptos_account_create_account(*account)),
     )
 }
 

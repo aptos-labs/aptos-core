@@ -21,7 +21,7 @@ module aptos_framework::aptos_governance {
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
 
-    use aptos_framework::account::{SignerCapability, create_signer_with_capability};
+    use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
     use aptos_framework::coin;
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
     use aptos_framework::reconfiguration;
@@ -156,9 +156,9 @@ module aptos_framework::aptos_governance {
             required_proposer_stake,
         });
         move_to(aptos_framework, GovernanceEvents {
-            create_proposal_events: event::new_event_handle<CreateProposalEvent>(aptos_framework),
-            update_config_events: event::new_event_handle<UpdateConfigEvent>(aptos_framework),
-            vote_events: event::new_event_handle<VoteEvent>(aptos_framework),
+            create_proposal_events: account::new_event_handle<CreateProposalEvent>(aptos_framework),
+            update_config_events: account::new_event_handle<UpdateConfigEvent>(aptos_framework),
+            vote_events: account::new_event_handle<VoteEvent>(aptos_framework),
         });
         move_to(aptos_framework, VotingRecords {
             votes: table::new(),
@@ -543,6 +543,10 @@ module aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::{Self, AptosCoin};
 
         timestamp::set_time_has_started_for_testing(aptos_framework);
+        account::create_account_for_test(signer::address_of(aptos_framework));
+        account::create_account_for_test(signer::address_of(proposer));
+        account::create_account_for_test(signer::address_of(yes_voter));
+        account::create_account_for_test(signer::address_of(no_voter));
 
         // Initialize the governance.
         staking_config::initialize_for_test(aptos_framework, 0, 1000, 2000, true, 0, 1, 100);
@@ -572,7 +576,9 @@ module aptos_framework::aptos_governance {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_governance_config(
-        aptos_framework: signer) acquires GovernanceConfig, GovernanceEvents {
+        aptos_framework: signer,
+    ) acquires GovernanceConfig, GovernanceEvents {
+        account::create_account_for_test(signer::address_of(&aptos_framework));
         initialize(&aptos_framework, 1, 2, 3);
         update_governance_config(&aptos_framework, 10, 20, 30);
 

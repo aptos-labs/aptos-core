@@ -13,7 +13,7 @@ use std::{convert::TryInto, path::PathBuf};
 async fn test_get_account_resource() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
-        .get(&get_account_resource("0xA550C18", "0x1::guid::Generator"))
+        .get(&get_account_resource("0xA550C18", "0x1::account::Account"))
         .await;
     context.check_golden_output(resp);
 }
@@ -71,7 +71,7 @@ async fn test_get_account_resource_with_version() {
     let resp = context
         .get(&get_account_resource_with_version(
             "0xA550C18",
-            "0x1::guid::Generator",
+            "0x1::account::Account",
             ledger_version,
         ))
         .await;
@@ -86,7 +86,7 @@ async fn test_get_account_resource_with_version_too_large() {
         .expect_status_code(404)
         .get(&get_account_resource_with_version(
             "0xA550C18",
-            "0x1::guid::Generator",
+            "0x1::account::Account",
             100000000,
         ))
         .await;

@@ -2,6 +2,7 @@ module hello_blockchain::message {
     use std::error;
     use std::signer;
     use std::string;
+    use aptos_framework::account;
     use aptos_std::event;
 
 //:!:>resource
@@ -30,7 +31,7 @@ module hello_blockchain::message {
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
                 message,
-                message_change_events: event::new_event_handle<MessageChangeEvent>(&account),
+                message_change_events: account::new_event_handle<MessageChangeEvent>(&account),
             })
         } else {
             let old_message_holder = borrow_global_mut<MessageHolder>(account_addr);
@@ -46,6 +47,7 @@ module hello_blockchain::message {
     #[test(account = @0x1)]
     public entry fun sender_can_set_message(account: signer) acquires MessageHolder {
         let addr = signer::address_of(&account);
+        aptos_framework::account::create_account_for_test(addr);
         set_message(account,  string::utf8(b"Hello, Blockchain"));
 
         assert!(

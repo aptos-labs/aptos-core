@@ -1,23 +1,23 @@
 module aptos_framework::genesis {
     use std::vector;
 
-    use aptos_framework::account;
     use aptos_framework::aggregator_factory;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
     use aptos_framework::coin::{Self, MintCapability};
-    use aptos_framework::coins;
+    use aptos_framework::account;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::staking_config;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::staking_config;
-    use aptos_framework::version;
+    use aptos_framework::transaction_validation;
     use aptos_framework::state_storage;
+    use aptos_framework::version;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -50,7 +50,9 @@ module aptos_framework::genesis {
         // to use this account.
         let (aptos_framework_account, aptos_framework_signer_cap) = account::create_framework_reserved_account(@aptos_framework);
         // Initialize account configs on aptos framework account.
-        account::initialize(
+        account::initialize(&aptos_framework_account);
+
+        transaction_validation::initialize(
             &aptos_framework_account,
             b"script_prologue",
             b"module_prologue",
@@ -117,7 +119,7 @@ module aptos_framework::genesis {
         aptos_framework: &signer,
         core_resources_auth_key: vector<u8>,
     ) {
-        let core_resources = account::create_account_internal(@core_resources);
+        let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         let mint_cap = initialize_aptos_coin(aptos_framework);
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
@@ -138,20 +140,20 @@ module aptos_framework::genesis {
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-            let owner = &account::create_account_internal(validator.owner_address);
+            let owner = &account::create_account(validator.owner_address);
             let operator = owner;
             // Create the operator account if it's different from owner.
             if (validator.operator_address != validator.owner_address) {
-                operator = &account::create_account_internal(validator.operator_address);
+                operator = &account::create_account(validator.operator_address);
             };
             // Create the voter account if it's different from owner and operator.
             if (validator.voter_address != validator.owner_address &&
                 validator.voter_address != validator.operator_address) {
-                account::create_account_internal(validator.voter_address);
+                account::create_account(validator.voter_address);
             };
 
             // Mint the initial staking amount to the validator.
-            coins::register<AptosCoin>(owner);
+            coin::register<AptosCoin>(owner);
             aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
 
             // Initialize the stake pool and join the validator set.

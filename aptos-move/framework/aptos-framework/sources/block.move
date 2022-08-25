@@ -5,11 +5,12 @@ module aptos_framework::block {
     use std::option;
     use aptos_std::event::{Self, EventHandle};
 
-    use aptos_framework::timestamp;
-    use aptos_framework::system_addresses;
+    use aptos_framework::account;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
+    use aptos_framework::system_addresses;
+    use aptos_framework::timestamp;
 
     friend aptos_framework::genesis;
 
@@ -60,8 +61,8 @@ module aptos_framework::block {
             BlockResource {
                 height: 0,
                 epoch_interval: epoch_interval_microsecs,
-                new_block_events: event::new_event_handle<NewBlockEvent>(aptos_framework),
-                update_epoch_interval_events: event::new_event_handle<UpdateEpochIntervalEvent>(aptos_framework),
+                new_block_events: account::new_event_handle<NewBlockEvent>(aptos_framework),
+                update_epoch_interval_events: account::new_event_handle<UpdateEpochIntervalEvent>(aptos_framework),
             }
         );
     }
@@ -186,6 +187,7 @@ module aptos_framework::block {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
+        account::create_account_for_test(@aptos_framework);
         initialize(&aptos_framework, 1);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 1, 0);
         update_epoch_interval_microsecs(&aptos_framework, 2);
@@ -198,6 +200,7 @@ module aptos_framework::block {
         aptos_framework: signer,
         account: signer,
     ) acquires BlockResource {
+        account::create_account_for_test(@aptos_framework);
         initialize(&aptos_framework, 1);
         update_epoch_interval_microsecs(&account, 2);
     }

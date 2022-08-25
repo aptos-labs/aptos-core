@@ -4,7 +4,10 @@
 /// events emitted to a handle and emit events to the event store.
 module aptos_std::event {
     use std::bcs;
-    use std::guid::{Self, GUID};
+
+    use aptos_framework::guid::GUID;
+
+    friend aptos_framework::account;
 
     /// A handle for an event such that:
     /// 1. Other modules can emit events to this handle.
@@ -16,18 +19,11 @@ module aptos_std::event {
         guid: GUID,
     }
 
-    /// Deprecated. Only kept around so Aptos clients know how to deserialize existing EventHandleGenerator's
-    struct EventHandleGenerator has key {
-        // A monotonically increasing counter
-        counter: u64,
-        addr: address,
-    }
-
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
-    public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
+    public(friend) fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {
         EventHandle<T> {
             counter: 0,
-            guid: guid::create(account)
+            guid,
         }
     }
 
@@ -53,13 +49,5 @@ module aptos_std::event {
     /// Destroy a unique handle.
     public fun destroy_handle<T: drop + store>(handle: EventHandle<T>) {
         EventHandle<T> { counter: _, guid: _ } = handle;
-    }
-
-    // ****************** TEST-ONLY FUNCTIONS **************
-
-    #[test_only]
-    public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUID {
-        let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
-        guid
     }
 }
