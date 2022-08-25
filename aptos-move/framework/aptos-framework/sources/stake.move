@@ -641,10 +641,11 @@ module aptos_framework::stake {
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        assert!(option::is_some(
-            &mut bls12381::public_key_from_bytes_with_pop(new_consensus_pubkey,
-            &proof_of_possession_from_bytes(proof_of_possession))
-        ), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+            new_consensus_pubkey,
+            &proof_of_possession_from_bytes(proof_of_possession)
+        );
+        assert!(option::is_some(pubkey_from_pop), error::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         event::emit_event<RotateConsensusKeyEvent>(
@@ -838,7 +839,9 @@ module aptos_framework::stake {
         if (withdraw_amount > total_withdrawable_amount) {
             withdraw_amount = total_withdrawable_amount;
         };
-        assert!(withdraw_amount > 0, error::invalid_argument(ENO_COINS_TO_WITHDRAW));
+        if (withdraw_amount == 0) {
+            return coin::zero<AptosCoin>()
+        };
 
         event::emit_event<WithdrawStakeEvent>(
             &mut stake_pool.withdraw_stake_events,
@@ -1262,6 +1265,27 @@ module aptos_framework::stake {
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+    }
+
+    #[test_only]
+    public fun join_validator_set_for_test(
+        operator: &signer,
+        pool_address: address,
+        should_end_epoch: bool,
+    ) acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        join_validator_set(operator, pool_address);
+        if (should_end_epoch) {
+            end_epoch();
+        }
+    }
+
+    #[test_only]
+    public fun fast_forward_to_unlock(pool_address: address)
+    acquires AptosCoinCapabilities, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let expiration_time = get_lockup_secs(pool_address);
+        timestamp::update_global_time_for_test_secs(expiration_time);
+        end_epoch();
     }
 
     // Convenient function for setting up all required stake initializations.
@@ -2371,5 +2395,11 @@ module aptos_framework::stake {
         assert_stake_pool(pool_address, active_stake, inactive_stake, pending_active_stake, pending_inactive_stake);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         assert!(validator_config.validator_index == validator_index, validator_config.validator_index);
+    }
+
+    #[test_only]
+    public fun with_rewards(amount: u64): u64 {
+        let (numerator, denominator) = staking_config::get_reward_rate(&staking_config::get());
+        amount + amount * numerator / denominator
     }
 }
