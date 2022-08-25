@@ -345,6 +345,7 @@ pub struct AccountData {
     account: Account,
     sequence_number: u64,
     coin_register_events: EventHandle,
+    key_rotation_events: EventHandle,
     coin_store: CoinStore,
 }
 
@@ -401,6 +402,7 @@ impl AccountData {
             ),
             sequence_number,
             coin_register_events: new_event_handle(0, addr),
+            key_rotation_events: new_event_handle(1, addr),
         }
     }
 
@@ -415,6 +417,7 @@ impl AccountData {
             self.sequence_number,
             AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
             self.coin_register_events.clone(),
+            self.key_rotation_events.clone(),
         );
         bcs::to_bytes(&account).unwrap()
     }

@@ -25,8 +25,14 @@ module aptos_framework::account {
         sequence_number: u64,
         guid_creation_num: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
+        key_rotation_events: EventHandle<KeyRotationEvent>,
         rotation_capability_offer: CapabilityOffer<RotationCapability>,
         signer_capability_offer: CapabilityOffer<SignerCapability>,
+    }
+
+    struct KeyRotationEvent has drop, store {
+        old_authentication_key: vector<u8>,
+        new_authentication_key: vector<u8>,
     }
 
     struct CoinRegisterEvent has drop, store {
@@ -121,8 +127,12 @@ module aptos_framework::account {
         );
 
         let guid_creation_num = 0;
-        let guid = guid::create(new_address, &mut guid_creation_num);
-        let coin_register_events = event::new_event_handle<CoinRegisterEvent>(guid);
+
+        let guid_for_coin = guid::create(new_address, &mut guid_creation_num);
+        let coin_register_events = event::new_event_handle<CoinRegisterEvent>(guid_for_coin);
+
+        let guid_for_rotation = guid::create(new_address, &mut guid_creation_num);
+        let key_rotation_events = event::new_event_handle<KeyRotationEvent>(guid_for_rotation);
 
         move_to(
             &new_account,
@@ -131,6 +141,7 @@ module aptos_framework::account {
                 sequence_number: 0,
                 guid_creation_num,
                 coin_register_events,
+                key_rotation_events,
                 rotation_capability_offer: CapabilityOffer { for: option::none() },
                 signer_capability_offer: CapabilityOffer { for: option::none() },
             }

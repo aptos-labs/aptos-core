@@ -25,7 +25,16 @@
               }
             }
           },
-          "guid_creation_num": "3",
+          "guid_creation_num": "4",
+          "key_rotation_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+                "creation_num": "1"
+              }
+            }
+          },
           "rotation_capability_offer": {
             "for": {
               "vec": []
