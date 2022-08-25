@@ -2,7 +2,7 @@
 /// 1) Keys point to Values
 /// 2) Each Key must be unique
 /// 3) A Key can be found within O(Log N) time
-/// 4) The data is stored as a sorted by Key
+/// 4) The data is stored as sorted by Key
 /// 5) Adds and removals take O(N) time
 module aptos_std::simple_map {
     use std::error;
@@ -119,7 +119,7 @@ module aptos_std::simple_map {
         let right = length;
 
         while (left != right) {
-            let mid = (left + right) / 2;
+            let mid = left + (right - left) / 2;
             let potential_key = &vector::borrow(&map.data, mid).key;
             if (comparator::is_smaller_than(&comparator::compare(potential_key, key))) {
                 left = mid + 1;
