@@ -5,10 +5,15 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+N/A
+
+## 1.3.8 (2022-08-25)
 - **[Breaking Change]** Reimplemented the JSON transaction submission interfaces with BCS. This is a breaking change. `createSigningMessage` is removed. Before the changes, the transaction payloads take string aruguments. But now, Typescript payload arguments have to match the smart contract arugment types. e.g. `number` matches `u8`, `number | bigint` matches `u64` and `u128`, etc.
 - **[Breaking Change]** `getTokenBalance` and `getTokenBalanceForAccount` have been renamed to `getToken` and `getTokenForAccount`, since they were never getting just the balance, but the full token.
 - Added `CoinClient` to help working with coins. This contains common operations such as `transfer`, `checkBalance`, etc.
-- Added `generateSignSendWaitForTransaction`, a function that provides a simple way to execute the full end to end transaction submission flow.
+- Added `generateSignSubmitWaitForTransaction`, a function that provides a simple way to execute the full end to end transaction submission flow. You may also leverage `generateSignSubmit`, a helper that does the same but without waiting, instead returning teh transaction hash.
+- Added `fromDerivePath` to `AptosAccount`. You can use this to create an `AptosAccount` (which is a local representation of an account) using a bip44 path and mnemonics.
+
 
 ## 1.3.7 (2022-08-17)
 
