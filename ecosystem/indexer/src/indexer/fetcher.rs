@@ -74,10 +74,21 @@ impl Fetcher {
                 futures.push(fetch_nexts(
                     self.client.clone(),
                     self.current_version + (i as u64 * TRANSACTION_FETCH_BATCH_SIZE as u64),
-                    self.transactions_sender.clone(),
                 ));
             }
-            futures::future::join_all(futures).await;
+            let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            res.sort_by(|a, b| {
+                a.first()
+                    .unwrap()
+                    .version()
+                    .unwrap()
+                    .cmp(&b.first().unwrap().version().unwrap())
+            });
+
+            for batch in res {
+                self.current_version = batch.last().unwrap().version().unwrap();
+                self.transactions_sender.send(batch).await.unwrap();
+            }
         }
     }
 }
@@ -85,11 +96,7 @@ impl Fetcher {
 /// Fetches the next version based on its internal version counter
 /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
 /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
-async fn fetch_nexts(
-    client: RestClient,
-    starting_version: u64,
-    mut transactions_sender: mpsc::Sender<Vec<Transaction>>,
-) -> Vec<Transaction> {
+async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transaction> {
     let mut retries = 0;
     while retries < MAX_RETRIES {
         retries += 1;
@@ -101,9 +108,7 @@ async fn fetch_nexts(
         match res {
             Ok(response) => {
                 FETCHED_TRANSACTION.inc();
-                let txns = remove_null_bytes_from_txns(response.into_inner());
-                transactions_sender.send(txns).await.unwrap();
-                return vec![];
+                return remove_null_bytes_from_txns(response.into_inner());
             }
             Err(err) => {
                 let err_str = err.to_string();
