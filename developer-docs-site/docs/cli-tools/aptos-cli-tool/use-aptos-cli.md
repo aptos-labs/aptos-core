@@ -678,6 +678,15 @@ SUCCESS proving 1 modules from package `hello_prover` in 1.649s
 }
 ```
 
+Move Prover may fail with the following terminal output if the dependencies are not installed and set up properly:
+```bash
+FAILURE proving 1 modules from package `hello_prover` in 0.067s
+{
+  "Error": "Move Prover failed: No boogie executable set.  Please set BOOGIE_EXE"
+}
+```
+In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
+
 ### Debug and Print Stacktrace
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).

@@ -69,3 +69,15 @@ cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --branch 
 which aptos
 ```
 
+### Step 3 (optional): Install the dependencies of Move Prover
+
+Run the following command in the `aptos-core` root directory:
+```bash
+./scripts/dev_setup.sh -yp
+. ~/.profile
+```
+This command should work on MacOS and Linux flavors like Ubuntu or CentOS. (Windows is currently not supported).
+
+Notice that you have to include environment variable definitions in `~/.profile` into your shell. Depending on your
+setup, the  `~/.profile` may be already automatically loaded for each login shell, or it may not. If not, you may
+need to add `. ~/.profile` to your `~/.bash_profile` or other shell configuration manually.
