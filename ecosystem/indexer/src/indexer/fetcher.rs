@@ -13,7 +13,7 @@ use url::Url;
 // TODO: make this configurable
 const RETRY_TIME_MILLIS: u64 = 1000;
 const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
-const TRANSACTION_CHANNEL_SIZE: usize = 50_000;
+const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const MAX_THREADS: usize = 10;
 const MAX_RETRIES: usize = 5;
 
