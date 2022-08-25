@@ -15,49 +15,15 @@ use anyhow::{ensure, Context, Result};
 use aptos_logger::info;
 use aptos_rest_client::Transaction;
 use diesel::{prelude::*, RunQueryDsl};
-use serde_json::Value;
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 use url::{ParseError, Url};
 
 diesel_migrations::embed_migrations!();
 
-pub fn string_null_byte_replacement(value: &mut str) -> String {
-    value.replace('\u{0000}', "").replace("\\u0000", "")
-}
-
-pub fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
-    match sub_json {
-        Value::Array(array) => {
-            for item in array {
-                recurse_remove_null_bytes_from_json(item);
-            }
-        }
-        Value::Object(object) => {
-            for (_key, value) in object {
-                recurse_remove_null_bytes_from_json(value);
-            }
-        }
-        Value::String(str) => {
-            if !str.is_empty() {
-                let replacement = string_null_byte_replacement(str);
-                *str = replacement;
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn remove_null_bytes_from_txn(txn: Arc<Transaction>) -> Arc<Transaction> {
-    let mut txn_json = serde_json::to_value(txn).unwrap();
-    recurse_remove_null_bytes_from_json(&mut txn_json);
-    let txn: Transaction = serde_json::from_value::<Transaction>(txn_json).unwrap();
-    Arc::new(txn)
-}
-
 #[derive(Clone)]
 pub struct Tailer {
-    transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
+    pub transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
     processors: Vec<Arc<dyn TransactionProcessor>>,
     connection_pool: PgDbPool,
 }
@@ -155,7 +121,7 @@ impl Tailer {
                 for version in errored_versions {
                     let txn = self2.get_txn(version).await;
                     if processor2
-                        .process_transaction_with_status(txn)
+                        .process_transactions_with_status(vec![txn])
                         .await
                         .is_ok()
                     {
@@ -195,16 +161,13 @@ impl Tailer {
     }
 
     pub async fn set_fetcher_version(&self, version: u64) -> u64 {
-        self.transaction_fetcher.lock().await.set_version(version);
+        self.transaction_fetcher
+            .lock()
+            .await
+            .set_version(version)
+            .await;
         aptos_logger::info!("Will start fetching from version {}", version);
         version
-    }
-
-    pub async fn process_next(
-        &mut self,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
-        let txn = self.get_next_txn().await;
-        self.process_transaction(txn).await
     }
 
     pub async fn process_version(
@@ -212,36 +175,53 @@ impl Tailer {
         version: u64,
     ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
         let txn = self.get_txn(version).await;
-        self.process_transaction(txn).await
+        self.process_transactions(vec![txn]).await
     }
 
     pub async fn process_next_batch(
-        &mut self,
+        &self,
         batch_size: u8,
-    ) -> Vec<anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> {
+    ) -> (
+        usize,
+        Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>>,
+    ) {
+        let transactions = self
+            .transaction_fetcher
+            .lock()
+            .await
+            .fetch_next_batch()
+            .await;
+        let num_txns = transactions.len();
         let mut tasks = vec![];
-        for _ in 0..batch_size {
-            let mut self2 = self.clone();
-            let task = tokio::task::spawn(async move { self2.process_next().await });
+        let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
+        for ind in 0..num_batches {
+            let self2 = self.clone();
+            let (start_index, end_index) = (
+                ind * batch_size as usize,
+                std::cmp::min((ind + 1) * batch_size as usize, transactions.len()),
+            );
+            let mut txns = vec![];
+            for t in &transactions[start_index..end_index] {
+                txns.push(t.clone());
+            }
+            let task = tokio::task::spawn(async move { self2.process_transactions(txns).await });
             tasks.push(task);
         }
-        let results = await_tasks(tasks).await;
-        results
+        let results: Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> =
+            await_tasks(tasks).await;
+        (num_txns, results)
     }
 
-    pub async fn process_transaction(
+    pub async fn process_transactions(
         &self,
-        txn: Arc<Transaction>,
+        txns: Vec<Transaction>,
     ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
         let mut tasks = vec![];
-        let txn = remove_null_bytes_from_txn(txn.clone());
         for processor in &self.processors {
             let processor2 = processor.clone();
-            let txn2 = txn.clone();
+            let txns2 = txns.clone();
             let task = tokio::task::spawn(async move {
-                processor2
-                    .process_transaction_with_status(txn2.clone())
-                    .await
+                processor2.process_transactions_with_status(txns2).await
             });
             tasks.push(task);
         }
@@ -249,18 +229,12 @@ impl Tailer {
         Ok(results)
     }
 
-    pub async fn get_next_txn(&mut self) -> Arc<Transaction> {
-        Arc::new(self.transaction_fetcher.lock().await.fetch_next().await)
-    }
-
-    pub async fn get_txn(&self, version: u64) -> Arc<Transaction> {
-        Arc::new(
-            self.transaction_fetcher
-                .lock()
-                .await
-                .fetch_version(version)
-                .await,
-        )
+    pub async fn get_txn(&self, version: u64) -> Transaction {
+        self.transaction_fetcher
+            .lock()
+            .await
+            .fetch_version(version)
+            .await
     }
 }
 
@@ -305,10 +279,12 @@ mod test {
 
     #[async_trait::async_trait]
     impl TransactionFetcherTrait for FakeFetcher {
-        fn set_version(&mut self, version: u64) {
-            self.version = version;
-            // Super hacky way of mocking chain_id
-            self.chain_id = version as u8;
+        async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
+            unimplemented!();
+        }
+
+        async fn fetch_version(&self, _version: u64) -> Transaction {
+            unimplemented!();
         }
 
         async fn fetch_ledger_info(&mut self) -> State {
@@ -323,12 +299,14 @@ mod test {
             }
         }
 
-        async fn fetch_next(&mut self) -> Transaction {
-            unimplemented!();
+        async fn set_version(&mut self, version: u64) {
+            self.version = version;
+            // Super hacky way of mocking chain_id
+            self.chain_id = version as u8;
         }
 
-        async fn fetch_version(&self, _version: u64) -> Transaction {
-            unimplemented!();
+        async fn start(&mut self) {
+            // do nothing
         }
     }
 
@@ -574,7 +552,7 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transaction(Arc::new(genesis_txn.clone()))
+            .process_transactions(vec![genesis_txn.clone()])
             .await
             .unwrap();
 
@@ -652,7 +630,7 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transaction(Arc::new(block_metadata_transaction.clone()))
+            .process_transactions(vec![block_metadata_transaction.clone()])
             .await
             .unwrap();
 
@@ -765,11 +743,11 @@ mod test {
 
         // We run it twice to ensure we don't explode. Idempotency!
         tailer
-            .process_transaction(Arc::new(user_txn.clone()))
+            .process_transactions(vec![user_txn.clone()])
             .await
             .unwrap();
         tailer
-            .process_transaction(Arc::new(user_txn.clone()))
+            .process_transactions(vec![user_txn.clone()])
             .await
             .unwrap();
 
@@ -852,10 +830,8 @@ mod test {
             }
         )).unwrap();
 
-        tailer
-            .process_transaction(Arc::new(message_txn.clone()))
-            .await
-            .unwrap();
+        let txns = crate::indexer::fetcher::remove_null_bytes_from_txns(vec![message_txn.clone()]);
+        tailer.process_transactions(txns).await.unwrap();
 
         let (_conn_pool, tailer) = setup_indexer().unwrap();
         tailer.set_fetcher_version(4).await;
