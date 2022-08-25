@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.57"
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-rest-client = { path = "../crates/aptos-rest-client" }
 aptos-types = { path = "../types" }
@@ -18,3 +19,10 @@ cached-packages = { path = "../aptos-move/framework/cached-packages" }
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 rand_core = "0.5.1"
 serde = { version = "1.0.137", features = ["derive"] }
+
+# Used by the examples.
+[dev-dependencies]
+once_cell = "1.13.0"
+rand = "0.7.3"
+tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread"] }
+url = "2.2.2"
