@@ -12,6 +12,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::HashValue;
 use aptos_rest_client::aptos_api_types::UserTransaction;
 use aptos_rest_client::Transaction;
+use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
     TransactionType,
@@ -115,7 +116,7 @@ async fn test_network() {
     assert_eq!(
         BlockIdentifier {
             index: 0,
-            hash: HashValue::zero().to_hex()
+            hash: BlockHash::new(chain_id, 0).to_string()
         },
         status.genesis_block_identifier
     );
@@ -141,7 +142,7 @@ async fn test_account_balance() {
         response.block_identifier,
         BlockIdentifier {
             index: 0,
-            hash: HashValue::zero().to_hex(),
+            hash: BlockHash::new(chain_id, 0).to_string()
         }
     );
 
@@ -508,7 +509,6 @@ async fn test_block() {
     // Now we have to watch all the changes
     let mut current_version = 0;
     let mut previous_block_index = 0;
-    let mut previous_block_hash = format!("{:x}", HashValue::zero());
     for block_height in 0..final_block_height {
         let request = BlockRequest::by_index(chain_id, block_height);
         let response: BlockResponse = rosetta_client
@@ -528,16 +528,17 @@ async fn test_block() {
         );
         assert_eq!(
             block.block_identifier.hash,
-            format!("{:x}", actual_block.block_hash),
-            "Block hash should match the actual block"
+            BlockHash::new(chain_id, block_height).to_string(),
+            "Block hash should match chain_id-block_height"
         );
         assert_eq!(
             block.parent_block_identifier.index, previous_block_index,
             "Parent block index should be previous block"
         );
         assert_eq!(
-            block.parent_block_identifier.hash, previous_block_hash,
-            "Parent block hash should be previous block"
+            block.parent_block_identifier.hash,
+            BlockHash::new(chain_id, previous_block_index).to_string(),
+            "Parent block hash should be previous block chain_id-block_height"
         );
 
         // It's only greater or equal because microseconds are cut off
@@ -567,7 +568,6 @@ async fn test_block() {
         assert_eq!(current_version - 1, actual_block.last_version.0);
 
         // Keep track of the previous
-        previous_block_hash = block.block_identifier.hash;
         previous_block_index = block_height;
     }
 
