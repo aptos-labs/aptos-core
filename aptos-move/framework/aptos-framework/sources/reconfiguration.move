@@ -4,11 +4,12 @@ module aptos_framework::reconfiguration {
     use std::error;
     use aptos_std::event;
     use std::signer;
-    use std::guid;
-    use aptos_framework::system_addresses;
-    use aptos_framework::timestamp;
+
+    use aptos_framework::account;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
+    use aptos_framework::system_addresses;
+    use aptos_framework::timestamp;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
@@ -54,13 +55,13 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(aptos_framework)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(account::get_guid_next_creation_num(signer::address_of(aptos_framework)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             aptos_framework,
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
-                events: event::new_event_handle<NewEpochEvent>(aptos_framework),
+                events: account::new_event_handle<NewEpochEvent>(aptos_framework),
             }
         );
     }
@@ -160,7 +161,7 @@ module aptos_framework::reconfiguration {
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
-                events: event::new_event_handle<NewEpochEvent>(account),
+                events: account::new_event_handle<NewEpochEvent>(account),
             }
         );
     }

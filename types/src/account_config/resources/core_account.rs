@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 pub struct AccountResource {
     authentication_key: Vec<u8>,
     sequence_number: u64,
+    guid_creation_num: u64,
     coin_register_events: EventHandle,
     rotation_capability_offer: Option<AccountAddress>,
     signer_capability_offer: Option<AccountAddress>,
@@ -33,6 +34,7 @@ impl AccountResource {
         AccountResource {
             authentication_key,
             sequence_number,
+            guid_creation_num: 0,
             coin_register_events,
             rotation_capability_offer: None,
             signer_capability_offer: None,
@@ -51,6 +53,10 @@ impl AccountResource {
 
     pub fn coin_register_events(&self) -> &EventHandle {
         &self.coin_register_events
+    }
+
+    pub fn guid_creation_num(&self) -> u64 {
+        self.guid_creation_num
     }
 
     pub fn rotation_capability_offer(&self) -> Option<AccountAddress> {
