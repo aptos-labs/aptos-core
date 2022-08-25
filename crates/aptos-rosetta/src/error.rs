@@ -147,23 +147,8 @@ impl ApiError {
     }
 
     pub fn status_code(&self) -> StatusCode {
-        use ApiError::*;
-        match self {
-            AccountNotFound(_)
-            | BlockNotFound(_)
-            | ResourceNotFound(_)
-            | ModuleNotFound(_)
-            | VersionNotFound(_)
-            | TransactionNotFound(_)
-            | StructFieldNotFound(_)
-            | TableItemNotFound(_) => StatusCode::NOT_FOUND,
-            MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
-            BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
-            NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
-            GasEstimationFailed(_) => StatusCode::SERVICE_UNAVAILABLE,
-            InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            _ => StatusCode::BAD_REQUEST,
-        }
+        // Per Rosetta guidelines, all errors are 500s
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 
     /// This value must be fixed, so it's all static strings
