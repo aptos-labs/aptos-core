@@ -5,6 +5,7 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_identifiers.html)
 
+use crate::common::BlockHash;
 use crate::{
     common::{to_hex_lower, BLOCKCHAIN},
     error::{ApiError, ApiResult},
@@ -68,10 +69,13 @@ pub struct BlockIdentifier {
 }
 
 impl BlockIdentifier {
-    pub fn from_block(block: &aptos_rest_client::aptos_api_types::Block) -> BlockIdentifier {
+    pub fn from_block(
+        block: &aptos_rest_client::aptos_api_types::Block,
+        chain_id: ChainId,
+    ) -> BlockIdentifier {
         BlockIdentifier {
             index: block.block_height.0,
-            hash: to_hex_lower(&block.block_hash),
+            hash: BlockHash::from((chain_id, block.block_height.0)).to_string(),
         }
     }
 }

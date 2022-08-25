@@ -185,9 +185,7 @@ pub async fn get_block_index_from_request(
         Some(PartialBlockIdentifier {
             index: None,
             hash: Some(hash),
-        }) => server_context.block_cache()?.get_block_height_by_hash(
-            &aptos_rest_client::aptos_api_types::HashValue::from_str(&hash)?,
-        )?,
+        }) => BlockHash::from_str(&hash)?.block_height(server_context.chain_id)?,
         // Lookup latest version
         _ => {
             let response = server_context
@@ -201,6 +199,116 @@ pub async fn get_block_index_from_request(
     })
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct BlockHash {
+    chain_id: ChainId,
+    block_height: u64,
+}
+
+impl BlockHash {
+    pub fn block_height(&self, chain_id: ChainId) -> ApiResult<u64> {
+        if chain_id != self.chain_id {
+            Err(ApiError::InvalidInput(Some(format!(
+                "Invalid chain id in block hash {} expected {}",
+                self.chain_id, chain_id
+            ))))
+        } else {
+            Ok(self.block_height)
+        }
+    }
+}
+
+impl From<(ChainId, u64)> for BlockHash {
+    fn from((chain_id, block_height): (ChainId, u64)) -> Self {
+        BlockHash {
+            chain_id,
+            block_height,
+        }
+    }
+}
+
+impl FromStr for BlockHash {
+    type Err = ApiError;
+
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        let error = ApiError::InvalidInput(Some(format!("Invalid block hash {}", str)));
+        let mut iter = str.split('-');
+
+        let chain_id = if let Some(maybe_chain_id) = iter.next() {
+            ChainId::from_str(maybe_chain_id).map_err(|_| error.clone())?
+        } else {
+            return Err(error);
+        };
+
+        let block_height = if let Some(maybe_block_height) = iter.next() {
+            u64::from_str(maybe_block_height).map_err(|_| error.clone())?
+        } else {
+            return Err(error);
+        };
+
+        if iter.next().is_some() {
+            Err(error)
+        } else {
+            Ok((chain_id, block_height).into())
+        }
+    }
+}
+
+impl std::fmt::Display for BlockHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.chain_id, self.block_height)
+    }
+}
+
 pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
     format!("{:x}", obj)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::common::BlockHash;
+    use aptos_types::chain_id::{ChainId, NamedChain};
+    use std::str::FromStr;
+
+    #[test]
+    pub fn chain_id_height_check() {
+        let block_hash: BlockHash = (ChainId::test(), 0).into();
+        block_hash
+            .block_height(ChainId::test())
+            .expect("Matching chain id should work");
+        block_hash
+            .block_height(ChainId::new(NamedChain::MAINNET.id()))
+            .expect_err("Mismatch chain id should not work");
+    }
+
+    #[test]
+    pub fn chain_id_string_check() {
+        let block_hash: BlockHash = (ChainId::test(), 0).into();
+        let parsed_block_hash =
+            BlockHash::from_str(&block_hash.to_string()).expect("Should parse string");
+        assert_eq!(block_hash, parsed_block_hash);
+    }
+
+    #[test]
+    pub fn valid_block_hashes() {
+        let valid_block_hashes: Vec<(&str, ChainId, u64)> = vec![
+            ("testnet-0", ChainId::new(NamedChain::TESTNET.id()), 0),
+            ("mainnet-20", ChainId::new(NamedChain::MAINNET.id()), 20),
+            ("5-2", ChainId::new(5), 2),
+        ];
+        for (str, chain_id, height) in valid_block_hashes {
+            let block_hash = BlockHash::from_str(str).expect("Valid block hash");
+            assert_eq!(block_hash.block_height, height);
+            assert_eq!(block_hash.chain_id, chain_id);
+        }
+    }
+
+    #[test]
+    pub fn invalid_block_hashes() {
+        let invalid_block_hashes: Vec<&str> =
+            vec!["testnet--1", "testnet", "1", "testnet-1-1", "1-mainnet"];
+        for str in invalid_block_hashes {
+            BlockHash::from_str(str).expect_err("Invalid block hash");
+        }
+    }
 }

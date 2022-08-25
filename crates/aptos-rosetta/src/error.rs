@@ -12,7 +12,7 @@ use warp::{http::StatusCode, reply::Reply};
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ApiError {
     TransactionIsPending,
     NetworkIdentifierMismatch,

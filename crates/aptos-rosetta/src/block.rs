@@ -12,6 +12,7 @@ use crate::{
 };
 use aptos_logger::{debug, trace};
 use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_types::chain_id::ChainId;
 use std::sync::Arc;
 use std::{collections::BTreeMap, sync::RwLock};
 use warp::Filter;
@@ -46,10 +47,14 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let block_index =
         get_block_index_from_request(&server_context, request.block_identifier).await?;
 
-    let (parent_transaction, block) =
-        get_block_by_index(server_context.block_cache()?.as_ref(), block_index).await?;
+    let (parent_transaction, block) = get_block_by_index(
+        server_context.block_cache()?.as_ref(),
+        block_index,
+        server_context.chain_id,
+    )
+    .await?;
 
-    let block = build_block(parent_transaction, block).await?;
+    let block = build_block(parent_transaction, block, server_context.chain_id).await?;
 
     Ok(BlockResponse { block })
 }
@@ -58,10 +63,11 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 async fn build_block(
     parent_block_identifier: BlockIdentifier,
     block: aptos_rest_client::aptos_api_types::Block,
+    chain_id: ChainId,
 ) -> ApiResult<Block> {
     // note: timestamps are in microseconds, so we convert to milliseconds
     let timestamp = get_timestamp(block.block_timestamp.0);
-    let block_identifier = BlockIdentifier::from_block(&block);
+    let block_identifier = BlockIdentifier::from_block(&block, chain_id);
 
     // Convert the transactions and build the block
     let mut transactions: Vec<Transaction> = Vec::new();
@@ -83,20 +89,23 @@ async fn build_block(
 async fn get_block_by_index(
     block_cache: &BlockCache,
     block_height: u64,
+    chain_id: ChainId,
 ) -> ApiResult<(BlockIdentifier, aptos_rest_client::aptos_api_types::Block)> {
-    let block = block_cache.get_block_by_height(block_height, true).await?;
+    let block = block_cache
+        .get_block_by_height(block_height, true, chain_id)
+        .await?;
 
     // For the genesis block, we populate parent_block_identifier with the
     // same genesis block. Refer to
     // https://www.rosetta-api.org/docs/common_mistakes.html#malformed-genesis-block
     if block_height == 0 {
-        Ok((BlockIdentifier::from_block(&block), block))
+        Ok((BlockIdentifier::from_block(&block, chain_id), block))
     } else {
         // Retrieve the previous block's identifier
         let prev_block = block_cache
-            .get_block_by_height(block_height - 1, false)
+            .get_block_by_height(block_height - 1, false, chain_id)
             .await?;
-        let prev_block_id = BlockIdentifier::from_block(&prev_block);
+        let prev_block_id = BlockIdentifier::from_block(&prev_block, chain_id);
 
         // Retrieve the current block
         Ok((prev_block_id, block))
@@ -114,9 +123,12 @@ pub struct BlockInfo {
 }
 
 impl BlockInfo {
-    pub fn from_block(block: &aptos_rest_client::aptos_api_types::Block) -> BlockInfo {
+    pub fn from_block(
+        block: &aptos_rest_client::aptos_api_types::Block,
+        chain_id: ChainId,
+    ) -> BlockInfo {
         BlockInfo {
-            block_id: BlockIdentifier::from_block(block),
+            block_id: BlockIdentifier::from_block(block, chain_id),
             timestamp: get_timestamp(block.block_timestamp.0),
             last_version: block.last_version.0,
         }
@@ -157,28 +169,33 @@ impl BlockCache {
         }
     }
 
-    pub async fn get_block_info_by_height(&self, height: u64) -> ApiResult<BlockInfo> {
+    pub async fn get_block_info_by_height(
+        &self,
+        height: u64,
+        chain_id: ChainId,
+    ) -> ApiResult<BlockInfo> {
         // If we cached it, get the information associated
         if let Some(info) = self.blocks.read().unwrap().get(&height) {
             return Ok(info.clone());
         }
 
         // Do this not in an else to allow function to be Send
-        let block = self.get_block_by_height(height, false).await?;
-        Ok(BlockInfo::from_block(&block))
+        let block = self.get_block_by_height(height, false, chain_id).await?;
+        Ok(BlockInfo::from_block(&block, chain_id))
     }
 
     pub async fn get_block_by_height(
         &self,
         height: u64,
         with_transactions: bool,
+        chain_id: ChainId,
     ) -> ApiResult<aptos_rest_client::aptos_api_types::Block> {
         let block = self
             .rest_client
             .get_block_by_height(height, with_transactions)
             .await?
             .into_inner();
-        let block_id = BlockInfo::from_block(&block);
+        let block_id = BlockInfo::from_block(&block, chain_id);
         self.blocks
             .write()
             .unwrap()
