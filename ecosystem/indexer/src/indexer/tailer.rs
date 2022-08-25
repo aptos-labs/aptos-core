@@ -192,15 +192,7 @@ impl Tailer {
             .fetch_next_batch()
             .await;
         let num_txns = transactions.len();
-        //let res = self.process_transactions(txns).await;
-        //(num_txns, res)
         let mut tasks = vec![];
-        // let transactions = self
-        //     .transaction_fetcher
-        //     .lock()
-        //     .await
-        //     .fetch_next_batch()
-        //     .await;
         let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
         for ind in 0..num_batches {
             let self2 = self.clone();

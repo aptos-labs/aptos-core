@@ -71,14 +71,13 @@ impl Fetcher {
             ) as usize;
             let mut futures = vec![];
             for i in 0..num_batches {
-                let ver = self.current_version + (i as u64 * TRANSACTION_FETCH_BATCH_SIZE as u64);
-                let sender = self.transactions_sender.clone();
-                let client = self.client.clone();
-
-                let fut = tokio::spawn(async move { fetch_nexts(client, ver, sender) });
-                futures.push(fut);
+                futures.push(fetch_nexts(
+                    self.client.clone(),
+                    self.current_version + (i as u64 * TRANSACTION_FETCH_BATCH_SIZE as u64),
+                    self.transactions_sender.clone(),
+                ));
             }
-            //let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            futures::future::join_all(futures).await;
         }
     }
 }
