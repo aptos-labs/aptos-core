@@ -178,11 +178,11 @@ export interface StakeInfo {
  */
 export function useAccountStakeInfo(
   address: string | undefined,
-  options?: UseQueryOptions<StakeInfo>,
+  options?: UseQueryOptions<StakeInfo | undefined>,
 ) {
   const { aptosClient } = useNetworks();
 
-  return useQuery<StakeInfo>(
+  return useQuery<StakeInfo | undefined>(
     [accountQueryKeys.getAccountStakeInfo, address],
     async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
       .then((res: any) => ({
@@ -193,7 +193,7 @@ export function useAccountStakeInfo(
       }))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
-          throw err;
+          return undefined;
         }
         throw err;
       }),

@@ -1,54 +1,21 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box, Button, Center, Flex, Heading, SimpleGrid, Spinner, Text, useColorMode, VStack,
+  Box, Button, Center, Heading, SimpleGrid, Spinner, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
 import { secondaryAddressFontColor, secondaryBorderColor, secondaryWalletHomeCardBgColor } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { type StakeInfo, useAccountStakeInfo } from 'core/queries/account';
 import React, { useMemo } from 'react';
-import formatDuration from 'date-fns/formatDuration';
-import intervalToDuration from 'date-fns/intervalToDuration';
 import addSeconds from 'date-fns/addSeconds';
 import format from 'date-fns/format';
-import { type Duration } from 'date-fns';
 import numeral from 'numeral';
 import { collapseHexString } from 'core/utils/hex';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import { AptosLogo } from './AptosLogo';
 import ChakraLink from './ChakraLink';
 import Copyable from './Copyable';
-
-interface DurationStringFormatProps {
-  duration: Duration;
-}
-
-const durationFormat = Object.freeze([
-  'years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds',
-] as const);
-
-const durationFormatBoundary = ({
-  duration,
-}: DurationStringFormatProps) => {
-  if (duration.years && duration.years > 0) {
-    return durationFormat.slice(0, 4);
-  }
-  if (duration.months && duration.months > 0) {
-    return durationFormat.slice(1, 4);
-  }
-  if (duration.weeks && duration.weeks > 0) {
-    return durationFormat.slice(2, 5);
-  }
-  if (duration.days && duration.days > 0) {
-    return durationFormat.slice(3, 6);
-  }
-  if (duration.hours && duration.hours > 0) {
-    return durationFormat.slice(4, 7);
-  }
-  return durationFormat.slice(5);
-};
 
 interface NoStakeProps {
   isLoading: boolean;
@@ -87,22 +54,6 @@ function StakeBodyContent({
 
   const stakeAmountString = numeral(stakeAmount).format('0,0');
 
-  const formattedDuration = useMemo(() => {
-    const currDate = new Date();
-    const lockedUntilDate = addSeconds(currDate, Number(lockedUntilSecs));
-    const duration = intervalToDuration({
-      end: lockedUntilDate,
-      start: currDate,
-    });
-    const boundary = durationFormatBoundary({ duration });
-
-    const durationString = formatDuration(
-      duration,
-      { format: boundary, zero: true },
-    );
-    return durationString;
-  }, [lockedUntilSecs]);
-
   const lockedUntilDateString = useMemo(() => {
     const currDate = new Date();
     const lockedUntilDate = addSeconds(currDate, Number(lockedUntilSecs));
@@ -123,7 +74,7 @@ function StakeBodyContent({
           <AptosLogo />
         </Box>
       </SimpleGrid>
-      <Text pt={4} fontSize="sm" color={secondaryAddressFontColor[colorMode]}>My stake</Text>
+      <Text pt={4} fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Stake balance</Text>
       <span>
         <Heading as="span" wordBreak="break-word" maxW="100%">{stakeAmountString}</Heading>
         <Text pl={2} pb="2px" as="span" fontSize="xl" fontWeight={600}>
@@ -180,7 +131,6 @@ function StakeBodyContent({
         >
           <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Operator</Text>
           <Copyable prompt="Copy address" value={delegatedVoter}>
-
             <Text fontSize="md">
               {collapseHexString(operatorAddress)}
             </Text>
@@ -188,7 +138,6 @@ function StakeBodyContent({
         </VStack>
       </Button>
     </ChakraLink>
-
   );
 
   return (
@@ -197,19 +146,17 @@ function StakeBodyContent({
       {voter}
       {operator}
     </VStack>
-
   );
 }
 
 export default function StakeBody() {
   const { activeAccountAddress } = useActiveAccount();
-  // TODO: change back to activeAccountAddress
   const {
     data: stakeInfo,
     isError,
     isLoading,
   } = useAccountStakeInfo(
-    '0xb77026ce272a63b7261d20e5d0d9ca8cddd81b42b3432891668c43c03dbd1b73',
+    activeAccountAddress,
     {
       refetchInterval: 5000,
     },

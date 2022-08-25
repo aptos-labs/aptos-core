@@ -12,20 +12,18 @@ import { useActiveAccount } from 'core/hooks/useAccounts';
 
 function WalletAccountStake() {
   const { colorMode } = useColorMode();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { activeAccountAddress } = useActiveAccount();
-  // TODO: switch address to activeAccountAddress
   const {
     data: stakeBalance,
     isLoading,
-  } = useAccountStakeBalance('0xb77026ce272a63b7261d20e5d0d9ca8cddd81b42b3432891668c43c03dbd1b73', {
+  } = useAccountStakeBalance(activeAccountAddress, {
     refetchInterval: 5000,
   });
   const stakeBalanceString = numeral(stakeBalance).format('0,0');
 
   return (
     <VStack alignItems="flex-start">
-      <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>My stake</Text>
+      <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Stake balance</Text>
       <Wrap alignItems="baseline">
         <span>
           {
