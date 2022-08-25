@@ -59,7 +59,7 @@ impl Fetcher {
 
     pub async fn run(&mut self) {
         loop {
-            if self.current_version == self.highest_known_version {
+            if self.current_version >= self.highest_known_version {
                 tokio::time::sleep(Duration::from_millis(200)).await;
                 self.set_highest_known_version().await;
             }
