@@ -17,7 +17,7 @@ use aptos_sdk::{
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
-use rand::prelude::SliceRandom;
+use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -42,8 +42,8 @@ use aptos_sdk::transaction_builder::aptos_stdlib;
 use rand::rngs::StdRng;
 use stats::{StatsAccumulator, TxnStats};
 
-// Max is 100k TPS for a full day.
-const MAX_TXNS: u64 = 100_000_000_000;
+// Max is 10k TPS for a full day.
+const MAX_TXNS: u64 = 10_000_000_000;
 const SEND_AMOUNT: u64 = 1;
 
 // This retry policy is used for important client calls necessary for setting
@@ -60,7 +60,6 @@ static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
 #[derive(Clone, Debug)]
 pub struct EmitModeParams {
     pub txn_expiration_time_secs: u64,
-    pub check_stats_at_end: bool,
 
     pub workers_per_endpoint: usize,
     pub accounts_per_worker: usize,
@@ -71,8 +70,7 @@ pub struct EmitModeParams {
     pub start_offset_multiplier_millis: f64,
     pub start_jitter_millis: u64,
     pub wait_millis: u64,
-    pub wait_committed: bool,
-    pub check_account_sequence_only_once: bool,
+    pub check_account_sequence_only_once_fraction: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -84,10 +82,10 @@ pub struct EmitJobRequest {
     invalid_transaction_ratio: usize,
     pub duration: Duration,
     reuse_accounts: bool,
+    mint_to_root: bool,
     transaction_type: TransactionType,
 
     txn_expiration_time_secs: u64,
-    check_stats_at_end: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -126,8 +124,8 @@ impl Default for EmitJobRequest {
             duration: Duration::from_secs(300),
             reuse_accounts: false,
             transaction_type: TransactionType::P2P,
+            mint_to_root: false,
             txn_expiration_time_secs: 60,
-            check_stats_at_end: true,
         }
     }
 }
@@ -177,11 +175,6 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn check_stats_at_end(mut self, check_stats_at_end: bool) -> Self {
-        self.check_stats_at_end = check_stats_at_end;
-        self
-    }
-
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 
@@ -208,16 +201,14 @@ impl EmitJobRequest {
 
                 EmitModeParams {
                     wait_millis: 0,
-                    wait_committed: true,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    check_stats_at_end: self.check_stats_at_end,
                     transactions_per_account,
                     max_submit_batch_size: 100,
                     start_offset_multiplier_millis: 0.0,
                     start_jitter_millis: 5000,
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
-                    check_account_sequence_only_once: false,
+                    check_account_sequence_only_once_fraction: 0.0,
                 }
             }
             EmitJobMode::ConstTps { tps } => {
@@ -270,17 +261,18 @@ impl EmitJobRequest {
 
                 EmitModeParams {
                     wait_millis: wait_seconds * 1000,
-                    wait_committed: true,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    check_stats_at_end: self.check_stats_at_end,
                     transactions_per_account: batch_size,
                     max_submit_batch_size: 100,
                     start_offset_multiplier_millis: (wait_seconds * 1000) as f64
                         / (num_workers_per_endpoint * clients_count) as f64,
-                    start_jitter_millis: 5000,
+                    // Using jitter here doesn't make TPS vary enough, as we have many workers.
+                    // If we wanted to support that, we could for example incrementally vary the offset.
+                    start_jitter_millis: 0,
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
-                    check_account_sequence_only_once: true,
+                    // sample latency on 2% of requests.
+                    check_account_sequence_only_once_fraction: 1.0 - 0.02,
                 }
             }
         }
@@ -406,9 +398,26 @@ impl<'t> TxnEmitter<'t> {
                 .await,
             ),
         };
+        let total_workers = req.rest_clients.len() * workers_per_endpoint;
+
+        let check_account_sequence_only_once_for = (0..total_workers)
+            .choose_multiple(
+                &mut self.from_rng(),
+                (mode_params.check_account_sequence_only_once_fraction * total_workers as f32)
+                    as usize,
+            )
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        info!(
+            "Checking account sequence and counting latency for {} out of {} total_workers",
+            total_workers - check_account_sequence_only_once_for.len(),
+            total_workers
+        );
+
         let mut workers = vec![];
-        for client in req.rest_clients {
-            for _ in 0..workers_per_endpoint {
+        for _ in 0..workers_per_endpoint {
+            for client in &req.rest_clients {
                 let accounts = (&mut all_accounts)
                     .take(mode_params.accounts_per_worker)
                     .collect();
@@ -425,8 +434,9 @@ impl<'t> TxnEmitter<'t> {
                     stats,
                     txn_generator_creator.create_transaction_generator(),
                     req.invalid_transaction_ratio,
-                    self.from_rng(),
                     workers.len(),
+                    check_account_sequence_only_once_for.contains(&workers.len()),
+                    self.from_rng(),
                 );
                 let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
                 workers.push(Worker { join_handle });
@@ -540,17 +550,12 @@ async fn wait_for_single_account_sequence(
 }
 
 /// This function waits for the submitted transactions to be committed, up to
-/// a deadline. If some accounts still have uncommitted transactions when we
-/// hit the deadline, we return a map of account to the info about the number
-/// of committed transactions, based on the delta between the local sequence
-/// number and the actual sequence number returned by the account. Note, this
-/// can return possibly unexpected results if the emitter was emitting more
-/// transactions per account than the mempool limit of the accounts on the node.
-/// As it is now, the sequence number of the local account incrememnts regardless
-/// of whether the transaction is accepted into the node's mempool or not. So the
-/// local sequence number could be much higher than the real sequence number ever
-/// will be, since not all of the submitted transactions were accepted.
-/// TODO, investigate whether this behaviour is desirable.
+/// a deadline.
+/// It returns number of transactions that expired without being committed,
+/// and sum of completion timestamps for those that have.
+///
+/// This function updates sequence_number for the account to match what
+/// we were able to fetch last.
 async fn wait_for_accounts_sequence(
     start_time: Instant,
     client: &RestClient,
@@ -559,38 +564,36 @@ async fn wait_for_accounts_sequence(
     wait_timeout: Duration,
     fetch_only_once: bool,
     rng: &mut StdRng,
-) -> Result<(), HashMap<AccountAddress, usize>> {
+) -> (usize, u128) {
     let deadline = start_time + wait_timeout;
     let mut pending_addresses: HashSet<_> = accounts.iter().map(|d| d.address()).collect();
     let mut latest_fetched_counts = HashMap::new();
 
-    if !fetch_only_once {
-        // Choose a random account and wait for its sequence number to be up to date. After that, we can
-        // query the all the accounts. This will help us ensure we don't hammer the REST API with too many
-        // query for all the accounts.
-        let account = accounts.choose(rng).expect("accounts can't be empty");
-        if wait_for_single_account_sequence(client, account, wait_timeout)
-            .await
-            .is_err()
-        {
-            return failed_transaction_counts_result(
-                accounts,
-                transactions_per_account,
-                latest_fetched_counts,
-            );
-        }
+    let mut sum_of_completion_timestamps_millis = 0u128;
 
-        // Special case for single account
-        if accounts.len() == 1 {
-            return Ok(());
-        }
+    if !fetch_only_once && accounts.len() > 1 {
+        // This cannot understand correct sum_of_completion_timestamps.
+        // Also, number of accounts is generally 1, so is not helping at the moment
+        // See if this block can just be removed.
+
+        // Choose a random account and wait for its sequence number to be up to date. After that, we can
+        // query all of the accounts. This will help us ensure we don't hammer the REST API with too many
+        // queries for all the accounts.
+        let account = accounts.choose(rng).expect("accounts can't be empty");
+        let _ = wait_for_single_account_sequence(client, account, wait_timeout).await;
     }
 
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok(sequence_numbers) => {
+                let millis_elapsed = start_time.elapsed().as_millis();
                 for (account, sequence_number) in zip(accounts.iter_mut(), &sequence_numbers) {
-                    latest_fetched_counts.insert(account.address(), *sequence_number);
+                    let prev_sequence_number = latest_fetched_counts
+                        .insert(account.address(), *sequence_number)
+                        .unwrap_or(account.sequence_number() - transactions_per_account as u64);
+                    assert!(prev_sequence_number <= *sequence_number);
+                    sum_of_completion_timestamps_millis +=
+                        millis_elapsed * (*sequence_number - prev_sequence_number) as u128;
 
                     if account.sequence_number() == *sequence_number || fetch_only_once {
                         pending_addresses.remove(&account.address());
@@ -616,15 +619,22 @@ async fn wait_for_accounts_sequence(
         time::sleep(Duration::from_millis(1000)).await;
     }
 
-    failed_transaction_counts_result(accounts, transactions_per_account, latest_fetched_counts)
+    (
+        update_seq_num_and_get_num_expired(
+            accounts,
+            transactions_per_account,
+            latest_fetched_counts,
+        ),
+        sum_of_completion_timestamps_millis,
+    )
 }
 
-fn failed_transaction_counts_result(
+fn update_seq_num_and_get_num_expired(
     accounts: &mut [LocalAccount],
     transactions_per_account: usize,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
-) -> Result<(), HashMap<AccountAddress, usize>> {
-    let result = accounts
+) -> usize {
+    accounts
         .iter_mut()
         .filter_map(
             |account| match latest_fetched_counts.get(&account.address()) {
@@ -636,24 +646,18 @@ fn failed_transaction_counts_result(
                         );
                         let diff = (account.sequence_number() - count) as usize;
                         *account.sequence_number_mut() = *count;
-                        Some((account.address(), diff))
+                        Some(diff)
                     } else {
                         None
                     }
                 }
                 None => {
                     *account.sequence_number_mut() -= transactions_per_account as u64;
-                    Some((account.address(), transactions_per_account))
+                    Some(transactions_per_account)
                 }
             },
         )
-        .collect::<HashMap<_, _>>();
-
-    if result.is_empty() {
-        Ok(())
-    } else {
-        Err(result)
-    }
+        .sum()
 }
 
 pub async fn query_sequence_numbers<'a, I>(client: &RestClient, addresses: I) -> Result<Vec<u64>>

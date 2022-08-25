@@ -55,6 +55,7 @@ async fn test_txn_emmitter() {
         .await
         .unwrap();
     println!("{:?}", txn_stat);
+    println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);

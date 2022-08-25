@@ -80,12 +80,6 @@ pub struct EmitArgs {
     #[clap(long, default_value = "0")]
     pub target_tps: usize,
 
-    /// This can only be set in conjunction with --burst. By default, when burst
-    /// is enabled, we check stats once at the end of the emitter run. If you
-    /// would like to opt out of that, you can use this flag.
-    #[structopt(long, requires = "burst")]
-    pub do_not_check_stats_at_end: bool,
-
     #[clap(long, default_value = "30")]
     pub txn_expiration_time_secs: u64,
 

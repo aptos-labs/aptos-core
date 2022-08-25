@@ -51,7 +51,6 @@ pub async fn emit_transactions_with_cluster(
             .transaction_type(args.transaction_type)
             .duration(duration)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
-            .check_stats_at_end(!args.do_not_check_stats_at_end)
             .gas_price(1);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
