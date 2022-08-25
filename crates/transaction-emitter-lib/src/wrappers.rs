@@ -44,11 +44,27 @@ pub async fn emit_transactions_with_cluster(
             .with_transaction_expiration_time(args.txn_expiration_time_secs),
         StdRng::from_seed(OsRng.gen()),
     );
+
+    let transaction_mix = if args.transaction_type_weights.is_empty() {
+        args.transaction_type.iter().map(|t| (*t, 1)).collect()
+    } else {
+        assert_eq!(
+            args.transaction_type_weights.len(),
+            args.transaction_type.len(),
+            "Transaction types and weights need to be the same length"
+        );
+        args.transaction_type
+            .iter()
+            .cloned()
+            .zip(args.transaction_type_weights.iter().cloned())
+            .collect()
+    };
+
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)
             .invalid_transaction_ratio(args.invalid_tx)
-            .transaction_type(args.transaction_type)
+            .transaction_mix(transaction_mix)
             .duration(duration)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
             .gas_price(1);
