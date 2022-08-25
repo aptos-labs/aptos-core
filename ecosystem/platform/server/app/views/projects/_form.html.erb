@@ -79,25 +79,25 @@
 
     <div class="mb-6">
       <%= form.label :thumbnail, 'Thumbnail', class: 'font-mono uppercase block mb-2' %>
-      <%= form.label :thumbnail, class: 'flex flex-col justify-center items-center w-48 h-48 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 bg-contain bg-no-repeat bg-center' do %>
+      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-48 h-48 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 bg-contain bg-no-repeat bg-center', data: { project_images_target: 'thumbnail', action: 'click->project-images#imageButtonClick change->project-images#thumbnailChange' } do %>
         <div class="flex flex-col justify-center items-center pt-5 pb-6">
           <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
           <p class="text-sm text-neutral-400"><span class="font-semibold">Click to upload</span></p>
           <p class="text-sm text-neutral-400">or drag and drop</p>
         </div>
-        <%= form.file_field :thumbnail, accept: 'image/*', class: 'hidden', data: { project_images_target: 'thumbnail', action: 'project-images#thumbnailChange' } %>
+        <%= form.file_field :thumbnail, accept: 'image/*', class: 'hidden' %>
       <% end %>
     </div>
 
     <div class="mb-6">
       <%= form.label :screenshots, 'Screenshot Gallery', class: 'font-mono uppercase block mb-2' %>
-      <%= form.label :screenshots, class: 'flex flex-col justify-center items-center w-full h-64 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 mb-8' do %>
+      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-full h-64 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 mb-8', data: { action: 'click->project-images#imageButtonClick change->project-images#screenshotsChange' } do %>
         <div class="flex flex-col justify-center items-center pt-5 pb-6">
           <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
           <p class="mb-2 text-sm text-neutral-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
           <p class="text-xs text-neutral-400">SVG, PNG, JPG or GIF (MAX. 1920x1080px)</p>
         </div>
-        <%= form.file_field :screenshots, name: 'project[screenshots][]', accept: 'image/*', class: 'hidden', data: { action: 'project-images#screenshotsChange' } %>
+        <%= form.file_field :screenshots, name: 'project[screenshots][]', accept: 'image/*', class: 'hidden' %>
       <% end %>
       <div class="grid grid-cols-5 gap-8" data-project-images-target="screenshotPreviews">
       </div>

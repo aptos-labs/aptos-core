@@ -9,7 +9,7 @@ export default class extends Controller {
     screenshotUrls: Array,
   }
 
-  declare readonly thumbnailTarget: HTMLInputElement;
+  declare readonly thumbnailTarget: HTMLButtonElement;
   declare readonly screenshotPreviewsTarget: HTMLElement;
   declare readonly screenshotPreviewTemplateTarget: HTMLTemplateElement;
 
@@ -41,10 +41,20 @@ export default class extends Controller {
     return url;
   }
 
-  thumbnailChange() {
-    if (this.thumbnailTarget == null) return;
+  imageButtonClick(event: Event) {
+    if (!(event.currentTarget instanceof Element)) return;
+    const input = event.currentTarget.querySelector('input');
+    if (event.target !== input) {
+      event.preventDefault();
+      input?.click();
+    }
+  }
 
-    const {files} = this.thumbnailTarget;
+  thumbnailChange(event: Event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+
+    const {files} = input;
     if (files == null || files.length === 0) return;
 
     const file = files[0];
@@ -53,12 +63,9 @@ export default class extends Controller {
   }
 
   addThumbnailPreview(url: string) {
-    const label = this.thumbnailTarget.closest('label');
-    if (label == null) return;
+    this.thumbnailTarget.style.backgroundImage = `url(${url})`;
 
-    label.style.backgroundImage = `url(${url})`;
-
-    for (const text of label.querySelectorAll('p, svg')) {
+    for (const text of this.thumbnailTarget.querySelectorAll('p, svg')) {
       text.remove();
     }
   }
@@ -66,10 +73,6 @@ export default class extends Controller {
   screenshotsChange(event: Event) {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
-    if (this.screenshotPreviewsTarget == null) return;
-    if (this.screenshotPreviewTemplateTarget == null) return;
-    const label = input.closest('label');
-    if (label == null) return;
 
     const {files} = input;
     if (files == null || files.length === 0) return;
