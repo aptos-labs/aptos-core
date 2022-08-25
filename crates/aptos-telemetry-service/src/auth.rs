@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
 use aptos_logger::{debug, error, warn};
+use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
 use warp::filters::BoxedFilter;
 use warp::{
@@ -112,7 +113,10 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         peer_role,
         epoch,
     )
-    .map_err(|_| reject::reject())?;
+    .map_err(|e| {
+        error!("unable to create jwt token: {}", e);
+        reject::custom(ServiceError::internal(anyhow!("unable to authenticate")))
+    })?;
 
     let mut rng = rand::rngs::OsRng;
     let response_payload = token.as_bytes();
@@ -144,4 +148,20 @@ pub fn with_auth(
         .and_then(jwt_from_header)
         .and(warp::any().map(move || (context.clone(), roles.clone())))
         .and_then(authorize_jwt)
+}
+
+pub fn check_chain_access(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("chain-access" / ChainId)
+        .and(warp::get())
+        .and(context.filter())
+        .and_then(handle_check_chain_access)
+        .boxed()
+}
+
+async fn handle_check_chain_access(
+    chain_id: ChainId,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    let present = context.configured_chains().contains(&chain_id);
+    Ok(reply::json(&present))
 }
