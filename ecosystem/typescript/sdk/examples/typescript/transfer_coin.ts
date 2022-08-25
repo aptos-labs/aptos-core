@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AptosClient, AptosAccount, CoinClient, FaucetClient } from "aptos";
-import { aptosCoinStore, NODE_URL, FAUCET_URL } from "./common";
+import { NODE_URL, FAUCET_URL } from "./common";
 
 (async () => {
   // Create API and faucet clients.
