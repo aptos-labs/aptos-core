@@ -567,10 +567,13 @@ export class AptosClient {
       checkSuccess?: boolean;
     },
   ): Promise<Gen.Transaction> {
+    /* eslint-disable max-len */
+    // :!:>generateSignSendWaitForTransactionInner
     const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
     const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
     const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-    const transactionResponse = await this.waitForTransactionWithResult(pendingTransaction.hash);
+    const transactionResponse = await this.waitForTransactionWithResult(pendingTransaction.hash); // <:!:generateSignSendWaitForTransactionInner
+    /* eslint-enable max-len */
     if (extraArgs?.checkSuccess === undefined || extraArgs?.checkSuccess === null || !extraArgs.checkSuccess) {
       return transactionResponse;
     }
