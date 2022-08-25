@@ -36,7 +36,7 @@
   ],
   "dependencies": {
     "axios": "^0.27.2",
-    "buffer": "^6.0.3",
+    "ed25519-hd-key": "^1.2.0",
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3",
     "typescript-memoize": "^1.1.0"
