@@ -14,7 +14,6 @@ pub type ApiResult<T> = Result<T, ApiError>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum ApiError {
-    BlockParameterConflict,
     TransactionIsPending,
     NetworkIdentifierMismatch,
     ChainIdMismatch,
@@ -63,7 +62,6 @@ impl ApiError {
     pub fn all() -> Vec<ApiError> {
         use ApiError::*;
         vec![
-            BlockParameterConflict,
             TransactionIsPending,
             NetworkIdentifierMismatch,
             ChainIdMismatch,
@@ -102,7 +100,6 @@ impl ApiError {
     pub fn code(&self) -> u32 {
         use ApiError::*;
         match self {
-            BlockParameterConflict => 0,
             TransactionIsPending => 1,
             NetworkIdentifierMismatch => 2,
             ChainIdMismatch => 3,
@@ -154,9 +151,6 @@ impl ApiError {
     /// This value must be fixed, so it's all static strings
     pub fn message(&self) -> &'static str {
         match self {
-            ApiError::BlockParameterConflict => {
-                "Block parameter conflict. Must provide either hash or index but not both"
-            }
             ApiError::TransactionIsPending => "Transaction is pending",
             ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
             ApiError::ChainIdMismatch => "Chain Id doesn't match",
