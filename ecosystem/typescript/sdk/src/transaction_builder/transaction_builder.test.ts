@@ -3,6 +3,7 @@
 
 /* eslint-disable max-len */
 import * as Nacl from "tweetnacl";
+import { bytesToHex } from "@movingco/bytes-to-hex";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";
 import { HexString } from "../hex_string";
 
@@ -38,7 +39,7 @@ function hexToBytes(hex: string) {
 }
 
 function hexSignedTxn(signedTxn: Uint8Array): string {
-  return Buffer.from(signedTxn).toString("hex");
+  return bytesToHex(signedTxn);
 }
 
 function sign(rawTxn: RawTransaction): Bytes {
