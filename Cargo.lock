@@ -377,14 +377,17 @@ dependencies = [
  "bcs",
  "bitvec",
  "blst",
+ "bulletproofs",
  "byteorder",
  "bytes 1.2.1",
  "criterion",
  "curve25519-dalek",
+ "curve25519-dalek-ng",
  "digest 0.9.0",
  "ed25519-dalek",
  "hex",
  "hkdf 0.10.0",
+ "merlin",
  "more-asserts",
  "once_cell",
  "proptest",
@@ -2177,6 +2180,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bulletproofs"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40e698f1df446cc6246afd823afbe2d121134d089c9102c1dd26d1264991ba32"
+dependencies = [
+ "byteorder",
+ "clear_on_drop",
+ "curve25519-dalek-ng",
+ "digest 0.9.0",
+ "merlin",
+ "rand 0.8.5",
+ "rand_core 0.6.3",
+ "serde 1.0.144",
+ "serde_derive",
+ "sha3",
+ "subtle-ng",
+ "thiserror",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2447,6 +2470,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
+]
+
+[[package]]
+name = "clear_on_drop"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38508a63f4979f0048febc9966fadbd48e5dab31fd0ec6a3f151bbf4a74f7423"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3078,6 +3110,20 @@ dependencies = [
  "fiat-crypto",
  "rand_core 0.6.3",
  "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-ng"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c359b7249347e46fb28804470d071c921156ad62b3eef5d34e2ba867533dec8"
+dependencies = [
+ "byteorder",
+ "digest 0.9.0",
+ "rand_core 0.6.3",
+ "serde 1.0.144",
+ "subtle-ng",
  "zeroize",
 ]
 
@@ -3890,15 +3936,18 @@ dependencies = [
  "base64 0.13.0",
  "bcs",
  "better_any",
+ "bulletproofs",
+ "claim",
  "claims",
  "clap 3.2.17",
- "curve25519-dalek",
+ "curve25519-dalek-ng",
  "flate2",
  "gas-algebra-ext",
  "include_dir 0.7.2",
  "itertools",
  "libsecp256k1",
  "log",
+ "merlin",
  "move-deps",
  "once_cell",
  "proptest",
@@ -5334,6 +5383,17 @@ dependencies = [
  "bytes 1.2.1",
  "futures",
  "once_cell",
+]
+
+[[package]]
+name = "merlin"
+version = "3.0.0"
+source = "git+https://github.com/aptos-labs/merlin#3454ccc85e37355c729ba40e6dac6e867ddf59f5"
+dependencies = [
+ "byteorder",
+ "keccak",
+ "rand_core 0.6.3",
+ "zeroize",
 ]
 
 [[package]]
@@ -8997,6 +9057,12 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "subtle-ng"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "syn"
