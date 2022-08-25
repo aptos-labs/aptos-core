@@ -62,7 +62,19 @@ module aptos_framework::genesis {
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
 
         // put reserved framework reserved accounts under aptos governance
-        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0x10];
+
+        // TODO: const vectors are not supported yet in the Move prover
+        let framework_reserved_addresses: vector<address> = vector::empty();
+        vector::push_back(&mut framework_reserved_addresses, @0x2);
+        vector::push_back(&mut framework_reserved_addresses, @0x3);
+        vector::push_back(&mut framework_reserved_addresses, @0x4);
+        vector::push_back(&mut framework_reserved_addresses, @0x5);
+        vector::push_back(&mut framework_reserved_addresses, @0x6);
+        vector::push_back(&mut framework_reserved_addresses, @0x7);
+        vector::push_back(&mut framework_reserved_addresses, @0x8);
+        vector::push_back(&mut framework_reserved_addresses, @0x9);
+        vector::push_back(&mut framework_reserved_addresses, @0x10);
+
         let i = 0;
         while (!vector::is_empty(&framework_reserved_addresses)){
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
