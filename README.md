@@ -8,6 +8,8 @@ This monorepo uses turborepo. We use [Yarn](https://classic.yarnpkg.com/lang/en/
 1. Clone the repo
 2. run `yarn install` from the root directory
 3. `yarn start` or `yarn dev` in the sub-directory of your choice
+4. Get VSCode and download the `eslint` extension
+5. Access `settings.json` in VSCode and enable fix eslint on save
 
 
 ### Apps and Packages
