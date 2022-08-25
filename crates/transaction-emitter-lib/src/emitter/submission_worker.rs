@@ -9,10 +9,7 @@ use crate::{
 use aptos_logger::sample::Sampling;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    types::{transaction::SignedTransaction, LocalAccount},
-};
+use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
@@ -26,16 +23,13 @@ use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
 
-#[derive(Debug)]
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<LocalAccount>,
     client: RestClient,
-    all_addresses: Arc<Vec<AccountAddress>>,
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
     stats: Arc<StatsAccumulator>,
     txn_generator: Box<dyn TransactionGenerator>,
-    invalid_transaction_ratio: usize,
     worker_index: usize,
     check_account_sequence_only_once: bool,
     rng: ::rand::rngs::StdRng,
@@ -45,12 +39,10 @@ impl SubmissionWorker {
     pub fn new(
         accounts: Vec<LocalAccount>,
         client: RestClient,
-        all_addresses: Arc<Vec<AccountAddress>>,
         stop: Arc<AtomicBool>,
         params: EmitModeParams,
         stats: Arc<StatsAccumulator>,
         txn_generator: Box<dyn TransactionGenerator>,
-        invalid_transaction_ratio: usize,
         worker_index: usize,
         check_account_sequence_only_once: bool,
         rng: ::rand::rngs::StdRng,
@@ -58,12 +50,10 @@ impl SubmissionWorker {
         Self {
             accounts,
             client,
-            all_addresses,
             stop,
             params,
             stats,
             txn_generator,
-            invalid_transaction_ratio,
             worker_index,
             check_account_sequence_only_once,
             rng,
@@ -71,7 +61,7 @@ impl SubmissionWorker {
     }
 
     #[allow(clippy::collapsible_if)]
-    pub(crate) async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
+    pub(crate) async fn run(mut self) -> Vec<LocalAccount> {
         // Introduce a random jitter between, so that:
         //  - we don't hammer the rest APIs all at once.
         //  - allow for even spread for fixed TPS setup
@@ -102,7 +92,7 @@ impl SubmissionWorker {
             // always add expected cycle duration, to not drift from expected pace.
             wait_until += wait_duration;
 
-            let requests = self.gen_requests(gas_price);
+            let requests = self.gen_requests();
             let num_requests = requests.len();
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
@@ -210,14 +200,6 @@ impl SubmissionWorker {
         .await;
 
         let num_committed = num_requests - num_expired;
-        // To avoid negative result caused by uncommitted tx occur
-        // Simplified from:
-        // sum_of_completion_timestamps_millis - (txn_offset_time/num_requests) * num_committed
-        // to
-        // (end_time - txn_offset_time / num_requests) * num_committed
-        //
-        // This approximates start time of only committed transaction to be
-        // average start time of all submitted transactions.
 
         if num_expired > 0 {
             self.stats
@@ -255,7 +237,7 @@ impl SubmissionWorker {
         }
     }
 
-    fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
+    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
         let batch_size = max(
             1,
             min(
@@ -267,13 +249,8 @@ impl SubmissionWorker {
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
-        self.txn_generator.generate_transactions(
-            accounts,
-            self.params.transactions_per_account,
-            self.all_addresses.clone(),
-            self.invalid_transaction_ratio,
-            gas_price,
-        )
+        self.txn_generator
+            .generate_transactions(accounts, self.params.transactions_per_account)
     }
 }
 

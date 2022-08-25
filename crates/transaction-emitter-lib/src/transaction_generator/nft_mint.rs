@@ -3,7 +3,6 @@
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
@@ -11,9 +10,8 @@ use aptos_sdk::{
 use crate::emitter::account_minter::create_and_fund_account_request;
 use aptos_logger::info;
 use rand::rngs::StdRng;
-use std::{fmt::Debug, sync::Arc};
+use std::sync::Arc;
 
-#[derive(Debug)]
 pub struct NFTMint {
     txn_factory: TransactionFactory,
     creator_account: Arc<LocalAccount>,
@@ -42,9 +40,6 @@ impl TransactionGenerator for NFTMint {
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
-        _all_addresses: Arc<Vec<AccountAddress>>,
-        _invalid_transaction_ratio: usize,
-        _gas_price: u64,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         for account in accounts {
@@ -159,7 +154,6 @@ pub fn create_nft_transfer_request(
     )
 }
 
-#[derive(Debug)]
 pub struct NFTMintGeneratorCreator {
     txn_factory: TransactionFactory,
     creator_account: Arc<LocalAccount>,
