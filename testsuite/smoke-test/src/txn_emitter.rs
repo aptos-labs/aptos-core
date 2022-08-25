@@ -4,7 +4,9 @@
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use anyhow::ensure;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TxnEmitter, TxnStats};
+use forge::{
+    EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+};
 use rand::{rngs::OsRng, SeedableRng};
 use std::time::Duration;
 use tokio::runtime::Builder;
@@ -39,6 +41,11 @@ pub async fn generate_traffic(
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .duration(duration)
+        .transaction_mix(vec![
+            (TransactionType::P2P, 70),
+            (TransactionType::AccountGeneration, 20),
+            (TransactionType::NftMint, 10),
+        ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     let stats = emitter.emit_txn_for(emit_job_request).await?;
 
@@ -54,7 +61,6 @@ async fn test_txn_emmitter() {
     let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(10), 1)
         .await
         .unwrap();
-    println!("{:?}", txn_stat);
     println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
