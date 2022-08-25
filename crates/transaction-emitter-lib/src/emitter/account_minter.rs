@@ -11,7 +11,9 @@ use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
+use aptos_rest_client::aptos_api_types::TransactionOnChainData;
+use aptos_rest_client::error::RestError;
+use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient, Response};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -432,9 +434,16 @@ pub async fn execute_and_wait_transactions(
 
     let state = state_mutex.into_inner();
 
+    async fn wait_for_signed_transactions_bsc(
+        client: &RestClient,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, RestError> {
+        client.wait_for_signed_transaction_bcs(txn).await
+    }
+
     for txn in state.txns.iter() {
-        client
-            .wait_for_signed_transaction_bcs(txn)
+        RETRY_POLICY
+            .retry(move || wait_for_signed_transactions_bsc(client, txn))
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }
