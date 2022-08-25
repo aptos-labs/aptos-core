@@ -77,7 +77,7 @@ async fn account_balance(
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_info = server_context
         .block_cache()?
-        .get_block_info_by_height(block_height)
+        .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
 

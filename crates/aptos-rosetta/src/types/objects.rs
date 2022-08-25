@@ -820,10 +820,16 @@ impl InternalOperation {
                 }
 
                 // Return invalid operations if for any reason parsing fails
-                Err(ApiError::InvalidOperations)
+                Err(ApiError::InvalidOperations(Some(format!(
+                    "Unrecognized single operation {:?}",
+                    operations
+                ))))
             }
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
-            _ => Err(ApiError::InvalidOperations),
+            _ => Err(ApiError::InvalidOperations(Some(format!(
+                "Unrecognized operation combination {:?}",
+                operations
+            )))),
         }
     }
 
