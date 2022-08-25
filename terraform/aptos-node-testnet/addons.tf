@@ -17,6 +17,17 @@ resource "helm_release" "metrics-server" {
       coredns = {
         maxReplicas = var.num_validators
       }
+      # https://github.com/kubernetes-sigs/metrics-server#scaling
+      metrics-server = {
+        # 1m core per node
+        # 2MiB memory per node
+        resources = {
+          requests = {
+            cpu    = var.validator_instance_max_num > 0 ? "${var.validator_instance_max_num}m" : null,
+            memory = var.validator_instance_max_num > 0 ? "${var.validator_instance_max_num * 2}Mi" : null,
+          }
+        }
+      }
       autoscaler = {
         enabled     = true
         clusterName = module.validator.aws_eks_cluster.name
