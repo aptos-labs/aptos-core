@@ -25,6 +25,7 @@ import CreateAccount from 'pages/CreateAccount';
 import AddNetwork from 'pages/AddNetwork';
 import RenameAccount from 'pages/RenameAccount';
 import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
+import Stake from 'pages/Stake';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -107,6 +108,10 @@ export const Routes = Object.freeze({
     element: <RenameAccount />,
     path: '/settings/rename_account',
   },
+  stake: {
+    element: <Stake />,
+    path: '/stake',
+  },
   settings: {
     element: <Settings />,
     path: '/settings',
@@ -160,6 +165,7 @@ export const routes = [
               Routes.addNetwork,
               Routes.recovery_phrase,
               Routes.help,
+              Routes.stake,
               { path: '/', element: <Navigate to={Routes.wallet.path} replace /> },
             ],
           },

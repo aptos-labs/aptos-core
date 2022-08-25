@@ -7,6 +7,7 @@ import {
 import { IoMdImage } from '@react-icons/all-files/io/IoMdImage';
 import { RiCopperCoinFill } from '@react-icons/all-files/ri/RiCopperCoinFill';
 import { RiFileListFill } from '@react-icons/all-files/ri/RiFileListFill';
+import { IoIosWater } from '@react-icons/all-files/io/IoIosWater';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SettingsIcon } from '@chakra-ui/icons';
@@ -35,7 +36,7 @@ export default function WalletFooter() {
       borderTopWidth="1px"
       borderTopColor={secondaryBorderColor[colorMode]}
     >
-      <SimpleGrid width="100%" gap={4} columns={4}>
+      <SimpleGrid width="100%" gap={0} columns={5}>
         <Center flexDir="column" width="100%">
           <ChakraLink display="flex" flexDir="column" alignItems="center" to={Routes.wallet.path}>
             <IconButton
@@ -87,7 +88,32 @@ export default function WalletFooter() {
               Library
             </Text>
           </ChakraLink>
-
+        </Center>
+        <Center flexDir="column" width="100%">
+          <ChakraLink display="flex" flexDir="column" alignItems="center" to={Routes.stake.path}>
+            <IconButton
+              color={(pathname.includes(Routes.stake.path))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
+              variant="unstyled"
+              size="md"
+              aria-label="Gallery"
+              icon={<IoIosWater size={26} />}
+              fontSize="xl"
+              display="flex"
+              height="20px"
+            />
+            <Text
+              fontWeight={600}
+              color={(pathname.includes(Routes.stake.path))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
+              pt={1}
+              fontSize="10px"
+            >
+              Stake
+            </Text>
+          </ChakraLink>
         </Center>
         <Center flexDir="column" width="100%">
           <ChakraLink display="flex" flexDir="column" alignItems="center" to={Routes.activity.path}>

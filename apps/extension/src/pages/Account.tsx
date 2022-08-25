@@ -72,9 +72,7 @@ function Account() {
             { collapseHexString(address!, 12) }
           </Copyable>
         </Heading>
-
         <Divider />
-
         <Heading fontSize="lg">Between you</Heading>
         <TransactionList transactions={transactions} />
       </VStack>
