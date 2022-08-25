@@ -26,7 +26,7 @@ use core::{
     cmp::min,
     result::Result::{Err, Ok},
 };
-use futures::future::try_join_all;
+use futures::StreamExt;
 use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
 use std::time::Duration;
@@ -74,12 +74,12 @@ impl<'t> AccountMinter<'t> {
                 (total_requested_accounts / 50).max(1)
             };
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
-        let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
+        let coins_per_account = MAX_TXNS * (SEND_AMOUNT + 10); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
 
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
-        let coins_per_seed_account = num_accounts as u64 * coins_per_account * 2;
+        let coins_per_seed_account = num_accounts as u64 * (coins_per_account + 1_000_000);
         let seed_accounts = self
             .create_and_fund_seed_accounts(
                 &req.rest_clients,
@@ -87,6 +87,7 @@ impl<'t> AccountMinter<'t> {
                 coins_per_seed_account,
                 mode_params.max_submit_batch_size,
                 req.reuse_accounts,
+                req.mint_to_root,
             )
             .await?;
         let actual_num_seed_accounts = seed_accounts.len();
@@ -127,8 +128,14 @@ impl<'t> AccountMinter<'t> {
                 )
             });
 
-        let mut minted_accounts = try_join_all(account_futures)
+        // Each future creates 50 accounts, limit concurrency to 30.
+        let stream = futures::stream::iter(account_futures).buffer_unordered(30);
+        // wait for all futures to complete
+        let mut minted_accounts = stream
+            .collect::<Vec<_>>()
             .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()
             .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
             .into_iter()
             .flatten()
@@ -152,7 +159,27 @@ impl<'t> AccountMinter<'t> {
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
         vasp: bool,
+        mint_to_root: bool,
     ) -> Result<Vec<LocalAccount>> {
+        if mint_to_root {
+            info!("Minting to root");
+
+            let txn = self
+                .root_account
+                .sign_with_transaction_builder(self.txn_factory.payload(
+                    aptos_stdlib::aptos_coin_mint(
+                        self.root_account.address(),
+                        coins_per_seed_account * seed_account_num as u64,
+                    ),
+                ));
+            execute_and_wait_transactions(
+                &self.pick_mint_client(rest_clients).clone(),
+                self.root_account,
+                vec![txn],
+            )
+            .await?;
+        }
+
         info!("Creating and minting seeds accounts");
         let mut i = 0;
         let mut seed_accounts = vec![];

@@ -40,9 +40,7 @@ evaluator_args:
   tps_args:
     emit_args:
       mempool_backlog: 25000
-      wait_millis: 2
-      burst: false
-      do_not_check_stats_at_end: true
+      target_tps: 0
       txn_expiration_time_secs: 30
       duration: 8
       invalid_tx: 0
