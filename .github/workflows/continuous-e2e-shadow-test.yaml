@@ -1,5 +1,5 @@
 
-name: Run forge shadow testing
+name: Continuous E2E Shadow Test
 
 permissions:
   issues: write

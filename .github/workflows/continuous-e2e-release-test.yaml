@@ -1,5 +1,5 @@
 
-name: Run forge release blocking
+name: Continuous E2E Release Test
 
 permissions:
   issues: write
