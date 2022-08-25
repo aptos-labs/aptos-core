@@ -226,3 +226,24 @@ async fn test_auth_wrong_key() {
 
     finish_handshake(&initiator, initiator_state, resp);
 }
+
+#[tokio::test]
+async fn test_chain_access() {
+    let mut context = new_test_context().await;
+    let present_chain_id = ChainId::new(24);
+    let missing_chain_id = ChainId::new(32);
+    context
+        .inner
+        .configured_chains_mut()
+        .insert(present_chain_id);
+
+    let resp = context
+        .get(&format!("/chain-access/{}", present_chain_id))
+        .await;
+    assert!(resp.as_bool().unwrap());
+
+    let resp = context
+        .get(&format!("/chain-access/{}", missing_chain_id))
+        .await;
+    assert!(!resp.as_bool().unwrap());
+}
