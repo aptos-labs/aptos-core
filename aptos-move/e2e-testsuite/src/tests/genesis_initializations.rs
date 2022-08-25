@@ -36,6 +36,13 @@ fn test_block_double_init() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
 
     executor.exec(
+        "account",
+        "create_account_unchecked",
+        vec![],
+        serialize_values(&vec![MoveValue::Address(CORE_CODE_ADDRESS)]),
+    );
+
+    executor.exec(
         "block",
         "initialize",
         vec![],

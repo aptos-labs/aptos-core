@@ -33,7 +33,7 @@ impl AccountGenerator {
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::account_create_account(to))
+                .payload(aptos_stdlib::aptos_account_create_account(to))
                 .gas_unit_price(gas_price),
         )
     }

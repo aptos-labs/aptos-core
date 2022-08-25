@@ -116,7 +116,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -129,7 +129,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -137,6 +137,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -188,17 +189,6 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
@@ -211,6 +201,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -233,7 +224,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9"
@@ -242,7 +233,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x17c6a9c1d74f15b6bd78488671973df047175ae37d9d4ef8fae759266672ee97b73b69e6e6bda1371518f06f4135494b7ee78611ec73bf9a21cc93aa668d2b00",
+      "signature": "0xe711e133d0d928535280ddd508c88a447980d7d8fa15fee03472495cea88a2405f892fce98319442d38800320e99eb0f96e46e33eb6b75790acdc1c756cf600b",
       "type": "ed25519_signature"
     },
     "events": [
@@ -379,7 +370,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -392,7 +383,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -400,6 +391,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -451,17 +443,6 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x095f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
@@ -474,6 +455,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -496,7 +478,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681"
@@ -505,7 +487,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x7d944a10b715c10716df32f2034ced940286e81c725d8b0c78c5a40271e26014e88247940388ed95afc17701b0735c0e734f0bfaebb4ed0116380b57b3f20106",
+      "signature": "0x9fa7094210cd044bbdfe008e2b1e6c428a4737207203ed2c13a3f5be8e6ef09f7b06b2114b38f5f34a4312a648dbed5ba03a9daff95df737f3f9bc22c86be30a",
       "type": "ed25519_signature"
     },
     "events": [
@@ -642,7 +624,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -655,7 +637,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -663,6 +645,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -714,17 +697,6 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
@@ -737,6 +709,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -759,7 +732,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22"
@@ -768,7 +741,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x95bdd5cf604797549b175c498cd3af0376b1841a7f06e0e21acaf54e0fd7ece7e315741b5ef312ab49f805eac2c55bd743df84ad67cca034dba4374216eda107",
+      "signature": "0x9bdfe4da65e2fe036dbc42b0ff86b9281b9299356452d43adae470f219d2580b2e5748b1ca7dc2a2f386732c2fb7d738d7031c7939e79e603f8a9c1f7017fa03",
       "type": "ed25519_signature"
     },
     "events": [
@@ -905,7 +878,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -918,7 +891,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -926,6 +899,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -977,17 +951,6 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
@@ -1000,6 +963,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1022,7 +986,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e"
@@ -1031,7 +995,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x970d634a43e62a2c7774b2651d66dacda4b6b322e3689c2e03100e5d788928f777f3bf1ae2c9afad1e6e3a87a36591e2241db9959003b8f0b7c06c2854aa4801",
+      "signature": "0xa05438f379686fd3faca0cbb3356400c3c1e6d45f9c7a393d9b9880fd8cafccd645aef7082f98297580dcfa9ff28e4a5dfdad9865295d47fb089513456e18d00",
       "type": "ed25519_signature"
     },
     "events": [
@@ -1168,7 +1132,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1181,7 +1145,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -1189,6 +1153,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1240,17 +1205,6 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
@@ -1263,6 +1217,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1285,7 +1240,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06"
@@ -1294,7 +1249,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x2a634309757dc7248c1bf574100c04424aedc8073b0fcbd8943fa9df417048199a25ec6ddb8556dacf0530a1d7618d25ecb475365d877e83b4f06ddcce4d7209",
+      "signature": "0xa0b4760b13be11b235f924527ad588025b9fa6df1298e45d589af1d36a156310adc6f8d11ba29c0b43ba0c1a0a03fa1db7a4b7f9feca7f11c102faf227f59608",
       "type": "ed25519_signature"
     },
     "events": [
@@ -1431,7 +1386,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1444,7 +1399,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -1452,6 +1407,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1503,17 +1459,6 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x099acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
@@ -1526,6 +1471,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1548,7 +1494,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26"
@@ -1557,7 +1503,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x932f0af0ce1ed219db3111d1567387f54e0f2c886f021dffd9033a3b083e348bb599c27e33c11cb6031330852ebdd0a5bf11b8389a6ae7ab51c7d86bdd5b980b",
+      "signature": "0xb5878f8b4fc77b11fa03ab6093441f2e4abab174198c10279a2bcbbcc77dbd0bac1bdf9e03c9be8ee4865047b6db748c8987f0d883b59af91967c11c5de97104",
       "type": "ed25519_signature"
     },
     "events": [
@@ -1694,7 +1640,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1707,7 +1653,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -1715,6 +1661,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1766,17 +1713,6 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
@@ -1789,6 +1725,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -1811,7 +1748,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd"
@@ -1820,7 +1757,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0xf7e5eb569f4609826ad0cf08445ae604b6d489695a2664c21ad210eb482910e06684fd2748afcb3c37a13f02fcbd1abe8ec181eae7a39ff9b1673417235fd900",
+      "signature": "0x6803dc96775b0d9e359769f0f3a2ca2878d29337ffc6517667a7ca65ceac0984662079c715111cbbf5c1506206710ee559926c4bcfe5b915848881bc34d6ee03",
       "type": "ed25519_signature"
     },
     "events": [
@@ -1957,7 +1894,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "54",
+    "gas_used": "45",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1970,7 +1907,7 @@
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
-              "counter": "0",
+              "counter": "1",
               "guid": {
                 "id": {
                   "addr": "0xa550c18",
@@ -1978,6 +1915,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -2029,17 +1967,6 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
-        "state_key_hash": "",
-        "data": {
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
@@ -2052,6 +1979,7 @@
                 }
               }
             },
+            "guid_creation_num": "3",
             "rotation_capability_offer": {
               "for": {
                 "vec": []
@@ -2074,7 +2002,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": "0x1::account::create_account",
+      "function": "0x1::aptos_account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300"
@@ -2083,7 +2011,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x4ea5f67d2591eda6be49ea36c550daefef3e69c9b85a1063459d8c00e103dc461cb93ae0ea1ea998f8447006076580cf576d448f3334b1e08a63b05587789409",
+      "signature": "0x071c67d52e56eeb82aa45bb506aada4733bf53b9f861a4f61ca7d739857fbc0c33ea487c3eccd2ea7587e43cf83632ae13c57dd6c39144e73b503944cc5d870b",
       "type": "ed25519_signature"
     },
     "events": [
