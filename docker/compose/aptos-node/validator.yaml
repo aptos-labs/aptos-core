@@ -9,8 +9,8 @@ consensus:
     service:
       type: "local"
     backend:
-      type: "on_disk_storage"
-      path: /opt/aptos/data/secure-data.json
+      type: "rocks_db_storage"
+      path: secure_storage_db
       namespace: ~
     initial_safety_rules_config:
       from_file:
