@@ -19,6 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
+    "aptos-developer-domains",
     {
       type: "category",
       label: "SDKs",
