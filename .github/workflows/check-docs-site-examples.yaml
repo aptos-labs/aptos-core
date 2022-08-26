@@ -13,6 +13,9 @@
 # This CI checks the second type of compatability, the sdk-release.yaml CI
 # steps check the first type.
 
+# NOTE: This is all subject to change soon, see this PR:
+# https://github.com/aptos-labs/aptos-core/pull/3485
+
 name: "Check docs site examples"
 on:
   pull_request:
@@ -65,6 +68,21 @@ jobs:
           max_attempts: 3
           timeout_minutes: 15
           command: cd ./developer-docs-site/static/examples/typescript && yarn first_nft
+
+      - uses: nick-fields/retry@v2
+        name: ts-example-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+
+      - uses: nick-fields/retry@v2
+        name: js-example-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
+
 
   # Note: We do not check first-coin yet.
   test-rust-examples:
