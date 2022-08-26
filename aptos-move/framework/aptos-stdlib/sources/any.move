@@ -1,6 +1,7 @@
 module aptos_std::any {
     use aptos_std::type_info;
-    use std::bcs;
+    use aptos_std::from_bcs::from_bytes;
+    use std::bcs::to_bytes;
     use std::error;
     use std::string::String;
 
@@ -30,7 +31,7 @@ module aptos_std::any {
     public fun pack<T: drop + store>(x: T): Any {
         Any {
             type_name: type_info::type_name<T>(),
-            data: bcs::to_bytes(&x)
+            data: to_bytes(&x)
         }
     }
 
@@ -44,13 +45,6 @@ module aptos_std::any {
     public fun type_name(x: &Any): &String {
         &x.type_name
     }
-
-    /// Native function to deserialize a type T.
-    ///
-    /// Note that this function does not put any constraint on `T`. If code uses this function to
-    /// deserialized a linear value, its their responsibility that the data they deserialize is
-    /// owned.
-    public(friend) native fun from_bytes<T>(bytes: vector<u8>): T;
 
     #[test_only]
     struct S has store, drop { x: u64 }

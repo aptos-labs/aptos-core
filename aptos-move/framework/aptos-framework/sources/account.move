@@ -9,9 +9,9 @@ module aptos_framework::account {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
-    use aptos_framework::util;
     use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
+    use aptos_std::from_bcs;
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -222,7 +222,7 @@ module aptos_framework::account {
         let account_resource = borrow_global_mut<Account>(addr);
         assert!(verify_authentication_key_matches_ed25519_public_key(account_resource.authentication_key, curr_pk_bytes), std::error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
 
-        let curr_auth_key = util::address_from_bytes(account_resource.authentication_key);
+        let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
         // Construct a RotationProofChallenge struct
         let challenge = RotationProofChallenge {
             sequence_number: account_resource.sequence_number,
@@ -246,7 +246,7 @@ module aptos_framework::account {
         // Derive the authentication key of the new PK
         vector::push_back(&mut new_pk_bytes, 0);
         let new_auth_key = hash::sha3_256(new_pk_bytes);
-        let new_address = util::address_from_bytes(new_auth_key);
+        let new_address = from_bcs::to_address(new_auth_key);
 
         // Update the originating address map
         table::add(address_map, new_address, addr);
@@ -317,7 +317,7 @@ module aptos_framework::account {
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
         let bytes = bcs::to_bytes(&signer::address_of(source));
         vector::append(&mut bytes, seed);
-        let addr = util::address_from_bytes(hash::sha3_256(bytes));
+        let addr = from_bcs::to_address(hash::sha3_256(bytes));
 
         let signer = create_account_unchecked(copy addr);
         let signer_cap = SignerCapability { account: addr };
@@ -476,7 +476,7 @@ module aptos_framework::account {
     public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
         let pk_with_scheme = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         vector::push_back(&mut pk_with_scheme, 0);
-        let alice_address = util::address_from_bytes(hash::sha3_256(pk_with_scheme));
+        let alice_address = from_bcs::to_address(hash::sha3_256(pk_with_scheme));
         let alice = create_account_unchecked(alice_address);
         create_account(signer::address_of(&bob));
 
@@ -490,7 +490,7 @@ module aptos_framework::account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let pk_with_scheme = copy pk;
         vector::push_back(&mut pk_with_scheme, 0);
-        let alice_address = util::address_from_bytes(hash::sha3_256(pk_with_scheme));
+        let alice_address = from_bcs::to_address(hash::sha3_256(pk_with_scheme));
         let alice = create_account_unchecked(alice_address);
         create_account(signer::address_of(&bob));
 
@@ -510,7 +510,7 @@ module aptos_framework::account {
         let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
         let pk_with_scheme = copy pk;
         vector::push_back(&mut pk_with_scheme, 0);
-        let alice_address = util::address_from_bytes(hash::sha3_256(pk_with_scheme));
+        let alice_address = from_bcs::to_address(hash::sha3_256(pk_with_scheme));
         let alice = create_account_unchecked(alice_address);
         create_account(signer::address_of(&bob));
         create_account(signer::address_of(&charlie));

@@ -118,6 +118,10 @@ pub struct InitPackage {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// For test: use the given local reference to the aptos framework
+    #[clap(skip)]
+    pub(crate) for_test_framework: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -140,6 +144,7 @@ impl CliCommand<()> for InitPackage {
             Some("main".to_string()),
             addresses,
             self.prompt_options,
+            self.for_test_framework,
         )
     }
 }
@@ -150,6 +155,7 @@ pub fn init_move_dir(
     rev: Option<String>,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
+    for_test_framework: Option<PathBuf>,
 ) -> CliTypedResult<()> {
     let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
     check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -161,7 +167,19 @@ pub fn init_move_dir(
 
     // Add the framework dependency if it's provided
     let mut dependencies = BTreeMap::new();
-    if let Some(rev) = rev {
+    if let Some(path) = for_test_framework {
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: Some(path.display().to_string()),
+                git: None,
+                rev: None,
+                subdir: None,
+                aptos: None,
+                address: None,
+            },
+        );
+    } else if let Some(rev) = rev {
         dependencies.insert(
             "AptosFramework".to_string(),
             Dependency {
