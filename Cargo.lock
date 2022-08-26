@@ -19,7 +19,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-types",
- "mirai-annotations",
  "proptest",
  "rand 0.7.3",
 ]
@@ -748,7 +747,6 @@ dependencies = [
  "bcs",
  "byteorder",
  "itertools",
- "mirai-annotations",
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
@@ -1407,7 +1405,6 @@ dependencies = [
  "chrono",
  "hex",
  "itertools",
- "mirai-annotations",
  "move-deps",
  "num-derive",
  "num-traits 0.2.15",
