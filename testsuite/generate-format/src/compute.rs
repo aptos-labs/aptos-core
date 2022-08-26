@@ -11,7 +11,7 @@ use structopt::StructOpt;
     about = "Trace serde (de)serialization to generate format descriptions for Aptos types"
 )]
 struct Options {
-    #[structopt(long, possible_values = &Corpus::variants(), default_value = "Aptos", case_insensitive = true)]
+    #[structopt(long, possible_values = &Corpus::variants(), default_value = "API", case_insensitive = true)]
     corpus: Corpus,
 
     #[structopt(long)]
@@ -28,7 +28,7 @@ fn main() {
     if options.record {
         match output_file {
             Some(path) => {
-                let mut f = File::create("testsuite/generate-format/".to_string() + path).unwrap();
+                let mut f = File::create(path).unwrap();
                 write!(f, "{}", content).unwrap();
             }
             None => panic!("Corpus {:?} doesn't record formats on disk", options.corpus),

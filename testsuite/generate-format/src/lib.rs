@@ -18,6 +18,8 @@ mod linter;
 mod move_abi;
 /// Network messages.
 mod network;
+/// Rest API types
+mod api;
 
 pub use linter::lint_bcs_format;
 
@@ -29,6 +31,7 @@ pub enum Corpus {
     Consensus,
     Network,
     MoveABI,
+    API,
 }
 }
 
@@ -48,6 +51,7 @@ impl Corpus {
             Corpus::Consensus => consensus::get_registry(),
             Corpus::Network => network::get_registry(),
             Corpus::MoveABI => move_abi::get_registry(),
+            Corpus::API => api::get_registry(),
         };
         match result {
             Ok(registry) => registry,
@@ -64,6 +68,7 @@ impl Corpus {
             Corpus::Consensus => consensus::output_file(),
             Corpus::Network => network::output_file(),
             Corpus::MoveABI => move_abi::output_file(),
+            Corpus::API => api::output_file(),
         }
     }
 }
