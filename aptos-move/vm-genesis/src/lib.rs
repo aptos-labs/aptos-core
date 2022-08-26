@@ -133,6 +133,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
+    set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
@@ -292,6 +293,16 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "set_genesis_end",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );

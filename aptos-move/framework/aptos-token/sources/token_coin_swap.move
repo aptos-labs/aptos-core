@@ -11,6 +11,7 @@ module aptos_token::token_coin_swap {
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
+    use aptos_framework::status;
     use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;
@@ -259,6 +260,7 @@ module aptos_token::token_coin_swap {
     public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, aptos_framework: signer) acquires TokenStoreEscrow, TokenListings {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(10000000);
+        status::set_genesis_end_for_test(&aptos_framework);
         aptos_framework::account::create_account_for_test(signer::address_of(&token_owner));
         let token_id = token::create_collection_and_token(&token_owner, 100, 100, 100);
         aptos_framework::account::create_account_for_test(signer::address_of(&coin_owner));

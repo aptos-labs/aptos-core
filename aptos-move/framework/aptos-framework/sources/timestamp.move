@@ -1,16 +1,10 @@
 /// This module keeps a global wall clock that stores the current Unix time in microseconds.
 /// It interacts with the other modules in the following ways:
-///
-/// * Genesis: to initialize the timestamp
-/// * ValidatorSystem, AptosAccount, Reconfiguration: to check if the current state is in the genesis state
-/// * Block: to reach consensus on the global wall clock time
-///
-/// This module moreover enables code to assert that it is running in genesis (`Self::assert_genesis`) or after
-/// genesis (`Self::assert_operating`). These are essentially distinct states of the system. Specifically,
-/// if `Self::assert_operating` succeeds, assumptions about invariants over the global state can be made
-/// which reflect that the system has been successfully initialized.
+/// * genesis: to initialize the timestamp
+/// * block: to reach consensus on the global wall clock time
 module aptos_framework::timestamp {
     use aptos_framework::system_addresses;
+    use aptos_framework::status;
     use std::error;
 
     friend aptos_framework::genesis;
@@ -28,8 +22,7 @@ module aptos_framework::timestamp {
     /// An invalid timestamp was provided
     const EINVALID_TIMESTAMP: u64 = 2;
 
-    /// Marks that time has started and genesis has finished. This can only be called from genesis and with the
-    /// aptos framework account.
+    /// Marks that time has started. This can only be called from genesis and with the aptos framework account.
     public(friend) fun set_time_has_started(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
@@ -42,7 +35,7 @@ module aptos_framework::timestamp {
         proposer: address,
         timestamp: u64
     ) acquires CurrentTimeMicroseconds {
-        assert_operating();
+        status::assert_operating();
         // Can only be invoked by AptosVM signer.
         system_addresses::assert_vm(account);
 
@@ -65,29 +58,13 @@ module aptos_framework::timestamp {
 
     /// Gets the current time in microseconds.
     public fun now_microseconds(): u64 acquires CurrentTimeMicroseconds {
-        assert_operating();
+        status::assert_operating();
         borrow_global<CurrentTimeMicroseconds>(@aptos_framework).microseconds
     }
 
     /// Gets the current time in seconds.
     public fun now_seconds(): u64 acquires CurrentTimeMicroseconds {
         now_microseconds() / MICRO_CONVERSION_FACTOR
-    }
-
-    /// Helper function to determine if Aptos is in genesis state.
-    public fun is_genesis(): bool {
-        !exists<CurrentTimeMicroseconds>(@aptos_framework)
-    }
-
-    /// Helper function to determine if Aptos is operating. This is the same as `!is_genesis()` and is provided
-    /// for convenience. Testing `is_operating()` is more frequent than `is_genesis()`.
-    public fun is_operating(): bool {
-        exists<CurrentTimeMicroseconds>(@aptos_framework)
-    }
-
-    /// Helper function to assert operating (!genesis) state.
-    public fun assert_operating() {
-        assert!(is_operating(), error::invalid_state(ENOT_OPERATING));
     }
 
     #[test_only]

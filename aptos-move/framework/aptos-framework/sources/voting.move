@@ -35,6 +35,7 @@ module aptos_framework::voting {
     use aptos_framework::account;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
+    use aptos_framework::status;
 
     /// Current script's execution hash does not match the specified proposal's
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
@@ -418,6 +419,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
+        status::set_genesis_end_for_test(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -445,6 +447,7 @@ module aptos_framework::voting {
     public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
+        status::set_genesis_end_for_test(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -470,6 +473,7 @@ module aptos_framework::voting {
     public entry fun test_voting_passed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
+        status::set_genesis_end_for_test(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -497,6 +501,7 @@ module aptos_framework::voting {
     public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
+        status::set_genesis_end_for_test(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -521,6 +526,7 @@ module aptos_framework::voting {
     public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
+        status::set_genesis_end_for_test(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);

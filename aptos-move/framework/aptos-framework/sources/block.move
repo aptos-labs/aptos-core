@@ -11,6 +11,7 @@ module aptos_framework::block {
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::status;
 
     friend aptos_framework::genesis;
 
@@ -103,7 +104,7 @@ module aptos_framework::block {
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
     ) acquires BlockResource {
-        timestamp::assert_operating();
+        status::assert_operating();
 
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);

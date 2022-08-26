@@ -32,6 +32,7 @@ module aptos_framework::stake {
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use aptos_framework::staking_config::{Self, StakingConfig};
+    use aptos_framework::status;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -1207,6 +1208,7 @@ module aptos_framework::stake {
         voting_power_increase_limit: u64,
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
+        status::set_genesis_end_for_test(aptos_framework);
         initialize(aptos_framework);
         staking_config::initialize_for_test(
             aptos_framework,
