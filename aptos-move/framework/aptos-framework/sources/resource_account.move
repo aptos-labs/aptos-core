@@ -115,7 +115,7 @@ module aptos_framework::resource_account {
         let seed = x"01";
         let bytes = bcs::to_bytes(&user_addr);
         vector::append(&mut bytes, copy seed);
-        let resource_addr = aptos_framework::byte_conversions::to_address(hash::sha3_256(bytes));
+        let resource_addr = aptos_framework::util::address_from_bytes(hash::sha3_256(bytes));
 
         create_resource_account(&user, seed, vector::empty());
         let container = borrow_global<Container>(user_addr);
