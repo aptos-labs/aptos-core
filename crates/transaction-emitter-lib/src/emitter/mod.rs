@@ -103,7 +103,7 @@ impl Default for EmitJobRequest {
             invalid_transaction_ratio: 0,
             duration: Duration::from_secs(300),
             reuse_accounts: false,
-            transaction_type: TransactionType::P2P,
+            transaction_type: TransactionType::AccountGeneration,
         }
     }
 }

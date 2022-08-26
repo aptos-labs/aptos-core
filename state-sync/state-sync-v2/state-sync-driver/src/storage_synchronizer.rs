@@ -37,7 +37,7 @@ use std::{
 use storage_interface::{DbReader, DbReaderWriter};
 use tokio::{
     runtime::{Handle, Runtime},
-    task::JoinHandle,
+    task::{yield_now, JoinHandle},
 };
 
 /// Synchronizes the storage of the node by verifying and storing new data
@@ -486,6 +486,8 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     decrement_pending_data_chunks(pending_transaction_chunks.clone());
                 }
             }
+
+            yield_thread().await; // This thread is heavily CPU bound
         }
     };
 
@@ -562,6 +564,8 @@ fn spawn_committer<
             };
             drop(timer);
             decrement_pending_data_chunks(pending_transaction_chunks.clone());
+
+            yield_thread().await; // This thread is heavily disk bound
         }
     };
 
@@ -741,6 +745,17 @@ fn spawn_state_snapshot_receiver<
 
     // Spawn the receiver
     spawn(runtime, receiver)
+}
+
+/// This yields the currently executing thread. This is required
+/// to avoid starvation between the executor and committer when
+/// the system is under heavy load.
+///
+/// TODO(joshlind): identify a better solution. It likely requires
+/// using spawn_blocking() at a lower level, or merging runtimes.
+async fn yield_thread() {
+    // We have a 10% chance of yielding here.
+    sample!(SampleRate::Frequency(10), yield_now().await;);
 }
 
 /// Creates a commit notification for the new committed state snapshot
