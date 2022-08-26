@@ -8,6 +8,10 @@ on:
         required: false
         type: string
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_NAMESPACE:
         required: true
         type: string
@@ -51,7 +55,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
-  IMAGE_TAG: ${{ inputs.GIT_SHA }}
+  IMAGE_TAG: ${{ inputs.IMAGE_TAG || inputs.GIT_SHA }}
   FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
@@ -79,8 +83,8 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         with:
           ref: ${{ inputs.GIT_SHA }}
-          # get the last 10 commits if IMAGE_TAG is not specified
-          fetch-depth: env.IMAGE_TAG != null && 0 || 10
+          # get the last 10 commits if GIT_SHA is not specified
+          fetch-depth: inputs.GIT_SHA != null && 0 || 10
       - uses: actions/setup-python@v4
         if: env.FORGE_ENABLED == 'true'
       - name: Install python deps
