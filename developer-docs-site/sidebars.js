@@ -27,14 +27,11 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "tutorials/first-transaction-sdk",
-        "tutorials/your-first-nft-sdk",
-        "tutorials/first-move-module-cli",
         "tutorials/first-transaction",
+        "tutorials/your-first-nft",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
-        "tutorials/first-coin",
-        "tutorials/your-first-nft",
+        // "tutorials/first-coin",
       ],
     },
     {

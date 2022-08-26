@@ -18,7 +18,7 @@ slug: "whats-new-in-docs"
 
 ## 16 August 2022
 
-- A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction-sdk) is posted.
+- A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction) is posted.
 
 ## 11 August 2022
 
