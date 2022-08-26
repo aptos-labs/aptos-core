@@ -12,10 +12,11 @@
 ///     (1) message cap update event, this event contains the board address and participant offered capability
 ///     (2) message change event, this event contains the board, message and message author
 module message_board::cap_based_mb {
-    use aptos_std::event::{Self, EventHandle};
     use message_board::offer;
     use std::signer;
     use std::vector;
+    use aptos_framework::account;
+    use aptos_std::event::{Self, EventHandle};
 
     // Error map
     const EACCOUNT_NO_NOTICE_CAP: u64 = 1;
@@ -59,10 +60,10 @@ module message_board::cap_based_mb {
         let notice_cap = MessageChangeCapability{ board: board_addr };
         move_to(account, notice_cap);
         move_to(account, MessageChangeEventHandle{
-            change_events: event::new_event_handle<MessageChangeEvent>(account)
+            change_events: account::new_event_handle<MessageChangeEvent>(account)
         });
         move_to(account, MessageCapEventHandle{
-            change_events: event::new_event_handle<MessageCapUpdateEvent>(account)
+            change_events: account::new_event_handle<MessageCapUpdateEvent>(account)
         })
     }
 
@@ -184,6 +185,9 @@ module message_board::MessageBoardCapTests {
     #[test_only]
     fun create_two_signers(): (signer, signer) {
         let signers = &mut unit_test::create_signers_for_testing(2);
-        (vector::pop_back(signers), vector::pop_back(signers))
+        let (alice, bob) = (vector::pop_back(signers), vector::pop_back(signers));
+        aptos_framework::account::create_account_for_test(signer::address_of(&alice));
+        aptos_framework::account::create_account_for_test(signer::address_of(&bob));
+        (alice, bob)
     }
 }

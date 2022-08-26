@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AptosClient, AptosAccount, CoinClient, FaucetClient } from "aptos";
-import { aptosCoinStore, NODE_URL, FAUCET_URL } from "./common";
+import { NODE_URL, FAUCET_URL } from "./common";
 
 (async () => {
   // Create API and faucet clients.
@@ -44,7 +44,9 @@ import { aptosCoinStore, NODE_URL, FAUCET_URL } from "./common";
 
   // Have Alice send Bob some AptosCoins.
   // :!:>section_5
-  await coinClient.transfer(alice, bob, 1_000); // <:!:section_5
+  const txnHash = await coinClient.transfer(alice, bob, 1_000); // <:!:section_5
+  // :!:>section_6a
+  await client.waitForTransaction(txnHash); // <:!:section_6a
 
   // Print out intermediate balances.
   console.log("=== Intermediate Balances ===");
@@ -53,8 +55,9 @@ import { aptosCoinStore, NODE_URL, FAUCET_URL } from "./common";
   console.log("");
 
   // Have Alice send Bob some more AptosCoins.
-  // :!:>section_6
-  await coinClient.transfer(alice, bob, 1_000, { checkSuccess: true }); // <:!:section_6
+  await coinClient.transfer(alice, bob, 1_000);
+  // :!:>section_6b
+  await client.waitForTransaction(txnHash, { checkSuccess: true }); // <:!:section_6b
 
   // Print out final balances.
   console.log("=== Final Balances ===");

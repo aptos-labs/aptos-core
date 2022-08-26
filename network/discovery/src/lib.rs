@@ -96,7 +96,7 @@ impl DiscoveryChangeListener {
     }
 
     pub fn start(self, executor: &Handle) {
-        executor.spawn(Box::pin(self).run());
+        spawn_named!("DiscoveryChangeListener", executor, Box::pin(self).run());
     }
 
     async fn run(mut self: Pin<Box<Self>>) {

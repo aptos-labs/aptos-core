@@ -52,6 +52,7 @@ use aptos_types::{
     },
 };
 use std::convert::TryFrom;
+use std::time::{SystemTime, UNIX_EPOCH};
 use warp::Filter;
 
 pub fn combine_route(
@@ -219,6 +220,8 @@ async fn construction_hash(
     })
 }
 
+const MAX_GAS_UNITS_PER_REQUEST: u64 = 1_000_000;
+
 /// Construction metadata command
 ///
 /// Retrieve sequence number for submitting transactions
@@ -262,9 +265,19 @@ async fn construction_metadata(
     let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
         max_gas.0
     } else {
+        let account_balance = rest_client
+            .get_account_balance(address)
+            .await
+            .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
+            .into_inner();
+
+        let maximum_possible_gas = std::cmp::min(
+            account_balance.coin.value.0 / gas_price_per_unit,
+            MAX_GAS_UNITS_PER_REQUEST,
+        );
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(gas_price_per_unit)
-            .with_max_gas_amount(1_000_000);
+            .with_max_gas_amount(maximum_possible_gas);
 
         let (txn_payload, sender) = request.options.internal_operation.payload()?;
         let unsigned_transaction = transaction_factory
@@ -369,12 +382,12 @@ async fn construction_parse(
             {
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && account_module_identifier() == module_name
+                && aptos_account_module_identifier() == module_name
                 && transfer_function_identifier() == function_name
             {
                 parse_account_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && account_module_identifier() == module_name
+                && aptos_account_module_identifier() == module_name
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
@@ -430,7 +443,9 @@ fn parse_create_account_operation(
             sender,
         )])
     } else {
-        Err(ApiError::InvalidOperations)
+        Err(ApiError::InvalidOperations(Some(
+            "Create account doesn't have an address argument".to_string(),
+        )))
     }
 }
 
@@ -543,7 +558,9 @@ fn parse_set_operator_operation(
 
         Ok(vec![Operation::set_operator(0, None, sender, operator)])
     } else {
-        Err(ApiError::InvalidOperations)
+        Err(ApiError::InvalidOperations(Some(
+            "Set operator doesn't have an address argument".to_string(),
+        )))
     }
 }
 
@@ -614,6 +631,62 @@ async fn construction_preprocess(
 
     let internal_operation = InternalOperation::extract(&request.operations)?;
     let required_public_keys = vec![internal_operation.sender().into()];
+
+    if let Some(gas_price) = request.metadata.as_ref().and_then(|inner| inner.gas_price) {
+        if gas_price.0 < 1 {
+            return Err(ApiError::InvalidInput(Some(
+                "Cannot have a gas price less than 1".to_string(),
+            )));
+        }
+    }
+    if let Some(max_gas) = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.max_gas_amount)
+    {
+        if max_gas.0 < 1 {
+            return Err(ApiError::InvalidInput(Some(
+                "Cannot have a max gas amount less than 1".to_string(),
+            )));
+        }
+    }
+    if let Some(expiry_time_secs) = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.expiry_time_secs)
+    {
+        if expiry_time_secs.0
+            <= SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|err| {
+                    ApiError::InternalError(Some(format!("Failed to get current time {}", err)))
+                })?
+                .as_secs()
+        {
+            return Err(ApiError::InvalidInput(Some(
+                "Expiry time secs is in the past, please provide a Unix timestamp in the future"
+                    .to_string(),
+            )));
+        }
+    }
+
+    let public_keys = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.public_keys.as_ref());
+
+    if request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.max_gas_amount)
+        .is_none()
+        && (public_keys.is_none() || public_keys.unwrap().is_empty())
+    {
+        return Err(ApiError::InvalidInput(Some(
+            "Must provide either max gas amount or public keys to estimate max gas amount"
+                .to_string(),
+        )));
+    }
 
     Ok(ConstructionPreprocessResponse {
         options: MetadataOptions {
