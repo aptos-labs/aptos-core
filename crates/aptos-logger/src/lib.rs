@@ -139,7 +139,7 @@ pub mod prelude {
         debug, error, info, sample,
         sample::{SampleRate, Sampling},
         security::SecurityEvent,
-        trace, warn,
+        spawn_named, trace, warn,
     };
 }
 

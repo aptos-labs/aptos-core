@@ -6,9 +6,9 @@ spec aptos_framework::timestamp {
         /// After time has started, all invariants guarded by `Timestamp::is_operating` will become activated
         /// and need to hold.
         pragma delegate_invariants_to_caller;
-        aborts_if exists<CurrentTimeMicroseconds>(signer::address_of(account));
+        aborts_if exists<CurrentTimeMicroseconds>(signer::address_of(aptos_framework));
         include AbortsIfNotGenesis;
-        include system_addresses::AbortsIfNotAptosFramework{account};
+        include system_addresses::AbortsIfNotAptosFramework{account: aptos_framework};
         ensures is_operating();
     }
 

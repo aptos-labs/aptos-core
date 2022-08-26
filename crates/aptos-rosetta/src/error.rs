@@ -24,6 +24,7 @@ pub enum ApiError {
     InvalidMaxGasFees,
     MaxGasFeeTooLow,
     InvalidGasMultiplier,
+    GasEstimationFailed(Option<String>),
     InvalidOperations,
     MissingPayloadMetadata,
     UnsupportedCurrency(Option<String>),
@@ -72,6 +73,7 @@ impl ApiError {
             InvalidMaxGasFees,
             MaxGasFeeTooLow,
             InvalidGasMultiplier,
+            GasEstimationFailed(None),
             InvalidOperations,
             MissingPayloadMetadata,
             UnsupportedCurrency(None),
@@ -116,22 +118,23 @@ impl ApiError {
             UnsupportedSignatureCount(_) => 13,
             NodeIsOffline => 14,
             TransactionParseError(_) => 15,
-            InternalError(_) => AptosErrorCode::InternalError.as_u32(),
-            AccountNotFound(_) => AptosErrorCode::AccountNotFound.as_u32(),
-            ResourceNotFound(_) => AptosErrorCode::ResourceNotFound.as_u32(),
-            ModuleNotFound(_) => AptosErrorCode::ModuleNotFound.as_u32(),
-            StructFieldNotFound(_) => AptosErrorCode::StructFieldNotFound.as_u32(),
-            VersionNotFound(_) => AptosErrorCode::VersionNotFound.as_u32(),
-            TransactionNotFound(_) => AptosErrorCode::TransactionNotFound.as_u32(),
-            TableItemNotFound(_) => AptosErrorCode::TableItemNotFound.as_u32(),
-            BlockNotFound(_) => AptosErrorCode::BlockNotFound.as_u32(),
-            VersionPruned(_) => AptosErrorCode::VersionPruned.as_u32(),
-            BlockPruned(_) => AptosErrorCode::BlockPruned.as_u32(),
-            InvalidInput(_) => AptosErrorCode::InvalidInput.as_u32(),
-            InvalidTransactionUpdate(_) => AptosErrorCode::InvalidTransactionUpdate.as_u32(),
-            SequenceNumberTooOld(_) => AptosErrorCode::SequenceNumberTooOld.as_u32(),
-            VmError(_) => AptosErrorCode::VmError.as_u32(),
-            MempoolIsFull(_) => AptosErrorCode::MempoolIsFull.as_u32(),
+            GasEstimationFailed(_) => 16,
+            InternalError(_) => 17,
+            AccountNotFound(_) => 18,
+            ResourceNotFound(_) => 19,
+            ModuleNotFound(_) => 20,
+            StructFieldNotFound(_) => 21,
+            VersionNotFound(_) => 22,
+            TransactionNotFound(_) => 23,
+            TableItemNotFound(_) => 24,
+            BlockNotFound(_) => 25,
+            VersionPruned(_) => 26,
+            BlockPruned(_) => 27,
+            InvalidInput(_) => 28,
+            InvalidTransactionUpdate(_) => 29,
+            SequenceNumberTooOld(_) => 30,
+            VmError(_) => 31,
+            MempoolIsFull(_) => 32,
         }
     }
 
@@ -139,7 +142,7 @@ impl ApiError {
         use ApiError::*;
         matches!(
             self,
-            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_)
+            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_) | GasEstimationFailed(_)
         )
     }
 
@@ -157,6 +160,8 @@ impl ApiError {
             MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
             BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
             NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
+            GasEstimationFailed(_) => StatusCode::SERVICE_UNAVAILABLE,
+            InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -198,6 +203,7 @@ impl ApiError {
             ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
+            ApiError::GasEstimationFailed(_) => "Gas estimation failed",
         }
     }
 
@@ -224,6 +230,7 @@ impl ApiError {
             ApiError::SequenceNumberTooOld(inner) => inner,
             ApiError::VmError(inner) => inner,
             ApiError::MempoolIsFull(inner) => inner,
+            ApiError::GasEstimationFailed(inner) => inner,
             _ => None,
         }
         .map(|details| ErrorDetails { details })

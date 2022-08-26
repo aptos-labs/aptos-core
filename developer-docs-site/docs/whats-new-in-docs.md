@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 ## 24 August 2022
 
-- The Korean language version of the [Aptos White Paper](aptos-white-paper#full-pdf-versions) is posted.
+- The Korean language version of the [Aptos White Paper](/aptos-white-paper/aptos-white-paper-in-korean) is posted.
 
 ## 16 August 2022
 
@@ -15,7 +15,7 @@ slug: "whats-new-in-docs"
 
 ## 11 August 2022
 
-- The [Aptos White Paper](aptos-white-paper) is released.
+- The [Aptos White Paper](/aptos-white-paper/aptos-white-paper-index) is released.
 
 - A section explaining the network [Port settings](/nodes/ait/node-requirements#ports) for the nodes connecting to an Aptos network is added.
 
