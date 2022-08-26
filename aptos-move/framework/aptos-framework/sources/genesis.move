@@ -18,6 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::state_storage;
     use aptos_framework::version;
+    use aptos_framework::chain_status;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -70,7 +71,7 @@ module aptos_framework::genesis {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
             let (aptos_account, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
-            i = i+1;
+            i = i + 1;
         };
 
 
@@ -93,8 +94,6 @@ module aptos_framework::genesis {
         aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
         coin::initialize_supply_config(&aptos_framework_account);
 
-        // This needs to be called at the very end because earlier initializations might rely on timestamp not being
-        // initialized yet.
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
@@ -185,6 +184,11 @@ module aptos_framework::genesis {
         aptos_coin::destroy_mint_cap(aptos_framework);
 
         stake::on_new_epoch();
+    }
+
+    /// The last step of genesis.
+    fun set_genesis_end(aptos_framework: &signer) {
+        chain_status::set_genesis_end(aptos_framework);
     }
 
     #[test_only]
