@@ -4,7 +4,7 @@ module aptos_framework::publish {
     use aptos_framework::account::{Self, SignerCapability};
 
     /// Holds the SignerCapability.
-    /// This can only ever be held by the resource account itself.
+    /// This can only ever be held by the deployer.
     struct SignerCapabilityStore has key, drop {
         /// The SignerCapability of the resource.
         resource_signer_cap: SignerCapability
@@ -18,15 +18,15 @@ module aptos_framework::publish {
     ) {
         let (resource, resource_signer_cap) = account::create_resource_account(deployer, seed);
         aptos_framework::code::publish_package_txn(&resource, metadata_serialized, code);
-        move_to(&resource, SignerCapabilityStore { resource_signer_cap });
+        move_to(deployer, SignerCapabilityStore { resource_signer_cap });
     }
 
     /// Retrieves the resource account signer capability once, allowing the package to be able
     /// to sign as itself.
     public fun retrieve_resource_account_cap(
-        resource: &signer
+        deployer: &signer
     ): SignerCapability acquires SignerCapabilityStore {
-        let SignerCapabilityStore { resource_signer_cap } = move_from<SignerCapabilityStore>(signer::address_of(resource));
+        let SignerCapabilityStore { resource_signer_cap } = move_from<SignerCapabilityStore>(signer::address_of(deployer));
         resource_signer_cap
     }
 }
