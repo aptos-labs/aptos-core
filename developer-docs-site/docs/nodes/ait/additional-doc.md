@@ -8,6 +8,13 @@ sidebar_position: 15
 
 Follow this instruction when you need to take down the validator node and cleanup the resources used by the node.
 
+
+Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch)
+
+    ```
+    aptos node leave-validator-set --profile ait3-operator
+    ```
+
 ### Using source code
 
 - Stop your node.
