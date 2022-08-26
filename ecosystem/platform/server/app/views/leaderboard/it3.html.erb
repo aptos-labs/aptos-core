@@ -107,7 +107,7 @@
                   <%= metric.rank %>
                 <% end %>
                 <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.owner_address) do %>
-                  <%= "0x#{metric.owner_address}" %>
+                  <%= metric.owner_address %>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
