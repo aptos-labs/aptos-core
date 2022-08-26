@@ -76,7 +76,11 @@ const sidebars = {
           link: { type: "doc", id: "guides/move-guides/index" },
           collapsible: true,
           collapsed: true,
-          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
+          items: [
+            "guides/move-guides/move-on-aptos",
+            "guides/move-guides/upgrading-move-code",
+            "guides/move-guides/guide-move-transactional-testing",
+          ],
         },
       ],
     },
