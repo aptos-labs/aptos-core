@@ -200,11 +200,18 @@ impl TransactionFetcherTrait for TransactionFetcher {
     }
 
     async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
+        loop {
+            match self.client.get_ledger_information().await {
+                Ok(inner) => return inner.into_inner(),
+                Err(err) => {
+                    eprintln!(
+                        "Failed to get ledger info, retrying in 2 seconds: {:?}",
+                        err
+                    );
+                    tokio::time::sleep(Duration::from_secs(2)).await
+                }
+            }
+        }
     }
 
     async fn set_version(&mut self, version: u64) {
