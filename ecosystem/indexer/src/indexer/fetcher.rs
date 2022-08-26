@@ -207,7 +207,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
                 }
             }
         }
-        panic!("Failed to get ledger info.",);
+        panic!("Failed to get ledger info.");
     }
 
     async fn set_version(&mut self, version: u64) {
