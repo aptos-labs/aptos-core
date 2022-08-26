@@ -5,10 +5,10 @@
 
 variable "GIT_SHA" {}
 variable "TARGET_CACHE_ID" {}
-variable "AWS_ACCOUNT_NUM" {}
+variable "AWS_ECR_ACCOUNT_NUM" {}
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 variable "ecr_base" {
-  default = "${AWS_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
+  default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
 variable "normalized_target_cache_id" {
   default = regex_replace("${TARGET_CACHE_ID}", "[^a-zA-Z0-9]", "-")

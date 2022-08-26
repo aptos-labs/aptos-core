@@ -26,7 +26,7 @@ variable "LAST_GREEN_COMMIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
-variable "AWS_ACCOUNT_NUM" {}
+variable "AWS_ECR_ACCOUNT_NUM" {}
 
 variable "TARGET_REGISTRY" {
   // must be "aws" | "gcp" | "local", informs which docker tags are being generated
@@ -34,7 +34,7 @@ variable "TARGET_REGISTRY" {
 }
 
 variable "ecr_base" {
-  default = "${AWS_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
+  default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
 
 variable "normalized_branch_or_pr" {
