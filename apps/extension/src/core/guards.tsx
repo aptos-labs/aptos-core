@@ -7,6 +7,7 @@ import {
   InitializedAccountsProvider,
   UnlockedAccountsProvider,
   useAccounts,
+  useUnlockedAccounts,
 } from 'core/hooks/useAccounts';
 
 import { Navigate, Outlet } from 'react-router-dom';
@@ -62,10 +63,18 @@ export function LockedAccountsGuard() {
  */
 export function ActiveAccountGuard() {
   const { activeAccountAddress } = useAccounts();
-  const hasActiveAccount = activeAccountAddress !== undefined;
+  const { accounts } = useUnlockedAccounts();
+
+  // Fall back to first available account if activeAccount was just removed
+  const isActiveAccountAvailable = activeAccountAddress !== undefined
+    && activeAccountAddress in accounts;
+  const activeOrFirstAccountAddress = isActiveAccountAvailable
+    ? activeAccountAddress
+    : Object.keys(accounts)[0];
+  const hasActiveAccount = activeOrFirstAccountAddress !== undefined;
 
   return hasActiveAccount ? (
-    <ActiveAccountProvider activeAccountAddress={activeAccountAddress}>
+    <ActiveAccountProvider activeAccountAddress={activeOrFirstAccountAddress}>
       <Outlet />
     </ActiveAccountProvider>
   ) : <Navigate to={Routes.addAccount.path} />;

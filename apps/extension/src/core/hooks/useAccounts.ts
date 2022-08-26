@@ -200,13 +200,12 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
     const newAccounts = { ...accounts, [account.address]: account };
     const newEncryptedAccounts = encryptAccounts(newAccounts);
 
-    // Note: need to await update to `activeAccountAddress` before `accounts`
+    await updateSessionState({ accounts: newAccounts });
     await updatePersistentState({
       activeAccountAddress: account.address,
       activeAccountPublicKey: account.publicKey,
       encryptedAccounts: newEncryptedAccounts,
     });
-    await updateSessionState({ accounts: newAccounts });
     const publicAccount = {
       address: account.address,
       publicKey: account.publicKey,
