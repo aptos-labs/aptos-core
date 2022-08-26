@@ -407,7 +407,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
 enum TestResult {
     Ok,
-    Failed,
+    // Failed,
     FailedWithMsg(String),
 }
 
@@ -415,18 +415,31 @@ impl Display for TestResult {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             TestResult::Ok => write!(f, "Test Ok"),
-            TestResult::Failed => write!(f, "Test Failed"),
+            // TestResult::Failed => write!(f, "Test Failed"),
             TestResult::FailedWithMsg(msg) => write!(f, "Test Failed: {}", msg),
         }
     }
 }
 
 fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
-    match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(f)) {
-        Ok(Ok(())) => TestResult::Ok,
-        Ok(Err(e)) => TestResult::FailedWithMsg(format!("{:?}", e)),
-        Err(_) => TestResult::Failed,
+    match f() {
+        Ok(()) => TestResult::Ok,
+        Err(e) => {
+            println!("Error while running test {:?}", e);
+            TestResult::FailedWithMsg(format!("{:?}", e))
+        }
     }
+    // match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(f)) {
+    //     Ok(Ok(())) => TestResult::Ok,
+    //     Ok(Err(e)) => {
+    //         println!("Error while running test {:?}", e);
+    //         TestResult::FailedWithMsg(format!("{:?}", e))
+    //     }
+    //     Err(e) => {
+    //         println!("Panic while running test {:?}", e);
+    //         TestResult::FailedWithMsg(format!("{:?}", e))
+    //     }
+    // }
 }
 
 struct TestSummary {
@@ -455,10 +468,10 @@ impl TestSummary {
                 self.passed += 1;
                 self.write_ok()?;
             }
-            TestResult::Failed => {
-                self.failed.push(name);
-                self.write_failed()?;
-            }
+            // TestResult::Failed => {
+            //     self.failed.push(name);
+            //     self.write_failed()?;
+            // }
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);
                 self.write_failed()?;
