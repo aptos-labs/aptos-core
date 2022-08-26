@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, TimelineState, TtlCache},
+    core_mempool::{CoreMempool, MempoolTransaction, TimelineState, TtlCache},
     tests::common::{
         add_signed_txn, add_txn, add_txns_to_mempool, exist_in_metrics_cache, setup_mempool,
         TestTransaction,
@@ -10,6 +10,7 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
+use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
 use std::{
     collections::HashSet,
@@ -509,6 +510,66 @@ fn test_capacity() {
     assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_err());
     pool.gc();
     assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_ok());
+}
+
+#[test]
+fn test_capacity_bytes() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 1_000; // Won't hit this limit.
+    config.mempool.capacity_bytes = 2_048;
+    let mut pool = CoreMempool::new(&config);
+    let address = 1;
+
+    let mut size_bytes: usize = 0;
+    let mut seq_no = 1_000;
+    let mut txns = vec![];
+    let last_txn;
+    loop {
+        let txn = new_test_mempool_transaction(address, seq_no);
+        let txn_bytes = txn.get_estimated_bytes();
+
+        if size_bytes <= config.mempool.capacity_bytes {
+            txns.push(txn);
+            seq_no -= 1;
+            size_bytes += txn_bytes;
+        } else {
+            last_txn = Some(txn);
+            break;
+        }
+    }
+    assert!(txns.len() > 0);
+    assert!(last_txn.is_some());
+
+    txns.into_iter().for_each(|txn| {
+        let status = pool.add_txn(
+            txn.txn,
+            txn.ranking_score,
+            txn.sequence_info.account_sequence_number_type,
+            txn.timeline_state,
+        );
+        assert_eq!(status.code, MempoolStatusCode::Accepted);
+    });
+
+    if let Some(txn) = last_txn {
+        let status = pool.add_txn(
+            txn.txn,
+            txn.ranking_score,
+            txn.sequence_info.account_sequence_number_type,
+            txn.timeline_state,
+        );
+        assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
+    }
+}
+
+fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> MempoolTransaction {
+    let signed_txn = TestTransaction::new(address, sequence_number, 1).make_signed_transaction();
+    MempoolTransaction::new(
+        signed_txn,
+        Duration::from_secs(1),
+        1,
+        TimelineState::NotReady,
+        AccountSequenceInfo::Sequential(0),
+    )
 }
 
 #[test]
