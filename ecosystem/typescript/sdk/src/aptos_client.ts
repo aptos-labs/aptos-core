@@ -597,7 +597,8 @@ export class AptosClient {
     const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
     const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
     const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash; // <:!:generateSignSubmitTransactionInner
+    return pendingTransaction.hash;
+    // <:!:generateSignSubmitTransactionInner
   }
 
   /**
