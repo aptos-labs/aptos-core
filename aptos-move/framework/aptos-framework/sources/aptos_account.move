@@ -25,10 +25,10 @@ module aptos_framework::aptos_account {
     #[test(alice = @0xa11ce, core = @0x1)]
     public fun test_transfer(alice: signer, core: signer) {
         use std::signer;
-        use aptos_framework::byte_conversions;
+        use aptos_framework::util;
 
-        let bob = byte_conversions::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
-        let carol = byte_conversions::to_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
+        let bob = util::address_from_bytes(x"0000000000000000000000000000000000000000000000000000000000000b0b");
+        let carol = util::address_from_bytes(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
         create_account(signer::address_of(&alice));
