@@ -12,9 +12,8 @@ use warp::{http::StatusCode, reply::Reply};
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ApiError {
-    BlockParameterConflict,
     TransactionIsPending,
     NetworkIdentifierMismatch,
     ChainIdMismatch,
@@ -25,7 +24,7 @@ pub enum ApiError {
     MaxGasFeeTooLow,
     InvalidGasMultiplier,
     GasEstimationFailed(Option<String>),
-    InvalidOperations,
+    InvalidOperations(Option<String>),
     MissingPayloadMetadata,
     UnsupportedCurrency(Option<String>),
     UnsupportedSignatureCount(Option<usize>),
@@ -63,7 +62,6 @@ impl ApiError {
     pub fn all() -> Vec<ApiError> {
         use ApiError::*;
         vec![
-            BlockParameterConflict,
             TransactionIsPending,
             NetworkIdentifierMismatch,
             ChainIdMismatch,
@@ -74,7 +72,7 @@ impl ApiError {
             MaxGasFeeTooLow,
             InvalidGasMultiplier,
             GasEstimationFailed(None),
-            InvalidOperations,
+            InvalidOperations(None),
             MissingPayloadMetadata,
             UnsupportedCurrency(None),
             UnsupportedSignatureCount(None),
@@ -102,7 +100,6 @@ impl ApiError {
     pub fn code(&self) -> u32 {
         use ApiError::*;
         match self {
-            BlockParameterConflict => 0,
             TransactionIsPending => 1,
             NetworkIdentifierMismatch => 2,
             ChainIdMismatch => 3,
@@ -112,7 +109,7 @@ impl ApiError {
             InvalidMaxGasFees => 7,
             MaxGasFeeTooLow => 8,
             InvalidGasMultiplier => 9,
-            InvalidOperations => 10,
+            InvalidOperations(_) => 10,
             MissingPayloadMetadata => 11,
             UnsupportedCurrency(_) => 12,
             UnsupportedSignatureCount(_) => 13,
@@ -147,31 +144,13 @@ impl ApiError {
     }
 
     pub fn status_code(&self) -> StatusCode {
-        use ApiError::*;
-        match self {
-            AccountNotFound(_)
-            | BlockNotFound(_)
-            | ResourceNotFound(_)
-            | ModuleNotFound(_)
-            | VersionNotFound(_)
-            | TransactionNotFound(_)
-            | StructFieldNotFound(_)
-            | TableItemNotFound(_) => StatusCode::NOT_FOUND,
-            MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
-            BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
-            NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
-            GasEstimationFailed(_) => StatusCode::SERVICE_UNAVAILABLE,
-            InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            _ => StatusCode::BAD_REQUEST,
-        }
+        // Per Rosetta guidelines, all errors are 500s
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 
     /// This value must be fixed, so it's all static strings
     pub fn message(&self) -> &'static str {
         match self {
-            ApiError::BlockParameterConflict => {
-                "Block parameter conflict. Must provide either hash or index but not both"
-            }
             ApiError::TransactionIsPending => "Transaction is pending",
             ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
             ApiError::ChainIdMismatch => "Chain Id doesn't match",
@@ -182,7 +161,7 @@ impl ApiError {
             ApiError::InvalidMaxGasFees => "Invalid max gas fee",
             ApiError::MaxGasFeeTooLow => "Max fee is lower than the estimated cost of the transaction",
             ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
-            ApiError::InvalidOperations => "Invalid operations",
+            ApiError::InvalidOperations(_) => "Invalid operations",
             ApiError::MissingPayloadMetadata => "Payload metadata is missing",
             ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
             ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
@@ -214,6 +193,7 @@ impl ApiError {
             ApiError::UnsupportedCurrency(inner) => inner,
             ApiError::UnsupportedSignatureCount(inner) => inner.map(|inner| inner.to_string()),
             ApiError::TransactionParseError(inner) => inner,
+            ApiError::InvalidOperations(inner) => inner,
             ApiError::InternalError(inner) => inner,
             ApiError::AccountNotFound(inner) => inner,
             ApiError::ResourceNotFound(inner) => inner,
