@@ -76,6 +76,7 @@ Rails.application.routes.draw do
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
+  get 'leaderboard/it3'
 
   # IT1
   get 'it1', to: 'leaderboard#it1'
