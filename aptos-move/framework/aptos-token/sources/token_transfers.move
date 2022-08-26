@@ -2,20 +2,35 @@
 module aptos_token::token_transfers {
     use std::signer;
     use std::string::String;
-    use aptos_std::table_with_length::{Self, TableWithLength};
+    use std::error;
+    use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, Token, TokenId};
 
+    const ETOKEN_OFFER_NOT_EXIST: u64 = 1;
+
     struct TokenTransfers has key {
-        pending_claims: TableWithLength<address, TableWithLength<TokenId, Token>>,
+        pending_claims: Table<TokenOfferId, Token>,
+    }
+
+    struct TokenOfferId has copy, drop, store {
+        to_addr: address,
+        token_id: TokenId,
     }
 
     fun initialize_token_transfers(account: &signer) {
         move_to(
             account,
             TokenTransfers {
-                pending_claims: table_with_length::new<address, TableWithLength<TokenId, Token>>(),
+                pending_claims: table::new<TokenOfferId, Token>(),
             }
         )
+    }
+
+    fun create_token_offer_id(to_addr: address, token_id: TokenId): TokenOfferId {
+        TokenOfferId {
+            to_addr,
+            token_id
+        }
     }
 
     public entry fun offer_script(
@@ -31,7 +46,6 @@ module aptos_token::token_transfers {
         offer(&sender, receiver, token_id, amount);
     }
 
-    // Make an entry into pending transfers and extract from gallery
     public fun offer(
         sender: &signer,
         receiver: address,
@@ -45,19 +59,14 @@ module aptos_token::token_transfers {
 
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
-        if (!table_with_length::contains(pending_claims, receiver)) {
-            table_with_length::add(pending_claims, receiver, table_with_length::new())
-        };
-        let addr_pending_claims = table_with_length::borrow_mut(pending_claims, receiver);
-
+        let token_offer_id = create_token_offer_id(receiver, token_id);
         let token = token::withdraw_token(sender, token_id, amount);
-        let token_id = *token::token_id(&token);
-        if (table_with_length::contains(addr_pending_claims, token_id)) {
-            let dst_token = table_with_length::borrow_mut(addr_pending_claims, token_id);
-            token::merge(dst_token, token)
+        if (!table::contains(pending_claims, token_offer_id)) {
+            table::add(pending_claims, token_offer_id, token);
         } else {
-            table_with_length::add(addr_pending_claims, token_id, token)
-        }
+            let dst_token = table::borrow_mut(pending_claims, token_offer_id);
+            token::merge(dst_token, token);
+        };
     }
 
     public entry fun claim_script(
@@ -72,24 +81,17 @@ module aptos_token::token_transfers {
         claim(&receiver, sender, token_id);
     }
 
-    // Pull from someone else's pending transfers and insert into our gallery
     public fun claim(
         receiver: &signer,
         sender: address,
         token_id: TokenId,
     ) acquires TokenTransfers {
-        let receiver_addr = signer::address_of(receiver);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender).pending_claims;
-        let pending_tokens = table_with_length::borrow_mut(pending_claims, receiver_addr);
-        let token = table_with_length::remove(pending_tokens, token_id);
-
-        if (table_with_length::length(pending_tokens) == 0) {
-            let real_pending_claims = table_with_length::remove(pending_claims, receiver_addr);
-            table_with_length::destroy_empty(real_pending_claims)
-        };
-
-        token::deposit_token(receiver, token)
+        let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
+        assert!(table::contains(pending_claims, token_offer_id), error::not_found(ETOKEN_OFFER_NOT_EXIST));
+        let tokens = table::remove(pending_claims, token_offer_id);
+        token::deposit_token(receiver, tokens);
     }
 
     public entry fun cancel_offer_script(
@@ -111,16 +113,10 @@ module aptos_token::token_transfers {
         token_id: TokenId,
     ) acquires TokenTransfers {
         let sender_addr = signer::address_of(sender);
+        let token_offer_id = create_token_offer_id(receiver, token_id);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
-        let pending_tokens = table_with_length::borrow_mut(pending_claims, receiver);
-        let token = table_with_length::remove(pending_tokens, token_id);
-
-        if (table_with_length::length(pending_tokens) == 0) {
-            let real_pending_claims = table_with_length::remove(pending_claims, receiver);
-            table_with_length::destroy_empty(real_pending_claims)
-        };
-
+        let token = table::remove(pending_claims, token_offer_id);
         token::deposit_token(sender, token)
     }
 
@@ -133,6 +129,7 @@ module aptos_token::token_transfers {
         aptos_framework::account::create_account_for_test(owner_addr);
         offer(&creator, owner_addr, token_id, 1);
         claim(&owner, creator_addr, token_id);
+
 
         offer(&owner, creator_addr, token_id, 1);
         cancel_offer(&owner, creator_addr, token_id);
@@ -153,13 +150,13 @@ module aptos_token::token_transfers {
         aptos_framework::account::create_account_for_test(owner1_addr);
 
         offer(&creator, owner0_addr, token_id, 1);
-        assert!(table_with_length::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
         offer(&creator, owner1_addr, token_id, 1);
-        assert!(table_with_length::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 2, 2);
+
+        assert!(token::balance_of(signer::address_of(&creator), token_id) == 0, 1);
         claim(&owner0, creator_addr, token_id);
-        assert!(table_with_length::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 3);
+        assert!(token::balance_of(signer::address_of(&owner0), token_id) == 1, 1);
         claim(&owner1, creator_addr, token_id);
-        assert!(table_with_length::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 0, 4);
+        assert!(token::balance_of(signer::address_of(&owner1), token_id) == 1, 1);
 
         offer(&owner0, owner1_addr, token_id, 1);
         claim(&owner1, owner0_addr, token_id);
