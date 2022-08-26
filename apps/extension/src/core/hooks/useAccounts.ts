@@ -159,7 +159,51 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
     });
   };
 
+  const changePassword = async (oldPassword: string, newPassword: string) => {
+    const ciphertext = bs58.decode(encryptedAccounts.ciphertext);
+    const nonce = bs58.decode(encryptedAccounts.nonce);
+    const encryptionKey = await deriveEncryptionKey(oldPassword, bs58.decode(salt));
+
+    // Retrieved unencrypted value
+    const plaintext = secretbox.open(ciphertext, nonce, encryptionKey)!;
+
+    // incorrect current password
+    if (!plaintext) {
+      return Promise.reject(new Error('Incorrect current password'));
+    }
+
+    const decodedPlaintext = Buffer.from(plaintext).toString();
+    const newAccounts = JSON.parse(decodedPlaintext) as Accounts;
+
+    // Generate salt and use it to derive encryption key
+    const newSalt = randomBytes(pbkdf2SaltSize);
+    const newEncryptionKey = await deriveEncryptionKey(newPassword, newSalt);
+
+    // Initialize new encrypted state
+    const newPlaintext = JSON.stringify(newAccounts);
+    const newNonce = randomBytes(secretbox.nonceLength);
+    const newCiphertext = secretbox(Buffer.from(newPlaintext), newNonce, newEncryptionKey);
+
+    const newEncryptedAccounts = {
+      ciphertext: bs58.encode(newCiphertext),
+      nonce: bs58.encode(newNonce),
+    };
+
+    await Promise.all([
+      updatePersistentState({
+        encryptedAccounts: newEncryptedAccounts,
+        salt: bs58.encode(newSalt),
+      }),
+      updateSessionState({
+        encryptionKey: bs58.encode(newEncryptionKey),
+      }),
+    ]);
+
+    return Promise.resolve();
+  };
+
   return {
+    changePassword,
     clearAccounts,
     encryptedAccounts,
     lockAccounts,

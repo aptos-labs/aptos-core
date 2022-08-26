@@ -27,6 +27,7 @@ import AddNetwork from 'pages/AddNetwork';
 import RenameAccount from 'pages/RenameAccount';
 import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
 import Stake from 'pages/Stake';
+import ChangePassword from 'pages/ChangePassword';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -52,6 +53,10 @@ export const Routes = Object.freeze({
   addNetwork: {
     element: <AddNetwork />,
     path: '/settings/add-network',
+  },
+  change_password: {
+    element: <ChangePassword />,
+    path: '/settings/security_privacy/change_password',
   },
   createAccount: {
     element: <CreateAccount />,
@@ -166,6 +171,7 @@ export const routes = [
               Routes.account,
               Routes.settings,
               Routes.switchAccount,
+              Routes.change_password,
               Routes.rename_account,
               Routes.credentials,
               Routes.network,

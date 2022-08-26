@@ -78,6 +78,32 @@ export const switchAccountErrorToast = () => {
   });
 };
 
+// Change Password
+
+export const changePasswordNewPasswordNotMatchErrorToast = () => {
+  toast({
+    description: "New password and confirmed new password don't match",
+    status: 'error',
+    title: 'Passsword do not match',
+  });
+};
+
+export const changePasswordIncorrectCurrentPasswordErrorToast = () => {
+  toast({
+    description: 'Current password entered is incorrect',
+    status: 'error',
+    title: 'Incorrect current password',
+  });
+};
+
+export const changePasswordSuccessfullyUpdatedToast = () => {
+  toast({
+    description: 'Password successfully updated to new password',
+    status: 'success',
+    title: 'Password updated',
+  });
+};
+
 // Remove Account
 
 export const removeAccountToast = (message: string) => {

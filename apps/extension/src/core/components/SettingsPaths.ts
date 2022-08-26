@@ -3,6 +3,7 @@
 
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
+import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
 import Routes from 'core/routes';
 import { settingsItemLabel } from 'core/constants';
 import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
@@ -33,15 +34,15 @@ export default function getSettingsPaths(hasMnemonic: boolean): SettingsListItem
       path: Routes.network.path,
       title: settingsItemLabel.NETWORK,
     },
-    // {
-    //   DividerComponent: Divider,
-    //   iconAfter: FiChevronRight,
-    //   iconBefore: BsShieldFill,
-    //   path: Routes.security_privacy.path,
-    //   title: 'Security and Privacy',
-    // },
     {
-      externalLink: 'https://discord.gg/rGRFrgFT',
+      DividerComponent: Divider,
+      iconAfter: FiChevronRight,
+      iconBefore: BsShieldFill,
+      path: Routes.security_privacy.path,
+      title: 'Security and Privacy',
+    },
+    {
+      externalLink: 'https://discord.com/invite/petrawallet',
       iconBefore: AiFillQuestionCircle,
       path: null,
       title: settingsItemLabel.HELP_SUPPORT,

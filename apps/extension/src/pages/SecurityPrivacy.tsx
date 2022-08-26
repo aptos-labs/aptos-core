@@ -2,18 +2,68 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React from 'react';
+import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
 import {
-  Box,
+  Icon,
+  Grid,
   VStack,
+  Center,
+  Text,
+  useColorMode,
 } from '@chakra-ui/react';
+import {
+  secondaryGridHoverBgColor,
+  textColor,
+  secondaryAddressFontColor,
+} from 'core/colors';
 import WalletLayout from 'core/layouts/WalletLayout';
+import { useNavigate } from 'react-router-dom';
+import SecurityPrivacyPaths, { type SecurityPrivacyItem } from 'core/components/SecurityPrivacyPaths';
 
 function SecurityPrivacy() {
-  // TODO: will implement later
+  const navigate = useNavigate();
+  const { colorMode } = useColorMode();
+
+  const handleItemClick = (item: SecurityPrivacyItem) => {
+    if (item.path) {
+      navigate(item.path);
+    }
+  };
+
   return (
     <WalletLayout title="Security and Privacy" showBackButton>
-      <VStack width="100%" paddingTop={8}>
-        <Box px={4} pb={4} width="100%" />
+      <VStack width="100%" paddingTop={4} px={4} pb={4} spacing={2}>
+        {SecurityPrivacyPaths()?.map((item: SecurityPrivacyItem) => (
+          <Grid
+            key={item.id}
+            templateColumns="1fr 32px"
+            p={4}
+            width="100%"
+            cursor="pointer"
+            onClick={() => handleItemClick(item)}
+            gap={2}
+            borderRadius=".5rem"
+            _hover={{
+              bgColor: secondaryGridHoverBgColor[colorMode],
+            }}
+          >
+            <Text
+              color={textColor[colorMode]}
+              fontWeight={600}
+              fontSize="md"
+            >
+              {item.label}
+            </Text>
+            <Center width="100%">
+              <Icon
+                fontSize="xl"
+                borderColor={textColor[colorMode]}
+                color={secondaryAddressFontColor[colorMode]}
+                as={FiChevronRight}
+              />
+            </Center>
+          </Grid>
+        ))}
       </VStack>
     </WalletLayout>
   );

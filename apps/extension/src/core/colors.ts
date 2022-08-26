@@ -50,6 +50,11 @@ export const checkCircleSuccessBg = {
   light: '#48BB78',
 };
 
+export const inputChangePasswordBgColor = {
+  dark: 'gray.800',
+  light: 'gray.200',
+};
+
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',
@@ -120,4 +125,14 @@ export const secondaryDividerColor = {
 export const secondaryWalletHomeCardBgColor = {
   dark: 'gray.800',
   light: 'gray.50',
+};
+
+export const lockIconBgColor = {
+  dark: 'gray.700',
+  light: 'gray.100',
+};
+
+export const lockIconColor = {
+  dark: 'white',
+  light: 'gray.600',
 };
