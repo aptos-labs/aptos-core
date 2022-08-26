@@ -30,32 +30,33 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: ./.github/actions/gar-auth
-
-      - uses: ./.github/actions/load-secrets
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Login to ECR
         uses: docker/login-action@v2
         with:
-          registry: ${{ steps.secrets.outputs.AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ steps.secrets.outputs.AWS_ACCESS_KEY_ID }}
-          password: ${{ steps.secrets.outputs.AWS_SECRET_ACCESS_KEY }}
+          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ steps.secrets.outputs.DOCKERHUB_USERNAME }}
-          password: ${{ steps.secrets.outputs.DOCKERHUB_PASSWORD }}
+          username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
       - name: Push Images to Dockerhub
         uses: akhilerm/tag-push-action@v2.0.0
         with:
-          src: ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ github.sha }}
+          src: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ github.sha }}
           dst: |
             docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
             docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
             docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
             docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
-            ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
-            ${{ steps.secrets.outputs.AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
-            ${{ steps.secrets.outputs.AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
