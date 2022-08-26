@@ -8,6 +8,10 @@ on:
         required: false
         type: string
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_NAMESPACE:
         required: true
         type: string
@@ -41,9 +45,19 @@ on:
         type: boolean
         default: false
         description: Set to true to enable new wrapper
+      TIMEOUT_MINUTES:
+        required: false
+        type: number
+        default: 360
+        description: Github job timeout in minutes
 env:
+  AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
-  IMAGE_TAG: ${{ inputs.GIT_SHA }}
+  IMAGE_TAG: ${{ inputs.IMAGE_TAG || inputs.GIT_SHA }}
+  FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
+  FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
   FORGE_REPORT: forge_report.json
@@ -60,26 +74,17 @@ env:
 jobs:
   forge:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     permissions:
       issues: write
       pull-requests: write
-      id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
     steps:
-
       - uses: actions/checkout@v3
+        if: env.FORGE_ENABLED == 'true'
         with:
           ref: ${{ inputs.GIT_SHA }}
-          # get the last 10 commits if IMAGE_TAG is not specified
-          fetch-depth: env.IMAGE_TAG != null && 0 || 10
-   
-      - uses: ./.github/actions/load-ci-env
-
-      - uses: ./.github/actions/gar-auth
-
-      - uses: ./.github/actions/load-secrets
-        with:
-          expose_env: "true"
-
+          # get the last 10 commits if GIT_SHA is not specified
+          fetch-depth: inputs.GIT_SHA != null && 0 || 10
       - uses: actions/setup-python@v4
         if: env.FORGE_ENABLED == 'true'
       - name: Install python deps
@@ -113,9 +118,9 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
-          PUSH_GATEWAY: ${{ steps.secrets.outputs.PUSH_GATEWAY }}
-          PUSH_GATEWAY_USER: ${{ steps.secrets.outputs.PUSH_GATEWAY_USER }}
-          PUSH_GATEWAY_PASSWORD: ${{ steps.secrets.outputs.PUSH_GATEWAY_PASSWORD }}
+          PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
+          PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
+          PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
         run: |
           set +e
 
@@ -156,4 +161,4 @@ jobs:
               "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.FORGE_SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

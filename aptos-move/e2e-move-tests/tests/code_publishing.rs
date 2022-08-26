@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
+use e2e_move_tests::package_builder::PackageBuilder;
 use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, MoveHarness};
-use framework::natives::code::PackageRegistry;
+use framework::natives::code::{PackageRegistry, UpgradePolicy};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use move_deps::move_core_types::vm_status::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -60,8 +61,6 @@ fn code_publishing_basic() {
     assert_eq!(state.value, 42)
 }
 
-// Ignored because we've disabled incompatible upgrade policy.
-#[ignore]
 #[test]
 fn code_publishing_upgrade_success_no_compat() {
     let mut h = MoveHarness::new_no_parallel();
@@ -220,4 +219,57 @@ fn code_publishing_framework_upgrade_fail() {
         &common::test_dir_path("code_publishing.data/pack_stdlib_incompat"),
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+}
+
+#[test]
+fn code_publishing_weak_dep_fail() {
+    let mut h = MoveHarness::new_no_parallel();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    let mut weak = PackageBuilder::new("WeakPackage").with_policy(UpgradePolicy::arbitrary());
+    weak.add_source("weak", "module 0xcafe::weak { public fun f() {} }");
+
+    let weak_dir = weak.write_to_temp().unwrap();
+    assert_success!(h.publish_package(&acc, weak_dir.path()));
+
+    let mut normal = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
+    normal.add_dep(&format!(
+        "WeakPackage = {{ local = \"{}\" }}",
+        weak_dir.path().display()
+    ));
+    normal.add_source(
+        "normal",
+        "module 0xcafe::normal { use 0xcafe::weak; public fun f() { weak::f() } }",
+    );
+    let normal_dir = normal.write_to_temp().unwrap();
+    let status = h.publish_package(&acc, normal_dir.path());
+    assert_abort!(status, 0x10006 /*invalid_arhument(EDEP_WEAKER_POLICY)*/);
+}
+
+#[test]
+fn code_publishing_arbitray_dep_different_address() {
+    let mut h = MoveHarness::new_no_parallel();
+    let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
+
+    let mut pack1 = PackageBuilder::new("Package1").with_policy(UpgradePolicy::arbitrary());
+    pack1.add_source("m", "module 0xcafe::m { public fun f() {} }");
+    let pack1_dir = pack1.write_to_temp().unwrap();
+
+    let mut pack2 = PackageBuilder::new("Package2").with_policy(UpgradePolicy::arbitrary());
+    pack2.add_dep(&format!(
+        "Package1 = {{ local = \"{}\" }}",
+        pack1_dir.path().display()
+    ));
+    pack2.add_source(
+        "m",
+        "module 0xdeaf::m { use 0xcafe::m; public fun f() { m::f() } }",
+    );
+    let pack2_dir = pack2.write_to_temp().unwrap();
+
+    assert_success!(h.publish_package(&acc1, pack1_dir.path()));
+    assert_abort!(
+        h.publish_package(&acc2, pack2_dir.path()),
+        0x10007 /*EDEP_ARBITRARY_NOT_SAME_ADDRESS*/
+    );
 }

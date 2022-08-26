@@ -1,37 +1,25 @@
-module aptos_std::any {
+module aptos_std::copyable_any {
     use aptos_std::type_info;
     use aptos_std::from_bcs::from_bytes;
-    use std::bcs::to_bytes;
+    use std::bcs;
     use std::error;
     use std::string::String;
-
-    friend aptos_std::copyable_any;
 
     /// The type provided for `unpack` is not the same as was given for `pack`.
     const ETYPE_MISMATCH: u64 = 0;
 
-    /// A type which can represent a value of any type. This allows for representation of 'unknown' future
-    /// values. For example, to define a resource such that it can be later be extended without breaking
-    /// changes one can do
-    ///
-    /// ```move
-    ///   struct Resource {
-    ///      field: Type,
-    ///      ...
-    ///      extension: Option<Any>
-    ///   }
-    /// ```
-    struct Any has drop, store {
+    /// The same as `any::Any` but with the copy ability.
+    struct Any has drop, store, copy {
         type_name: String,
         data: vector<u8>
     }
 
-    /// Pack a value into the `Any` representation. Because Any can be stored and dropped, this is
+    /// Pack a value into the `Any` representation. Because Any can be stored, dropped, and copied this is
     /// also required from `T`.
-    public fun pack<T: drop + store>(x: T): Any {
+    public fun pack<T: drop + store + copy>(x: T): Any {
         Any {
             type_name: type_info::type_name<T>(),
-            data: to_bytes(&x)
+            data: bcs::to_bytes(&x)
         }
     }
 
@@ -47,7 +35,7 @@ module aptos_std::any {
     }
 
     #[test_only]
-    struct S has store, drop { x: u64 }
+    struct S has store, drop, copy { x: u64 }
 
     #[test]
     fun test_any() {

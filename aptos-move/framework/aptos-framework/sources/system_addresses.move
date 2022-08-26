@@ -42,7 +42,7 @@ module aptos_framework::system_addresses {
             addr == @0x7 ||
             addr == @0x8 ||
             addr == @0x9 ||
-            addr == @0x10,
+            addr == @0xa,
             error::permission_denied(ENOT_FRAMEWORK_RESERVED_ADDRESS),
         )
     }

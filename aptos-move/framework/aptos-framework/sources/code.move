@@ -7,7 +7,7 @@ module aptos_framework::code {
 
     use aptos_framework::util;
     use aptos_framework::system_addresses;
-    use aptos_std::any::Any;
+    use aptos_std::copyable_any::Any;
     use std::option::Option;
 
     // ----------------------------------------------------------------------
@@ -35,8 +35,16 @@ module aptos_framework::code {
         manifest: vector<u8>,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// For future extensions.
-        extension: Option<Any>,
+        /// Holds PackageDeps.
+        deps: vector<PackageDep>,
+        /// For future extension
+        extension: Option<Any>
+    }
+
+    /// A dependency to a package published at address
+    struct PackageDep has store, drop, copy {
+        account: address,
+        package_name: String
     }
 
     /// Metadata about a module in a package.
@@ -68,8 +76,14 @@ module aptos_framework::code {
     /// Cannot delete a module that was published in the same package
     const EMODULE_MISSING: u64 = 0x4;
 
-    /// Creating a package with incompatible upgrade policy is disabled.
-    const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x5;
+    /// Dependency could not be resolved to any published package.
+    const EPACKAGE_DEP_MISSING: u64 = 0x5;
+
+    /// A dependency cannot have a weaker upgrade policy.
+    const EDEP_WEAKER_POLICY: u64 = 0x6;
+
+    /// A dependency to an `arbitrary` package must be on the same address.
+    const EDEP_ARBITRARY_NOT_SAME_ADDRESS: u64 = 0x7;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
@@ -111,18 +125,15 @@ module aptos_framework::code {
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
     public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
-        // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
-        assert!(
-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
-            error::invalid_argument(EINCOMPATIBLE_POLICY_DISABLED),
-        );
-
         let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
             move_to(owner, PackageRegistry{packages: vector::empty()})
         };
 
-        // Check package
+        // Checks for valid dependencies to other packages
+        check_dependencies(addr, &pack);
+
+        // Check package against conflicts
         let module_names = get_module_names(&pack);
         let packages = &mut borrow_global_mut<PackageRegistry>(addr).packages;
         let len = vector::length(packages);
@@ -198,6 +209,54 @@ module aptos_framework::code {
             };
             i = i + 1;
         }
+    }
+
+    /// Check that the upgrade policies of all packages are equal or higher quality than this package.
+    fun check_dependencies(publish_address: address, pack: &PackageMetadata) acquires PackageRegistry {
+        let deps = &pack.deps;
+        let i = 0;
+        let n = vector::length(deps);
+        while (i < n) {
+            let dep = vector::borrow(deps, i);
+            assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
+            if (is_policy_exempted_address(dep.account)) {
+                i = i + 1;
+                continue
+            };
+            let registry = borrow_global<PackageRegistry>(dep.account);
+            let j = 0;
+            let m = vector::length(&registry.packages);
+            let found = false;
+            while (j < m) {
+                let dep_pack = vector::borrow(&registry.packages, j);
+                if (dep_pack.name == dep.package_name) {
+                    // Found the package in the registry, now check policy
+                    assert!(
+                        dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
+                        error::invalid_argument(EDEP_WEAKER_POLICY)
+                    );
+                    if (dep_pack.upgrade_policy == upgrade_policy_arbitrary()) {
+                        assert!(
+                            dep.account == publish_address,
+                            error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
+                        )
+                    };
+                    found = true;
+                    break
+                };
+                j = j + 1;
+            };
+            assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
+            i = i + 1;
+        };
+    }
+
+    /// Core addresses which are exempted from the check that their policy matches the referring package. Without
+    /// this exemption, it would not be possible to define an immutable package based on the core system, which
+    /// requires to be upgradable for maintenance and evolution, and is configured to be `compatible`.
+    fun is_policy_exempted_address(addr: address): bool {
+        addr == @1 || addr == @2 || addr == @3 || addr == @4 || addr == @5 ||
+        addr == @6 || addr == @7 || addr == @8 || addr == @9 || addr == @10
     }
 
     /// Get the names of the modules in a package.

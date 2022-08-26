@@ -35,18 +35,17 @@ jobs:
           check-regexp: "community-platform.*"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: "./.github/actions/gar-auth"
+      - id: auth
+        uses: "google-github-actions/auth@v0"
         with:
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - uses: ./.github/actions/load-secrets
-        id: secrets
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - id: deploy-app
         uses: "google-github-actions/deploy-cloudrun@v0"
         with:
           service: community
-          image: ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/community-platform:${{ env.GIT_SHA }}
+          image: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/community-platform:${{ env.GIT_SHA }}
           project_id: aptos-community-${{ inputs.aptos_env }}
           region: us-west1
 
@@ -54,6 +53,6 @@ jobs:
         uses: "google-github-actions/deploy-cloudrun@v0"
         with:
           service: community-worker
-          image: ${{ steps.secrets.outputs.GCP_DOCKER_ARTIFACT_REPO }}/community-platform:${{ env.GIT_SHA }}
+          image: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/community-platform:${{ env.GIT_SHA }}
           project_id: aptos-community-${{ inputs.aptos_env }}
           region: us-west1

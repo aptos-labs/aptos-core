@@ -41,27 +41,22 @@ impl Fetcher {
         }
     }
 
-    pub async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
-    }
-
-    pub async fn set_highest_known_version(&mut self) {
-        let info = self.client.get_ledger_information().await;
-        let res = info.unwrap();
+    pub async fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
+        let res = self.client.get_ledger_information().await?;
         let state = res.state();
         self.highest_known_version = state.version;
         self.chain_id = state.chain_id;
+        Ok(())
     }
 
     pub async fn run(&mut self) {
         loop {
             if self.current_version >= self.highest_known_version {
                 tokio::time::sleep(Duration::from_millis(200)).await;
-                self.set_highest_known_version().await;
+                if let Err(err) = self.set_highest_known_version().await {
+                    aptos_logger::error!("Failed to set highest known version. Err: {:?}", err);
+                    continue;
+                }
             }
 
             let num_missing = self.highest_known_version - self.current_version;
@@ -200,11 +195,22 @@ impl TransactionFetcherTrait for TransactionFetcher {
     }
 
     async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
+        let mut retries = 0;
+        while retries < MAX_RETRIES {
+            retries += 1;
+            match self.client.get_ledger_information().await {
+                Ok(inner) => return inner.into_inner(),
+                Err(err) => {
+                    aptos_logger::error!(
+                        "Failed to get ledger info, will retry in {}ms. Err: {:?}",
+                        RETRY_TIME_MILLIS,
+                        err
+                    );
+                    tokio::time::sleep(Duration::from_secs(RETRY_TIME_MILLIS)).await
+                }
+            }
+        }
+        panic!("Failed to get ledger info.");
     }
 
     async fn set_version(&mut self, version: u64) {

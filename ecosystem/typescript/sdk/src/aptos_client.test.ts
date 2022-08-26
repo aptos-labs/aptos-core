@@ -10,7 +10,6 @@ import {
   TxnBuilderTypes,
   TransactionBuilderMultiEd25519,
   BCS,
-  TransactionBuilder,
   TransactionBuilderRemoteABI,
 } from "./transaction_builder";
 import { TokenClient } from "./token_client";
