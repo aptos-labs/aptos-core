@@ -7,7 +7,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 ## Unreleased
 N/A
 
-## 1.3.8 (2022-08-25)
+## 1.3.9 (2022-08-25)
 - **[Breaking Change]** Reimplemented the JSON transaction submission interfaces with BCS. This is a breaking change. `createSigningMessage` is removed. Before the changes, the transaction payloads take string aruguments. But now, Typescript payload arguments have to match the smart contract arugment types. e.g. `number` matches `u8`, `number | bigint` matches `u64` and `u128`, etc.
 - **[Breaking Change]** `getTokenBalance` and `getTokenBalanceForAccount` have been renamed to `getToken` and `getTokenForAccount`, since they were never getting just the balance, but the full token.
 - Added `CoinClient` to help working with coins. This contains common operations such as `transfer`, `checkBalance`, etc.
