@@ -12,6 +12,7 @@ interface WalletLayoutProps {
   children: React.ReactNode;
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
+  showAccountCircle?: boolean;
   showBackButton?: boolean;
   title?: string
 }
@@ -21,6 +22,7 @@ export default function WalletLayout({
   children,
   hasWalletFooter = true,
   hasWalletHeader = true,
+  showAccountCircle = true,
   showBackButton,
   title,
 }: WalletLayoutProps) {
@@ -49,6 +51,7 @@ export default function WalletLayout({
     >
       {hasWalletHeader ? (
         <WalletHeader
+          showAccountCircle={showAccountCircle}
           accessoryButton={accessoryButton}
           title={title}
           showBackButton={showBackButton}

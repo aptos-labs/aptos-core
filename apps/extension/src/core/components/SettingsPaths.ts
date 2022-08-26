@@ -3,7 +3,7 @@
 
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
-import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
+// import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
 import Routes from 'core/routes';
 import { settingsItemLabel } from 'core/constants';
 import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
@@ -34,13 +34,13 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
       path: Routes.network.path,
       title: settingsItemLabel.NETWORK,
     },
-    {
-      DividerComponent: Divider,
-      iconAfter: FiChevronRight,
-      iconBefore: BsShieldFill,
-      path: null,
-      title: 'Security and Privacy',
-    },
+    // {
+    //   DividerComponent: Divider,
+    //   iconAfter: FiChevronRight,
+    //   iconBefore: BsShieldFill,
+    //   path: Routes.security_privacy.path,
+    //   title: 'Security and Privacy',
+    // },
     {
       externalLink: 'https://discord.gg/rGRFrgFT',
       iconBefore: AiFillQuestionCircle,
@@ -72,17 +72,18 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
     [
       {
         iconAfter: FiChevronRight,
-        path: null,
+        path: Routes.switchAccount.path,
         title: 'Switch account',
       },
-      {
-        path: null,
-        textColorDict: {
-          dark: 'red.400',
-          light: 'red.400',
-        },
-        title: 'Remove account',
-      }],
+      // {
+      //   path: null,
+      //   textColorDict: {
+      //     dark: 'red.400',
+      //     light: 'red.400',
+      //   },
+      //   title: 'Remove account',
+      // }
+    ],
   );
 
   return items;

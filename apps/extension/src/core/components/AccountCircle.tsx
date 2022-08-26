@@ -6,31 +6,35 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import { Account } from 'shared/types';
 import AvatarImage from 'core/accountImages';
 
-interface ButtonProps {
-  height?: number;
+interface AccountCircleProps {
+  account?: Account;
   onClick?: MouseEventHandler<HTMLDivElement>;
-  width?: number;
+  size?: number;
 }
 
 const AccountCircle = React.forwardRef((
-  { height = 32, onClick, width = 32 }: ButtonProps,
+  {
+    account,
+    onClick,
+    size = 32,
+  }: AccountCircleProps,
   ref: LegacyRef<HTMLImageElement>,
 ) => {
   const { activeAccountAddress } = useActiveAccount();
+  const address = account?.address || activeAccountAddress;
   return (
     <Box
-      height={`${height}px`}
-      width={`${width}px`}
       borderRadius="2rem"
       cursor="pointer"
       onClick={onClick}
       ref={ref}
     >
       <AvatarImage
-        size={32}
-        address={activeAccountAddress ?? ''}
+        size={size}
+        address={address ?? ''}
       />
     </Box>
   );

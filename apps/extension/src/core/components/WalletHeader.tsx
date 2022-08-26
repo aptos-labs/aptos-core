@@ -8,29 +8,30 @@ import {
   Tooltip,
   Text,
   useColorMode,
-  useDisclosure,
   IconButton,
 } from '@chakra-ui/react';
+import { Routes } from 'core/routes';
 import { ArrowBackIcon } from '@chakra-ui/icons';
-import { secondaryBorderColor } from 'core/colors';
+import { secondaryBorderColor, walletHeaderBgColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
-import AccountDrawer from 'core/components/AccountDrawer';
 import AccountCircle from 'core/components/AccountCircle';
+import ChakraLink from 'core/components/ChakraLink';
 
 interface WalletHeaderProps {
   accessoryButton?: React.ReactNode,
+  showAccountCircle?: boolean;
   showBackButton?: boolean;
   title?: string
 }
 
 export default function WalletHeader({
   accessoryButton,
+  showAccountCircle,
   showBackButton,
   title,
 }: WalletHeaderProps) {
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
-  const { isOpen, onClose, onOpen } = useDisclosure();
 
   const backOnClick = () => {
     navigate(-1);
@@ -58,7 +59,7 @@ export default function WalletHeader({
                 icon={<ArrowBackIcon fontSize={26} />}
                 variant="filled"
                 onClick={backOnClick}
-                bgColor="gray.100"
+                bgColor={walletHeaderBgColor[colorMode]}
                 borderRadius="1rem"
               />
             ) : null
@@ -69,12 +70,17 @@ export default function WalletHeader({
         </HStack>
         <HStack spacing={4}>
           {accessoryButton}
-          <Tooltip label="Switch wallet" closeDelay={300}>
-            <AccountCircle onClick={onOpen} />
-          </Tooltip>
+          {showAccountCircle ? (
+            <Tooltip label="Switch wallet" closeDelay={300}>
+              <ChakraLink
+                to={Routes.switchAccount.path}
+              >
+                <AccountCircle />
+              </ChakraLink>
+            </Tooltip>
+          ) : null}
         </HStack>
       </HStack>
-      <AccountDrawer isOpen={isOpen} onClose={onClose} />
     </Box>
 
   );

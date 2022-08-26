@@ -7,11 +7,13 @@ import Account from 'pages/Account';
 import Activity from 'pages/Activity';
 import CreateWallet from 'pages/CreateWallet';
 import Credentials from 'pages/Credentials';
+import SecurityPrivacy from 'pages/SecurityPrivacy';
 import Gallery from 'pages/Gallery';
 import Help from 'pages/Help';
 import Network from 'pages/Network';
 import Password from 'pages/Password';
 import Settings from 'pages/Settings';
+import SwitchAccount from 'pages/SwitchAccount';
 import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
 import React from 'react';
@@ -92,6 +94,10 @@ export const Routes = Object.freeze({
     element: <Network />,
     path: '/settings/network',
   },
+  security_privacy: {
+    element: <SecurityPrivacy />,
+    path: '/settings/security_privacy',
+  },
   noWallet: {
     element: <NoWallet />,
     path: '/no-wallet',
@@ -115,6 +121,10 @@ export const Routes = Object.freeze({
   settings: {
     element: <Settings />,
     path: '/settings',
+  },
+  switchAccount: {
+    element: <SwitchAccount />,
+    path: '/switch-account',
   },
   token: {
     element: <Token />,
@@ -159,11 +169,13 @@ export const routes = [
               Routes.transaction,
               Routes.account,
               Routes.settings,
+              Routes.switchAccount,
               Routes.rename_account,
               Routes.credentials,
               Routes.network,
               Routes.addNetwork,
               Routes.recovery_phrase,
+              Routes.security_privacy,
               Routes.help,
               Routes.stake,
               { path: '/', element: <Navigate to={Routes.wallet.path} replace /> },

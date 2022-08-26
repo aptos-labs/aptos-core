@@ -47,6 +47,11 @@ export const secondaryBgColor = {
   light: 'white',
 };
 
+export const walletHeaderBgColor = {
+  dark: 'gray.600',
+  light: 'gray.100',
+};
+
 export const accountViewBgColor = {
   dark: 'gray.600',
   light: 'gray.200',

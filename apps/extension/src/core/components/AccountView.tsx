@@ -1,19 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo } from 'react';
+import React, { LegacyRef, useMemo, useState } from 'react';
 import {
+  Box,
   Center,
   Grid, Text, useColorMode, VStack, Flex, Button,
   useClipboard, Tooltip,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { Routes } from 'core/routes';
+
 import { RiFileCopyLine } from '@react-icons/all-files/ri/RiFileCopyLine';
 import { HiPencil } from '@react-icons/all-files/hi/HiPencil';
+import { AiFillCheckCircle } from '@react-icons/all-files/ai/AiFillCheckCircle';
 import {
-  AptosAccountState,
-} from 'core/types/stateTypes';
+  Account,
+} from 'shared/types';
 import {
   secondaryGridBgColor,
   textColor,
@@ -24,13 +27,33 @@ import AccountCircle from 'core/components/AccountCircle';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
 type AccountViewProps = {
-  account?: AptosAccountState
+  account?: Account
+  allowEdit?: boolean;
+  bgColor?: any;
+  boxShadow?: string;
+  hoverBgColor?: any;
+  onClick?: (address: string) => void;
+  showCheck?: boolean;
 };
 
-function AccountView({ account: accountFromProps }: AccountViewProps) {
+const CheckCircleSuccessBg = {
+  dark: '#00FF00',
+  light: 'green',
+};
+
+const AccountView = React.forwardRef(({
+  account: accountFromProps,
+  boxShadow = '',
+  allowEdit = false,
+  showCheck = false,
+  onClick,
+  bgColor = secondaryGridBgColor,
+  hoverBgColor = accountViewBgColor,
+}: AccountViewProps, ref: LegacyRef<HTMLImageElement>) => {
   const { colorMode } = useColorMode();
   const navigate = useNavigate();
   const { activeAccount } = useActiveAccount();
+  const [opacity, setOpacity] = useState(0);
 
   const displayActiveAccountAddress = useMemo(() => {
     const displayActiveAccount = accountFromProps || activeAccount;
@@ -40,7 +63,7 @@ function AccountView({ account: accountFromProps }: AccountViewProps) {
       return displayActiveAccount?.address;
     }
 
-    return displayActiveAccount?.address().toString();
+    return displayActiveAccount?.address;
   }, [accountFromProps, activeAccount]);
 
   const { hasCopied, onCopy } = useClipboard(displayActiveAccountAddress || '');
@@ -50,45 +73,69 @@ function AccountView({ account: accountFromProps }: AccountViewProps) {
     navigate(Routes.rename_account.path);
   };
 
-  const beginAddress = useMemo(() => displayActiveAccountAddress?.slice(0, 4) || '', [displayActiveAccountAddress]);
+  const handleClickAccount = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const targetClasses = (e.target as Element).classList;
+    const isCopyAddress = targetClasses.contains('address') || targetClasses.contains('address-copy');
+    if (onClick && !isCopyAddress) {
+      onClick(displayActiveAccountAddress);
+    }
+  };
+
+  const beginAddress = useMemo(() => displayActiveAccountAddress?.slice(0, 6) || '', [displayActiveAccountAddress]);
   const endAddress = useMemo(() => displayActiveAccountAddress?.slice(62) || '', [displayActiveAccountAddress]);
 
   return (
     <Grid
-      templateColumns="32px 1fr 32px"
+      ref={ref}
+      onClick={handleClickAccount}
+      templateColumns="48px 1fr 32px"
       p={4}
       width="100%"
       cursor="pointer"
       gap={2}
-      bgColor={secondaryGridBgColor[colorMode]}
+      boxShadow={boxShadow}
+      bgColor={bgColor[colorMode]}
       borderRadius=".5rem"
       _hover={{
-        bgColor: accountViewBgColor[colorMode],
+        bgColor: hoverBgColor[colorMode],
       }}
     >
       <Center width="100%">
-        <AccountCircle />
+        <AccountCircle account={accountFromProps} size={40} />
       </Center>
       <VStack width="100%" alignItems="flex-start" spacing={0}>
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
           {activeAccount?.name}
         </Text>
         <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
-          <Text fontSize="sm" color={secondaryTextColor[colorMode]} onClick={onCopy}>
-            <Flex flexDirection="row" gap={1} alignItems="baseline">
+          <Text
+            fontSize="sm"
+            color={secondaryTextColor[colorMode]}
+            onClick={onCopy}
+            onMouseEnter={() => setOpacity(1)}
+            onMouseLeave={() => setOpacity(0)}
+          >
+            <Flex flexDirection="row" gap={1} alignItems="baseline" className="address">
               {beginAddress}
               ...
               {endAddress}
-              <RiFileCopyLine />
+              <Box opacity={opacity}>
+                <RiFileCopyLine className="address-copy" />
+              </Box>
             </Flex>
           </Text>
         </Tooltip>
       </VStack>
-      <Button bg="none" p={0} onClick={handleClickEditAccount}>
-        <HiPencil size={20} />
-      </Button>
+      {activeAccount.address === displayActiveAccountAddress && showCheck
+        ? <AiFillCheckCircle size={32} color={CheckCircleSuccessBg[colorMode]} /> : null}
+      {allowEdit ? (
+        <Button bg="none" p={0} onClick={handleClickEditAccount}>
+          <HiPencil size={20} />
+        </Button>
+      ) : null}
     </Grid>
   );
-}
+});
 
 export default AccountView;
