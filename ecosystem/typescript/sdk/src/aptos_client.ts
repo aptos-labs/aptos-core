@@ -450,7 +450,8 @@ export class AptosClient {
         if (e instanceof Gen.ApiError) {
           if (e.status === 404) {
             isPending = true;
-            break;
+            // eslint-disable-next-line no-continue
+            continue;
           }
           if (e.status >= 400) {
             throw e;
