@@ -117,8 +117,8 @@ class LeaderboardController < ApplicationController
       sort.map do |key, direction|
         value = metric[key] || -Float::INFINITY
         if value.is_a?(String) && value.include?('/')
-          _numerator, denominator = value.split('/')
-          value = value.to_r
+          numerator, denominator = value.split('/').map(&:strip)
+          value = Rational(numerator, denominator)
           # When n=d, fractions with larger denominators should go first.
           value *= denominator.to_i if value == 1
         end
