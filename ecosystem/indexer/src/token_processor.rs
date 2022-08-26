@@ -17,7 +17,6 @@ use crate::{
     },
     models::{
         collection::Collection,
-        events::EventModel,
         metadata::Metadata,
         ownership::Ownership,
         token_property::TokenProperty,
@@ -196,52 +195,47 @@ fn insert_collection(
 
 fn process_token_on_chain_data(
     conn: &PgPoolConnection,
-    events: &[EventModel],
-    txns: &[UserTransaction],
+    txns_with_token_events: &[(&UserTransaction, Vec<TokenEvent>)],
     uris: &mut Vec<(String, String)>,
 ) {
-    // filter events to only keep token events
-    let token_events = events
-        .iter()
-        .map(TokenEvent::from_event)
-        .filter(|e| e.is_some())
-        .collect::<Vec<Option<TokenEvent>>>();
     // for create token event, insert a new token to token table,
     // if token exists, increase the supply
-    for event in token_events {
-        match event.unwrap() {
-            TokenEvent::CreateTokenDataEvent(event_data) => {
-                let uri = event_data.uri.clone();
-                let t_data_id = event_data.id.to_string();
-                insert_token_data(conn, event_data, &txns[0]);
-                uris.push((t_data_id, uri));
+    for (txn, events) in txns_with_token_events {
+        for event in events {
+            match event {
+                TokenEvent::CreateTokenDataEvent(event_data) => {
+                    let uri = event_data.uri.clone();
+                    let t_data_id = event_data.id.to_string();
+                    insert_token_data(conn, event_data.clone(), txn);
+                    uris.push((t_data_id, uri));
+                }
+                TokenEvent::MintTokenEvent(event_data) => {
+                    update_mint_token(conn, event_data.clone(), txn);
+                }
+                TokenEvent::CollectionCreationEvent(event_data) => {
+                    insert_collection(conn, event_data.clone(), txn);
+                }
+                TokenEvent::DepositEvent(event_data) => {
+                    update_token_ownership(
+                        conn,
+                        event_data.id.to_string(),
+                        txn,
+                        event_data.amount.clone(),
+                    );
+                }
+                TokenEvent::WithdrawEvent(event_data) => {
+                    update_token_ownership(
+                        conn,
+                        event_data.id.to_string(),
+                        txn,
+                        -event_data.amount.clone(),
+                    );
+                }
+                TokenEvent::MutateTokenPropertyMapEvent(event_data) => {
+                    insert_token_properties(conn, event_data.clone(), txn);
+                }
+                _ => (),
             }
-            TokenEvent::MintTokenEvent(event_data) => {
-                update_mint_token(conn, event_data, &txns[0]);
-            }
-            TokenEvent::CollectionCreationEvent(event_data) => {
-                insert_collection(conn, event_data, &txns[0]);
-            }
-            TokenEvent::DepositEvent(event_data) => {
-                update_token_ownership(
-                    conn,
-                    event_data.id.to_string(),
-                    &txns[0],
-                    event_data.amount,
-                );
-            }
-            TokenEvent::WithdrawEvent(event_data) => {
-                update_token_ownership(
-                    conn,
-                    event_data.id.to_string(),
-                    &txns[0],
-                    -event_data.amount,
-                );
-            }
-            TokenEvent::MutateTokenPropertyMapEvent(event_data) => {
-                insert_token_properties(conn, event_data, &txns[0]);
-            }
-            _ => (),
         }
     }
 }
@@ -258,13 +252,28 @@ impl TransactionProcessor for TokenTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let (_, user_txns, _, events, _) = TransactionModel::from_transactions(&transactions);
+        let txns_with_events = TransactionModel::from_transactions_for_tokens(&transactions);
 
         let conn = self.get_conn();
         let mut token_uris: Vec<(String, String)> = vec![];
 
+        // filter events to only keep token events
+        let txns_with_token_events: Vec<_> = txns_with_events
+            .iter()
+            .filter_map(|(txn, events)| {
+                let events: Vec<_> = events.iter().filter_map(TokenEvent::from_event).collect();
+
+                // Only keep txns with events
+                if events.is_empty() {
+                    None
+                } else {
+                    Some((txn, events))
+                }
+            })
+            .collect();
+
         let mut tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-            process_token_on_chain_data(&conn, &events, &user_txns, &mut token_uris);
+            process_token_on_chain_data(&conn, &txns_with_token_events, &mut token_uris);
             Ok(())
         });
 
