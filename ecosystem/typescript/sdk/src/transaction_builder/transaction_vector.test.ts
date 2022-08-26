@@ -11,7 +11,7 @@
 import path from "path";
 import * as Nacl from "tweetnacl";
 import fs from "fs";
-import { bytesToHex } from "@movingco/bytes-to-hex";
+import { bytesToHex } from "../bytes_to_hex.js";
 import {
   AccountAddress,
   ChainId,
