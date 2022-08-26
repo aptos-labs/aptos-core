@@ -301,6 +301,7 @@ fn compile_in_temp_dir(
         framework_rev,
         BTreeMap::new(),
         prompt_options,
+        None,
     )?;
 
     // Insert the new script
