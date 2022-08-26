@@ -1,13 +1,14 @@
 /** @type {import("ts-jest/dist/types").InitialOptionsTsJest} */
 module.exports = {
   preset: "ts-jest",
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1",
+  },
   testEnvironment: "node",
   coveragePathIgnorePatterns: ["generated/*", "transaction_builder/aptos_types/*"],
   testPathIgnorePatterns: ["dist/*"],
   collectCoverage: true,
-  setupFiles: [
-    "dotenv/config",
-  ],
+  setupFiles: ["dotenv/config"],
   coverageThreshold: {
     global: {
       branches: 50, // 90,
