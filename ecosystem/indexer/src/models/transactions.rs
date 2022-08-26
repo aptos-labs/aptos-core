@@ -315,6 +315,22 @@ impl Transaction {
         }
         (txns, user_txns, bm_txns, events, wscs)
     }
+
+    pub fn from_transactions_for_tokens(
+        transactions: &[APITransaction],
+    ) -> Vec<(UserTransaction, Vec<EventModel>)> {
+        let mut txns = vec![];
+        for (_, maybe_user_txn, maybe_event_list, _) in
+            transactions.iter().map(Self::from_transaction)
+        {
+            if let Some(Either::Left(user_txn)) = maybe_user_txn {
+                if let Some(event_list) = maybe_event_list {
+                    txns.push((user_txn, event_list))
+                }
+            }
+        }
+        txns
+    }
 }
 
 #[derive(
