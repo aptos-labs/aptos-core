@@ -33,10 +33,8 @@
     "Move"
   ],
   "dependencies": {
-    "@movingco/bytes-to-hex": "^0.4.1",
     "@scure/bip39": "^1.1.0",
     "axios": "^0.27.2",
-    "buffer": "^6.0.3",
     "ed25519-hd-key": "^1.2.0",
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3",
