@@ -40,6 +40,8 @@ module aptos_framework::resource_account {
     use std::signer;
     use std::vector;
     use aptos_framework::account;
+    use aptos_framework::coin;
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_std::simple_map::{Self, SimpleMap};
 
     /// Container resource not found in account
@@ -58,6 +60,7 @@ module aptos_framework::resource_account {
         optional_auth_key: vector<u8>,
     ) acquires Container {
         let (resource, resource_signer_cap) = account::create_resource_account(origin, seed);
+        coin::register<AptosCoin>(&resource);
 
         let origin_addr = signer::address_of(origin);
         if (!exists<Container>(origin_addr)) {
