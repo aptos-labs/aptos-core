@@ -295,7 +295,7 @@ module aptos_token::token {
 
     public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
         let addr = signer::address_of(account);
-        assert!(exists<TokenStore>(addr), ETOKEN_STORE_NOT_PUBLISHED);
+        initialize_token_store(account);
         let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
         *opt_in_flag = opt_in;
     }
