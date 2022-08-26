@@ -14,7 +14,8 @@
     "pretty": true
   },
   "include": [
-    "src"
+    "src",
+    "*.ts"
   ],
   "paths": {
     "@aptos/*": "../..",

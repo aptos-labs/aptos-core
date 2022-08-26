@@ -151,7 +151,7 @@ const config = {
           {
             position: "left",
             type: "doc",
-            docId: "aptos-white-paper",
+            docId: "aptos-white-paper/index",
             label: "Aptos White Paper",
           },
         ],

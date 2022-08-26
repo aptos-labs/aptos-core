@@ -63,6 +63,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
+use aptos_types::proof::TransactionAccumulatorSummary;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -382,7 +383,9 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_latest_version_option()?.map_or(0, |v| v + 1);
+        let ledger_next_version = self
+            .get_latest_transaction_info_option()?
+            .map_or(0, |(v, _)| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -1410,6 +1413,15 @@ impl DbReader for AptosDB {
             self.ledger_store
                 .get_consistency_proof(client_known_version, ledger_version)
         })
+    }
+
+    fn get_accumulator_summary(
+        &self,
+        ledger_version: Version,
+    ) -> Result<TransactionAccumulatorSummary> {
+        let num_txns = ledger_version + 1;
+        let frozen_subtrees = self.ledger_store.get_frozen_subtree_hashes(num_txns)?;
+        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {

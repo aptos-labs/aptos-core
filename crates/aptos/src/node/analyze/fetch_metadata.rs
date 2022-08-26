@@ -21,6 +21,7 @@ pub struct EpochInfo {
     pub epoch: u64,
     pub blocks: Vec<VersionedNewBlockEvent>,
     pub validators: Vec<ValidatorInfo>,
+    pub partial: bool,
 }
 
 pub struct FetchMetadata {}
@@ -104,8 +105,8 @@ impl FetchMetadata {
 
     pub async fn fetch_new_block_events(
         client: &RestClient,
-        start_epoch: Option<u64>,
-        end_epoch: Option<u64>,
+        start_epoch: Option<i64>,
+        end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
         let mut start_seq_num = 0;
         let (last_events, state) = client
@@ -113,33 +114,50 @@ impl FetchMetadata {
             .await?
             .into_parts();
         assert_eq!(last_events.len(), 1, "{:?}", last_events);
-        let last_seq_num = last_events.first().unwrap().sequence_number;
+        let last_event = last_events.first().unwrap();
+        let last_seq_num = last_event.sequence_number;
 
-        if let Some(start_epoch) = start_epoch {
-            if start_epoch > 1 {
-                let mut search_end = last_seq_num;
+        let wanted_start_epoch = {
+            let mut wanted_start_epoch = start_epoch.unwrap_or(2);
+            if wanted_start_epoch < 0 {
+                wanted_start_epoch = last_event.event.epoch() as i64 + wanted_start_epoch + 1;
+            }
+            std::cmp::max(2, wanted_start_epoch) as u64
+        };
+        let wanted_end_epoch = {
+            let mut wanted_end_epoch = end_epoch.unwrap_or(i64::MAX);
+            if wanted_end_epoch < 0 {
+                wanted_end_epoch = last_event.event.epoch() as i64 + wanted_end_epoch + 1;
+            }
+            std::cmp::min(
+                last_event.event.epoch() + 1,
+                std::cmp::max(2, wanted_end_epoch) as u64,
+            )
+        };
 
-                // Stop when search is close enough, and we can then linearly
-                // proceed from there.
-                // Since we are ignoring results we are fetching during binary search
-                // we want to stop when we are close.
-                while start_seq_num + 20 < search_end {
-                    let mid = (start_seq_num + search_end) / 2;
+        if wanted_start_epoch > 2 {
+            let mut search_end = last_seq_num;
 
-                    let mid_epoch = client
-                        .get_new_block_events(Some(mid), Some(1))
-                        .await?
-                        .into_inner()
-                        .first()
-                        .unwrap()
-                        .event
-                        .epoch();
+            // Stop when search is close enough, and we can then linearly
+            // proceed from there.
+            // Since we are ignoring results we are fetching during binary search
+            // we want to stop when we are close.
+            while start_seq_num + 20 < search_end {
+                let mid = (start_seq_num + search_end) / 2;
 
-                    if mid_epoch < start_epoch {
-                        start_seq_num = mid;
-                    } else {
-                        search_end = mid;
-                    }
+                let mid_epoch = client
+                    .get_new_block_events(Some(mid), Some(1))
+                    .await?
+                    .into_inner()
+                    .first()
+                    .unwrap()
+                    .event
+                    .epoch();
+
+                if mid_epoch < wanted_start_epoch {
+                    start_seq_num = mid;
+                } else {
+                    search_end = mid;
                 }
             }
         }
@@ -148,8 +166,8 @@ impl FetchMetadata {
         let mut batch_index = 0;
 
         println!(
-            "Fetching {} to {} sequence number, last version: {} and epoch: {}",
-            start_seq_num, last_seq_num, state.version, state.epoch,
+            "Fetching {} to {} sequence number, wanting epochs [{}, {}), last version: {} and epoch: {}",
+            start_seq_num, last_seq_num, wanted_start_epoch, wanted_end_epoch, state.version, state.epoch,
         );
 
         let mut validators: Vec<ValidatorInfo> = vec![];
@@ -159,7 +177,6 @@ impl FetchMetadata {
         let mut result: Vec<EpochInfo> = vec![];
 
         let mut cursor = start_seq_num;
-        let start_epoch = start_epoch.unwrap_or(2);
         loop {
             let events = client.get_new_block_events(Some(cursor), Some(batch)).await;
 
@@ -174,6 +191,7 @@ impl FetchMetadata {
                     epoch,
                     blocks: current,
                     validators: validators.clone(),
+                    partial: true,
                 });
                 return Ok(result);
             }
@@ -201,12 +219,13 @@ impl FetchMetadata {
                                 if let Ok(new_validators) =
                                     FetchMetadata::get_validators_from_transaction(&transaction)
                                 {
-                                    if epoch >= start_epoch {
+                                    if epoch >= wanted_start_epoch {
                                         assert!(!validators.is_empty());
                                         result.push(EpochInfo {
                                             epoch,
                                             blocks: current,
                                             validators: validators.clone(),
+                                            partial: false,
                                         });
                                     }
                                     current = vec![];
@@ -215,7 +234,7 @@ impl FetchMetadata {
                                     validators.sort_by_key(|v| v.validator_index);
                                     assert_eq!(epoch + 1, event.event.epoch());
                                     epoch = event.event.epoch();
-                                    if end_epoch.is_some() && epoch >= end_epoch.unwrap() {
+                                    if epoch >= wanted_end_epoch {
                                         return Ok(result);
                                     }
                                     break;
@@ -247,6 +266,14 @@ impl FetchMetadata {
             }
 
             if cursor > last_seq_num {
+                if !validators.is_empty() {
+                    result.push(EpochInfo {
+                        epoch,
+                        blocks: current,
+                        validators: validators.clone(),
+                        partial: true,
+                    });
+                }
                 return Ok(result);
             }
         }

@@ -4,7 +4,6 @@
 mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
-mod rotate_key;
 
 use language_e2e_tests::{
     account_universe::{

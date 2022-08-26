@@ -255,6 +255,9 @@ impl TestContext {
             "0x1::state_storage::StateStorageUsage" => {
                 Value::String("state storage omitted".to_string())
             }
+            "0x1::state_storage::GasParameter" => {
+                Value::String("state storage gas parameter omitted".to_string())
+            }
             _ => val["data"].clone(),
         };
         nval

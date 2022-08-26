@@ -34,11 +34,6 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// Basic account creation methods.
-    AccountCreateAccount {
-        auth_key: AccountAddress,
-    },
-
     /// Offer rotation capability of this account to another address
     /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
     /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
@@ -47,10 +42,6 @@ pub enum EntryFunctionCall {
         rotation_capability_sig_bytes: Vec<u8>,
         account_public_key_bytes: Vec<u8>,
         recipient_address: AccountAddress,
-    },
-
-    AccountRotateAuthenticationKey {
-        new_auth_key: Vec<u8>,
     },
 
     /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
@@ -65,7 +56,12 @@ pub enum EntryFunctionCall {
         new_pk_bytes: Vec<u8>,
     },
 
-    AccountTransfer {
+    /// Basic account creation methods.
+    AptosAccountCreateAccount {
+        auth_key: AccountAddress,
+    },
+
+    AptosAccountTransfer {
         to: AccountAddress,
         amount: u64,
     },
@@ -121,13 +117,6 @@ pub enum EntryFunctionCall {
     /// Upgrade total supply to use a parallelizable implementation if it is
     /// available.
     CoinUpgradeSupply {
-        coin_type: TypeTag,
-    },
-
-    /// Entry function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-    /// has to explicitly registers to do so. The register creates a special `CoinStore`
-    /// to hold the specified `CoinType`.
-    CoinsRegister {
         coin_type: TypeTag,
     },
 
@@ -260,7 +249,6 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
-            AccountCreateAccount { auth_key } => account_create_account(auth_key),
             AccountOfferRotationCapabilityEd25519 {
                 rotation_capability_sig_bytes,
                 account_public_key_bytes,
@@ -270,9 +258,6 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
-            AccountRotateAuthenticationKey { new_auth_key } => {
-                account_rotate_authentication_key(new_auth_key)
-            }
             AccountRotateAuthenticationKeyEd25519 {
                 curr_sig_bytes,
                 new_sig_bytes,
@@ -284,7 +269,8 @@ impl EntryFunctionCall {
                 curr_pk_bytes,
                 new_pk_bytes,
             ),
-            AccountTransfer { to, amount } => account_transfer(to, amount),
+            AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
+            AptosAccountTransfer { to, amount } => aptos_account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
@@ -314,7 +300,6 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
-            CoinsRegister { coin_type } => coins_register(coin_type),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -397,22 +382,6 @@ impl EntryFunctionCall {
     }
 }
 
-/// Basic account creation methods.
-pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("create_account").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&auth_key).unwrap()],
-    ))
-}
-
 /// Offer rotation capability of this account to another address
 /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
 /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
@@ -437,21 +406,6 @@ pub fn account_offer_rotation_capability_ed25519(
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
-    ))
-}
-
-pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("rotate_authentication_key").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&new_auth_key).unwrap()],
     ))
 }
 
@@ -485,14 +439,30 @@ pub fn account_rotate_authentication_key_ed25519(
     ))
 }
 
-pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+/// Basic account creation methods.
+pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("account").to_owned(),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("create_account").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&auth_key).unwrap()],
+    ))
+}
+
+pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
         ),
         ident_str!("transfer").to_owned(),
         vec![],
@@ -657,24 +627,6 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
             ident_str!("coin").to_owned(),
         ),
         ident_str!("upgrade_supply").to_owned(),
-        vec![coin_type],
-        vec![],
-    ))
-}
-
-/// Entry function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-/// has to explicitly registers to do so. The register creates a special `CoinStore`
-/// to hold the specified `CoinType`.
-pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("coins").to_owned(),
-        ),
-        ident_str!("register").to_owned(),
         vec![coin_type],
         vec![],
     ))
@@ -1056,16 +1008,6 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
-    pub fn account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountCreateAccount {
-                auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn account_offer_rotation_capability_ed25519(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1074,18 +1016,6 @@ mod decoder {
                 rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
                 account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
                 recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn account_rotate_authentication_key(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountRotateAuthenticationKey {
-                new_auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1107,9 +1037,19 @@ mod decoder {
         }
     }
 
-    pub fn account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn aptos_account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountTransfer {
+            Some(EntryFunctionCall::AptosAccountCreateAccount {
+                auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountTransfer {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -1204,16 +1144,6 @@ mod decoder {
     pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinUpgradeSupply {
-                coin_type: script.ty_args().get(0)?.clone(),
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn coins_register(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::CoinsRegister {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
@@ -1444,24 +1374,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "account_create_account".to_string(),
-            Box::new(decoder::account_create_account),
-        );
-        map.insert(
             "account_offer_rotation_capability_ed25519".to_string(),
             Box::new(decoder::account_offer_rotation_capability_ed25519),
-        );
-        map.insert(
-            "account_rotate_authentication_key".to_string(),
-            Box::new(decoder::account_rotate_authentication_key),
         );
         map.insert(
             "account_rotate_authentication_key_ed25519".to_string(),
             Box::new(decoder::account_rotate_authentication_key_ed25519),
         );
         map.insert(
-            "account_transfer".to_string(),
-            Box::new(decoder::account_transfer),
+            "aptos_account_create_account".to_string(),
+            Box::new(decoder::aptos_account_create_account),
+        );
+        map.insert(
+            "aptos_account_transfer".to_string(),
+            Box::new(decoder::aptos_account_transfer),
         );
         map.insert(
             "aptos_coin_claim_mint_capability".to_string(),
@@ -1494,10 +1420,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
-        );
-        map.insert(
-            "coins_register".to_string(),
-            Box::new(decoder::coins_register),
         );
         map.insert(
             "managed_coin_burn".to_string(),

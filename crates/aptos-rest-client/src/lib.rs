@@ -5,6 +5,7 @@ pub mod aptos;
 pub mod error;
 pub mod faucet;
 
+use aptos_api_types::TransactionsBatchSubmissionResult;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -23,8 +24,8 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
-    VersionedEvent,
+    GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData,
+    UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
@@ -288,6 +289,42 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
+    pub async fn submit_batch(
+        &self,
+        txns: &[SignedTransaction],
+    ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
+        let txn_payload = bcs::to_bytes(&txns.to_vec())?;
+        let url = self.build_path("transactions/batch")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .body(txn_payload)
+            .send()
+            .await?;
+        self.json(response).await
+    }
+    pub async fn submit_batch_bcs(
+        &self,
+        txns: &[SignedTransaction],
+    ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
+        let txn_payload = bcs::to_bytes(&txns.to_vec())?;
+        let url = self.build_path("transactions/batch")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes)).unwrap())
+    }
+
     pub async fn submit_and_wait(
         &self,
         txn: &SignedTransaction,
@@ -309,6 +346,20 @@ impl Client {
         pending_transaction: &PendingTransaction,
     ) -> AptosResult<Response<Transaction>> {
         self.wait_for_transaction_by_hash(
+            pending_transaction.hash.into(),
+            *pending_transaction
+                .request
+                .expiration_timestamp_secs
+                .inner(),
+        )
+        .await
+    }
+
+    pub async fn wait_for_transaction_bcs(
+        &self,
+        pending_transaction: &PendingTransaction,
+    ) -> AptosResult<Response<TransactionOnChainData>> {
+        self.wait_for_transaction_by_hash_bcs(
             pending_transaction.hash.into(),
             *pending_transaction
                 .request
@@ -842,6 +893,12 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<AccountResource>> {
         let url = self.build_path(&format!("accounts/{}", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {
+        let url = self.build_path("estimate_gas_price")?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }

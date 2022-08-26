@@ -25,19 +25,14 @@ test(
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
-    async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
-      const txnHash = await txnHashPromise;
-      const txn = await client.waitForTransactionWithResult(txnHash);
-      expect((txn as any)?.success).toBe(true);
-    }
-
     // Create collection and token on Alice's account
-    await ensureTxnSuccess(
-      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+    await client.waitForTransaction(
+      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+      { checkSuccess: true },
     );
 
-    await ensureTxnSuccess(
-      tokenClient.createToken(
+    await client.waitForTransaction(
+      await tokenClient.createToken(
         alice,
         collectionName,
         tokenName,
@@ -52,6 +47,7 @@ test(
         ["2"],
         ["int"],
       ),
+      { checkSuccess: true },
     );
 
     const tokenId = {
@@ -65,34 +61,38 @@ test(
 
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
-    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
     const tokenData = await tokenClient.getTokenData(alice.address().hex(), collectionName, tokenName);
     expect(tokenData.name).toBe(tokenName);
 
-    await ensureTxnSuccess(
-      tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+    await client.waitForTransaction(
+      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+      { checkSuccess: true },
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    await ensureTxnSuccess(
-      tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
+    await client.waitForTransaction(
+      await tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName),
+      { checkSuccess: true },
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    await ensureTxnSuccess(
-      tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+    await client.waitForTransaction(
+      await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1),
+      { checkSuccess: true },
     );
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    await ensureTxnSuccess(
-      tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),
+    await client.waitForTransaction(
+      await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName),
+      { checkSuccess: true },
     );
 
-    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,

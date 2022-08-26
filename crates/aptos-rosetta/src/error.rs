@@ -12,9 +12,8 @@ use warp::{http::StatusCode, reply::Reply};
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ApiError {
-    BlockParameterConflict,
     TransactionIsPending,
     NetworkIdentifierMismatch,
     ChainIdMismatch,
@@ -22,8 +21,10 @@ pub enum ApiError {
     InvalidTransferOperations(Option<&'static str>),
     InvalidSignatureType,
     InvalidMaxGasFees,
+    MaxGasFeeTooLow,
     InvalidGasMultiplier,
-    InvalidOperations,
+    GasEstimationFailed(Option<String>),
+    InvalidOperations(Option<String>),
     MissingPayloadMetadata,
     UnsupportedCurrency(Option<String>),
     UnsupportedSignatureCount(Option<usize>),
@@ -61,7 +62,6 @@ impl ApiError {
     pub fn all() -> Vec<ApiError> {
         use ApiError::*;
         vec![
-            BlockParameterConflict,
             TransactionIsPending,
             NetworkIdentifierMismatch,
             ChainIdMismatch,
@@ -69,8 +69,10 @@ impl ApiError {
             InvalidTransferOperations(None),
             InvalidSignatureType,
             InvalidMaxGasFees,
+            MaxGasFeeTooLow,
             InvalidGasMultiplier,
-            InvalidOperations,
+            GasEstimationFailed(None),
+            InvalidOperations(None),
             MissingPayloadMetadata,
             UnsupportedCurrency(None),
             UnsupportedSignatureCount(None),
@@ -98,7 +100,6 @@ impl ApiError {
     pub fn code(&self) -> u32 {
         use ApiError::*;
         match self {
-            BlockParameterConflict => 0,
             TransactionIsPending => 1,
             NetworkIdentifierMismatch => 2,
             ChainIdMismatch => 3,
@@ -106,29 +107,31 @@ impl ApiError {
             InvalidTransferOperations(_) => 5,
             InvalidSignatureType => 6,
             InvalidMaxGasFees => 7,
-            InvalidGasMultiplier => 8,
-            InvalidOperations => 9,
-            MissingPayloadMetadata => 10,
-            UnsupportedCurrency(_) => 11,
-            UnsupportedSignatureCount(_) => 12,
-            NodeIsOffline => 13,
-            TransactionParseError(_) => 14,
-            InternalError(_) => AptosErrorCode::InternalError.as_u32(),
-            AccountNotFound(_) => AptosErrorCode::AccountNotFound.as_u32(),
-            ResourceNotFound(_) => AptosErrorCode::ResourceNotFound.as_u32(),
-            ModuleNotFound(_) => AptosErrorCode::ModuleNotFound.as_u32(),
-            StructFieldNotFound(_) => AptosErrorCode::StructFieldNotFound.as_u32(),
-            VersionNotFound(_) => AptosErrorCode::VersionNotFound.as_u32(),
-            TransactionNotFound(_) => AptosErrorCode::TransactionNotFound.as_u32(),
-            TableItemNotFound(_) => AptosErrorCode::TableItemNotFound.as_u32(),
-            BlockNotFound(_) => AptosErrorCode::BlockNotFound.as_u32(),
-            VersionPruned(_) => AptosErrorCode::VersionPruned.as_u32(),
-            BlockPruned(_) => AptosErrorCode::BlockPruned.as_u32(),
-            InvalidInput(_) => AptosErrorCode::InvalidInput.as_u32(),
-            InvalidTransactionUpdate(_) => AptosErrorCode::InvalidTransactionUpdate.as_u32(),
-            SequenceNumberTooOld(_) => AptosErrorCode::SequenceNumberTooOld.as_u32(),
-            VmError(_) => AptosErrorCode::VmError.as_u32(),
-            MempoolIsFull(_) => AptosErrorCode::MempoolIsFull.as_u32(),
+            MaxGasFeeTooLow => 8,
+            InvalidGasMultiplier => 9,
+            InvalidOperations(_) => 10,
+            MissingPayloadMetadata => 11,
+            UnsupportedCurrency(_) => 12,
+            UnsupportedSignatureCount(_) => 13,
+            NodeIsOffline => 14,
+            TransactionParseError(_) => 15,
+            GasEstimationFailed(_) => 16,
+            InternalError(_) => 17,
+            AccountNotFound(_) => 18,
+            ResourceNotFound(_) => 19,
+            ModuleNotFound(_) => 20,
+            StructFieldNotFound(_) => 21,
+            VersionNotFound(_) => 22,
+            TransactionNotFound(_) => 23,
+            TableItemNotFound(_) => 24,
+            BlockNotFound(_) => 25,
+            VersionPruned(_) => 26,
+            BlockPruned(_) => 27,
+            InvalidInput(_) => 28,
+            InvalidTransactionUpdate(_) => 29,
+            SequenceNumberTooOld(_) => 30,
+            VmError(_) => 31,
+            MempoolIsFull(_) => 32,
         }
     }
 
@@ -136,33 +139,18 @@ impl ApiError {
         use ApiError::*;
         matches!(
             self,
-            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_)
+            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_) | GasEstimationFailed(_)
         )
     }
 
     pub fn status_code(&self) -> StatusCode {
-        use ApiError::*;
-        match self {
-            AccountNotFound(_)
-            | BlockNotFound(_)
-            | ResourceNotFound(_)
-            | ModuleNotFound(_)
-            | VersionNotFound(_)
-            | TransactionNotFound(_)
-            | StructFieldNotFound(_)
-            | TableItemNotFound(_) => StatusCode::NOT_FOUND,
-            MempoolIsFull(_) => StatusCode::INSUFFICIENT_STORAGE,
-            BlockPruned(_) | VersionPruned(_) => StatusCode::GONE,
-            NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
-            _ => StatusCode::BAD_REQUEST,
-        }
+        // Per Rosetta guidelines, all errors are 500s
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 
-    pub fn message(&self) -> String {
+    /// This value must be fixed, so it's all static strings
+    pub fn message(&self) -> &'static str {
         match self {
-            ApiError::BlockParameterConflict => {
-                "Block parameter conflict. Must provide either hash or index but not both"
-            }
             ApiError::TransactionIsPending => "Transaction is pending",
             ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
             ApiError::ChainIdMismatch => "Chain Id doesn't match",
@@ -171,8 +159,9 @@ impl ApiError {
             ApiError::AccountNotFound(_) => "Account not found",
             ApiError::InvalidSignatureType => "Invalid signature type",
             ApiError::InvalidMaxGasFees => "Invalid max gas fee",
+            ApiError::MaxGasFeeTooLow => "Max fee is lower than the estimated cost of the transaction",
             ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
-            ApiError::InvalidOperations => "Invalid operations",
+            ApiError::InvalidOperations(_) => "Invalid operations",
             ApiError::MissingPayloadMetadata => "Payload metadata is missing",
             ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
             ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
@@ -193,8 +182,8 @@ impl ApiError {
             ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
+            ApiError::GasEstimationFailed(_) => "Gas estimation failed",
         }
-        .to_string()
     }
 
     pub fn details(self) -> Option<ErrorDetails> {
@@ -204,6 +193,7 @@ impl ApiError {
             ApiError::UnsupportedCurrency(inner) => inner,
             ApiError::UnsupportedSignatureCount(inner) => inner.map(|inner| inner.to_string()),
             ApiError::TransactionParseError(inner) => inner,
+            ApiError::InvalidOperations(inner) => inner,
             ApiError::InternalError(inner) => inner,
             ApiError::AccountNotFound(inner) => inner,
             ApiError::ResourceNotFound(inner) => inner,
@@ -220,6 +210,7 @@ impl ApiError {
             ApiError::SequenceNumberTooOld(inner) => inner,
             ApiError::VmError(inner) => inner,
             ApiError::MempoolIsFull(inner) => inner,
+            ApiError::GasEstimationFailed(inner) => inner,
             _ => None,
         }
         .map(|details| ErrorDetails { details })
@@ -236,7 +227,7 @@ impl ApiError {
 
 impl From<ApiError> for types::Error {
     fn from(error: ApiError) -> Self {
-        let message = error.message();
+        let message = error.message().to_string();
         let code = error.code();
         let retriable = error.retriable();
         let details = error.details();
@@ -245,7 +236,6 @@ impl From<ApiError> for types::Error {
             code,
             retriable,
             details,
-            description: None,
         }
     }
 }

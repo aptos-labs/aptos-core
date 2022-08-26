@@ -14,4 +14,6 @@
 # Use Move syntax highlighter for Move IR code
 *.mvir linguist-language=Move
 
+# Generated files, dont show diffs etc
 **/src/pb/*.rs linguist-generated=true
+*.fixture linguist-generated=true

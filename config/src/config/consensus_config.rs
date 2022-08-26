@@ -45,7 +45,7 @@ impl Default for ConsensusConfig {
             use_quorum_store: false,
 
             quorum_store_pull_timeout_ms: 1000,
-            quorum_store_poll_count: 20,
+            quorum_store_poll_count: 5,
             intra_consensus_channel_buffer_size: 10,
         }
     }

@@ -12,7 +12,9 @@ class ProjectsController < ApplicationController
   # GET /projects
   def index
     @categories = Category.all.index_by(&:id)
-    @projects = Project.where(public: true).includes(:project_categories)
+    @projects = Project.where(public: true)
+                       .includes(:project_categories)
+                       .with_attached_thumbnail
 
     selected_category = params[:category]&.to_i
     @projects = @projects.filter_by_category(selected_category) if selected_category
@@ -52,9 +54,6 @@ class ProjectsController < ApplicationController
 
     return unless check_recaptcha
 
-    @project.thumbnail.attach(params[:thumbnail])
-    @project.screenshots.attach(params[:screenshots])
-
     if @project.save
       redirect_to project_url(@project), notice: 'Project was successfully created.'
     else
@@ -68,9 +67,6 @@ class ProjectsController < ApplicationController
 
     @project = Project.find(params[:id])
     return head :forbidden unless @project.user_id == current_user.id
-
-    @project.thumbnail.attach(params[:thumbnail])
-    @project.screenshots.attach(params[:screenshots])
 
     if @project.update(project_params)
       redirect_to project_url(@project), notice: 'Project was successfully updated.'

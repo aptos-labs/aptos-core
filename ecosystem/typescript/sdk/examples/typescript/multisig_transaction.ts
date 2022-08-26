@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AptosClient, AptosAccount, FaucetClient, BCS, TransactionBuilderMultiEd25519, TxnBuilderTypes } from "aptos";
-import { aptosCoin } from "./constants";
+import { aptosCoinStore } from "./common";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
@@ -45,7 +45,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   await faucetClient.fundAccount(mutisigAccountAddress, 100000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
-  let accountResource = resources.find((r) => r.type === aptosCoin);
+  let accountResource = resources.find((r) => r.type === aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 100000);
   console.log(`multisig account coins: ${balance}. Should be 100000!`);
@@ -54,7 +54,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   // Creates a receiver account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account4.address(), 0);
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === aptosCoin);
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`multisig account coins: ${balance}. Should be 0!`);
@@ -124,7 +124,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === aptosCoin);
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
   console.log(`multisig account coins: ${balance}. Should be 123!`);

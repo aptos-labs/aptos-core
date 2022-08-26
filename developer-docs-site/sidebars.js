@@ -149,14 +149,11 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "link",
-          label: "Typescript SDK",
-          href: "https://aptos-labs.github.io/ts-sdk-doc/",
-        },
         "sdks/aptos-sdk-overview",
+        "sdks/typescript-sdk",
         "sdks/transactions-with-ts-sdk",
         "sdks/python-sdk",
+        "sdks/rust-sdk",
       ],
     },
     {
@@ -168,7 +165,14 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     "reference/telemetry",
-    "aptos-white-paper",
+    {
+      type: "category",
+      label: "Aptos White Paper",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "aptos-white-paper/index" },
+      items: ["aptos-white-paper/in-korean"],
+    },
     "reference/glossary",
   ],
 };

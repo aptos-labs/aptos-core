@@ -14,6 +14,41 @@ numValidators: 1
 # -- Total number of fullnode groups to deploy
 numFullnodeGroups: 1
 
+# -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
+overrideNodeConfig: false
+
+haproxy:
+  # -- Enable HAProxy deployment in front of validator and fullnodes
+  enabled: true
+  # -- Number of HAProxy replicas
+  replicas: 1
+  image:
+    # -- Image repo to use for HAProxy images
+    repo: haproxy
+    # -- Image tag to use for HAProxy images
+    tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
+    # -- Image pull policy to use for HAProxy images
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1.5
+      memory: 2Gi
+    requests:
+      cpu: 1.5
+      memory: 2Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  limits:
+    validator:
+      # -- Limit the number of connections per IP address per minute
+      connectionsPerIPPerMin: 2
+  config:
+    # -- Whether to send Proxy Protocol v2
+    send_proxy_protocol: &send_proxy_protocol false
+  # -- Name of the Kubernetes TLS secret to use for HAProxy
+  tls_secret:
+
 validator:
   # -- Internal: name of your validator for use in labels
   name:
@@ -47,24 +82,33 @@ validator:
   affinity: {}
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
-    sync_only: false
-    concurrency_level: 8
-    round_initial_timeout_ms:
-    quorum_store_poll_count: 1
-    enable_state_store_pruner: true
-    enable_ledger_pruner: true
-    ledger_prune_window: 10000000
-    state_store_prune_window: 1000000
-    ledger_pruning_batch_size: 10000
-    state_store_pruning_batch_size: 10000
+    base: {}
+    consensus: {}
+    execution: {}
+    full_node_networks: []
+    inspection_service: {}
+    logger: {}
+    mempool:
+      shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
+      max_broadcasts_per_peer: 2 # default 1
+      default_failovers: 0 # default 3
+    metrics: {}
+    peer_monitoring_service: {}
+    api: {}
+    state_sync: {}
+    firehose_stream: {}
+    storage: {}
+    test: {}
+    validator_network: {}
+    failpoints: {}
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
   groups:
-  - name: fullnode
-    replicas: 1
+    - name: fullnode
+      replicas: 1
   resources:
     limits:
       cpu: 15.5
@@ -84,50 +128,46 @@ fullnode:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-  # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
+  # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
-    max_inbound_connections: 100
-    shared_mempool_max_concurrent_inbound_syncs: 16
-    max_broadcasts_per_peer: 2
-    default_failovers: 0
-
-haproxy:
-  # -- Enable HAProxy deployment in front of validator and fullnodes
-  enabled: true
-  # -- Number of HAProxy replicas
-  replicas: 1
-  image:
-    # -- Image repo to use for HAProxy images
-    repo: haproxy
-    # -- Image tag to use for HAProxy images
-    tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
-    # -- Image pull policy to use for HAProxy images
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 1.5
-      memory: 2Gi
-    requests:
-      cpu: 1.5
-      memory: 2Gi
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  limits:
-    validator:
-      # -- Limit the number of connections per IP address per minute
-      connectionsPerIPPerMin: 2
-  config:
-    # -- Whether to send Proxy Protocol v2
-    send_proxy_protocol: false
-  # -- Name of the Kubernetes TLS secret to use for HAProxy
-  tls_secret:
+    base: {}
+    consensus: {}
+    execution: {}
+    # The below default values correctly configure a VFN to the onboard validator
+    # It's not recommended that you change it unless you know what you're doing
+    full_node_networks:
+      - network_id: "public"
+        discovery_method: "onchain"
+        listen_address: "/ip4/0.0.0.0/tcp/6182"
+        identity:
+          type: "from_file"
+          path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
+        enable_proxy_protocol: *send_proxy_protocol
+        max_inbound_connections: 100
+        seeds: {}
+    inspection_service: {}
+    logger: {}
+    mempool:
+      shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
+      max_broadcasts_per_peer: 4 # default 1
+      default_failovers: 0 # default 3
+      shared_mempool_batch_size: 200 # default 100
+      shared_mempool_tick_interval_ms: 10 # default 50
+    metrics: {}
+    peer_monitoring_service: {}
+    api: {}
+    state_sync: {}
+    firehose_stream: {}
+    storage: {}
+    test: {}
+    validator_network: {}
+    failpoints: {}
 
 service:
   # -- If set, the base domain name to use for External DNS
   domain:
   validator:
-    external: 
+    external:
       # -- The Kubernetes ServiceType to use for validator
       type: LoadBalancer
     # -- The externalTrafficPolicy for the validator service

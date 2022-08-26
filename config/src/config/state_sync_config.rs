@@ -152,8 +152,8 @@ impl Default for DataStreamingServiceConfig {
         Self {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 3,
-            max_concurrent_state_requests: 4,
-            max_data_stream_channel_sizes: 1000,
+            max_concurrent_state_requests: 6,
+            max_data_stream_channel_sizes: 300,
             max_request_retry: 3,
             max_notification_id_mappings: 300,
             progress_check_interval_ms: 100,

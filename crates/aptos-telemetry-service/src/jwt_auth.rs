@@ -5,7 +5,6 @@ use aptos_config::config::PeerRole;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
-use reqwest::StatusCode;
 use warp::{
     http::header::{HeaderMap, HeaderValue, AUTHORIZATION},
     reject, Rejection,
@@ -50,16 +49,15 @@ pub async fn authorize_jwt(
         &context.jwt_decoding_key,
         &Validation::new(Algorithm::HS512),
     )
-    .map_err(|_| reject::reject())?;
+    .map_err(|_| reject::custom(ServiceError::unauthorized("invalid authorization token")))?;
 
     let claims = decoded.claims;
 
     let current_epoch = match context.validator_cache().read().get(&claims.chain_id) {
         Some(info) => info.0,
         None => {
-            return Err(reject::custom(ServiceError::new(
-                StatusCode::UNAUTHORIZED,
-                "invalid claim".into(),
+            return Err(reject::custom(ServiceError::unauthorized(
+                "expired authorization token",
             )));
         }
     };
@@ -70,9 +68,8 @@ pub async fn authorize_jwt(
     {
         Ok(claims)
     } else {
-        Err(reject::custom(ServiceError::new(
-            StatusCode::UNAUTHORIZED,
-            "invalid claim".into(),
+        Err(reject::custom(ServiceError::unauthorized(
+            "expired authorization token",
         )))
     }
 }
@@ -80,7 +77,11 @@ pub async fn authorize_jwt(
 pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<String, Rejection> {
     let header = match headers.get(AUTHORIZATION) {
         Some(v) => v,
-        None => return Err(reject::reject()),
+        None => {
+            return Err(reject::custom(ServiceError::unauthorized(
+                "no authorization header present",
+            )))
+        }
     };
     let auth_header = match std::str::from_utf8(header.as_bytes()) {
         Ok(v) => v,
@@ -91,7 +92,9 @@ pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<
         .unwrap_or_default()
         .eq_ignore_ascii_case(BEARER)
     {
-        return Err(reject::reject());
+        return Err(reject::custom(ServiceError::unauthorized(
+            "invalid authorization header",
+        )));
     }
     Ok(auth_header
         .get(BEARER.len()..)

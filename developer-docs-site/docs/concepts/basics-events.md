@@ -22,5 +22,5 @@ Each registered event has a unique `key`. The key `0x0000000000000000c40f1c9b9fd
 
 These represent event streams, or a list of events with each entry containing a sequentially increasing `sequence_number` beginning at `0`, a `type`, and `data`. Each event must be defined by some `type`. There may be multiple events defined by the same or similar `type`s especially when using generics. Events have associated `data`. The general principle is to include all data necessary to understand the changes to the underlying resources before and after the execution of the transaction that changed the data and emitted the event.
 
-[coin_transfer]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Coin.move#L304
-[get_events]: https://fullnode.devnet.aptoslabs.com/spec.html#/operations/get_events_by_event_handle
+[coin_transfer]: https://github.com/aptos-labs/aptos-core/blob/bdd0a7fe82cd6aab4b47250e5eb6298986777cf7/aptos-move/framework/aptos-framework/sources/coin.move#L412
+[get_events]: https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle

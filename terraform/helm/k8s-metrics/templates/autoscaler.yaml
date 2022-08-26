@@ -153,7 +153,7 @@ spec:
         - image: {{ .Values.autoscaler.image.repo }}:{{ .Values.autoscaler.image.tag }}
           name: cluster-autoscaler
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.autoscaler.resources | nindent 12 }}
           command:
             - ./cluster-autoscaler
             - --v=4

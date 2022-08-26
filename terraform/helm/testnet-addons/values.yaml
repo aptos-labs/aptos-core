@@ -13,6 +13,10 @@ waypoint:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
 
 load_test:
   # -- Whether to enable the load test CronJob

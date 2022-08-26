@@ -35,7 +35,7 @@ impl Default for MempoolConfig {
             shared_mempool_max_concurrent_inbound_syncs: 4,
             max_broadcasts_per_peer: 1,
             mempool_snapshot_interval_secs: 180,
-            capacity: 1_000_000,
+            capacity: 2_000_000,
             capacity_per_user: 100,
             default_failovers: 3,
             system_transaction_timeout_secs: 600,

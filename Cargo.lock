@@ -644,6 +644,7 @@ dependencies = [
 name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
+ "aptos-types",
  "framework",
  "gas-algebra-ext",
  "move-binary-format",
@@ -1137,14 +1138,19 @@ dependencies = [
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
+ "anyhow",
  "aptos-crypto",
  "aptos-rest-client",
  "aptos-types",
  "bcs",
  "cached-packages",
  "move-deps",
+ "once_cell",
+ "rand 0.7.3",
  "rand_core 0.5.1",
  "serde 1.0.144",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -9802,6 +9808,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",

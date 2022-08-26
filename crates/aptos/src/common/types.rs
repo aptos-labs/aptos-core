@@ -890,17 +890,26 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 }
 
 /// A shortened transaction output
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransactionSummary {
     pub transaction_hash: HashValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_unit_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pending: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sender: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub success: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_status: Option<String>,
 }
 
@@ -1093,8 +1102,17 @@ impl TransactionOptions {
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        let sender_key = self.private_key()?;
-        Ok(account_address_from_public_key(&sender_key.public_key()))
+        // If private key flags are specified, do not use the profile's account address
+        if self
+            .private_key_options
+            .extract_private_key_cli(self.encoding_options.encoding)?
+            .is_some()
+        {
+            let sender_key = self.private_key()?;
+            Ok(account_address_from_public_key(&sender_key.public_key()))
+        } else {
+            self.profile_options.account_address()
+        }
     }
 
     /// Submit a transaction

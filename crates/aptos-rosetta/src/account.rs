@@ -77,7 +77,7 @@ async fn account_balance(
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_info = server_context
         .block_cache()?
-        .get_block_info_by_height(block_height)
+        .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
 
@@ -100,7 +100,9 @@ async fn account_balance(
     Ok(AccountBalanceResponse {
         block_identifier: block_info.block_id,
         balances: amounts,
-        metadata: AccountBalanceMetadata { sequence_number },
+        metadata: AccountBalanceMetadata {
+            sequence_number: sequence_number.into(),
+        },
     })
 }
 
@@ -277,7 +279,7 @@ impl CoinCache {
         struct CoinInfo {
             name: String,
             symbol: String,
-            decimals: U64,
+            decimals: u8,
         }
 
         let struct_tag = match coin {
@@ -318,7 +320,7 @@ impl CoinCache {
 
             Ok(Some(Currency {
                 symbol: coin_info.symbol,
-                decimals: coin_info.decimals.0,
+                decimals: coin_info.decimals,
                 metadata: Some(CurrencyMetadata {
                     move_type: struct_tag.to_string(),
                 }),

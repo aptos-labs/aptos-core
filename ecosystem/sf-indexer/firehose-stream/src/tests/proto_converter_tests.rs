@@ -171,6 +171,7 @@ async fn test_block_height_and_ts_work() {
     }
 }
 
+#[ignore] // TODO: disabled because of bundle publishing deactivated; reactivate
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_table_item_parsing_works() {
     let mut test_context = new_test_context(current_function_name!());

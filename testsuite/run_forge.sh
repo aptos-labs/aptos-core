@@ -10,7 +10,7 @@
 #
 
 # Default to off
-WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+USE_NEW_WRAPPER="${USE_NEW_WRAPPER:-false}"
 
 # output files
 FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
@@ -18,17 +18,16 @@ FORGE_REPORT="${FORGE_REPORT:-$(mktemp)}"
 FORGE_PRE_COMMENT="${FORGE_PRE_COMMENT:-$(mktemp)}"
 FORGE_COMMENT="${FORGE_COMMENT:-$(mktemp)}"
 
-if [[ $WRAPPER_KILLSWITCH = true ]]; then
-    echo "Using current forge wrapper"
-else
+if [[ $USE_NEW_WRAPPER = true ]]; then
     echo "Running new forge wrapper"
-    export FORGE_INSTALL_DEPENDENCIES=yeet
     exec python3 testsuite/forge.py test "$@"
+else
+    echo "Using current forge wrapper"
 fi
 
 # available clusters to choose from
 # forge-1 is used for continuous testing exclusively
-FORGE_CLUSTERS=("aptos-forge-0" "aptos-forge-2")
+FORGE_CLUSTERS=("aptos-forge-big-0" "aptos-forge-big-1" "aptos-forge-0")
 
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
@@ -183,7 +182,12 @@ if [ -z "$FORGE_CLUSTER_NAME" ]; then
     FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
 fi
 
-aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+context=$(kubectl config current-context)
+echo $context | grep $FORGE_CLUSTER_NAME
+if [ "$?" -ne 0 ]; then
+    echo "WARN: current context is not set to ${FORGE_CLUSTER_NAME}. Switching to ${FORGE_CLUSTER_NAME}..."
+    aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+fi
 
 # determine cluster name from kubectl context and set o11y resources
 echo "Using cluster ${FORGE_CLUSTER_NAME}"

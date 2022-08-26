@@ -27,7 +27,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        is_native_coin, native_coin, to_hex_lower, with_context,
+        native_coin, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -35,8 +35,7 @@ use crate::{
 };
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::CryptoHash,
-    signing_message,
+    signing_message, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::debug;
 use aptos_sdk::{
@@ -49,12 +48,11 @@ use aptos_sdk::{
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
-        authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
-        Transaction::UserTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
-use cached_packages::aptos_stdlib;
-use std::str::FromStr;
+use std::convert::TryFrom;
+use std::time::{SystemTime, UNIX_EPOCH};
 use warp::Filter;
 
 pub fn combine_route(
@@ -195,14 +193,11 @@ async fn construction_derive(
 
     let public_key: Ed25519PublicKey =
         decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
-    let address = to_hex_lower(&AuthenticationKey::ed25519(&public_key).derived_address());
+    let address = AuthenticationKey::ed25519(&public_key).derived_address();
 
-    let account_identifier = Some(AccountIdentifier {
-        address,
-        sub_account: None,
-    });
-
-    Ok(ConstructionDeriveResponse { account_identifier })
+    Ok(ConstructionDeriveResponse {
+        account_identifier: address.into(),
+    })
 }
 
 /// Construction hash command (OFFLINE)
@@ -217,13 +212,15 @@ async fn construction_hash(
     debug!("/construction/hash {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let signed_transaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let hash = to_hex_lower(&UserTransaction(signed_transaction).hash());
+    let signed_transaction: SignedTransaction =
+        decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
     Ok(TransactionIdentifierResponse {
-        transaction_identifier: TransactionIdentifier { hash },
+        transaction_identifier: signed_transaction.committed_hash().into(),
     })
 }
+
+const MAX_GAS_UNITS_PER_REQUEST: u64 = 1_000_000;
 
 /// Construction metadata command
 ///
@@ -247,20 +244,99 @@ async fn construction_metadata(
     }
 
     let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
-        sequence_number
+        sequence_number.0
     } else {
         // Retrieve the sequence number from the rest server if one wasn't provided
         response.inner().sequence_number
     };
 
+    // Determine the gas price (either provided from upstream, or through estimation)
+    let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
+        gas_price.0
+    } else {
+        rest_client
+            .estimate_gas_price()
+            .await?
+            .into_inner()
+            .gas_estimate
+    };
+
+    // Determine max gas by simulation if it isn't provided
+    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
+        max_gas.0
+    } else {
+        let account_balance = rest_client
+            .get_account_balance(address)
+            .await
+            .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
+            .into_inner();
+
+        let maximum_possible_gas = std::cmp::min(
+            account_balance.coin.value.0 / gas_price_per_unit,
+            MAX_GAS_UNITS_PER_REQUEST,
+        );
+        let transaction_factory = TransactionFactory::new(server_context.chain_id)
+            .with_gas_unit_price(gas_price_per_unit)
+            .with_max_gas_amount(maximum_possible_gas);
+
+        let (txn_payload, sender) = request.options.internal_operation.payload()?;
+        let unsigned_transaction = transaction_factory
+            .payload(txn_payload)
+            .sender(sender)
+            .sequence_number(sequence_number)
+            .build();
+
+        let public_key = if let Some(public_key) = request
+            .options
+            .public_keys
+            .as_ref()
+            .and_then(|inner| inner.first())
+        {
+            Ed25519PublicKey::from_encoded_string(&public_key.hex_bytes).map_err(|err| {
+                ApiError::InvalidInput(Some(format!(
+                    "Public key provided is not parsable {:?}",
+                    err
+                )))
+            })?
+        } else {
+            return Err(ApiError::InvalidInput(Some(
+                "Must provide public_keys with max_gas_amount".to_string(),
+            )));
+        };
+        let signed_transaction = SignedTransaction::new(
+            unsigned_transaction,
+            public_key,
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+        );
+
+        let request = rest_client
+            .simulate_bcs(&signed_transaction)
+            .await?
+            .into_inner();
+
+        if request.info.status().is_success() {
+            request.info.gas_used()
+        } else {
+            return Err(ApiError::VmError(Some(format!(
+                "Transaction simulation for gas failed with {:?}",
+                request.info.status()
+            ))));
+        }
+    };
+
+    let suggested_fee = Amount {
+        value: format!("-{}", gas_price_per_unit.saturating_mul(max_gas_amount)),
+        currency: native_coin(),
+    };
+
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
-            sequence_number,
-            max_gas: request.options.max_gas,
-            gas_price_per_unit: request.options.gas_price_per_unit,
+            sequence_number: sequence_number.into(),
+            max_gas_amount: max_gas_amount.into(),
+            gas_price_per_unit: gas_price_per_unit.into(),
             expiry_time_secs: request.options.expiry_time_secs,
         },
-        suggested_fee: None,
+        suggested_fee: vec![suggested_fee],
     })
 }
 
@@ -306,12 +382,12 @@ async fn construction_parse(
             {
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && account_module_identifier() == module_name
+                && aptos_account_module_identifier() == module_name
                 && transfer_function_identifier() == function_name
             {
                 parse_account_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && account_module_identifier() == module_name
+                && aptos_account_module_identifier() == module_name
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
@@ -367,7 +443,9 @@ fn parse_create_account_operation(
             sender,
         )])
     } else {
-        Err(ApiError::InvalidOperations)
+        Err(ApiError::InvalidOperations(Some(
+            "Create account doesn't have an address argument".to_string(),
+        )))
     }
 }
 
@@ -480,7 +558,9 @@ fn parse_set_operator_operation(
 
         Ok(vec![Operation::set_operator(0, None, sender, operator)])
     } else {
-        Err(ApiError::InvalidOperations)
+        Err(ApiError::InvalidOperations(Some(
+            "Set operator doesn't have an address argument".to_string(),
+        )))
     }
 }
 
@@ -505,46 +585,29 @@ async fn construction_payloads(
     };
 
     // Encode operation
-    let (txn_payload, sender) = match operation {
-        InternalOperation::CreateAccount(create_account) => (
-            aptos_stdlib::account_create_account(create_account.new_account),
-            create_account.sender,
-        ),
-        InternalOperation::Transfer(transfer) => {
-            is_native_coin(&transfer.currency)?;
-            (
-                aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
-                transfer.sender,
-            )
-        }
-        InternalOperation::SetOperator(set_operator) => (
-            aptos_stdlib::stake_set_operator(set_operator.operator),
-            set_operator.owner,
-        ),
-    };
+    let (txn_payload, sender) = operation.payload()?;
 
     // Build the transaction and make it ready for signing
-    let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
-        .with_gas_unit_price(metadata.gas_price_per_unit)
-        .with_max_gas_amount(metadata.max_gas);
-    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
-        transaction_factory =
-            transaction_factory.with_transaction_expiration_time(expiry_time_secs);
-    }
+    let transaction_factory = TransactionFactory::new(server_context.chain_id)
+        .with_gas_unit_price(metadata.gas_price_per_unit.0)
+        .with_max_gas_amount(metadata.max_gas_amount.0);
 
-    let sequence_number = metadata.sequence_number;
-    let unsigned_transaction = transaction_factory
+    let mut txn_builder = transaction_factory
         .payload(txn_payload)
         .sender(sender)
-        .sequence_number(sequence_number)
-        .build();
+        .sequence_number(metadata.sequence_number.0);
+
+    // Default expiry is 30 seconds from right now
+    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
+        txn_builder = txn_builder.expiration_timestamp_secs(expiry_time_secs.0)
+    }
+    let unsigned_transaction = txn_builder.build();
 
     let signing_message = hex::encode(signing_message(&unsigned_transaction));
     let payload = SigningPayload {
-        address: None,
-        account_identifier: Some(AccountIdentifier::from(sender)),
+        account_identifier: AccountIdentifier::from(sender),
         hex_bytes: signing_message,
-        signature_type: Some(SignatureType::Ed25519),
+        signature_type: SignatureType::Ed25519,
     };
 
     // Transaction is both the unsigned transaction and the payload
@@ -553,9 +616,6 @@ async fn construction_payloads(
         payloads: vec![payload],
     })
 }
-
-const DEFAULT_GAS_PRICE_PER_UNIT: u64 = 1;
-const DEFAULT_MAX_GAS_PRICE: u64 = 10000;
 
 /// Construction preprocess command (OFFLINE)
 ///
@@ -569,37 +629,73 @@ async fn construction_preprocess(
     debug!("/construction/preprocess {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    // Ensure that the max fee is only in the native coin
-    let max_gas = if let Some(max_fees) = request.max_fee {
-        if max_fees.len() != 1 {
-            return Err(ApiError::InvalidMaxGasFees);
-        }
-        let max_fee = max_fees.first().unwrap();
-        is_native_coin(&max_fee.currency)?;
-        u64::from_str(&max_fee.value)?
-    } else {
-        DEFAULT_MAX_GAS_PRICE
-    };
-
-    // Let's not accept fractions, as we don't support it
-    let gas_price_per_unit = if let Some(fee_multiplier) = request.suggested_fee_multiplier {
-        if fee_multiplier != (fee_multiplier as u32) as f64 {
-            return Err(ApiError::InvalidGasMultiplier);
-        }
-
-        fee_multiplier as u64
-    } else {
-        DEFAULT_GAS_PRICE_PER_UNIT
-    };
-
     let internal_operation = InternalOperation::extract(&request.operations)?;
     let required_public_keys = vec![internal_operation.sender().into()];
 
+    if let Some(gas_price) = request.metadata.as_ref().and_then(|inner| inner.gas_price) {
+        if gas_price.0 < 1 {
+            return Err(ApiError::InvalidInput(Some(
+                "Cannot have a gas price less than 1".to_string(),
+            )));
+        }
+    }
+    if let Some(max_gas) = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.max_gas_amount)
+    {
+        if max_gas.0 < 1 {
+            return Err(ApiError::InvalidInput(Some(
+                "Cannot have a max gas amount less than 1".to_string(),
+            )));
+        }
+    }
+    if let Some(expiry_time_secs) = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.expiry_time_secs)
+    {
+        if expiry_time_secs.0
+            <= SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|err| {
+                    ApiError::InternalError(Some(format!("Failed to get current time {}", err)))
+                })?
+                .as_secs()
+        {
+            return Err(ApiError::InvalidInput(Some(
+                "Expiry time secs is in the past, please provide a Unix timestamp in the future"
+                    .to_string(),
+            )));
+        }
+    }
+
+    let public_keys = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.public_keys.as_ref());
+
+    if request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.max_gas_amount)
+        .is_none()
+        && (public_keys.is_none() || public_keys.unwrap().is_empty())
+    {
+        return Err(ApiError::InvalidInput(Some(
+            "Must provide either max gas amount or public keys to estimate max gas amount"
+                .to_string(),
+        )));
+    }
+
     Ok(ConstructionPreprocessResponse {
-        options: Some(MetadataOptions {
+        options: MetadataOptions {
             internal_operation,
-            max_gas,
-            gas_price_per_unit,
+            max_gas_amount: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.max_gas_amount),
+            gas_price_per_unit: request.metadata.as_ref().and_then(|inner| inner.gas_price),
             expiry_time_secs: request
                 .metadata
                 .as_ref()
@@ -608,8 +704,12 @@ async fn construction_preprocess(
                 .metadata
                 .as_ref()
                 .and_then(|inner| inner.sequence_number),
-        }),
-        required_public_keys: Some(required_public_keys),
+            public_keys: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.public_keys.clone()),
+        },
+        required_public_keys,
     })
 }
 
@@ -630,8 +730,6 @@ async fn construction_submit(
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
     let response = rest_client.submit(&txn).await?;
     Ok(ConstructionSubmitResponse {
-        transaction_identifier: TransactionIdentifier {
-            hash: to_hex_lower(&response.inner().hash),
-        },
+        transaction_identifier: response.inner().hash.into(),
     })
 }

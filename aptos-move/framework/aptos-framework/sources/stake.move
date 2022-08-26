@@ -26,6 +26,7 @@ module aptos_framework::stake {
     use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
     use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -432,18 +433,18 @@ module aptos_framework::stake {
             delegated_voter: owner_address,
 
             // Events.
-            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(owner),
-            set_operator_events: event::new_event_handle<SetOperatorEvent>(owner),
-            add_stake_events: event::new_event_handle<AddStakeEvent>(owner),
-            reactivate_stake_events: event::new_event_handle<ReactivateStakeEvent>(owner),
-            rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(owner),
-            update_network_and_fullnode_addresses_events: event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
-            increase_lockup_events: event::new_event_handle<IncreaseLockupEvent>(owner),
-            join_validator_set_events: event::new_event_handle<JoinValidatorSetEvent>(owner),
-            distribute_rewards_events: event::new_event_handle<DistributeRewardsEvent>(owner),
-            unlock_stake_events: event::new_event_handle<UnlockStakeEvent>(owner),
-            withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(owner),
-            leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(owner),
+            initialize_validator_events: account::new_event_handle<RegisterValidatorCandidateEvent>(owner),
+            set_operator_events: account::new_event_handle<SetOperatorEvent>(owner),
+            add_stake_events: account::new_event_handle<AddStakeEvent>(owner),
+            reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(owner),
+            rotate_consensus_key_events: account::new_event_handle<RotateConsensusKeyEvent>(owner),
+            update_network_and_fullnode_addresses_events: account::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
+            increase_lockup_events: account::new_event_handle<IncreaseLockupEvent>(owner),
+            join_validator_set_events: account::new_event_handle<JoinValidatorSetEvent>(owner),
+            distribute_rewards_events: account::new_event_handle<DistributeRewardsEvent>(owner),
+            unlock_stake_events: account::new_event_handle<UnlockStakeEvent>(owner),
+            withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(owner),
+            leave_validator_set_events: account::new_event_handle<LeaveValidatorSetEvent>(owner),
         });
 
         move_to(owner, OwnerCapability { pool_address: owner_address });
@@ -1172,7 +1173,7 @@ module aptos_framework::stake {
     public fun mint(account: &signer, amount: u64) acquires AptosCoinCapabilities {
         let account_address = signer::address_of(account);
         if (!coin::is_account_registered<AptosCoin>(account_address)) {
-            coin::register_for_test<AptosCoin>(account);
+            coin::register<AptosCoin>(account);
         };
 
         coin::deposit(account_address, mint_coins(amount));
@@ -1192,9 +1193,11 @@ module aptos_framework::stake {
         should_join_validator_set: bool,
         should_end_epoch: bool,
     ) acquires AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let validator_address = signer::address_of(validator);
+        aptos_framework::account::create_account_for_test(validator_address);
+
         initialize_validator(validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
 
-        let validator_address = signer::address_of(validator);
         if (amount > 0) {
             mint_and_add_stake(validator, amount);
         };
@@ -1603,8 +1606,8 @@ module aptos_framework::stake {
     ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test(&aptos_framework);
         // Initial balance = 900 (idle) + 100 (staked) = 1000.
-        mint(&validator, 900);
         initialize_test_validator(&validator, 100, true, true);
+        mint(&validator, 900);
 
         // Validator unlocks stake.
         unlock(&validator, 100);
@@ -1876,7 +1879,7 @@ module aptos_framework::stake {
         assert!(validator_config.fullnode_addresses == b"2", 4);
 
         // Cleanups.
-        coin::register_for_test<AptosCoin>(&validator);
+        coin::register<AptosCoin>(&validator);
         coin::deposit<AptosCoin>(pool_address, coins);
         deposit_owner_cap(&validator, owner_cap);
     }
@@ -2075,6 +2078,7 @@ module aptos_framework::stake {
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(&validator);
+        aptos_framework::account::create_account_for_test(validator_address);
         initialize_stake_owner(&validator, 0, validator_address, validator_address);
         mint_and_add_stake(&validator, 100);
 
@@ -2092,6 +2096,7 @@ module aptos_framework::stake {
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(&validator);
+        aptos_framework::account::create_account_for_test(validator_address);
         initialize_stake_owner(&validator, 0, validator_address, validator_address);
         mint_and_add_stake(&validator, 100);
 

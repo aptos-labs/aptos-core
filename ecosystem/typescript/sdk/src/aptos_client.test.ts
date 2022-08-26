@@ -396,66 +396,25 @@ test(
 
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
-    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
-      TxnBuilderTypes.EntryFunction.natural(
-        "0x3::token",
-        "direct_transfer_script",
-        [],
-        [
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(tokenName),
-          BCS.bcsSerializeUint64(propertyVersion),
-          BCS.bcsSerializeUint64(1),
-        ],
-      ),
+    const txnHash = await tokenClient.directTransferToken(
+      alice,
+      bob,
+      alice.address(),
+      collectionName,
+      tokenName,
+      1,
+      propertyVersion,
     );
 
-    const rawTxn = await client.generateRawTransaction(alice.address(), entryFunctionPayload);
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
-      TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
-    ]);
+    await client.waitForTransaction(txnHash, { checkSuccess: true });
 
-    const aliceSignature = new TxnBuilderTypes.Ed25519Signature(
-      alice.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
-    );
-
-    const aliceAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-      new TxnBuilderTypes.Ed25519PublicKey(alice.signingKey.publicKey),
-      aliceSignature,
-    );
-
-    const bobSignature = new TxnBuilderTypes.Ed25519Signature(
-      bob.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
-    );
-
-    const bobAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-      new TxnBuilderTypes.Ed25519PublicKey(bob.signingKey.publicKey),
-      bobSignature,
-    );
-
-    const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
-      aliceAuthenticator, // sender authenticator
-      [TxnBuilderTypes.AccountAddress.fromHex(bob.address())], // secondary signer addresses
-      [bobAuthenticator], // secondary signer authenticators
-    );
-
-    const bcsTxn = BCS.bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
-
-    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
-
-    await client.waitForTransaction(transactionRes.hash);
-
-    const transaction = await client.getTransactionByHash(transactionRes.hash);
-    expect((transaction as any)?.success).toBe(true);
-
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,
