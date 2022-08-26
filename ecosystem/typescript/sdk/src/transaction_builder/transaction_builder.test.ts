@@ -3,7 +3,7 @@
 
 /* eslint-disable max-len */
 import * as Nacl from "tweetnacl";
-import { bytesToHex } from "@movingco/bytes-to-hex";
+import { bytesToHex } from "../bytes_to_hex.js";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";
 import { HexString } from "../hex_string";
 
