@@ -2,6 +2,12 @@ coredns:
   maxReplicas: 2
   minReplicas: 2
 
+metrics-server:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
 autoscaler:
   enabled:
   clusterName:

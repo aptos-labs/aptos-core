@@ -421,7 +421,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new(2, account1.address()),
+            &EventKey::new(3, account1.address()),
             0,
             Order::Ascending,
             10,
@@ -433,7 +433,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new(2, account1.address()),
+            &EventKey::new(3, account1.address()),
             10,
             Order::Ascending,
             10,
@@ -445,7 +445,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new(1, account3.address()),
+            &EventKey::new(2, account3.address()),
             u64::MAX,
             Order::Descending,
             10,
@@ -462,7 +462,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new(1, account3.address()),
+            &EventKey::new(2, account3.address()),
             6,
             Order::Descending,
             10,

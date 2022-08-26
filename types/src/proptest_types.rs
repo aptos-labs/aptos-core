@@ -647,6 +647,7 @@ impl AccountResourceGen {
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
             EventHandle::random(0),
+            EventHandle::random(1),
         )
     }
 }

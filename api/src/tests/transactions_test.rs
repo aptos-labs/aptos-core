@@ -467,7 +467,7 @@ async fn test_signing_message_with_entry_function_payload() {
     let txn = context.create_user_account(&account);
     let payload = json!({
         "type": "entry_function_payload",
-        "function": "0x1::account::create_account",
+        "function": "0x1::aptos_account::create_account",
         "type_arguments": [],
         "arguments": [
             account.address().to_hex_literal(), // new_account_address

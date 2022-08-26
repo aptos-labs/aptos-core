@@ -3,7 +3,7 @@ processed 8 tasks
 task 1 'run'. lines 6-8:
 Events:
 {
-    key:     0300000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    key:     0400000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::CreateCollectionEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b7300006400000000000000"
@@ -13,19 +13,19 @@ return values: 0
 task 2 'run'. lines 9-9:
 Events:
 {
-    key:     0400000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    key:     0500000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::CreateTokenDataEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00640000000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6000000000000000000000000000000000a6765656b5f746f6b656e0000000000000000"
 }
 {
-    key:     0600000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    key:     0700000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::DepositEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000a00000000000000"
 }
 {
-    key:     0500000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    key:     0600000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::MintTokenEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e0a00000000000000"
@@ -44,7 +44,7 @@ key 0x3::token::Collections {
         counter: 1
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 3
+                creation_num: 4
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -53,7 +53,7 @@ key 0x3::token::Collections {
         counter: 1
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 4
+                creation_num: 5
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -62,7 +62,7 @@ key 0x3::token::Collections {
         counter: 1
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 5
+                creation_num: 6
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -75,7 +75,7 @@ task 4 'view_table'. lines 13-15:
 task 5 'run'. lines 16-18:
 Events:
 {
-    key:     0700000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    key:     0800000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
     seq_num: 0
     type:    0x3::token::WithdrawEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
@@ -85,7 +85,7 @@ return values: 0
 task 6 'run'. lines 19-19:
 Events:
 {
-    key:     03000000000000009c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
+    key:     04000000000000009c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
     seq_num: 0
     type:    0x3::token::DepositEvent
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"

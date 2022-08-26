@@ -451,6 +451,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "setup_test" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&ForgeSetupTest]),
+        "single_vfn_perf" => config
+            .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
+            .with_initial_fullnode_count(1)
+            .with_network_tests(&[&PerformanceBenchmarkWithFN]),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)

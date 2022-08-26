@@ -820,10 +820,16 @@ impl InternalOperation {
                 }
 
                 // Return invalid operations if for any reason parsing fails
-                Err(ApiError::InvalidOperations)
+                Err(ApiError::InvalidOperations(Some(format!(
+                    "Unrecognized single operation {:?}",
+                    operations
+                ))))
             }
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
-            _ => Err(ApiError::InvalidOperations),
+            _ => Err(ApiError::InvalidOperations(Some(format!(
+                "Unrecognized operation combination {:?}",
+                operations
+            )))),
         }
     }
 
@@ -841,13 +847,13 @@ impl InternalOperation {
     ) -> ApiResult<(aptos_types::transaction::TransactionPayload, AccountAddress)> {
         Ok(match self {
             InternalOperation::CreateAccount(create_account) => (
-                aptos_stdlib::account_create_account(create_account.new_account),
+                aptos_stdlib::aptos_account_create_account(create_account.new_account),
                 create_account.sender,
             ),
             InternalOperation::Transfer(transfer) => {
                 is_native_coin(&transfer.currency)?;
                 (
-                    aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
+                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount),
                     transfer.sender,
                 )
             }

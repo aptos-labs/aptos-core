@@ -141,7 +141,7 @@ impl TransactionFactory {
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_create_account(
+        self.payload(aptos_stdlib::aptos_account_create_account(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
         ))
     }
@@ -152,7 +152,7 @@ impl TransactionFactory {
         amount: u64,
     ) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_transfer(
+        self.payload(aptos_stdlib::aptos_account_transfer(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
             amount,
         ))
