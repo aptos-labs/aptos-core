@@ -41,14 +41,6 @@ impl Fetcher {
         }
     }
 
-    pub async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
-    }
-
     pub async fn set_highest_known_version(&mut self) {
         let info = self.client.get_ledger_information().await;
         let res = info.unwrap();
@@ -200,11 +192,22 @@ impl TransactionFetcherTrait for TransactionFetcher {
     }
 
     async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
+        let mut retries = 0;
+        while retries < MAX_RETRIES {
+            retries += 1;
+            match self.client.get_ledger_information().await {
+                Ok(inner) => return inner.into_inner(),
+                Err(err) => {
+                    aptos_logger::error!(
+                        "Failed to get ledger info, will retry in {}ms. Err: {:?}",
+                        RETRY_TIME_MILLIS,
+                        err
+                    );
+                    tokio::time::sleep(Duration::from_secs(RETRY_TIME_MILLIS)).await
+                }
+            }
+        }
+        panic!("Failed to get ledger info.",);
     }
 
     async fn set_version(&mut self, version: u64) {
