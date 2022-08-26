@@ -113,21 +113,6 @@ jobs:
           command: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
 
-      # Run example code in typescript.
-      - uses: nick-fields/retry@v2
-        name: ts-example-test
-        with:
-          max_attempts: 3
-          timeout_minutes: 15
-          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
-      # Run example code in javascript.
-      - uses: nick-fields/retry@v2
-        name: js-example-test
-        with:
-          max_attempts: 3
-          timeout_minutes: 15
-          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
-
       # Ensure the version, changelog, etc. are valid.
       - run: cd ./ecosystem/typescript/sdk && ./check.sh
         if: github.event_name == 'push' && github.ref_name == 'devnet'
