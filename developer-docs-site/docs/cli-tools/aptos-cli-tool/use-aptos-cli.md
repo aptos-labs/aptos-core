@@ -207,14 +207,14 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 You can fund an account with the faucet via the CLI with either an account or a profile:
 
 ```bash
-$ aptos account fund --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
+$ aptos account fund-with-faucet --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
 {
   "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
 }
 ```
 
 ```bash
-$ aptos account fund --account default
+$ aptos account fund-with-faucet --account default
 {
   "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
 }
