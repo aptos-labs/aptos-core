@@ -4,6 +4,8 @@ module aptos_std::any {
     use std::error;
     use std::string::String;
 
+    friend aptos_std::copyable_any;
+
     /// The type provided for `unpack` is not the same as was given for `pack`.
     const ETYPE_MISMATCH: u64 = 0;
 
