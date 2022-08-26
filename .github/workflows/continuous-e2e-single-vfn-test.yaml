@@ -6,6 +6,8 @@ permissions:
 
 on:
   workflow_dispatch:
+    schedule:
+      - cron: "*/12 * * * *"
 
 jobs:
   # Test transaction processing throughput at a single VFN
