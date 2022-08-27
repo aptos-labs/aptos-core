@@ -70,8 +70,8 @@ fn update_mint_token(
             last_minted_at.eq(last_mint_time),
         ))
         .get_result::<TokenData>(conn);
-    if result.is_err() {
-        aptos_logger::warn!("Error running query: {:?}", result.as_ref().err().unwrap());
+    if let Err(e) = result {
+        aptos_logger::warn!("Error running query: {:?}", e);
     }
 }
 
@@ -79,10 +79,10 @@ async fn get_all_metadata(uris: &Vec<(String, String)>, res: &mut Vec<Metadata>)
     let fetcher = MetaDataFetcher::new();
     for (tid, uri) in uris {
         let token_metadata = fetcher.get_metadata(uri.clone()).await;
-        if token_metadata.is_some() {
-            let metadata = Metadata::from_token_uri_meta(token_metadata.unwrap(), tid.clone());
-            if metadata.is_some() {
-                res.push(metadata.unwrap());
+        if let Some(token_metadata) = token_metadata {
+            let metadata = Metadata::from_token_uri_meta(token_metadata, tid.clone());
+            if let Some(metadata) = metadata {
+                res.push(metadata);
             }
         }
     }

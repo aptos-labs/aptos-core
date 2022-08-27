@@ -138,35 +138,27 @@ impl TokenEvent {
     pub fn from_event(event: &Event) -> Option<TokenEvent> {
         let data = event.data.clone();
         match event.type_.as_str() {
-            "0x3::token::WithdrawEvent" => {
-                let event = serde_json::from_value::<WithdrawEventType>(data).unwrap();
-                Some(TokenEvent::WithdrawEvent(event))
-            }
-            "0x3::token::DepositEvent" => {
-                let event = serde_json::from_value::<DepositEventType>(data).unwrap();
-                Some(TokenEvent::DepositEvent(event))
-            }
-            "0x3::token::CreateTokenDataEvent" => {
-                let event = serde_json::from_value::<CreateTokenDataEventType>(data).unwrap();
-                Some(TokenEvent::CreateTokenDataEvent(event))
-            }
-            "0x3::token::CreateCollectionEvent" => {
-                let event = serde_json::from_value::<CreateCollectionEventType>(data).unwrap();
-                Some(TokenEvent::CollectionCreationEvent(event))
-            }
-            "0x3::token::BurnTokenEvent" => {
-                let event = serde_json::from_value::<BurnTokenEventType>(data).unwrap();
-                Some(TokenEvent::BurnTokenEvent(event))
-            }
-            "0x3::token::MutateTokenPropertyMapEvent" => {
-                let event =
-                    serde_json::from_value::<MutateTokenPropertyMapEventType>(data).unwrap();
-                Some(TokenEvent::MutateTokenPropertyMapEvent(event))
-            }
-            "0x3::token::MintTokenEvent" => {
-                let event = serde_json::from_value::<MintTokenEventType>(data).unwrap();
-                Some(TokenEvent::MintTokenEvent(event))
-            }
+            "0x3::token::WithdrawEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::WithdrawEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::DepositEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::DepositEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::CreateTokenDataEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::CreateTokenDataEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::CreateCollectionEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::CollectionCreationEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::BurnTokenEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::BurnTokenEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::MutateTokenPropertyMapEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner)))
+                .unwrap_or(None),
+            "0x3::token::MintTokenEvent" => serde_json::from_value(data)
+                .map(|inner| Some(TokenEvent::MintTokenEvent(inner)))
+                .unwrap_or(None),
             _ => None,
         }
     }

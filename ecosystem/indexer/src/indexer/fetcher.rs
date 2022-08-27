@@ -15,7 +15,7 @@ const RETRY_TIME_MILLIS: u64 = 1000;
 const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const MAX_THREADS: usize = 10;
-const MAX_RETRIES: usize = 5;
+const MAX_RETRIES: usize = 10;
 
 #[derive(Debug)]
 pub struct Fetcher {
@@ -72,6 +72,7 @@ impl Fetcher {
                 ));
             }
             let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            // Sort by first transaction of batch's version
             res.sort_by(|a, b| {
                 a.first()
                     .unwrap()
@@ -80,9 +81,13 @@ impl Fetcher {
                     .cmp(&b.first().unwrap().version().unwrap())
             });
 
+            // Send keeping track of the last version sent by the batch
             for batch in res {
                 self.current_version = batch.last().unwrap().version().unwrap();
-                self.transactions_sender.send(batch).await.unwrap();
+                self.transactions_sender
+                    .send(batch)
+                    .await
+                    .expect("Should be able to send transaction on channel");
             }
         }
     }
@@ -93,6 +98,7 @@ impl Fetcher {
 /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
 async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transaction> {
     let mut retries = 0;
+    let mut backoff_time = Duration::from_millis(RETRY_TIME_MILLIS);
     while retries < MAX_RETRIES {
         retries += 1;
 
@@ -113,7 +119,7 @@ async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transacti
                             "Could not fetch {} transactions starting at {}: all caught up. Will check again in {}ms.",
                             TRANSACTION_FETCH_BATCH_SIZE,
                             starting_version,
-                            RETRY_TIME_MILLIS,
+                            backoff_time.as_millis(),
                         );
                 }
                 UNABLE_TO_FETCH_TRANSACTION.inc();
@@ -121,17 +127,18 @@ async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transacti
                     "Could not fetch {} transactions starting at {}, will retry in {}ms. Err: {:?}",
                     TRANSACTION_FETCH_BATCH_SIZE,
                     starting_version,
-                    RETRY_TIME_MILLIS,
+                    backoff_time.as_millis(),
                     err
                 );
             }
         }
-        tokio::time::sleep(Duration::from_millis(RETRY_TIME_MILLIS)).await;
+        tokio::time::sleep(backoff_time).await;
+        backoff_time = backoff_time * 3 / 2;
     }
 
     panic!(
-        "Could not fetch {} transactions starting at {}!",
-        TRANSACTION_FETCH_BATCH_SIZE, starting_version
+        "Could not fetch {} transactions starting at {} after {} retries!",
+        TRANSACTION_FETCH_BATCH_SIZE, starting_version, retries
     );
 }
 
@@ -164,10 +171,11 @@ impl TransactionFetcher {
 #[async_trait::async_trait]
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
-    /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
-    /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver.next().await.unwrap()
+        self.transaction_receiver
+            .next()
+            .await
+            .expect("No transactions, producer of batches died")
     }
 
     /// fetches one version; this used for error checking/repair/etc
@@ -201,7 +209,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
             match self.client.get_ledger_information().await {
                 Ok(inner) => return inner.into_inner(),
                 Err(err) => {
-                    aptos_logger::error!(
+                    aptos_logger::warn!(
                         "Failed to get ledger info, will retry in {}ms. Err: {:?}",
                         RETRY_TIME_MILLIS,
                         err
@@ -210,7 +218,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
                 }
             }
         }
-        panic!("Failed to get ledger info.");
+        panic!("Failed to get ledger info after {} retries", retries);
     }
 
     async fn set_version(&mut self, version: u64) {

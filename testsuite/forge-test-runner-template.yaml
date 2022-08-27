@@ -18,7 +18,7 @@ spec:
     - -c
     - |
       ulimit -n 1048576
-      forge --suite {FORGE_TEST_SUITE} --duration-secs {FORGE_RUNNER_DURATION_SECS} --avg-tps {FORGE_RUNNER_TPS_THRESHOLD} test k8s-swarm --image-tag {IMAGE_TAG} --upgrade-image-tag {UPGRADE_IMAGE_TAG} --namespace {FORGE_NAMESPACE} {REUSE_ARGS} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
+      forge --suite {FORGE_TEST_SUITE} --duration-secs {FORGE_RUNNER_DURATION_SECS} test k8s-swarm --image-tag {IMAGE_TAG} --upgrade-image-tag {UPGRADE_IMAGE_TAG} --namespace {FORGE_NAMESPACE} {REUSE_ARGS} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
     env:
     - name: FORGE_TRIGGERED_BY
       value: {FORGE_TRIGGERED_BY}
