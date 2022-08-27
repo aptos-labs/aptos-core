@@ -6,12 +6,10 @@
 use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use fail::fail_point;
-use std::collections::HashSet;
 use storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -50,17 +48,13 @@ impl ChunkOutput {
             transactions_and_outputs.into_iter().unzip();
 
         // collect all accounts touched and dedup
-        let state_updates = transaction_outputs
+        let write_set = transaction_outputs
             .iter()
-            .flat_map(|o| o.write_set())
-            .collect::<HashSet<_>>();
+            .map(|o| o.write_set())
+            .collect::<Vec<_>>();
 
         // prime the state cache by fetching all touched accounts
-        // TODO: add concurrency
-        state_updates
-            .iter()
-            .map(|(key, _)| state_view.get_state_value(key))
-            .collect::<Result<Vec<_>>>()?;
+        state_view.prime_cache_by_write_set(write_set)?;
 
         Ok(Self {
             transactions,
