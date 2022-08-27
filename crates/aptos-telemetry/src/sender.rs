@@ -17,6 +17,7 @@ use aptos_telemetry_service::types::{
 };
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
+use prometheus::proto::{Gauge, Metric, MetricFamily, MetricType};
 use prometheus::{default_registry, Registry};
 use reqwest::header::CONTENT_ENCODING;
 use reqwest::{RequestBuilder, Response, StatusCode};
@@ -92,8 +93,17 @@ impl TelemetrySender {
 
         let token = self.get_auth_token().await?;
 
-        let scraped_metrics =
-            prometheus::TextEncoder::new().encode_to_string(&registry.gather())?;
+        let mut gathered_metrics = registry.gather();
+
+        // This will add a synthetic `up 1` metric to the pushed metrics.
+        // In prometheus' pull model this metric is normally added by the scraping daemon (https://prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series).
+        // Adding it here as synthetic metric allows us to use this metric in dashboards to show the set of nodes without filtering on a specific metric.
+        // Note that this is just an approximation.
+        // In prometheus push model this value can be 0 when a discovered target couldn't be scraped (e.g. shortly after a crash etc.),
+        // whereas the synthetic up metric is either `1` or completely absent but never 0.
+        gathered_metrics.push(create_up_metric_family());
+
+        let scraped_metrics = prometheus::TextEncoder::new().encode_to_string(&gathered_metrics)?;
 
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
         gzip_encoder.write_all(scraped_metrics.as_bytes())?;
@@ -585,4 +595,16 @@ async fn error_for_status_with_body(response: Response) -> Result<Response, anyh
     } else {
         Ok(response)
     }
+}
+
+fn create_up_metric_family() -> MetricFamily {
+    let mut up_metric = Metric::default();
+    let mut up_gauge = Gauge::default();
+    up_gauge.set_value(1.0);
+    up_metric.set_gauge(up_gauge);
+    let mut up_metric_family = MetricFamily::default();
+    up_metric_family.set_name("up".to_string());
+    up_metric_family.set_field_type(MetricType::GAUGE);
+    up_metric_family.set_metric(vec![up_metric]);
+    up_metric_family
 }
