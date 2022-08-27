@@ -52,7 +52,7 @@ async fn test_full_node_basic_flow() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 
@@ -149,7 +149,7 @@ async fn test_vfn_failover() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 
@@ -268,7 +268,7 @@ async fn test_private_full_node() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 
