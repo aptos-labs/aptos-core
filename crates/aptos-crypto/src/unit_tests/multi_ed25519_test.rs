@@ -29,14 +29,14 @@ fn generate_keys(n: usize) -> Vec<Ed25519PrivateKey> {
 
 // Reused assertions in our tests.
 fn test_successful_public_key_serialization(original_keys: &[Ed25519PublicKey], threshold: u8) {
-    let n = original_keys.len();
+    let num_pks = original_keys.len();
     let public_key: MultiEd25519PublicKey =
         MultiEd25519PublicKey::new(original_keys.to_vec(), threshold).unwrap();
     assert_eq!(public_key.threshold(), &threshold);
-    assert_eq!(public_key.public_keys().len(), n);
+    assert_eq!(public_key.public_keys().len(), num_pks);
     assert_eq!(public_key.public_keys(), &original_keys.to_vec());
     let serialized = public_key.to_bytes();
-    assert_eq!(serialized.len(), n * ED25519_PUBLIC_KEY_LENGTH + 1);
+    assert_eq!(serialized.len(), num_pks * ED25519_PUBLIC_KEY_LENGTH + 1);
     let reserialized = MultiEd25519PublicKey::try_from(&serialized[..]);
     assert!(reserialized.is_ok());
     assert_eq!(public_key, reserialized.unwrap());
@@ -61,7 +61,7 @@ fn test_successful_signature_serialization(private_keys: &[Ed25519PrivateKey], t
     assert!(multi_signature_serialized.is_ok());
     let multi_signature_serialized_unwrapped = multi_signature_serialized.unwrap();
     assert_eq!(multi_signature, multi_signature_serialized_unwrapped);
-    // Ensure that the signature verifies.
+    // Ensure that the signature verifies.m
     assert!(multi_signature.verify(message(), &multi_public_key).is_ok());
 }
 
@@ -488,4 +488,61 @@ fn test_invalid_multi_ed25519_signature_bitmap() {
     assert!(multi_signature_1of3
         .verify(message(), &multi_public_key_2of3)
         .is_err());
+}
+
+/// Used for generating test cases for the MultiEd25519 Move module.
+#[test]
+#[ignore]
+fn test_sample_multisig() {
+    let test_cases = vec![(1, 1), (1, 2), (2, 2), (2, 3), (3, 10), (15, 32)]
+        .iter()
+        .map(|(k, n)| (*k as usize, *n as usize))
+        .collect::<Vec<(usize, usize)>>();
+
+    let mut ks = vec![];
+    let mut ns = vec![];
+    let mut pks = vec![];
+    let mut sigs = vec![];
+    let msg = b"Hello Aptos!";
+
+    for &(k, n) in test_cases.iter() {
+        let private_keys = generate_keys(n);
+
+        let multi_private_key =
+            MultiEd25519PrivateKey::new(private_keys.to_vec(), k as u8).unwrap();
+        let multi_public_key = MultiEd25519PublicKey::from(&multi_private_key);
+        let multi_signature = multi_private_key.sign_arbitrary_message(msg);
+
+        ks.push(k);
+        ns.push(n);
+        pks.push(multi_public_key);
+        sigs.push(multi_signature);
+    }
+
+    println!("let msg = b\"Hello Aptos!\";");
+    print!("//let ks = vector[");
+    for k in ks {
+        print!("{k}, ")
+    }
+    println!("]; // the thresholds, implicitly encoded in the public keys");
+
+    print!("let ns = vector[");
+    for n in ns {
+        print!("{n}, ")
+    }
+    println!("];");
+
+    println!("let pks = vector[");
+    for pk in pks {
+        println!("\tx\"{}\",", hex::encode(pk.to_bytes()));
+    }
+    println!("];");
+
+    println!("let sigs = vector[");
+    for sig in sigs {
+        println!("\tx\"{}\",", hex::encode(sig.to_bytes()));
+    }
+    println!("];");
+
+    println!();
 }

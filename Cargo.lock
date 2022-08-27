@@ -428,7 +428,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hkdf 0.10.0",
- "mirai-annotations",
+ "more-asserts",
  "once_cell",
  "proptest",
  "proptest-derive",
@@ -5473,6 +5473,12 @@ dependencies = [
  "quote 1.0.21",
  "syn 1.0.99",
 ]
+
+[[package]]
+name = "more-asserts"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5474f8732dc7e0635ae9df6595bcd39cd30e3cfe8479850d4fa3e69306c19712"
 
 [[package]]
 name = "move-abigen"
