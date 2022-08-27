@@ -45,7 +45,7 @@ impl WriteSetChange {
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
                 address: address.to_string(),
-                module: serde_json::to_value(module).unwrap(),
+                module: serde_json::to_value(module).expect("Should be able to parse module"),
                 resource: Default::default(),
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
@@ -60,7 +60,7 @@ impl WriteSetChange {
                 type_: write_set_change.type_str().to_string(),
                 address: address.to_string(),
                 module: Default::default(),
-                resource: serde_json::to_value(resource).unwrap(),
+                resource: serde_json::to_value(resource).expect("Should be able to parse resource"),
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
@@ -107,7 +107,8 @@ impl WriteSetChange {
                 address: address.to_string(),
                 module: Default::default(),
                 resource: Default::default(),
-                data: serde_json::to_value(data).unwrap(),
+                data: serde_json::to_value(data)
+                    .expect("Should be able to parse write resource data"),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
             APIWriteSetChange::WriteTableItem(WriteTableItem {

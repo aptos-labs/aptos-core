@@ -27,14 +27,14 @@ pub struct Metadata {
 
 impl Metadata {
     pub fn from_token_uri_meta(token_uri: TokenMetaFromURI, token_id_str: String) -> Option<Self> {
-        if token_uri.image.is_some() {
+        if let Some(image) = token_uri.image {
             Some(Self {
                 token_id: token_id_str,
                 name: token_uri.name,
                 symbol: token_uri.symbol,
                 seller_fee_basis_points: token_uri.seller_fee_basis_points,
                 description: token_uri.description,
-                image: token_uri.image.unwrap(),
+                image,
                 external_url: token_uri.external_url,
                 animation_url: token_uri.animation_url,
                 attributes: token_uri.attributes,
