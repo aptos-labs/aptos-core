@@ -22,7 +22,8 @@ impl ProcessorStatus {
     pub fn new(name: &'static str, version: u64, success: bool, details: Option<String>) -> Self {
         Self {
             name,
-            version: bigdecimal::BigDecimal::from_u64(version).unwrap(),
+            version: bigdecimal::BigDecimal::from_u64(version)
+                .expect("Should be able to convert u64 to big decimal"),
             success,
             details,
             last_updated: chrono::Utc::now().naive_utc(),

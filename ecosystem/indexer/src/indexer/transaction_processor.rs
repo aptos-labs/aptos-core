@@ -70,6 +70,10 @@ pub trait TransactionProcessor: Send + Sync + Debug {
         &self,
         txns: Vec<Transaction>,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        assert!(
+            !txns.is_empty(),
+            "Must provide at least one transaction to this function"
+        );
         PROCESSOR_INVOCATIONS
             .with_label_values(&[self.name()])
             .inc();
