@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use crate::common::{
     types::{
         CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileConfig,
-        TransactionOptions, TransactionSummary,
+        PromptOptions, TransactionOptions, TransactionSummary,
     },
-    utils::read_line,
+    utils::{prompt_yes_with_override, read_line},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
@@ -43,9 +43,12 @@ pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+
     /// Private key encoded in a type as shown in `encoding`
     #[clap(long)]
-    new_private_key: String,
+    pub(crate) new_private_key: String,
 }
 
 #[async_trait]
@@ -128,12 +131,18 @@ impl CliCommand<()> for RotateKey {
         // Asks user if they want to create a new Profile. Overriding profile is a bit of risky, we create a new one
         // instead.
 
-        // Default is Yes
-        eprintln!("Do you want to create a profile with the new private key? [Yes | no]");
-        let should_create_profile = read_line("Should create a profile")?.trim().to_string();
-
-        if should_create_profile.to_lowercase() == "no" {
-            return Ok(());
+        if let Err(cli_err) = prompt_yes_with_override(
+            "Do you want to create a profile with the new private key?",
+            self.prompt_options,
+        ) {
+            match cli_err {
+                CliError::AbortedError => {
+                    return Ok(());
+                }
+                _ => {
+                    return Err(cli_err);
+                }
+            }
         }
 
         eprintln!("Enter the name for the profile");
