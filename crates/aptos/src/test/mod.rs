@@ -4,6 +4,7 @@
 use crate::account::{
     create::{CreateAccount, DEFAULT_FUNDED_COINS},
     fund::FundWithFaucet,
+    key_rotation::RotateKey,
     list::{ListAccount, ListQuery},
     transfer::{TransferCoins, TransferSummary},
 };
@@ -175,6 +176,20 @@ impl CliTestFramework {
             faucet_options: self.faucet_options(),
             amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn rotate_key(&self, index: usize, new_private_key: String) -> CliTypedResult<()> {
+        RotateKey {
+            txn_options: self.transaction_options(index, None),
+            // Do not save profile
+            prompt_options: PromptOptions {
+                assume_yes: false,
+                assume_no: true,
+            },
+            new_private_key,
         }
         .execute()
         .await
