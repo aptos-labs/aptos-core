@@ -3,19 +3,16 @@
 
 import {
   Center,
-  Grid, Icon, Text, useColorMode, Flex,
+  Grid, Icon, Text, useColorMode, Flex, VStack,
 } from '@chakra-ui/react';
-import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useActiveAccount, useInitializedAccounts, useUnlockedAccounts } from 'core/hooks/useAccounts';
+import React, { useCallback, useMemo } from 'react';
+import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
 import { settingsItemLabel } from 'core/constants';
-import Browser from 'core/utils/browser';
 import {
   secondaryGridHoverBgColor,
   textColor, secondaryAddressFontColor,
 } from 'core/colors';
-import { removeAccountToast } from 'core/components/Toast';
-import { Routes } from 'core/routes';
+import ChakraLink from './ChakraLink';
 
 interface BgColorDictType {
   dark: string;
@@ -45,38 +42,19 @@ export default function SettingsListItem({
   DividerComponent,
   title,
 }: SettingsListItemProps) {
-  const navigate = useNavigate();
   const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
   const { lockAccounts } = useInitializedAccounts();
   const { removeAccount } = useUnlockedAccounts();
 
-  const gridOnClick = async () => {
+  const gridOnClick = useCallback(async () => {
     // todo: Create an enum for these titles for more typed code
     if (title === settingsItemLabel.LOCK_WALLET && activeAccount) {
       // todo: add toasts for removing the account
       // we should probably combine the toasts from the wallet drawer
       await lockAccounts();
-    } else if (title === 'View on Explorer') {
-      const explorerAddress = activeAccount?.address
-        ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}`
-        : 'https://explorer.devnet.aptos.dev';
-      window.open(explorerAddress, '_blank');
-    } else if (title === settingsItemLabel.REMOVE_ACCOUNT) {
-      await removeAccount(activeAccount.address);
-      const removedAddress = `${activeAccount.address.slice(0, 4)}...${activeAccount.address.slice(62)}`;
-      removeAccountToast(`Successfully removed account ${removedAddress}`);
-      navigate(Routes.wallet.path);
     }
-
-    if (path) {
-      navigate(path);
-    }
-
-    if (externalLink) {
-      Browser.redirect(externalLink);
-    }
-  };
+  }, [activeAccount, lockAccounts, title]);
 
   const renderTitle = useMemo(() => {
     if (title === settingsItemLabel.NETWORK) {
@@ -100,8 +78,8 @@ export default function SettingsListItem({
     return '1fr 32px';
   }, [iconBefore, iconAfter]);
 
-  return (
-    <>
+  const settingsListItemContent = useMemo(() => (
+    <VStack width="100%">
       <Grid
         templateColumns={templateColumns}
         p={4}
@@ -144,6 +122,65 @@ export default function SettingsListItem({
           ) : null}
       </Grid>
       {DividerComponent ? <DividerComponent /> : null}
-    </>
+    </VStack>
+  ), [
+    DividerComponent,
+    colorMode,
+    gridOnClick,
+    hoverBgColorDict,
+    iconAfter,
+    iconBefore,
+    renderTitle,
+    templateColumns,
+    textColorDict,
+  ]);
+
+  const settingsListItemContentWithRedirects = useMemo(() => {
+    if (externalLink) {
+      return (
+        <VStack
+          as="a"
+          width="100%"
+          alignItems="flex-start"
+          href={externalLink}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {settingsListItemContent}
+        </VStack>
+      );
+    }
+    if (path) {
+      return (
+        <ChakraLink width="100%" to={path}>
+          { settingsListItemContent }
+        </ChakraLink>
+      );
+    }
+    if (title === 'View on Explorer') {
+      const explorerAddress = activeAccount?.address
+        ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}`
+        : 'https://explorer.devnet.aptos.dev';
+      return (
+        <VStack
+          as="a"
+          width="100%"
+          alignItems="flex-start"
+          href={explorerAddress}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {settingsListItemContent}
+        </VStack>
+      );
+    }
+
+    return settingsListItemContent;
+  }, [activeAccount.address, externalLink, path, settingsListItemContent, title]);
+
+  return (
+    <VStack width="100%" alignItems="flex-start">
+      {settingsListItemContentWithRedirects}
+    </VStack>
   );
 }
