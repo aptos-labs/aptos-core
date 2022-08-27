@@ -11,7 +11,7 @@ slug: "aptos-white-paper-in-korean"
 블록체인이 새로운 인터넷 인프라로 부상하면서 수만개의 탈중앙 애플리케이션이 배포되어 왔
 다. 불행히도, 블록체인은 잦은 중단, 높은 비용, 낮은 처리량 제한 및 수 많은 보안 문제들로 인해
 사용이 아직 보편화되지 않았다. 블록체인 인프라는 웹3 시대의 대중화를 위해서 신뢰할 수 있고
-확장 가능하고, 비용 효율적이며, 널리 사용되는 어플리케이션의 구축을 위해 지속적으로 발전하는
+확장 가능하고, 비용 효율적이며, 널리 사용되는 애플리케이션의 구축을 위해 지속적으로 발전하는
 플랫폼인 클라우드 인프라의 길을 따라야 한다.
 
 우리는 이러한 과제를 해결하기 위해 확장성, 안전성, 신뢰성 및 향상성을 핵심 원칙으로 설계
@@ -45,6 +45,6 @@ slug: "aptos-white-paper-in-korean"
 
 :::tip 전체 PDF 버전
 
-- **초록**: Aptos 백서의 한국어 버전 전체 PDF를 보려면 [여기를 클릭하십시오](/developer-docs-site/static/papers/whitepaper-korean.pdf).
-- **English**: Click [here for the full PDF of the Aptos White Paper](/developer-docs-site/static/papers/Aptos-Whitepaper.pdf).
+- **초록**: Aptos 백서의 한국어 버전 전체 PDF를 보려면 [여기를 클릭하십시오](/papers/whitepaper-korean.pdf).
+- **English**: Click [here for the full PDF of the Aptos White Paper](/papers/whitepaper-korean.pdf).
 :::
