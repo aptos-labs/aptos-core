@@ -19,7 +19,7 @@ use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -135,7 +135,7 @@ async fn test_large_total_stake() {
     );
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(20))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(20))
         .await
         .unwrap();
 }

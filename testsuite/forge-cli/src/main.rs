@@ -419,7 +419,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(&[&SimpleValidatorUpgrade])
-            .with_success_criteria(SuccessCriteria::new(5000, 10000, None)),
+            .with_success_criteria(SuccessCriteria::new(
+                5000,
+                10000,
+                Some(Duration::from_secs(240)),
+            )),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
@@ -431,7 +435,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&PerformanceBenchmarkWithFN])
-            .with_success_criteria(SuccessCriteria::new(5000, 10000, None)),
+            .with_success_criteria(SuccessCriteria::new(
+                5000,
+                10000,
+                Some(Duration::from_secs(240)),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -447,13 +455,17 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(SuccessCriteria::new(
-            if duration > Duration::from_secs(1200) {
+            if duration.as_secs() > 1200 {
                 5000
             } else {
                 6000
             },
             10000,
-            None,
+            Some(Duration::from_secs(if duration.as_secs() > 1200 {
+                240
+            } else {
+                60
+            })),
         ))
 }
 

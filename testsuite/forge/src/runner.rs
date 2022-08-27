@@ -402,7 +402,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
 enum TestResult {
     Ok,
-    Failed,
     FailedWithMsg(String),
 }
 
@@ -410,17 +409,23 @@ impl Display for TestResult {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             TestResult::Ok => write!(f, "Test Ok"),
-            TestResult::Failed => write!(f, "Test Failed"),
             TestResult::FailedWithMsg(msg) => write!(f, "Test Failed: {}", msg),
         }
     }
 }
 
 fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
-    match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(f)) {
-        Ok(Ok(())) => TestResult::Ok,
-        Ok(Err(e)) => TestResult::FailedWithMsg(format!("{:?}", e)),
-        Err(_) => TestResult::Failed,
+    match f() {
+        Ok(()) => TestResult::Ok,
+        Err(e) => {
+            let is_triggerd_by_github_actions =
+                std::env::var("FORGE_TRIGGERED_BY").unwrap_or_default() == "github-actions";
+            if is_triggerd_by_github_actions {
+                // ::error:: is github specific syntax to set an error on the job that is highlighted as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
+                println!("::error::{:?}", e);
+            }
+            TestResult::FailedWithMsg(format!("{:?}", e))
+        }
     }
 }
 
@@ -449,10 +454,6 @@ impl TestSummary {
             TestResult::Ok => {
                 self.passed += 1;
                 self.write_ok()?;
-            }
-            TestResult::Failed => {
-                self.failed.push(name);
-                self.write_failed()?;
             }
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);
