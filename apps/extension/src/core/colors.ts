@@ -105,6 +105,11 @@ export const secondaryGridBgColor = {
   light: 'gray.100',
 };
 
+export const secondaryDisabledNetworkBgColor = {
+  dark: 'gray.800',
+  light: 'gray.50',
+};
+
 // Other
 
 export const secondaryDividerColor = {

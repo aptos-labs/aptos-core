@@ -23,7 +23,7 @@ import {
   UseRadioProps,
   VStack,
 } from '@chakra-ui/react';
-import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
+import { secondaryHoverBgColor, secondaryButtonColor, secondaryDisabledNetworkBgColor } from 'core/colors';
 import { DeleteIcon } from '@chakra-ui/icons';
 import { useNodeStatus } from 'core/queries/network';
 import { defaultNetworks, Network } from 'shared/types';
@@ -115,7 +115,7 @@ export default function NetworkListItem(props: NetworkListItemProps) {
         borderRadius="md"
         bgColor={secondaryButtonColor[colorMode]}
         _disabled={{
-          bg: 'gray.50',
+          bg: secondaryDisabledNetworkBgColor[colorMode],
           color: 'gray.400',
         }}
         _checked={{

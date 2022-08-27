@@ -12,7 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { Routes } from 'core/routes';
 import { ArrowBackIcon } from '@chakra-ui/icons';
-import { secondaryBorderColor, walletHeaderBgColor } from 'core/colors';
+import { secondaryBackButtonBgColor, secondaryBorderColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountCircle from 'core/components/AccountCircle';
 
@@ -58,7 +58,7 @@ export default function WalletHeader({
                 icon={<ArrowBackIcon fontSize={26} />}
                 variant="filled"
                 onClick={backOnClick}
-                bgColor={walletHeaderBgColor[colorMode]}
+                bgColor={secondaryBackButtonBgColor[colorMode]}
                 borderRadius="1rem"
               />
             ) : null
@@ -77,6 +77,5 @@ export default function WalletHeader({
         </HStack>
       </HStack>
     </Box>
-
   );
 }
