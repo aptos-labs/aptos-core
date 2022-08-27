@@ -72,6 +72,7 @@ impl Fetcher {
                 ));
             }
             let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            // Sort by first transaction of batch's version
             res.sort_by(|a, b| {
                 a.first()
                     .unwrap()
@@ -80,9 +81,13 @@ impl Fetcher {
                     .cmp(&b.first().unwrap().version().unwrap())
             });
 
+            // Send keeping track of the last version sent by the batch
             for batch in res {
                 self.current_version = batch.last().unwrap().version().unwrap();
-                self.transactions_sender.send(batch).await.unwrap();
+                self.transactions_sender
+                    .send(batch)
+                    .await
+                    .expect("Should be able to send transaction on channel");
             }
         }
     }
@@ -130,8 +135,8 @@ async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transacti
     }
 
     panic!(
-        "Could not fetch {} transactions starting at {}!",
-        TRANSACTION_FETCH_BATCH_SIZE, starting_version
+        "Could not fetch {} transactions starting at {} after {} retries!",
+        TRANSACTION_FETCH_BATCH_SIZE, starting_version, MAX_RETRIES
     );
 }
 
@@ -167,7 +172,10 @@ impl TransactionFetcherTrait for TransactionFetcher {
     /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
     /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver.next().await.unwrap()
+        self.transaction_receiver
+            .next()
+            .await
+            .expect("No transactions, producer of batches died")
     }
 
     /// fetches one version; this used for error checking/repair/etc
@@ -201,7 +209,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
             match self.client.get_ledger_information().await {
                 Ok(inner) => return inner.into_inner(),
                 Err(err) => {
-                    aptos_logger::error!(
+                    aptos_logger::warn!(
                         "Failed to get ledger info, will retry in {}ms. Err: {:?}",
                         RETRY_TIME_MILLIS,
                         err
