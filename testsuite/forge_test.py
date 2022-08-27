@@ -99,8 +99,6 @@ def fake_context(shell=None, filesystem=None, processes=None, time=None) -> Forg
         time=time if time else FakeTime(),
 
         forge_test_suite="banana",
-        local_p99_latency_ms_threshold="6000",
-        forge_runner_tps_threshold="593943",
         forge_runner_duration_secs="123",
 
         reuse_args=[],

@@ -29,7 +29,6 @@ aptos-types = { path = "../../types" }
 
 netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
-short-hex-str = { path = "../../crates/short-hex-str" }
 storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
 
