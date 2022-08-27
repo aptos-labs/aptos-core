@@ -135,6 +135,14 @@ module.exports = {
 
     // region Add fallback plugins
 
+    // Needed for the aptos SDK
+    Object.assign(config.resolve, {
+      fallback: {
+        events: false,
+        stream: require.resolve('stream-browserify'),
+      },
+    });
+
     if (isEnvProduction) {
       // The `Buffer` class is available as built-in global when running the webpack dev server,
       // but is not imported automatically in builds. This makes sure that

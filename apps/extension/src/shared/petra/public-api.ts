@@ -3,9 +3,8 @@
 
 import { PublicAccount } from 'shared/types';
 import {
+  EntryFunctionPayload,
   PendingTransaction,
-  SubmitTransactionRequest,
-  TransactionPayload,
 } from 'aptos/dist/generated';
 
 export interface PetraPublicApi {
@@ -14,9 +13,9 @@ export interface PetraPublicApi {
   disconnect(): Promise<void>;
   isConnected(): Promise<boolean>;
   network(): Promise<string>;
-  signAndSubmitTransaction(payload: TransactionPayload): Promise<PendingTransaction>;
+  signAndSubmitTransaction(payload: EntryFunctionPayload): Promise<PendingTransaction>;
   signMessage(message: string): Promise<string>;
-  signTransaction(payload: TransactionPayload): Promise<SubmitTransactionRequest>;
+  signTransaction(payload: EntryFunctionPayload): Promise<Uint8Array>;
 }
 
 export default PetraPublicApi;
