@@ -578,7 +578,7 @@ async fn execute_transactions_and_wait(
 /// Waits for all nodes to catch up
 async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_SECS))
         .await
         .unwrap();
 }
