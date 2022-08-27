@@ -447,16 +447,11 @@ export class AptosClient {
           break;
         }
       } catch (e) {
-        if (e instanceof Gen.ApiError) {
-          if (e.status === 404) {
-            isPending = true;
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-          if (e.status >= 400) {
-            throw e;
-          }
-        } else {
+        const isApiError = e instanceof Gen.ApiError;
+        const isErrorStatus = isApiError
+          && e.status !== 404
+          && e.status >= 400;
+        if (!isApiError || isErrorStatus) {
           throw e;
         }
       }
