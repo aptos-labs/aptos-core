@@ -124,13 +124,13 @@ export default function SettingsListItem({
             />
           </Center>
         ) : null}
-        <Text
+        <Flex
           color={textColorDict[colorMode]}
           fontWeight={600}
           fontSize="md"
         >
           {renderTitle}
-        </Text>
+        </Flex>
         {iconAfter
           ? (
             <Center width="100%">

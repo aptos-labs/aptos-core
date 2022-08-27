@@ -5,8 +5,13 @@ import React, { LegacyRef, useMemo, useState } from 'react';
 import {
   Box,
   Center,
-  Grid, Text, useColorMode, VStack, Flex, Button,
-  useClipboard, Tooltip,
+  Grid,
+  Text,
+  useColorMode,
+  VStack,
+  Button,
+  HStack,
+  Tooltip,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { Routes } from 'core/routes';
@@ -26,6 +31,8 @@ import {
 } from 'core/colors';
 import AccountCircle from 'core/components/AccountCircle';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import { collapseHexString } from 'core/utils/hex';
+import Copyable from './Copyable';
 
 interface AccountViewProps {
   account?: Account
@@ -55,20 +62,13 @@ const AccountView = React.forwardRef(({
 
   const { hasCopied, onCopy } = useClipboard(displayAccount?.address || '');
 
+    return displayActiveAccount?.address;
+  }, [account, activeAccount]);
+
   const handleClickEditAccount = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     navigate(Routes.rename_account.path);
   };
-
-  const handleClickAccount = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (onClick && opacity === 0) {
-      e.preventDefault();
-      onClick(displayAccount?.address);
-    }
-  };
-
-  const beginAddress = useMemo(() => displayAccount.address?.slice(0, 6) || '', [displayAccount]);
-  const endAddress = useMemo(() => displayAccount.address?.slice(62) || '', [displayAccount]);
 
   return (
     <Grid
@@ -95,32 +95,20 @@ const AccountView = React.forwardRef(({
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
           {displayAccount.name}
         </Text>
-        <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
-          <Text
-            fontSize="sm"
-            color={secondaryTextColor[colorMode]}
-            onClick={onCopy}
-            onMouseEnter={() => setOpacity(1)}
-            onMouseLeave={() => setOpacity(0)}
-          >
-            <Flex flexDirection="row" gap={1} alignItems="baseline">
-              {beginAddress}
-              ...
-              {endAddress}
-              <Box opacity={opacity}>
-                <RiFileCopyLine />
-              </Box>
-            </Flex>
-          </Text>
-        </Tooltip>
+        <Copyable value={displayActiveAccountAddress}>
+          <HStack alignItems="baseline">
+            <Text fontSize="sm" color={secondaryTextColor[colorMode]}>
+              {collapseHexString(displayActiveAccountAddress)}
+            </Text>
+            <RiFileCopyLine />
+          </HStack>
+        </Copyable>
       </VStack>
-      {(activeAccount.address === displayAccount.address && showCheck
-        ? <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} /> : null)}
-      {(allowEdit ? (
-        <Button bg="none" p={0} onClick={handleClickEditAccount}>
+      <Tooltip label="Rename">
+        <Button borderRadius="100%" colorScheme="teal" variant="ghost" bg="none" p={0} onClick={handleClickEditAccount}>
           <HiPencil size={20} />
         </Button>
-      ) : null)}
+      </Tooltip>
     </Grid>
   );
 });
