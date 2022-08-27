@@ -193,9 +193,7 @@ module aptos_framework::account {
     //  1. First, append the Ed25519 scheme identifier '0x00' to `account_public_key_bytes`
     //  2. Second, hash this using SHA3-256
     fun verify_authentication_key_matches_ed25519_public_key(account_auth_key: vector<u8>, account_public_key_bytes: vector<u8>) : bool {
-        vector::push_back(&mut account_public_key_bytes, 0);
-        let expected_account_auth_key = hash::sha3_256(account_public_key_bytes);
-        expected_account_auth_key == account_auth_key
+        ed25519::public_key_bytes_to_authentication_key(account_public_key_bytes) == account_auth_key
     }
 
     /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
@@ -244,8 +242,7 @@ module aptos_framework::account {
         };
 
         // Derive the authentication key of the new PK
-        vector::push_back(&mut new_pk_bytes, 0);
-        let new_auth_key = hash::sha3_256(new_pk_bytes);
+        let new_auth_key = ed25519::public_key_bytes_to_authentication_key(new_pk_bytes);
         let new_address = from_bcs::to_address(new_auth_key);
 
         // Update the originating address map
