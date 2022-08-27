@@ -40,12 +40,18 @@ fn move_framework_prover_tests() {
 
 #[ignore]
 #[test]
-fn move_stdlib_prover_tests() {
+fn move_token_prover_tests() {
+    run_prover_for_pkg("aptos-token");
+}
+
+#[ignore]
+#[test]
+fn move_aptos_stdlib_prover_tests() {
     run_prover_for_pkg("aptos-stdlib");
 }
 
 #[ignore]
 #[test]
-fn move_token_prover_tests() {
-    run_prover_for_pkg("aptos-token");
+fn move_stdlib_prover_tests() {
+    run_prover_for_pkg("move-stdlib");
 }
