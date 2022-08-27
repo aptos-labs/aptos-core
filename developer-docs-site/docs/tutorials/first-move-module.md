@@ -52,7 +52,7 @@ There are many example Move modules in the [aptos-core/aptos-move/move-examples]
 
 Load a terminal and change directories into the `hello_blockchain` directory: `cd aptos-core/aptos-move/move-examples`.
 
-To build the module run: `aptos move build --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
+To compile the module run: `aptos move compile --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
 To test the module run: `aptos move test --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
 
 The CLI entry must contain `--named-addresses` because the `Move.toml` file leaves this as undefined:
