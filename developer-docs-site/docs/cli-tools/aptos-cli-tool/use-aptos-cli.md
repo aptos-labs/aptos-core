@@ -629,7 +629,7 @@ The below example uses the `HelloBlockchain` in [move-examples](https://github.c
 The named addresses can be either an account address, or a profile name.
 
 ```bash
-$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 
 The above command will generate the below terminal output:
@@ -647,7 +647,7 @@ The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
-$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 The above command will generate the following terminal output:
 ```bash
