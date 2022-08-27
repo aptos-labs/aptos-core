@@ -49,6 +49,7 @@ export const PromptMessage = Object.freeze({
   APPROVED: 'approved',
   LOADED: 'loaded',
   REJECTED: 'rejected',
+  TIME_OUT: 'timeout',
 } as const);
 
 export interface PromptInfo {

@@ -138,8 +138,22 @@ function PromptState() {
   } = useAppState();
 
   useEffect(() => {
+    // Let the promptPresenter know that prompt is ready
     chrome.runtime.sendMessage(PromptMessage.LOADED, (response) => {
       setPromptInfo(response);
+    });
+
+    // listener for prompt reuse messages
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.promptInfo) {
+        setPromptInfo(message.promptInfo);
+        chrome.runtime.sendMessage(PromptMessage.TIME_OUT).then(() => {
+          // Wait for timeout message to send, so that the first prompt is rejected
+          sendResponse();
+        });
+        return true;
+      }
+      return false;
     });
   }, []);
 
