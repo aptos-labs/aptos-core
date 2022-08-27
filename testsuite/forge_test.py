@@ -232,9 +232,9 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     def testDashboardLink(self) -> None:
         self.assertFixture(
             get_dashboard_link(
-                "aptos-forge-1",
+                "aptos-forge-big-1",
                 "forge-pr-2983",
-                "forge-1",
+                "forge-big-1",
                 True,
             ),
             "testDashboardLink.fixture",
@@ -263,7 +263,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
             )
             result = runner.invoke(main, [
                 "test", "--dry-run",
-                "--forge-cluster-name", "forge-1",
+                "--forge-cluster-name", "forge-big-1",
                 "--forge-report", "temp-report",
                 "--forge-pre-comment", "temp-pre-comment",
                 "--forge-comment", "temp-comment",
