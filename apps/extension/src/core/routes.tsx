@@ -1,4 +1,3 @@
-/* eslint-disable sort-keys-fix/sort-keys-fix,sort-keys */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -114,10 +113,6 @@ export const Routes = Object.freeze({
     element: <RenameAccount />,
     path: '/settings/rename_account',
   },
-  stake: {
-    element: <Stake />,
-    path: '/stake',
-  },
   settings: {
     element: <Settings />,
     path: '/settings',
@@ -125,6 +120,10 @@ export const Routes = Object.freeze({
   switchAccount: {
     element: <SwitchAccount />,
     path: '/switch-account',
+  },
+  stake: {
+    element: <Stake />,
+    path: '/stake',
   },
   token: {
     element: <Token />,
@@ -154,13 +153,10 @@ export default Routes;
  */
 export const routes = [
   {
-    element: <InitializedAccountsGuard />,
     children: [
       {
-        element: <UnlockedAccountsGuard />,
         children: [
           {
-            element: <ActiveAccountGuard />,
             children: [
               Routes.wallet,
               Routes.gallery,
@@ -178,22 +174,25 @@ export const routes = [
               Routes.security_privacy,
               Routes.help,
               Routes.stake,
-              { path: '/', element: <Navigate to={Routes.wallet.path} replace /> },
+              { element: <Navigate to={Routes.wallet.path} replace />, path: '/' },
             ],
+            element: <ActiveAccountGuard />,
           },
           Routes.addAccount,
           Routes.createAccount,
           Routes.importWalletMnemonic,
           Routes.importWalletPrivateKey,
         ],
+        element: <UnlockedAccountsGuard />,
       },
       {
-        element: <LockedAccountsGuard />,
         children: [
           Routes.password,
         ],
+        element: <LockedAccountsGuard />,
       },
     ],
+    element: <InitializedAccountsGuard />,
   },
   Routes.noWallet,
   Routes.createWallet,

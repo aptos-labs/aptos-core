@@ -1,3 +1,5 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from 'react';
 
 /**
@@ -6,12 +8,20 @@ import { useState, useEffect } from 'react';
  */
 export default function useDebounce<T>(value: T, delayMs: number = 500) {
   const [debouncedValue, setDebouncedValue] = useState(value);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delayMs);
+    setIsLoading(true);
+    const handler = setTimeout(() => {
+      setIsLoading(false);
+      setDebouncedValue(value);
+    }, delayMs);
     // Cancel the timeout on unmount
     return () => clearTimeout(handler);
   }, [value, delayMs]);
 
-  return debouncedValue;
+  return {
+    debouncedValue,
+    isLoading,
+  };
 }

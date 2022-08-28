@@ -59,7 +59,7 @@ function AddNetworkBody() {
 
   // Make sure to check node status only when format is right
   const shouldCheckNodeStatus = errors.nodeUrl === undefined;
-  const debouncedNodeUrl = useDebounce(watch('nodeUrl'), 300);
+  const { debouncedValue: debouncedNodeUrl } = useDebounce(watch('nodeUrl'), 300);
   const {
     isLoading: isNodeStatusLoading,
     isNodeAvailable,
