@@ -1,4 +1,4 @@
-module aptos_token::listing {
+module aptos_token::marketplace_utils {
     use std::signer;
     use std::string::String;
     use aptos_std::table::{Self, Table};
