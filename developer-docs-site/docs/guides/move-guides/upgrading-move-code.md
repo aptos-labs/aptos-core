@@ -15,13 +15,14 @@ next time their code is executed.
 
 Code upgrade enables code owners to evolve their contracts or frameworks under
 a stable, well-known account address, which can than be referenced by other
-applications, inside or outside the chain. 
+applications, inside or outside the chain.
 
 Code upgrade is based on an _upgrade policy_ which the owner of a package
 determines. The default policy is _(backwards) compatible_. That means, only
-those upgrades are accepted which guarantee that no existing APIs 
+those upgrades are accepted which guarantee that no existing public APIs 
+(including transactions and public functions) 
 and/or existing resource storage is broken by the upgrade. This compatibility
-checking is technical complete and a result of Move's strongly typed 
+checking is technical complete and possible because of Move's strongly typed 
 byte code semantics. However, even a compatible upgrade can have 
 hazardous effects on applications so depending on upgradable code on chain 
 should be carefully considered on a case-by-case basis (see also below
@@ -48,7 +49,7 @@ Aptos checks compatibility at the time a [Move package](https://move-language.gi
 
 Currently, three different upgrade policies are supported:
 
-- `compatible`: upgrades most be downwards compatible, specifically:
+- `compatible`: upgrades most be backwards compatible, specifically:
   - For storage, all old struct declarations must be the same in
     the new code. This ensures that the existing state of storage is 
     correctly interpreted by the new code. However, new struct declarations 
@@ -81,7 +82,7 @@ restrictions, but sharing of such code is not allowed.
 
 ## Security considerations for dependencies
 
-As mentioned, even compatible upgrades can lead to harzadous effects for
+As mentioned, even compatible upgrades can lead to hazardous effects for
 contracts depending on that upgraded code. Those effects can come simply
 from bugs but can be also be the result of malicious upgrades. For example, an
 upgraded dependency can suddenly make all functions
