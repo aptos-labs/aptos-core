@@ -20,8 +20,6 @@ use aptos_rest_client::aptos_api_types::HexEncodedBytes;
 use field_count::FieldCount;
 use serde::Serialize;
 
-static SECONDS_IN_10_YEARS: i64 = 60 * 60 * 24 * 365 * 10;
-
 #[derive(Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(version)]
 #[diesel(table_name = "transactions")]
@@ -257,10 +255,8 @@ pub type TransactionModel = Transaction;
 pub type UserTransactionModel = UserTransaction;
 
 fn parse_proto_timestamp(ts: &Timestamp, version: u64) -> chrono::NaiveDateTime {
-    let seconds_in_10_years = chrono::offset::Utc::now().timestamp() + SECONDS_IN_10_YEARS;
-
     chrono::NaiveDateTime::from_timestamp_opt(
-        std::cmp::min(ts.seconds, seconds_in_10_years),
+        std::cmp::min(ts.seconds, chrono::NaiveDateTime::MAX.timestamp()),
         ts.nanos as u32,
     )
     .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
