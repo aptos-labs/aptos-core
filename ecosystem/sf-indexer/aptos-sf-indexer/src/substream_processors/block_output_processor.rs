@@ -410,7 +410,7 @@ impl SubstreamProcessor for BlockOutputSubstreamProcessor {
         // This is the expected output of the substream
         let block_output: BlockOutput = match output.data.as_ref().unwrap() {
             ModuleOutputData::MapOutput(data) => {
-                aptos_logger::debug!("Parsing mapper for block {}", block_height);
+                aptos_logger::debug!(block_height = block_height, "Parsing mapper for block");
                 Message::decode(data.value.as_slice()).map_err(|err| {
                     BlockProcessingError::ParsingError((
                         anyhow::Error::from(err),
