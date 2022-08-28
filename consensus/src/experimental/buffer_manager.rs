@@ -316,6 +316,7 @@ impl BufferManager {
         }
     }
 
+    
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
