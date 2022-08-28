@@ -649,6 +649,8 @@ impl CliTestFramework {
     ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
+            save_metadata: false,
+            included_artifacts: IncludedArtifacts::Sparse,
         }
         .execute()
         .await
