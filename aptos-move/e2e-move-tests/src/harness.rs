@@ -3,6 +3,8 @@
 
 use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{PrivateKey, Uniform};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -18,6 +20,10 @@ use language_e2e_tests::{
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
+use rand::{
+    rngs::{OsRng, StdRng},
+    Rng, SeedableRng,
+};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -77,6 +83,19 @@ impl MoveHarness {
         let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
         self.executor.add_account_data(&data);
         self.txn_seq_no.insert(addr, 10);
+        data.account().clone()
+    }
+
+    // Creates an account for the given static address with a randomly generated key pair
+    pub fn new_account_with_key_pair(&mut self) -> Account {
+        let mut rng = StdRng::from_seed(OsRng.gen());
+
+        let privkey = Ed25519PrivateKey::generate(&mut rng);
+        let pubkey = privkey.public_key();
+        let acc = Account::with_keypair(privkey, pubkey);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), 10);
         data.account().clone()
     }
 

@@ -17,6 +17,7 @@ project-root = "0.2.2"
 proptest = "1.0.0"
 serde = { version = "1.0.137", default-features = false }
 tempfile = "3.3.0"
+rand = "0.7.3"
 
 aptos = { path = "../../crates/aptos" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }

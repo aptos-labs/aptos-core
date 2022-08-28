@@ -3412,6 +3412,7 @@ dependencies = [
  "move-deps",
  "project-root",
  "proptest",
+ "rand 0.7.3",
  "serde 1.0.144",
  "tempfile",
  "vm-genesis",
