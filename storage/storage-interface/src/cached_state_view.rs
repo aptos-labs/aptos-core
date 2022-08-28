@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::TIMER;
 use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -188,6 +189,7 @@ impl StateView for CachedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.

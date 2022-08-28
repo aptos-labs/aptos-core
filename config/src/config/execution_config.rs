@@ -47,7 +47,7 @@ impl Default for ExecutionConfig {
             // Default value of 30 seconds for the network timeout.
             network_timeout_ms: 30_000,
             // Parallel execution by default.
-            concurrency_level: 8,
+            concurrency_level: 16,
             num_proof_reading_threads: 32,
         }
     }
