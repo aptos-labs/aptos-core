@@ -9,43 +9,111 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Upgrading Move Code
 
 The Aptos chain supports _code upgrade_, which means already deployed Move
-code can be replaced with newer versions. Code upgrade enables
-code owners to evolve their contracts or frameworks under a stable, well-known
-account address, which can than be referenced by other applications, inside or
-outside the chain.
+code can be replaced with newer code. If a code upgrade happens, all 
+consumers of the upgraded code will automatically receive the new code the
+next time their code is executed. 
+
+Code upgrade enables code owners to evolve their contracts or frameworks under
+a stable, well-known account address, which can than be referenced by other
+applications, inside or outside the chain. 
+
+Code upgrade is based on an _upgrade policy_ which the owner of a package
+determines. The default policy is _(backwards) compatible_. That means, only
+those upgrades are accepted which guarantee that no existing APIs 
+and/or existing resource storage is broken by the upgrade. This compatibility
+checking is technical complete and a result of Move's strongly typed 
+byte code semantics. However, even a compatible upgrade can have 
+hazardous effects on applications so depending on upgradable code on chain 
+should be carefully considered on a case-by-case basis (see also below
+discussion of security aspects).
 
 ## How it works
 
-Code upgrade on the Aptos chain happens on [Move package](https://move-language.github.io/move/packages.html) level. A package in Aptos Move specifies an _upgrade policy_ in the manifest:
+Code upgrade on the Aptos chain happens on [Move package](https://move-language.github.io/move/packages.html) 
+level. A package specifies an upgrade policy in the `Move.toml`
+manifest:
 
 ```toml
 [package]
 name = "MyApp"
 version = "0.0.1"
 upgrade_policy = "compatible"
+...
 ```
-
-The above `upgrade_policy = "compatible"` policy means that any upgrades to this package must be _downwards compatible_ both in regards to storage and APIs, conditions which can be checked mechanical from the Move bytecode:
-
-- For storage, all old struct declarations must be in exactly the same way
-  in the new code. This ensures that the existing state of storage is correctly
-  interpreted by the new code. Also, new struct declarations can be added.
-- Similarly for APIs, all public functions must have the same signature as before, but new ones can be added.
-
 :::tip Compatibility check
 Aptos checks compatibility at the time a [Move package](https://move-language.github.io/move/packages.html) is published via a dedicated Aptos framework transaction. This transaction aborts if compatibility is not satisfied as specified.
 :::
 
-## Upgrade policies
+## Upgrade Policies
 
-The upgrade policy is specified using the key `upgrade_policy`. In addition to the above-shown `upgrade_policy = "compatible"` policy, the following policies are supported:
+Currently, three different upgrade policies are supported:
 
-- `immutable`: A package owner can also choose `immutable`, to disallow any future upgrade.
-- `arbitrary`: Perform no checks at all. The policy of a given package can start as `arbitrary`, then move to `compatible`, and then move to `immutable`, **but it can never move back**. This gives a consumer of a Move package verifiable guarantees on how the code is now and how it evolves in the future.
+- `compatible`: upgrades most be downwards compatible, specifically:
+  - For storage, all old struct declarations must be the same in
+    the new code. This ensures that the existing state of storage is 
+    correctly interpreted by the new code. However, new struct declarations 
+    can be added.
+  - For APIs, all public functions must have the same signature as 
+    before. New functions can be added.
+- `immutable`: the code is not upgradable and guaranteed to stay the same 
+  forever.
+- `arbitrary`: the code can be arbitrarily upgraded, without any compatibility
+  checks.
 
+Those policies are ordered regarding strength such that `arbitrary <
+compatible < immutable`.
+The policy of a package on chain can only get stronger, not weaker. Moreover,
+the policy of all dependencies of a package must be stronger or equal to
+the policy of the given package. For example, an `immutable` package
+cannot refer directly or indirectly to a `compatible` package. This gives
+users the guarantee that no unexpected updates happen
+under the hood. There is one exception to the above rule: framework packages
+installed at addresses `0x1` to `0xa` are exempted from the dependency check.
+This is necessary so one can define an `immutable` package based on the standard
+libraries, which have the `compatible` policy.
+
+In addition to the rules above, there is one further rule for `arbitrary`
+packages: a dependency to a package with upgrade policy `arbitrary` must
+be within the same account (the two packages must be at the same address). 
+This restriction is intended to protect users from misuse via sharing of
+such packages. A single account can work with `arbitrary` without
+restrictions, but sharing of such code is not allowed.
+
+## Security considerations for dependencies
+
+As mentioned, even compatible upgrades can lead to harzadous effects for
+contracts depending on that upgraded code. Those effects can come simply
+from bugs but can be also be the result of malicious upgrades. For example, an
+upgraded dependency can suddenly make all functions
+abort, breaking operation of your contract, or suddenly cost much more
+gas to execute then before the upgrade. Because you cannot control
+the upgrade, dependencies to upgradable packages need to be handled with
+care.
+
+- The safest dependency is, of course, to an `immutable` package. This is 
+  guaranteed to never change, including its transitive dependencies (modulo 
+  the Aptos framework). In order to evolve an immutable package, the owner 
+  would have to introduce a new major version, which is practically like an 
+  independent new package. Currently, major versioning would have to be 
+  expressed by naming (e.g. `module feature_v1` and `module feature_v2`).
+  However, not all package owners like to publish their code
+  as `immutable`, because this takes away the ability to fix bugs and evolve 
+  the code in place.
+- If you have a dependency to a `compatible` package it is highly 
+  recommended that you know and understand the entity publishing the package. 
+  The highest level of assurance is that the package is governed by a DAO where 
+  no single user can initiate an upgrade, but a vote or similar has 
+  to be taken. This is for example the case for the Aptos framework.
+- Dependencies to `arbitrary` packages are technically only allowed in the 
+  same account, so the decision to upgrade and responsibility to ensure 
+  compatibility is on the account owner.
+   
 ## Programmatic upgrade
 
-In general, Aptos offers, via the Move module `aptos_framework::code`, ways to publish code from arbitray points in your smart contracts. However, notice that code published in the current transaction cannot be executed before that transaction ends.
+In general, Aptos offers, via the Move module `aptos_framework::code`, 
+ways to publish code from anywhere in your smart contracts. However,
+notice that code published in the current transaction cannot be executed 
+before that transaction ends.
 
 The Aptos Framework itself, including all the chain administration logic, is
 an example for programmatic upgrade. The framework is marked as `compatible`.
