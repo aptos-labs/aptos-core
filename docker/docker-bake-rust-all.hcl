@@ -157,7 +157,7 @@ function "generate_cache_from" {
 ## we only cache to GCP because AWS ECR doesn't support cache manifests
 function "generate_cache_to" {
   params = [target]
-  result = TARGET_REGISTRY == "gcp" ? ["type=inline"] : []
+  result = TARGET_REGISTRY == "gcp" ? ["type=registry,mode=max"] : []
 }
 
 function "generate_tags" {
