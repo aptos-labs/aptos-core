@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 
-use aptos::account::key_rotation::RotationProofChallenge;
+use aptos::common::types::RotationProofChallenge;
 use cached_packages::aptos_stdlib;
 use e2e_move_tests::{assert_success, MoveHarness};
 use language_e2e_tests::account::Account;
