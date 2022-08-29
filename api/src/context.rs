@@ -34,6 +34,8 @@ use storage_interface::{
     DbReader, Order,
 };
 
+const MIN_GAS_PRICE: u64 = 1;
+
 // Context holds application scope context
 #[derive(Clone)]
 pub struct Context {
@@ -58,7 +60,7 @@ impl Context {
             node_config,
             gas_estimation: Arc::new(RwLock::new(GasEstimationCache {
                 last_updated_version: 0,
-                median_gas_price: 1,
+                median_gas_price: MIN_GAS_PRICE,
             })),
         }
     }
@@ -588,9 +590,17 @@ impl Context {
                 .map_err(|err| {
                     E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            gas_prices.sort();
-            let mid = gas_prices.len() / 2;
-            gas_estimation.median_gas_price = gas_prices[mid];
+
+            // When there's no gas prices in the last 100k transactions, we're going to set it to
+            // the lowest gas price because the transaction should get through with any amount
+            gas_estimation.median_gas_price = if gas_prices.is_empty() {
+                MIN_GAS_PRICE
+            } else {
+                gas_prices.sort();
+                let mid = gas_prices.len() / 2;
+                gas_prices[mid]
+            };
+
             Ok(gas_estimation.median_gas_price)
         }
     }
