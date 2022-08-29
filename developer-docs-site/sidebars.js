@@ -28,7 +28,7 @@ const sidebars = {
         "cli-tools/aptos-cli-tool/install-aptos-cli",
         {
           type: "category",
-          label: "Develop on Local Testnet",
+          label: "Run a Local Testnet",
           link: { type: "doc", id: "nodes/local-testnet/index" },
           collapsible: true,
           collapsed: true,
