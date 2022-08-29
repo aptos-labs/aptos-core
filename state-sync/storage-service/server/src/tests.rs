@@ -881,7 +881,7 @@ async fn test_get_storage_server_summary() {
         .times(1)
         .returning(move || Ok(Some(lowest_version)));
     db_reader
-        .expect_get_state_prune_window()
+        .expect_get_epoch_snapshot_prune_window()
         .times(1)
         .returning(move || Ok(state_prune_window));
     db_reader
@@ -1823,7 +1823,7 @@ fn create_mock_db_for_subscription(
         .expect_get_first_write_set_version()
         .returning(move || Ok(Some(lowest_version)));
     db_reader
-        .expect_get_state_prune_window()
+        .expect_get_epoch_snapshot_prune_window()
         .returning(move || Ok(100));
     db_reader
         .expect_is_state_pruner_enabled()
@@ -2295,7 +2295,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<usize>;
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
 
         fn is_state_pruner_enabled(&self) -> Result<bool>;
     }

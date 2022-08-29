@@ -1450,9 +1450,13 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_prune_window(&self) -> Result<usize> {
+    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
         gauged_api("get_state_prune_window", || {
-            Ok(self.state_store.state_db.state_pruner.get_pruner_window() as usize)
+            Ok(self
+                .state_store
+                .state_db
+                .epoch_snapshot_pruner
+                .get_prune_window() as usize)
         })
     }
 
@@ -1464,7 +1468,7 @@ impl DbReader for AptosDB {
 
     fn get_ledger_prune_window(&self) -> Result<usize> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self.ledger_pruner.get_pruner_window() as usize)
+            Ok(self.ledger_pruner.get_prune_window() as usize)
         })
     }
 
