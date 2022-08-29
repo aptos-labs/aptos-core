@@ -81,6 +81,16 @@ An owner can designate a voter. This enables the voter to participate in governa
 This document describes staking. See [Governance](governance.md) for how to participate in the Aptos on-chain governance using the owner-voter model.
 :::
 
+## Validation on the Aptos blockchain
+
+The following is a high-level description of how validation works on the Aptos blockchain:
+
+- Throughout the duration of an epoch, the following flow of events occurs several times (thousands of times):
+  - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance and stake. **This selection is not done by voting.**
+  - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
+  - All the validators from the validator set will vote on the leader's proposal for the new block. Once a quorum consensus is reached the block can be finalized. Hence the actual list of votes to achieve the quorum consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, and not to the voters.**
+  - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block and rewarding the leader. 
+
 ## Joining the validator set
 
 Participating as a validator node on the Aptos network works like this: 
@@ -126,7 +136,7 @@ The lockup duration is decided by the Aptos governance, i.e., by the covenants t
 An epoch in the Aptos blockchain is defined as a duration of time, in seconds, during which a number of blocks are voted on by the validators, the validator set is updated, and the rewards are distributed to the validators. 
 
 :::tip
-Currently an epoch on the Aptos blockchain is defined as 3600 seconds (one hour).
+For the AIT-3 an epoch on the Aptos blockchain is defined as 7200 seconds (two hours).
 :::
 
 ### Triggers at the epoch start
