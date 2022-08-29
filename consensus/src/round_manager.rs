@@ -558,7 +558,7 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
-        if self.sync_only {
+        if self.sync_only() {
             // In case of sync only mode, we delay processing proposal. This is done by resending the
             // same proposal to self after some time.
             return Ok(self
