@@ -29,7 +29,6 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use mirai_annotations::*;
 use std::{cmp::Eq, collections::HashMap, hash::Hash, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
@@ -89,7 +88,6 @@ where
     }
 
     fn set_child(&mut self, index: usize, child_info: ChildInfo<K>) {
-        precondition!(index < 16);
         self.children[index] = Some(child_info);
     }
 
