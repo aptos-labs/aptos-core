@@ -67,7 +67,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update `chain_id` to 43.
+- Update `chain_id` to 47.
 - Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
