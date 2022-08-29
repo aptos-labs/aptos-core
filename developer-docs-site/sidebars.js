@@ -21,7 +21,7 @@ const sidebars = {
     {
       type: "category",
       label: "Getting Started",
-      link: { type: "doc", id: "guides/getting-started", },
+      // link: { type: "doc", id: "guides/getting-started", },
       collapsible: true,
       collapsed: true,
       items: [

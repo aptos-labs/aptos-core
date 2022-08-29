@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Getting Started
+# Getting Started (Draft)
 
 To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
 
@@ -69,4 +69,4 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     </Tabs>
 
 
-Now your basic Aptos development environment is ready.
+Next, install the Aptos CLI.

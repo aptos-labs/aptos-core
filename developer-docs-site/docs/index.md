@@ -143,8 +143,6 @@ We are excited that you are here, and we look forward to getting to know you. We
 <div class="aptos-timeline-card">
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Set up developer tools and environment</aptos-timeline-h3>
-    <a href="guides/getting-started.html" class="card-link">Clone the Aptos repo</a>
-    <p>Follow this step-by-step guide to clone the Aptos repo.</p>
     <a href="cli-tools/aptos-cli-tool/install-aptos-cli.html" class="card-link">Install the Aptos CLI</a>
     <p>Next, install the Aptos CLI.</p>
     <a href="nodes/local-testnet/local-testnet-index.html" class="card-link">Run a local testnet or access the Aptos devnet</a>
