@@ -13,6 +13,7 @@ import {
   TransactionBuilderRemoteABI,
 } from "./transaction_builder";
 import { TokenClient } from "./token_client";
+import { HexString } from "./hex_string";
 
 const account = "0x1::account::Account";
 
@@ -415,6 +416,38 @@ test(
 
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
+  },
+  30 * 1000,
+);
+
+test(
+  "rotates auth key ed25519",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 50000);
+
+    const helperAccount = new AptosAccount();
+
+    const pendingTxn = await client.rotateAuthKeyEd25519(alice, helperAccount.signingKey.secretKey);
+
+    await client.waitForTransaction(pendingTxn.hash);
+
+    const resource = await client.getAccountResource("0x1", "0x1::account::OriginatingAddress");
+
+    const {
+      address_map: { handle },
+    } = resource.data as any;
+
+    const origAddress = await client.getTableItem(handle, {
+      key_type: "address",
+      value_type: "address",
+      key: helperAccount.address().hex(),
+    });
+
+    expect(new HexString(origAddress).hex()).toBe(alice.address().hex());
   },
   30 * 1000,
 );
