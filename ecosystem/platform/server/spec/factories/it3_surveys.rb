@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :it3_survey do
-    user { nil }
+    user { build :user }
     persona { 'Node Operator' }
     participate_reason { Faker::Quote.yoda }
     qualified_reason { Faker::Quote.yoda }
