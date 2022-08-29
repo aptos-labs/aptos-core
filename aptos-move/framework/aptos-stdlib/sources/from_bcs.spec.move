@@ -1,5 +1,5 @@
-spec aptos_std::event {
-    spec write_to_event_store {
+spec aptos_std::from_bcs {
+    spec from_bytes {
         // TODO: temporary mockup.
         pragma opaque;
     }

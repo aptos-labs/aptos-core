@@ -5,11 +5,11 @@ use crate::{
     models::transactions::Transaction,
     schema::{move_modules, move_resources, table_items, table_metadatas, write_set_changes},
 };
-use aptos_crypto::HashValue;
 use aptos_protos::block_output::v1::{
     write_set_change_output::Change, MoveModuleOutput, MoveResourceOutput, TableItemOutput,
     WriteSetChangeOutput,
 };
+use aptos_rest_client::aptos_api_types::HexEncodedBytes;
 use field_count::FieldCount;
 use serde::Serialize;
 
@@ -37,9 +37,7 @@ impl WriteSetChange {
     ) -> (Self, WriteSetChangeDetail) {
         let version = write_set_change.version as i64;
         let block_height = block_height as i64;
-        let hash = HashValue::from_slice(write_set_change.hash.clone())
-            .unwrap()
-            .to_string();
+        let hash = HexEncodedBytes::from(write_set_change.hash.clone()).to_string();
         let type_ = write_set_change.r#type.clone();
         match write_set_change.change.as_ref().unwrap() {
             Change::MoveModule(module) => (
@@ -149,12 +147,10 @@ impl MoveModule {
             transaction_block_height: block_height,
             name: move_module.name.clone(),
             address: move_module.address.clone(),
-            bytecode: move_module.is_deleted.then(|| move_module.bytecode.clone()),
-            friends: move_module
-                .is_deleted
+            bytecode: (!move_module.is_deleted).then(|| move_module.bytecode.clone()),
+            friends: (!move_module.is_deleted)
                 .then(|| serde_json::to_value(move_module.friends.clone()).unwrap()),
-            structs: move_module
-                .is_deleted
+            structs: (!move_module.is_deleted)
                 .then(|| serde_json::to_value(move_module.structs.clone()).unwrap()),
             is_deleted: move_module.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),
@@ -196,11 +192,9 @@ impl MoveResource {
             name: move_resource.name.clone(),
             address: move_resource.address.clone(),
             module: move_resource.module.clone(),
-            generic_type_params: move_resource
-                .is_deleted
+            generic_type_params: (!move_resource.is_deleted)
                 .then(|| serde_json::to_value(move_resource.generic_type_params.clone()).unwrap()),
-            data: move_resource
-                .is_deleted
+            data: (!move_resource.is_deleted)
                 .then(|| serde_json::from_str(&move_resource.data).unwrap()),
             is_deleted: move_resource.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),
@@ -241,8 +235,7 @@ impl TableItem {
             key: table_item.key.clone(),
             table_handle: table_item.handle.clone(),
             decoded_key: serde_json::from_str(&table_item.decoded_key).unwrap(),
-            decoded_value: table_item
-                .is_deleted
+            decoded_value: (!table_item.is_deleted)
                 .then(|| serde_json::from_str(&table_item.decoded_value).unwrap()),
             is_deleted: table_item.is_deleted,
             inserted_at: chrono::Utc::now().naive_utc(),

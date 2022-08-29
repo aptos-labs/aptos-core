@@ -65,8 +65,8 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
                 Err(err) => {
                     UNABLE_TO_GET_CONNECTION.inc();
                     aptos_logger::error!(
-                        "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                        pool.connection_timeout(),
+                        retry_in = pool.connection_timeout(),
+                        "Could not get DB connection from pool, will retry. Error: {:?}",
                         err
                     );
                 }
@@ -84,9 +84,9 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
             .with_label_values(&[self.substream_module_name()])
             .inc();
 
-        aptos_logger::debug!("Marking block started {}", block_height);
+        aptos_logger::debug!(block_height = block_height, "Marking block started");
         self.mark_block_started(block_height);
-        aptos_logger::debug!("Starting to process stream for block {}", block_height);
+        aptos_logger::debug!(block_height = block_height, "Starting to process stream");
         let res = self.process_substream(stream_data, block_height).await;
         // Handle block success/failure
         match res.as_ref() {
@@ -99,9 +99,9 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     /// Writes that a block has been started for this `SubstreamProcessor` to the DB
     fn mark_block_started(&self, block_height: u64) {
         aptos_logger::debug!(
-            "[{}] Marking processing block started: {}",
-            self.substream_module_name(),
-            block_height
+            substream_module_name = self.substream_module_name(),
+            block_height = block_height,
+            "Marking processing block started",
         );
         let psm = IndexerState::for_mark_started(
             self.substream_module_name().to_string(),
@@ -113,9 +113,9 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     /// Writes that a block has been completed successfully for this `SubstreamProcessor` to the DB
     fn update_status_success(&self, processing_result: &ProcessingResult) {
         aptos_logger::debug!(
-            "[{}] Marking processing block OK: block_height {}",
-            self.substream_module_name(),
-            processing_result.block_height
+            substream_module_name = self.substream_module_name(),
+            block_height = processing_result.block_height,
+            "Marking processing block OK",
         );
         PROCESSOR_SUCCESSES
             .with_label_values(&[self.substream_module_name()])
@@ -130,8 +130,8 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     /// Writes that a block has errored for this `SubstreamProcessor` to the DB
     fn update_status_err(&self, bpe: &BlockProcessingError) {
         aptos_logger::debug!(
-            "[{}] Marking processing block Err: {:?}",
-            self.substream_module_name(),
+            substream_module_name = self.substream_module_name(),
+            "Marking processing block ERROR. {:?}",
             bpe
         );
         PROCESSOR_ERRORS
@@ -178,12 +178,12 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
                 if *chain_id != input_chain_id {
                     panic!("Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", input_chain_id, chain_id);
                 }
-                info!("Chain id matches! Continuing to index chain {}", chain_id);
+                info!(chain_id = chain_id, "Chain id matches! Continuing to index");
             }
             None => {
                 info!(
-                    "Adding chain id {} to db, continue to index",
-                    input_chain_id
+                    input_chain_id = input_chain_id,
+                    "Adding chain id to db, continue to index",
                 );
                 execute_with_better_error(
                     &conn,

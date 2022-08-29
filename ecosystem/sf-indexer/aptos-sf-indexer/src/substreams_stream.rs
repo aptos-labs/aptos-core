@@ -69,10 +69,12 @@ fn stream_blocks(
 
     try_stream! {
         loop {
-            println!("Blockstreams disconnected, connecting (endpoint {}, start block {}, cursor {})",
-                &endpoint,
-                start_block_num,
-                &latest_cursor
+            aptos_logger::info!(
+                substream_uri = &endpoint.uri,
+                substream_token = &endpoint.token,
+                start_block_num = start_block_num,
+                latest_cursor = &latest_cursor,
+                "Blockstreams disconnected, connecting",
             );
 
             // We just reconnected, assume that we want to back off on errors
@@ -82,7 +84,7 @@ fn stream_blocks(
 
             match result {
                 Ok(stream) => {
-                    println!("Blockstreams connected");
+                    aptos_logger::info!("Blockstreams connected");
 
                     let mut expected_stream_end = stop_block_num != 0;
 
@@ -105,7 +107,7 @@ fn stream_blocks(
                                 }
                             },
                             Err(err) => {
-                                println!("Received error {:#}", err);
+                                aptos_logger::error!("Received error {:#}", err);
 
                                 // We have an open connection but there was an error processing the Firehose
                                 // response. We will reconnect the stream after this; this is the case where
@@ -120,7 +122,7 @@ fn stream_blocks(
                     }
 
                     if !expected_stream_end {
-                        println!("Stream blocks complete unexpectedly, expecting stream to always stream blocks");
+                        aptos_logger::error!("Stream blocks complete unexpectedly, expecting stream to always stream blocks");
                     } else {
                         return
                     }
@@ -130,7 +132,7 @@ fn stream_blocks(
                     // case where we actually _want_ to back off in case we keep
                     // having connection errors.
 
-                    println!("Unable to connect to endpoint: {:#}", e);
+                    aptos_logger::error!("Unable to connect to endpoint: {:#}", e);
                 }
             }
 
@@ -159,7 +161,7 @@ async fn process_substreams_response(
     match response.message {
         Some(proto::response::Message::Data(block_scoped_data)) => Ok(Some(block_scoped_data)),
         None => {
-            println!("Got None on substream message");
+            aptos_logger::info!("Got None on substream message");
             Ok(None)
         }
         _ => Ok(None),
