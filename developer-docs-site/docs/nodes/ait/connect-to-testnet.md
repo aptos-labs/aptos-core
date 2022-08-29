@@ -51,7 +51,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data directory. **Make sure you remove the secure-data.json file too**, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
-- Pull the latest changes on `testnet` branch
+- Pull the latest changes on `testnet` branch. It should be commit `b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
@@ -60,7 +60,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data.json file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
-- Update your docker image to use tag `testnet`
+- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
@@ -68,7 +68,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
 - Update `chain_id` to 43.
-- Update your docker image to use tag `testnet`
+- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
