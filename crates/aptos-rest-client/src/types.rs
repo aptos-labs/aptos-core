@@ -58,24 +58,24 @@ pub struct Account {
     pub sequence_number: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EventHandle {
     counter: U64,
     guid: EventHandleGUID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EventHandleGUID {
     len_bytes: u8,
     guid: GUID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GUID {
     id: ID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ID {
     creation_num: U64,
     addr: Address,
