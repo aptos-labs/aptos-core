@@ -156,6 +156,8 @@ fn create_node_for_fuzzing() -> RoundManager {
     // TODO: have two different nodes, one for proposing, one for accepting a proposal
     let proposer_election = Box::new(RotatingProposer::new(vec![signer.author()], 1));
 
+    let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+
     // event processor
     RoundManager::new(
         epoch_state,
@@ -171,6 +173,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         storage,
         false,
         OnChainConsensusConfig::default(),
+        round_manager_tx,
     )
 }
 
