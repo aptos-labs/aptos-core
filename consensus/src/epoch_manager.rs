@@ -675,6 +675,7 @@ impl EpochManager {
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
+            | ConsensusMsg::VerifiedProposalMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {

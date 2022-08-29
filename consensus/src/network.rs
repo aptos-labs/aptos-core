@@ -15,6 +15,7 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use channel::{self, aptos_channel, message_queues::QueueStyle};
+use consensus_types::block::Block;
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
@@ -36,6 +37,7 @@ use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
 };
+use tokio::time::sleep;
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
@@ -222,6 +224,21 @@ impl NetworkSender {
         fail_point!("consensus::send::proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
         self.send(msg, recipients).await
+    }
+
+    pub async fn resend_verified_proposal_to_self(&self, proposal: Block, interval_ms: u64) {
+        let author = self.author;
+        let mut self_sender = self.self_sender.clone();
+        tokio::spawn(async move {
+            sleep(Duration::from_millis(interval_ms)).await;
+            let self_msg = Event::Message(
+                author,
+                ConsensusMsg::VerifiedProposalMsg(Box::new(proposal)),
+            );
+            if let Err(err) = self_sender.send(self_msg).await {
+                error!(error = ?err, "Error delivering a self msg");
+            }
+        });
     }
 
     pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {

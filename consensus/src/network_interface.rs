@@ -10,6 +10,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
+use consensus_types::block::Block;
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
@@ -47,6 +48,7 @@ pub enum ConsensusMsg {
     /// ProposalMsg contains the required information for the proposer election protocol to make
     /// its choice (typically depends on round and proposer info).
     ProposalMsg(Box<ProposalMsg>),
+    VerifiedProposalMsg(Box<Block>),
     /// This struct describes basic synchronization metadata.
     SyncInfo(Box<SyncInfo>),
     /// A vector of LedgerInfo with contiguous increasing epoch numbers to prove a sequence of

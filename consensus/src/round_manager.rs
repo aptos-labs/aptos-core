@@ -53,6 +53,7 @@ use termion::color::*;
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
+    VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
@@ -66,6 +67,8 @@ impl UnverifiedEvent {
                 p.verify(validator)?;
                 VerifiedEvent::ProposalMsg(p)
             }
+            // Self sent proposal message doesn't need signature verification
+            UnverifiedEvent::VerifiedProposalMsg(p) => VerifiedEvent::VerifiedProposalMsg(p),
             UnverifiedEvent::VoteMsg(v) => {
                 v.verify(validator)?;
                 VerifiedEvent::VoteMsg(v)
@@ -86,6 +89,7 @@ impl UnverifiedEvent {
     pub fn epoch(&self) -> u64 {
         match self {
             UnverifiedEvent::ProposalMsg(p) => p.epoch(),
+            UnverifiedEvent::VerifiedProposalMsg(p) => p.epoch(),
             UnverifiedEvent::VoteMsg(v) => v.epoch(),
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
@@ -98,6 +102,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
     fn from(value: ConsensusMsg) -> Self {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
+            ConsensusMsg::VerifiedProposalMsg(m) => UnverifiedEvent::VerifiedProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
@@ -111,6 +116,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
 pub enum VerifiedEvent {
     // network messages
     ProposalMsg(Box<ProposalMsg>),
+    VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
@@ -314,6 +320,21 @@ impl RoundManager {
                 self.round_state.current_round()
             );
         }
+    }
+
+    pub async fn process_verified_self_proposal_msg(
+        &mut self,
+        proposal: Block,
+    ) -> anyhow::Result<()> {
+        if proposal.round() < self.round_state.current_round() {
+            bail!(
+                "Discarding stale self proposal {}, current round {}",
+                proposal,
+                self.round_state.current_round()
+            );
+        }
+
+        self.process_verified_proposal(proposal).await
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
@@ -533,8 +554,20 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
+        self.process_verified_proposal(proposal).await
+    }
 
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
+        if self.sync_only {
+            // In case of sync only mode, we delay processing proposal. This is done by resending the
+            // same proposal to self after some time.
+            return Ok(self
+                .network
+                .resend_verified_proposal_to_self(proposal, 100)
+                .await);
+        }
         let proposal_round = proposal.round();
+
         let vote = self
             .execute_and_vote(proposal)
             .await
@@ -572,11 +605,6 @@ impl RoundManager {
             self.round_state.vote_sent().is_none(),
             "[RoundManager] Already vote on this round {}",
             self.round_state.current_round()
-        );
-
-        ensure!(
-            !self.sync_only(),
-            "[RoundManager] sync_only flag is set, stop voting"
         );
 
         let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
@@ -772,6 +800,7 @@ impl RoundManager {
                         self.process_proposal_msg(*proposal_msg).await
                     )
                 }
+
                 VerifiedEvent::VoteMsg(vote_msg) => {
                     monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                 }
