@@ -144,9 +144,9 @@ We are excited that you are here, and we look forward to getting to know you. We
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Set up developer tools and environment</aptos-timeline-h3>
     <a href="cli-tools/aptos-cli-tool/install-aptos-cli.html" class="card-link">Install the Aptos CLI</a>
-    <p>Next, install the Aptos CLI.</p>
+    <p>Start by installing the Aptos CLI.</p>
     <a href="nodes/local-testnet/local-testnet-index.html" class="card-link">Run a local testnet or access the Aptos devnet</a>
-    <p>This completes your development environment setup.</p>
+    <p>Use the CLI to run a local testnet or configure access to the Aptos devnet. This completes your development environment setup.</p>
   </div>
 </div>
 <div class="aptos-timeline-card">
