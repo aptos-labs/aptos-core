@@ -27,7 +27,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
   // Print out account addresses.
   console.log("=== Addresses ===");
   console.log(`Alice: ${alice.address()}`);
-  console.log(`Alice: ${bob.address()}`);
+  console.log(`Bob: ${bob.address()}`);
   console.log("");
 
   // Fund accounts.

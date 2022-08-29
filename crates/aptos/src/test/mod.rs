@@ -627,6 +627,7 @@ impl CliTestFramework {
         &self,
         name: String,
         account_strs: BTreeMap<&str, &str>,
+        framework_dir: Option<PathBuf>,
     ) -> CliTypedResult<()> {
         InitPackage {
             name,
@@ -636,6 +637,7 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
+            for_test_framework: framework_dir,
         }
         .execute()
         .await

@@ -3,7 +3,8 @@
 <% content_for(:meta) do %>
   <meta property="og:image" content="https://aptoslabs.com/images/meta/aptos_meta_og_ait3.jpg">
 <% end %>
-<style>#global-announcement { display: none }</style>
+
+<style type="text/css">#global-announcement { display: none }</style>
 
   <div class="bg-neutral-900 text-neutral-50 h-full">
     <div class="max-w-screen-2xl mx-auto px-6 pb-24">
@@ -70,8 +71,8 @@
       </section>
       <section class="py-12 lg:py-32 lg:grid grid-cols-12">
         <div class="lg:col-start-4 lg:col-span-7">
-          <h3 class="font-display text-3xl text-neutral-100 mb-4">Aptos Incentivized Testnet 3</h3>
-          <p class="text-neutral-400 mb-8 text-3xl lg:text-4xl max-w-4xl">Aptos Labs remains focused on launching Mainnet to bring the community the safest, fastest and most reliable foundation for building within Web3.</p>
+          <h3 class="font-display text-3xl text-neutral-100 mb-4">Aptos Incentivized <span class="whitespace-nowrap">Testnet 3</span></h3>
+          <p class="text-neutral-400 mb-8 text-2xl md:text-3xl lg:text-4xl max-w-4xl">Aptos Labs remains focused on launching Mainnet to bring the community the safest, fastest and most reliable foundation for building within Web3.</p>
           <div class="flex flex-col md:flex-row justify-start items-start gap-4 mb-16">
             <%= render ButtonComponent.new(href: it3_path, title: 'Aptos Incentivized Testnet 3 details', target: 'blank', size: :large, scheme: :primary, class: '') do %>
               Get Started

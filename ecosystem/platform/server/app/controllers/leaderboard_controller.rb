@@ -11,6 +11,10 @@ class LeaderboardController < ApplicationController
   IT2_METRIC_KEYS = %i[rank validator liveness participation num_votes latest_reported_timestamp].freeze
   It2Metric = Struct.new(*IT2_METRIC_KEYS)
 
+  IT3_METRIC_KEYS = %i[rank owner_address liveness rewards_growth last_epoch last_epoch_performance
+                       governance_voting_record].freeze
+  It3Metric = Struct.new(*IT3_METRIC_KEYS)
+
   def it1
     default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
     @metrics, @last_updated = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
@@ -73,6 +77,33 @@ class LeaderboardController < ApplicationController
     sort_metrics!(@metrics, sort) if sort.present?
   end
 
+  def it3
+    default_sort = [[:rewards_growth, -1], [:liveness, -1], [:last_epoch_performance, -1]]
+    @metrics, @last_updated = Rails.cache.fetch(:it3_leaderboard, expires_in: 1.minute) do
+      response = HTTParty.get(ENV.fetch('LEADERBOARD_IT3_URL'))
+      metrics = JSON.parse(response.body).map do |metric|
+        It3Metric.new(
+          -1,
+          metric['owner_address'],
+          metric['liveness'].to_f,
+          metric['rewards_growth'].to_f,
+          metric['last_epoch'].to_i,
+          metric['last_epoch_performance'],
+          metric['governance_voting_record']
+        )
+      end
+      sort_metrics!(metrics, default_sort)
+      metrics.each_with_index do |metric, i|
+        metric.rank = i + 1
+      end
+      [metrics, Time.now]
+    end
+
+    @sort_columns = %w[rank liveness rewards_growth last_epoch last_epoch_performance governance_voting_record]
+    sort = sort_params(@sort_columns)
+    sort_metrics!(@metrics, sort) if sort.present?
+  end
+
   private
 
   def sort_params(valid_columns)
@@ -85,6 +116,12 @@ class LeaderboardController < ApplicationController
     metrics.sort_by! do |metric|
       sort.map do |key, direction|
         value = metric[key] || -Float::INFINITY
+        if value.is_a?(String) && value.include?('/')
+          numerator, denominator = value.split('/').map(&:strip)
+          value = Rational(numerator, denominator)
+          # When n=d, fractions with larger denominators should go first.
+          value *= denominator.to_i if value == 1
+        end
         value * direction
       end
     end

@@ -39,7 +39,7 @@ Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src
     ├── bls12-381/          # Boneh-Lynn-Shacham (BLS) signatures over (Barreto-Lynn-Scott) BLS12-381 curves
     ├── unit_tests/         # Unit tests
     ├── lib.rs
-    ├── ed25519.rs          # Ed25519 implementation of the signing/verification API in traits.rs
+    ├── ed25519/            # Ed25519 implementation of the signing/verification API in traits.rs
     ├── hash.rs             # Hash function (SHA-3)
     ├── hkdf.rs             # HKDF implementation
     ├── multi_ed25519.rs    # MultiEd25519 implementation of the signing/verification API in traits.rs

@@ -5,15 +5,20 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
+## 25 August 2022
+
+- A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted. 
+
+
 ## 24 August 2022
 
 - The Korean language version of the [Aptos White Paper](/aptos-white-paper/aptos-white-paper-in-korean) is posted.
 - Typescript and Rust are added to the [first transaction tutorial](/tutorials/your-first-transaction-sdk).
-- A [new tutorial](/tutorials/your-first-nft-sdk) is added that shows you how to use the Typescript / Python SDKs to work with NFT. It covers topics such as creating your own collection, creating a token in that collection, and how to offer and claim that token.
+- A [new tutorial](/tutorials/your-first-nft-sdk) is added that shows how to use the Typescript SDK and Python SDKs to work with NFT. The tutorial covers topics such as creating your own collection, creating a token in that collection, and how to offer and claim that token.
 
 ## 16 August 2022
 
-- A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction-sdk) is posted.
+- A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction) is posted.
 
 ## 11 August 2022
 

@@ -68,7 +68,7 @@ class It3sController < ApplicationController
     completed = !current_user.it3_survey.nil?
     {
       name: :survey,
-      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
+      disabled: !Flipper.enabled?(:it3_node_registration_enabled, current_user),
       completed:,
       href: completed ? edit_it3_survey_path(current_user.it3_survey) : new_it3_survey_path
     }
@@ -79,7 +79,7 @@ class It3sController < ApplicationController
     {
       name: :node_registration,
       completed:,
-      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
+      disabled: !Flipper.enabled?(:it3_node_registration_enabled, current_user),
       href: completed ? edit_it3_profile_path(current_user.it3_profile) : new_it3_profile_path
     }
   end

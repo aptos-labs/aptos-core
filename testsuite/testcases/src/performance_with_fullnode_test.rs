@@ -34,10 +34,8 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
         runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
         runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
 
-        // TODO(skedia) enable them after resolving failure in
-        // https://github.com/aptos-labs/aptos-core/runs/7904217460?check_suite_focus=true
         // Threshold of more than 12 CPU cores for 30% of the time
-        // let cpu_threshold = MetricsThreshold::new(12, 30);
+        //let cpu_threshold = MetricsThreshold::new(12, 30);
         // Threshold of more than 3 GB of memory for 30% of the time
         // let memory_threshold = MetricsThreshold::new(3 * 1024 * 1024 * 1024, 30);
         // runtime.block_on(ctx.swarm().ensure_healthy_system_metrics(

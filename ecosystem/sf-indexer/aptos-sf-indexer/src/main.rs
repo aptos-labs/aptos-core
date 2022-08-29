@@ -4,7 +4,7 @@
 //! Indexer is used to index blockchain data into Postgres
 #![forbid(unsafe_code)]
 
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_sf_indexer::indexer::substream_processor::{
     get_start_block, run_migrations, SubstreamProcessor,
 };
@@ -40,13 +40,18 @@ struct IndexerArgs {
     /// If set, don't run any migrations
     #[clap(long)]
     skip_migrations: bool,
+
+    /// How many blocks to process before logging a "processed X blocks" message.
+    /// Set to 0 to disable.
+    #[clap(long, default_value_t = 10)]
+    emit_every: usize,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     aptos_logger::Logger::new().init();
     let args: IndexerArgs = IndexerArgs::parse();
-    info!("Starting indexer...");
+    info!("Starting indexer");
 
     let endpoint_url = &args.endpoint_url;
     let package_file = &args.package_file;
@@ -54,7 +59,7 @@ async fn main() -> Result<(), Error> {
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let conn_pool = new_db_pool(&database_url).unwrap();
-    info!("Created the connection pool... ");
+    info!("Created the connection pool");
 
     if !args.skip_migrations {
         run_migrations(&conn_pool);
@@ -76,7 +81,7 @@ async fn main() -> Result<(), Error> {
         info!("Could not fetch max block so starting from block 0");
         0
     });
-    info!("Starting stream from block {}", start_block);
+    info!(start_block = start_block, "Starting stream");
 
     let mut stream = SubstreamsStream::new(
         endpoint.clone(),
@@ -95,18 +100,25 @@ async fn main() -> Result<(), Error> {
     } else {
         panic!("Module unsupported {}", substream_module_name);
     }
+    let start = chrono::Utc::now().naive_utc();
+    let mut base: usize = 0;
     loop {
         let data = match stream.next().await {
             None => {
-                info!("Stream consumed for module {}", substream_module_name);
+                info!(
+                    substream_module_name = substream_module_name,
+                    "Stream fully consumed"
+                );
                 break;
             }
             Some(event) => {
                 let block_data;
                 if let Ok(BlockResponse::New(data)) = event {
-                    info!(
-                        "Consuming module output (module {}, block {}, cursor {})",
-                        substream_module_name, block_height, data.cursor
+                    debug!(
+                        substream_module_name = substream_module_name,
+                        block_height = block_height,
+                        cursor = data.cursor,
+                        "Consuming module output",
                     );
                     block_data = data;
                 } else {
@@ -120,7 +132,22 @@ async fn main() -> Result<(), Error> {
             .await
         {
             Ok(_) => {
-                info!("Finished processing block {}", block_height);
+                if args.emit_every != 0 {
+                    let processed_this_session = block_height as usize - start_block as usize + 1;
+                    let new_base: usize = block_height as usize / args.emit_every;
+                    if base != new_base {
+                        base = new_base;
+                        let num_millis = (chrono::Utc::now().naive_utc() - start).num_milliseconds()
+                            as f64
+                            / 1000.0;
+                        let bps = (processed_this_session as f64 / num_millis) as u64;
+                        info!(
+                            block_height = block_height,
+                            blocks_per_second = bps,
+                            "Finished processing block",
+                        );
+                    }
+                }
                 block_height += 1
             }
             Err(error) => {
