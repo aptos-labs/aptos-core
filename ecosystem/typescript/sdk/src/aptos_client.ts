@@ -450,7 +450,8 @@ export class AptosClient {
         if (e instanceof Gen.ApiError) {
           if (e.status === 404) {
             isPending = true;
-            break;
+            // eslint-disable-next-line no-continue
+            continue;
           }
           if (e.status >= 400) {
             throw e;
@@ -596,7 +597,8 @@ export class AptosClient {
     const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
     const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
     const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-    return pendingTransaction.hash; // <:!:generateSignSubmitTransactionInner
+    return pendingTransaction.hash;
+    // <:!:generateSignSubmitTransactionInner
   }
 
   /**

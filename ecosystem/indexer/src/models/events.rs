@@ -28,7 +28,8 @@ impl Event {
         Event {
             transaction_hash,
             key: event.key.to_string(),
-            sequence_number: BigDecimal::from_u64(event.sequence_number.0).unwrap(),
+            sequence_number: BigDecimal::from_u64(event.sequence_number.0)
+                .expect("Should be able to convert U64 to big decimal"),
             type_: event.typ.to_string(),
             data: event.data.clone(),
             inserted_at: chrono::Utc::now().naive_utc(),

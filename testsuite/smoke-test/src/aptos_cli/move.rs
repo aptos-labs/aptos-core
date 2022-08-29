@@ -9,10 +9,20 @@ use framework::{BuildOptions, BuiltPackage};
 use move_deps::move_core_types::account_address::AccountAddress;
 use move_deps::move_package::source_package::manifest_parser::parse_move_manifest_from_file;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 const PACKAGE_NAME: &str = "AwesomePackage";
 const HELLO_BLOCKCHAIN: &str = "hello_blockchain";
+
+fn aptos_framework_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework")
+}
 
 #[tokio::test]
 async fn test_move_compile_flow() {
@@ -25,9 +35,13 @@ async fn test_move_compile_flow() {
     let mut package_addresses = BTreeMap::new();
     package_addresses.insert(HELLO_BLOCKCHAIN, "_");
 
-    cli.init_package(PACKAGE_NAME.to_string(), package_addresses)
-        .await
-        .expect("Should succeed");
+    cli.init_package(
+        PACKAGE_NAME.to_string(),
+        package_addresses,
+        Some(aptos_framework_dir()),
+    )
+    .await
+    .expect("Should succeed");
 
     // The manifest should work to compile
     let mut named_addresses = BTreeMap::new();
@@ -56,11 +70,6 @@ async fn test_move_compile_flow() {
 
     let dependency = manifest.dependencies.iter().next().unwrap();
     assert_eq!("AptosFramework", dependency.0.to_string());
-    dependency
-        .1
-        .git_info
-        .as_ref()
-        .expect("Expect some git information");
 
     // Now try to compile real code
     cli.add_move_files();
@@ -89,9 +98,13 @@ async fn test_move_publish_flow() {
     cli.init_move_dir();
     let mut package_addresses = BTreeMap::new();
     package_addresses.insert(HELLO_BLOCKCHAIN, "_");
-    cli.init_package(PACKAGE_NAME.to_string(), package_addresses)
-        .await
-        .expect("Should succeed");
+    cli.init_package(
+        PACKAGE_NAME.to_string(),
+        package_addresses,
+        Some(aptos_framework_dir()),
+    )
+    .await
+    .expect("Should succeed");
     cli.add_move_files();
 
     cli.wait_for_account(0)

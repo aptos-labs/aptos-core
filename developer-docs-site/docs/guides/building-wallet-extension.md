@@ -61,7 +61,7 @@ const transaction = {
     arguments: [address, '717'],
     function: '0x1::coin::transfer',
     type: 'entry_function_payload',
-    type_arguments: ['0x1::aptos_coin::TestCoin'],
+    type_arguments: ['0x1::aptos_coin::AptosCoin'],
 };
 
 // Send transaction to the extension to be signed and submitted to chain

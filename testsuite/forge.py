@@ -398,8 +398,6 @@ class ForgeContext:
 
     # forge criteria
     forge_test_suite: str
-    local_p99_latency_ms_threshold: str
-    forge_runner_tps_threshold: str
     forge_runner_duration_secs: str
     
     # forge cluster options
@@ -676,8 +674,6 @@ class LocalForgeRunner(ForgeRunner):
                 "--",
                 "--suite", context.forge_test_suite,
                 "--mempool-backlog", "5000",
-                "--avg-tps", context.forge_runner_tps_threshold,
-                "--max-latency-ms", context.local_p99_latency_ms_threshold,
                 "--duration-secs", context.forge_runner_duration_secs,
                 "test", "k8s-swarm",
                 "--image-tag", context.image_tag,
@@ -724,7 +720,6 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_POD_NAME=forge_pod_name,
             FORGE_TEST_SUITE=context.forge_test_suite,
             FORGE_RUNNER_DURATION_SECS=context.forge_runner_duration_secs,
-            FORGE_RUNNER_TPS_THRESHOLD=context.forge_runner_tps_threshold,
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
@@ -888,8 +883,6 @@ def image_exists(shell: Shell, image_tag: str) -> bool:
 
 
 @main.command()
-# for calculating regression in local mode
-@envoption("LOCAL_P99_LATENCY_MS_THRESHOLD", "60000")
 # output files
 @envoption("FORGE_OUTPUT")
 @envoption("FORGE_REPORT")
@@ -907,7 +900,6 @@ def image_exists(shell: Shell, image_tag: str) -> bool:
 @envoption("FORGE_ENABLE_HAPROXY")
 @envoption("FORGE_TEST_SUITE", "land_blocking")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
-@envoption("FORGE_RUNNER_TPS_THRESHOLD", "400")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("IMAGE_TAG")
 @envoption("UPGRADE_IMAGE_TAG")
@@ -924,7 +916,6 @@ def image_exists(shell: Shell, image_tag: str) -> bool:
 @envoption("GITHUB_RUN_ID")
 @envoption("GITHUB_STEP_SUMMARY")
 def test(
-    local_p99_latency_ms_threshold: str,
     forge_output: Optional[str],
     forge_report: Optional[str],
     forge_pre_comment: Optional[str],
@@ -939,7 +930,6 @@ def test(
     forge_enable_haproxy: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
-    forge_runner_tps_threshold: str,
     forge_image_tag: Optional[str],
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
@@ -1029,8 +1019,6 @@ def test(
         time=time,
 
         forge_test_suite=forge_test_suite,
-        local_p99_latency_ms_threshold=local_p99_latency_ms_threshold,
-        forge_runner_tps_threshold=forge_runner_tps_threshold,
         forge_runner_duration_secs=forge_runner_duration_secs,
 
         reuse_args=["--reuse"] if forge_namespace_reuse else [],
