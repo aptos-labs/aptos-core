@@ -40,7 +40,6 @@
   <body class="flex flex-col h-screen justify-between antialiased bg-neutral-900 <%= content_for(:body_class) %>">
     <div class="flex flex-col flex-1">
       <%= render HeaderComponent.new(user: current_user) %>
-      <%= render GlobalAnnouncementComponent.new(id: 'global-announcement', class: 'flex') %>
       <main class="flex-1">
         <%= yield %>
       </main>
