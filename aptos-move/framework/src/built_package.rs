@@ -23,8 +23,9 @@ use move_deps::move_package::source_package::manifest_parser::{
 use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
 /// Represents a set of options for building artifacts from Move.
@@ -95,7 +96,13 @@ impl BuiltPackage {
             None
         };
         if let Some(map) = &error_map {
-            inject_module_metadata(package_path.clone(), &mut package, map)?
+            inject_module_metadata(
+                package_path
+                    .join(CompiledPackageLayout::Root.path())
+                    .join(package.compiled_package_info.package_name.as_str()),
+                &mut package,
+                map,
+            )?
         }
         Ok(Self {
             options,
@@ -107,6 +114,16 @@ impl BuiltPackage {
     /// Returns the name of this package.
     pub fn name(&self) -> &str {
         self.package.compiled_package_info.package_name.as_str()
+    }
+
+    pub fn package_path(&self) -> &Path {
+        self.package_path.as_path()
+    }
+
+    pub fn package_artifacts_path(&self) -> PathBuf {
+        self.package_path
+            .join(CompiledPackageLayout::Root.path())
+            .join(self.name())
     }
 
     /// Extracts the bytecode for the modules of the built package.
@@ -214,6 +231,14 @@ impl BuiltPackage {
             deps,
             extension: MoveOption::none(),
         })
+    }
+
+    pub fn extract_metadata_and_save(&self) -> anyhow::Result<()> {
+        let data = self.extract_metadata()?;
+        let path = self.package_artifacts_path();
+        std::fs::create_dir_all(&path)?;
+        std::fs::write(path.join(METADATA_FILE_NAME), &bcs::to_bytes(&data)?)?;
+        Ok(())
     }
 }
 

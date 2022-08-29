@@ -217,6 +217,13 @@ pub fn init_move_dir(
 pub struct CompilePackage {
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+    /// Artifacts to be generated when building this package.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
+    /// Whether package metadata should be generated and stored in the package's build directory.
+    /// This metadata can be used to construct a transaction to publish a package.
+    #[clap(long)]
+    pub(crate) save_metadata: bool,
 }
 
 #[async_trait]
@@ -227,15 +234,16 @@ impl CliCommand<Vec<String>> for CompilePackage {
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_options = BuildOptions {
-            with_srcs: false,
-            with_abis: true,
-            with_source_maps: true,
-            with_error_map: true,
             install_dir: self.move_options.output_dir.clone(),
-            named_addresses: self.move_options.named_addresses(),
+            ..self
+                .included_artifacts
+                .build_options(self.move_options.named_addresses())
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        if self.save_metadata {
+            pack.extract_metadata_and_save()?;
+        }
         let mut ids = Vec::new();
         for module in pack.modules() {
             verify_module_init_function(module)
