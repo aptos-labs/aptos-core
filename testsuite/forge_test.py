@@ -124,7 +124,7 @@ class ForgeRunnerTests(unittest.TestCase):
     def testLocalRunner(self) -> None:
         shell = SpyShell(OrderedDict([
             (
-                'cargo run -p forge-cli -- --suite banana --mempool-backlog 500'
+                'cargo run -p forge-cli -- --suite banana'
                 '0 --avg-tps 593943 --max-latency-ms 6000 --duration-secs 123 t'
                 'est k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asd'
                 'f --namespace potato --port-forward',

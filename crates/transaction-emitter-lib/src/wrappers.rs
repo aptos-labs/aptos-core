@@ -65,14 +65,17 @@ pub async fn emit_transactions_with_cluster(
             .mode(emitter_mode)
             .invalid_transaction_ratio(args.invalid_tx)
             .transaction_mix(transaction_mix)
-            .duration(duration)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
             .gas_price(1);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }
     let stats = emitter
-        .emit_txn_for_with_stats(emit_job_request, min(10, max(args.duration / 5, 1)))
+        .emit_txn_for_with_stats(
+            emit_job_request,
+            duration,
+            min(10, max(args.duration / 5, 1)),
+        )
         .await?;
     Ok(stats)
 }
