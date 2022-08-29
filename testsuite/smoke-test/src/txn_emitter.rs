@@ -40,14 +40,15 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
-        .duration(duration)
         .transaction_mix(vec![
             (TransactionType::P2P, 70),
             (TransactionType::AccountGeneration, 20),
             (TransactionType::NftMint, 10),
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
-    emitter.emit_txn_for_with_stats(emit_job_request, 3).await
+    emitter
+        .emit_txn_for_with_stats(emit_job_request, duration, 3)
+        .await
 }
 
 #[tokio::test]
