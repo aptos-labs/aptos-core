@@ -239,6 +239,10 @@ impl NetworkSender {
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.send(msg, vec![self.author]).await
     }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
 }
 
 pub struct NetworkTask {

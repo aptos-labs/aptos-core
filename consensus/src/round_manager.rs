@@ -47,7 +47,9 @@ use futures::{channel::oneshot, FutureExt, StreamExt};
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
 use serde::Serialize;
+use std::mem::discriminant;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
+use tokio::time::sleep;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -57,6 +59,8 @@ pub enum UnverifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
 }
+
+pub const SYNC_ONLY_PROPOSAL_PROCESSING_INTERVAL_MS: u64 = 100;
 
 impl UnverifiedEvent {
     pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
@@ -110,6 +114,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
 pub enum VerifiedEvent {
     // network messages
     ProposalMsg(Box<ProposalMsg>),
+    VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
@@ -142,6 +147,8 @@ pub struct RoundManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
     onchain_config: OnChainConsensusConfig,
+    round_manager_tx:
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
 }
 
 impl RoundManager {
@@ -156,6 +163,10 @@ impl RoundManager {
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
         onchain_config: OnChainConsensusConfig,
+        round_manager_tx: aptos_channel::Sender<
+            (Author, Discriminant<VerifiedEvent>),
+            (Author, VerifiedEvent),
+        >,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -176,6 +187,7 @@ impl RoundManager {
             storage,
             sync_only,
             onchain_config,
+            round_manager_tx,
         }
     }
 
@@ -314,6 +326,18 @@ impl RoundManager {
         }
     }
 
+    pub async fn process_verified_self_proposal_msg(&mut self, proposal: Block) -> Result<()> {
+        if proposal.round() != self.round_state.current_round() {
+            bail!(
+                "Discarding stale self proposal {}, current round {}",
+                proposal,
+                self.round_state.current_round()
+            );
+        }
+
+        self.process_verified_proposal(proposal).await
+    }
+
     /// Sync to the sync info sending from peer if it has newer certificates.
     async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
@@ -411,6 +435,11 @@ impl RoundManager {
         } else {
             self.sync_only
         }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_sync_only(&mut self, sync_only: bool) {
+        self.sync_only = sync_only
     }
 
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
@@ -531,8 +560,34 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
+        self.process_verified_proposal(proposal).await
+    }
 
+    async fn resend_verified_proposal_to_self(&self, proposal: Block, interval_ms: u64) {
+        let author = self.network.author();
+        let self_sender = self.round_manager_tx.clone();
+        let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
+        tokio::spawn(async move {
+            sleep(Duration::from_millis(interval_ms)).await;
+            if let Err(e) = self_sender.push((author, discriminant(&event)), (author, event)) {
+                error!("Failed to send event to round manager {:?}", e);
+            }
+        });
+    }
+
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
+        if self.sync_only() {
+            // In case of sync only mode, we delay processing proposal. This is done by resending the
+            // same proposal to self after some time.
+            return Ok(self
+                .resend_verified_proposal_to_self(
+                    proposal,
+                    SYNC_ONLY_PROPOSAL_PROCESSING_INTERVAL_MS,
+                )
+                .await);
+        }
         let proposal_round = proposal.round();
+
         let vote = self
             .execute_and_vote(proposal)
             .await
@@ -570,11 +625,6 @@ impl RoundManager {
             self.round_state.vote_sent().is_none(),
             "[RoundManager] Already vote on this round {}",
             self.round_state.current_round()
-        );
-
-        ensure!(
-            !self.sync_only(),
-            "[RoundManager] sync_only flag is set, stop voting"
         );
 
         let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
@@ -770,6 +820,12 @@ impl RoundManager {
                             monitor!(
                                 "process_proposal",
                                 self.process_proposal_msg(*proposal_msg).await
+                            )
+                        }
+                        VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
+                            monitor!(
+                                "process_verified_proposal",
+                                self.process_verified_self_proposal_msg(*proposal_msg).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
