@@ -13,6 +13,7 @@ class It3ProfilesControllerTest < ActionDispatch::IntegrationTest
     @user = FactoryBot.create(:user)
     sign_in @user
     Flipper.enable(:it3_registration_open)
+    Flipper.enable(:it3_node_registration_enabled)
     It3ProfilesController.any_instance.stubs(:verify_recaptcha).returns(true)
     It3ProfilesController.any_instance.stubs(:validate_node).returns([])
   end

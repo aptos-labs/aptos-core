@@ -627,6 +627,7 @@ impl CliTestFramework {
         &self,
         name: String,
         account_strs: BTreeMap<&str, &str>,
+        framework_dir: Option<PathBuf>,
     ) -> CliTypedResult<()> {
         InitPackage {
             name,
@@ -636,6 +637,7 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
+            for_test_framework: framework_dir,
         }
         .execute()
         .await
@@ -647,6 +649,8 @@ impl CliTestFramework {
     ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
+            save_metadata: false,
+            included_artifacts: IncludedArtifacts::Sparse,
         }
         .execute()
         .await

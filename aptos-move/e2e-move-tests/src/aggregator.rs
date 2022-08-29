@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::assert_success;
 use crate::harness::MoveHarness;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use language_e2e_tests::account::Account;
@@ -9,13 +10,13 @@ use std::path::PathBuf;
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
     let mut harness = MoveHarness::new();
     let account = harness.new_account_at(AccountAddress::ONE);
-    harness.publish_package(&account, &path);
-    harness.run_entry_function(
+    assert_success!(harness.publish_package(&account, &path));
+    assert_success!(harness.run_entry_function(
         &account,
         str::parse("0x1::aggregator_test::initialize").unwrap(),
         vec![],
         vec![],
-    );
+    ));
     (harness, account)
 }
 

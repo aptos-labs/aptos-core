@@ -32,7 +32,7 @@ if __name__ == "__main__":
     faucet_client.fund_account(bob.address(), 20_000)
 #<:!:section_3
 
-    print("\n=== Initial Balances ===")
+    print("\n=== Initial Coin Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")
     print(f"Bob: {rest_client.account_balance(bob.address())}")
 

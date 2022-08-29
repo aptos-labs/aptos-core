@@ -389,50 +389,54 @@ export class AptosClient {
   }
 
   /**
-   * Waits up to 10 seconds for a transaction to move past pending state.
-   * @param txnHash A hash of transaction
-   * @returns A Promise, that will resolve if transaction is accepted to the
-   * blockchain and reject if more then 10 seconds passed
+   * Wait for a transaction to move past pending state.
+   *
+   * There are 4 possible outcomes:
+   * 1. Transaction is processed and successfully committed to the blockchain.
+   * 2. Transaction is rejected for some reason, and is therefore not committed
+   *    to the blockchain.
+   * 3. Transaction is committed but execution failed, meaning no changes were
+   *    written to the blockchain state.
+   * 4. Transaction is not processed within the specified timeout.
+   *
+   * In case 1, this function resolves with the transaction response returned
+   * by the API.
+   *
+   * In case 2, the function will throw an ApiError, likely with an HTTP status
+   * code indicating some problem with the request (e.g. 400).
+   *
+   * In case 3, if `checkSuccess` is false (the default), this function returns
+   * the transaction response just like in case 1, in which the `success` field
+   * will be false. If `checkSuccess` is true, it will instead throw a
+   * FailedTransactionError.
+   *
+   * In case 4, this function throws a WaitForTransactionError.
+   *
+   * @param txnHash The hash of a transaction previously submitted to the blockchain.
+   * @param timeoutSecs Timeout in seconds. Defaults to 10 seconds.
+   * @param checkSuccess See above. Defaults to false.
+   * @returns See above.
+   *
    * @example
    * ```
-   * const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-   * const res = await this.aptosClient.submitTransaction(signedTxn);
-   * await this.aptosClient.waitForTransaction(res.hash);
-   * // do smth after transaction is accepted into blockchain
+   * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
+   * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+   * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
+   * const transasction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
    * ```
    */
-  async waitForTransaction(txnHash: string) {
-    let count = 0;
-    // eslint-disable-next-line no-await-in-loop
-    while (await this.transactionPending(txnHash)) {
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(1000);
-      count += 1;
-      if (count >= 10) {
-        throw new Error(`Waiting for transaction ${txnHash} timed out!`);
-      }
-    }
-  }
+  async waitForTransactionWithResult(
+    txnHash: string,
+    extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean },
+  ): Promise<Gen.Transaction> {
+    const timeoutSecs = extraArgs?.timeoutSecs ?? 10;
+    const checkSuccess = extraArgs?.checkSuccess ?? false;
 
-  /**
-   * Waits up to 10 seconds for a transaction to move past pending state.
-   * @param txnHash A hash of transaction
-   * @returns A Promise, that will resolve if transaction is accepted to the
-   * blockchain, and reject if more then 10 seconds passed. The return value
-   * contains the last transaction returned by the blockchain.
-   * @example
-   * ```
-   * const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-   * const res = await this.aptosClient.submitTransaction(signedTxn);
-   * const waitResult = await this.aptosClient.waitForTransaction(res.hash);
-   * ```
-   */
-  async waitForTransactionWithResult(txnHash: string): Promise<Gen.Transaction> {
     let isPending = true;
     let count = 0;
     let lastTxn: Gen.Transaction | undefined;
     while (isPending) {
-      if (count >= 10) {
+      if (count >= timeoutSecs) {
         break;
       }
       try {
@@ -440,11 +444,18 @@ export class AptosClient {
         lastTxn = await this.client.transactions.getTransactionByHash(txnHash);
         isPending = lastTxn.type === "pending_transaction";
         if (!isPending) {
-          return lastTxn;
+          break;
         }
       } catch (e) {
         if (e instanceof Gen.ApiError) {
-          isPending = e.status === 404;
+          if (e.status === 404) {
+            isPending = true;
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          if (e.status >= 400) {
+            throw e;
+          }
         } else {
           throw e;
         }
@@ -453,11 +464,36 @@ export class AptosClient {
       await sleep(1000);
       count += 1;
     }
-    throw new WaitForTransactionError(`Waiting for transaction ${txnHash} timed out!`, lastTxn);
+    if (isPending) {
+      throw new WaitForTransactionError(
+        `Waiting for transaction ${txnHash} timed out after ${timeoutSecs} seconds`,
+        lastTxn,
+      );
+    }
+    if (!checkSuccess) {
+      return lastTxn;
+    }
+    if (!(lastTxn as any)?.success) {
+      throw new FailedTransactionError(
+        `Transaction ${lastTxn.hash} committed to the blockchain but execution failed`,
+        lastTxn,
+      );
+    }
+    return lastTxn;
   }
 
-  // TODO: For some reason this endpoint doesn't appear in the generated client
-  // if we use --modular, so I'm not using it for now.
+  /**
+   * This function works the same as `waitForTransactionWithResult` except it
+   * doesn't return the transaction in those cases, it returns nothing. For
+   * more information, see the documentation for `waitForTransactionWithResult`.
+   */
+  async waitForTransaction(
+    txnHash: string,
+    extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean },
+  ): Promise<void> {
+    await this.waitForTransactionWithResult(txnHash, extraArgs);
+  }
+
   /**
    * Queries the latest ledger information
    * @param params Request params
@@ -541,23 +577,37 @@ export class AptosClient {
   }
 
   /**
-   * Helper for generating, submitting, and waiting for a transaction, and then
-   * checking whether it was committed successfully. This has the same failure
-   * semantics as `submitTransaction` and `waitForTransactionWithResult`, see
-   * those for information about how this can fail (throw errors).
+   * Helper for generating, signing, and submitting a transaction.
    *
-   * If you set checkSuccess there are additional error cases, see the
-   * documentation for `checkSuccess` below.
-   *
-   * @param sender AptosAccount of transaction sender
-   * @param payload Transaction payload
-   * @param extraArgs Extra args for building transaction payload and configuring
-   * behavior of this function.
-   * @param checkSuccess If set, check whether the transaction was successful and
-   * throw a TransactionNotCommittedError if not.
+   * @param sender AptosAccount of transaction sender.
+   * @param payload Transaction payload.
+   * @param extraArgs Extra args for building the transaction payload.
    * @returns The transaction response from the API.
    */
-  async generateSignSendWaitForTransaction(
+  async generateSignSubmitTransaction(
+    sender: AptosAccount,
+    payload: TxnBuilderTypes.TransactionPayload,
+    extraArgs?: {
+      maxGasAmount?: BCS.Uint64;
+      gasUnitPrice?: BCS.Uint64;
+      expireTimestamp?: BCS.Uint64;
+    },
+  ): Promise<string> {
+    // :!:>generateSignSubmitTransactionInner
+    const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+    const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
+    // <:!:generateSignSubmitTransactionInner
+  }
+
+  /**
+   * Helper for generating, submitting, and waiting for a transaction, and then
+   * checking whether it was committed successfully. Under the hood this is just
+   * `generateSignSubmitTransaction` and then `waitForTransactionWithResult`, see
+   * those for information about the return / error semantics of this function.
+   */
+  async generateSignSubmitWaitForTransaction(
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: {
@@ -565,25 +615,11 @@ export class AptosClient {
       gasUnitPrice?: BCS.Uint64;
       expireTimestamp?: BCS.Uint64;
       checkSuccess?: boolean;
+      timeoutSecs?: number;
     },
   ): Promise<Gen.Transaction> {
-    /* eslint-disable max-len */
-    // :!:>generateSignSendWaitForTransactionInner
-    const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
-    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
-    const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-    const transactionResponse = await this.waitForTransactionWithResult(pendingTransaction.hash); // <:!:generateSignSendWaitForTransactionInner
-    /* eslint-enable max-len */
-    if (extraArgs?.checkSuccess === undefined || extraArgs?.checkSuccess === null || !extraArgs.checkSuccess) {
-      return transactionResponse;
-    }
-    if (!(transactionResponse as any)?.success) {
-      throw new TransactionNotCommittedError(
-        `Transaction ${pendingTransaction.hash} processed by blockchain but not committed successfully`,
-        transactionResponse,
-      );
-    }
-    return transactionResponse;
+    const txnHash = await this.generateSignSubmitTransaction(sender, payload, extraArgs);
+    return this.waitForTransactionWithResult(txnHash, extraArgs);
   }
 }
 
@@ -601,13 +637,13 @@ export class WaitForTransactionError extends Error {
 }
 
 /**
- * This error is used by `generateSignSendWaitForTransaction` when a transaction
- * is processed by the API, but it was not committed successfully.
+ * This error is used by `waitForTransactionWithResult` if `checkSuccess` is true.
+ * See that function for more information.
  */
-export class TransactionNotCommittedError extends Error {
+export class FailedTransactionError extends Error {
   public readonly transaction: Gen.Transaction;
 
-  constructor(message: string, transaction: Gen.Transaction | undefined) {
+  constructor(message: string, transaction: Gen.Transaction) {
     super(message);
     this.transaction = transaction;
   }

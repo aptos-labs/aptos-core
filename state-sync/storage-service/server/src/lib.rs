@@ -988,7 +988,7 @@ impl StorageReader {
         }
         let pruning_window = self
             .storage
-            .get_state_prune_window()
+            .get_epoch_snapshot_prune_window()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
 
         if latest_version > pruning_window as Version {

@@ -67,7 +67,7 @@ where
         self.pruner_enabled
     }
 
-    fn get_pruner_window(&self) -> Version {
+    fn get_prune_window(&self) -> Version {
         self.prune_window
     }
 

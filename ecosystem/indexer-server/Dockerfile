@@ -1,4 +1,4 @@
-FROM node:16 as builder
+FROM node:16@sha256:ca988c6e7f4a41a18030a7adae34a5ea6f9faf7e4f84c8d886ce1afa0080d84a as builder
 ARG PATH
 
 WORKDIR /usr

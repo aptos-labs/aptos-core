@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error_map::generate_error_map;
-use crate::natives::code::{ModuleMetadata, MoveOption, PackageMetadata, UpgradePolicy};
+use crate::natives::code::{
+    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
+};
 use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_types::account_address::AccountAddress;
@@ -20,9 +22,10 @@ use move_deps::move_package::source_package::manifest_parser::{
 };
 use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
+pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
 /// Represents a set of options for building artifacts from Move.
@@ -93,7 +96,13 @@ impl BuiltPackage {
             None
         };
         if let Some(map) = &error_map {
-            inject_module_metadata(package_path.clone(), &mut package, map)?
+            inject_module_metadata(
+                package_path
+                    .join(CompiledPackageLayout::Root.path())
+                    .join(package.compiled_package_info.package_name.as_str()),
+                &mut package,
+                map,
+            )?
         }
         Ok(Self {
             options,
@@ -105,6 +114,16 @@ impl BuiltPackage {
     /// Returns the name of this package.
     pub fn name(&self) -> &str {
         self.package.compiled_package_info.package_name.as_str()
+    }
+
+    pub fn package_path(&self) -> &Path {
+        self.package_path.as_path()
+    }
+
+    pub fn package_artifacts_path(&self) -> PathBuf {
+        self.package_path
+            .join(CompiledPackageLayout::Root.path())
+            .join(self.name())
     }
 
     /// Extracts the bytecode for the modules of the built package.
@@ -184,6 +203,24 @@ impl BuiltPackage {
                 extension: MoveOption::default(),
             })
         }
+        let deps = self
+            .package
+            .deps_compiled_units
+            .iter()
+            .map(|(name, unit)| {
+                let package_name = name.as_str().to_string();
+                let account = match &unit.unit {
+                    CompiledUnit::Module(m) => AccountAddress::new(m.address.into_bytes()),
+                    _ => panic!("script not a dependency"),
+                };
+                PackageDep {
+                    account,
+                    package_name,
+                }
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
@@ -191,8 +228,17 @@ impl BuiltPackage {
             source_digest,
             manifest,
             modules,
-            extension: MoveOption::default(),
+            deps,
+            extension: MoveOption::none(),
         })
+    }
+
+    pub fn extract_metadata_and_save(&self) -> anyhow::Result<()> {
+        let data = self.extract_metadata()?;
+        let path = self.package_artifacts_path();
+        std::fs::create_dir_all(&path)?;
+        std::fs::write(path.join(METADATA_FILE_NAME), &bcs::to_bytes(&data)?)?;
+        Ok(())
     }
 }
 

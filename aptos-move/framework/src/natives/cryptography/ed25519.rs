@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::util::make_native_from_func;
+use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
 use aptos_crypto::{ed25519, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_deps::move_core_types::gas_algebra::{InternalGasPerArg, NumArgs};
@@ -15,6 +16,7 @@ use move_deps::{
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
+
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
     pub const E_WRONG_SIGNATURE_SIZE: u64 = 2;
@@ -41,7 +43,7 @@ fn native_public_key_validate(
 
     let mut cost = gas_params.base + gas_params.per_pubkey_deserialize * NumArgs::one();
 
-    let key_bytes_slice = match <[u8; 32]>::try_from(key_bytes) {
+    let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
             return Ok(NativeResult::err(cost, abort_codes::E_WRONG_PUBKEY_SIZE));

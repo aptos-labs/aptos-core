@@ -26,15 +26,10 @@ else
 fi
 
 # available clusters to choose from
-# forge-1 is used for continuous testing exclusively
-FORGE_CLUSTERS=("aptos-forge-big-0" "aptos-forge-big-1" "aptos-forge-0")
+FORGE_CLUSTERS=("aptos-forge-big-0" "aptos-forge-big-2")
 
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
-
-# for calculating regression in local mode
-LOCAL_P99_LATENCY_MS_THRESHOLD=60000
-
 
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
@@ -55,7 +50,6 @@ FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
-FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
@@ -259,8 +253,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
     prometheus_port_forward_pid=$!
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
-        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --upgrade-image-tag $UPGRADE_IMAGE_TAG \
@@ -291,7 +284,6 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
-        -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
         -e "s/{FORGE_IMAGE_TAG}/${FORGE_IMAGE_TAG}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \

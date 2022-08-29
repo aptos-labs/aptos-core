@@ -99,8 +99,6 @@ def fake_context(shell=None, filesystem=None, processes=None, time=None) -> Forg
         time=time if time else FakeTime(),
 
         forge_test_suite="banana",
-        local_p99_latency_ms_threshold="6000",
-        forge_runner_tps_threshold="593943",
         forge_runner_duration_secs="123",
 
         reuse_args=[],
@@ -234,9 +232,9 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     def testDashboardLink(self) -> None:
         self.assertFixture(
             get_dashboard_link(
-                "aptos-forge-1",
+                "aptos-forge-big-1",
                 "forge-pr-2983",
-                "forge-1",
+                "forge-big-1",
                 True,
             ),
             "testDashboardLink.fixture",
@@ -265,7 +263,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
             )
             result = runner.invoke(main, [
                 "test", "--dry-run",
-                "--forge-cluster-name", "forge-1",
+                "--forge-cluster-name", "forge-big-1",
                 "--forge-report", "temp-report",
                 "--forge-pre-comment", "temp-pre-comment",
                 "--forge-comment", "temp-comment",

@@ -288,7 +288,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<usize>;
+        fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
     }
 }
 
