@@ -479,7 +479,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<usize> {
+    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
         unimplemented!()
     }
 
