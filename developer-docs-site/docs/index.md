@@ -143,16 +143,18 @@ We are excited that you are here, and we look forward to getting to know you. We
 <div class="aptos-timeline-card">
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Set up developer tools and environment</aptos-timeline-h3>
-    <a href="guides/getting-started.html" class="card-link">Clone the Aptos repo and get to know important developer resources</a>
-    <p>Follow this step-by-step guide to install the tools you need to start developing.</p>
-    <a href="guides/local-testnet-dev-flow.html" class="card-link">Run a local testnet with the matching SDK, or access the Aptos devnet</a>
-    <p>Use either Python SDK or TypeScript SDK.</p>
+    <a href="guides/getting-started.html" class="card-link">Clone the Aptos repo</a>
+    <p>Follow this step-by-step guide to clone the Aptos repo.</p>
+    <a href="cli-tools/aptos-cli-tool/install-aptos-cli.html" class="card-link">Install the Aptos CLI</a>
+    <p>Next, install the Aptos CLI.</p>
+    <a href="nodes/local-testnet/local-testnet-index.html" class="card-link">Run a local testnet or access the Aptos devnet</a>
+    <p>This completes your development environment setup.</p>
   </div>
 </div>
 <div class="aptos-timeline-card">
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Learn how to submit your first transaction</aptos-timeline-h3>
-    <a href="tutorials/your-first-transaction-sdk.html" class="card-link">Submit your first transaction to the Aptos blockchain</a>
+    <a href="tutorials/your-first-transaction.html" class="card-link">Submit your first transaction to the Aptos blockchain</a>
     <p>Get to know how to use the SDK by preparing and submitting your first transaction to the Aptos blockchain.</p>
   </div>
 </div>
@@ -166,7 +168,7 @@ We are excited that you are here, and we look forward to getting to know you. We
 <div class="aptos-timeline-card">
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Create your first NFT</aptos-timeline-h3>
-    <a href="tutorials/your-first-nft-sdk.html" class="card-link">Create and transfer NFTs on the Aptos blockchain</a>
+    <a href="tutorials/your-first-nft.html" class="card-link">Create and transfer NFTs on the Aptos blockchain</a>
     <p>This SDK-based tutorial will also introduce you to the Aptos Token module in Move.</p>
     <a href="guides/install-petra-wallet-extension.html" class="card-link">Get to know Petra (Aptos Wallet)</a>
     <p>Install the Petra extension for the Chrome browser and get familiar with it.</p>
@@ -182,7 +184,7 @@ We are excited that you are here, and we look forward to getting to know you. We
 <div class="aptos-timeline-card">
   <div class="aptos-timeline-info">
     <aptos-timeline-h3 class="aptos-timeline-title">Create your first smart contract with Move</aptos-timeline-h3>
-    <a href="/tutorials/your-first-move-module.html" class="card-link">Your first Move Module </a>
+    <a href="/tutorials/first-move-module.html" class="card-link">Your first Move Module </a>
     <p>Write, test and publish your first Move module. This forms the foundation for understanding how to write, publish and deploy smart contracts in Move language.</p>
   </div>
 </div>

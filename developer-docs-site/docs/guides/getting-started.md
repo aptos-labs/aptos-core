@@ -5,10 +5,20 @@ slug: "getting-started"
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Getting Started
 
 To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
+
+<ThemedImage
+  alt="Development Flow with Aptos CLI"
+  sources={{
+    light: useBaseUrl('/img/docs/dev-with-aptos-cli.svg'),
+    dark: useBaseUrl('/img/docs/dev-with-aptos-cli-dark.svg'),
+  }}
+/>
 
 ### Clone the Aptos-core repo
 

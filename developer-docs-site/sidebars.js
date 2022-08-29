@@ -18,31 +18,36 @@ const sidebars = {
   aptosSidebar: [
     "index",
     "whats-new-in-docs",
-    "guides/getting-started",
-    "aptos-developer-domains",
+    {
+      type: "category",
+      label: "Getting Started",
+      link: { type: "doc", id: "guides/getting-started", },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "cli-tools/aptos-cli-tool/install-aptos-cli",
+        {
+          type: "category",
+          label: "Develop on Local Testnet",
+          link: { type: "doc", id: "nodes/local-testnet/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "guides/local-testnet-dev-flow", "nodes/local-testnet/run-a-local-testnet"],
+        },
+      ],
+    },
     {
       type: "category",
       label: "SDKs",
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "link",
-          label: "Typescript SDK",
-          href: "https://aptos-labs.github.io/ts-sdk-doc/",
-        },
         "sdks/aptos-sdk-overview",
+        "sdks/typescript-sdk",
         "sdks/transactions-with-ts-sdk",
         "sdks/python-sdk",
+        "sdks/rust-sdk",
       ],
-    },
-    {
-      type: "category",
-      label: "Aptos CLI",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
-      items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     {
       type: "category",
@@ -58,6 +63,16 @@ const sidebars = {
         // "tutorials/first-coin",
       ],
     },
+    {
+      type: "category",
+      label: "Aptos CLI",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
+      items: ["cli-tools/aptos-cli-tool/use-aptos-cli"],
+    },
+    
+    
     {
       type: "category",
       label: "Concepts",
@@ -90,7 +105,6 @@ const sidebars = {
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
-        "guides/local-testnet-dev-flow",
         {
           type: "category",
           label: "Move Guides",
@@ -156,40 +170,15 @@ const sidebars = {
             "nodes/full-node/run-a-fullnode-on-gcp",
           ],
         },
-        {
-          type: "category",
-          label: "Local Testnet",
-          link: { type: "doc", id: "nodes/local-testnet/index" },
-          collapsible: true,
-          collapsed: true,
-          items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
-        },
+        
         "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
       ],
     },
-    {
-      type: "category",
-      label: "SDKs",
-      collapsible: true,
-      collapsed: true,
-      items: [
-        "sdks/aptos-sdk-overview",
-        "sdks/typescript-sdk",
-        "sdks/transactions-with-ts-sdk",
-        "sdks/python-sdk",
-        "sdks/rust-sdk",
-      ],
-    },
-    {
-      type: "category",
-      label: "Aptos CLI",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
-      items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
-    },
+    
+    
     "reference/telemetry",
+    "aptos-developer-domains",
     {
       type: "category",
       label: "Aptos White Paper",
