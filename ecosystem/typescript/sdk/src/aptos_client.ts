@@ -662,6 +662,64 @@ export class AptosClient {
     const txnHash = await this.generateSignSubmitTransaction(sender, payload, extraArgs);
     return this.waitForTransactionWithResult(txnHash, extraArgs);
   }
+
+  /**
+   * Rotate an account's auth key. After rotation, only the new private key can be used to sign txns for
+   * the account.
+   * @param forAccount Account of which the auth key will be rotated
+   * @param privateKeyBytes New private key
+   * @param extraArgs Extra args for building the transaction payload.
+   * @returns PendingTransaction
+   */
+  async rotateAuthKeyEd25519(
+    forAccount: AptosAccount,
+    privateKeyBytes: Uint8Array,
+    extraArgs?: {
+      maxGasAmount?: BCS.Uint64;
+      gasUnitPrice?: BCS.Uint64;
+      expireTimestamp?: BCS.Uint64;
+    },
+  ): Promise<Gen.PendingTransaction> {
+    const { sequence_number: sequenceNumber, authentication_key: authKey } = await this.getAccount(
+      forAccount.address(),
+    );
+
+    const helperAccount = new AptosAccount(privateKeyBytes);
+
+    const challenge = new TxnBuilderTypes.RotationProofChallenge(
+      TxnBuilderTypes.AccountAddress.CORE_CODE_ADDRESS,
+      "account",
+      "RotationProofChallenge",
+      BigInt(sequenceNumber),
+      TxnBuilderTypes.AccountAddress.fromHex(forAccount.address()),
+      new TxnBuilderTypes.AccountAddress(new HexString(authKey).toUint8Array()),
+      helperAccount.pubKey().toUint8Array(),
+    );
+
+    const challengeHex = HexString.fromUint8Array(BCS.bcsToBytes(challenge));
+
+    const proofSignedByCurrentPrivateKey = forAccount.signHexString(challengeHex);
+
+    const proofSignedByNewPrivateKey = helperAccount.signHexString(challengeHex);
+
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::account",
+        "rotate_authentication_key_ed25519",
+        [],
+        [
+          BCS.bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
+          BCS.bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
+          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
+          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
+        ],
+      ),
+    );
+
+    const rawTransaction = await this.generateRawTransaction(forAccount.address(), payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(forAccount, rawTransaction);
+    return this.submitSignedBCSTransaction(bcsTxn);
+  }
 }
 
 export class ApiError extends Error {
