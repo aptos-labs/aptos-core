@@ -106,7 +106,6 @@ pub struct EmitJobRequest {
 
     gas_price: u64,
     invalid_transaction_ratio: usize,
-    pub duration: Duration,
     reuse_accounts: bool,
     mint_to_root: bool,
 
@@ -127,7 +126,6 @@ impl Default for EmitJobRequest {
             },
             gas_price: 0,
             invalid_transaction_ratio: 0,
-            duration: Duration::from_secs(300),
             reuse_accounts: false,
             mint_to_root: false,
             transaction_mix: vec![(TransactionType::P2P, 1)],
@@ -175,11 +173,6 @@ impl EmitJobRequest {
 
     pub fn reuse_accounts(mut self) -> Self {
         self.reuse_accounts = true;
-        self
-    }
-
-    pub fn duration(mut self, duration: Duration) -> Self {
-        self.duration = duration;
         self
     }
 
@@ -522,8 +515,11 @@ impl<'t> TxnEmitter<'t> {
         }
     }
 
-    pub async fn emit_txn_for(&mut self, emit_job_request: EmitJobRequest) -> Result<TxnStats> {
-        let duration = emit_job_request.duration;
+    pub async fn emit_txn_for(
+        &mut self,
+        emit_job_request: EmitJobRequest,
+        duration: Duration,
+    ) -> Result<TxnStats> {
         let job = self.start_job(emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
@@ -536,9 +532,9 @@ impl<'t> TxnEmitter<'t> {
     pub async fn emit_txn_for_with_stats(
         &mut self,
         emit_job_request: EmitJobRequest,
+        duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
-        let duration = emit_job_request.duration;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         let job = self.start_job(emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
