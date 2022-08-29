@@ -233,8 +233,9 @@ module aptos_framework::account {
         // Update the originating address map: i.e., set this account's new address to point to the originating address.
         // Begin by removing the entry for the current authentication key, if there is one.
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let originating_address = addr;
         if (table::contains(address_map, curr_auth_key)) {
-            table::remove(address_map, curr_auth_key);
+            originating_address = table::remove(address_map, curr_auth_key);
         };
 
         // Derive the authentication key of the new PK
@@ -242,7 +243,7 @@ module aptos_framework::account {
         let new_address = from_bcs::to_address(new_auth_key);
 
         // Update the originating address map
-        table::add(address_map, new_address, addr);
+        table::add(address_map, new_address, originating_address);
 
         // Update the account with the new authentication key
         account_resource.authentication_key = new_auth_key;
