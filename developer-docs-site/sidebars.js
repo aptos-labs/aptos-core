@@ -100,6 +100,7 @@ const sidebars = {
             "nodes/ait/steps-in-ait3",
             "nodes/ait/node-requirements",
             "nodes/ait/node-liveness-criteria",
+            "nodes/ait/staking-rewards",
             "nodes/ait/connect-to-testnet",
             "nodes/ait/additional-doc",
           ],
