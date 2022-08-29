@@ -80,6 +80,12 @@ module.exports = {
 
     // endregion
 
+    Object.assign(config.resolve, {
+      fallback: {
+        stream: require.resolve('stream-browserify'),
+      },
+    });
+
     // region Replace default HtmlWebpackPlugin entry with updated ones
 
     const htmlPluginIdx = config.plugins.findIndex((plugin) => plugin instanceof HtmlWebpackPlugin);

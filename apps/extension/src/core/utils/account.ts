@@ -9,13 +9,13 @@ import {
 } from 'core/types/stateTypes';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { HDKey } from '@scure/bip32';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import {
   defaultCustomNetworks,
   defaultNetworkName,
   defaultNetworks,
 } from 'shared/types';
+import { derivePath } from 'ed25519-hd-key';
 
 // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
 const bip44Coin = 637;
@@ -28,14 +28,13 @@ export function generateMnemonic() {
 // We are only looking for the first derivation of the bip44
 // In the future we may support importing multiple keys from other wallets
 function getAptosBip44Path(): string {
-  return `m/44'/${bip44Coin}'/0'/0/0`;
+  return `m/44'/${bip44Coin}'/0'/0'/0'`;
 }
 
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
   const seed = await bip39.mnemonicToSeed(mnemonicString);
   const derivationPath = getAptosBip44Path();
-  const node = HDKey.fromMasterSeed(Buffer.from(seed));
-  const key = node.derive(derivationPath).privateKey;
+  const { key } = derivePath(derivationPath, Buffer.from(seed).toString('hex'));
   if (key) {
     return { mnemonic: mnemonicString, seed: key };
   }
