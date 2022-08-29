@@ -665,6 +665,7 @@ export class AptosClient {
   /**
    * Rotate an account's auth key. After rotation, only the new private key can be used to sign txns for
    * the account.
+   * WARNING: You must create a new instance of AptosAccount after using this function.
    * @param forAccount Account of which the auth key will be rotated
    * @param privateKeyBytes New private key
    * @param extraArgs Extra args for building the transaction payload.
@@ -718,6 +719,27 @@ export class AptosClient {
     const rawTransaction = await this.generateRawTransaction(forAccount.address(), payload, extraArgs);
     const bcsTxn = AptosClient.generateBCSTransaction(forAccount, rawTransaction);
     return this.submitSignedBCSTransaction(bcsTxn);
+  }
+
+  /**
+   * Lookup the original address by the current authKey
+   * @param authKey
+   * @returns original address
+   */
+  async lookupAddressByAuthKey(authKey: MaybeHexString): Promise<HexString> {
+    const resource = await this.getAccountResource("0x1", "0x1::account::OriginatingAddress");
+
+    const {
+      address_map: { handle },
+    } = resource.data as any;
+
+    const origAddress = await this.getTableItem(handle, {
+      key_type: "address",
+      value_type: "address",
+      key: HexString.ensure(authKey).hex(),
+    });
+
+    return new HexString(origAddress);
   }
 }
 
