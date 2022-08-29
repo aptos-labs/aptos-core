@@ -37,7 +37,9 @@ pub(crate) fn choose_index(mut weights: Vec<u128>, state: Vec<u8>) -> usize {
     // Create cumulative weights vector
     // Since we own the vector, we can safely modify it in place
     for w in &mut weights {
-        total_weight = total_weight.checked_add(w).unwrap();
+        total_weight = total_weight
+            .checked_add(w)
+            .expect("Total stake shouldn't exceed u128::MAX");
         *w = total_weight;
     }
     let chosen_weight = next_in_range(state, total_weight);
@@ -56,7 +58,7 @@ pub(crate) fn choose_index(mut weights: Vec<u128>, state: Vec<u8>) -> usize {
 fn test_bounds() {
     // check that bounds are correct, and both first and last weight can be selected.
     let mut selected = [0, 0];
-    let weights = [1, 1].to_vec();
+    let weights = [u64::MAX as u128 * 1000, u64::MAX as u128 * 1000].to_vec();
     // 10 is enough to get one of each.
     for i in 0..10 {
         selected[choose_index(weights.clone(), (i as i32).to_le_bytes().to_vec())] += 1;
