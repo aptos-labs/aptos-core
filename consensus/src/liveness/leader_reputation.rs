@@ -486,17 +486,19 @@ impl ProposerElection for LeaderReputation {
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
         let proposers = &self.epoch_to_proposers[&self.epoch];
         assert_eq!(weights.len(), proposers.len());
+
         // Multiply weights by voting power:
-        weights
+        let stake_weights: Vec<u128> = weights
             .iter_mut()
             .enumerate()
-            .for_each(|(i, w)| *w *= self.voting_powers[i]);
+            .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
+            .collect();
 
         let state = [self.epoch.to_le_bytes(), round.to_le_bytes()]
             .concat()
             .to_vec();
 
-        let chosen_index = choose_index(weights, state);
+        let chosen_index = choose_index(stake_weights, state);
         proposers[chosen_index]
     }
 }
