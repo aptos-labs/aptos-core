@@ -25,10 +25,6 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "30000")]
-    mempool_backlog: usize,
-    #[structopt(long, default_value = "0")]
-    target_tps: usize,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
@@ -177,18 +173,14 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
-    let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
-
-    let global_emit_job_request = EmitJobRequest::default()
-        .duration(Duration::from_secs(args.duration_secs as u64))
-        .mode(emitter_mode);
+    let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
-            let mut test_suite = get_test_suite(args.suite.as_ref(), duration)?;
+            let mut test_suite = get_test_suite(suite_name, duration)?;
             if let Some(num_validators) = args.num_validators {
                 match NonZeroUsize::new(num_validators) {
                     Some(num_validators) => {
@@ -207,14 +199,17 @@ fn main() -> Result<()> {
             match test_cmd {
                 TestCommand::LocalSwarm(..) => {
                     // Loosen all criteria for local runs
-                    let test_suite =
-                        test_suite.with_success_criteria(SuccessCriteria::new(400, 60000, None));
+                    let test_suite = test_suite
+                        .with_success_criteria(SuccessCriteria::new(400, 60000, None))
+                        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                            mempool_backlog: 5000,
+                        }));
                     run_forge(
+                        duration,
                         test_suite,
                         LocalFactory::from_workspace()?,
                         &args.options,
                         args.changelog.clone(),
-                        global_emit_job_request,
                     )
                 }
                 TestCommand::K8sSwarm(k8s) => {
@@ -222,6 +217,7 @@ fn main() -> Result<()> {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
                     run_forge(
+                        duration,
                         test_suite,
                         K8sFactory::new(
                             k8s.namespace.clone(),
@@ -235,7 +231,6 @@ fn main() -> Result<()> {
                         .unwrap(),
                         &args.options,
                         args.changelog,
-                        global_emit_job_request,
                     )?;
                     Ok(())
                 }
@@ -280,13 +275,13 @@ fn main() -> Result<()> {
 }
 
 pub fn run_forge<F: Factory>(
+    global_duration: Duration,
     tests: ForgeConfig<'_>,
     factory: F,
     options: &Options,
     logs: Option<Vec<String>>,
-    global_job_request: EmitJobRequest,
 ) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, global_job_request);
+    let forge = Forge::new(options, tests, global_duration, factory);
 
     if options.list {
         forge.list()?;
@@ -441,6 +436,25 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 5000,
                 10000,
                 Some(Duration::from_secs(240)),
+            )),
+        "account_creation_state_sync" => config
+            .with_network_tests(&[&PerformanceBenchmarkWithFN])
+            .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+            .with_initial_fullnode_count(3)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 1200.into();
+            }))
+            .with_emit_job(
+                EmitJobRequest::default()
+                    .mode(EmitJobMode::MaxLoad {
+                        mempool_backlog: 50000,
+                    })
+                    .transaction_type(TransactionType::AccountGeneration),
+            )
+            .with_success_criteria(SuccessCriteria::new(
+                1200,
+                10000,
+                Some(Duration::from_secs(300)),
             )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
