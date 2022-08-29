@@ -679,6 +679,22 @@ export class AptosClient {
     const bcsTxn = AptosClient.generateBCSTransaction(forAccount, rawTransaction);
     return this.submitSignedBCSTransaction(bcsTxn);
   }
+
+  async lookupAddressByPublicKey(publicKey: MaybeHexString): Promise<HexString> {
+    const resource = await this.getAccountResource("0x1", "0x1::account::OriginatingAddress");
+
+    const {
+      address_map: { handle },
+    } = resource.data as any;
+
+    const origAddress = await this.getTableItem(handle, {
+      key_type: "address",
+      value_type: "address",
+      key: HexString.ensure(publicKey).hex(),
+    });
+
+    return new HexString(origAddress);
+  }
 }
 
 /**

@@ -435,19 +435,14 @@ test(
 
     await client.waitForTransaction(pendingTxn.hash);
 
-    const resource = await client.getAccountResource("0x1", "0x1::account::OriginatingAddress");
+    const origAddressHex = await client.lookupAddressByPublicKey(helperAccount.address());
+    // Sometimes the returned addresses do not have leading 0s. To be safe, converting hex addresses to AccountAddress
+    const origAddress = TxnBuilderTypes.AccountAddress.fromHex(origAddressHex);
+    const aliceAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
 
-    const {
-      address_map: { handle },
-    } = resource.data as any;
-
-    const origAddress = await client.getTableItem(handle, {
-      key_type: "address",
-      value_type: "address",
-      key: helperAccount.address().hex(),
-    });
-
-    expect(new HexString(origAddress).hex()).toBe(alice.address().hex());
+    expect(HexString.fromUint8Array(BCS.bcsToBytes(origAddress)).hex()).toBe(
+      HexString.fromUint8Array(BCS.bcsToBytes(aliceAddress)).hex(),
+    );
   },
   30 * 1000,
 );
