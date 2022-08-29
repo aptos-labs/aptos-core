@@ -25,7 +25,6 @@
 
 use crate::proof::definition::{LeafCount, MAX_ACCUMULATOR_LEAVES, MAX_ACCUMULATOR_PROOF_DEPTH};
 use anyhow::{ensure, Result};
-use mirai_annotations::*;
 use std::fmt;
 
 #[cfg(test)]
@@ -61,8 +60,8 @@ impl Position {
 
     /// pos count start from 0 on each level
     pub fn from_level_and_pos(level: u32, pos: u64) -> Self {
-        precondition!(level < 64);
-        assume!(1u64 << level > 0); // bitwise and integer operations don't mix.
+        assert!(level < 64);
+        assert!(1u64 << level > 0); // bitwise and integer operations don't mix.
         let level_one_bits = (1u64 << level) - 1;
         let shifted_pos = if level == 63 { 0 } else { pos << (level + 1) };
         Position(shifted_pos | level_one_bits)
@@ -91,7 +90,7 @@ impl Position {
 
     /// What is the parent of this node?
     pub fn parent(self) -> Self {
-        assume!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::max_value() - 1); // invariant
         Self(
             (self.0 | isolate_rightmost_zero_bit(self.0))
                 & !(isolate_rightmost_zero_bit(self.0) << 1),
@@ -100,19 +99,19 @@ impl Position {
 
     /// What is the left node of this node? Will overflow if the node is a leaf
     pub fn left_child(self) -> Self {
-        checked_precondition!(!self.is_leaf());
+        assert!(!self.is_leaf());
         Self::child(self, NodeDirection::Left)
     }
 
     /// What is the right node of this node? Will overflow if the node is a leaf
     pub fn right_child(self) -> Self {
-        checked_precondition!(!self.is_leaf());
+        assert!(!self.is_leaf());
         Self::child(self, NodeDirection::Right)
     }
 
     fn child(self, dir: NodeDirection) -> Self {
-        checked_precondition!(!self.is_leaf());
-        assume!(self.0 < u64::max_value() - 1); // invariant
+        assert!(!self.is_leaf());
+        assert!(self.0 < u64::max_value() - 1); // invariant
 
         let direction_bit = match dir {
             NodeDirection::Left => 0,
@@ -125,7 +124,7 @@ impl Position {
     /// after stripping out all right-most 1 bits, a left child will have a bit pattern
     /// of xxx00(11..), while a right child will be represented by xxx10(11..)
     pub fn is_left_child(self) -> bool {
-        assume!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::max_value() - 1); // invariant
         self.0 & (isolate_rightmost_zero_bit(self.0) << 1) == 0
     }
 
@@ -145,7 +144,7 @@ impl Position {
     /// To find out the right-most common bits, first remove all the right-most ones
     /// because they are corresponding to level's indicator. Then remove next zero right after.
     pub fn sibling(self) -> Self {
-        assume!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::max_value() - 1); // invariant
         Self(self.0 ^ (isolate_rightmost_zero_bit(self.0) << 1))
     }
 
@@ -216,7 +215,7 @@ fn smear_ones_for_u64(v: u64) -> u64 {
 ///     00010010000 n=3
 /// ```
 fn turn_off_right_most_n_bits(v: u64, n: u32) -> u64 {
-    debug_checked_precondition!(n < 64);
+    debug_assert!(n < 64);
     (v >> n) << n
 }
 
@@ -357,7 +356,7 @@ impl Iterator for FrozenSubTreeIterator {
     type Item = Position;
 
     fn next(&mut self) -> Option<Position> {
-        assume!(self.seen_leaves < u64::max_value() - self.bitmap); // invariant
+        assert!(self.seen_leaves < u64::max_value() - self.bitmap); // invariant
 
         if self.bitmap == 0 {
             return None;
@@ -371,7 +370,7 @@ impl Iterator for FrozenSubTreeIterator {
         // subtree root is (num_leaves - 1) greater than that of the leftmost leaf, and also
         // (num_leaves - 1) less than that of the rightmost leaf.
         let root_offset = smear_ones_for_u64(self.bitmap) >> 1;
-        assume!(root_offset < self.bitmap); // relate bit logic to integer logic
+        assert!(root_offset < self.bitmap); // relate bit logic to integer logic
         let num_leaves = root_offset + 1;
         let leftmost_leaf = Position::from_leaf_index(self.seen_leaves);
         let root = Position::from_inorder_index(leftmost_leaf.to_inorder_index() + root_offset);

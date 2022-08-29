@@ -960,7 +960,6 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        mirai_annotations::precondition!(index < HashValue::LENGTH);
         Nibble::from(if index % 2 == 0 {
             self[index / 2] >> 4
         } else {
