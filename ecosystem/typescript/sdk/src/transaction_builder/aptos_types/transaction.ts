@@ -223,6 +223,9 @@ export class Module {
   }
 }
 
+/**
+ * @deprecated
+ */
 export class ModuleBundle {
   /**
    * Contains a list of Modules that can be published together.
@@ -391,6 +394,9 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 }
 
+/**
+ * @deprecated
+ */
 export class TransactionPayloadModuleBundle extends TransactionPayload {
   constructor(public readonly value: ModuleBundle) {
     super();
