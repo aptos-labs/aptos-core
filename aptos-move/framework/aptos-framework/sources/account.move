@@ -2,7 +2,7 @@ module aptos_framework::account {
     use std::bcs;
     use std::error;
     use std::hash;
-    use std::option::{Self, Option};
+    use std::option::{Self, Option, borrow};
     use std::signer;
     use std::vector;
     use aptos_std::type_info::{Self, TypeInfo};
@@ -12,6 +12,8 @@ module aptos_framework::account {
     use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
+    use aptos_std::multi_ed25519;
+    use aptos_std::multi_ed25519::signature_verify_strict_t;
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -66,6 +68,9 @@ module aptos_framework::account {
 
     const MAX_U64: u128 = 18446744073709551615;
 
+    const ED25519_SCHEME: vector<u8> = vector<u8>[0];
+    const MULTIED25519_SCHEME: vector<u8> = vector<u8>[1];
+
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
     /// Account does not exist
@@ -88,6 +93,7 @@ module aptos_framework::account {
     const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
     ///
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
+    const EINVALID_SCHEME: u64 = 12;
 
     native fun create_signer(addr: address): signer;
 
@@ -246,6 +252,82 @@ module aptos_framework::account {
         table::add(address_map, new_address, originating_address);
 
         // Update the account with the new authentication key
+        account_resource.authentication_key = new_auth_key;
+    }
+
+    fun verify_key_rotation_signature(scheme: vector<u8>, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge) : vector<u8> {
+        let auth_key: vector<u8>;
+        if (scheme == ED25519_SCHEME) {
+            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = ed25519::new_signature_from_bytes(signature);
+            assert!(ed25519::signature_verify_strict_t(&sig, &pk, challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pk);
+        } else {
+            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = multi_ed25519::new_signature_from_bytes(signature);
+            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pk);
+        };
+        auth_key
+    }
+
+    fun get_challenge_message(account_address: address, in_scheme: vector<u8>, from_public_key_bytes: vector<u8>, to_public_key_bytes: vector<u8>): RotationProofChallenge acquires Account {
+        let account_resource = borrow_global_mut<Account>(account_address);
+
+        if (in_scheme == ED25519_SCHEME) {
+            let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        } else {
+            let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        };
+
+        let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
+
+        let challenge = RotationProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            originator: account_address,
+            current_auth_key: curr_auth_key,
+            new_public_key: to_public_key_bytes,
+        };
+
+        challenge
+    }
+
+    public entry fun rotate_authentication_key(
+        account: &signer,
+        in_scheme: vector<u8>,
+        to_scheme: vector<u8>,
+        from_public_key_bytes: vector<u8>,
+        to_public_key_bytes: vector<u8>,
+        cap_rotate_key: vector<u8>,
+        cap_update_table: vector<u8>,
+
+    ) acquires Account, OriginatingAddress {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!((in_scheme == ED25519_SCHEME || to_scheme == MULTIED25519_SCHEME), EINVALID_SCHEME);
+        assert!((in_scheme == ED25519_SCHEME || to_scheme == MULTIED25519_SCHEME), EINVALID_SCHEME);
+
+        let addr = signer::address_of(account);
+
+        let challenge = get_challenge_message(addr, in_scheme, from_public_key_bytes, to_public_key_bytes);
+        let curr_auth_key = verify_key_rotation_signature(in_scheme, from_public_key_bytes, cap_rotate_key, challenge);
+        let new_auth_key = verify_key_rotation_signature(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let originating_address = signer::address_of(account);
+        let curr_address = from_bcs::to_address(curr_auth_key);
+        let new_address = from_bcs::to_address(new_auth_key);
+        if (table::contains(address_map, curr_address)) {
+            originating_address = table::remove(address_map, curr_address);
+        };
+        
+        table::add(address_map, new_address, originating_address);
+
+        let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
     }
 
