@@ -61,6 +61,113 @@ async fn test_basic_client() {
 }
 
 #[tokio::test]
+async fn test_gas_estimation() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut public_info = swarm.aptos_public_info();
+
+    // No transactions should always return 1 as the estimated gas
+    assert_eq!(
+        1,
+        public_info
+            .client()
+            .estimate_gas_price()
+            .await
+            .unwrap()
+            .into_inner()
+            .gas_estimate,
+        "No transactions should equate to lowest gas price"
+    );
+    let account1 = public_info
+        .create_and_fund_user_account(1000000)
+        .await
+        .expect("Should create account");
+    let account2 = public_info
+        .create_and_fund_user_account(1000000)
+        .await
+        .expect("Should create account");
+
+    // When we have higher cost transactions, it should shift to a non-1 value (if it's higher than 1)
+    let transfer1 = public_info
+        .transaction_factory()
+        .transfer(account2.address(), 10)
+        .gas_unit_price(5)
+        .sequence_number(0)
+        .sender(account1.address())
+        .build();
+    let transfer2 = public_info
+        .transaction_factory()
+        .transfer(account2.address(), 10)
+        .gas_unit_price(5)
+        .sequence_number(1)
+        .sender(account1.address())
+        .build();
+    let transfer3 = public_info
+        .transaction_factory()
+        .transfer(account2.address(), 10)
+        .gas_unit_price(5)
+        .sequence_number(2)
+        .sender(account1.address())
+        .build();
+    let transfer4 = public_info
+        .transaction_factory()
+        .transfer(account2.address(), 10)
+        .gas_unit_price(5)
+        .sequence_number(3)
+        .sender(account1.address())
+        .build();
+    let transfer5 = public_info
+        .transaction_factory()
+        .transfer(account2.address(), 10)
+        .gas_unit_price(5)
+        .sequence_number(4)
+        .sender(account1.address())
+        .build();
+    let transfer1 = account1.sign_transaction(transfer1);
+    let transfer2 = account1.sign_transaction(transfer2);
+    let transfer3 = account1.sign_transaction(transfer3);
+    let transfer4 = account1.sign_transaction(transfer4);
+    let transfer5 = account1.sign_transaction(transfer5);
+    public_info
+        .client()
+        .submit(&transfer1)
+        .await
+        .expect("Should successfully submit");
+    public_info
+        .client()
+        .submit(&transfer2)
+        .await
+        .expect("Should successfully submit");
+    public_info
+        .client()
+        .submit(&transfer3)
+        .await
+        .expect("Should successfully submit");
+    public_info
+        .client()
+        .submit(&transfer4)
+        .await
+        .expect("Should successfully submit");
+    public_info
+        .client()
+        .submit_and_wait_bcs(&transfer5)
+        .await
+        .expect("Should successfully submit and wait")
+        .into_inner();
+
+    assert_eq!(
+        5,
+        public_info
+            .client()
+            .estimate_gas_price()
+            .await
+            .unwrap()
+            .into_inner()
+            .gas_estimate,
+        "Gas estimate should move based on median"
+    );
+}
+
+#[tokio::test]
 async fn test_bcs() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
