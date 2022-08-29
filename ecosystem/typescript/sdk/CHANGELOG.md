@@ -6,7 +6,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-N/A
+- Add an interface to publish Move packages.
 
 ## 1.3.10 (2022-08-26)
 

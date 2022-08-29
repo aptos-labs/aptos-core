@@ -602,6 +602,42 @@ export class AptosClient {
   }
 
   /**
+   * Publishes a move package. `packageMetadata` and `modules` can be generated with command
+   * `aptos move compile --save-metadata [ --included-artifacts=<...> ]`.
+   * @param sender
+   * @param packageMetadata
+   * @param modules
+   * @param extraArgs
+   * @returns
+   */
+  async publishPackage(
+    sender: AptosAccount,
+    packageMetadata: BCS.Bytes,
+    modules: BCS.Seq<TxnBuilderTypes.Module>,
+    extraArgs?: {
+      maxGasAmount?: BCS.Uint64;
+      gasUnitPrice?: BCS.Uint64;
+      expireTimestamp?: BCS.Uint64;
+    },
+  ): Promise<Gen.PendingTransaction> {
+    const codeSerializer = new BCS.Serializer();
+    BCS.serializeVector(modules, codeSerializer);
+
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::code",
+        "publish_package_txn",
+        [],
+        [BCS.bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
+      ),
+    );
+
+    const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+    return this.submitSignedBCSTransaction(bcsTxn);
+  }
+
+  /**
    * Helper for generating, submitting, and waiting for a transaction, and then
    * checking whether it was committed successfully. Under the hood this is just
    * `generateSignSubmitTransaction` and then `waitForTransactionWithResult`, see
