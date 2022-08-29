@@ -258,3 +258,18 @@ impl StorageConfig {
             .set_port(utils::get_available_port());
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::config::PrunerConfig;
+
+    #[test]
+    pub fn tset_default_prune_window() {
+        // Not that these can't be changed, but think twice -- make them safe for mainnet
+
+        let config = PrunerConfig::default();
+        assert!(config.ledger_pruner_config.prune_window >= 50_000_000);
+        assert!(config.state_merkle_pruner_config.prune_window >= 100_000);
+        assert!(config.epoch_snapshot_pruner_config.prune_window > 50_000_000);
+    }
+}
