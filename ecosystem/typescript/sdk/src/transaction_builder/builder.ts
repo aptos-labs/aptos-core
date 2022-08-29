@@ -358,6 +358,7 @@ export class TransactionBuilderRemoteABI {
    * @returns RawTransaction
    */
   async build(func: Gen.EntryFunctionId, ty_tags: Gen.MoveType[], args: any[]): Promise<RawTransaction> {
+    /* eslint no-param-reassign: ["off"] */
     const normlize = (s: string) => s.replace(/^0[xX]0*/g, "0x");
     func = normlize(func);
     const funcNameParts = func.split("::");
