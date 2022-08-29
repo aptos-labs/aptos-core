@@ -16,6 +16,7 @@ pub struct TxnStats {
     pub submitted: u64,
     pub committed: u64,
     pub expired: u64,
+    pub failed_submission: u64,
     pub latency: u64,
     pub latency_samples: u64,
     pub latency_buckets: AtomicHistogramSnapshot,
@@ -26,6 +27,7 @@ pub struct TxnStatsRate {
     pub submitted: u64,
     pub committed: u64,
     pub expired: u64,
+    pub failed_submission: u64,
     pub latency: u64,
     pub p99_latency: u64,
 }
@@ -34,8 +36,8 @@ impl fmt::Display for TxnStatsRate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
-            self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, failed submission: {} tnx/s, latency: {} ms, p99 latency: {} ms",
+            self.submitted, self.committed, self.expired, self.failed_submission, self.latency, self.p99_latency,
         )
     }
 }
@@ -50,6 +52,7 @@ impl TxnStats {
             submitted: self.submitted / window_secs,
             committed: self.committed / window_secs,
             expired: self.expired / window_secs,
+            failed_submission: self.failed_submission / window_secs,
             latency: if self.latency_samples == 0 {
                 0u64
             } else {
@@ -64,8 +67,8 @@ impl fmt::Display for TxnStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "submitted: {}, committed: {}, expired: {}",
-            self.submitted, self.committed, self.expired,
+            "submitted: {}, committed: {}, expired: {}, failed submission: {}",
+            self.submitted, self.committed, self.expired, self.failed_submission,
         )
     }
 }
@@ -78,6 +81,7 @@ impl Sub for &TxnStats {
             submitted: self.submitted - other.submitted,
             committed: self.committed - other.committed,
             expired: self.expired - other.expired,
+            failed_submission: self.failed_submission - other.failed_submission,
             latency: self.latency - other.latency,
             latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
@@ -90,6 +94,7 @@ pub struct StatsAccumulator {
     pub submitted: AtomicU64,
     pub committed: AtomicU64,
     pub expired: AtomicU64,
+    pub failed_submission: AtomicU64,
     pub latency: AtomicU64,
     pub latency_samples: AtomicU64,
     pub latencies: Arc<AtomicHistogramAccumulator>,
@@ -101,6 +106,7 @@ impl StatsAccumulator {
             submitted: self.submitted.load(Ordering::Relaxed),
             committed: self.committed.load(Ordering::Relaxed),
             expired: self.expired.load(Ordering::Relaxed),
+            failed_submission: self.failed_submission.load(Ordering::Relaxed),
             latency: self.latency.load(Ordering::Relaxed),
             latency_samples: self.latency_samples.load(Ordering::Relaxed),
             latency_buckets: self.latencies.snapshot(),
@@ -273,6 +279,7 @@ mod test {
             submitted: 0,
             committed: 10,
             expired: 0,
+            failed_submission: 0,
             latency: 0,
             latency_samples: 0,
             latency_buckets: histogram.snapshot(),

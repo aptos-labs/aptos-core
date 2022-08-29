@@ -90,7 +90,7 @@ impl SubmissionWorker {
             if loop_start_time.duration_since(wait_until) > wait_duration {
                 warn!(
                     "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
-                    self.client.show_base_url_string(),
+                    self.client.path_prefix_string(),
                     loop_start_time.duration_since(wait_until).as_secs()
                 );
             }
@@ -118,7 +118,7 @@ impl SubmissionWorker {
                     SampleRate::Duration(Duration::from_secs(120)),
                     warn!(
                         "[{:?}] Failed to submit request: {:?}",
-                        self.client.show_base_url_string(),
+                        self.client.path_prefix_string(),
                         e
                     )
                 );
@@ -149,15 +149,15 @@ impl SubmissionWorker {
         self.accounts
     }
 
-    async fn sleep_check_done(&self, duration: Duration) -> bool {
+    async fn sleep_check_done(&self, duration: Duration) {
         let start_time = Instant::now();
         loop {
             sleep(Duration::from_secs(1)).await;
             if self.stop.load(Ordering::Relaxed) {
-                return false;
+                return;
             }
             if start_time.elapsed() >= duration {
-                return true;
+                return;
             }
         }
     }
@@ -201,7 +201,6 @@ impl SubmissionWorker {
             self.params.transactions_per_account,
             wait_for_accounts_sequence_timeout,
             check_account_sequence_only_once,
-            &mut self.rng,
         )
         .await;
 
@@ -223,7 +222,7 @@ impl SubmissionWorker {
                 SampleRate::Duration(Duration::from_secs(120)),
                 warn!(
                     "[{:?}] Transactions were not committed before expiration: {:?}",
-                    self.client.show_base_url_string(),
+                    self.client.path_prefix_string(),
                     num_expired
                 )
             );
@@ -291,21 +290,30 @@ pub async fn submit_transactions(
         .fetch_add(txns.len() as u64, Ordering::Relaxed);
 
     match client.submit_batch_bcs(txns).await {
-        Err(e) => sample!(
-            SampleRate::Duration(Duration::from_secs(5)),
-            warn!(
-                "[{:?}] Failed to submit batch request: {:?}",
-                client.show_base_url_string(),
-                e
-            )
-        ),
+        Err(e) => {
+            stats
+                .failed_submission
+                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+            sample!(
+                SampleRate::Duration(Duration::from_secs(120)),
+                warn!(
+                    "[{:?}] Failed to submit batch request: {:?}",
+                    client.path_prefix_string(),
+                    e
+                )
+            );
+        }
         Ok(v) => {
-            for f in v.into_inner().transaction_failures {
+            let failures = v.into_inner().transaction_failures;
+            stats
+                .failed_submission
+                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+            for f in failures {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(5)),
+                    SampleRate::Duration(Duration::from_secs(120)),
                     warn!(
                         "[{:?}] Failed to submit a request within a batch: {:?}",
-                        client.show_base_url_string(),
+                        client.path_prefix_string(),
                         f
                     )
                 );

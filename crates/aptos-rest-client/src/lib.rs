@@ -92,7 +92,7 @@ impl Client {
         Self::new_with_timeout(base_url, Duration::from_secs(10))
     }
 
-    pub fn show_base_url_string(&self) -> String {
+    pub fn path_prefix_string(&self) -> String {
         self.base_url
             .join(&self.version_path_base)
             .map(|path| path.to_string())
