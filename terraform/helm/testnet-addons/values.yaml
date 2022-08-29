@@ -51,7 +51,7 @@ load_test:
     mint_key:
     # -- Number of transactions outstanding in mempool
     mempool_backlog: 5000
-    # -- Whether to target a constant TPS
+    # -- Whether to target a constant TPS, or 0 if not used. Cannot be used with mempool_backlog.
     target_tps: 0
     # -- How long to emit transactions for
     duration: 300
