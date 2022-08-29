@@ -48,6 +48,7 @@ pub enum ConsensusMsg {
     /// ProposalMsg contains the required information for the proposer election protocol to make
     /// its choice (typically depends on round and proposer info).
     ProposalMsg(Box<ProposalMsg>),
+    /// Add here
     VerifiedProposalMsg(Box<Block>),
     /// This struct describes basic synchronization metadata.
     SyncInfo(Box<SyncInfo>),

@@ -801,6 +801,13 @@ impl RoundManager {
                     )
                 }
 
+                VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
+                    monitor!(
+                        "process_verified_proposal",
+                        self.process_verified_self_proposal_msg(*proposal_msg).await
+                    )
+                }
+
                 VerifiedEvent::VoteMsg(vote_msg) => {
                     monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                 }
