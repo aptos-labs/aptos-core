@@ -271,10 +271,24 @@ async fn construction_metadata(
             .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
             .into_inner();
 
-        let maximum_possible_gas = std::cmp::min(
-            account_balance.coin.value.0 / gas_price_per_unit,
-            MAX_GAS_UNITS_PER_REQUEST,
-        );
+        let maximum_possible_gas =
+            if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
+                std::cmp::min(
+                    (account_balance
+                        .coin
+                        .value
+                        .0
+                        .saturating_sub(transfer.amount.0))
+                        / gas_price_per_unit,
+                    MAX_GAS_UNITS_PER_REQUEST,
+                )
+            } else {
+                std::cmp::min(
+                    account_balance.coin.value.0 / gas_price_per_unit,
+                    MAX_GAS_UNITS_PER_REQUEST,
+                )
+            };
+
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(gas_price_per_unit)
             .with_max_gas_amount(maximum_possible_gas);
