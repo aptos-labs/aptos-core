@@ -18,7 +18,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   test 'view all projects' do
     3.times do
-      FactoryBot.create(:project, user: FactoryBot.create(:user))
+      FactoryBot.create(:project, user: @user)
     end
     sign_out @user
     get projects_path
