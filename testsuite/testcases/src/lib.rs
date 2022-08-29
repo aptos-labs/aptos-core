@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
+pub mod continuous_progress_test;
 pub mod forge_setup_test;
 pub mod gas_price_test;
 pub mod network_bandwidth_test;
@@ -16,7 +17,9 @@ pub mod state_sync_performance;
 
 use anyhow::{anyhow, ensure};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
+use forge::{
+    NetworkContext, NetworkTest, NodeExt, Result, Swarm, Test, TxnEmitter, TxnStats, Version,
+};
 use rand::SeedableRng;
 use std::time::{Duration, Instant};
 use tokio::runtime::Builder;
@@ -91,4 +94,62 @@ pub fn generate_traffic<'t>(
     let stats = rt.block_on(emitter.emit_txn_for(emit_job_request, duration))?;
 
     Ok(stats)
+}
+
+pub enum LoadDestination {
+    AllNodes,
+    AllValidators,
+    AllFullnodes,
+    Peers(Vec<PeerId>),
+}
+
+pub trait NetworkLoadTest: Test {
+    fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+        Ok(LoadDestination::AllNodes)
+    }
+    fn test(&self, _swarm: &mut dyn Swarm, _duration: Duration) -> Result<()> {
+        Ok(())
+    }
+    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl NetworkTest for dyn NetworkLoadTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let duration = ctx.global_duration;
+
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+
+        let all_fullnodes = ctx
+            .swarm()
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+
+        let nodes_to_send_load_to = match self.setup(ctx.swarm())? {
+            LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
+            LoadDestination::AllValidators => all_validators,
+            LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::Peers(peers) => peers,
+        };
+
+        // Generate some traffic
+        let txn_stat = generate_traffic(ctx, &nodes_to_send_load_to, duration, 1)?;
+
+        self.test(ctx.swarm(), duration)?;
+
+        ctx.report
+            .report_txn_stats(self.name().to_string(), &txn_stat, duration);
+
+        ctx.check_for_success(&txn_stat, &duration)?;
+
+        self.finish(ctx.swarm())?;
+
+        Ok(())
+    }
 }

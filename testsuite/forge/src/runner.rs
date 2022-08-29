@@ -207,9 +207,17 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn get_emit_job(&self) -> &EmitJobRequest {
+        &self.emit_job_request
+    }
+
     pub fn with_success_criteria(mut self, success_criteria: SuccessCriteria) -> Self {
         self.success_criteria = success_criteria;
         self
+    }
+
+    pub fn get_mut_success_criteria(&mut self) -> &mut SuccessCriteria {
+        &mut self.success_criteria
     }
 
     pub fn number_of_tests(&self) -> usize {
@@ -240,7 +248,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 30000,
             }),
-            success_criteria: SuccessCriteria::new(3500, 10000, None),
+            success_criteria: SuccessCriteria::new(3500, 10000, true, None),
         }
     }
 }
