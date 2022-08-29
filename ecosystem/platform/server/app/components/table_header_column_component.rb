@@ -19,7 +19,7 @@ class TableHeaderColumnComponent < ViewComponent::Base
 
     @rest = rest
     @rest[:class] = [
-      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-base font-bold whitespace-nowrap',
+      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-base font-normal whitespace-nowrap',
       @rest[:class]
     ]
   end
