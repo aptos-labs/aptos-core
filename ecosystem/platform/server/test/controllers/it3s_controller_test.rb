@@ -19,11 +19,13 @@ class It3sControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'it loads correctly' do
+    skip('it3 registration closed')
     get it3_path
     assert_response :success
   end
 
   test 'if logged out, it redirects to sign in, then redirects back to /it3' do
+    skip('it3 registration closed')
     sign_out @user
     get it3_path
     assert_redirected_to new_user_session_path
