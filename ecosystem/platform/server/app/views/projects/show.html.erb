@@ -44,8 +44,8 @@
           <% end %>
         </div>
         <div class="flex gap-8">
-          <% @project.members.public.each do |user| %>
-            <%= content_tag :a, user.username, href: '#TODO' %>
+          <% [@project.user].concat(@project.members.public).each do |user| %>
+            <%= content_tag :a, user.username, href: user_path(user) %>
           <% end %>
         </div>
       </div>

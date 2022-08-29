@@ -5,6 +5,6 @@
 
 FactoryBot.define do
   factory :category do
-    title { Faker::Company.buzzword }
+    title { %w[NFTs DeFi Gaming Tooling Wallets Data Lending Other].sample }
   end
 end

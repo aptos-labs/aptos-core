@@ -501,7 +501,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number,
-            cached_packages::aptos_stdlib::account_create_account(account_addr),
+            cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -947,5 +947,7 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: remove once bundles removed
+    aptos_vm::aptos_vm::allow_module_bundle_for_test();
     run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

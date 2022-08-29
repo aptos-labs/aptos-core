@@ -376,11 +376,11 @@ impl CliTestFramework {
 
     pub async fn analyze_validator_performance(
         &self,
-        start_epoch: Option<u64>,
-        end_epoch: Option<u64>,
+        start_epoch: Option<i64>,
+        end_epoch: Option<i64>,
     ) -> CliTypedResult<()> {
         AnalyzeValidatorPerformance {
-            start_epoch,
+            start_epoch: start_epoch.unwrap_or(-2),
             end_epoch,
             rest_options: self.rest_options(),
             profile_options: Default::default(),
@@ -627,6 +627,7 @@ impl CliTestFramework {
         &self,
         name: String,
         account_strs: BTreeMap<&str, &str>,
+        framework_dir: Option<PathBuf>,
     ) -> CliTypedResult<()> {
         InitPackage {
             name,
@@ -636,6 +637,7 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
+            for_test_framework: framework_dir,
         }
         .execute()
         .await
@@ -658,6 +660,7 @@ impl CliTestFramework {
         filter: Option<&str>,
     ) -> CliTypedResult<&'static str> {
         TestPackage {
+            instruction_execution_bound: 100_000,
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
         }

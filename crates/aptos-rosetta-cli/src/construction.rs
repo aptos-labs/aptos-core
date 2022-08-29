@@ -29,6 +29,35 @@ impl ConstructionCommand {
     }
 }
 
+#[derive(Debug, Parser)]
+pub struct TransactionArgs {
+    #[clap(long)]
+    expiry_offset_secs: Option<i64>,
+    #[clap(long)]
+    sequence_number: Option<u64>,
+    #[clap(long)]
+    max_gas: Option<u64>,
+    #[clap(long)]
+    gas_price: Option<u64>,
+}
+
+impl TransactionArgs {
+    pub fn expiry_time(&self) -> anyhow::Result<u64> {
+        let offset = self.expiry_offset_secs.unwrap_or(60);
+        if offset > 0 {
+            Ok(
+                (SystemTime::now().duration_since(UNIX_EPOCH)?
+                    + Duration::from_secs(offset as u64))
+                .as_secs(),
+            )
+        } else {
+            Ok((SystemTime::now().duration_since(UNIX_EPOCH)?
+                - Duration::from_secs((-offset) as u64))
+            .as_secs())
+        }
+    }
+}
+
 /// Creates an account using Rosetta, no funds will be transferred
 ///
 /// EncodingOptions are here so we can allow using the BCS encoded mint key
@@ -44,6 +73,8 @@ pub struct CreateAccountCommand {
     profile_options: ProfileOptions,
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
@@ -68,8 +99,10 @@ impl CreateAccountCommand {
                 &network_identifier,
                 &private_key,
                 self.new_account,
-                expiry_time()?,
-                None,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
             )
             .await
     }
@@ -90,6 +123,8 @@ pub struct TransferCommand {
     profile_options: ProfileOptions,
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
     /// The sending account, since the private key doesn't always match the
     /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
@@ -118,13 +153,11 @@ impl TransferCommand {
                 &private_key,
                 self.receiver,
                 self.amount,
-                expiry_time()?,
-                None,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
             )
             .await
     }
-}
-
-fn expiry_time() -> anyhow::Result<u64> {
-    Ok((SystemTime::now().duration_since(UNIX_EPOCH)? + Duration::from_secs(60)).as_secs())
 }

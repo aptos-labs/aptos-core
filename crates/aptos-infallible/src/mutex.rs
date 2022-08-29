@@ -22,6 +22,13 @@ impl<T> Mutex<T> {
             .lock()
             .expect("Cannot currently handle a poisoned lock")
     }
+
+    // consume the mutex
+    pub fn into_inner(self) -> T {
+        self.0
+            .into_inner()
+            .expect("Cannot currently handle a poisoned lock")
+    }
 }
 
 #[cfg(test)]

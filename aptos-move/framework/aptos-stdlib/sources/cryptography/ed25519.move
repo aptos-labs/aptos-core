@@ -7,17 +7,33 @@ module aptos_std::ed25519 {
     use aptos_std::type_info::{Self, TypeInfo};
     use std::option::{Self, Option};
 
+    //
+    // Error codes
+    //
+
     /// Wrong number of bytes were given as input when deserializing an Ed25519 public key.
     const E_WRONG_PUBKEY_SIZE : u64 = 1;
 
     /// Wrong number of bytes were given as input when deserializing an Ed25519 signature.
     const E_WRONG_SIGNATURE_SIZE : u64 = 2;
 
+    //
+    // Constants
+    //
+
+    /// The identifier of the Ed25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
+    /// it together with an Ed25519 public key.
+    const SIGNATURE_SCHEME_ID : u8 = 0;
+
     /// The size of a serialized public key, in bytes.
     const PUBLIC_KEY_NUM_BYTES : u64 = 32;
 
     /// The size of a serialized signature, in bytes.
     const SIGNATURE_NUM_BYTES : u64 = 64;
+
+    //
+    // Structs
+    //
 
     /// A BCS-serializable message, which one can verify signatures on via `verify_signature_t`
     struct SignedMessage<MessageType> has drop {
@@ -42,6 +58,10 @@ module aptos_std::ed25519 {
     struct Signature has copy, drop, store {
         bytes: vector<u8>
     }
+
+    //
+    // Functions
+    //
 
     /// Parses the input 32 bytes as an *unvalidated* Ed25519 public key.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
@@ -113,13 +133,37 @@ module aptos_std::ed25519 {
 
     /// This function is used to verify a signature on any BCS-serializable type T. For now, it is used to verify the
     /// proof of private key ownership when rotating authentication keys.
-    public fun signature_verify_strict_t<T: drop> (signature: &Signature, public_key: &UnvalidatedPublicKey, data: T): bool {
+    public fun signature_verify_strict_t<T: drop>(signature: &Signature, public_key: &UnvalidatedPublicKey, data: T): bool {
         let encoded = SignedMessage {
             type_info: type_info::type_of<T>(),
             inner: data,
         };
 
         signature_verify_strict_internal(signature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
+    }
+
+    /// Helper method to construct a SignedMessage struct.
+    public fun new_signed_message<T: drop>(data: T): SignedMessage<T> {
+        SignedMessage {
+            type_info: type_info::type_of<T>(),
+            inner: data,
+        }
+    }
+
+    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    public fun unvalidated_public_key_to_authentication_key(pk: &UnvalidatedPublicKey): vector<u8> {
+        public_key_bytes_to_authentication_key(pk.bytes)
+    }
+
+    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    public fun validated_public_key_to_authentication_key(pk: &ValidatedPublicKey): vector<u8> {
+        public_key_bytes_to_authentication_key(pk.bytes)
+    }
+
+    /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
+    fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
+        std::vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
+        std::hash::sha3_256(pk_bytes)
     }
 
     //

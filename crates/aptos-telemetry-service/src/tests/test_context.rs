@@ -10,6 +10,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
+use reqwest::header::AUTHORIZATION;
 use reqwest::Url;
 use serde_json::Value;
 use warp::http::header::CONTENT_TYPE;
@@ -42,6 +43,9 @@ pub async fn new_test_context() -> TestContext {
         Url::parse("http://localhost/").unwrap(),
         config.humio_auth_token.clone(),
     );
+    let gcp_bigquery_client = gcp_bigquery_client::Client::with_workload_identity(false)
+        .await
+        .unwrap();
     let validator_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
     let vfn_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
@@ -49,7 +53,7 @@ pub async fn new_test_context() -> TestContext {
         config,
         validator_cache,
         vfn_cache,
-        None,
+        Some(gcp_bigquery_client),
         None,
         humio_client,
     ))
@@ -57,8 +61,9 @@ pub async fn new_test_context() -> TestContext {
 
 #[derive(Clone)]
 pub struct TestContext {
-    pub expect_status_code: u16,
+    expect_status_code: u16,
     pub inner: Context,
+    bearer_token: String,
 }
 
 impl TestContext {
@@ -66,18 +71,41 @@ impl TestContext {
         Self {
             expect_status_code: 200,
             inner: context,
+            bearer_token: "".into(),
         }
     }
 
-    #[allow(dead_code)]
+    pub fn expect_status_code(&self, status_code: u16) -> Self {
+        let mut ret = self.clone();
+        ret.expect_status_code = status_code;
+        ret
+    }
+
+    pub fn with_bearer_auth(&self, token: String) -> Self {
+        let mut ret = self.clone();
+        ret.bearer_token = token;
+        ret
+    }
+
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(warp::test::request().method("GET").path(path))
-            .await
+        self.execute(
+            warp::test::request()
+                .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
+                .method("GET")
+                .path(path),
+        )
+        .await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(warp::test::request().method("POST").path(path).json(&body))
-            .await
+        self.execute(
+            warp::test::request()
+                .header(AUTHORIZATION, format!("Bearer {}", self.bearer_token))
+                .method("POST")
+                .path(path)
+                .json(&body),
+        )
+        .await
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {

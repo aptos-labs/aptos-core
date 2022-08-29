@@ -17,12 +17,10 @@ use aptos_telemetry_service::types::{
 };
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
+use prometheus::{default_registry, Registry};
+use reqwest::header::CONTENT_ENCODING;
 use reqwest::{RequestBuilder, Response, StatusCode};
 use std::{io::Write, sync::Arc};
-use tokio_retry::{
-    strategy::{jitter, ExponentialBackoff},
-    Retry,
-};
 
 struct AuthContext {
     noise_config: Option<NoiseConfig>,
@@ -86,13 +84,16 @@ impl TelemetrySender {
         Ok(response)
     }
 
-    pub(crate) async fn push_prometheus_metrics(&self) -> Result<(), anyhow::Error> {
+    pub(crate) async fn push_prometheus_metrics(
+        &self,
+        registry: &Registry,
+    ) -> Result<(), anyhow::Error> {
         debug!("Sending Prometheus Metrics");
 
         let token = self.get_auth_token().await?;
 
         let scraped_metrics =
-            prometheus::TextEncoder::new().encode_to_string(&aptos_metrics_core::gather())?;
+            prometheus::TextEncoder::new().encode_to_string(&registry.gather())?;
 
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
         gzip_encoder.write_all(scraped_metrics.as_bytes())?;
@@ -102,7 +103,7 @@ impl TelemetrySender {
             .send_authenticated_request(
                 self.client
                     .post(format!("{}/push-metrics", self.base_url))
-                    .header("Content-Encoding", "gzip")
+                    .header(CONTENT_ENCODING, "gzip")
                     .bearer_auth(token)
                     .body(compressed_bytes),
             )
@@ -128,25 +129,19 @@ impl TelemetrySender {
     }
 
     pub(crate) async fn try_push_prometheus_metrics(&self) {
-        self.push_prometheus_metrics().await.map_or_else(
-            |e| debug!("Failed to push Prometheus Metrics: {}", e),
-            |_| debug!("Prometheus Metrics pushed successfully."),
-        );
+        self.push_prometheus_metrics(default_registry())
+            .await
+            .map_or_else(
+                |e| debug!("Failed to push Prometheus Metrics: {}", e),
+                |_| debug!("Prometheus Metrics pushed successfully."),
+            );
     }
 
-    pub async fn send_logs(&self, batch: Vec<String>) {
+    pub async fn try_send_logs(&self, batch: Vec<String>) {
         if let Ok(json) = serde_json::to_string(&batch) {
             let len = json.len();
 
-            let retry_strategy = ExponentialBackoff::from_millis(10)
-                .map(jitter) // add jitter to delays
-                .take(4); // limit to 4 retries
-
-            let result = Retry::spawn(retry_strategy, || async {
-                self.post_logs(json.as_bytes()).await
-            })
-            .await;
-            match result {
+            match self.post_logs(json.as_bytes()).await {
                 Ok(_) => {
                     increment_log_ingest_successes_by(batch.len() as u64);
                     debug!("Sent log of length: {}", len);
@@ -161,96 +156,54 @@ impl TelemetrySender {
         }
     }
 
-    async fn post_logs(&self, json: &[u8]) -> Result<(), anyhow::Error> {
-        let token = self.get_auth_token().await?;
+    async fn post_logs(&self, json: &[u8]) -> Result<Response, anyhow::Error> {
+        debug!("Sending logs");
 
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
         gzip_encoder.write_all(json)?;
         let compressed_bytes = gzip_encoder.finish()?;
 
         // Send the request and wait for a response
-        let send_result = self
-            .client
-            .post(format!("{}/log_ingest", self.base_url))
-            .header("Content-Encoding", "gzip")
-            .bearer_auth(token)
-            .body(compressed_bytes)
-            .send()
-            .await;
+        let response = self
+            .send_authenticated_request(
+                self.client
+                    .post(format!("{}/log_ingest", self.base_url))
+                    .header(CONTENT_ENCODING, "gzip")
+                    .body(compressed_bytes),
+            )
+            .await?;
 
         // Process the result
-        match send_result {
-            Ok(response) => {
-                let status_code = response.status();
-                if status_code.is_success() {
-                    Ok(())
-                } else if status_code == StatusCode::UNAUTHORIZED {
-                    self.reset_token();
-                    Err(anyhow!("Unauthorized"))
-                } else {
-                    Err(anyhow!("Error status received: {}", status_code))
-                }
-            }
-            Err(error) => Err(anyhow!("Error sending log. Err: {}", error)),
-        }
+        error_for_status_with_body(response).await
     }
 
-    pub async fn send_metrics(&self, event_name: String, telemetry_dump: TelemetryDump) {
-        let retry_strategy = ExponentialBackoff::from_millis(10)
-            .map(jitter) // add jitter to delays
-            .take(4); // limit to 4 retries
-
-        let result = Retry::spawn(retry_strategy, || async {
-            self.post_metrics(&telemetry_dump.clone()).await
-        })
-        .await;
-
-        match result {
+    pub async fn try_send_custom_metrics(&self, event_name: String, telemetry_dump: TelemetryDump) {
+        match self.post_custom_metrics(&telemetry_dump.clone()).await {
             Ok(_) => {
-                debug!(
-                    "Sent telemetry event {}, data: {:?}",
-                    &event_name, &telemetry_dump
-                );
                 metrics::increment_telemetry_service_successes(&event_name);
+                debug!("Custom metrics with name {} sent successfully.", event_name);
             }
-            Err(error) => {
-                debug!("Failed to send telemetry event: Error: {}", error);
+            Err(e) => {
                 metrics::increment_telemetry_service_failures(&event_name);
+                debug!("Failed to send custom metrics: {}", e);
             }
         }
     }
 
-    async fn post_metrics(&self, telemetry_dump: &TelemetryDump) -> Result<(), anyhow::Error> {
-        let token = self.get_auth_token().await?;
-
+    async fn post_custom_metrics(
+        &self,
+        telemetry_dump: &TelemetryDump,
+    ) -> Result<Response, anyhow::Error> {
         // Send the request and wait for a response
-        let send_result = self
-            .client
-            .post(format!("{}/custom_event", self.base_url))
-            .json::<TelemetryDump>(telemetry_dump)
-            .bearer_auth(token)
-            .send()
-            .await;
+        let response = self
+            .send_authenticated_request(
+                self.client
+                    .post(format!("{}/custom_event", self.base_url))
+                    .json::<TelemetryDump>(telemetry_dump),
+            )
+            .await?;
 
-        // Process the response
-        match send_result {
-            Ok(response) => {
-                let status_code = response.status();
-                if status_code.is_success() {
-                    Ok(())
-                } else if status_code == StatusCode::UNAUTHORIZED {
-                    self.reset_token();
-                    Err(anyhow!("Unauthorized"))
-                } else {
-                    Err(anyhow!(
-                        "Error status received {}: {}",
-                        status_code,
-                        response.text().await?,
-                    ))
-                }
-            }
-            Err(error) => Err(anyhow!("Error sending metrics. Err: {}", error)),
-        }
+        error_for_status_with_body(response).await
     }
 
     async fn get_auth_token(&self) -> Result<String, Error> {
@@ -361,6 +314,29 @@ impl TelemetrySender {
 
         Ok(jwt)
     }
+
+    pub(crate) async fn check_chain_access(&self, chain_id: ChainId) -> bool {
+        debug!("checking chain access for chain id {}", chain_id);
+        let response = self
+            .client
+            .get(format!("{}/chain-access/{}", self.base_url, chain_id))
+            .send()
+            .await;
+
+        match response {
+            Ok(response) => match error_for_status_with_body(response).await {
+                Ok(response) => response.json::<bool>().await.unwrap_or(true),
+                Err(e) => {
+                    debug!("Unable to check chain access {}", e);
+                    true
+                }
+            },
+            Err(e) => {
+                debug!("Unable to check chain access {}", e);
+                true
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -377,6 +353,7 @@ mod tests {
     use aptos_crypto::Uniform;
     use aptos_telemetry_service::types::telemetry::TelemetryEvent;
     use httpmock::MockServer;
+    use prometheus::{register_int_counter_vec_with_registry, Registry};
 
     #[tokio::test]
     async fn test_server_public_key() {
@@ -395,8 +372,6 @@ mod tests {
         let result1 = client.server_public_key().await;
         let result2 = client.server_public_key().await;
 
-        println!("{:?}", result1);
-
         // Should call the server once and cache the key
         assert_eq!(mock.hits(), 1);
         assert_eq!(result1.is_ok(), true);
@@ -413,7 +388,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_post_metrics() {
+    async fn test_post_custom_metrics() {
         let mut telemetry_event = TelemetryEvent {
             name: "sample-event".into(),
             params: BTreeMap::new(),
@@ -447,14 +422,14 @@ mod tests {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
 
-        let result = client.post_metrics(&telemetry_dump).await;
+        let result = client.post_custom_metrics(&telemetry_dump).await;
 
         mock.assert();
         assert!(result.is_ok());
     }
 
     #[tokio::test]
-    async fn test_send_metrics_retry() {
+    async fn test_try_send_metrics_retry_unauthorized() {
         let event_name = "sample-event";
         let mut telemetry_event = TelemetryEvent {
             name: event_name.into(),
@@ -477,7 +452,7 @@ mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method("POST").path("/custom_event");
-            then.status(400);
+            then.status(401);
         });
 
         let node_config = NodeConfig::default();
@@ -486,9 +461,11 @@ mod tests {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
 
-        client.send_metrics(event_name.into(), telemetry_dump).await;
+        client
+            .try_send_custom_metrics(event_name.into(), telemetry_dump)
+            .await;
 
-        mock.assert_hits(5);
+        mock.assert_hits(1);
         assert_eq!(
             APTOS_TELEMETRY_SERVICE_SUCCESS
                 .with_label_values(&[event_name])
@@ -505,10 +482,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_push_prometheus_metrics() {
-        metrics::increment_telemetry_service_successes("test-event");
+        // Initialize a local prometheus registry
+        // Using the global registry will conflict will other tests that increment counters
+        let test_registry = Registry::default();
+
+        let counter = register_int_counter_vec_with_registry!(
+            "aptos_telemetry_service_success",
+            "Number of telemetry events successfully sent to telemetry service",
+            &["event_name"],
+            test_registry
+        )
+        .unwrap();
+
+        counter.with_label_values(&["test-event"]).inc();
 
         let scraped_metrics = prometheus::TextEncoder::new()
-            .encode_to_string(&aptos_metrics_core::gather())
+            .encode_to_string(&test_registry.gather())
             .unwrap();
 
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -530,7 +519,7 @@ mod tests {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
 
-        let result = client.push_prometheus_metrics().await;
+        let result = client.push_prometheus_metrics(&test_registry).await;
 
         mock.assert();
         assert!(result.is_ok());
@@ -561,7 +550,25 @@ mod tests {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
 
-        client.send_logs(batch).await;
+        client.try_send_logs(batch).await;
+
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_check_chain_access() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path("/chain-access/24");
+            then.status(200).json_body(true);
+        });
+
+        let client = TelemetrySender::new(
+            server.base_url(),
+            ChainId::default(),
+            &NodeConfig::default(),
+        );
+        assert!(client.check_chain_access(ChainId::new(24)).await);
 
         mock.assert();
     }

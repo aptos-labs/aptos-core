@@ -6,6 +6,8 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
+#[cfg(feature = "no-upload-proposal")]
+use crate::common::utils::read_from_file;
 use crate::move_tool::{init_move_dir, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
@@ -48,7 +50,7 @@ impl GovernanceTool {
             Propose(tool) => tool.execute_serialized().await,
             Vote(tool) => tool.execute_serialized().await,
             ExecuteProposal(tool) => tool.execute_serialized().await,
-            GenerateUpgradeProposal(tool) => tool.execute_serialized().await,
+            GenerateUpgradeProposal(tool) => tool.execute_serialized_success().await,
         }
     }
 }
@@ -56,11 +58,15 @@ impl GovernanceTool {
 /// Submit proposal to other validators to be proposed on
 #[derive(Parser)]
 pub struct SubmitProposal {
-    /// Code location of the script to be voted on
-    #[clap(long)]
+    /// Location of the JSON metadata of the proposal
+    #[clap(long, group = "proposal-metadata")]
     pub(crate) metadata_url: Url,
-    #[clap(long)]
+
+    #[cfg(feature = "no-upload-proposal")]
+    /// A JSON file to be uploaded later at the metadata URL
+    #[clap(long, group = "proposal-metadata")]
     pub(crate) metadata_path: Option<PathBuf>,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -99,7 +105,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
                 metadata_hash.to_hex().as_bytes().to_vec(),
             ))
             .await?;
-
+        let txn_summary = TransactionSummary::from(&txn);
         if let Transaction::UserTransaction(inner) = txn {
             // Find event with proposal id
             let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
@@ -116,17 +122,10 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
                 warn!("No proposal event found to find proposal id");
                 None
             };
-            let request = inner.request;
-            let info = inner.info;
 
             return Ok(ProposalSubmissionSummary {
                 proposal_id,
-                transaction_hash: info.hash.into(),
-                transaction_version: info.version.into(),
-                gas_used: info.gas_used.0,
-                gas_price_per_unit: request.gas_unit_price.0,
-                sequence_number: request.sequence_number.0,
-                vm_status: info.vm_status,
+                transaction: txn_summary,
             });
         }
         Err(CliError::UnexpectedError(
@@ -138,11 +137,14 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 impl SubmitProposal {
     /// Retrieve metadata and validate it
     async fn get_metadata(&self) -> CliTypedResult<(ProposalMetadata, HashValue)> {
-        let bytes = if let Some(path) = &self.metadata_path {
-            Self::get_metadata_from_file(path)?
+        #[cfg(feature = "no-upload-proposal")]
+        let bytes = if let Some(ref path) = self.metadata_path {
+            read_from_file(path)?
         } else {
-            Self::get_metadata_from_url(&self.metadata_url).await?
+            get_metadata_from_url(&self.metadata_url).await?
         };
+        #[cfg(not(feature = "no-upload-proposal"))]
+        let bytes = get_metadata_from_url(&self.metadata_url).await?;
 
         let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
             CliError::CommandArgumentError(format!(
@@ -165,43 +167,32 @@ impl SubmitProposal {
         let metadata_hash = HashValue::sha3_256_of(&bytes);
         Ok((metadata, metadata_hash))
     }
+}
 
-    async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
-        let client = reqwest::ClientBuilder::default()
-            .tls_built_in_root_certs(true)
-            .build()
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to build HTTP client {}", err))
-            })?;
-        client
-            .get(metadata_url.clone())
-            .send()
-            .await
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    metadata_url, err
-                ))
-            })?
-            .bytes()
-            .await
-            .map(|b| b.to_vec())
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    metadata_url, err
-                ))
-            })
-    }
-
-    fn get_metadata_from_file(metadata_path: &PathBuf) -> CliTypedResult<Vec<u8>> {
-        fs::read(metadata_path).map_err(|err| {
+async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
+    let client = reqwest::ClientBuilder::default()
+        .tls_built_in_root_certs(true)
+        .build()
+        .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
+    client
+        .get(metadata_url.clone())
+        .send()
+        .await
+        .map_err(|err| {
             CliError::CommandArgumentError(format!(
-                "Failed to read metadata path {:?}: {}",
-                metadata_path, err
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
+            ))
+        })?
+        .bytes()
+        .await
+        .map(|b| b.to_vec())
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
             ))
         })
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -212,12 +203,8 @@ struct CreateProposalEvent {
 #[derive(Debug, Deserialize, Serialize)]
 struct ProposalSubmissionSummary {
     proposal_id: Option<u64>,
-    transaction_hash: HashValue,
-    transaction_version: u64,
-    gas_used: u64,
-    gas_price_per_unit: u64,
-    sequence_number: u64,
-    vm_status: String,
+    #[serde(flatten)]
+    transaction: TransactionSummary,
 }
 
 /// Submit a vote on a current proposal
@@ -244,12 +231,12 @@ pub struct SubmitVote {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SubmitVote {
+impl CliCommand<TransactionSummary> for SubmitVote {
     fn command_name(&self) -> &'static str {
         "SubmitVote"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let (vote_str, vote) = match (self.yes, self.no) {
             (true, false) => ("Yes", true),
             (false, true) => ("No", false),
@@ -274,6 +261,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 vote,
             ))
             .await
+            .map(TransactionSummary::from)
     }
 }
 
@@ -297,7 +285,7 @@ impl std::fmt::Display for ProposalMetadata {
 
 fn compile_in_temp_dir(
     script_path: &Path,
-    git_revision: &str,
+    framework_rev: Option<String>,
     prompt_options: PromptOptions,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
@@ -310,9 +298,10 @@ fn compile_in_temp_dir(
     init_move_dir(
         package_dir,
         "Proposal",
-        git_revision,
+        framework_rev,
         BTreeMap::new(),
         prompt_options,
+        None,
     )?;
 
     // Insert the new script
@@ -368,8 +357,10 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
+    /// Proposal Id being executed
     #[clap(long)]
     pub(crate) proposal_id: u64,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
@@ -403,9 +394,13 @@ pub struct CompileProposalArgs {
     #[clap(long, parse(from_os_str))]
     pub script_path: PathBuf,
 
-    /// Git hash or branch of the framework in aptos core
+    /// Git revision or branch for the Aptos framework
+    ///
+    /// If not provided, it won't be using the AptosFramework.  Keep in mind that this
+    /// will only build correctly without the framework git revision when doing a full
+    /// framework upgrade
     #[clap(long)]
-    pub framework_git_rev: String,
+    pub(crate) framework_git_rev: Option<String>,
 
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
@@ -428,7 +423,11 @@ impl CompileProposalArgs {
         }
 
         // Compile script
-        compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
+        compile_in_temp_dir(
+            script_path,
+            self.framework_git_rev.clone(),
+            self.prompt_options,
+        )
     }
 }
 
@@ -458,12 +457,12 @@ pub struct GenerateUpgradeProposal {
 }
 
 #[async_trait]
-impl CliCommand<&'static str> for GenerateUpgradeProposal {
+impl CliCommand<()> for GenerateUpgradeProposal {
     fn command_name(&self) -> &'static str {
         "GenerateUpgradeProposal"
     }
 
-    async fn execute(self) -> CliTypedResult<&'static str> {
+    async fn execute(self) -> CliTypedResult<()> {
         let GenerateUpgradeProposal {
             move_options,
             account,
@@ -475,6 +474,6 @@ impl CliCommand<&'static str> for GenerateUpgradeProposal {
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
         release.generate_script_proposal(account, output)?;
-        Ok("success")
+        Ok(())
     }
 }

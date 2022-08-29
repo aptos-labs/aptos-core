@@ -21,11 +21,11 @@ use aptos_types::{
 };
 use proptest::{collection::vec, prelude::*};
 use schemadb::SchemaBatch;
+use storage_interface::DbReader;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
-    #[ignore]
     #[test]
     fn test_txn_store_pruner(txns in vec(
         prop_oneof![
@@ -152,6 +152,7 @@ fn verify_txn_store_pruner(
                 j as u64,
                 ledger_version,
             );
+            aptos_db.get_accumulator_summary(j as Version).unwrap();
         }
         verify_transaction_accumulator_pruned(&ledger_store, i as u64);
     }

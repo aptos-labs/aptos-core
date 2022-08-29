@@ -18,12 +18,13 @@ use aptos_rest_client::aptos_api_types::{
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
+use field_count::FieldCount;
 use futures::future::Either;
 use serde::Serialize;
 
 static SECONDS_IN_10_YEARS: i64 = 60 * 60 * 24 * 365 * 10;
 
-#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(AsChangeset, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
@@ -204,7 +205,8 @@ impl Transaction {
             APITransaction::UserTransaction(tx) => (
                 Self::from_transaction_info(
                     &tx.info,
-                    serde_json::to_value(&tx.request.payload).unwrap(),
+                    serde_json::to_value(&tx.request.payload)
+                        .expect("Unable to deserialize transaction payload"),
                     transaction.type_str().to_string(),
                 ),
                 Some(Either::Left(UserTransaction::from_transaction(tx))),
@@ -217,7 +219,8 @@ impl Transaction {
             APITransaction::GenesisTransaction(tx) => (
                 Self::from_transaction_info(
                     &tx.info,
-                    serde_json::to_value(&tx.payload).unwrap(),
+                    serde_json::to_value(&tx.payload)
+                        .expect("Unable to deserialize Genesis transaction"),
                     transaction.type_str().to_string(),
                 ),
                 None,
@@ -277,9 +280,64 @@ impl Transaction {
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
+
+    pub fn from_transactions(
+        transactions: &[APITransaction],
+    ) -> (
+        Vec<Self>,
+        Vec<UserTransaction>,
+        Vec<BlockMetadataTransaction>,
+        Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
+    ) {
+        let mut txns = vec![];
+        let mut user_txns = vec![];
+        let mut bm_txns = vec![];
+        let mut events = vec![];
+        let mut wscs = vec![];
+        for (txn, user_or_bmt, maybe_event_list, maybe_wsc_list) in
+            transactions.iter().map(Self::from_transaction)
+        {
+            txns.push(txn);
+            match user_or_bmt {
+                Some(Either::Left(user_transaction_model)) => {
+                    user_txns.push(user_transaction_model);
+                }
+                Some(Either::Right(bmt_model)) => {
+                    bm_txns.push(bmt_model);
+                }
+                _ => (),
+            }
+            if let Some(mut event_list) = maybe_event_list {
+                events.append(&mut event_list);
+            }
+            if let Some(mut wsc_list) = maybe_wsc_list {
+                wscs.append(&mut wsc_list);
+            }
+        }
+        (txns, user_txns, bm_txns, events, wscs)
+    }
+
+    pub fn from_transactions_for_tokens(
+        transactions: &[APITransaction],
+    ) -> Vec<(UserTransaction, Vec<EventModel>)> {
+        let mut txns = vec![];
+        for (_, maybe_user_txn, maybe_event_list, _) in
+            transactions.iter().map(Self::from_transaction)
+        {
+            if let Some(Either::Left(user_txn)) = maybe_user_txn {
+                if let Some(event_list) = maybe_event_list {
+                    txns.push((user_txn, event_list))
+                }
+            }
+        }
+        txns
+    }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
@@ -305,7 +363,8 @@ impl UserTransaction {
     pub fn from_transaction(tx: &APIUserTransaction) -> Self {
         Self {
             hash: tx.info.hash.to_string(),
-            signature: serde_json::to_value(&tx.request.signature).unwrap(),
+            signature: serde_json::to_value(&tx.request.signature)
+                .expect("Unable to deserialize txn signature"),
             sender: tx.request.sender.inner().to_hex_literal(),
             sequence_number: u64_to_bigdecimal(tx.request.sequence_number.0),
             max_gas_amount: u64_to_bigdecimal(tx.request.max_gas_amount.0),
@@ -320,7 +379,9 @@ impl UserTransaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
@@ -354,13 +415,14 @@ impl BlockMetadataTransaction {
             epoch: u64_to_bigdecimal(tx.epoch.0),
             previous_block_votes_bitvec: serde_json::to_value(&tx.previous_block_votes_bitvec)
                 .unwrap(),
-            failed_proposer_indices: serde_json::to_value(&tx.failed_proposer_indices).unwrap(),
+            failed_proposer_indices: serde_json::to_value(&tx.failed_proposer_indices)
+                .expect("Should be able to parse proposer indices"),
         }
     }
 }
 
 fn parse_timestamp(ts: U64, version: U64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(*ts.inner() as i64 / 1000000, 0)
+    chrono::NaiveDateTime::from_timestamp_opt((*ts.inner() / 1000000) as i64, 0)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 

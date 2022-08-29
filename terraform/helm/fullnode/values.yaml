@@ -5,8 +5,8 @@ chain:
 
 aptos_chains:
   devnet:
-    id: 24
-    waypoint: 0:e5844c0dd980f6a75bd8dee5901425df5c1420883dfa216f79c9bfd287642573
+    id: 25
+    waypoint: 0:b9ef40d9846bb0a2f0a56517f50392b8eaddeb5a607e6635d280c96d8e23ae2c
 
 # fullnode network config
 fullnode_identity:

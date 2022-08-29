@@ -90,8 +90,8 @@ To transfer coins from Alice’s account to Bob’s account, we need to prepare 
 // We need to pass a token type to the `transfer` function.
 const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-  TxnBuilderTypes.ScriptFunction.natural(
+const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+  TxnBuilderTypes.EntryFunction.natural(
     // Fully qualified module name, `AccountAddress::ModuleName`
     "0x1::coin",
     // Module function
@@ -118,7 +118,7 @@ After assembling a transaction payload, we are ready to create a `RawTransaction
 
 ```ts
 // Create a raw transaction out of the transaction payload
-const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
+const rawTxn = await client.generateRawTransaction(alice.address(), entryFunctionPayload);
 
 // Sign the raw transaction with Alice's private key
 const bcsTxn = AptosClient.generateBCSTransaction(alice, rawTxn);

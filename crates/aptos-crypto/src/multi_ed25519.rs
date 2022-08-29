@@ -17,7 +17,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
-use mirai_annotations::*;
 use rand::Rng;
 use serde::Serialize;
 use std::{convert::TryInto, fmt};
@@ -42,11 +41,6 @@ pub struct MultiEd25519PublicKey {
     threshold: u8,
 }
 
-#[cfg(mirai)]
-use crate::tags::ValidatedPublicKeyTag;
-#[cfg(not(mirai))]
-struct ValidatedPublicKeyTag {}
-
 /// Vector of the multi-key signatures along with a 32bit [u8; 4] bitmap required to map signatures
 /// with their corresponding public keys.
 ///
@@ -64,10 +58,10 @@ impl MultiEd25519PrivateKey {
         private_keys: Vec<Ed25519PrivateKey>,
         threshold: u8,
     ) -> std::result::Result<Self, CryptoMaterialError> {
-        let num_of_keys = private_keys.len();
-        if threshold == 0 || num_of_keys < threshold as usize {
+        let num_of_private_keys = private_keys.len();
+        if threshold == 0 || num_of_private_keys < threshold as usize {
             Err(CryptoMaterialError::ValidationError)
-        } else if num_of_keys > MAX_NUM_OF_KEYS {
+        } else if num_of_private_keys > MAX_NUM_OF_KEYS {
             Err(CryptoMaterialError::WrongLengthError)
         } else {
             Ok(MultiEd25519PrivateKey {
@@ -93,10 +87,10 @@ impl MultiEd25519PublicKey {
         public_keys: Vec<Ed25519PublicKey>,
         threshold: u8,
     ) -> std::result::Result<Self, CryptoMaterialError> {
-        let num_of_keys = public_keys.len();
-        if threshold == 0 || num_of_keys < threshold as usize {
+        let num_of_public_keys = public_keys.len();
+        if threshold == 0 || num_of_public_keys < threshold as usize {
             Err(CryptoMaterialError::ValidationError)
-        } else if num_of_keys > MAX_NUM_OF_KEYS {
+        } else if num_of_public_keys > MAX_NUM_OF_KEYS {
             Err(CryptoMaterialError::WrongLengthError)
         } else {
             Ok(MultiEd25519PublicKey {
@@ -144,6 +138,8 @@ impl SigningKey for MultiEd25519PrivateKey {
     type VerifyingKeyMaterial = MultiEd25519PublicKey;
     type SignatureMaterial = MultiEd25519Signature;
 
+    /// Uses the first `threshold` private keys to create a MultiEd25519 signature on `message`.
+    /// (Used for testing only.)
     fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> MultiEd25519Signature {
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
         let signatures: Vec<Ed25519Signature> = self
@@ -292,8 +288,9 @@ impl std::hash::Hash for MultiEd25519PublicKey {
 impl TryFrom<&[u8]> for MultiEd25519PublicKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize a MultiEd25519PublicKey. This method will also check for key and threshold
-    /// validity, and will only deserialize keys that are safe against small subgroup attacks.
+    /// Deserialize a MultiEd25519PublicKey. This method will also check for threshold validity.
+    /// This method will NOT ensure keys are safe against small subgroup attacks, since our signature
+    /// verification API will automatically prevent it.
     fn try_from(bytes: &[u8]) -> std::result::Result<MultiEd25519PublicKey, CryptoMaterialError> {
         if bytes.is_empty() {
             return Err(CryptoMaterialError::WrongLengthError);
@@ -303,19 +300,14 @@ impl TryFrom<&[u8]> for MultiEd25519PublicKey {
             .chunks_exact(ED25519_PUBLIC_KEY_LENGTH)
             .map(Ed25519PublicKey::try_from)
             .collect();
-        public_keys.map(|public_keys| {
-            let public_key = MultiEd25519PublicKey {
-                public_keys,
-                threshold,
-            };
-            add_tag!(&public_key, ValidatedPublicKeyTag);
-            public_key
+        public_keys.map(|public_keys| MultiEd25519PublicKey {
+            public_keys,
+            threshold,
         })
     }
 }
 
 /// We deduce VerifyingKey from pointing to the signature material
-/// we get the ability to do `pubkey.validate(msg, signature)`
 impl VerifyingKey for MultiEd25519PublicKey {
     type SigningKeyMaterial = MultiEd25519PrivateKey;
     type SignatureMaterial = MultiEd25519Signature;
@@ -361,7 +353,7 @@ impl MultiEd25519Signature {
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
 
         // Check if all indexes are unique and < MAX_NUM_OF_KEYS
-        let (sigs, indexes): (Vec<_>, Vec<_>) = sorted_signatures.iter().cloned().unzip();
+        let (sigs, indexes): (Vec<_>, Vec<_>) = sorted_signatures.into_iter().unzip();
         for i in indexes {
             // If an index is out of range.
             if i < MAX_NUM_OF_KEYS as u8 {
@@ -493,8 +485,8 @@ impl Signature for MultiEd25519Signature {
         message: &T,
         public_key: &MultiEd25519PublicKey,
     ) -> Result<()> {
-        // Public keys should be validated to be safe against small subgroup attacks, etc.
-        precondition!(has_tag!(public_key, ValidatedPublicKeyTag));
+        // NOTE: Public keys need not be validated because we use ed25519_dalek's verify_strict,
+        // which checks for small order public keys.
         let mut bytes = <T as CryptoHash>::Hasher::seed().to_vec();
         bcs::serialize_into(&mut bytes, &message)
             .map_err(|_| CryptoMaterialError::SerializationError)?;
@@ -509,8 +501,8 @@ impl Signature for MultiEd25519Signature {
         message: &[u8],
         public_key: &MultiEd25519PublicKey,
     ) -> Result<()> {
-        // Public keys should be validated to be safe against small subgroup attacks, etc.
-        precondition!(has_tag!(public_key, ValidatedPublicKeyTag));
+        // NOTE: Public keys need not be validated because we use ed25519_dalek's verify_strict,
+        // which checks for small order public keys.
         match bitmap_last_set_bit(self.bitmap) {
             Some(last_bit) if last_bit as usize <= public_key.public_keys.len() => (),
             _ => {
@@ -529,7 +521,7 @@ impl Signature for MultiEd25519Signature {
             ));
         }
         let mut bitmap_index = 0;
-        // TODO use deterministic batch verification when gets available.
+        // TODO: Eventually switch to deterministic batch verification
         for sig in &self.signatures {
             while !bitmap_get_bit(self.bitmap, bitmap_index) {
                 bitmap_index += 1;

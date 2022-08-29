@@ -2,7 +2,7 @@
 
 # NOTE: We're only using this base image for the preinstalled dependencies. We
 # are using Puma as the app server, not Passenger.
-FROM phusion/passenger-full:2.3.0
+FROM phusion/passenger-full:2.3.0@sha256:dfd15f7a63ae07b8637df6a01a603f8ae82cbbdf684bfd696d09ae130c034fd1
 
 RUN npm install -g yarn && \
   rm -f /etc/my_init.d/10_syslog-ng.init && \

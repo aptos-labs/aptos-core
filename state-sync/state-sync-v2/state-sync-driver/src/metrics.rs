@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
+    HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -11,6 +12,9 @@ pub const DRIVER_CLIENT_NOTIFICATION: &str = "driver_client_notification";
 pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_notification";
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
+pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
+pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
+pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
@@ -122,6 +126,16 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking storage synchronizer latencies
+pub static STORAGE_SYNCHRONIZER_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_state_sync_storage_synchronizer_latencies",
+        "Counters related to the storage synchronizer latencies",
+        &["label"]
+    )
+    .unwrap()
+});
+
 /// Gauges for the storage synchronizer operations
 pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -162,4 +176,9 @@ pub fn set_epoch_state_gauge(epoch: &str, validator_address: &str, validator_wei
     EPOCH_STATE
         .with_label_values(&[epoch, validator_address, validator_weight])
         .set(1);
+}
+
+/// Starts the timer for the provided histogram and label
+pub fn start_timer(histogram: &Lazy<HistogramVec>, label: &str) -> HistogramTimer {
+    histogram.with_label_values(&[label]).start_timer()
 }

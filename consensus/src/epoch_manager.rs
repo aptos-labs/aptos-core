@@ -57,6 +57,7 @@ use consensus_types::{
     request_response::ConsensusRequest,
 };
 use event_notifications::ReconfigNotificationListener;
+use fail::fail_point;
 use futures::{
     channel::{
         mpsc,
@@ -177,12 +178,10 @@ impl EpochManager {
         time_service: Arc<dyn TimeService>,
         timeout_sender: channel::Sender<Round>,
     ) -> RoundState {
-        // 1.5^6 ~= 11
-        // Timeout goes from initial_timeout to initial_timeout*11 in 6 steps
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
-            1.2,
-            6,
+            self.config.round_timeout_backoff_exponent_base,
+            self.config.round_timeout_backoff_max_exponent,
         ));
         RoundState::new(time_interval, time_service, timeout_sender)
     }
@@ -415,7 +414,7 @@ impl EpochManager {
             self.quorum_store_to_mempool_sender.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
-        tokio::spawn(quorum_store.start());
+        spawn_named!("Quorum Store", quorum_store.start());
     }
 
     /// this function spawns the phases and a buffer manager
@@ -638,6 +637,9 @@ impl EpochManager {
         peer_id: AccountAddress,
         consensus_msg: ConsensusMsg,
     ) -> anyhow::Result<()> {
+        fail_point!("consensus::process::any", |_| {
+            Err(anyhow::anyhow!("Injected error in process_message"))
+        });
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -754,6 +756,9 @@ impl EpochManager {
         &self,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
+        fail_point!("consensus::process::any", |_| {
+            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
+        });
         if let Some(block_store) = &self.block_store {
             block_store.process_block_retrieval(request).await
         } else {

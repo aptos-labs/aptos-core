@@ -131,7 +131,7 @@ fn signing_message_request() -> Value {
         "expiration_timestamp_secs": "9991638487317",
         "payload": {
             "type": "entry_function_payload",
-            "function": "0x1::account::create_account",
+            "function": "0x1::aptos_account::create_account",
             "type_arguments": [
             ],
             "arguments": [

@@ -118,6 +118,10 @@ pub struct InitPackage {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// For test: use the given local reference to the aptos framework
+    #[clap(skip)]
+    pub(crate) for_test_framework: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -137,9 +141,10 @@ impl CliCommand<()> for InitPackage {
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            "devnet",
+            Some("main".to_string()),
             addresses,
             self.prompt_options,
+            self.for_test_framework,
         )
     }
 }
@@ -147,9 +152,10 @@ impl CliCommand<()> for InitPackage {
 pub fn init_move_dir(
     package_dir: &Path,
     name: &str,
-    rev: &str,
+    rev: Option<String>,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
+    for_test_framework: Option<PathBuf>,
 ) -> CliTypedResult<()> {
     let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
     check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -159,18 +165,34 @@ pub fn init_move_dir(
             .as_path(),
     )?;
 
+    // Add the framework dependency if it's provided
     let mut dependencies = BTreeMap::new();
-    dependencies.insert(
-        "AptosFramework".to_string(),
-        Dependency {
-            local: None,
-            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-            rev: Some(rev.to_string()),
-            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-            aptos: None,
-            address: None,
-        },
-    );
+    if let Some(path) = for_test_framework {
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: Some(path.display().to_string()),
+                git: None,
+                rev: None,
+                subdir: None,
+                aptos: None,
+                address: None,
+            },
+        );
+    } else if let Some(rev) = rev {
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: None,
+                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+                rev: Some(rev),
+                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+                aptos: None,
+                address: None,
+            },
+        );
+    }
+
     let manifest = MovePackageManifest {
         package: PackageInfo {
             name: name.to_string(),
@@ -236,6 +258,15 @@ pub struct TestPackage {
 
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+
+    /// Bound the number of instructions that can be executed by any one test.
+    #[clap(
+        name = "instructions",
+        default_value = "100000",
+        short = 'i',
+        long = "instructions"
+    )]
+    pub instruction_execution_bound: u64,
 }
 
 #[async_trait]
@@ -256,7 +287,8 @@ impl CliCommand<&'static str> for TestPackage {
             config,
             UnitTestingConfig {
                 filter: self.filter,
-                ..UnitTestingConfig::default_with_bound(Some(100_000))
+                instruction_execution_bound: Some(self.instruction_execution_bound),
+                ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(

@@ -3,7 +3,6 @@
 
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
-import * as Gen from "./generated/index";
 import { HexString } from "./hex_string";
 import { BCS, TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";
@@ -29,19 +28,17 @@ export class CoinClient {
   }
 
   /**
-   * Generate, submit, and wait for a transaction to transfer AptosCoin from
-   * one account to another.
-   *
-   * If the transaction is submitted successfully, it returns the response
-   * from the API indicating that the transaction was submitted.
+   * Generate, sign, and submit a transaction to the Aptos blockchain API to
+   * transfer AptosCoin from one account to another.
    *
    * @param from Account sending the coins
    * @param from Account to receive the coins
    * @param amount Number of coins to transfer
    * @param extraArgs Extra args for building the transaction or configuring how
-   * the client should submit and wait for the transaction.
-   * @returns Promise that resolves to the response from the API
+   * the client should submit and wait for the transaction
+   * @returns The hash of the transaction submitted to the API
    */
+  // :!:>transfer
   async transfer(
     from: AptosAccount,
     to: AptosAccount,
@@ -52,18 +49,16 @@ export class CoinClient {
       maxGasAmount?: BCS.Uint64;
       gasUnitPrice?: BCS.Uint64;
       expireTimestamp?: BCS.Uint64;
-      // If true, this function will throw if the transaction is not committed succesfully.
-      checkSuccess?: boolean;
     },
-  ): Promise<Gen.Transaction> {
+  ): Promise<string> {
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x1::coin::transfer",
       [coinTypeToTransfer],
       [to.address(), amount],
     );
-    return this.aptosClient.generateSignSendWaitForTransaction(from, payload, extraArgs);
-  }
+    return this.aptosClient.generateSignSubmitTransaction(from, payload, extraArgs);
+  } // <:!:transfer
 
   /**
    * Generate, submit, and wait for a transaction to transfer AptosCoin from
@@ -76,6 +71,7 @@ export class CoinClient {
    * @param extraArgs Extra args for checking the balance.
    * @returns Promise that resolves to the balance as a bigint.
    */
+  // :!:>checkBalance
   async checkBalance(
     account: AptosAccount,
     extraArgs?: {
@@ -88,5 +84,5 @@ export class CoinClient {
     const resources = await this.aptosClient.getAccountResources(account.address());
     const accountResource = resources.find((r) => r.type === typeTag);
     return BigInt((accountResource!.data as any).coin.value);
-  }
+  } // <:!:checkBalance
 }

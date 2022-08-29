@@ -76,6 +76,7 @@ Rails.application.routes.draw do
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
+  get 'leaderboard/it3'
 
   # IT1
   get 'it1', to: 'leaderboard#it1'
@@ -83,6 +84,13 @@ Rails.application.routes.draw do
 
   # Projects
   resources :projects
+
+  # User profiles
+  resources :users, only: %i[show] do
+    get 'projects'
+    get 'activity'
+    get 'rewards'
+  end
 
   # Static pages
   get 'community', to: 'static_page#community'

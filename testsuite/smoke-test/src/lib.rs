@@ -10,6 +10,8 @@ mod aptos_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]
+mod consensus;
+#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod fullnode;
@@ -31,6 +33,8 @@ mod storage;
 mod transaction;
 #[cfg(test)]
 mod txn_broadcast;
+#[cfg(test)]
+mod txn_emitter;
 
 #[cfg(test)]
 mod smoke_test_environment;

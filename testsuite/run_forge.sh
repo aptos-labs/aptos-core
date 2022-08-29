@@ -10,7 +10,7 @@
 #
 
 # Default to off
-WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+USE_NEW_WRAPPER="${USE_NEW_WRAPPER:-false}"
 
 # output files
 FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
@@ -18,24 +18,19 @@ FORGE_REPORT="${FORGE_REPORT:-$(mktemp)}"
 FORGE_PRE_COMMENT="${FORGE_PRE_COMMENT:-$(mktemp)}"
 FORGE_COMMENT="${FORGE_COMMENT:-$(mktemp)}"
 
-if [[ $WRAPPER_KILLSWITCH = true ]]; then
-    echo "Using current forge wrapper"
-else
+if [[ $USE_NEW_WRAPPER = true ]]; then
     echo "Running new forge wrapper"
-    export FORGE_INSTALL_DEPENDENCIES=yeet
     exec python3 testsuite/forge.py test "$@"
+else
+    echo "Using current forge wrapper"
 fi
 
 # available clusters to choose from
 # forge-1 is used for continuous testing exclusively
-FORGE_CLUSTERS=("aptos-forge-0" "aptos-forge-2")
+FORGE_CLUSTERS=("aptos-forge-big-0" "aptos-forge-big-1" "aptos-forge-0")
 
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
-
-# for calculating regression in local mode
-LOCAL_P99_LATENCY_MS_THRESHOLD=60000
-
 
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
@@ -56,7 +51,6 @@ FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
-FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
@@ -183,7 +177,12 @@ if [ -z "$FORGE_CLUSTER_NAME" ]; then
     FORGE_CLUSTER_NAME=${FORGE_CLUSTERS[ $RANDOM % ${#FORGE_CLUSTERS[@]} ]}
 fi
 
-aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+context=$(kubectl config current-context)
+echo $context | grep $FORGE_CLUSTER_NAME
+if [ "$?" -ne 0 ]; then
+    echo "WARN: current context is not set to ${FORGE_CLUSTER_NAME}. Switching to ${FORGE_CLUSTER_NAME}..."
+    aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+fi
 
 # determine cluster name from kubectl context and set o11y resources
 echo "Using cluster ${FORGE_CLUSTER_NAME}"
@@ -255,8 +254,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
     prometheus_port_forward_pid=$!
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
-        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --upgrade-image-tag $UPGRADE_IMAGE_TAG \
@@ -287,7 +285,6 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
-        -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
         -e "s/{FORGE_IMAGE_TAG}/${FORGE_IMAGE_TAG}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \

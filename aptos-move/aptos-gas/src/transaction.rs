@@ -5,22 +5,16 @@
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
 use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitFractionalWithParams,
-    ToUnitWithParams,
+    InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
+    ToUnitFractionalWithParams, ToUnitWithParams,
 };
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
     [
-        [load_data_base: InternalGas, "load_data.base", 1],
-        [
-            load_data_per_byte: InternalGasPerByte,
-            "load_data.per_byte",
-            1
-        ],
-        [load_data_failure: InternalGas, "load_data.failure", 1],
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
         [
@@ -73,6 +67,35 @@ crate::params::define_gas_parameters!(
             "gas_unit_scaling_factor",
             1000
         ],
+        // Gas Parameters for reading data from storage.
+        [load_data_base: InternalGas, "load_data.base", 1],
+        [
+            load_data_per_byte: InternalGasPerByte,
+            "load_data.per_byte",
+            1
+        ],
+        [load_data_failure: InternalGas, "load_data.failure", 1],
+        // Gas parameters for writing data to storage.
+        [
+            write_data_per_op: InternalGasPerArg,
+            "write_data.per_op",
+            100
+        ],
+        [
+            write_data_per_new_item: InternalGasPerArg,
+            "write_data.new_item",
+            1000
+        ],
+        [
+            write_data_per_byte_in_key: InternalGasPerByte,
+            "write_data.per_byte_in_key",
+            100
+        ],
+        [
+            write_data_per_byte_in_val: InternalGasPerByte,
+            "write_data.per_byte_in_val",
+            100
+        ],
     ]
 );
 
@@ -98,6 +121,51 @@ impl TransactionGasParameters {
         } else {
             min_transaction_fee
         }
+    }
+
+    pub fn calculate_write_set_gas<'a>(
+        &self,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> InternalGas {
+        use WriteOp::*;
+
+        // Counting
+        let mut num_ops = NumArgs::zero();
+        let mut num_new_items = NumArgs::zero();
+        let mut num_bytes_key = NumBytes::zero();
+        let mut num_bytes_val = NumBytes::zero();
+
+        for (key, op) in ops.into_iter() {
+            num_ops += 1.into();
+
+            if self.write_data_per_byte_in_key > 0.into() {
+                // TODO(Gas): Are we supposed to panic here?
+                num_bytes_key += NumBytes::new(
+                    key.encode()
+                        .expect("Should be able to serialize state key")
+                        .len() as u64,
+                );
+            }
+
+            match op {
+                Creation(data) => {
+                    num_new_items += 1.into();
+                    num_bytes_val += NumBytes::new(data.len() as u64);
+                }
+                Modification(data) => {
+                    num_bytes_val += NumBytes::new(data.len() as u64);
+                }
+                Deletion => (),
+            }
+        }
+
+        // Calculate the costs
+        let cost_ops = self.write_data_per_op * num_ops;
+        let cost_new_items = self.write_data_per_new_item * num_new_items;
+        let cost_bytes = self.write_data_per_byte_in_key * num_bytes_key
+            + self.write_data_per_byte_in_val * num_bytes_val;
+
+        cost_ops + cost_new_items + cost_bytes
     }
 }
 

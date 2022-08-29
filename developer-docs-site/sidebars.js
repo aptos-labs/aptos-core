@@ -27,14 +27,11 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        "tutorials/first-transaction-sdk",
-        "tutorials/your-first-nft-sdk",
-        "tutorials/first-move-module-cli",
         "tutorials/first-transaction",
+        "tutorials/your-first-nft",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
-        "tutorials/first-coin",
-        "tutorials/your-first-nft",
+        // "tutorials/first-coin",
       ],
     },
     {
@@ -76,7 +73,11 @@ const sidebars = {
           link: { type: "doc", id: "guides/move-guides/index" },
           collapsible: true,
           collapsed: true,
-          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
+          items: [
+            "guides/move-guides/move-on-aptos",
+            "guides/move-guides/upgrading-move-code",
+            "guides/move-guides/guide-move-transactional-testing",
+          ],
         },
       ],
     },
@@ -149,14 +150,11 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "link",
-          label: "Typescript SDK",
-          href: "https://aptos-labs.github.io/ts-sdk-doc/",
-        },
         "sdks/aptos-sdk-overview",
+        "sdks/typescript-sdk",
         "sdks/transactions-with-ts-sdk",
         "sdks/python-sdk",
+        "sdks/rust-sdk",
       ],
     },
     {
@@ -168,7 +166,14 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     "reference/telemetry",
-    "aptos-white-paper",
+    {
+      type: "category",
+      label: "Aptos White Paper",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "aptos-white-paper/index" },
+      items: ["aptos-white-paper/in-korean"],
+    },
     "reference/glossary",
   ],
 };

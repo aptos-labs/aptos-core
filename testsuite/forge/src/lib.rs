@@ -23,6 +23,8 @@ mod github;
 pub use github::*;
 
 mod slack;
+pub use slack::*;
+
 pub mod success_criteria;
 
-pub use slack::*;
+pub mod test_utils;

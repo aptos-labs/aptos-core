@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use framework::natives::code::UpgradePolicy;
 use itertools::Itertools;
 use move_deps::move_command_line_common::files::MOVE_EXTENSION;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
@@ -11,6 +12,7 @@ use tempfile::{tempdir, TempDir};
 #[derive(Debug, Clone)]
 pub struct PackageBuilder {
     name: String,
+    policy: UpgradePolicy,
     deps: Vec<String>,
     aliases: Vec<(String, String)>,
     sources: Vec<(String, String)>,
@@ -20,10 +22,15 @@ impl PackageBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
+            policy: UpgradePolicy::compat(),
             deps: vec![],
             aliases: vec![],
             sources: vec![],
         }
+    }
+
+    pub fn with_policy(self, policy: UpgradePolicy) -> Self {
+        Self { policy, ..self }
     }
 
     pub fn add_dep(&mut self, dep: &str) {
@@ -48,11 +55,13 @@ impl PackageBuilder {
 [package]
 name = \"{}\"
 version = \"0.0.0\"
+upgrade_policy = \"{}\"
 [addresses]
 {}
 [dependencies]
 {}",
                 self.name,
+                self.policy,
                 self.aliases
                     .into_iter()
                     .map(|(k, v)| format!("{} = \"{}\"", k, v))

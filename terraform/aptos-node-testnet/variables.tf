@@ -4,6 +4,11 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "maximize_single_az_capacity" {
+  description = "TEST ONLY: Whether to maximize the capacity of the cluster by allocating a large CIDR block to the first AZ"
+  default     = false
+}
+
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
   default     = ""
@@ -155,6 +160,16 @@ variable "num_utility_instance" {
 
 variable "num_validator_instance" {
   description = "Number of instances for validator node pool, when it's 0, it will be set to 2 * var.num_validators"
+  default     = 0
+}
+
+variable "utility_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
+  default     = 0
+}
+
+variable "validator_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
   default     = 0
 }
 

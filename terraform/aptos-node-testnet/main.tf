@@ -23,6 +23,8 @@ locals {
 module "validator" {
   source = "../aptos-node/aws"
 
+  maximize_single_az_capacity = var.maximize_single_az_capacity
+
   region   = var.region
   iam_path = var.iam_path
   zone_id  = var.zone_id
@@ -36,6 +38,8 @@ module "validator" {
 
   # if forge enabled, standardize the helm release name for ease of operations
   helm_release_name_override = var.enable_forge ? "aptos-node" : ""
+  # Forge testing does not require calico for validator NetworkPolicies
+  enable_calico = !var.enable_forge
 
   k8s_api_sources = var.admin_sources_ipv4
   k8s_admin_roles = var.k8s_admin_roles
@@ -51,10 +55,12 @@ module "validator" {
   num_fullnode_groups = var.num_fullnode_groups
   helm_values         = var.aptos_node_helm_values
 
-  # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
-  validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
+  # allow all nodegroups to surge to 2x their size by default, in case of total nodes replacement
+  validator_instance_num     = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
+  validator_instance_max_num = var.validator_instance_max_num
   # create one utility instance per validator, since HAProxy requires resources 1.5 CPU, 2Gi memory for now
-  utility_instance_num = var.num_utility_instance > 0 ? var.num_utility_instance : var.num_validators
+  utility_instance_num     = var.num_utility_instance > 0 ? var.num_utility_instance : var.num_validators
+  utility_instance_max_num = var.utility_instance_max_num
 
   utility_instance_type   = var.utility_instance_type
   validator_instance_type = var.validator_instance_type
