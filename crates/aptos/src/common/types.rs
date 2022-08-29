@@ -562,17 +562,43 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        _profile: &str,
+        profile: &str,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--public-key", key)
+        } else if let Some(Some(public_key)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.public_key)
+        {
+            Ok(public_key)
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
+                "One of ['--public-key', '--public-key-file', '--profile'] must be used"
+                    .to_string(),
             ))
+        }
+    }
+}
+
+pub trait ParsePrivateKey {
+    fn parse_private_key(
+        &self,
+        encoding: EncodingType,
+        private_key_file: Option<PathBuf>,
+        private_key: Option<String>,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = private_key_file {
+            Ok(Some(
+                encoding.load_key("--private-key-file", file.as_path())?,
+            ))
+        } else if let Some(ref key) = private_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--private-key", key)?))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -586,6 +612,8 @@ pub struct PrivateKeyInputOptions {
     #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
+
+impl ParsePrivateKey for PrivateKeyInputOptions {}
 
 impl PrivateKeyInputOptions {
     pub fn from_private_key(private_key: &Ed25519PrivateKey) -> CliTypedResult<Self> {
@@ -642,16 +670,11 @@ impl PrivateKeyInputOptions {
         &self,
         encoding: EncodingType,
     ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
-        if let Some(ref file) = self.private_key_file {
-            Ok(Some(
-                encoding.load_key("--private-key-file", file.as_path())?,
-            ))
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            Ok(Some(encoding.decode_key("--private-key", key)?))
-        } else {
-            Ok(None)
-        }
+        self.parse_private_key(
+            encoding,
+            self.private_key_file.clone(),
+            self.private_key.clone(),
+        )
     }
 }
 
@@ -730,7 +753,7 @@ pub struct RestOptions {
     ///
     /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
     #[clap(long)]
-    url: Option<reqwest::Url>,
+    pub(crate) url: Option<reqwest::Url>,
 }
 
 impl RestOptions {
@@ -1313,4 +1336,23 @@ pub struct PoolAddressArgs {
     /// Address of the Staking pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_address: AccountAddress,
+}
+
+// This struct includes TypeInfo (account_address, module_name, and struct_name)
+// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
+// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
+// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
+// Originator refers to the user's address
+#[derive(Serialize, Deserialize)]
+pub struct RotationProofChallenge {
+    // Should be `CORE_CODE_ADDRESS`
+    pub account_address: AccountAddress,
+    // Should be `account`
+    pub module_name: String,
+    // Should be `RotationProofChallenge`
+    pub struct_name: String,
+    pub sequence_number: u64,
+    pub originator: AccountAddress,
+    pub current_auth_key: AccountAddress,
+    pub new_public_key: Vec<u8>,
 }

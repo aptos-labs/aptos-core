@@ -930,14 +930,14 @@ impl Client {
         })
     }
 
-    pub async fn get_table_item<H: ToString, K: Serialize>(
+    pub async fn get_table_item<K: Serialize>(
         &self,
-        table_handle: H,
+        table_handle: AccountAddress,
         key_type: &str,
         value_type: &str,
         key: K,
     ) -> AptosResult<Response<Value>> {
-        let url = self.build_path(&format!("tables/{}/item", table_handle.to_string()))?;
+        let url = self.build_path(&format!("tables/{}/item", table_handle))?;
         let data = json!({
             "key_type": key_type,
             "value_type": value_type,

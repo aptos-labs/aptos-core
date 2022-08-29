@@ -4,6 +4,7 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::account::create::DEFAULT_FUNDED_COINS;
 use aptos::common::types::GasOptions;
+use aptos_crypto::PrivateKey;
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
@@ -122,7 +123,7 @@ async fn test_account_key_rotation() {
         AccountAddress::from_hex_literal(
             rest_client
                 .get_table_item(
-                    table_handle,
+                    table_handle.parse().unwrap(),
                     "address",
                     "address",
                     new_address.to_hex_literal(),
