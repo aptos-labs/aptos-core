@@ -514,12 +514,10 @@ fn test_capacity() {
 
 #[test]
 fn test_capacity_bytes() {
-    let mut config = NodeConfig::random();
-    config.mempool.capacity = 1_000; // Won't hit this limit.
-    config.mempool.capacity_bytes = 2_048;
-    let mut pool = CoreMempool::new(&config);
-    let address = 1;
+    let capacity_bytes = 2_048;
 
+    // Get transactions to add.
+    let address = 1;
     let mut size_bytes: usize = 0;
     let mut seq_no = 1_000;
     let mut txns = vec![];
@@ -528,7 +526,7 @@ fn test_capacity_bytes() {
         let txn = new_test_mempool_transaction(address, seq_no);
         let txn_bytes = txn.get_estimated_bytes();
 
-        if size_bytes <= config.mempool.capacity_bytes {
+        if size_bytes <= capacity_bytes {
             txns.push(txn);
             seq_no -= 1;
             size_bytes += txn_bytes;
@@ -540,24 +538,37 @@ fn test_capacity_bytes() {
     assert!(txns.len() > 0);
     assert!(last_txn.is_some());
 
-    txns.into_iter().for_each(|txn| {
-        let status = pool.add_txn(
-            txn.txn,
-            txn.ranking_score,
-            txn.sequence_info.account_sequence_number_type,
-            txn.timeline_state,
-        );
-        assert_eq!(status.code, MempoolStatusCode::Accepted);
-    });
+    // Set exact limit
+    let capacity_bytes = size_bytes;
 
-    if let Some(txn) = last_txn {
-        let status = pool.add_txn(
-            txn.txn,
-            txn.ranking_score,
-            txn.sequence_info.account_sequence_number_type,
-            txn.timeline_state,
-        );
-        assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 1_000; // Won't hit this limit.
+    config.mempool.capacity_bytes = capacity_bytes;
+    config.mempool.system_transaction_timeout_secs = 0;
+    let mut pool = CoreMempool::new(&config);
+
+    for _i in 0..2 {
+        txns.clone().into_iter().for_each(|txn| {
+            let status = pool.add_txn(
+                txn.txn,
+                txn.ranking_score,
+                txn.sequence_info.account_sequence_number_type,
+                txn.timeline_state,
+            );
+            assert_eq!(status.code, MempoolStatusCode::Accepted);
+        });
+
+        if let Some(txn) = last_txn.clone() {
+            let status = pool.add_txn(
+                txn.txn,
+                txn.ranking_score,
+                txn.sequence_info.account_sequence_number_type,
+                txn.timeline_state,
+            );
+            assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
+        }
+        // Check that GC returns size to zero.
+        pool.gc();
     }
 }
 
