@@ -352,8 +352,8 @@ fn test_proposer_and_voter_heuristic() {
 
 #[test]
 fn test_api() {
-    let active_weight = 9;
-    let inactive_weight = 1;
+    let active_weight: u64 = 9;
+    let inactive_weight: u64 = 1;
     let proposers: Vec<AccountAddress> =
         (0..5).map(|_| AccountAddress::random()).sorted().collect();
     let voting_powers: Vec<u64> = (0..5).map(|i| i + 1).collect();
@@ -361,13 +361,13 @@ fn test_api() {
     let mut block_builder = TestBlockBuilder::new();
     // first metadata is ignored because of window size 1
     let expected_weights = vec![
-        active_weight,
-        inactive_weight * 2,
-        inactive_weight * 3,
-        active_weight * 4,
-        inactive_weight * 5,
+        active_weight as u128,
+        (inactive_weight * 2) as u128,
+        (inactive_weight * 3) as u128,
+        (active_weight * 4) as u128,
+        (inactive_weight * 5) as u128,
     ];
-    let total_weights: u64 = expected_weights.iter().sum();
+    let total_weights: u128 = expected_weights.iter().sum();
 
     let mut selected = [0; 5].to_vec();
     for epoch in 1..1000 {
