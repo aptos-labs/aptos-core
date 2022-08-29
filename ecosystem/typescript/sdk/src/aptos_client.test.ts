@@ -454,3 +454,30 @@ test(
   },
   30 * 1000,
 );
+
+test(
+  "rotates auth key ed25519",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 50000);
+
+    const helperAccount = new AptosAccount();
+
+    const pendingTxn = await client.rotateAuthKeyEd25519(alice, helperAccount.signingKey.secretKey);
+
+    await client.waitForTransaction(pendingTxn.hash);
+
+    const origAddressHex = await client.lookupAddressByAuthKey(helperAccount.address());
+    // Sometimes the returned addresses do not have leading 0s. To be safe, converting hex addresses to AccountAddress
+    const origAddress = TxnBuilderTypes.AccountAddress.fromHex(origAddressHex);
+    const aliceAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
+
+    expect(HexString.fromUint8Array(BCS.bcsToBytes(origAddress)).hex()).toBe(
+      HexString.fromUint8Array(BCS.bcsToBytes(aliceAddress)).hex(),
+    );
+  },
+  30 * 1000,
+);
