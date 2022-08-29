@@ -5,13 +5,21 @@ use std::collections::BTreeMap;
 
 use crate::common::{
     types::{
-        CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileConfig,
-        PromptOptions, TransactionOptions, TransactionSummary,
+        CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
+        ExtractPublicKey, ProfileConfig, ProfileOptions, PromptOptions, PublicKeyInputOptions,
+        RestOptions, TransactionOptions, TransactionSummary,
     },
     utils::{prompt_yes_with_override, read_line},
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey};
-use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    PrivateKey, SigningKey,
+};
+use aptos_rest_client::Client;
+use aptos_types::{
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    transaction::authenticator::AuthenticationKey,
+};
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
@@ -174,5 +182,78 @@ impl CliCommand<()> for RotateKey {
         eprintln!("Profile {} is saved.", profile_name);
 
         Ok(())
+    }
+}
+
+/// Command to lookup the account adress through on-chain lookup table
+///
+#[derive(Debug, Parser)]
+pub struct LookupAddress {
+    #[clap(flatten)]
+    pub(crate) encoding_options: EncodingOptions,
+
+    #[clap(flatten)]
+    pub(crate) public_key_options: PublicKeyInputOptions,
+
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+}
+
+impl LookupAddress {
+    pub(crate) fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        self.public_key_options.extract_public_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )
+    }
+
+    /// Builds a rest client
+    fn rest_client(&self) -> CliTypedResult<Client> {
+        self.rest_options.client(&self.profile_options.profile)
+    }
+}
+
+#[async_trait]
+impl CliCommand<String> for LookupAddress {
+    fn command_name(&self) -> &'static str {
+        "LookupAddress"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        let originating_resource = self
+            .rest_client()?
+            .get_account_resource(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner()
+            .ok_or_else(|| CliError::UnexpectedError("Unable to parse API response.".to_string()))?
+            .data;
+
+        let table_handle = originating_resource["address_map"]["handle"]
+            .as_str()
+            .ok_or_else(|| {
+                CliError::UnexpectedError("Unable to parse table handle.".to_string())
+            })?;
+
+        // The derived address that can be used to look up the original address
+        let address_key = AuthenticationKey::ed25519(&self.public_key()?).derived_address();
+
+        Ok(self
+            .rest_client()?
+            .get_table_item(
+                table_handle,
+                "address",
+                "address",
+                address_key.to_hex_literal(),
+            )
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner()
+            .as_str()
+            .ok_or_else(|| CliError::UnexpectedError("Unable to parse API response.".to_string()))?
+            .to_string())
     }
 }
