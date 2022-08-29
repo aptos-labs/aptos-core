@@ -89,18 +89,11 @@ scrape_configs:
     target_label: __metrics_path__
     replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 
- {{ if not .Values.monitoring.prometheus.fullKubernetesScrape }}
+  {{ if not .Values.monitoring.prometheus.fullKubernetesScrape }}
   metric_relabel_configs:
-  - source_labels: [namespace, pod]
+  - source_labels: [pod]
     action: keep
-    regex: "{{ .Release.Namespace }};{{ .Release.Name }}-.*"
-  # Explicitly drop spammy metrics
-  - source_labels: [__name__]
-    regex: 'container_tasks_state'
-    action: drop
-  - source_labels: [__name__]
-    regex: 'container_memory_(!working_set_bytes).*'
-    action: drop
+    regex: "{{ .Release.Name }}-.*"
   {{ end }}
 
 - job_name: "prom-pod-annotation"
