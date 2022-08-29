@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
+use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
@@ -177,6 +178,9 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(1200);
+    let suite_name = "consensus_stress_test";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -209,11 +213,14 @@ fn main() -> Result<()> {
             match test_cmd {
                 TestCommand::LocalSwarm(..) => {
                     // Loosen all criteria for local runs
-                    let test_suite = test_suite
-                        .with_success_criteria(SuccessCriteria::new(400, 60000, None))
-                        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                    test_suite.get_mut_success_criteria().avg_tps = 400;
+                    test_suite.get_mut_success_criteria().max_latency_ms = 60000;
+                    let previous_emit_job = test_suite.get_emit_job().clone();
+                    let test_suite =
+                        test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
                             mempool_backlog: 5000,
                         }));
+
                     run_forge(
                         duration,
                         test_suite,
@@ -424,13 +431,14 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
             .with_initial_fullnode_count(4)
             .with_network_tests(&[&StateSyncPerformance])
-            .with_success_criteria(SuccessCriteria::new(5000, 10000, None)),
+            .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None)),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(&[&SimpleValidatorUpgrade])
             .with_success_criteria(SuccessCriteria::new(
                 5000,
                 10000,
+                false,
                 Some(Duration::from_secs(240)),
             )),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
@@ -449,6 +457,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_success_criteria(SuccessCriteria::new(
                 5000,
                 10000,
+                true,
                 Some(Duration::from_secs(240)),
             )),
         "account_creation_state_sync" => config
@@ -468,7 +477,27 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_success_criteria(SuccessCriteria::new(
                 4000,
                 10000,
+                true,
                 Some(Duration::from_secs(240)),
+            )),
+        "consensus_stress_test" => config
+            .with_network_tests(&[&ContinuousProgressTest { target_tps: 100 }])
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 60.into();
+            }))
+            .with_node_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["consensus"]["max_block_txns"] = 50.into();
+                helm_values["consensus"]["round_initial_timeout_ms"] = 500.into();
+                helm_values["consensus"]["round_timeout_backoff_exponent_base"] = 1.0.into();
+                helm_values["consensus"]["quorum_store_poll_count"] = 1.into();
+            }))
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_success_criteria(SuccessCriteria::new(
+                80,
+                10000,
+                true,
+                Some(Duration::from_secs(30)),
             )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
@@ -491,6 +520,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 6000
             },
             10000,
+            true,
             Some(Duration::from_secs(if duration.as_secs() > 1200 {
                 240
             } else {
@@ -516,6 +546,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 1000
             },
             10000,
+            true,
             None,
         ))
 }
