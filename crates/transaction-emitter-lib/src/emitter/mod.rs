@@ -17,7 +17,7 @@ use aptos_sdk::{
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
-use rand::{prelude::SliceRandom, seq::IteratorRandom};
+use rand::seq::IteratorRandom;
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -220,8 +220,8 @@ impl EmitJobRequest {
                 //     transactions succeeded
                 //   - wait until our time.
                 // If we always finish first 3 steps before our time, we have a constant TPS of:
-                // clients_count * num_workers_per_endpoint * batch_size / (wait_millis / 1000)
-                // Also, with batch_size = 100, only 1% of the load should be coming from fetching
+                // clients_count * num_workers_per_endpoint * transactions_per_account / (wait_millis / 1000)
+                // Also, with transactions_per_account = 100, only 1% of the load should be coming from fetching
                 // sequence number from the account, so that it doesn't affect the TPS meaningfully.
                 //
                 // That's why we set wait_seconds conservativelly, to make sure all processing and
@@ -229,14 +229,18 @@ impl EmitJobRequest {
 
                 let wait_seconds = self.txn_expiration_time_secs + 180;
                 // In case we set a very low TPS, we need to still be able to spread out
-                // transactions, at least to the seconds granularity, so we reduce batch_size
+                // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let batch_size = min(100, tps);
-                assert!(batch_size > 0, "TPS ({}) needs to be larger than 0", tps,);
+                let transactions_per_account = min(100, tps);
+                assert!(
+                    transactions_per_account > 0,
+                    "TPS ({}) needs to be larger than 0",
+                    tps,
+                );
 
                 // compute num_workers_per_endpoint, so that target_tps is achieved.
                 let num_workers_per_endpoint =
-                    (tps * wait_seconds as usize) / clients_count / batch_size;
+                    (tps * wait_seconds as usize) / clients_count / transactions_per_account;
                 assert!(
                     num_workers_per_endpoint > 0,
                     "Requested too small TPS: {}",
@@ -244,14 +248,15 @@ impl EmitJobRequest {
                 );
 
                 info!(
-                    " Transaction emitter targetting {} TPS, expecting {}",
+                    " Transaction emitter targetting {} TPS, expecting {} TPS",
                     tps,
-                    clients_count * num_workers_per_endpoint * batch_size / wait_seconds as usize
+                    clients_count * num_workers_per_endpoint * transactions_per_account
+                        / wait_seconds as usize
                 );
 
                 info!(
-                    " Transaction emitter batch_size is {}, with wait_seconds {}",
-                    batch_size, wait_seconds
+                    " Transaction emitter transactions_per_account batch is {}, with wait_seconds {}",
+                    transactions_per_account, wait_seconds
                 );
 
                 info!(
@@ -262,7 +267,7 @@ impl EmitJobRequest {
                 EmitModeParams {
                     wait_millis: wait_seconds * 1000,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    transactions_per_account: batch_size,
+                    transactions_per_account,
                     max_submit_batch_size: 100,
                     start_offset_multiplier_millis: (wait_seconds * 1000) as f64
                         / (num_workers_per_endpoint * clients_count) as f64,
@@ -357,14 +362,13 @@ impl<'t> TxnEmitter<'t> {
             "Will use {} workers per endpoint for a total of {} endpoint clients and {} accounts",
             workers_per_endpoint, num_workers, num_accounts
         );
-        info!("Will create a total of {} accounts", num_accounts);
         let mut account_minter = AccountMinter::new(
             self.root_account,
             self.txn_factory.clone(),
             self.rng.clone(),
         );
         let mut new_accounts = account_minter
-            .mint_accounts(&req, &mode_params, num_accounts)
+            .create_accounts(&req, &mode_params, num_accounts)
             .await?;
         self.accounts.append(&mut new_accounts);
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
@@ -469,7 +473,7 @@ impl<'t> TxnEmitter<'t> {
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
         let mut prev_stats: Option<TxnStats> = None;
-        let window = Duration::from_secs(min(interval_secs, 1));
+        let window = Duration::from_secs(max(interval_secs, 1));
         while Instant::now() < deadline {
             tokio::time::sleep(window).await;
             let stats = self.peek_job_stats(job);
@@ -563,25 +567,12 @@ async fn wait_for_accounts_sequence(
     transactions_per_account: usize,
     wait_timeout: Duration,
     fetch_only_once: bool,
-    rng: &mut StdRng,
 ) -> (usize, u128) {
     let deadline = start_time + wait_timeout;
     let mut pending_addresses: HashSet<_> = accounts.iter().map(|d| d.address()).collect();
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
-
-    if !fetch_only_once && accounts.len() > 1 {
-        // This cannot understand correct sum_of_completion_timestamps.
-        // Also, number of accounts is generally 1, so is not helping at the moment
-        // See if this block can just be removed.
-
-        // Choose a random account and wait for its sequence number to be up to date. After that, we can
-        // query all of the accounts. This will help us ensure we don't hammer the REST API with too many
-        // queries for all the accounts.
-        let account = accounts.choose(rng).expect("accounts can't be empty");
-        let _ = wait_for_single_account_sequence(client, account, wait_timeout).await;
-    }
 
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {

@@ -40,9 +40,7 @@ pub async fn generate_traffic(
         .gas_price(gas_price)
         .duration(duration)
         .mode(EmitJobMode::ConstTps { tps: 20 });
-    let stats = emitter.emit_txn_for(emit_job_request).await?;
-
-    Ok(stats)
+    emitter.emit_txn_for_with_stats(emit_job_request, 3).await
 }
 
 #[tokio::test]
@@ -54,7 +52,6 @@ async fn test_txn_emmitter() {
     let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(10), 1)
         .await
         .unwrap();
-    println!("{:?}", txn_stat);
     println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
