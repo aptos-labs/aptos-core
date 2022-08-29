@@ -470,7 +470,7 @@ test(
 
     await client.waitForTransaction(pendingTxn.hash);
 
-    const origAddressHex = await client.lookupAddressByAuthKey(helperAccount.address());
+    const origAddressHex = await client.lookupOriginalAddress(helperAccount.address());
     // Sometimes the returned addresses do not have leading 0s. To be safe, converting hex addresses to AccountAddress
     const origAddress = TxnBuilderTypes.AccountAddress.fromHex(origAddressHex);
     const aliceAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());

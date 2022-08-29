@@ -5,9 +5,11 @@ import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
+import { Memoize } from "typescript-memoize";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+import { IAptosClient } from "./common.js";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -22,14 +24,23 @@ export class AptosAccount {
   /**
    * A private key and public key, associated with the given account
    */
-  readonly signingKey: Nacl.SignKeyPair;
+  private signingKeyInternal: Nacl.SignKeyPair;
 
   /**
    * Address associated with the given account
    */
   private readonly accountAddress: HexString;
 
-  private authKeyCached?: HexString;
+  private client?: IAptosClient;
+
+  get signingKey() {
+    return this.signingKeyInternal;
+  }
+
+  /** @internal */
+  set signingKey(keyPair: Nacl.SignKeyPair) {
+    this.signingKeyInternal = keyPair;
+  }
 
   static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
@@ -74,15 +85,17 @@ export class AptosAccount {
    * @param privateKeyBytes  Private key from which account key pair will be generated.
    * If not specified, new key pair is going to be created.
    * @param address Account address (e.g. 0xe8012714cd17606cee7188a2a365eef3fe760be598750678c8c5954eb548a591).
+   * @param client
    * If not specified, a new one will be generated from public key
    */
-  constructor(privateKeyBytes?: Uint8Array | undefined, address?: MaybeHexString) {
+  constructor(privateKeyBytes?: Uint8Array | undefined, address?: MaybeHexString, client?: IAptosClient) {
     if (privateKeyBytes) {
       this.signingKey = Nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
     } else {
       this.signingKey = Nacl.sign.keyPair();
     }
     this.accountAddress = HexString.ensure(address || this.authKey().hex());
+    this.client = client;
   }
 
   /**
@@ -96,19 +109,25 @@ export class AptosAccount {
   }
 
   /**
+   * Lookup the original address by current account's auth key
+   * @returns
+   */
+  async originalAddress(): Promise<HexString> {
+    return this.client.lookupOriginalAddress(this.authKey());
+  }
+
+  /**
    * This key enables account owners to rotate their private key(s)
    * associated with the account without changing the address that hosts their account.
    * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
+  @Memoize()
   authKey(): HexString {
-    if (!this.authKeyCached) {
-      const hash = SHA3.sha3_256.create();
-      hash.update(this.signingKey.publicKey);
-      hash.update("\x00");
-      this.authKeyCached = new HexString(hash.hex());
-    }
-    return this.authKeyCached;
+    const hash = SHA3.sha3_256.create();
+    hash.update(this.signingKey.publicKey);
+    hash.update("\x00");
+    return new HexString(hash.hex());
   }
 
   /**

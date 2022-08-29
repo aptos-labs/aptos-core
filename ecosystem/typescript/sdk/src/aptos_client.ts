@@ -13,12 +13,13 @@ import {
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
 } from "./transaction_builder";
+import { IAptosClient } from "./common";
 
 /**
  * Provides methods for retrieving data from Aptos node.
  * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
  */
-export class AptosClient {
+export class AptosClient extends IAptosClient {
   client: Gen.AptosGeneratedClient;
 
   /**
@@ -32,6 +33,7 @@ export class AptosClient {
    * @param config Additional configuration options for the generated Axios client.
    */
   constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
+    super();
     if (!nodeUrl) {
       throw new Error("Node URL cannot be empty.");
     }
@@ -666,14 +668,15 @@ export class AptosClient {
   /**
    * Rotate an account's auth key. After rotation, only the new private key can be used to sign txns for
    * the account.
+   * WARNING: You must create a new instance of AptosAccount after using this function.
    * @param forAccount Account of which the auth key will be rotated
-   * @param privateKeyBytes New private key
+   * @param toPrivateKeyBytes New private key
    * @param extraArgs Extra args for building the transaction payload.
    * @returns PendingTransaction
    */
   async rotateAuthKeyEd25519(
     forAccount: AptosAccount,
-    privateKeyBytes: Uint8Array,
+    toPrivateKeyBytes: Uint8Array,
     extraArgs?: {
       maxGasAmount?: BCS.Uint64;
       gasUnitPrice?: BCS.Uint64;
@@ -684,7 +687,7 @@ export class AptosClient {
       forAccount.address(),
     );
 
-    const helperAccount = new AptosAccount(privateKeyBytes);
+    const helperAccount = new AptosAccount(toPrivateKeyBytes);
 
     const challenge = new TxnBuilderTypes.RotationProofChallenge(
       TxnBuilderTypes.AccountAddress.CORE_CODE_ADDRESS,
@@ -719,6 +722,27 @@ export class AptosClient {
     const rawTransaction = await this.generateRawTransaction(forAccount.address(), payload, extraArgs);
     const bcsTxn = AptosClient.generateBCSTransaction(forAccount, rawTransaction);
     return this.submitSignedBCSTransaction(bcsTxn);
+  }
+
+  /**
+   * Lookup the original address by the current derived address
+   * @param addressOrAuthKey
+   * @returns original address
+   */
+  async lookupOriginalAddress(addressOrAuthKey: MaybeHexString): Promise<HexString> {
+    const resource = await this.getAccountResource("0x1", "0x1::account::OriginatingAddress");
+
+    const {
+      address_map: { handle },
+    } = resource.data as any;
+
+    const origAddress = await this.getTableItem(handle, {
+      key_type: "address",
+      value_type: "address",
+      key: HexString.ensure(addressOrAuthKey).hex(),
+    });
+
+    return new HexString(origAddress);
   }
 }
 
