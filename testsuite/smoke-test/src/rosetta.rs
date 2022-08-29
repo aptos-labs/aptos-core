@@ -8,8 +8,8 @@ use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::HashValue;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_crypto::{HashValue, PrivateKey};
 use aptos_rest_client::aptos_api_types::UserTransaction;
 use aptos_rest_client::Transaction;
 use aptos_rosetta::common::BlockHash;
@@ -26,9 +26,13 @@ use aptos_rosetta::{
     },
     ROSETTA_VERSION,
 };
+use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use forge::{LocalSwarm, Node, NodeExt};
+use cached_packages::aptos_stdlib;
+use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
@@ -269,6 +273,149 @@ async fn get_balance(
         currencies: Some(vec![native_coin()]),
     };
     try_until_ok_default(|| rosetta_client.account_balance(&request)).await
+}
+
+#[tokio::test]
+async fn test_transfer() {
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let chain_id = swarm.chain_id();
+    let public_info = swarm.aptos_public_info();
+    let client = public_info.client();
+    let sender = cli.account_id(0);
+    let receiver = AccountAddress::from_hex_literal("0xBEEF").unwrap();
+    let sender_private_key = cli.private_key(0);
+    let sender_balance = client
+        .get_account_balance(sender)
+        .await
+        .unwrap()
+        .into_inner()
+        .coin
+        .value
+        .0;
+    let network = NetworkIdentifier::from(chain_id);
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: network.clone(),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
+            break;
+        }
+    }
+    // Attempt to transfer all coins to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer all coins");
+
+    // Attempt to transfer more than balance to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance + 200,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer more than balance coins");
+
+    // Attempt to transfer more than balance to another user (should fail)
+    let transaction_factory = TransactionFactory::new(chain_id)
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(500);
+    let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
+    let unsigned_transaction = transaction_factory
+        .payload(txn_payload)
+        .sender(sender)
+        .sequence_number(0)
+        .build();
+    let signed_transaction = SignedTransaction::new(
+        unsigned_transaction,
+        sender_private_key.public_key(),
+        Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+    );
+
+    let simulation_txn = client
+        .simulate_bcs(&signed_transaction)
+        .await
+        .expect("Should succeed getting gas estimate")
+        .into_inner();
+    let gas_usage = simulation_txn.info.gas_used();
+
+    // Attempt to transfer more than balance - gas to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance - gas_usage + 1,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer more than balance + gas coins");
+
+    // Attempt to transfer more than balance - gas to another user (should fail)
+    let transfer = transfer_and_wait(
+        &rosetta_client,
+        client,
+        &network,
+        sender_private_key,
+        receiver,
+        sender_balance - gas_usage,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should succeed transfer");
+    assert_eq!(transfer.info.gas_used.0, gas_usage);
+
+    // Sender balance should be 0
+    assert_eq!(
+        client
+            .get_account_balance(sender)
+            .await
+            .unwrap()
+            .into_inner()
+            .coin
+            .value
+            .0,
+        0
+    );
+    // Receiver should be sent coins
+    assert_eq!(
+        client
+            .get_account_balance(receiver)
+            .await
+            .unwrap()
+            .into_inner()
+            .coin
+            .value
+            .0,
+        sender_balance - gas_usage
+    );
 }
 
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since

@@ -853,7 +853,7 @@ impl InternalOperation {
             InternalOperation::Transfer(transfer) => {
                 is_native_coin(&transfer.currency)?;
                 (
-                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount),
+                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
                     transfer.sender,
                 )
             }
@@ -877,7 +877,7 @@ pub struct CreateAccount {
 pub struct Transfer {
     pub sender: AccountAddress,
     pub receiver: AccountAddress,
-    pub amount: u64,
+    pub amount: U64,
     pub currency: Currency,
 }
 
@@ -966,7 +966,7 @@ impl Transfer {
         Ok(Transfer {
             sender,
             receiver,
-            amount,
+            amount: amount.into(),
             currency,
         })
     }
