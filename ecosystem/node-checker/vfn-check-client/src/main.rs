@@ -53,9 +53,7 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to get on chain validator info")?;
 
-    let nhc_responses = check_vfns(&nhc_client, &args.check_args, validator_infos)
-        .await
-        .context("Failed to check nodes unexpectedly")?;
+    let nhc_responses = check_vfns(&nhc_client, &args.check_args, validator_infos).await;
 
     info!(
         "Got {} responses from NHC, will now output to {:?}",
