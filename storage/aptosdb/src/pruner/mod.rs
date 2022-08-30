@@ -6,7 +6,6 @@ pub(crate) mod event_store;
 pub(crate) mod ledger_pruner_worker;
 pub(crate) mod ledger_store;
 pub(crate) mod pruner_manager;
-pub(crate) mod pruner_metadata;
 pub(crate) mod state_pruner_worker;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
