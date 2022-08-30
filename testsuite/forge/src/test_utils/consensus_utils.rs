@@ -152,7 +152,7 @@ pub async fn test_consensus_fault_tolerance(
         .await;
 
     for i in 1..transactions.len() {
-        let txns_a = transactions.get(0).unwrap();
+        let txns_a = transactions.first().unwrap();
         let txns_b = transactions.get(i).unwrap();
         assert_eq!(txns_a.len(), txns_b.len());
         for i in 0..txns_a.len() {

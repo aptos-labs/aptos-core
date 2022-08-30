@@ -54,8 +54,7 @@ where
         let min_readable_version = self.min_readable_version();
         let target_version = self.target_version();
 
-        return match self.prune_state_merkle(min_readable_version, target_version, batch_size, None)
-        {
+        match self.prune_state_merkle(min_readable_version, target_version, batch_size, None) {
             Ok(new_min_readable_version) => Ok(new_min_readable_version),
             Err(e) => {
                 error!(
@@ -65,7 +64,7 @@ where
                 Err(e)
                 // On error, stop retrying vigorously by making next recv() blocking.
             }
-        };
+        }
     }
 
     fn initialize_min_readable_version(&self) -> Result<Version> {

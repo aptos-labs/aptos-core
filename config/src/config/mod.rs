@@ -49,7 +49,7 @@ use aptos_types::account_address::AccountAddress;
 use poem_openapi::Enum as PoemEnum;
 
 /// Represents a deprecated config that provides no field verification.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DeprecatedConfig {}
 
 /// Config pulls in configuration information from the config file.
@@ -93,7 +93,7 @@ pub struct NodeConfig {
     pub failpoints: Option<HashMap<String, String>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BaseConfig {
     pub data_dir: PathBuf,
@@ -111,7 +111,7 @@ impl Default for BaseConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WaypointConfig {
     FromConfig(Waypoint),

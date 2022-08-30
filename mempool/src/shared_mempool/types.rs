@@ -82,7 +82,7 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SharedMempoolNotification {
     PeerStateChange,
     NewTransactions,

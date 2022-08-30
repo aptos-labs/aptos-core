@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 use warp::{http::StatusCode, reject::Reject};
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ServiceError {
     pub code: u16,
     pub message: String,

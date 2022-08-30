@@ -22,7 +22,7 @@ use tokio::time::timeout;
 
 const MEMPOOL_NOTIFICATION_CHANNEL_SIZE: usize = 1;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Commit notification failed: {0}")]
     CommitNotificationError(String),

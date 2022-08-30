@@ -59,7 +59,7 @@ pub trait StateSnapshotReceiver<K, V>: Send {
     fn finish_box(self: Box<Self>) -> Result<()>;
 }
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Service error: {:?}", error)]
     ServiceError { error: String },

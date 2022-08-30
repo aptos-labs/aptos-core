@@ -4,7 +4,7 @@
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub struct EventKey(pub aptos_types::event::EventKey);
 
 impl From<aptos_types::event::EventKey> for EventKey {

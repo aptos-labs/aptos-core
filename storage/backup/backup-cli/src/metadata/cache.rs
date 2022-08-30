@@ -101,7 +101,7 @@ pub async fn sync_and_load(
     let up_to_date_local_hashes = local_hashes.intersection(&remote_hashes);
 
     for h in stale_local_hashes {
-        let file = cache_dir.join(&*h);
+        let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
     }
 
@@ -148,7 +148,7 @@ pub async fn sync_and_load(
     // Load metadata from synced cache files.
     let mut metadata_vec = Vec::new();
     for h in new_remote_hashes.into_iter().chain(up_to_date_local_hashes) {
-        let cached_file = cache_dir.join(&*h);
+        let cached_file = cache_dir.join(h);
         metadata_vec.extend(
             OpenOptions::new()
                 .read(true)

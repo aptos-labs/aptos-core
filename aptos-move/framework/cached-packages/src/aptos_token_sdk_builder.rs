@@ -30,7 +30,7 @@ type Bytes = Vec<u8>;
 ///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
@@ -647,7 +647,7 @@ mod decoder {
     pub fn token_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenBurn {
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creators_address: bcs::from_bytes(script.args().first()?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -663,7 +663,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCreateCollectionScript {
-                name: bcs::from_bytes(script.args().get(0)?).ok()?,
+                name: bcs::from_bytes(script.args().first()?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
                 uri: bcs::from_bytes(script.args().get(2)?).ok()?,
                 maximum: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -677,7 +677,7 @@ mod decoder {
     pub fn token_create_token_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCreateTokenScript {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection: bcs::from_bytes(script.args().first()?).ok()?,
                 name: bcs::from_bytes(script.args().get(1)?).ok()?,
                 description: bcs::from_bytes(script.args().get(2)?).ok()?,
                 balance: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -699,7 +699,7 @@ mod decoder {
     pub fn token_direct_transfer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenDirectTransferScript {
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creators_address: bcs::from_bytes(script.args().first()?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -723,7 +723,7 @@ mod decoder {
     pub fn token_mint_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenMintScript {
-                token_data_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                token_data_address: bcs::from_bytes(script.args().first()?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -738,7 +738,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenMutateTokenProperties {
-                token_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
+                token_owner: bcs::from_bytes(script.args().first()?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection_name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 token_name: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -756,7 +756,7 @@ mod decoder {
     pub fn token_opt_in_direct_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenOptInDirectTransfer {
-                opt_in: bcs::from_bytes(script.args().get(0)?).ok()?,
+                opt_in: bcs::from_bytes(script.args().first()?).ok()?,
             })
         } else {
             None
@@ -768,8 +768,8 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCoinSwapListTokenForSwap {
-                coin_type: script.ty_args().get(0)?.clone(),
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                coin_type: script.ty_args().first()?.clone(),
+                creators_address: bcs::from_bytes(script.args().first()?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -787,7 +787,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersCancelOfferScript {
-                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
+                receiver: bcs::from_bytes(script.args().first()?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -801,7 +801,7 @@ mod decoder {
     pub fn token_transfers_claim_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersClaimScript {
-                sender: bcs::from_bytes(script.args().get(0)?).ok()?,
+                sender: bcs::from_bytes(script.args().first()?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -815,7 +815,7 @@ mod decoder {
     pub fn token_transfers_offer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersOfferScript {
-                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
+                receiver: bcs::from_bytes(script.args().first()?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,

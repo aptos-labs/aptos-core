@@ -32,7 +32,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
     #[serde(rename = "type")]
     #[oai(rename = "type")]
@@ -112,7 +112,7 @@ impl FromStr for U64 {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Copy)]
 pub struct U128(pub u128);
 
 impl U128 {
@@ -169,7 +169,7 @@ impl FromStr for U128 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexEncodedBytes(pub Vec<u8>);
 
 impl HexEncodedBytes {
@@ -255,7 +255,7 @@ impl HexEncodedBytes {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
@@ -358,7 +358,7 @@ impl Serialize for MoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoveStructTag {
     pub address: Address,
     pub module: IdentifierWrapper,
@@ -448,7 +448,7 @@ impl TryFrom<MoveStructTag> for StructTag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MoveType {
     Bool,
     U8,
@@ -618,7 +618,7 @@ impl TryFrom<MoveType> for TypeTag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveModule {
     pub address: Address,
     pub name: IdentifierWrapper,
@@ -719,7 +719,7 @@ impl<'de> Deserialize<'de> for MoveModuleId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
     pub name: IdentifierWrapper,
     pub is_native: bool,
@@ -731,7 +731,7 @@ pub struct MoveStruct {
 // TODO: Consider finding a way to derive NewType here instead of using the
 // custom macro, since some of the enum type information (such as the
 // variants) is currently being lost.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoveAbility(pub Ability);
 
 impl From<Ability> for MoveAbility {
@@ -788,7 +788,7 @@ impl<'de> Deserialize<'de> for MoveAbility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStructGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
     #[oai(skip)]
@@ -808,7 +808,7 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStructField {
     pub name: IdentifierWrapper,
     #[serde(rename = "type")]
@@ -816,7 +816,7 @@ pub struct MoveStructField {
     pub typ: MoveType,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveFunction {
     pub name: IdentifierWrapper,
     pub visibility: MoveFunctionVisibility,
@@ -850,7 +850,7 @@ impl From<&CompiledScript> for MoveFunction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Enum)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
 #[oai(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
@@ -879,7 +879,7 @@ impl From<MoveFunctionVisibility> for Visibility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveFunctionGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
 }
@@ -892,7 +892,7 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveModuleBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -928,7 +928,7 @@ impl From<Module> for MoveModuleBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -958,7 +958,7 @@ impl MoveScriptBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EntryFunctionId {
     pub module: MoveModuleId,
     pub name: IdentifierWrapper,

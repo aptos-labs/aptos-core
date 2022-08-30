@@ -53,7 +53,7 @@ where
 
 /// A container for a get response that contains relevant metadata and the value stored at the
 /// given key.
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(tag = "data")]
 pub struct GetResponse<T> {
     /// Time since Unix Epoch in seconds.

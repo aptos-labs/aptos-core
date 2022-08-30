@@ -33,7 +33,7 @@ impl From<move_deps::move_table_extension::TableHandle> for TableHandle {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct TableInfo {
     pub key_type: TypeTag,
