@@ -38,7 +38,7 @@ use storage_interface::jmt_update_refs;
     Deserialize,
     CryptoHasher,
 )]
-pub(crate) struct ValueBlob(Vec<u8>);
+pub struct ValueBlob(Vec<u8>);
 
 impl From<Vec<u8>> for ValueBlob {
     fn from(blob: Vec<u8>) -> Self {

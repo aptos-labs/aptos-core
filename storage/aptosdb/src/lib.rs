@@ -17,6 +17,7 @@ pub mod backup;
 pub mod errors;
 pub mod metrics;
 pub mod schema;
+pub mod state_restore;
 
 mod db_options;
 mod event_store;

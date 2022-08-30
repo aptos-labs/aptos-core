@@ -1,17 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    mock_tree_store::MockTreeStore,
-    node_type::{LeafNode, Node, NodeKey},
-    restore::StateSnapshotRestore,
-    test_helper::{init_mock_db, ValueBlob},
-    JellyfishMerkleTree, NodeBatch, StateSnapshotProgress, StateValueBatch, StateValueWriter,
-    TestKey, TestValue, TreeReader, TreeWriter,
+use crate::state_restore::{
+    StateSnapshotProgress, StateSnapshotRestore, StateValueBatch, StateValueWriter,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::RwLock;
+use aptos_jellyfish_merkle::mock_tree_store::MockTreeStore;
+use aptos_jellyfish_merkle::node_type::{LeafNode, Node, NodeKey};
+use aptos_jellyfish_merkle::test_helper::{init_mock_db, ValueBlob};
+use aptos_jellyfish_merkle::{
+    JellyfishMerkleTree, NodeBatch, TestKey, TestValue, TreeReader, TreeWriter,
+};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
@@ -234,7 +235,7 @@ fn assert_success<V>(
     btree: &BTreeMap<HashValue, (V, V)>,
     version: Version,
 ) where
-    V: crate::TestKey + crate::TestValue,
+    V: TestKey + TestValue,
 {
     let tree = JellyfishMerkleTree::new(db);
     for (key, value) in btree.values() {
@@ -262,7 +263,7 @@ fn restore_without_interruption<V>(
     target_db: &Arc<MockSnapshotStore<V, V>>,
     try_resume: bool,
 ) where
-    V: crate::TestKey + crate::TestValue,
+    V: TestKey + TestValue,
 {
     let (db, source_version) = init_mock_store(
         &btree
