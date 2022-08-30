@@ -8,6 +8,7 @@ pub mod submission_worker;
 use ::aptos_logger::*;
 use again::RetryPolicy;
 use anyhow::{anyhow, format_err, Result};
+use aptos_infallible::RwLock;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -35,7 +36,8 @@ use crate::{
     emitter::{account_minter::AccountMinter, submission_worker::SubmissionWorker},
     transaction_generator::{
         account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
-        p2p_transaction_generator::P2PTransactionGeneratorCreator, TransactionGeneratorCreator,
+        p2p_transaction_generator::P2PTransactionGeneratorCreator,
+        transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
     },
 };
 use aptos_sdk::transaction_builder::aptos_stdlib;
@@ -74,21 +76,6 @@ pub struct EmitModeParams {
 }
 
 #[derive(Clone, Debug)]
-pub struct EmitJobRequest {
-    rest_clients: Vec<RestClient>,
-    mode: EmitJobMode,
-
-    gas_price: u64,
-    invalid_transaction_ratio: usize,
-    pub duration: Duration,
-    reuse_accounts: bool,
-    mint_to_root: bool,
-    transaction_type: TransactionType,
-
-    txn_expiration_time_secs: u64,
-}
-
-#[derive(Clone, Debug)]
 pub enum EmitJobMode {
     MaxLoad { mempool_backlog: usize },
     ConstTps { tps: usize },
@@ -112,6 +99,25 @@ impl EmitJobMode {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct EmitJobRequest {
+    rest_clients: Vec<RestClient>,
+    mode: EmitJobMode,
+
+    gas_price: u64,
+    invalid_transaction_ratio: usize,
+    pub duration: Duration,
+    reuse_accounts: bool,
+    mint_to_root: bool,
+
+    transaction_mix: Vec<(TransactionType, usize)>,
+
+    add_created_accounts_to_pool: bool,
+    max_account_working_set: usize,
+
+    txn_expiration_time_secs: u64,
+}
+
 impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
@@ -123,8 +129,10 @@ impl Default for EmitJobRequest {
             invalid_transaction_ratio: 0,
             duration: Duration::from_secs(300),
             reuse_accounts: false,
-            transaction_type: TransactionType::P2P,
             mint_to_root: false,
+            transaction_mix: vec![(TransactionType::P2P, 1)],
+            add_created_accounts_to_pool: true,
+            max_account_working_set: 1_000_000,
             txn_expiration_time_secs: 60,
         }
     }
@@ -151,7 +159,12 @@ impl EmitJobRequest {
     }
 
     pub fn transaction_type(mut self, transaction_type: TransactionType) -> Self {
-        self.transaction_type = transaction_type;
+        self.transaction_mix = vec![(transaction_type, 1)];
+        self
+    }
+
+    pub fn transaction_mix(mut self, transaction_mix: Vec<(TransactionType, usize)>) -> Self {
+        self.transaction_mix = transaction_mix;
         self
     }
 
@@ -167,6 +180,16 @@ impl EmitJobRequest {
 
     pub fn duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
+        self
+    }
+
+    pub fn add_created_accounts_to_pool(mut self, add_created_accounts_to_pool: bool) -> Self {
+        self.add_created_accounts_to_pool = add_created_accounts_to_pool;
+        self
+    }
+
+    pub fn max_account_working_set(mut self, max_account_working_set: usize) -> Self {
+        self.max_account_working_set = max_account_working_set;
         self
     }
 
@@ -373,7 +396,7 @@ impl<'t> TxnEmitter<'t> {
         self.accounts.append(&mut new_accounts);
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
-        let all_addresses = Arc::new(all_addresses);
+        let all_addresses = Arc::new(RwLock::new(all_addresses));
         let mut all_accounts = all_accounts.into_iter();
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(StatsAccumulator::default());
@@ -382,26 +405,45 @@ impl<'t> TxnEmitter<'t> {
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs);
-        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match req.transaction_type
-        {
-            TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
-                self.from_rng(),
-                txn_factory,
-                SEND_AMOUNT,
-            )),
-            TransactionType::AccountGeneration => {
-                Box::new(AccountGeneratorCreator::new(txn_factory))
-            }
-            TransactionType::NftMint => Box::new(
-                NFTMintGeneratorCreator::new(
+        let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
+            Vec::new();
+        for (transaction_type, weight) in req.transaction_mix {
+            let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
+            {
+                TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
                     self.from_rng(),
-                    txn_factory,
-                    self.root_account,
-                    req.rest_clients[0].clone(),
-                )
-                .await,
-            ),
-        };
+                    txn_factory.clone(),
+                    SEND_AMOUNT,
+                    all_addresses.clone(),
+                    req.invalid_transaction_ratio,
+                    req.gas_price,
+                )),
+                TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
+                    txn_factory.clone(),
+                    all_addresses.clone(),
+                    req.add_created_accounts_to_pool,
+                    req.max_account_working_set,
+                    req.gas_price,
+                )),
+                TransactionType::NftMint => Box::new(
+                    NFTMintGeneratorCreator::new(
+                        self.from_rng(),
+                        txn_factory.clone(),
+                        self.root_account,
+                        req.rest_clients[0].clone(),
+                    )
+                    .await,
+                ),
+            };
+            txn_generator_creator_mix.push((txn_generator_creator, weight));
+        }
+        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
+            if txn_generator_creator_mix.len() > 1 {
+                Box::new(TxnMixGeneratorCreator::new(txn_generator_creator_mix))
+            } else {
+                txn_generator_creator_mix.into_iter().next().unwrap().0
+            };
+
         let total_workers = req.rest_clients.len() * workers_per_endpoint;
 
         let check_account_sequence_only_once_for = (0..total_workers)
@@ -425,24 +467,21 @@ impl<'t> TxnEmitter<'t> {
                 let accounts = (&mut all_accounts)
                     .take(mode_params.accounts_per_worker)
                     .collect();
-                let all_addresses = all_addresses.clone();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
 
                 let worker = SubmissionWorker::new(
                     accounts,
                     client.clone(),
-                    all_addresses,
                     stop,
                     mode_params.clone(),
                     stats,
                     txn_generator_creator.create_transaction_generator(),
-                    req.invalid_transaction_ratio,
                     workers.len(),
                     check_account_sequence_only_once_for.contains(&workers.len()),
                     self.from_rng(),
                 );
-                let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
+                let join_handle = tokio_handle.spawn(worker.run().boxed());
                 workers.push(Worker { join_handle });
             }
         }
