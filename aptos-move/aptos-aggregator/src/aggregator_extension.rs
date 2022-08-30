@@ -366,7 +366,8 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 mod test {
     use super::*;
     use crate::delta_change_set::serialize;
-    use aptos_state_view::{state_storage_usage::StateStorageUsage, StateView};
+    use aptos_state_view::StateView;
+    use aptos_types::state_store::state_storage_usage::StateStorageUsage;
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle},

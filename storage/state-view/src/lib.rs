@@ -6,9 +6,9 @@
 //! This crate defines [`trait StateView`](StateView).
 
 use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
-use crate::state_storage_usage::StateStorageUsage;
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress, state_store::state_key::StateKey, transaction::Version,
 };
@@ -16,7 +16,6 @@ use std::ops::Deref;
 
 pub mod account_with_state_cache;
 pub mod account_with_state_view;
-pub mod state_storage_usage;
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the

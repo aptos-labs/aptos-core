@@ -3,8 +3,8 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
