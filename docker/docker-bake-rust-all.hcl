@@ -48,10 +48,10 @@ target "builder" {
   cache-from = generate_cache_from("builder")
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
-  args       = {
-    GIT_SHA         = "${GIT_SHA}"
-    GIT_BRANCH      = "${GIT_BRANCH}"
-    GIT_TAG         = "${GIT_TAG}"
+  args = {
+    GIT_SHA            = "${GIT_SHA}"
+    GIT_BRANCH         = "${GIT_BRANCH}"
+    GIT_TAG            = "${GIT_TAG}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }
@@ -88,10 +88,10 @@ target "_common" {
     "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
   args = {
-    GIT_SHA         = "${GIT_SHA}"
-    GIT_BRANCH      = "${GIT_BRANCH}"
-    GIT_TAG         = "${GIT_TAG}"
-    BUILD_DATE      = "${BUILD_DATE}"
+    GIT_SHA            = "${GIT_SHA}"
+    GIT_BRANCH         = "${GIT_BRANCH}"
+    GIT_TAG            = "${GIT_TAG}"
+    BUILD_DATE         = "${BUILD_DATE}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }
@@ -140,7 +140,7 @@ target "forge" {
 
 target "telemetry-service" {
   inherits = ["_common"]
-  target = "telemetry-service"
+  target   = "telemetry-service"
   cache-to = generate_cache_to("telemetry-service")
   tags     = generate_tags("telemetry-service")
 }
@@ -157,15 +157,14 @@ function "generate_cache_from" {
 ## we only cache to GCP because AWS ECR doesn't support cache manifests
 function "generate_cache_to" {
   params = [target]
-  result = TARGET_REGISTRY == "gcp" ? ["type=inline"] : []
+  result = TARGET_REGISTRY == "remote" ? ["type=registry,mode=max"] : []
 }
 
 function "generate_tags" {
   params = [target]
-  result = TARGET_REGISTRY == "gcp" ? [
+  result = TARGET_REGISTRY == "remote" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${normalized_branch_or_pr}",
-    ] : TARGET_REGISTRY == "aws" ? [
     "${ecr_base}/${target}:${GIT_SHA}",
     ] : [
     "aptos-core/${target}:${GIT_SHA}-from-local",
