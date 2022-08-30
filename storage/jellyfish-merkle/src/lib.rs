@@ -84,6 +84,7 @@ use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::proof::SparseMerkleProofExt;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -148,7 +149,7 @@ pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
     fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()>;
 
-    fn write_usage(&self, version: Version, items: usize, total_bytes: usize) -> Result<()>;
+    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()>;
 }
 
 pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
