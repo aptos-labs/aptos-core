@@ -21,7 +21,8 @@ use rand::Rng;
 use serde::Serialize;
 use std::{convert::TryInto, fmt};
 
-const MAX_NUM_OF_KEYS: usize = 32;
+/// const for max number of ed25519 keys allowed for multi-ed25519 keys
+pub const MAX_NUM_OF_KEYS: usize = 32;
 const BITMAP_NUM_OF_BYTES: usize = 4;
 
 /// Vector of private keys in the multi-key Ed25519 structure along with the threshold.
