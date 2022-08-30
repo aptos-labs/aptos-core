@@ -24,6 +24,8 @@
 /state-sync/ @joshlind
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
+# Owners for quorum store
+/consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 # Owners for execution and storage
 /execution/ @msmouse @lightmark
 /storage/ @msmouse @lightmark
@@ -40,4 +42,5 @@
 # Owner for token_standard and related tutorials
 /aptos-move/framework/aptos-token @areshand
 /developer-docs-site/docs/tutorials @areshand
-
+# Owners for mempool
+/mempool/ @bchocho
