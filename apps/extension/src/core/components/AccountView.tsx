@@ -70,10 +70,8 @@ const AccountView = React.forwardRef(({
   };
 
   const handleClickAccount = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const targetClasses = (e.target as Element).classList;
-    const isCopyAddress = targetClasses.contains('address') || targetClasses.contains('address-copy');
-    if (onClick && !isCopyAddress) {
+    if (onClick && opacity === 0) {
+      e.preventDefault();
       onClick(displayActiveAccountAddress);
     }
   };
@@ -114,12 +112,12 @@ const AccountView = React.forwardRef(({
             onMouseEnter={() => setOpacity(1)}
             onMouseLeave={() => setOpacity(0)}
           >
-            <Flex flexDirection="row" gap={1} alignItems="baseline" className="address">
+            <Flex flexDirection="row" gap={1} alignItems="baseline">
               {beginAddress}
               ...
               {endAddress}
               <Box opacity={opacity}>
-                <RiFileCopyLine className="address-copy" />
+                <RiFileCopyLine />
               </Box>
             </Flex>
           </Text>
