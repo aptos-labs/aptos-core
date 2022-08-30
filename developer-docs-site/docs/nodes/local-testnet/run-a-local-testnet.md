@@ -186,5 +186,5 @@ Use the [Aptos CLI tool](https://github.com/aptos-labs/aptos-core/blob/main/crat
 At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with:
 
 * [Your first transaction](/tutorials/your-first-transaction) to learn how to submit transactions.
-* [Your first Move module](/tutorials/your-first-move-module) to learn how to create Move modules.
+* [Your first Move module](/tutorials/first-move-module) to learn how to create Move modules.
 * [Interacting with the Aptos Blockchain](/guides/interacting-with-the-aptos-blockchain) to learn how to mint coins.
