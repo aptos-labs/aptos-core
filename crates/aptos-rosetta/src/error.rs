@@ -287,7 +287,10 @@ impl From<RestError> for ApiError {
             },
             RestError::Bcs(_) => ApiError::DeserializationFailed(None),
             RestError::Json(_) => ApiError::DeserializationFailed(None),
-            RestError::WebClient(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::Http(err) => ApiError::InternalError(Some(format!(
+                "Failed internal API call with HTTP code {}",
+                err
+            ))),
             RestError::UrlParse(err) => ApiError::InternalError(Some(err.to_string())),
             RestError::Timeout(err) => ApiError::InternalError(Some(err.to_string())),
             RestError::Unknown(err) => ApiError::InternalError(Some(err.to_string())),

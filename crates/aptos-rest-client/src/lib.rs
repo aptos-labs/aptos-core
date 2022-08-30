@@ -42,12 +42,18 @@ use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::time::Duration;
+use tokio::time::Instant;
 use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
+const DEFAULT_MAX_WAIT_MS: u64 = 60000;
+const DEFAULT_INTERVAL_MS: u64 = 1000;
+static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
+static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
 
 type AptosResult<T> = Result<T, RestError>;
 
@@ -1006,6 +1012,58 @@ impl Client {
         let (response, state) = self.check_response(response).await?;
         Ok(Response::new(response.bytes().await?, state))
     }
+
+    pub async fn try_until_ok<F, Fut, T>(
+        total_wait: Option<Duration>,
+        initial_interval: Option<Duration>,
+        function: F,
+    ) -> AptosResult<T>
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = AptosResult<T>>,
+    {
+        let total_wait = total_wait.unwrap_or(DEFAULT_MAX_WAIT_DURATION);
+        let mut backoff = initial_interval.unwrap_or(DEFAULT_INTERVAL_DURATION);
+        let mut result = Err(RestError::Unknown(anyhow!("Failed to run function")));
+        let start = Instant::now();
+
+        // TODO: Add jitter
+        while start.elapsed() < total_wait {
+            result = function().await;
+
+            let retry = match &result {
+                Ok(_) => break,
+                Err(err) => match err {
+                    RestError::Api(inner) => is_retriable_status_code(inner.status_code.as_u16()),
+                    RestError::Http(inner) => is_retriable_status_code(*inner),
+                    RestError::Bcs(_)
+                    | RestError::Json(_)
+                    | RestError::Timeout(_)
+                    | RestError::Unknown(_) => true,
+                    RestError::UrlParse(_) => false,
+                },
+            };
+
+            if !retry {
+                break;
+            }
+
+            aptos_logger::info!(
+                "Failed to call API, retrying in {}ms: {:?}",
+                backoff.as_millis(),
+                result.as_ref().err().unwrap()
+            );
+
+            tokio::time::sleep(backoff).await;
+            backoff = backoff.saturating_mul(2);
+        }
+
+        result
+    }
+}
+
+fn is_retriable_status_code(status_code: u16) -> bool {
+    (500..600).contains(&status_code) || status_code == 404 || status_code == 429
 }
 
 impl From<(ReqwestClient, Url)> for Client {
@@ -1043,6 +1101,6 @@ async fn parse_error(response: reqwest::Response) -> RestError {
     let maybe_state = parse_state_optional(&response);
     match response.json::<AptosError>().await {
         Ok(error) => (error, maybe_state, status_code).into(),
-        Err(err) => err.into(),
+        Err(_) => RestError::Http(status_code.as_u16()),
     }
 }
