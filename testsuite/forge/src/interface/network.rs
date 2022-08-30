@@ -6,6 +6,7 @@ use std::time::Duration;
 use super::Test;
 use crate::success_criteria::SuccessCriteria;
 use crate::{CoreContext, Result, Swarm, TestReport};
+use tokio::runtime::Runtime;
 use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 
 /// The testing interface which defines a test written with full control over an existing network.
@@ -22,6 +23,7 @@ pub struct NetworkContext<'t> {
     pub report: &'t mut TestReport,
     pub global_job: EmitJobRequest,
     success_criteria: SuccessCriteria,
+    runtime: Runtime,
 }
 
 impl<'t> NetworkContext<'t> {
@@ -38,6 +40,7 @@ impl<'t> NetworkContext<'t> {
             report,
             global_job,
             success_criteria,
+            runtime: Runtime::new().unwrap(),
         }
     }
 
@@ -49,7 +52,9 @@ impl<'t> NetworkContext<'t> {
         &mut self.core
     }
     pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
-        self.success_criteria
-            .check_for_success(stats, window, self.swarm)
+        self.runtime.block_on(
+            self.success_criteria
+                .check_for_success(stats, window, self.swarm),
+        )
     }
 }
