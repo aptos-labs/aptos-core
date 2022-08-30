@@ -73,7 +73,6 @@ module aptos_framework::genesis {
             i = i+1;
         };
 
-
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
@@ -145,11 +144,13 @@ module aptos_framework::genesis {
             // Create the operator account if it's different from owner.
             if (validator.operator_address != validator.owner_address) {
                 operator = &account::create_account(validator.operator_address);
+                coin::register<AptosCoin>(operator);
             };
             // Create the voter account if it's different from owner and operator.
             if (validator.voter_address != validator.owner_address &&
                 validator.voter_address != validator.operator_address) {
-                account::create_account(validator.voter_address);
+                let voter = &account::create_account(validator.voter_address);
+                coin::register<AptosCoin>(voter);
             };
 
             // Mint the initial staking amount to the validator.
@@ -175,7 +176,7 @@ module aptos_framework::genesis {
                 validator.network_addresses,
                 validator.full_node_network_addresses,
             );
-            stake::join_validator_set_internal(operator, validator.owner_address);
+            stake::join_validator_set(operator, validator.owner_address);
 
             i = i + 1;
         };

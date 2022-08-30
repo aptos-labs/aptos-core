@@ -673,27 +673,16 @@ module aptos_framework::stake {
 
     /// This can only called by the operator of the validator/staking pool.
     public entry fun join_validator_set(
-        account: &signer, pool_address: address) acquires StakePool, ValidatorConfig, ValidatorSet {
+        operator: &signer, pool_address: address) acquires StakePool, ValidatorConfig, ValidatorSet {
         assert!(
             staking_config::get_allow_validator_set_change(&staking_config::get()),
             error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
 
-        join_validator_set_internal(account, pool_address);
-    }
-
-    /// Request to have `pool_address` join the validator set. Can only be called after calling `initialize_validator`.
-    /// If the validator has the required stake (more than minimum and less than maximum allowed), they will be
-    /// added to the pending_active queue. All validators in this queue will be added to the active set when the next
-    /// epoch starts (eligibility will be rechecked).
-    ///
-    /// This internal version can only be called by the Genesis module during Genesis.
-    public(friend) fun join_validator_set_internal(
-        account: &signer, pool_address: address) acquires StakePool, ValidatorConfig, ValidatorSet {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         // Account has to be the operator.
-        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
         // Throw an error is the validator is already active.
         assert!(
@@ -1919,7 +1908,7 @@ module aptos_framework::stake {
 
         // Bypass the check to join. This is the same function called during Genesis.
         let validator_address = signer::address_of(&validator);
-        join_validator_set_internal(&validator, validator_address);
+        join_validator_set(&validator, validator_address);
         end_epoch();
 
         // Leaving the validator set should fail as post genesis validator set change is not allowed.
