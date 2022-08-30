@@ -19,6 +19,7 @@ import {
   useDisclosure,
   VStack,
 } from '@chakra-ui/react';
+import { UserTransaction } from 'aptos/dist/generated';
 import { FormProvider, useForm } from 'react-hook-form';
 import React, { useState } from 'react';
 import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
@@ -34,10 +35,12 @@ import {
   ExternalLinkIcon,
 } from '@chakra-ui/icons';
 import { secondaryDividerColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
+import toast from 'core/components/Toast';
 import numeral from 'numeral';
 import useDebounce from 'core/hooks/useDebounce';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatAddress, isAddressValid } from 'core/utils/address';
+import { parseMoveAbortDetails } from 'shared/move';
 import TransferInput from './TransferInput';
 import TransferAvatar from './TransferAvatar';
 import TransferSummary from './TransferSummary';
@@ -45,6 +48,38 @@ import TransferSummary from './TransferSummary';
 enum TransferDrawerPage {
   ADD_ADDRESS_AND_AMOUNT = 'Add an address and amount',
   CONFIRM_TRANSACTION = 'Confirm transaction',
+}
+
+function coinTransferSuccessToast(amount: number, txn: UserTransaction) {
+  toast({
+    description: `Amount transferred: ${amount}, gas consumed: ${txn.gas_used}`,
+    status: 'success',
+    title: 'Transaction succeeded',
+  });
+}
+
+function coinTransferAbortToast(txn: UserTransaction) {
+  const abortDetails = parseMoveAbortDetails(txn.vm_status);
+  const abortReasonDescr = abortDetails !== undefined
+    ? abortDetails.reasonDescr
+    : 'Transaction failed';
+  toast({
+    description: `${abortReasonDescr}, gas consumed: ${txn.gas_used}`,
+    status: 'error',
+    title: 'Transaction failed',
+  });
+}
+
+function transactionErrorToast(err: unknown) {
+  const errorMsg = err instanceof Error
+    ? err.message
+    : 'Unexpected error';
+
+  toast({
+    description: errorMsg,
+    status: 'error',
+    title: 'Transaction error',
+  });
 }
 
 export interface CoinTransferFormData {
@@ -76,10 +111,9 @@ function TransferDrawer() {
 
   const recipient = watch('recipient');
   const validRecipientAddress = isAddressValid(recipient) ? formatAddress(recipient) : undefined;
-  const {
-    data: doesRecipientAccountExist,
-  } = useAccountExists({ address: validRecipientAddress });
-  const validRecipient = doesRecipientAccountExist ? recipient : undefined;
+  const { data: doesRecipientAccountExist } = useAccountExists({
+    address: validRecipientAddress,
+  });
 
   const amount = watch('amount');
   const numberAmount = numeral(amount).value() || undefined;
@@ -89,35 +123,65 @@ function TransferDrawer() {
   } = useDebounce(numberAmount, 500);
   const { activeAccountAddress } = useActiveAccount();
   const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
+  const isBalanceEnoughBeforeFee = (debouncedAmount && coinBalance !== undefined)
+    ? debouncedAmount <= coinBalance
+    : undefined;
 
   const {
-    data: simulatedTxn,
+    data: simulationResult,
+    error: simulationError,
   } = useCoinTransferSimulation({
     amount: debouncedAmount,
-    create: !doesRecipientAccountExist,
-    enabled: isDrawerOpen,
+    doesRecipientExist: doesRecipientAccountExist,
     recipient: validRecipientAddress,
+  }, {
+    enabled: isDrawerOpen && isBalanceEnoughBeforeFee,
+    maxGasAmount: coinBalance || 0,
+    refetchInterval: 5000,
   });
 
-  const {
-    isLoading: transferIsLoading,
-    isReady: canSubmitTransaction,
-    mutateAsync: submitCoinTransfer,
-  } = useCoinTransferTransaction();
+  const estimatedGasFee = debouncedAmount && simulationResult && Number(simulationResult.gas_used);
+  const { mutateAsync: submitCoinTransfer } = useCoinTransferTransaction({ estimatedGasFee });
+
+  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${recipient}`;
+  const simulationAbortDetails = simulationResult !== undefined
+    ? parseMoveAbortDetails(simulationResult.vm_status)
+    : undefined;
+
+  const shouldBalanceShake = isBalanceEnoughBeforeFee === false
+    || simulationError !== null
+    || simulationAbortDetails !== undefined;
+
+  const canSubmitForm = validRecipientAddress !== undefined
+    && !debouncedAmountIsLoading
+    && doesRecipientAccountExist !== undefined
+    && debouncedAmount !== undefined
+    && debouncedAmount >= 0
+    && simulationResult?.success === true
+    && !simulationError;
 
   const onSubmit = async () => {
-    if (!validRecipientAddress || !debouncedAmount) {
+    if (!canSubmitForm) {
       return;
     }
-    const onChainTxn = await submitCoinTransfer({
-      amount: debouncedAmount,
-      create: !doesRecipientAccountExist,
-      recipient: validRecipientAddress,
-    });
-    if (onChainTxn && onChainTxn.success) {
-      resetForm();
-      setDrawerPage(TransferDrawerPage.ADD_ADDRESS_AND_AMOUNT);
-      closeDrawer();
+
+    try {
+      const onChainTxn = await submitCoinTransfer({
+        amount: debouncedAmount,
+        doesRecipientExist: doesRecipientAccountExist,
+        recipient: validRecipientAddress,
+      });
+
+      if (onChainTxn.success) {
+        coinTransferSuccessToast(debouncedAmount, onChainTxn);
+        resetForm();
+        setDrawerPage(TransferDrawerPage.ADD_ADDRESS_AND_AMOUNT);
+        closeDrawer();
+      } else {
+        coinTransferAbortToast(onChainTxn);
+      }
+    } catch (err) {
+      transactionErrorToast(err);
     }
   };
 
@@ -136,20 +200,6 @@ function TransferDrawer() {
   const backOnClick = () => {
     setDrawerPage(TransferDrawerPage.ADD_ADDRESS_AND_AMOUNT);
   };
-
-  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${recipient}`;
-  const estimatedGasFee = debouncedAmount && simulatedTxn && Number(simulatedTxn.gas_used);
-  const maxAmount = coinBalance && estimatedGasFee && coinBalance - estimatedGasFee;
-  const isBalanceEnough = !maxAmount || debouncedAmount <= maxAmount;
-
-  const shouldBalanceShake = (!isBalanceEnough);
-
-  const canSubmitForm = canSubmitTransaction
-    && !debouncedAmountIsLoading
-    && validRecipientAddress
-    && debouncedAmount
-    && isBalanceEnough
-    && (!doesRecipientAccountExist || simulatedTxn?.success);
 
   const addAddressAndAmountDrawerContent = (
     <>
@@ -203,7 +253,7 @@ function TransferDrawer() {
             ) : (
               <Button
                 color={
-                  validRecipient
+                  doesRecipientAccountExist
                     ? secondaryTextColor[colorMode]
                     : secondaryErrorMessageColor[colorMode]
                 }
@@ -292,7 +342,7 @@ function TransferDrawer() {
             Back
           </Button>
           <Button
-            isLoading={isSubmitting || transferIsLoading}
+            isLoading={isSubmitting}
             isDisabled={!canSubmitForm}
             colorScheme="teal"
             type="submit"
