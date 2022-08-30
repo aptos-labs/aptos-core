@@ -107,7 +107,7 @@
                   <%= metric.rank %>
                 <% end %>
                 <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.owner_address) do %>
-                  <a href="https://explorer.devnet.aptos.dev/address/<%= metric.owner_address %>?network=ait3" target="_blank" title="View Account Address on Explorer"><%= metric.owner_address %></a>
+                  <a href="https://explorer.devnet.aptos.dev/account/<%= metric.owner_address %>?network=ait3" target="_blank" title="View Account Address on Explorer"><%= metric.owner_address %></a>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
