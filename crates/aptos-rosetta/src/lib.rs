@@ -99,6 +99,20 @@ pub async fn bootstrap_async(
     rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
+
+    if let Some(ref client) = rest_client {
+        assert_eq!(
+            chain_id.id(),
+            client
+                .get_ledger_information()
+                .await
+                .expect("Should successfully get ledger information from Rest API")
+                .into_inner()
+                .chain_id,
+            "Failed to match Rosetta chain Id to upstream server"
+        );
+    }
+
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
