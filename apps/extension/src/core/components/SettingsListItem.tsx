@@ -7,13 +7,15 @@ import {
 } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
+import { useActiveAccount, useInitializedAccounts, useUnlockedAccounts } from 'core/hooks/useAccounts';
 import { settingsItemLabel } from 'core/constants';
 import Browser from 'core/utils/browser';
 import {
   secondaryGridHoverBgColor,
   textColor, secondaryAddressFontColor,
 } from 'core/colors';
+import { removeAccountToast } from 'core/components/Toast';
+import { Routes } from 'core/routes';
 
 interface BgColorDictType {
   dark: string;
@@ -46,7 +48,8 @@ export default function SettingsListItem({
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
-  const { clearAccounts, lockAccounts } = useInitializedAccounts();
+  const { lockAccounts } = useInitializedAccounts();
+  const { removeAccount } = useUnlockedAccounts();
 
   const gridOnClick = async () => {
     // todo: Create an enum for these titles for more typed code
@@ -60,7 +63,10 @@ export default function SettingsListItem({
         : 'https://explorer.devnet.aptos.dev';
       window.open(explorerAddress, '_blank');
     } else if (title === settingsItemLabel.REMOVE_ACCOUNT) {
-      await clearAccounts();
+      await removeAccount(activeAccount.address);
+      const removedAddress = `${activeAccount.address.slice(0, 4)}...${activeAccount.address.slice(62)}`;
+      removeAccountToast(`Successfully removed account ${removedAddress}`);
+      navigate(Routes.wallet.path);
     }
 
     if (path) {
