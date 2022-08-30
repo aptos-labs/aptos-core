@@ -7,22 +7,17 @@ import {
 } from '@chakra-ui/react';
 import { formatAddress, isAddressValid } from 'core/utils/address';
 import React, { useCallback, useMemo } from 'react';
-import { useFormContext } from 'react-hook-form';
 import { GraceHopperBoringAvatar } from './BoringAvatar';
-import type { CoinTransferFormData } from './TransferDrawer';
 
 interface TransferAvatarProps {
   doesRecipientAccountExist?: boolean;
+  recipient?: string;
 }
 
 export default function TransferAvatar({
   doesRecipientAccountExist,
+  recipient,
 }: TransferAvatarProps) {
-  const {
-    watch,
-  } = useFormContext<CoinTransferFormData>();
-
-  const recipient = watch('recipient');
   const validRecipientAddress = isAddressValid(recipient) ? formatAddress(recipient) : undefined;
 
   const getAvatarBadgeColor = useCallback(() => {

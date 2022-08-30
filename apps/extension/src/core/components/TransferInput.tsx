@@ -47,6 +47,9 @@ const defaultMaskOptions = {
   decimalLimit: 8,
   decimalSymbol: '.',
   includeThousandsSeparator: true,
+  // this would be more than the supply of APT
+  // TODO: implement after we change from octa to decimal APT
+  // integerLimit: 10,
   prefix: '',
   // how many digits allowed after the decimal
   suffix: ' APT',
@@ -60,7 +63,13 @@ function getAmountInputFontSize(amount?: number) {
   if (amount < 1e7) {
     return 48;
   }
-  return 36;
+  if (amount < 1e10) {
+    return 36;
+  }
+  if (amount < 1e16) {
+    return 24;
+  }
+  return 18;
 }
 
 const currencyMask = createNumberMask(defaultMaskOptions);

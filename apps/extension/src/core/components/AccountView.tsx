@@ -105,7 +105,14 @@ const AccountView = React.forwardRef(({
         </Copyable>
       </VStack>
       <Tooltip label="Rename">
-        <Button borderRadius="100%" colorScheme="teal" variant="ghost" bg="none" p={0} onClick={handleClickEditAccount}>
+        <Button
+          borderRadius="100%"
+          colorScheme="teal"
+          variant="ghost"
+          bg="none"
+          p={0}
+          onClick={handleClickEditAccount}
+        >
           <HiPencil size={20} />
         </Button>
       </Tooltip>
