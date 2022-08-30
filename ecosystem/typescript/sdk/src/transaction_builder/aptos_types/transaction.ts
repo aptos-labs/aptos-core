@@ -223,26 +223,6 @@ export class Module {
   }
 }
 
-/**
- * @deprecated
- */
-export class ModuleBundle {
-  /**
-   * Contains a list of Modules that can be published together.
-   * @param codes List of modules.
-   */
-  constructor(public readonly codes: Seq<Module>) {}
-
-  serialize(serializer: Serializer): void {
-    serializeVector<Module>(this.codes, serializer);
-  }
-
-  static deserialize(deserializer: Deserializer): ModuleBundle {
-    const codes = deserializeVector(deserializer, Module);
-    return new ModuleBundle(codes);
-  }
-}
-
 export class ModuleId {
   /**
    * Full name of a module.
@@ -368,8 +348,7 @@ export abstract class TransactionPayload {
     switch (index) {
       case 0:
         return TransactionPayloadScript.load(deserializer);
-      case 1:
-        return TransactionPayloadModuleBundle.load(deserializer);
+      // TODO: change to 1 once ModuleBundle has been removed from rust
       case 2:
         return TransactionPayloadEntryFunction.load(deserializer);
       default:
@@ -391,25 +370,6 @@ export class TransactionPayloadScript extends TransactionPayload {
   static load(deserializer: Deserializer): TransactionPayloadScript {
     const value = Script.deserialize(deserializer);
     return new TransactionPayloadScript(value);
-  }
-}
-
-/**
- * @deprecated
- */
-export class TransactionPayloadModuleBundle extends TransactionPayload {
-  constructor(public readonly value: ModuleBundle) {
-    super();
-  }
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
-    this.value.serialize(serializer);
-  }
-
-  static load(deserializer: Deserializer): TransactionPayloadModuleBundle {
-    const value = ModuleBundle.deserialize(deserializer);
-    return new TransactionPayloadModuleBundle(value);
   }
 }
 

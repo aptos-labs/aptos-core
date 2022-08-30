@@ -39,9 +39,6 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8Vector,
   TransactionArgumentU128,
-  TransactionPayloadModuleBundle,
-  ModuleBundle,
-  Module,
 } from "./aptos_types";
 import { HexString } from "../hex_string";
 import { TransactionBuilderEd25519 } from "./builder";
@@ -58,11 +55,6 @@ const ENTRY_FUNCTION_VECTOR = path.join(
 const SCRIPT_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,
   "aptos_api__tests__transaction_vector_test__test_script_payload.json",
-);
-
-const MODULE_VECTOR = path.join(
-  VECTOR_FILES_ROOT_DIR,
-  "aptos_api__tests__transaction_vector_test__test_module_payload.json",
 );
 
 function parseTypeTag(typeTag: any): TypeTag {
@@ -177,7 +169,7 @@ type IRawTxn = {
 
 function verify(
   raw_txn: IRawTxn,
-  payload: TransactionPayloadEntryFunction | TransactionPayloadScript | TransactionPayloadModuleBundle,
+  payload: TransactionPayloadEntryFunction | TransactionPayloadScript,
   private_key: string,
   expected_output: string,
 ) {
@@ -229,19 +221,6 @@ describe("Transaction builder vector test", () => {
       );
 
       verify(raw_txn, scriptPayload, private_key, signed_txn_bcs);
-    });
-  });
-
-  it("should pass on module payload", () => {
-    const vector: any[] = JSON.parse(fs.readFileSync(MODULE_VECTOR, "utf8"));
-    vector.forEach(({ raw_txn, signed_txn_bcs, private_key }) => {
-      const payload = raw_txn.payload.ModuleBundle.codes;
-      // payload.code is hex string
-      const modulePayload = new TransactionPayloadModuleBundle(
-        new ModuleBundle(payload.map(({ code }: { code: string }) => new Module(new HexString(code).toUint8Array()))),
-      );
-
-      verify(raw_txn, modulePayload, private_key, signed_txn_bcs);
     });
   });
 });
