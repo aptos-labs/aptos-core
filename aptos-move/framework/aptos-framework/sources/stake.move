@@ -2134,12 +2134,12 @@ module aptos_framework::stake {
     }
 
     #[test(
-    aptos_framework = @aptos_framework,
-    validator_1 = @aptos_framework,
-    validator_2 = @0x2,
-    validator_3 = @0x3,
-    validator_4 = @0x4,
-    validator_5 = @0x5
+        aptos_framework = @aptos_framework,
+        validator_1 = @aptos_framework,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
     )]
     public entry fun test_staking_validator_index(
         aptos_framework: &signer,
