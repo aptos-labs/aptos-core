@@ -55,7 +55,7 @@ export default function ImportAccountPrivateKey() {
       }}
       onSubmit={onSubmit}
     >
-      <ImportAccountPrivateKeyBody />
+      <ImportAccountPrivateKeyBody hasSubmit />
     </ImportAccountPrivateKeyLayout>
   );
 }
