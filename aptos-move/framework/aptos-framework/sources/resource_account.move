@@ -1,13 +1,15 @@
 /// A resource account is used to manage resources independent of an account managed by a user.
 /// This contains several utilities to make using resource accounts more effective.
 ///
+/// ## Resource Accounts to manage liquidity pools
+///
 /// A dev wishing to use resource accounts for a liquidity pool, would likely do the following:
-/// 1. Create a new account using `Resourceaccount::create_resource_account`. This creates the
-/// account, stores the `signer_cap` within a `Resourceaccount::Container`, and rotates the key to
+/// 1. Create a new account using `resource_account::create_resource_account`. This creates the
+/// account, stores the `signer_cap` within a `resource_account::Container`, and rotates the key to
 /// the current accounts authentication key or a provided authentication key.
 /// 2. Define the LiquidityPool module's address to be the same as the resource account.
-/// 3. Construct a ModuleBundle payload for the resource account using the authentication key used
-/// in step 1.
+/// 3. Construct a transaction package publishing transaction for the resource account using the
+/// authentication key used in step 1.
 /// 4. In the LiquidityPool module's `init_module` function, call `retrieve_resource_account_cap`
 /// which will retrive the `signer_cap` and rotate the resource account's authentication key to
 /// `0x0`, effectively locking it off.
@@ -35,6 +37,28 @@
 ///     ...
 /// }
 /// ```
+/// ## Resource accounts to manage an account for module publishing (i.e., contract account)
+///
+/// A dev wishes to have an account dedicated to managing a contract. The contract itself does not
+/// require signer post initialization. The dev could do the following:
+/// 1. Create a new account using `resource_account::create_resource_account_and_publish_package`.
+/// This creates the account and publishes the package for that account.
+/// 2. At a later point in time, the account creator can move the signer capability to the module.
+///
+/// ```
+/// struct MyModuleResource has key {
+///     ...
+///     resource_signer_cap: Option<SignerCapability>,
+/// }
+///
+/// public fun provide_signer_capability(resource_signer_cap: SignerCapability) {
+///    let account_addr = account::get_signer_capability_address(resource_signer_cap);
+///    let resource_addr = type_info::account_address(&type_info::type_of<MyModuleResource>());
+///    assert!(account_addr == resource_addr, EADDRESS_MISMATCH);
+///    let module = borrow_global_mut<MyModuleResource>(account_addr);
+///    module.resource_signer_cap = option::some(resource_signer_cap);
+/// }
+/// ```
 module aptos_framework::resource_account {
     use std::error;
     use std::signer;
@@ -46,6 +70,8 @@ module aptos_framework::resource_account {
 
     /// Container resource not found in account
     const ECONTAINER_NOT_PUBLISHED: u64 = 1;
+
+    const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
     struct Container has key {
         store: SimpleMap<address, account::SignerCapability>,
@@ -87,6 +113,24 @@ module aptos_framework::resource_account {
             resource,
             resource_signer_cap,
             optional_auth_key,
+        );
+    }
+
+    /// Creates a new resource account, publishes the package under this account transaction under
+    /// this account and leaves the signer cap readily available for pickup.
+    public entry fun create_resource_account_and_publish_package(
+        origin: &signer,
+        seed: vector<u8>,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>,
+    ) acquires Container {
+        let (resource, resource_signer_cap) = account::create_resource_account(origin, seed);
+        aptos_framework::code::publish_package_txn(&resource, metadata_serialized, code);
+        rotate_account_authentication_key_and_store_capability(
+            origin,
+            resource,
+            resource_signer_cap,
+            ZERO_AUTH_KEY,
         );
     }
 
@@ -135,14 +179,13 @@ module aptos_framework::resource_account {
             simple_map::destroy_empty(store);
         };
 
-        let zero_auth_key = x"0000000000000000000000000000000000000000000000000000000000000000";
         let resource = account::create_signer_with_capability(&resource_signer_cap);
-        account::rotate_authentication_key_internal(&resource, zero_auth_key);
+        account::rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
         resource_signer_cap
     }
 
     #[test(user = @0x1111)]
-    public entry fun end_to_end(user: signer) acquires Container {
+    public entry fun test_create_account_and_retrieve_cap(user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
 
