@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_crypto::SigningKey;
+use aptos_crypto::{SigningKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     state_store::state_key::StateKey, state_store::table::TableHandle,
@@ -13,6 +13,8 @@ use e2e_move_tests::{assert_success, MoveHarness};
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
+use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 
 // This struct includes TypeInfo (account_address, module_name, and struct_name)
 // and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
@@ -30,6 +32,55 @@ struct RotationProofChallenge {
     new_public_key: Vec<u8>,
 }
 
+#[test]
+fn rotate_auth_key_ed25519_to_ed25519() {
+    let mut harness = MoveHarness::new();
+    let mut account1 = harness.new_account_with_key_pair();
+
+    let account2 = harness.new_account_with_key_pair();
+    let ed25519_scheme = vec![0];
+    // assert that the payload is successfully processed (the signatures are correct)
+    assert_successful_payload_key_rotation_to_ed25519(
+        &mut harness,
+        account1.clone(),
+        *account1.address(),
+        10,
+        ed25519_scheme,
+        account2.privkey.clone(),
+        account2.pubkey.clone(),
+    );
+    // rotate account1's keypair to account2
+    account1.rotate_key(account2.privkey, account2.pubkey);
+    // verify that we can still get to account1's originating address
+    verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
+}
+
+#[test]
+fn rotate_auth_key_ed25519_to_multi_ed25519() {
+    let mut harness = MoveHarness::new();
+    let account1 = harness.new_account_with_key_pair();
+
+    let ed25519_scheme = vec![0];
+    let private_key = MultiEd25519PrivateKey::generate_for_testing();
+    let public_key = MultiEd25519PublicKey::from(&private_key);
+    let auth_key = AuthenticationKey::multi_ed25519(&public_key);
+
+    // assert that the payload is successfully processed (the signatures are correct)
+    assert_successful_payload_key_rotation_to_multi_ed25519(
+        &mut harness,
+        account1.clone(),
+        *account1.address(),
+        10,
+        ed25519_scheme,
+        private_key,
+        public_key,
+    );
+
+    // verify that we can still get to account1's originating address
+    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
+}
+
+#[test]
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
     let mut account1 = harness.new_account_with_key_pair();
@@ -60,6 +111,93 @@ fn rotate_auth_key_twice() {
     );
     account1.rotate_key(account3.privkey, account3.pubkey);
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
+}
+
+pub fn assert_successful_payload_key_rotation_to_multi_ed25519(
+    harness: &mut MoveHarness,
+    current_account: Account,
+    originator: AccountAddress,
+    sequence_number: u64,
+    in_scheme: Vec<u8>,
+    new_private_key: MultiEd25519PrivateKey,
+    new_public_key: MultiEd25519PublicKey,
+) {
+    // construct a proof challenge struct that proves that
+    // the user intends to rotate their auth key
+    let rotation_proof = RotationProofChallenge {
+        account_address: CORE_CODE_ADDRESS,
+        module_name: String::from("account"),
+        struct_name: String::from("RotationProofChallenge"),
+        sequence_number,
+        originator,
+        current_auth_key: AccountAddress::from_bytes(&current_account.auth_key()).unwrap(),
+        new_public_key: new_public_key.to_bytes().to_vec(),
+    };
+
+    let rotation_msg = bcs::to_bytes(&rotation_proof);
+
+    // sign the rotation message by the current private key and the new private key
+    let signature_by_curr_privkey = current_account
+        .privkey
+        .sign_arbitrary_message(&rotation_msg.clone().unwrap());
+    let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
+    let to_scheme= vec![1];
+
+
+    assert_success!(harness.run_transaction_payload(
+        &current_account,
+        aptos_stdlib::account_rotate_authentication_key(
+            in_scheme,
+            to_scheme,
+            current_account.pubkey.to_bytes().to_vec(),
+            new_public_key.to_bytes().to_vec(),
+            signature_by_curr_privkey.to_bytes().to_vec(),
+            signature_by_new_privkey.to_bytes().to_vec(),
+        )
+    ));
+}
+
+pub fn assert_successful_payload_key_rotation_to_ed25519(
+    harness: &mut MoveHarness,
+    current_account: Account,
+    originator: AccountAddress,
+    sequence_number: u64,
+    in_scheme: Vec<u8>,
+    new_private_key: Ed25519PrivateKey,
+    new_public_key: Ed25519PublicKey,
+) {
+    // construct a proof challenge struct that proves that
+    // the user intends to rotate their auth key
+    let rotation_proof = RotationProofChallenge {
+        account_address: CORE_CODE_ADDRESS,
+        module_name: String::from("account"),
+        struct_name: String::from("RotationProofChallenge"),
+        sequence_number,
+        originator,
+        current_auth_key: AccountAddress::from_bytes(&current_account.auth_key()).unwrap(),
+        new_public_key: new_public_key.to_bytes().to_vec(),
+    };
+
+    let rotation_msg = bcs::to_bytes(&rotation_proof);
+
+    // sign the rotation message by the current private key and the new private key
+    let signature_by_curr_privkey = current_account
+        .privkey
+        .sign_arbitrary_message(&rotation_msg.clone().unwrap());
+    let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
+    let to_scheme = vec![0];
+
+    assert_success!(harness.run_transaction_payload(
+        &current_account,
+        aptos_stdlib::account_rotate_authentication_key(
+            in_scheme,
+            to_scheme,
+            current_account.pubkey.to_bytes().to_vec(),
+            new_public_key.to_bytes().to_vec(),
+            signature_by_curr_privkey.to_bytes().to_vec(),
+            signature_by_new_privkey.to_bytes().to_vec(),
+        )
+    ));
 }
 
 pub fn assert_successful_payload_key_rotation(
