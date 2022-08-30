@@ -16,6 +16,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[derive(Debug, Subcommand)]
 pub enum ConstructionCommand {
     CreateAccount(CreateAccountCommand),
+    SetOperator(SetOperatorCommand),
     Transfer(TransferCommand),
 }
 
@@ -24,6 +25,7 @@ impl ConstructionCommand {
         use ConstructionCommand::*;
         match self {
             CreateAccount(inner) => format_output(inner.execute().await),
+            SetOperator(inner) => format_output(inner.execute().await),
             Transfer(inner) => format_output(inner.execute().await),
         }
     }
@@ -153,6 +155,59 @@ impl TransferCommand {
                 &private_key,
                 self.receiver,
                 self.amount,
+                self.txn_args.expiry_time()?,
+                self.txn_args.sequence_number,
+                self.txn_args.max_gas,
+                self.txn_args.gas_price,
+            )
+            .await
+    }
+}
+
+/// Set operator
+///
+///
+#[derive(Debug, Parser)]
+pub struct SetOperatorCommand {
+    #[clap(flatten)]
+    network_args: NetworkArgs,
+    #[clap(flatten)]
+    url_args: UrlArgs,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    profile_options: ProfileOptions,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    txn_args: TransactionArgs,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    /// The receiving account
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    new_operator: AccountAddress,
+    /// The amount of coins to send
+    #[clap(long)]
+    amount: u64,
+}
+
+impl SetOperatorCommand {
+    pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("Set operator {:?}", self);
+        let client = self.url_args.client();
+        let network_identifier = self.network_args.network_identifier();
+        let private_key = self.private_key_options.extract_private_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
+
+        client
+            .set_operator(
+                &network_identifier,
+                &private_key,
+                self.new_operator,
                 self.txn_args.expiry_time()?,
                 self.txn_args.sequence_number,
                 self.txn_args.max_gas,
