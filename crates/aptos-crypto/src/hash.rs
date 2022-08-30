@@ -144,11 +144,6 @@ impl HashValue {
             .map(Self::new)
     }
 
-    /// Get byte array representation.
-    pub fn get_bytes(&self) -> [u8; HashValue::LENGTH] {
-        self.hash.clone()
-    }
-
     /// Dumps into a vector.
     pub fn to_vec(&self) -> Vec<u8> {
         self.hash.to_vec()
