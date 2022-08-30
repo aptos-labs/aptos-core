@@ -98,7 +98,7 @@ use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -145,11 +145,31 @@ pub trait TreeWriter<K>: Send + Sync {
     fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<K>>) -> Result<()>;
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StateSnapshotProgress {
+    pub key_hash: HashValue,
+    pub usage: StateStorageUsage,
+}
+
+impl StateSnapshotProgress {
+    pub fn new(key_hash: HashValue, usage: StateStorageUsage) -> Self {
+        Self { key_hash, usage }
+    }
+}
+
 pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
-    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()>;
+    fn write_kv_batch(
+        &self,
+        version: Version,
+        kv_batch: &StateValueBatch<K, Option<V>>,
+        progress: StateSnapshotProgress,
+    ) -> Result<()>;
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()>;
+
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>>;
 }
 
 pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {

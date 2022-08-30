@@ -11,6 +11,7 @@
 
 use crate::schema::DB_METADATA_CF_NAME;
 use anyhow::Result;
+use aptos_jellyfish_merkle::StateSnapshotProgress;
 use aptos_types::transaction::Version;
 use schemadb::{
     define_schema,
@@ -22,12 +23,21 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub(crate) enum DbMetadataValue {
     Version(Version),
+    StateSnapshotProgress(StateSnapshotProgress),
 }
 
 impl DbMetadataValue {
     pub fn expect_version(self) -> Version {
         match self {
-            Self::Version(v) => v,
+            Self::Version(version) => version,
+            _ => unreachable!("expected Version, got {:?}", self),
+        }
+    }
+
+    pub fn expect_state_snapshot_progress(self) -> StateSnapshotProgress {
+        match self {
+            Self::StateSnapshotProgress(progress) => progress,
+            _ => unreachable!("expected KeyHashAndUsage, got {:?}", self),
         }
     }
 }
@@ -38,6 +48,7 @@ pub enum DbMetadataKey {
     LedgerPrunerProgress,
     StateMerklePrunerProgress,
     EpochEndingStateMerklePrunerProgress,
+    StateSnapshotRestoreProgress(Version),
 }
 
 define_schema!(
