@@ -173,7 +173,7 @@ class It3ProfilesController < ApplicationController
   def ensure_registration_enabled!
     return redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
     return redirect_to it3_path unless Flipper.enabled?(:it3_node_registration_enabled, current_user)
-    return redirect_to it3_path if Flipper.enabled?(:it3_registration_closed) && !Flipper.enabled?(:it3_registration_override,
-                                                                                                   current_user)
+    return redirect_to it3_path if Flipper.enabled?(:it3_registration_closed) &&
+                                   !Flipper.enabled?(:it3_registration_override, current_user)
   end
 end

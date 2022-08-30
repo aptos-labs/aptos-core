@@ -14,14 +14,14 @@
         </div>
         <div class="grow">
           <%= render CardOutlineComponent.new(scheme: :filled, class: 'h-full') do %>
-            <p class="font-mono uppercase text-4xl font-light">44</p>
+            <p class="font-mono uppercase text-4xl font-light">41</p>
             <div class="my-4"><%= render DividerComponent.new %></div>
             <h3 class="font-mono uppercase text-lg">Countries</h3>
           <% end %>
         </div>
         <div class="grow">
           <%= render CardOutlineComponent.new(scheme: :filled, class: 'h-full') do %>
-            <p class="font-mono uppercase text-4xl font-light">110</p>
+            <p class="font-mono uppercase text-4xl font-light">91</p>
             <div class="my-4"><%= render DividerComponent.new %></div>
             <h3 class="font-mono uppercase text-lg">Cities</h3>
           <% end %>
@@ -65,7 +65,7 @@
               <% end %>
             <% end %>
           <% end %>
-          <%= t.with_column(:rewards_growth, 'Rewards Growth', align: 'left') do |column| %>
+          <%= t.with_column(:rewards_growth, 'Rewards Performance', align: 'left') do |column| %>
             <%= column.with_tooltip(:info) do |tooltip| %>
               <%= tooltip.with_header do %>
                 Cumulative range: 0%-100%
