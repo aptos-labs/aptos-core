@@ -20,4 +20,5 @@ jobs:
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
       FORGE_TEST_SUITE: single_vfn_perf
+      POST_TO_SLACK: true
       USE_NEW_WRAPPER: true
