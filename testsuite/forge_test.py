@@ -2,18 +2,24 @@ import json
 import os
 import unittest
 import tempfile
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, OrderedDict, Sequence, Union
+from typing import Any, Dict, List, Optional, Protocol, Sequence, Union
 
 from click.testing import CliRunner
 from .forge import (
-    AwsError, FakeTime, ForgeFormatter, ForgeResult, ForgeState,
-    Git, K8sForgeRunner, assert_aws_token_expiration, find_recent_images,
-    format_pre_comment, get_dashboard_link, get_humio_logs_link,
+    AwsError, FakeTime, ForgeCluster, ForgeFormatter, ForgeJob, ForgeResult, ForgeState, GetPodsItem, GetPodsItemMetadata, GetPodsItemStatus, GetPodsResult,
+    Git, K8sForgeRunner, ListClusterResult, SystemContext, assert_aws_token_expiration, find_recent_images,
+    format_pre_comment, get_all_forge_jobs, get_dashboard_link, get_humio_logs_link,
     get_validator_logs_link, list_eks_clusters, list_jobs, main, ForgeContext, LocalForgeRunner, FakeShell,
     FakeFilesystem, RunResult, FakeProcesses
 )
+
+
+class HasAssertMultiLineEqual(Protocol):
+    def assertMultiLineEqual(self, first: str, second: str, msg: Any = ...) -> None:
+        ...
 
 
 def get_cwd() -> Path:
@@ -25,7 +31,7 @@ def get_fixture_path(fixture_name: str) -> Path:
 
 
 class AssertFixtureMixin:
-    def assertFixture(self, test_str: str, fixture_name: str) -> None:
+    def assertFixture(self: HasAssertMultiLineEqual, test_str: str, fixture_name: str) -> None:
         fixture_path = get_fixture_path(fixture_name)
         if os.getenv("FORGE_WRITE_FIXTURES") == "true":
             print(f"Writing fixture to {str(fixture_path)}")
@@ -46,28 +52,45 @@ class AssertFixtureMixin:
 
 
 class SpyShell(FakeShell):
-    def __init__(self, command_map: Dict[str, Union[RunResult, Exception]]) -> None:
+    def __init__(
+        self,
+        command_map: Dict[str, Union[RunResult, Exception]],
+        strict: bool = False,
+    ) -> None:
         self.command_map = command_map
         self.commands = []
+        self.strict = strict
 
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
-        result = self.command_map.get(" ".join(command), super().run(command))
-        self.commands.append(" ".join(command))
+        rendered_command = " ".join(command)
+        default = Exception(f"Command not mocked: {rendered_command}") if self.strict else super().run(command)
+        result = self.command_map.get(rendered_command, default)
+        self.commands.append(rendered_command)
         if isinstance(result, Exception):
             raise result
         return result
+
+    async def gen_run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        return self.run(command, stream_output)
 
     def assert_commands(self, testcase) -> None:
         testcase.assertEqual(list(self.command_map.keys()), self.commands)
 
 
 class SpyFilesystem(FakeFilesystem):
-    def __init__(self, expected_writes: Dict[str, bytes], expected_reads: Dict[str, bytes]) -> None:
+    def __init__(
+        self,
+        expected_writes: Dict[str, bytes],
+        expected_reads: Dict[str, bytes],
+        expected_unlinks: Optional[List[str]] = None,
+    ) -> None:
         self.expected_writes = expected_writes
         self.expected_reads = expected_reads
+        self.expected_unlinks = expected_unlinks or []
         self.writes = {}
         self.reads = []
         self.temp_count = 1
+        self.unlinks = []
 
     def write(self, filename: str, contents: bytes) -> None:
         self.writes[filename] = contents
@@ -89,6 +112,21 @@ class SpyFilesystem(FakeFilesystem):
         filename = f"temp{self.temp_count}"
         self.temp_count += 1
         return filename
+
+    def unlink(self, filename: str) -> None:
+        self.unlinks.append(filename)
+
+
+    def assert_unlinks(self, testcase) -> None:
+        for filename in self.expected_unlinks:
+            testcase.assertIn(filename, self.unlinks, f"{filename} was not unlinked")
+
+
+
+class SpyProcesses(FakeProcesses):
+    def run_atexit(self) -> None:
+        for callback in self.exit_callbacks:
+            callback()
 
 
 def fake_context(shell=None, filesystem=None, processes=None, time=None) -> ForgeContext:
@@ -124,10 +162,7 @@ class ForgeRunnerTests(unittest.TestCase):
     def testLocalRunner(self) -> None:
         shell = SpyShell(OrderedDict([
             (
-                'cargo run -p forge-cli -- --suite banana'
-                '0 --avg-tps 593943 --max-latency-ms 6000 --duration-secs 123 t'
-                'est k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asd'
-                'f --namespace potato --port-forward',
+                'cargo run -p forge-cli -- --suite banana --mempool-backlog 5000 --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward',
                 RunResult(0, b"orange"),
             ),
         ]))
@@ -287,13 +322,15 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
 class TestListClusters(unittest.TestCase):
     def testListClusters(self) -> None:
         fake_clusters = (
-            json.dumps({
-                "clusters": [
-                    "banana-fake-1",
-                    "aptos-forge-banana-1",
-                    "aptos-forge-potato-2",
-                ],
-            })
+            json.dumps(
+                ListClusterResult(
+                    clusters=[
+                        "banana-fake-1",
+                        "aptos-forge-banana-1",
+                        "aptos-forge-potato-2",
+                    ]
+                ),
+            )
         )
         shell = SpyShell(OrderedDict([
             ("aws eks list-clusters", RunResult(0, fake_clusters.encode())),
@@ -309,3 +346,91 @@ class TestListClusters(unittest.TestCase):
             ]))
             list_eks_clusters(shell)
             shell.assert_commands(self)
+
+
+def fake_pod_item(name: str, phase: str) -> GetPodsItem:
+    return GetPodsItem(
+        metadata=GetPodsItemMetadata(name=name),
+        status=GetPodsItemStatus(phase=phase)
+    )
+
+
+class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
+    async def testGetAllForgeJobs(self) -> None:
+        fake_clusters = json.dumps(
+            ListClusterResult(clusters=["aptos-forge-banana", "banana-1", "aptos-forge-apple-2"])
+        ).encode()
+        fake_first_pods = GetPodsResult(
+            items=[
+                fake_pod_item("forge-first", "Running"),
+                fake_pod_item("forge-failed", "Failed"),
+                fake_pod_item("ignore-me", "Failed"),
+            ]
+        )
+        fake_second_pods = GetPodsResult(
+            items=[
+                fake_pod_item("forge-second", "Running"),
+                fake_pod_item("forge-succeeded", "Succeeded"),
+                fake_pod_item("me-too", "Failed"),
+            ]
+        )
+        shell = SpyShell(OrderedDict([
+            ("aws eks list-clusters", RunResult(0, fake_clusters)),
+            (
+                "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
+                RunResult(0, b""),
+            ),
+            (
+                "kubectl get pods -n default --kubeconfig temp1 -o json",
+                RunResult(0, json.dumps(fake_first_pods).encode()),
+            ),
+            (
+                "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
+                RunResult(0, b""),
+            ),
+            (
+                "kubectl get pods -n default --kubeconfig temp2 -o json",
+                RunResult(0, json.dumps(fake_second_pods).encode()),
+            ),
+        ]), strict=True)
+        filesystem = SpyFilesystem({}, {}, ["temp1", "temp2"])
+        processes = SpyProcesses()
+        context = SystemContext(shell, filesystem, processes)
+        jobs = await get_all_forge_jobs(context)
+        expected_jobs = [
+            ForgeJob(
+                name="forge-first",
+                phase="Running",
+                cluster=ForgeCluster(
+                    name="aptos-forge-banana",
+                    kubeconf="temp1",
+                )
+            ),
+            ForgeJob(
+                name="forge-failed",
+                phase="Failed",
+                cluster=ForgeCluster(
+                    name="aptos-forge-banana",
+                    kubeconf="temp1",
+                )
+            ),
+            ForgeJob(
+                name="forge-second",
+                phase="Running",
+                cluster=ForgeCluster(
+                    name="aptos-forge-apple-2",
+                    kubeconf="temp2",
+                )
+            ),
+            ForgeJob(
+                name="forge-succeeded",
+                phase="Succeeded",
+                cluster=ForgeCluster(
+                    name="aptos-forge-apple-2",
+                    kubeconf="temp2",
+                )
+            )
+        ]
+        self.assertEqual(jobs, expected_jobs)
+        processes.run_atexit()
+        filesystem.assert_unlinks(self)
