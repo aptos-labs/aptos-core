@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_crypto::SigningKey;
+use aptos_crypto::multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey};
+use aptos_crypto::{Signature, SigningKey, Uniform, ValidCryptoMaterial};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     state_store::state_key::StateKey, state_store::table::TableHandle,
+    transaction::authenticator::AuthenticationKey,
 };
 
 use cached_packages::aptos_stdlib;
@@ -30,6 +30,54 @@ struct RotationProofChallenge {
     new_public_key: Vec<u8>,
 }
 
+#[test]
+fn rotate_auth_key_ed25519_to_ed25519() {
+    let mut harness = MoveHarness::new();
+    let account1 = harness.new_account_with_key_pair();
+
+    let account2 = harness.new_account_with_key_pair();
+    // assert that the payload is successfully processed (the signatures are correct)
+    assert_successful_payload_key_rotation(
+        0,
+        0,
+        &mut harness,
+        account1.clone(),
+        *account1.address(),
+        10,
+        account2.privkey.clone(),
+        account2.pubkey.clone(),
+    );
+
+    // verify that we can still get to account1's originating address
+    verify_originating_address(&mut harness, account2.auth_key(), *account1.address());
+}
+
+#[test]
+fn rotate_auth_key_ed25519_to_multi_ed25519() {
+    let mut harness = MoveHarness::new();
+    let account1 = harness.new_account_with_key_pair();
+
+    let private_key = MultiEd25519PrivateKey::generate_for_testing();
+    let public_key = MultiEd25519PublicKey::from(&private_key);
+    let auth_key = AuthenticationKey::multi_ed25519(&public_key);
+
+    // assert that the payload is successfully processed (the signatures are correct)
+    assert_successful_payload_key_rotation(
+        0,
+        1,
+        &mut harness,
+        account1.clone(),
+        *account1.address(),
+        10,
+        private_key,
+        public_key,
+    );
+
+    // verify that we can still get to account1's originating address
+    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
+}
+
+#[test]
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
     let mut account1 = harness.new_account_with_key_pair();
@@ -37,6 +85,8 @@ fn rotate_auth_key_twice() {
     let account2 = harness.new_account_with_key_pair();
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_payload_key_rotation(
+        0,
+        0,
         &mut harness,
         account1.clone(),
         *account1.address(),
@@ -51,6 +101,8 @@ fn rotate_auth_key_twice() {
 
     let account3 = harness.new_account_with_key_pair();
     assert_successful_payload_key_rotation(
+        0,
+        0,
         &mut harness,
         account1.clone(),
         *account1.address(),
@@ -62,13 +114,18 @@ fn rotate_auth_key_twice() {
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 }
 
-pub fn assert_successful_payload_key_rotation(
+pub fn assert_successful_payload_key_rotation<
+    S: SigningKey + ValidCryptoMaterial,
+    V: ValidCryptoMaterial,
+>(
+    from_scheme: u8,
+    to_scheme: u8,
     harness: &mut MoveHarness,
     current_account: Account,
     originator: AccountAddress,
     sequence_number: u64,
-    new_private_key: Ed25519PrivateKey,
-    new_public_key: Ed25519PublicKey,
+    new_private_key: S,
+    new_public_key: V,
 ) {
     // construct a proof challenge struct that proves that
     // the user intends to rotate their auth key
@@ -92,11 +149,13 @@ pub fn assert_successful_payload_key_rotation(
 
     assert_success!(harness.run_transaction_payload(
         &current_account,
-        aptos_stdlib::account_rotate_authentication_key_ed25519(
+        aptos_stdlib::account_rotate_authentication_key(
+            from_scheme,
+            current_account.pubkey.to_bytes().to_vec(),
+            to_scheme,
+            new_public_key.to_bytes().to_vec(),
             signature_by_curr_privkey.to_bytes().to_vec(),
             signature_by_new_privkey.to_bytes().to_vec(),
-            current_account.pubkey.to_bytes().to_vec(),
-            new_public_key.to_bytes().to_vec(),
         )
     ));
 }

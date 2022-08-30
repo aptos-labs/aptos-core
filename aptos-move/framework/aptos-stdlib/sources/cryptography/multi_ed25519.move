@@ -41,6 +41,9 @@ module aptos_std::multi_ed25519 {
     /// bytes.
     const BITMAP_NUM_OF_BYTES: u64 = 4;
 
+    /// Max number of ed25519 public keys allowed in multi-ed25519 keys
+    const MAX_NUMBER_OF_PUBLIC_KEYS: u64 = 32;
+
     //
     // Structs
     //
@@ -76,6 +79,7 @@ module aptos_std::multi_ed25519 {
 
     /// Parses the input 32 bytes as an *unvalidated* MultiEd25519 public key.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
+        assert!(vector::length(&bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES <= MAX_NUMBER_OF_PUBLIC_KEYS, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
         assert!(vector::length(&bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
         UnvalidatedPublicKey { bytes }
     }
