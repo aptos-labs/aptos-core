@@ -216,7 +216,7 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
-    pub fn get_mut_success_criteria(&mut self) -> &mut SuccessCriteria {
+    pub fn get_success_criteria_mut(&mut self) -> &mut SuccessCriteria {
         &mut self.success_criteria
     }
 

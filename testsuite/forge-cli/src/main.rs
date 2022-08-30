@@ -178,9 +178,6 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
-    let duration = Duration::from_secs(1200);
-    let suite_name = "consensus_stress_test";
-
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -213,8 +210,8 @@ fn main() -> Result<()> {
             match test_cmd {
                 TestCommand::LocalSwarm(..) => {
                     // Loosen all criteria for local runs
-                    test_suite.get_mut_success_criteria().avg_tps = 400;
-                    test_suite.get_mut_success_criteria().max_latency_ms = 60000;
+                    test_suite.get_success_criteria_mut().avg_tps = 400;
+                    test_suite.get_success_criteria_mut().max_latency_ms = 60000;
                     let previous_emit_job = test_suite.get_emit_job().clone();
                     let test_suite =
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
@@ -445,7 +442,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config
             .with_network_tests(&[&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, None)),
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None)),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
@@ -480,6 +477,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(240)),
             )),
+        // maximizing number of rounds and epochs within a given time, to stress test consensus
+        // so using small constant traffic, small blocks and fast rounds, and short epochs.
         "consensus_stress_test" => config
             .with_network_tests(&[&ContinuousProgressTest { target_tps: 100 }])
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())

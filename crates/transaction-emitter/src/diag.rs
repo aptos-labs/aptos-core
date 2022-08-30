@@ -16,11 +16,8 @@ use transaction_emitter_lib::{query_sequence_numbers, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
-    let mut root_account = cluster.load_aptos_root_account(&client).await?;
     let mut faucet_account = cluster.load_aptos_root_account(&client).await?;
     let emitter = TxnEmitter::new(
-        &mut root_account,
-        client,
         TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
         StdRng::from_seed(OsRng.gen()),
     );
