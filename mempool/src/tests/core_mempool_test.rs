@@ -535,7 +535,7 @@ fn test_capacity_bytes() {
             break;
         }
     }
-    assert!(txns.len() > 0);
+    assert!(!txns.is_empty());
     assert!(last_txn.is_some());
 
     // Set exact limit
