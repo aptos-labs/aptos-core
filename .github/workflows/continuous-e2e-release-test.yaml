@@ -18,7 +18,7 @@ jobs:
     with:
       FORGE_NAMESPACE: forge-release-blocking
       # Run for 10 hours
-      FORGE_RUNNER_DURATION_SECS: 36000
+      FORGE_RUNNER_DURATION_SECS: 18000
       FORGE_TEST_SUITE: land_blocking
       USE_NEW_WRAPPER: true
       # Give us 12 hour timeout
