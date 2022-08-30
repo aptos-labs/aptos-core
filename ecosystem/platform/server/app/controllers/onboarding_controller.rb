@@ -101,6 +101,8 @@ class OnboardingController < ApplicationController
   end
 
   def ensure_it3_registration_open!
-    redirect_to leaderboard_it3_path if Flipper.enabled?(:it3_registration_closed, current_user)
+    redirect_to leaderboard_it3_path if Flipper.enabled?(:it3_registration_closed) && !Flipper.enabled?(
+      :it3_registration_override, current_user
+    )
   end
 end

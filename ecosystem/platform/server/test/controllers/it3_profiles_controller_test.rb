@@ -14,18 +14,18 @@ class It3ProfilesControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
     Flipper.enable(:it3_registration_open)
     Flipper.enable(:it3_node_registration_enabled)
+    Flipper.enable(:it3_registration_closed)
+    Flipper.enable(:it3_registration_override, @user)
     It3ProfilesController.any_instance.stubs(:verify_recaptcha).returns(true)
     It3ProfilesController.any_instance.stubs(:validate_node).returns([])
   end
 
   test 'new profile page' do
-    skip('it3 registration closed')
     get new_it3_profile_path
     assert_response :success
   end
 
   test 'create new profile' do
-    skip('it3 registration closed')
     assert_nil @user.it3_profile
     post it3_profiles_path, params: { it3_profile: {
       owner_key: '0xecaa0d44b821a745bc29767713cd78dbc88da73679e3ccdf5c145a2b4f7b17ac',
@@ -45,7 +45,6 @@ class It3ProfilesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update existing profile' do
-    skip('it3 registration closed')
     it3_profile = FactoryBot.create(:it3_profile, user: @user)
 
     patch it3_profile_path(it3_profile), params: { it3_profile: {
