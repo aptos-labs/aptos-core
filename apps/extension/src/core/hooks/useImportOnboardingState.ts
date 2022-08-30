@@ -34,7 +34,6 @@ export default function useImportOnboardingStateRecorder() {
       default:
         throw new Error('Undefined step');
     }
-    setActiveStep(activeStep + 1);
   }, [activeStep, navigate]);
 
   const prevStep = useCallback(() => {

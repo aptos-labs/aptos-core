@@ -16,9 +16,8 @@ import { passwordOptions } from 'core/components/CreatePasswordBody';
 import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import {
-  importAccountErrorToast, importAccountNotFoundToast, importAccountToast, networkDoesNotExistToast,
+  importAccountErrorToast, importAccountToast, networkDoesNotExistToast,
 } from 'core/components/Toast';
-import { getAccountExists } from 'core/queries/account';
 import { useAccounts } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { MnemonicFormValues } from './AddAccountLayout';
@@ -135,17 +134,6 @@ function NextButton() {
             publicKeyHex,
           } = aptosAccount.toPrivateKeyObject();
 
-          // Confirm account exists on chain
-          const accountExists = await getAccountExists({
-            address: aptosAccount.address(),
-            nodeUrl,
-          });
-          if (!accountExists) {
-            setIsLoading(false);
-            importAccountNotFoundToast();
-            return;
-          }
-
           // initialize password and wallet
           const firstAccount = {
             address: address!,
@@ -180,17 +168,6 @@ function NextButton() {
           const nonHexKey = (privateKey.startsWith('0x')) ? privateKey.substring(2) : privateKey;
           const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
           const aptosAccount = new AptosAccount(encodedKey);
-
-          // Confirm account exists on chain
-          const accountExists = await getAccountExists({
-            address: aptosAccount.address(),
-            nodeUrl,
-          });
-          if (!accountExists) {
-            setIsLoading(false);
-            importAccountNotFoundToast();
-            return;
-          }
 
           const {
             address,
