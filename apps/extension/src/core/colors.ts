@@ -42,9 +42,12 @@ export const secondaryButtonColor = {
 
 // Background
 
+// color hex code come from https://chakra-ui.com/docs/styled-system/theme#green
+// for some reason green.100 and green.400 does not work
+// TODO investigate why
 export const checkCircleSuccessBg = {
-  dark: '#00FF00',
-  light: 'green',
+  dark: '#C6F6D5',
+  light: '#48BB78',
 };
 
 export const secondaryBgColor = {

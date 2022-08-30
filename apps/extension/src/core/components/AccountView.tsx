@@ -27,7 +27,7 @@ import {
 import AccountCircle from 'core/components/AccountCircle';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
-type AccountViewProps = {
+interface AccountViewProps {
   account?: Account
   allowEdit?: boolean;
   bgColor?: any;
@@ -35,10 +35,10 @@ type AccountViewProps = {
   hoverBgColor?: any;
   onClick?: (address: string) => void;
   showCheck?: boolean;
-};
+}
 
 const AccountView = React.forwardRef(({
-  account: accountFromProps,
+  account,
   boxShadow = '',
   allowEdit = false,
   showCheck = false,
@@ -52,7 +52,7 @@ const AccountView = React.forwardRef(({
   const [opacity, setOpacity] = useState(0);
 
   const displayActiveAccountAddress = useMemo(() => {
-    const displayActiveAccount = accountFromProps || activeAccount;
+    const displayActiveAccount = account || activeAccount;
 
     if (!displayActiveAccount) return '';
     if (typeof displayActiveAccount?.address === 'string') {
@@ -60,7 +60,7 @@ const AccountView = React.forwardRef(({
     }
 
     return displayActiveAccount?.address;
-  }, [accountFromProps, activeAccount]);
+  }, [account, activeAccount]);
 
   const { hasCopied, onCopy } = useClipboard(displayActiveAccountAddress || '');
 
@@ -90,7 +90,8 @@ const AccountView = React.forwardRef(({
       width="100%"
       cursor="pointer"
       gap={2}
-      border="1px #F2F4F8"
+      borderWidth={1}
+      borderColor="gray.100"
       boxShadow={boxShadow}
       bgColor={bgColor[colorMode]}
       borderRadius=".5rem"
@@ -99,7 +100,7 @@ const AccountView = React.forwardRef(({
       }}
     >
       <Center width="100%">
-        <AccountCircle account={accountFromProps} size={40} />
+        <AccountCircle account={account} size={40} />
       </Center>
       <VStack width="100%" alignItems="flex-start" spacing={0}>
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
@@ -124,13 +125,13 @@ const AccountView = React.forwardRef(({
           </Text>
         </Tooltip>
       </VStack>
-      {activeAccount.address === displayActiveAccountAddress && showCheck
-        ? <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} /> : null}
-      {allowEdit ? (
+      {(activeAccount.address === displayActiveAccountAddress && showCheck
+        ? <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} /> : null)}
+      {(allowEdit ? (
         <Button bg="none" p={0} onClick={handleClickEditAccount}>
           <HiPencil size={20} />
         </Button>
-      ) : null}
+      ) : null)}
     </Grid>
   );
 });

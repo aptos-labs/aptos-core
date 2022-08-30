@@ -40,7 +40,7 @@ export default function SwitchAccountBody() {
     }
   };
 
-  const accountsList = useMemo(() => Object.values(accounts), [accounts]);
+  const accountsList: Account[] = useMemo(() => Object.values(accounts), [accounts]);
 
   const handleClickAddAccount = () => {
     navigate(Routes.addAccount.path);
@@ -51,13 +51,12 @@ export default function SwitchAccountBody() {
       <VStack gap={1} p={2} flex={1} overflow="scroll">
         {
         accountsList.map((account: Account) => (
-          <Box px={4} width="100%">
+          <Box px={4} width="100%" key={account.address}>
             <AccountView
               account={account}
               showCheck
               boxShadow={boxShadow}
               onClick={onSwitchAccount}
-              key={account.address}
               bgColor={{
                 dark: 'gray.700',
                 light: 'white',
