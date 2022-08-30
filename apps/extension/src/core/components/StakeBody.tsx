@@ -8,7 +8,6 @@ import { secondaryAddressFontColor, secondaryBorderColor, secondaryWalletHomeCar
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { type StakeInfo, useAccountStakeInfo } from 'core/queries/account';
 import React, { useMemo } from 'react';
-import addSeconds from 'date-fns/addSeconds';
 import format from 'date-fns/format';
 import numeral from 'numeral';
 import { collapseHexString } from 'core/utils/hex';
@@ -55,9 +54,8 @@ function StakeBodyContent({
   const stakeAmountString = numeral(stakeAmount).format('0,0');
 
   const lockedUntilDateString = useMemo(() => {
-    const currDate = new Date();
-    const lockedUntilDate = addSeconds(currDate, Number(lockedUntilSecs));
-    return format(lockedUntilDate, 'MMM dd yyyy');
+    const lockedUntilDate = new Date(Number(lockedUntilSecs) * 1000);
+    return format(lockedUntilDate, 'MMM dd yyyy \'at\' hh:mm aa');
   }, [lockedUntilSecs]);
 
   const stakingAmount = (
