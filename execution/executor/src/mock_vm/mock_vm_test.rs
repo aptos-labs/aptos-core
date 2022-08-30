@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress, state_store::state_key::StateKey, write_set::WriteOp,
 };

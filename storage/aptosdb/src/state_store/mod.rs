@@ -24,7 +24,8 @@ use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
 };
 use aptos_logger::info;
-use aptos_state_view::{state_storage_usage::StateStorageUsage, StateViewId};
+use aptos_state_view::StateViewId;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{

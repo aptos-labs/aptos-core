@@ -89,7 +89,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
 use std::{
