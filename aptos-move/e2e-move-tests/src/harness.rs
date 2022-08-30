@@ -86,7 +86,7 @@ impl MoveHarness {
         data.account().clone()
     }
 
-    // Creates an account for the given static address with a randomly generated key pair
+    // Creates an account with a randomly generated address and key pair
     pub fn new_account_with_key_pair(&mut self) -> Account {
         let mut rng = StdRng::from_seed(OsRng.gen());
 

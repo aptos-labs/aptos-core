@@ -45,9 +45,9 @@ pub enum EntryFunctionCall {
     },
 
     AccountRotateAuthenticationKey {
-        in_scheme: Vec<u8>,
-        to_scheme: Vec<u8>,
+        from_scheme: u8,
         from_public_key_bytes: Vec<u8>,
+        to_scheme: u8,
         to_public_key_bytes: Vec<u8>,
         cap_rotate_key: Vec<u8>,
         cap_update_table: Vec<u8>,
@@ -268,16 +268,16 @@ impl EntryFunctionCall {
                 recipient_address,
             ),
             AccountRotateAuthenticationKey {
-                in_scheme,
-                to_scheme,
+                from_scheme,
                 from_public_key_bytes,
+                to_scheme,
                 to_public_key_bytes,
                 cap_rotate_key,
                 cap_update_table,
             } => account_rotate_authentication_key(
-                in_scheme,
-                to_scheme,
+                from_scheme,
                 from_public_key_bytes,
+                to_scheme,
                 to_public_key_bytes,
                 cap_rotate_key,
                 cap_update_table,
@@ -434,9 +434,9 @@ pub fn account_offer_rotation_capability_ed25519(
 }
 
 pub fn account_rotate_authentication_key(
-    in_scheme: Vec<u8>,
-    to_scheme: Vec<u8>,
+    from_scheme: u8,
     from_public_key_bytes: Vec<u8>,
+    to_scheme: u8,
     to_public_key_bytes: Vec<u8>,
     cap_rotate_key: Vec<u8>,
     cap_update_table: Vec<u8>,
@@ -452,9 +452,9 @@ pub fn account_rotate_authentication_key(
         ident_str!("rotate_authentication_key").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&in_scheme).unwrap(),
-            bcs::to_bytes(&to_scheme).unwrap(),
+            bcs::to_bytes(&from_scheme).unwrap(),
             bcs::to_bytes(&from_public_key_bytes).unwrap(),
+            bcs::to_bytes(&to_scheme).unwrap(),
             bcs::to_bytes(&to_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_rotate_key).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
@@ -1080,9 +1080,9 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKey {
-                in_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
-                to_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
-                from_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                from_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                from_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                to_scheme: bcs::from_bytes(script.args().get(2)?).ok()?,
                 to_public_key_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
                 cap_rotate_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                 cap_update_table: bcs::from_bytes(script.args().get(5)?).ok()?,
