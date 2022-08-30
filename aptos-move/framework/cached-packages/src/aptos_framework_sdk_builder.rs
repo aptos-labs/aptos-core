@@ -44,10 +44,17 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
+    /// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
+    /// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
+    /// private key on a valid RotationProofChallenge (`cap_update_table`) verifies that the user has the capability to update the
+    /// value at key `auth_key` on the `OriginatingAddress` table. `from_scheme` refers to the scheme of the `from_public_key` and
+    /// `to_scheme` refers to the scheme of the `to_public_key`. A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to
+    /// Multi-Ed25519 keys.
     AccountRotateAuthenticationKey {
-        in_scheme: Vec<u8>,
-        to_scheme: Vec<u8>,
+        from_scheme: u8,
         from_public_key_bytes: Vec<u8>,
+        to_scheme: u8,
         to_public_key_bytes: Vec<u8>,
         cap_rotate_key: Vec<u8>,
         cap_update_table: Vec<u8>,
@@ -268,16 +275,16 @@ impl EntryFunctionCall {
                 recipient_address,
             ),
             AccountRotateAuthenticationKey {
-                in_scheme,
-                to_scheme,
+                from_scheme,
                 from_public_key_bytes,
+                to_scheme,
                 to_public_key_bytes,
                 cap_rotate_key,
                 cap_update_table,
             } => account_rotate_authentication_key(
-                in_scheme,
-                to_scheme,
+                from_scheme,
                 from_public_key_bytes,
+                to_scheme,
                 to_public_key_bytes,
                 cap_rotate_key,
                 cap_update_table,
@@ -433,10 +440,17 @@ pub fn account_offer_rotation_capability_ed25519(
     ))
 }
 
+/// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
+/// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
+/// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
+/// private key on a valid RotationProofChallenge (`cap_update_table`) verifies that the user has the capability to update the
+/// value at key `auth_key` on the `OriginatingAddress` table. `from_scheme` refers to the scheme of the `from_public_key` and
+/// `to_scheme` refers to the scheme of the `to_public_key`. A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to
+/// Multi-Ed25519 keys.
 pub fn account_rotate_authentication_key(
-    in_scheme: Vec<u8>,
-    to_scheme: Vec<u8>,
+    from_scheme: u8,
     from_public_key_bytes: Vec<u8>,
+    to_scheme: u8,
     to_public_key_bytes: Vec<u8>,
     cap_rotate_key: Vec<u8>,
     cap_update_table: Vec<u8>,
@@ -452,9 +466,9 @@ pub fn account_rotate_authentication_key(
         ident_str!("rotate_authentication_key").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&in_scheme).unwrap(),
-            bcs::to_bytes(&to_scheme).unwrap(),
+            bcs::to_bytes(&from_scheme).unwrap(),
             bcs::to_bytes(&from_public_key_bytes).unwrap(),
+            bcs::to_bytes(&to_scheme).unwrap(),
             bcs::to_bytes(&to_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_rotate_key).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
@@ -1080,9 +1094,9 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKey {
-                in_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
-                to_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
-                from_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                from_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                from_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                to_scheme: bcs::from_bytes(script.args().get(2)?).ok()?,
                 to_public_key_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
                 cap_rotate_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                 cap_update_table: bcs::from_bytes(script.args().get(5)?).ok()?,
