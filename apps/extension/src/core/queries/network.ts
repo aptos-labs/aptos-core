@@ -3,7 +3,6 @@
 
 import { AptosClient, FaucetClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
 export const networkQueryKeys = Object.freeze({
@@ -89,21 +88,4 @@ export function useFaucetStatus(
     },
   );
   return { isFaucetAvailable: data, ...rest };
-}
-
-/**
- * Query chain id associated with the current node,
- * which is required to BCD-encode a transaction locally
- */
-export function useChainId() {
-  const { aptosClient } = useNetworks();
-
-  return useQuery(
-    [networkQueryKeys.getChainId],
-    () => aptosClient.getChainId(),
-    {
-      enabled: Boolean(aptosClient),
-      staleTime: 60000,
-    },
-  );
 }

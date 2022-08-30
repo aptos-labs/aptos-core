@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, MaybeHexString } from 'aptos';
-import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
+import { useQuery, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
-import { useActiveAccount } from 'core/hooks/useAccounts';
 import { ApiError } from 'aptos/dist/generated';
 
 /**
@@ -95,44 +94,6 @@ export function useAccountCoinBalance(
       ...options,
     },
   );
-}
-
-/**
- * Query sequence number for current account,
- * which is required to BCD-encode a transaction locally.
- * The value is queried lazily the first time `get` is called, and is
- * refetched only when an error occurs, by invalidating the cache or
- * manually refetching.
- */
-export function useSequenceNumber() {
-  const { aptosAccount } = useActiveAccount();
-  const { aptosClient } = useNetworks();
-  const accountAddress = aptosAccount.address().hex();
-  const queryClient = useQueryClient();
-
-  const queryKey = [accountQueryKeys.getSequenceNumber];
-
-  const { refetch } = useQuery(queryKey, async () => {
-    if (!accountAddress) {
-      return undefined;
-    }
-    const account = await aptosClient.getAccount(accountAddress!);
-    return BigInt(account.sequence_number);
-  }, { enabled: false });
-
-  return {
-    get: async () => {
-      const value = queryClient.getQueryData<bigint>(queryKey);
-      return value !== undefined
-        ? value
-        : (await refetch({ throwOnError: true })).data!;
-    },
-    increment: () => queryClient.setQueryData<bigint | undefined>(
-      queryKey,
-      (prev?: bigint) => prev && prev + BigInt(1),
-    ),
-    refetch,
-  };
 }
 
 /**
