@@ -1,46 +1,69 @@
 # **Please** keep this file ordered alphabetically by directory paths!
-/aptos-move/framework/ @davidiw @movekevin @wrwg
-/aptos-move/aptos-gas/ @vgao1996
-/aptos-move/aptos-vm/ @davidiw @wrwg @zekun000
-/aptos-move/vm-genesis/ @davidiw @movekevin
-/aptos-move/parallel-executor/ @gelash @zekun000
-/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
-/aptos-move/framework/src/natives/cryptography/ @alinush
-# Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @rajkaramchedu
-# Owners for the `/crates/aptos-crypto*` directories
-/crates/aptos-crypto/ @alinush
-/crates/aptos-crypto-derive/ @alinush
+
 # Owners for the `/api` directory and all its subdirectories. And other API related crates
 /api/ @banool @gregnazario
-/crates/aptos-rest-client @banool @gregnazario
-/crates/aptos-open-api @banool @gregnazario
-/crates/aptos-faucet @banool @gregnazario
-# Owners for the `/terraform` directory and all its subdirectories.
-/terraform/ @aptos-labs/prod-eng
-# Owners for the `/docker` directory and all its subdirectories.
-/docker/ @aptos-labs/prod-eng
-# Owners for the `/state-sync` directory and all its subdirectories.
-/state-sync/ @joshlind
+
+# Owners for the `/aptos-move` directory and its subdirectories:` aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`. 
+/aptos-move/aptos-gas/ @vgao1996
+/aptos-move/aptos-vm/ @davidiw @wrwg @zekun000
+/aptos-move/framework/ @davidiw @movekevin @wrwg
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
+
+# Owner for token_standard and related tutorials
+/aptos-move/framework/aptos-token @areshand
+/aptos-move/framework/src/natives/cryptography/ @alinush
+/aptos-move/parallel-executor/ @gelash @zekun000
+/aptos-move/vm-genesis/ @davidiw @movekevin
+
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
+
 # Owners for quorum store
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
-# Owners for execution and storage
-/execution/ @msmouse @lightmark
-/storage/ @msmouse @lightmark
+
+
 # Owners for the `/aptos` directory and all its subdirectories. And other CLI related crates
 /crates/aptos @gregnazario
-/crates/aptos-genesis @gregnazario
+
+# Owners for the `/crates/aptos-crypto*` directories
+/crates/aptos-crypto-derive/ @alinush
+/crates/aptos-crypto/ @alinush
+
+# Owners for the `/aptos` directory and all its subdirectories. And other CLI related crates
+/crates/aptos-faucet @banool @gregnazario
 /crates/aptos-faucet-cli @gregnazario
+/crates/aptos-genesis @gregnazario
+/crates/aptos-open-api @banool @gregnazario
+/crates/aptos-rest-client @banool @gregnazario
+
 # Owners for the `/aptos-rosetta` directory and related crates.
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
-# Owners for the `SDKs`
-/ecosystem/typescript/sdk @jjleng @gregnazario @banool
-/ecosystem/python/sdk @davidiw @gregnazario @banool
+
+# Owners for the `/developer-docs-site` directory and all its subdirectories.
+/developer-docs-site/ @davidiw @rajkaramchedu
+
 # Owner for token_standard and related tutorials
-/aptos-move/framework/aptos-token @areshand
 /developer-docs-site/docs/tutorials @areshand
+
+# Owners for the `/docker` directory and all its subdirectories.
+/docker/ @aptos-labs/prod-eng
+
+# Owners for the `SDKs`
+/ecosystem/python/sdk @davidiw @gregnazario @banool
+/ecosystem/typescript/sdk @jjleng @gregnazario @banool
+
+# Owners for execution and storage
+/execution/ @msmouse @lightmark
+
 # Owners for mempool
 /mempool/ @bchocho
+
+# Owners for the `/state-sync` directory and all its subdirectories.
+/state-sync/ @joshlind
+
+# Owners for execution and storage
+/storage/ @msmouse @lightmark
+
+# Owners for the `/terraform` directory and all its subdirectories.
+/terraform/ @aptos-labs/prod-eng
