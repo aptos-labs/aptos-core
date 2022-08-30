@@ -7,6 +7,12 @@ aptos_chains:
   devnet:
     id: 25
     waypoint: 0:b9ef40d9846bb0a2f0a56517f50392b8eaddeb5a607e6635d280c96d8e23ae2c
+  testnet:
+    id: 2
+    waypoint: 0:dd390913a71b52ef9b35e8cac861a8a21fdaba1def10f76cae765c25c634b3bb
+  ait3:
+    id: 47
+    waypoint: 0:96d6b0c072ae759ee3d071d1b41a87b3bc983eb852a805e7054482235eace373
 
 # fullnode network config
 fullnode_identity:
@@ -36,11 +42,11 @@ image:
 
 resources:
   limits:
-    cpu: 8
-    memory: 15Gi
+    cpu: 7
+    memory: 14Gi
   requests:
-    cpu: 8
-    memory: 15Gi
+    cpu: 7
+    memory: 12Gi
 
 nodeSelector: {}
 tolerations: []
