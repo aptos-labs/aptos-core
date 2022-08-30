@@ -78,8 +78,8 @@ impl Default for StateSyncDriverConfig {
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
-            max_consecutive_stream_notifications: 10,
-            max_pending_data_chunks: 100,
+            max_consecutive_stream_notifications: 30,
+            max_pending_data_chunks: 200,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 10_000_000, // At 1k TPS, this allows a node to fail for about 3 hours.
         }
@@ -151,11 +151,11 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 6,
             max_concurrent_state_requests: 6,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 600,
             max_request_retry: 3,
-            max_notification_id_mappings: 300,
+            max_notification_id_mappings: 600,
             progress_check_interval_ms: 100,
         }
     }
