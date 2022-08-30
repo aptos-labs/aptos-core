@@ -74,7 +74,7 @@ impl NodeIdentityEvaluator {
                 ),
                 0,
                 format!(
-                    "The node under investigation reported the {} {}  while the \
+                    "The node under investigation reported the {} {} while the \
                 baseline reported {}. These values should match. Confirm that \
                 the baseline you're using is appropriate for the node you're testing.",
                     attribute_str, target_value, baseline_value
