@@ -270,13 +270,16 @@ impl CliCommand<TransactionSummary> for InitializeValidator {
             };
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_initialize_validator(
-                consensus_public_key.to_bytes().to_vec(),
-                consensus_proof_of_possession.to_bytes().to_vec(),
-                // BCS encode, so that we can hide the original type
-                bcs::to_bytes(&validator_network_addresses)?,
-                bcs::to_bytes(&full_node_network_addresses)?,
-            ))
+            .submit_transaction(
+                aptos_stdlib::stake_initialize_validator(
+                    consensus_public_key.to_bytes().to_vec(),
+                    consensus_proof_of_possession.to_bytes().to_vec(),
+                    // BCS encode, so that we can hide the original type
+                    bcs::to_bytes(&validator_network_addresses)?,
+                    bcs::to_bytes(&full_node_network_addresses)?,
+                ),
+                None,
+            )
             .await
             .map(|inner| inner.into())
     }
@@ -334,7 +337,7 @@ impl CliCommand<TransactionSummary> for JoinValidatorSet {
             .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
+            .submit_transaction(aptos_stdlib::stake_join_validator_set(address), None)
             .await
             .map(|inner| inner.into())
     }
@@ -361,7 +364,7 @@ impl CliCommand<TransactionSummary> for LeaveValidatorSet {
             .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
+            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address), None)
             .await
             .map(|inner| inner.into())
     }
@@ -644,11 +647,14 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
             .validator_consensus_key_args
             .get_consensus_proof_of_possession(&operator_config)?;
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
-                address,
-                consensus_public_key.to_bytes().to_vec(),
-                consensus_proof_of_possession.to_bytes().to_vec(),
-            ))
+            .submit_transaction(
+                aptos_stdlib::stake_rotate_consensus_key(
+                    address,
+                    consensus_public_key.to_bytes().to_vec(),
+                    consensus_proof_of_possession.to_bytes().to_vec(),
+                ),
+                None,
+            )
             .await
             .map(|inner| inner.into())
     }
@@ -702,12 +708,15 @@ impl CliCommand<TransactionSummary> for UpdateValidatorNetworkAddresses {
             };
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
-                address,
-                // BCS encode, so that we can hide the original type
-                bcs::to_bytes(&validator_network_addresses)?,
-                bcs::to_bytes(&full_node_network_addresses)?,
-            ))
+            .submit_transaction(
+                aptos_stdlib::stake_update_network_and_fullnode_addresses(
+                    address,
+                    // BCS encode, so that we can hide the original type
+                    bcs::to_bytes(&validator_network_addresses)?,
+                    bcs::to_bytes(&full_node_network_addresses)?,
+                ),
+                None,
+            )
             .await
             .map(|inner| inner.into())
     }

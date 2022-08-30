@@ -98,12 +98,15 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         let txn = self
             .txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                self.pool_address_args.pool_address,
-                script_hash.to_vec(),
-                self.metadata_url.to_string().as_bytes().to_vec(),
-                metadata_hash.to_hex().as_bytes().to_vec(),
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_create_proposal(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                ),
+                None,
+            )
             .await?;
         let txn_summary = TransactionSummary::from(&txn);
         if let Transaction::UserTransaction(inner) = txn {
@@ -253,11 +256,14 @@ impl CliCommand<TransactionSummary> for SubmitVote {
         )?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                self.pool_address_args.pool_address,
-                self.proposal_id,
-                vote,
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_vote(
+                    self.pool_address_args.pool_address,
+                    self.proposal_id,
+                    vote,
+                ),
+                None,
+            )
             .await
             .map(TransactionSummary::from)
     }
@@ -379,7 +385,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
-            .submit_transaction(txn)
+            .submit_transaction(txn, None)
             .await
             .map(TransactionSummary::from)
     }
