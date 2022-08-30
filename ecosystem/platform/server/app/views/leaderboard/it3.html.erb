@@ -139,6 +139,11 @@
         <% end %>
       <% end %>
     <% end %>
+    <p class="my-6">
+    <%= render LinkComponent.new(href: 'https://aptos-analytics-data-sherrynet.s3.us-west-2.amazonaws.com/validator_epoch_history.json', target: '_blank') do %>
+      View complete performance history
+    <% end %>
+    </p>
     <p class="text-neutral-400 text-xs mt-6 font-light">This page refreshes every 15 minutes.</p>
     <p class="text-neutral-400 text-xs font-light">Data last updated <%= @last_updated.utc.to_fs(:db) %> UTC</p>
   </div>
