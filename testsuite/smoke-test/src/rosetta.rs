@@ -128,6 +128,27 @@ async fn test_network() {
         status.genesis_block_identifier,
         status.oldest_block_identifier,
     );
+
+    // Wrong blockcha8in should fail
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier {
+            blockchain: "eth".to_string(),
+            network: chain_id.to_string(),
+        },
+    };
+    rosetta_client
+        .network_status(&request)
+        .await
+        .expect_err("Should not work with wrong blockchain name");
+
+    // Wrong network should fail
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(ChainId::new(22)),
+    };
+    rosetta_client
+        .network_status(&request)
+        .await
+        .expect_err("Should not work with wrong network chain id");
 }
 
 #[tokio::test]
