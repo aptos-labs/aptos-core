@@ -29,13 +29,12 @@ Additional components for aptos-nodes testnet
 | ingress.wafAclArn | string | `nil` | The ARN of the WAF ACL to install on the ingress |
 | load_test.affinity | object | `{}` |  |
 | load_test.config.duration | int | `300` | How long to emit transactions for |
-| load_test.config.enableBurst | bool | `false` | Whether to send a burst of transactions without waiting |
+| load_test.config.target_tps | int | `0` | Whether to target constant TPS |
 | load_test.config.mempool_backlog | int | `5000` | Number of transactions outstanding in mempool |
 | load_test.config.mint_key | string | `nil` | The private key used to mint to fund load test |
 | load_test.config.numFullnodeGroups | string | `nil` | The number of fullnode groups to run traffic against |
 | load_test.config.txn_expiration_time_secs | int | `30` | How long to wait for transactions to be expired |
 | load_test.config.use_validators | bool | `false` | Whether to submit transactions through validator REST API |
-| load_test.config.waitMillis | int | `1000` | How long to wait for transactions to be finalized |
 | load_test.enabled | bool | `false` | Whether to enable the load test CronJob |
 | load_test.fullnode | object | `{"groups":[{"name":"fullnode"}]}` | The fullnode groups to target |
 | load_test.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for tools image |

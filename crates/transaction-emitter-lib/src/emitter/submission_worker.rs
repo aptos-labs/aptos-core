@@ -2,16 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{
-        stats::StatsAccumulator, wait_for_accounts_sequence, MAX_TXN_BATCH_SIZE,
-        TRANSACTIONS_PER_ACCOUNT, TXN_EXPIRATION_SECONDS,
-    },
+    emitter::{stats::StatsAccumulator, wait_for_accounts_sequence},
     transaction_generator::TransactionGenerator,
-    EmitThreadParams,
+    EmitModeParams,
 };
-use aptos_logger::sample::SampleRate;
 use aptos_logger::sample::Sampling;
-use aptos_logger::{debug, sample, warn};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -36,28 +32,27 @@ pub struct SubmissionWorker {
     client: RestClient,
     all_addresses: Arc<Vec<AccountAddress>>,
     stop: Arc<AtomicBool>,
-    params: EmitThreadParams,
+    params: EmitModeParams,
     stats: Arc<StatsAccumulator>,
     txn_generator: Box<dyn TransactionGenerator>,
     invalid_transaction_ratio: usize,
+    worker_index: usize,
+    check_account_sequence_only_once: bool,
     rng: ::rand::rngs::StdRng,
 }
 
-// Note, there is an edge case that can occur if the transaction emitter
-// bursts the target node too fast, and the emitter doesn't handle it
-// very well, instead waiting up until the timeout for the target seqnum
-// to progress, even though it never will. See more here:
-// https://github.com/aptos-labs/aptos-core/issues/
 impl SubmissionWorker {
     pub fn new(
         accounts: Vec<LocalAccount>,
         client: RestClient,
         all_addresses: Arc<Vec<AccountAddress>>,
         stop: Arc<AtomicBool>,
-        params: EmitThreadParams,
+        params: EmitModeParams,
         stats: Arc<StatsAccumulator>,
         txn_generator: Box<dyn TransactionGenerator>,
         invalid_transaction_ratio: usize,
+        worker_index: usize,
+        check_account_sequence_only_once: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
         Self {
@@ -69,85 +64,119 @@ impl SubmissionWorker {
             stats,
             txn_generator,
             invalid_transaction_ratio,
+            worker_index,
+            check_account_sequence_only_once,
             rng,
         }
     }
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
-        // Introduce a random jitter between 0 to 5 seconds so that we don't hammer the rest APIs
-        // all at once.
-        let random_jitter_ms = self.rng.gen_range(0, 5000);
-        sleep(Duration::from_millis(random_jitter_ms)).await;
+        // Introduce a random jitter between, so that:
+        //  - we don't hammer the rest APIs all at once.
+        //  - allow for even spread for fixed TPS setup
+        let start_sleep_duration = self.start_sleep_time();
+        let start_time = Instant::now() + start_sleep_duration;
 
-        let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
-        let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
-            self.params.txn_expiration_time_secs,
-            TXN_EXPIRATION_SECONDS,
-        ));
+        self.sleep_check_done(start_sleep_duration).await;
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-
-        let start_time = Instant::now();
-        let mut total_num_requests = 0;
+        let wait_for_accounts_sequence_timeout =
+            Duration::from_secs(self.params.txn_expiration_time_secs + 30);
+        let mut wait_until = start_time;
 
         while !self.stop.load(Ordering::Relaxed) {
+            let loop_start_time = Arc::new(Instant::now());
+            if wait_duration.as_secs() > 0
+                && loop_start_time.duration_since(wait_until) > wait_duration
+            {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(120)),
+                    warn!(
+                        "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
+                        self.client.path_prefix_string(),
+                        loop_start_time.duration_since(wait_until).as_secs()
+                    )
+                );
+            }
+            // always add expected cycle duration, to not drift from expected pace.
+            wait_until += wait_duration;
+
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
-            total_num_requests += num_requests;
-            let loop_start_time = Arc::new(Instant::now());
-            let wait_until = *loop_start_time + wait_duration;
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
-            if let Err(e) = try_join_all(requests.chunks(10).map(|reqs| {
-                submit_transactions(
-                    &self.client,
-                    reqs,
-                    loop_start_time.clone(),
-                    txn_offset_time.clone(),
-                    self.stats.clone(),
-                )
-            }))
+            if let Err(e) = try_join_all(requests.chunks(self.params.max_submit_batch_size).map(
+                |reqs| {
+                    submit_transactions(
+                        &self.client,
+                        reqs,
+                        loop_start_time.clone(),
+                        txn_offset_time.clone(),
+                        self.stats.clone(),
+                    )
+                },
+            ))
             .await
             {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(120)),
-                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e)
+                    warn!(
+                        "[{:?}] Failed to submit request: {:?}",
+                        self.client.path_prefix_string(),
+                        e
+                    )
                 );
             }
 
-            if self.params.wait_committed {
-                let loop_start_time = Instant::now();
-                self.update_stats(
-                    loop_start_time,
-                    txn_offset_time.load(Ordering::Relaxed),
-                    num_requests,
-                    false,
-                    wait_for_accounts_sequence_timeout,
-                )
-                .await;
+            if self.check_account_sequence_only_once {
+                self.sleep_check_done(Duration::from_secs(self.params.txn_expiration_time_secs))
+                    .await;
             }
+
+            self.update_stats(
+                *loop_start_time,
+                txn_offset_time.load(Ordering::Relaxed),
+                num_requests,
+                // skip latency if checking seq_num only once
+                self.check_account_sequence_only_once,
+                wait_for_accounts_sequence_timeout,
+                self.check_account_sequence_only_once,
+            )
+            .await;
+
             let now = Instant::now();
             if wait_until > now {
-                sleep(wait_until - now).await;
+                self.sleep_check_done(wait_until - now).await;
             }
-        }
-
-        // If this was a burst mode run and the user didn't specifically opt
-        // out of it, update the stats for the whole run.
-        if check_stats_at_end {
-            debug!("Checking stats for final time at the end");
-            self.update_stats(
-                start_time,
-                0,
-                total_num_requests,
-                true,
-                Duration::from_millis(500),
-            )
-            .await
         }
 
         self.accounts
+    }
+
+    async fn sleep_check_done(&self, duration: Duration) {
+        let start_time = Instant::now();
+        loop {
+            sleep(Duration::from_secs(1)).await;
+            if self.stop.load(Ordering::Relaxed) {
+                return;
+            }
+            if start_time.elapsed() >= duration {
+                return;
+            }
+        }
+    }
+
+    fn start_sleep_time(&mut self) -> Duration {
+        let random_jitter_millis = if self.params.start_jitter_millis > 0 {
+            self.rng.gen_range(0, self.params.start_jitter_millis)
+        } else {
+            0
+        };
+        Duration::from_millis(
+            (self.params.start_offset_multiplier_millis * self.worker_index as f64) as u64
+                + random_jitter_millis,
+        )
     }
 
     /// This function assumes that num_requests == num_accounts, which is
@@ -164,75 +193,83 @@ impl SubmissionWorker {
         num_requests: usize,
         skip_latency_stats: bool,
         wait_for_accounts_sequence_timeout: Duration,
+        check_account_sequence_only_once: bool,
     ) {
-        match wait_for_accounts_sequence(
+        assert_eq!(
+            num_requests,
+            self.params.transactions_per_account * self.accounts.len()
+        );
+        let (num_expired, sum_of_completion_timestamps_millis) = wait_for_accounts_sequence(
+            start_time,
             &self.client,
             &mut self.accounts,
+            self.params.transactions_per_account,
             wait_for_accounts_sequence_timeout,
-            &mut self.rng,
+            check_account_sequence_only_once,
         )
-        .await
-        {
-            Ok(()) => {
-                let latency = (Instant::now() - start_time).as_millis() as u64
-                    - txn_offset_time / num_requests as u64;
+        .await;
+
+        let num_committed = num_requests - num_expired;
+        // To avoid negative result caused by uncommitted tx occur
+        // Simplified from:
+        // sum_of_completion_timestamps_millis - (txn_offset_time/num_requests) * num_committed
+        // to
+        // (end_time - txn_offset_time / num_requests) * num_committed
+        //
+        // This approximates start time of only committed transaction to be
+        // average start time of all submitted transactions.
+
+        if num_expired > 0 {
+            self.stats
+                .expired
+                .fetch_add(num_expired as u64, Ordering::Relaxed);
+            sample!(
+                SampleRate::Duration(Duration::from_secs(120)),
+                warn!(
+                    "[{:?}] Transactions were not committed before expiration: {:?}",
+                    self.client.path_prefix_string(),
+                    num_expired
+                )
+            );
+        }
+
+        if num_committed > 0 {
+            let sum_latency = sum_of_completion_timestamps_millis
+                - (txn_offset_time as u128 * num_committed as u128) / num_requests as u128;
+            let avg_latency = (sum_latency / num_committed as u128) as u64;
+            self.stats
+                .committed
+                .fetch_add(num_committed as u64, Ordering::Relaxed);
+
+            if !skip_latency_stats {
                 self.stats
-                    .committed
-                    .fetch_add(num_requests as u64, Ordering::Relaxed);
-                if !skip_latency_stats {
-                    self.stats
-                        .latency
-                        .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
-                    self.stats
-                        .latencies
-                        .record_data_point(latency, num_requests as u64);
-                }
-            }
-            Err(uncommitted) => {
-                let num_uncommitted = uncommitted.len() as u64;
-                let num_committed = num_requests as u64 - num_uncommitted;
-                // To avoid negative result caused by uncommitted tx occur
-                // Simplified from:
-                // end_time * num_committed - (txn_offset_time/num_requests) * num_committed
-                // to
-                // (end_time - txn_offset_time / num_requests) * num_committed
-                let latency = (Instant::now() - start_time).as_millis() as u64
-                    - txn_offset_time / num_requests as u64;
-                let committed_latency = latency * num_committed as u64;
+                    .latency
+                    .fetch_add(sum_latency as u64, Ordering::Relaxed);
                 self.stats
-                    .committed
-                    .fetch_add(num_committed, Ordering::Relaxed);
+                    .latency_samples
+                    .fetch_add(num_committed as u64, Ordering::Relaxed);
                 self.stats
-                    .expired
-                    .fetch_add(num_uncommitted, Ordering::Relaxed);
-                if !skip_latency_stats {
-                    self.stats
-                        .latency
-                        .fetch_add(committed_latency, Ordering::Relaxed);
-                    self.stats
-                        .latencies
-                        .record_data_point(latency, num_committed);
-                }
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
-                    warn!(
-                        "[{:?}] Transactions were not committed before expiration: {:?}",
-                        self.client, uncommitted
-                    )
-                );
+                    .latencies
+                    .record_data_point(avg_latency, num_committed as u64);
             }
         }
     }
 
     fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
-        let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
+        let batch_size = max(
+            1,
+            min(
+                self.params.max_submit_batch_size / self.params.transactions_per_account,
+                self.accounts.len(),
+            ),
+        );
         let accounts = self
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
         self.txn_generator.generate_transactions(
             accounts,
-            TRANSACTIONS_PER_ACCOUNT,
+            self.params.transactions_per_account,
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
             gas_price,
@@ -256,18 +293,33 @@ pub async fn submit_transactions(
     stats
         .submitted
         .fetch_add(txns.len() as u64, Ordering::Relaxed);
+
     match client.submit_batch_bcs(txns).await {
-        Err(e) => sample!(
-            SampleRate::Duration(Duration::from_secs(120)),
-            warn!("[{:?}] Failed to submit batch request: {:?}", client, e)
-        ),
+        Err(e) => {
+            stats
+                .failed_submission
+                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+            sample!(
+                SampleRate::Duration(Duration::from_secs(120)),
+                warn!(
+                    "[{:?}] Failed to submit batch request: {:?}",
+                    client.path_prefix_string(),
+                    e
+                )
+            );
+        }
         Ok(v) => {
-            for f in v.into_inner().transaction_failures {
+            let failures = v.into_inner().transaction_failures;
+            stats
+                .failed_submission
+                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+            for f in failures {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(120)),
                     warn!(
                         "[{:?}] Failed to submit a request within a batch: {:?}",
-                        client, f
+                        client.path_prefix_string(),
+                        f
                     )
                 );
             }
