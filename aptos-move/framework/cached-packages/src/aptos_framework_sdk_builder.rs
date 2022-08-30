@@ -157,6 +157,25 @@ pub enum EntryFunctionCall {
         optional_auth_key: Vec<u8>,
     },
 
+    /// Creates a new resource account, transfer the amount of coins from the origin to the resource
+    /// account, and rotates the authentication key to either the optional auth key if it is
+    /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
+    /// this function adds additional resource ownership to the resource account and should only be
+    /// used for resource accounts that need access to Coin<AptosCoin>.
+    ResourceAccountCreateResourceAccountAndFund {
+        seed: Vec<u8>,
+        optional_auth_key: Vec<u8>,
+        fund_amount: u64,
+    },
+
+    /// Creates a new resource account, publishes the package under this account transaction under
+    /// this account and leaves the signer cap readily available for pickup.
+    ResourceAccountCreateResourceAccountAndPublishPackage {
+        seed: Vec<u8>,
+        metadata_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
+    },
+
     /// Add `amount` of coins from the `account` owning the StakePool.
     StakeAddStake {
         amount: u64,
@@ -318,6 +337,24 @@ impl EntryFunctionCall {
                 seed,
                 optional_auth_key,
             } => resource_account_create_resource_account(seed, optional_auth_key),
+            ResourceAccountCreateResourceAccountAndFund {
+                seed,
+                optional_auth_key,
+                fund_amount,
+            } => resource_account_create_resource_account_and_fund(
+                seed,
+                optional_auth_key,
+                fund_amount,
+            ),
+            ResourceAccountCreateResourceAccountAndPublishPackage {
+                seed,
+                metadata_serialized,
+                code,
+            } => resource_account_create_resource_account_and_publish_package(
+                seed,
+                metadata_serialized,
+                code,
+            ),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
             StakeInitializeStakeOwner {
@@ -736,6 +773,59 @@ pub fn resource_account_create_resource_account(
         vec![
             bcs::to_bytes(&seed).unwrap(),
             bcs::to_bytes(&optional_auth_key).unwrap(),
+        ],
+    ))
+}
+
+/// Creates a new resource account, transfer the amount of coins from the origin to the resource
+/// account, and rotates the authentication key to either the optional auth key if it is
+/// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
+/// this function adds additional resource ownership to the resource account and should only be
+/// used for resource accounts that need access to Coin<AptosCoin>.
+pub fn resource_account_create_resource_account_and_fund(
+    seed: Vec<u8>,
+    optional_auth_key: Vec<u8>,
+    fund_amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("resource_account").to_owned(),
+        ),
+        ident_str!("create_resource_account_and_fund").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&seed).unwrap(),
+            bcs::to_bytes(&optional_auth_key).unwrap(),
+            bcs::to_bytes(&fund_amount).unwrap(),
+        ],
+    ))
+}
+
+/// Creates a new resource account, publishes the package under this account transaction under
+/// this account and leaves the signer cap readily available for pickup.
+pub fn resource_account_create_resource_account_and_publish_package(
+    seed: Vec<u8>,
+    metadata_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("resource_account").to_owned(),
+        ),
+        ident_str!("create_resource_account_and_publish_package").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&seed).unwrap(),
+            bcs::to_bytes(&metadata_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
         ],
     ))
 }
@@ -1211,6 +1301,38 @@ mod decoder {
         }
     }
 
+    pub fn resource_account_create_resource_account_and_fund(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::ResourceAccountCreateResourceAccountAndFund {
+                    seed: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    optional_auth_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    fund_amount: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn resource_account_create_resource_account_and_publish_package(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::ResourceAccountCreateResourceAccountAndPublishPackage {
+                    seed: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    metadata_serialized: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    code: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
@@ -1440,6 +1562,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "resource_account_create_resource_account".to_string(),
             Box::new(decoder::resource_account_create_resource_account),
+        );
+        map.insert(
+            "resource_account_create_resource_account_and_fund".to_string(),
+            Box::new(decoder::resource_account_create_resource_account_and_fund),
+        );
+        map.insert(
+            "resource_account_create_resource_account_and_publish_package".to_string(),
+            Box::new(decoder::resource_account_create_resource_account_and_publish_package),
         );
         map.insert(
             "stake_add_stake".to_string(),

@@ -271,3 +271,34 @@ fn code_publishing_arbitray_dep_different_address() {
         0x10007 /*EDEP_ARBITRARY_NOT_SAME_ADDRESS*/
     );
 }
+
+#[test]
+fn code_publishing_using_resource_account() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    let mut pack = PackageBuilder::new("Package1").with_policy(UpgradePolicy::arbitrary());
+    pack.add_source("m", "module 0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a::m { public fun f() {} }");
+    let pack_dir = pack.write_to_temp().unwrap();
+    let package = framework::BuiltPackage::build(
+        pack_dir.path().to_owned(),
+        framework::BuildOptions::default(),
+    )
+    .expect("building package must succeed");
+
+    let code = package.extract_code();
+    let metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+    let bcs_metadata = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
+
+    let result = h.run_transaction_payload(
+        &acc,
+        cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+            vec![],
+            bcs_metadata,
+            code,
+        ),
+    );
+    assert_success!(result);
+}
