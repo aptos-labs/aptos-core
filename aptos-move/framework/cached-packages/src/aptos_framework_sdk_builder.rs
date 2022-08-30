@@ -1013,7 +1013,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountOfferRotationCapabilityEd25519 {
-                rotation_capability_sig_bytes: bcs::from_bytes(script.args().first()?).ok()?,
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
                 account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
                 recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
@@ -1027,7 +1027,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKeyEd25519 {
-                curr_sig_bytes: bcs::from_bytes(script.args().first()?).ok()?,
+                curr_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_sig_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
                 curr_pk_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
                 new_pk_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -1040,7 +1040,7 @@ mod decoder {
     pub fn aptos_account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountCreateAccount {
-                auth_key: bcs::from_bytes(script.args().first()?).ok()?,
+                auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1050,7 +1050,7 @@ mod decoder {
     pub fn aptos_account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountTransfer {
-                to: bcs::from_bytes(script.args().first()?).ok()?,
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1073,7 +1073,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosCoinDelegateMintCapability {
-                to: bcs::from_bytes(script.args().first()?).ok()?,
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1083,7 +1083,7 @@ mod decoder {
     pub fn aptos_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosCoinMint {
-                dst_addr: bcs::from_bytes(script.args().first()?).ok()?,
+                dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1096,7 +1096,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceCreateProposal {
-                stake_pool: bcs::from_bytes(script.args().first()?).ok()?,
+                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
                 metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
                 metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -1109,7 +1109,7 @@ mod decoder {
     pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceVote {
-                stake_pool: bcs::from_bytes(script.args().first()?).ok()?,
+                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
@@ -1121,7 +1121,7 @@ mod decoder {
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
-                metadata_serialized: bcs::from_bytes(script.args().first()?).ok()?,
+                metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1132,8 +1132,8 @@ mod decoder {
     pub fn coin_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinTransfer {
-                coin_type: script.ty_args().first()?.clone(),
-                to: bcs::from_bytes(script.args().first()?).ok()?,
+                coin_type: script.ty_args().get(0)?.clone(),
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1144,7 +1144,7 @@ mod decoder {
     pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinUpgradeSupply {
-                coin_type: script.ty_args().first()?.clone(),
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -1154,8 +1154,8 @@ mod decoder {
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
-                coin_type: script.ty_args().first()?.clone(),
-                amount: bcs::from_bytes(script.args().first()?).ok()?,
+                coin_type: script.ty_args().get(0)?.clone(),
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1165,8 +1165,8 @@ mod decoder {
     pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinInitialize {
-                coin_type: script.ty_args().first()?.clone(),
-                name: bcs::from_bytes(script.args().first()?).ok()?,
+                coin_type: script.ty_args().get(0)?.clone(),
+                name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 symbol: bcs::from_bytes(script.args().get(1)?).ok()?,
                 decimals: bcs::from_bytes(script.args().get(2)?).ok()?,
                 monitor_supply: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -1179,8 +1179,8 @@ mod decoder {
     pub fn managed_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinMint {
-                coin_type: script.ty_args().first()?.clone(),
-                dst_addr: bcs::from_bytes(script.args().first()?).ok()?,
+                coin_type: script.ty_args().get(0)?.clone(),
+                dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1191,7 +1191,7 @@ mod decoder {
     pub fn managed_coin_register(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinRegister {
-                coin_type: script.ty_args().first()?.clone(),
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -1203,7 +1203,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ResourceAccountCreateResourceAccount {
-                seed: bcs::from_bytes(script.args().first()?).ok()?,
+                seed: bcs::from_bytes(script.args().get(0)?).ok()?,
                 optional_auth_key: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1214,7 +1214,7 @@ mod decoder {
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
-                amount: bcs::from_bytes(script.args().first()?).ok()?,
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1232,7 +1232,7 @@ mod decoder {
     pub fn stake_initialize_stake_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeStakeOwner {
-                initial_stake_amount: bcs::from_bytes(script.args().first()?).ok()?,
+                initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 voter: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
@@ -1244,7 +1244,7 @@ mod decoder {
     pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeValidator {
-                consensus_pubkey: bcs::from_bytes(script.args().first()?).ok()?,
+                consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
                 network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
                 fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
@@ -1257,7 +1257,7 @@ mod decoder {
     pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeJoinValidatorSet {
-                pool_address: bcs::from_bytes(script.args().first()?).ok()?,
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1267,7 +1267,7 @@ mod decoder {
     pub fn stake_leave_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeLeaveValidatorSet {
-                pool_address: bcs::from_bytes(script.args().first()?).ok()?,
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1277,7 +1277,7 @@ mod decoder {
     pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeReactivateStake {
-                amount: bcs::from_bytes(script.args().first()?).ok()?,
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1287,7 +1287,7 @@ mod decoder {
     pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeRotateConsensusKey {
-                pool_address: bcs::from_bytes(script.args().first()?).ok()?,
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
                 proof_of_possession: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
@@ -1299,7 +1299,7 @@ mod decoder {
     pub fn stake_set_delegated_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeSetDelegatedVoter {
-                new_delegated_voter: bcs::from_bytes(script.args().first()?).ok()?,
+                new_delegated_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1309,7 +1309,7 @@ mod decoder {
     pub fn stake_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeSetOperator {
-                new_operator: bcs::from_bytes(script.args().first()?).ok()?,
+                new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1319,7 +1319,7 @@ mod decoder {
     pub fn stake_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeUnlock {
-                amount: bcs::from_bytes(script.args().first()?).ok()?,
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1331,7 +1331,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeUpdateNetworkAndFullnodeAddresses {
-                pool_address: bcs::from_bytes(script.args().first()?).ok()?,
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_network_addresses: bcs::from_bytes(script.args().get(1)?).ok()?,
                 new_fullnode_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
@@ -1343,7 +1343,7 @@ mod decoder {
     pub fn stake_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeWithdraw {
-                withdraw_amount: bcs::from_bytes(script.args().first()?).ok()?,
+                withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1353,7 +1353,7 @@ mod decoder {
     pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
-                major: bcs::from_bytes(script.args().first()?).ok()?,
+                major: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
