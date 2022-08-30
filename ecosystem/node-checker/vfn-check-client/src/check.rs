@@ -88,13 +88,39 @@ pub enum SingleCheckResult {
     /// The node was successfully checked. Note: The evaulation itself could
     /// indicate, a problem with the node, this just states that we were able
     /// to check the node sucessfully with NHC.
-    Success(EvaluationSummary),
+    Success(SingleCheckSuccess),
 
     /// Something went wrong with checking the node.
     Failure(SingleCheckFailure),
 
     /// The account does not have a VFN registered on chain.
     NoVfnRegistered(NoVfnRegistered),
+}
+
+#[derive(Debug, Serialize)]
+pub struct SingleCheckSuccess {
+    /// The evaluation summary returned by NHC. This doesn't necessarily imply
+    /// that the node passed the evaluation, just that an evaluation was returned
+    /// successfully and it passed the API available check.
+    pub evaluation_summary: EvaluationSummary,
+
+    /// This is the address that we used to get this successful evaluation.
+    /// This is presented in a normal URL format, not the NetworkAddress
+    /// representation. Example value for this field: http://vfn.site.com:8080.
+    /// Note, sometimes the address we started with was a DNS name, and we resolved
+    /// it to an IP address. As such, this IP address may become incorrect down
+    /// the line. In that case, refer to vfn_address in SingleCheck, or just
+    /// run this tool again.
+    pub vfn_address_url: String,
+}
+
+impl SingleCheckSuccess {
+    pub fn new(evaluation_summary: EvaluationSummary, vfn_address_url: String) -> Self {
+        Self {
+            evaluation_summary,
+            vfn_address_url,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -307,10 +333,8 @@ async fn check_single_vfn_one_api_port(
     params.insert("api_port", &api_port_string);
     params.insert("baseline_configuration_name", nhc_baseline_config_name);
 
-    debug!(
-        "Querying NHC at address: {}:{}",
-        vfn_url_string, api_port_string
-    );
+    let address_single_string = format!("{}:{}", vfn_url_string, api_port_string);
+    debug!("Querying NHC at address: {}", address_single_string);
 
     // Send the request and parse the response.
     let response = match nhc_client
@@ -365,5 +389,8 @@ async fn check_single_vfn_one_api_port(
         ));
     }
 
-    SingleCheckResult::Success(evaluation_summary)
+    SingleCheckResult::Success(SingleCheckSuccess::new(
+        evaluation_summary,
+        address_single_string,
+    ))
 }
