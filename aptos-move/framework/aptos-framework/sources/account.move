@@ -308,12 +308,17 @@ module aptos_framework::account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
+    /// This is a helper function to compute resource addresses. Computation of the address
+    /// involves the use of a cryptographic hash operation and should be use thoughtfully.
+    public fun create_resource_address(source: &address, seed: vector<u8>): address {
+        let bytes = bcs::to_bytes(source);
+        vector::append(&mut bytes, seed);
+        from_bcs::to_address(hash::sha3_256(bytes))
+    }
+
     /// A resource account is used to manage resources independent of an account managed by a user.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        let bytes = bcs::to_bytes(&signer::address_of(source));
-        vector::append(&mut bytes, seed);
-        let addr = from_bcs::to_address(hash::sha3_256(bytes));
-
+        let addr = create_resource_address(&signer::address_of(source), seed);
         let signer = create_account_unchecked(copy addr);
         let signer_cap = SignerCapability { account: addr };
         (signer, signer_cap)
