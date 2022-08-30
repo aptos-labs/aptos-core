@@ -1,0 +1,32 @@
+---
+name: "\SEV_FOLLOWUP"
+about: Suggest a new feature or update a change as a part of our weekly SEV_Followup in Aptos Core
+title: "[SEV_FOLLOWUP]"
+labels: SEV_FOLLOWUP
+assignees: ''
+
+---
+
+# 🚀 Feature Request
+
+<!-- A clear and concise description of the action items you are requesting.  Best to reference to the SEV# -->
+
+## Motivation
+
+**Is this SEV_followup a critical or long term action?  Please describe.**
+<!-- A clear and concise description of what the problem is. Ex. This is followup action on the SEV#1234[...] -->
+<!-- Please link to the SEV, any relevant issues or other PRs! -->
+
+## Pitch
+
+**Describe the solution you'd like**
+<!-- A clear and concise description of what you want to happen. -->
+
+**Describe alternatives you've considered**
+<!-- A clear and concise description of any alternative solutions or features you've considered. -->
+
+**Are you willing to open a pull request?** (See [CONTRIBUTING](../../CONTRIBUTING.md))
+
+## Additional context
+
+<!-- Add any other context or screenshots about the feature request here. -->
