@@ -6,8 +6,8 @@ use crate::{
     node_type::{LeafNode, Node, NodeKey},
     restore::StateSnapshotRestore,
     test_helper::{init_mock_db, ValueBlob},
-    JellyfishMerkleTree, NodeBatch, StateValueBatch, StateValueWriter, TestKey, TestValue,
-    TreeReader, TreeWriter,
+    JellyfishMerkleTree, NodeBatch, StateSnapshotProgress, StateValueBatch, StateValueWriter,
+    TestKey, TestValue, TreeReader, TreeWriter,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -26,6 +26,7 @@ struct MockSnapshotStore<K: TestKey, V: TestValue> {
     tree_store: MockTreeStore<K>,
     kv_store: RwLock<BTreeMap<(K, Version), V>>,
     usage_store: RwLock<HashMap<Version, StateStorageUsage>>,
+    progress_store: RwLock<HashMap<Version, StateSnapshotProgress>>,
 }
 
 impl<K, V> MockSnapshotStore<K, V>
@@ -38,6 +39,7 @@ where
             tree_store: MockTreeStore::new(overwrite),
             kv_store: RwLock::new(BTreeMap::default()),
             usage_store: RwLock::new(HashMap::new()),
+            progress_store: RwLock::new(HashMap::new()),
         }
     }
 
@@ -69,7 +71,12 @@ where
     K: TestKey,
     V: TestValue,
 {
-    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()> {
+    fn write_kv_batch(
+        &self,
+        version: Version,
+        kv_batch: &StateValueBatch<K, Option<V>>,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
         for (k, v) in kv_batch {
             if let Some(v) = v {
                 self.kv_store.write().insert(k.clone(), v.clone());
@@ -77,12 +84,17 @@ where
                 self.kv_store.write().remove(k);
             }
         }
+        self.progress_store.write().insert(version, progress);
         Ok(())
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.usage_store.write().insert(version, usage);
         Ok(())
+    }
+
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(self.progress_store.read().get(&version).cloned())
     }
 }
 
@@ -130,6 +142,7 @@ where
             tree_store,
             kv_store: RwLock::new(kv_store),
             usage_store: RwLock::new(HashMap::new()),
+            progress_store: RwLock::new(HashMap::new()),
         },
         version,
     )

@@ -18,7 +18,8 @@ use aptos_config::config::{
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
-    restore::StateSnapshotRestore, NodeBatch, StateValueBatch, StateValueWriter, TreeWriter,
+    restore::StateSnapshotRestore, NodeBatch, StateSnapshotProgress, StateValueBatch,
+    StateValueWriter, TreeWriter,
 };
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
@@ -143,13 +144,19 @@ impl TreeWriter<StateKey> for MockStore {
 impl StateValueWriter<StateKey, StateValue> for MockStore {
     fn write_kv_batch(
         &self,
+        _version: Version,
         _kv_batch: &StateValueBatch<StateKey, Option<StateValue>>,
+        _progress: StateSnapshotProgress,
     ) -> Result<()> {
         Ok(())
     }
 
     fn write_usage(&self, _version: Version, _usage: StateStorageUsage) -> Result<()> {
         Ok(())
+    }
+
+    fn get_progress(&self, _version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(None)
     }
 }
 
