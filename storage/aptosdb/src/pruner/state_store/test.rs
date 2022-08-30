@@ -419,4 +419,10 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValu
         let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
         assert_eq!(&v_from_db, if pruned { &None } else { v });
     }
+
+    if pruned {
+        assert!(state_store.get_usage(Some(version)).is_err())
+    } else {
+        assert!(state_store.get_usage(Some(version)).is_ok())
+    }
 }
