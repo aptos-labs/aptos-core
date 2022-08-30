@@ -1119,6 +1119,7 @@ impl TransactionOptions {
     pub async fn submit_transaction(
         &self,
         payload: TransactionPayload,
+        amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
         let sender_key = self.private_key()?;
         let client = self.rest_client()?;
@@ -1146,7 +1147,7 @@ impl TransactionOptions {
             max_gas
         } else {
             let simulated_txn = self
-                .simulate_transaction(payload.clone(), Some(gas_unit_price))
+                .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
                 .await?;
             if !simulated_txn.info.success {
                 return Err(CliError::ApiError(format!(
@@ -1180,6 +1181,7 @@ impl TransactionOptions {
         &self,
         payload: TransactionPayload,
         gas_price: Option<u64>,
+        amount_transfer: Option<u64>,
     ) -> CliTypedResult<UserTransaction> {
         let sender_key = self.private_key()?;
         let client = self.rest_client()?;
@@ -1205,7 +1207,15 @@ impl TransactionOptions {
             .coin
             .value
             .0;
-        let max_possible_gas = std::cmp::min(account_balance / gas_price, MAX_POSSIBLE_GAS_UNITS);
+
+        let max_possible_gas = if let Some(amount) = amount_transfer {
+            std::cmp::min(
+                account_balance.saturating_sub(amount) / gas_price,
+                MAX_POSSIBLE_GAS_UNITS,
+            )
+        } else {
+            std::cmp::min(account_balance / gas_price, MAX_POSSIBLE_GAS_UNITS)
+        };
 
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
             .with_gas_unit_price(gas_price)
