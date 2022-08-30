@@ -42,6 +42,11 @@ export const secondaryButtonColor = {
 
 // Background
 
+export const checkCircleSuccessBg = {
+  dark: '#00FF00',
+  light: 'green',
+};
+
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',

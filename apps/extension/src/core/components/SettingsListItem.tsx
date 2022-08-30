@@ -46,7 +46,7 @@ export default function SettingsListItem({
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
-  const { lockAccounts } = useInitializedAccounts();
+  const { clearAccounts, lockAccounts } = useInitializedAccounts();
 
   const gridOnClick = async () => {
     // todo: Create an enum for these titles for more typed code
@@ -59,6 +59,8 @@ export default function SettingsListItem({
         ? `https://explorer.devnet.aptos.dev/account/${activeAccount.address}`
         : 'https://explorer.devnet.aptos.dev';
       window.open(explorerAddress, '_blank');
+    } else if (title === settingsItemLabel.REMOVE_ACCOUNT) {
+      await clearAccounts();
     }
 
     if (path) {

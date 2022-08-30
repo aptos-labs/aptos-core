@@ -15,7 +15,6 @@ import { ArrowBackIcon } from '@chakra-ui/icons';
 import { secondaryBorderColor, walletHeaderBgColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountCircle from 'core/components/AccountCircle';
-import ChakraLink from 'core/components/ChakraLink';
 
 interface WalletHeaderProps {
   accessoryButton?: React.ReactNode,
@@ -72,11 +71,7 @@ export default function WalletHeader({
           {accessoryButton}
           {showAccountCircle ? (
             <Tooltip label="Switch wallet" closeDelay={300}>
-              <ChakraLink
-                to={Routes.switchAccount.path}
-              >
-                <AccountCircle />
-              </ChakraLink>
+              <AccountCircle onClick={() => navigate(Routes.switchAccount.path)} />
             </Tooltip>
           ) : null}
         </HStack>

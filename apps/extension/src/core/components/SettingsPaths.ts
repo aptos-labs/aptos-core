@@ -73,16 +73,16 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
       {
         iconAfter: FiChevronRight,
         path: Routes.switchAccount.path,
-        title: 'Switch account',
+        title: settingsItemLabel.SWITCH_ACCOUNT,
       },
-      // {
-      //   path: null,
-      //   textColorDict: {
-      //     dark: 'red.400',
-      //     light: 'red.400',
-      //   },
-      //   title: 'Remove account',
-      // }
+      {
+        path: null,
+        textColorDict: {
+          dark: 'red.400',
+          light: 'red.400',
+        },
+        title: settingsItemLabel.REMOVE_ACCOUNT,
+      },
     ],
   );
 

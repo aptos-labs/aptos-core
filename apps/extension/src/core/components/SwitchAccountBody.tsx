@@ -5,6 +5,7 @@ import {
   VStack,
   Button,
   useColorMode,
+  Box,
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
 import React, { useMemo } from 'react';
@@ -19,7 +20,7 @@ import { secondaryHeaderInputBgColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountView from './AccountView';
 
-export const boxShadow = 'rgba(149, 157, 165, 0.2) 0px 0px 8px 4px';
+export const boxShadow = 'rgba(0, 0, 0, 0.05) 0px 4px 24px 0px';
 
 export default function SwitchAccountBody() {
   const {
@@ -46,33 +47,37 @@ export default function SwitchAccountBody() {
   };
 
   return (
-    <VStack mt={2} spacing={2} alignItems="left" display="flex" height="100%">
+    <VStack spacing={2} alignItems="stretch" height="100%">
       <VStack gap={1} p={2} flex={1} overflow="scroll">
         {
         accountsList.map((account: Account) => (
-          <AccountView
-            account={account}
-            showCheck
-            boxShadow={boxShadow}
-            onClick={onSwitchAccount}
-            key={account.address}
-            bgColor={{
-              dark: 'gray.700',
-              light: 'white',
-            }}
-          />
+          <Box px={4} width="100%">
+            <AccountView
+              account={account}
+              showCheck
+              boxShadow={boxShadow}
+              onClick={onSwitchAccount}
+              key={account.address}
+              bgColor={{
+                dark: 'gray.700',
+                light: 'white',
+              }}
+            />
+          </Box>
         ))
       }
       </VStack>
-      <Button
-        size="lg"
-        width="100%"
-        onClick={handleClickAddAccount}
-        bgColor={secondaryHeaderInputBgColor[colorMode]}
-        leftIcon={<AddIcon fontSize="xs" />}
-      >
-        Add Account
-      </Button>
+      <Box px={4} width="100%">
+        <Button
+          size="lg"
+          width="100%"
+          onClick={handleClickAddAccount}
+          bgColor={secondaryHeaderInputBgColor[colorMode]}
+          leftIcon={<AddIcon fontSize="xs" />}
+        >
+          Add Account
+        </Button>
+      </Box>
     </VStack>
   );
 }

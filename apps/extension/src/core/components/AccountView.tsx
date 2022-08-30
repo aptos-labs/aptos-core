@@ -22,6 +22,7 @@ import {
   textColor,
   accountViewBgColor,
   secondaryTextColor,
+  checkCircleSuccessBg,
 } from 'core/colors';
 import AccountCircle from 'core/components/AccountCircle';
 import { useActiveAccount } from 'core/hooks/useAccounts';
@@ -34,11 +35,6 @@ type AccountViewProps = {
   hoverBgColor?: any;
   onClick?: (address: string) => void;
   showCheck?: boolean;
-};
-
-const CheckCircleSuccessBg = {
-  dark: '#00FF00',
-  light: 'green',
 };
 
 const AccountView = React.forwardRef(({
@@ -94,6 +90,7 @@ const AccountView = React.forwardRef(({
       width="100%"
       cursor="pointer"
       gap={2}
+      border="1px #F2F4F8"
       boxShadow={boxShadow}
       bgColor={bgColor[colorMode]}
       borderRadius=".5rem"
@@ -128,7 +125,7 @@ const AccountView = React.forwardRef(({
         </Tooltip>
       </VStack>
       {activeAccount.address === displayActiveAccountAddress && showCheck
-        ? <AiFillCheckCircle size={32} color={CheckCircleSuccessBg[colorMode]} /> : null}
+        ? <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} /> : null}
       {allowEdit ? (
         <Button bg="none" p={0} onClick={handleClickEditAccount}>
           <HiPencil size={20} />
