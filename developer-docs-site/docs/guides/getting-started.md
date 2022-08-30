@@ -88,4 +88,4 @@ Now your basic Aptos development environment is ready.
 
 ### Aptos explorer
 
-- [Aptos Exporer](https://explorer.devnet.aptos.dev/). Use the top-right drop-down menu to select the network.
+- [Aptos Explorer](https://explorer.devnet.aptos.dev/). Use the top-right drop-down menu to select the network.

@@ -27,3 +27,6 @@ application.register("shake", ShakeController)
 
 import VisibilityController from "./visibility_controller"
 application.register("visibility", VisibilityController)
+
+import TableRowController from "./table_row_controller"
+application.register("table_row", TableRowController)

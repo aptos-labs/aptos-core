@@ -7,19 +7,17 @@ import TabItem from '@theme/TabItem';
 
 # Building the Wallet Extension
 
-This tutorial goes through how to build the wallet extension and how to use it with your dApp 
-1. Install the wallet on Chrome
+We will be using "Petra Aptos Wallet" for this tutorial. This tutorial goes through how to install the Petra extension and how to use it with your dApp
+1. Install Petra on Chrome
 2. Wallet functionality
 3. dApp Integration
 
 ## Step 1) Install the wallet on Chrome
 
-1. Download the latest [wallet release](https://github.com/aptos-labs/aptos-core/releases/) and unzip
-2. Open a Chrome window and navigate to [chrome://extensions](chrome://extensions)
-3. Enable **Developer mode** in the top right of the extension page
-4. Hit **Load unpacked** and point it to the folder you just downloaded
+1. Visit the [Petra Wallet extension page](https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci).
+2. Click the **Add to Chrome** button.
 
-Now you should see the Aptos wallet in your chrome extensions!
+Now you should see "Petra Aptos Wallet" in your chrome extensions!
 
 *Hint: Open your downloaded extensions by clicking the puzzle piece icon in your Chrome toolbar*
 

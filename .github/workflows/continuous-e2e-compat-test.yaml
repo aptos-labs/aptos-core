@@ -19,7 +19,7 @@ jobs:
       FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 5 minutes
       FORGE_RUNNER_DURATION_SECS: 300
-      # This will upgrade from devnet to the latest main
+      # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: devnet
+      IMAGE_TAG: testnet
       POST_TO_SLACK: true

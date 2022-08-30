@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :project_category do
-    project { nil }
-    category { Category.count > 0 ? Category.order('RANDOM()').first : build(:category) }
+    project { build(:project, project_categories: [instance]) }
+    category { Category.order('RANDOM()').first || build(:category) }
   end
 end

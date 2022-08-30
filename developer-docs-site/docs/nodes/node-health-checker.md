@@ -38,7 +38,7 @@ mkdir /tmp/nhc && cd /tmp/nhc && wget https://raw.githubusercontent.com/aptos-la
 Start the NHC service by providing the above-downloaded `devnet_fullnode.yaml` baseline configuration YAML file:
 
 ```
-docker run -v /tmp/nhc:/nhc -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /nhc/devnet_fullnode.yaml
+docker run -v /tmp/nhc:/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /nhc/devnet_fullnode.yaml
 ```
 
 ### Step 3: Send a request to NHC service

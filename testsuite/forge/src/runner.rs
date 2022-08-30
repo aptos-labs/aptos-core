@@ -272,6 +272,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         Ok(())
     }
 
+    /// Get the initial version based on test configuration
     pub fn initial_version(&self) -> Version {
         let versions = self.factory.versions();
         match self.tests.initial_version {
@@ -279,13 +280,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             InitialVersion::Newest => versions.max(),
         }
         .expect("There has to be at least 1 version")
-    }
-
-    pub fn genesis_version(&self) -> Version {
-        self.factory
-            .versions()
-            .max()
-            .expect("There has to be at least 1 version")
     }
 
     pub fn run(&self) -> Result<TestReport> {
@@ -305,7 +299,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     .collect::<Vec<_>>()
             );
             let initial_version = self.initial_version();
-            let genesis_version = self.genesis_version();
+            // The genesis version should always match the initial node version
+            let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap();
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
             let mut swarm = runtime.block_on(self.factory.launch_swarm(

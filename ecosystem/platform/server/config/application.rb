@@ -29,5 +29,8 @@ module CommunityPlatform
     # Enable gzip compression for HTTP responses.
     # TODO: Remove when the CDN handles compression.
     config.middleware.insert_before(Rack::Sendfile, Rack::Deflater)
+
+    # View helpers should be scoped to the corresponding controller.
+    config.action_controller.include_all_helpers = false
   end
 end

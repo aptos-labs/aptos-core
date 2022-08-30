@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :notification_preference do
-    user { nil }
+    user { build :user }
     delivery_method { 0 }
     node_upgrade_notification { false }
     governance_proposal_notification { false }
