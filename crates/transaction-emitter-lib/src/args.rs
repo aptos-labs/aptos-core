@@ -69,23 +69,16 @@ impl Default for TransactionType {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct EmitArgs {
-    #[clap(long, default_value = "5000")]
+    #[clap(long, default_value = "0")]
     /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
     /// is producing enough load to get the highest TPS in the system. Typically this should be
     /// configured to be ~4x of the max achievable TPS.
-    pub mempool_backlog: u64,
+    /// 0 if target_tps used.
+    pub mempool_backlog: usize,
 
-    #[clap(long, default_value = "0", requires = "burst")]
-    pub wait_millis: u64,
-
-    #[clap(long)]
-    pub burst: bool,
-
-    /// This can only be set in conjunction with --burst. By default, when burst
-    /// is enabled, we check stats once at the end of the emitter run. If you
-    /// would like to opt out of that, you can use this flag.
-    #[structopt(long, requires = "burst")]
-    pub do_not_check_stats_at_end: bool,
+    /// Target constant TPS, 0 if mempool_backlog used
+    #[clap(long, default_value = "0")]
+    pub target_tps: usize,
 
     #[clap(long, default_value = "30")]
     pub txn_expiration_time_secs: u64,

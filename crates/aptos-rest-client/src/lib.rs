@@ -59,9 +59,9 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(base_url: Url) -> Self {
+    pub fn new_with_timeout(base_url: Url, timeout: Duration) -> Self {
         let inner = ReqwestClient::builder()
-            .timeout(Duration::from_secs(10))
+            .timeout(timeout)
             .user_agent(USER_AGENT)
             .cookie_store(true)
             .build()
@@ -86,6 +86,17 @@ impl Client {
             base_url,
             version_path_base,
         }
+    }
+
+    pub fn new(base_url: Url) -> Self {
+        Self::new_with_timeout(base_url, Duration::from_secs(10))
+    }
+
+    pub fn path_prefix_string(&self) -> String {
+        self.base_url
+            .join(&self.version_path_base)
+            .map(|path| path.to_string())
+            .unwrap_or_else(|_| "<bad_base_url>".to_string())
     }
 
     /// Set a different version path base, e.g. "v1/" See
