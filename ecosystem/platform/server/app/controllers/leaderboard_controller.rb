@@ -118,7 +118,11 @@ class LeaderboardController < ApplicationController
         value = metric[key] || -Float::INFINITY
         if value.is_a?(String) && value.include?('/')
           numerator, denominator = value.split('/').map(&:strip)
-          value = Rational(numerator, denominator)
+          value = if denominator.to_i.zero?
+                    0
+                  else
+                    Rational(numerator, denominator)
+                  end
           # When n=d, fractions with larger denominators should go first.
           value *= denominator.to_i if value == 1
         end
