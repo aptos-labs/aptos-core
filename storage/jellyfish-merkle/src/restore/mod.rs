@@ -20,6 +20,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -746,8 +747,10 @@ impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
     }
 
     pub fn finish(self) -> Result<()> {
-        self.db
-            .write_usage(self.version, self.num_items, self.total_bytes)
+        self.db.write_usage(
+            self.version,
+            StateStorageUsage::new(self.num_items, self.total_bytes),
+        )
     }
 }
 

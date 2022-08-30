@@ -20,6 +20,7 @@ use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
     restore::StateSnapshotRestore, NodeBatch, StateValueBatch, StateValueWriter, TreeWriter,
 };
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -147,7 +148,7 @@ impl StateValueWriter<StateKey, StateValue> for MockStore {
         Ok(())
     }
 
-    fn write_usage(&self, _version: Version, _items: usize, _total_bytes: usize) -> Result<()> {
+    fn write_usage(&self, _version: Version, _usage: StateStorageUsage) -> Result<()> {
         Ok(())
     }
 }

@@ -10,7 +10,7 @@ use crate::{
     stale_state_value_index::StaleStateValueIndexSchema,
     state_merkle_db::StateMerkleDb,
     state_store::buffered_state::BufferedState,
-    version_data::{VersionData, VersionDataSchema},
+    version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
@@ -779,14 +779,9 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         self.ledger_db.write_schemas(batch)
     }
 
-    fn write_usage(&self, version: Version, items: usize, total_bytes: usize) -> Result<()> {
-        self.ledger_db.put::<VersionDataSchema>(
-            &version,
-            &VersionData {
-                state_items: items,
-                total_state_bytes: total_bytes,
-            },
-        )
+    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.ledger_db
+            .put::<VersionDataSchema>(&version, &usage.into())
     }
 }
 

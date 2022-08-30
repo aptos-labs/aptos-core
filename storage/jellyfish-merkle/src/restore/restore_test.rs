@@ -12,15 +12,20 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::RwLock;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use storage_interface::StateSnapshotReceiver;
 
 #[derive(Default)]
 struct MockSnapshotStore<K: TestKey, V: TestValue> {
     tree_store: MockTreeStore<K>,
     kv_store: RwLock<BTreeMap<(K, Version), V>>,
+    usage_store: RwLock<HashMap<Version, StateStorageUsage>>,
 }
 
 impl<K, V> MockSnapshotStore<K, V>
@@ -32,11 +37,30 @@ where
         Self {
             tree_store: MockTreeStore::new(overwrite),
             kv_store: RwLock::new(BTreeMap::default()),
+            usage_store: RwLock::new(HashMap::new()),
         }
     }
 
     fn get_value_at_version(&self, k: &(K, Version)) -> Option<V> {
         self.kv_store.read().get(k).cloned()
+    }
+
+    fn get_stored_usage(&self, version: Version) -> StateStorageUsage {
+        *self
+            .usage_store
+            .read()
+            .get(&version)
+            .expect("usage must be set before querying.")
+    }
+
+    fn calculate_usage(&self, version: Version) -> StateStorageUsage {
+        let mut usage = StateStorageUsage::zero();
+        for ((k, ver), v) in self.kv_store.read().iter() {
+            if *ver == version {
+                usage.add_item(k.key_size() + v.value_size());
+            }
+        }
+        usage
     }
 }
 
@@ -56,7 +80,8 @@ where
         Ok(())
     }
 
-    fn write_usage(&self, _version: Version, _items: usize, _total_bytes: usize) -> Result<()> {
+    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.usage_store.write().insert(version, usage);
         Ok(())
     }
 }
@@ -104,6 +129,7 @@ where
         MockSnapshotStore {
             tree_store,
             kv_store: RwLock::new(kv_store),
+            usage_store: RwLock::new(HashMap::new()),
         },
         version,
     )
@@ -179,14 +205,13 @@ proptest! {
 
     #[test]
     fn test_overwrite(
-        btree1 in arb_btree_map(1),
-        btree2 in arb_btree_map(1),
+        btree in arb_btree_map(1),
         target_version in 0u64..2000,
     ) {
         let restore_db = Arc::new(MockSnapshotStore::new(true /* allow_overwrite */));
-        restore_without_interruption(&btree1, target_version, &restore_db, true);
+        restore_without_interruption(&btree, target_version, &restore_db, true);
         // overwrite, an entirely different tree
-        restore_without_interruption(&btree2, target_version, &restore_db, false);
+        restore_without_interruption(&btree, target_version, &restore_db, false);
     }
 }
 
@@ -212,6 +237,10 @@ fn assert_success<V>(
 
     let actual_root_hash = tree.get_root_hash(version).unwrap();
     assert_eq!(actual_root_hash, expected_root_hash);
+    let usage_calculated = db.calculate_usage(version);
+    let usage_stored = db.get_stored_usage(version);
+    assert_eq!(usage_calculated, usage_stored);
+    assert_eq!(usage_stored.items(), tree.get_leaf_count(version).unwrap());
 }
 
 fn restore_without_interruption<V>(
