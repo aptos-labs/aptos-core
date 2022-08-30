@@ -494,6 +494,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 60
             })),
         ))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 8000 }))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
