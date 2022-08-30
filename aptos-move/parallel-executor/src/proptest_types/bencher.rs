@@ -17,6 +17,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 
+use rayon::ThreadPool;
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub struct Bencher<K, V> {
@@ -47,7 +48,12 @@ where
         }
     }
 
-    pub fn bench(&self, key_strategy: &impl Strategy<Value = K>, bencher: &mut CBencher) {
+    pub fn bench(
+        &self,
+        key_strategy: &impl Strategy<Value = K>,
+        bencher: &mut CBencher,
+        thread_pool: &ThreadPool,
+    ) {
         bencher.iter_batched(
             || {
                 BencherState::<K, V>::with_universe(
@@ -56,7 +62,7 @@ where
                     self.transaction_gen_param,
                 )
             },
-            |state| state.run(),
+            |state| state.run(thread_pool),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
@@ -102,11 +108,7 @@ where
         }
     }
 
-    pub(crate) fn run(self) {
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap();
+    pub(crate) fn run(self, thread_pool: &ThreadPool) {
         let output =
             ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
                 &thread_pool,

@@ -11,9 +11,14 @@ use proptest::prelude::*;
 //
 
 fn random_benches(c: &mut Criterion) {
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_cpus::get())
+        .build()
+        .unwrap();
+
     c.bench_function("random_benches", |b| {
         let bencher = Bencher::<[u8; 32], [u8; 32]>::new(10000, 100);
-        bencher.bench(&any::<[u8; 32]>(), b)
+        bencher.bench(&any::<[u8; 32]>(), b, &thread_pool)
     });
 }
 
