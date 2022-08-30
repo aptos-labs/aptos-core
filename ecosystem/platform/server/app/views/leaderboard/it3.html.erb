@@ -102,13 +102,14 @@
 
           <%= t.with_body do %>
             <% @metrics.each_with_index do |metric, i| %>
-              <%= render TableRowComponent.new(class: 'cursor-pointer select-none active:translate-y-0.5') do |tr| %>
+              <%= render TableRowComponent.new(class: 'cursor-pointer select-none active:translate-y-0.5', title: 'Click to view account on Explorer') do |tr| %>
                 <%= tr.with_column(align: 'left') do %>
                   <%= metric.rank %>
                 <% end %>
-                <%= tr.with_column(align: 'left', title: metric.owner_address) do %>
-                  <a href="https://explorer.devnet.aptos.dev/account/<%= metric.owner_address %>?network=ait3" target="_blank" title="<%= metric.owner_address %>">
+                <%= tr.with_column(align: 'left') do %>
+                  <a class="relative" href="https://explorer.devnet.aptos.dev/account/<%= metric.owner_address %>?network=ait3" target="_blank" title="<%= metric.owner_address %>">
                     <%= truncate_address(metric.owner_address) %>
+                    <span class="absolute w-100 overflow-visible inline-block text-transparent left-0 pointer-events-none"><%= metric.owner_address %></span>
                   </a>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
@@ -119,7 +120,7 @@
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
-                    <div class="<%= rewards_growth_color(metric.rewards_growth) %> block w-5 h-5 rounded-full"></div>
+                    <div class="<%= rewards_growth_color(metric.rewards_growth) %> block w-4 h-4 rounded-full"></div>
                     <%= number_to_percentage(metric.rewards_growth, precision: 2) %>
                   </div>
                 <% end %>

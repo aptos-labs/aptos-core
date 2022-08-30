@@ -107,7 +107,10 @@
                   <%= metric.rank %>
                 <% end %>
                 <%= tr.with_column(align: 'left', title: "0x#{metric.validator}") do %>
-                  <%= truncate_address("0x#{metric.validator}") %>
+                  <div class="relative">
+                    <%= truncate_address("0x#{metric.validator}") %>
+                    <span class="absolute w-100 overflow-visible inline-block text-transparent bottom-0 left-0 pointer-events-none">0x<%= metric.validator %></span>
+                  </div>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
@@ -117,7 +120,7 @@
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
-                    <div class="<%= availability_color(metric.participation) %> block w-5 h-5 rounded-full"></div>
+                    <div class="<%= availability_color(metric.participation) %> block w-4 h-4 rounded-full"></div>
                     <%= number_to_percentage(metric.participation, precision: 2) %>
                   </div>
                 <% end %>
