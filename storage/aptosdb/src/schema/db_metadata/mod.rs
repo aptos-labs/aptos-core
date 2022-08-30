@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-//! This module defines the physical storage schema for indexes of min_readable_version of pruners.
-//! For the state pruner, the metadata represents the key of the StaleNodeIndexSchema and for the
-//! ledger pruner, the metadata represents the key of the TransactionSchema.
+//! This module defines the physical storage schema for db wide miscellaneous metadata entries.
+//! For example, the progress of a db pruner.
 //!
 //! ```text
-//! |<------key---->|<------ value ----->|
-//! | pruner tag    | pruned until values|
+//! |<------key---->|<---- value --->|
+//! | metadata key  | metadata value |
 //! ```
 //!
 
