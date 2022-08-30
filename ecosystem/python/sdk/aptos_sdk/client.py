@@ -45,7 +45,8 @@ class RestClient:
     def account(self, account_address: AccountAddress) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
-        response = self.client.get(f"{self.base_url}/accounts/{account_address}")
+        response = self.client.get(
+            f"{self.base_url}/accounts/{account_address}")
         assert response.status_code == 200, f"{response.text} - {account_address}"
         return response.json()
 
@@ -145,7 +146,8 @@ class RestClient:
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
-        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        response = self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}")
         if response.status_code == 404:
             return True
         assert response.status_code == 200, f"{response.text} - {txn_hash}"
@@ -159,7 +161,8 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        response = self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
@@ -192,13 +195,15 @@ class RestClient:
         authenticator = Authenticator(
             MultiAgentAuthenticator(
                 Authenticator(
-                    Ed25519Authenticator(sender.public_key(), sender.sign(keyed_txn))
+                    Ed25519Authenticator(
+                        sender.public_key(), sender.sign(keyed_txn))
                 ),
                 [
                     (
                         x.address(),
                         Authenticator(
-                            Ed25519Authenticator(x.public_key(), x.sign(keyed_txn))
+                            Ed25519Authenticator(
+                                x.public_key(), x.sign(keyed_txn))
                         ),
                     )
                     for x in secondary_accounts
@@ -276,7 +281,7 @@ class RestClient:
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
     ) -> str:
-#<:!:create_collection
+        # <:!:create_collection
         """Creates a new collection within the specified account"""
 
         transaction_arguments = [
@@ -285,7 +290,8 @@ class RestClient:
             TransactionArgument(uri, Serializer.str),
             TransactionArgument(U64_MAX, Serializer.u64),
             TransactionArgument(
-                [False, False, False], Serializer.sequence_serializer(Serializer.bool)
+                [False, False, False], Serializer.sequence_serializer(
+                    Serializer.bool)
             ),
         ]
 
@@ -312,7 +318,7 @@ class RestClient:
         uri: str,
         royalty_points_per_million: int,
     ) -> str:
-#<:!:create_token
+        # <:!:create_token
         transaction_arguments = [
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
@@ -321,15 +327,19 @@ class RestClient:
             TransactionArgument(supply, Serializer.u64),
             TransactionArgument(uri, Serializer.str),
             TransactionArgument(account.address(), Serializer.struct),
-            TransactionArgument(1000000, Serializer.u64),  # SDK assumes per million
+            # SDK assumes per million
+            TransactionArgument(1000000, Serializer.u64),
             TransactionArgument(royalty_points_per_million, Serializer.u64),
             TransactionArgument(
                 [False, False, False, False, False],
                 Serializer.sequence_serializer(Serializer.bool),
             ),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument(
+                [], Serializer.sequence_serializer(Serializer.str)),
         ]
 
         payload = EntryFunction.natural(
@@ -489,7 +499,7 @@ class RestClient:
             "0x3::token::TokenData",
             token_data_id,
         )
-        #<:!:read_token_data_table
+        # <:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
@@ -502,6 +512,29 @@ class RestClient:
             "0x3::token::CollectionData",
             collection_name,
         )
+
+    #
+    # Package publishing
+    #
+
+    def publish_package(self, sender: Account, package_metadata: bytes, modules: List[bytes]) -> str:
+        transaction_arguments = [
+            TransactionArgument(package_metadata, Serializer.bytes),
+            TransactionArgument(
+                modules, Serializer.sequence_serializer(Serializer.bytes)),
+        ]
+
+        payload = EntryFunction.natural(
+            "0x1::code",
+            "publish_package_txn",
+            [],
+            transaction_arguments,
+        )
+
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            sender, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
 
 
 class FaucetClient:
