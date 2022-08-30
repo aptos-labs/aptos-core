@@ -1049,6 +1049,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-crypto",
+ "aptos-logger",
  "aptos-types",
  "bcs",
  "bytes 1.2.1",
