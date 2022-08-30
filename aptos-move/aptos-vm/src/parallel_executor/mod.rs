@@ -7,9 +7,6 @@ mod vm_wrapper;
 use aptos_crypto::hash::DefaultHasher;
 use bcs::to_bytes;
 use lru::LruCache;
-use rand::{thread_rng, Rng};
-use std::borrow::{Borrow, BorrowMut};
-use std::ops::DerefMut;
 use std::sync::Mutex;
 
 use crate::{

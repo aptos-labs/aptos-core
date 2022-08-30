@@ -36,7 +36,6 @@ aptos-types = { path = "../../types" }
 framework =  { path = "../framework" }
 move-deps = { path = "../move-deps", features = ["address32", "table-extension"] }
 mvhashmap = { path = "../mvhashmap" }
-rand = "0.8.5"
 lru = "0.7.8"
 
 [dev-dependencies]
