@@ -40,4 +40,5 @@
 # Owner for token_standard and related tutorials
 /aptos-move/framework/aptos-token @areshand
 /developer-docs-site/docs/tutorials @areshand
-
+# Owners for mempool
+/mempool/ @bchocho
