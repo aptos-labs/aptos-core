@@ -25,6 +25,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::str::FromStr;
 use url::Url;
 
 /// Client for testing & interacting with a Rosetta service
@@ -252,6 +253,24 @@ impl RosettaClient {
                 keys,
             )
             .await?;
+
+        // Should have a fee in the native coin
+        let suggested_fee = metadata.suggested_fee.first().expect("Expected fee");
+        let expected_fee = u64::from_str(&suggested_fee.value).expect("Expected u64 for fee");
+        assert_eq!(
+            suggested_fee.currency,
+            native_coin(),
+            "Fee should always be the native coin"
+        );
+        assert!(expected_fee > 0, "Suggested fee should be greater than 0");
+        assert_eq!(
+            metadata
+                .metadata
+                .max_gas_amount
+                .0
+                .saturating_mul(metadata.metadata.gas_price_per_unit.0),
+            expected_fee
+        );
 
         // Build the transaction, sign it, and submit it
         let response = self
