@@ -1452,6 +1452,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-vfn-check-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-node-checker",
+ "aptos-sdk",
+ "clap 3.2.17",
+ "env_logger 0.9.0",
+ "futures",
+ "gcp-bigquery-client",
+ "log",
+ "reqwest",
+ "serde 1.0.144",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-vm"
 version = "0.1.0"
 dependencies = [
@@ -3514,6 +3532,19 @@ name = "env_logger"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
+dependencies = [
+ "atty",
+ "humantime 2.1.0",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
 dependencies = [
  "atty",
  "humantime 2.1.0",

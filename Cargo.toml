@@ -71,6 +71,7 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/indexer",
     "ecosystem/node-checker",
+    "ecosystem/node-checker/vfn-check-client",
     "ecosystem/sf-indexer/aptos-sf-indexer",
     "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",

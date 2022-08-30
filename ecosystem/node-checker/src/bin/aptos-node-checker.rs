@@ -1,15 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod common_args;
-mod configuration;
-mod evaluator;
-mod evaluators;
-mod metric_collector;
-mod runner;
-mod server;
-
 use anyhow::Result;
+use aptos_node_checker_lib::{configuration, server};
 use clap::{Parser, Subcommand};
 
 #[derive(Clone, Debug, Subcommand)]

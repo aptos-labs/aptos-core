@@ -38,5 +38,6 @@ aptos-sdk = { path = "../../sdk" }
 
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
 
-[[bin]]
-name = "aptos-node-checker"
+[lib]
+name = "aptos_node_checker_lib"
+path = "src/lib.rs"
