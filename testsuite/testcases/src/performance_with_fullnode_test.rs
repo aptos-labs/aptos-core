@@ -15,7 +15,7 @@ impl Test for PerformanceBenchmarkWithFN {
 
 impl NetworkTest for PerformanceBenchmarkWithFN {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
 
         let all_fullnodes = ctx
             .swarm()

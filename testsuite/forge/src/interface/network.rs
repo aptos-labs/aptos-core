@@ -21,7 +21,8 @@ pub struct NetworkContext<'t> {
     core: CoreContext,
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
-    pub global_job: EmitJobRequest,
+    pub global_duration: Duration,
+    pub emit_job: EmitJobRequest,
     pub success_criteria: SuccessCriteria,
     runtime: Runtime,
 }
@@ -31,14 +32,16 @@ impl<'t> NetworkContext<'t> {
         core: CoreContext,
         swarm: &'t mut dyn Swarm,
         report: &'t mut TestReport,
-        global_job: EmitJobRequest,
+        global_duration: Duration,
+        emit_job: EmitJobRequest,
         success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             core,
             swarm,
             report,
-            global_job,
+            global_duration,
+            emit_job,
             success_criteria,
             runtime: Runtime::new().unwrap(),
         }

@@ -74,7 +74,7 @@ pub fn generate_traffic<'t>(
         .collect::<Vec<_>>();
     let all_node_clients = [&fullnode_clients[..], &validator_clients[..]].concat();
 
-    let mut emit_job_request = ctx.global_job.clone();
+    let mut emit_job_request = ctx.emit_job.clone();
     let chain_info = ctx.swarm().chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
     let mut emitter = TxnEmitter::new(
@@ -87,9 +87,8 @@ pub fn generate_traffic<'t>(
 
     emit_job_request = emit_job_request
         .rest_clients(all_node_clients)
-        .gas_price(gas_price)
-        .duration(duration);
-    let stats = rt.block_on(emitter.emit_txn_for(emit_job_request))?;
+        .gas_price(gas_price);
+    let stats = rt.block_on(emitter.emit_txn_for(emit_job_request, duration))?;
 
     Ok(stats)
 }

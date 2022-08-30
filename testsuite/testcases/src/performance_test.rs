@@ -15,7 +15,7 @@ impl Test for PerformanceBenchmark {
 
 impl NetworkTest for PerformanceBenchmark {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
         let all_validators = ctx
             .swarm()
             .validators()

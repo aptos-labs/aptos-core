@@ -22,7 +22,7 @@ impl Test for NetworkBandwidthTest {
 
 impl NetworkTest for NetworkBandwidthTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
         let bandwidth = SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
             rate: RATE_MBPS,
             limit: LIMIT_BYTES,
