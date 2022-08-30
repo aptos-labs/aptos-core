@@ -421,7 +421,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             })),
         "state_sync" => config
-            .with_initial_fullnode_count(1)
+            .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+            .with_initial_fullnode_count(4)
             .with_network_tests(&[&StateSyncPerformance])
             .with_success_criteria(SuccessCriteria::new(5000, 10000, None)),
         "compat" => config
