@@ -76,7 +76,13 @@ export class TransactionBuilder<F extends SigningFn> {
 
     const prefix = new Uint8Array(hash.arrayBuffer());
 
-    return Uint8Array.from([...prefix, ...bcsToBytes(rawTxn)]);
+    const body = bcsToBytes(rawTxn);
+
+    const mergedArray = new Uint8Array(prefix.length + body.length);
+    mergedArray.set(prefix);
+    mergedArray.set(body, prefix.length);
+
+    return mergedArray;
   }
 }
 
