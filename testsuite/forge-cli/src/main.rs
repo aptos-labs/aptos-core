@@ -438,7 +438,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             )),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
-        "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
+        "network_latency" => config
+            .with_network_tests(&[&NetworkLatencyTest])
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, None)),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
