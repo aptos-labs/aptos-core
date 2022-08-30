@@ -12,8 +12,8 @@ const config = {
   tagline: "Developer Documentation",
   url: "https://aptos.dev",
   baseUrl: "/",
-  onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
+  onBrokenLinks: "throw",
+  onBrokenMarkdownLinks: "throw",
   favicon: "img/favicon.ico",
   organizationName: "aptos-labs", // Usually your GitHub org/user name.
   projectName: "aptos-core", // Usually your repo name.
