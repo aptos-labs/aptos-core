@@ -385,10 +385,16 @@ module aptos_framework::account {
         create_signer(*addr)
     }
 
+    public fun get_signer_capability_address(capability: &SignerCapability): address {
+        capability.account
+    }
+
     #[test(user = @0x1)]
     public entry fun test_create_resource_account(user: signer) {
-        let (resource_account, _) = create_resource_account(&user, x"01");
-        assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
+        let (resource_account, resource_account_cap) = create_resource_account(&user, x"01");
+        let resource_addr = signer::address_of(&resource_account);
+        assert!(resource_addr != signer::address_of(&user), 0);
+        assert!(resource_addr == get_signer_capability_address(&resource_account_cap), 1);
     }
 
     #[test_only]
