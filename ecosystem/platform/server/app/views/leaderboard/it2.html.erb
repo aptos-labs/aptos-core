@@ -31,7 +31,7 @@
     <%= turbo_frame_tag 'metrics', data: { controller: 'refresh', refresh_interval_value: 1.minute, refresh_src_value: request.path, turbo_action: 'advance' } do %>
       <%= content_tag :div, class: 'overflow-x-auto' do %>
         <%= render TableComponent.new(class: 'w-full table-auto border-separate border-spacing-y-2') do |t| %>
-          <%= t.with_column(:rank, '#', align: 'right') %>
+          <%= t.with_column(:rank, '#', align: 'left') %>
           <%= t.with_column('Account Address', align: 'left') %>
           <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
             <%= column.with_tooltip(:info) do |tooltip| %>
@@ -103,11 +103,11 @@
           <%= t.with_body do %>
             <% @metrics.each_with_index do |metric, i| %>
               <%= render TableRowComponent.new do |tr| %>
-                <%= tr.with_column(align: 'right') do %>
+                <%= tr.with_column(align: 'left') do %>
                   <%= metric.rank %>
                 <% end %>
-                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
-                  <%= "0x#{metric.validator}" %>
+                <%= tr.with_column(align: 'left', title: "0x#{metric.validator}") do %>
+                  <%= truncate_address("0x#{metric.validator}") %>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
