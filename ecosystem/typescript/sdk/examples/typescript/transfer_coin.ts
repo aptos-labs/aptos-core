@@ -44,7 +44,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
 
   // Have Alice send Bob some AptosCoins.
   // :!:>section_5
-  const txnHash = await coinClient.transfer(alice, bob, 1_000); // <:!:section_5
+  let txnHash = await coinClient.transfer(alice, bob, 1_000); // <:!:section_5
   // :!:>section_6a
   await client.waitForTransaction(txnHash); // <:!:section_6a
 
@@ -55,7 +55,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
   console.log("");
 
   // Have Alice send Bob some more AptosCoins.
-  await coinClient.transfer(alice, bob, 1_000);
+  txnHash = await coinClient.transfer(alice, bob, 1_000);
   // :!:>section_6b
   await client.waitForTransaction(txnHash, { checkSuccess: true }); // <:!:section_6b
 
