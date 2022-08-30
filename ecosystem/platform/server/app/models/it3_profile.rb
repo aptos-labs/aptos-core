@@ -82,6 +82,10 @@ class It3Profile < ApplicationRecord
     self.account_address = self.class.address_from_key account_key
   end
 
+  def set_owner_address
+    self.owner_address = self.class.address_from_key owner_key
+  end
+
   def check_validator_ipv4
     # If the updates don't require revalidation, don't do it
     return unless validator_ip_changed?
