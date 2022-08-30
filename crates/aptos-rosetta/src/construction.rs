@@ -339,7 +339,9 @@ async fn construction_metadata(
     };
 
     let suggested_fee = Amount {
-        value: format!("-{}", gas_price_per_unit.saturating_mul(max_gas_amount)),
+        value: gas_price_per_unit
+            .saturating_mul(max_gas_amount)
+            .to_string(),
         currency: native_coin(),
     };
 
