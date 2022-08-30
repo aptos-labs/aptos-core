@@ -21,6 +21,21 @@ For a backgrounder on staking with explanations of epoch, rewards and how to joi
 -  On failed proposals, i.e., a proposal that did not achieve the quorum consensus, the leaders do not earn any reward for that proposal.
 -  If all the proposals in an epoch fail, a validator earns zero rewards for that epoch.
 
+### Example
+
+:::tip Rewards are given only at the end of the epoch
+Note that the rewards are given only at the end of the epoch, not on every block.
+:::
+
+The reward a leader receives is calculated by multiplying the maximum possible reward with the leader's proposal success rate. For example:
+- A leader with 8 successful and 2 failed proposals will receive 80% of maximum reward.
+- Similarly, another leader with 80 successful and 20 failed proposal will also receive 80% of maximum reward.
+- Also, two leaders with no failures but one with 10 and another with 100 successful proposals will get the same % of the maximum reward.
+
+:::tip Reward rate is the same
+Note also that the reward rate is the same for every validator. Hence the maxumum reward is directly proportional to the staking amount, i.e., the more a validator stakes, the more the validator can earn in absolute terms.
+:::
+
 ## Reward performance
 
 - The reward performance of a validator is calculated as a % of reward earned by the validator out of the maximum reward earning opportunity i.e., `(rewards earned across the epochs)/(maximum reward opportunity across the epochs)`. **This is a cumulative metric across all the epochs.**

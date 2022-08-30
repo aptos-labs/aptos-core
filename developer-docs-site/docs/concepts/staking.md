@@ -86,10 +86,10 @@ This document describes staking. See [Governance](governance.md) for how to part
 The following is a high-level description of how validation works on the Aptos blockchain:
 
 - Throughout the duration of an epoch, the following flow of events occurs several times (thousands of times):
-  - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance and stake. **This selection is not done by voting.**
+  - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
   - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
   - All the validators from the validator set will vote on the leader's proposal for the new block. Once a quorum consensus is reached the block can be finalized. Hence the actual list of votes to achieve the quorum consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, and not to the voters.**
-  - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block and rewarding the leader. 
+  - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Joining the validator set
 
