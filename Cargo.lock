@@ -1405,9 +1405,9 @@ dependencies = [
  "bcs",
  "better_any",
  "claim",
- "concurrent_lru",
  "fail 0.5.0",
  "framework",
+ "lru",
  "mirai-annotations",
  "move-deps",
  "mvhashmap",
@@ -2456,15 +2456,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af4780a44ab5696ea9e28294517f1fffb421a83a25af521333c838635509db9c"
 dependencies = [
  "cache-padded",
-]
-
-[[package]]
-name = "concurrent_lru"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7feb5cb312f774e8a24540e27206db4e890f7d488563671d24a16389cf4c2e4e"
-dependencies = [
- "once_cell",
 ]
 
 [[package]]

@@ -6,14 +6,18 @@ mod vm_wrapper;
 
 use aptos_crypto::hash::DefaultHasher;
 use bcs::to_bytes;
-use concurrent_lru::sharded::LruCache;
+use lru::LruCache;
 use rand::{thread_rng, Rng};
+use std::borrow::{Borrow, BorrowMut};
+use std::ops::DerefMut;
+use std::sync::Mutex;
 
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
+use aptos_crypto::HashValue;
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
@@ -72,38 +76,14 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-struct LruCache16ShardWrapper {
-    state: LruCache<[u8; 32], u64>,
+fn get_txn_digest(item: &Transaction) -> HashValue {
+    let bytes = to_bytes(item).unwrap();
+    let mut hasher = DefaultHasher::new(b"CacheTesting");
+    hasher.update(&bytes);
+    hasher.finish()
 }
 
-impl LruCache16ShardWrapper {
-    fn new(cache_size_per_shard: usize) -> LruCache16ShardWrapper {
-        LruCache16ShardWrapper {
-            state: LruCache::new(cache_size_per_shard as u64),
-        }
-    }
-
-    pub fn get_key(&self, item: &Transaction) -> [u8; 32] {
-        let bytes = to_bytes(item).unwrap();
-        let mut hasher = DefaultHasher::new(b"CacheTesting");
-        hasher.update(&bytes);
-        hasher.finish().get_bytes()
-    }
-
-    /// return whether the item exists (cache hit).
-    /// NOTE: false cache miss is possible.
-    pub fn insert(&self, item: &Transaction) -> bool {
-        let nonce = thread_rng().gen::<u64>();
-        let entry = self.state.get_or_init(self.get_key(item), 1, |_e| nonce);
-        let hit = *entry.value() != nonce;
-        hit
-    }
-}
-
-const CACHE_SIZE_PER_SHARD: usize = 4096;
-
-static CACHE: Lazy<LruCache16ShardWrapper> =
-    Lazy::new(|| LruCache16ShardWrapper::new(CACHE_SIZE_PER_SHARD));
+static CACHE: Lazy<Mutex<LruCache<HashValue, u8>>> = Lazy::new(|| Mutex::new(LruCache::new(70000)));
 
 pub struct ParallelAptosVM();
 
@@ -118,7 +98,13 @@ impl ParallelAptosVM {
         // sequentially while executing the transactions.
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
-            .filter(|txn| !CACHE.insert(txn))
+            .filter(|txn| {
+                CACHE
+                    .lock()
+                    .unwrap()
+                    .push(get_txn_digest(*txn), 1_u8)
+                    .is_none()
+            })
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
