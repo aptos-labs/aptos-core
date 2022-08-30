@@ -313,26 +313,17 @@ pub struct EmitJob {
 }
 
 #[derive(Debug)]
-pub struct TxnEmitter<'t> {
+pub struct TxnEmitter {
     accounts: Vec<LocalAccount>,
     txn_factory: TransactionFactory,
-    client: RestClient,
     rng: StdRng,
-    root_account: &'t mut LocalAccount,
 }
 
-impl<'t> TxnEmitter<'t> {
-    pub fn new(
-        root_account: &'t mut LocalAccount,
-        client: RestClient,
-        transaction_factory: TransactionFactory,
-        rng: StdRng,
-    ) -> Self {
+impl TxnEmitter {
+    pub fn new(transaction_factory: TransactionFactory, rng: StdRng) -> Self {
         Self {
             accounts: vec![],
             txn_factory: transaction_factory,
-            root_account,
-            client,
             rng,
         }
     }
@@ -353,23 +344,11 @@ impl<'t> TxnEmitter<'t> {
         StdRng::from_rng(self.rng()).unwrap()
     }
 
-    pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
-        let client = self.client.clone();
-        info!("Creating and minting faucet account");
-        let faucet_account = &mut self.root_account;
-        let balance = client
-            .get_account_balance(faucet_account.address())
-            .await?
-            .into_inner();
-        info!(
-            "Root account current balances are {}, requested {} coins",
-            balance.get(),
-            coins_total
-        );
-        Ok(faucet_account)
-    }
-
-    pub async fn start_job(&mut self, req: EmitJobRequest) -> Result<EmitJob> {
+    pub async fn start_job(
+        &mut self,
+        root_account: &mut LocalAccount,
+        req: EmitJobRequest,
+    ) -> Result<EmitJob> {
         let mode_params = req.calculate_mode_params();
         let workers_per_endpoint = mode_params.workers_per_endpoint;
         let num_workers = req.rest_clients.len() * workers_per_endpoint;
@@ -378,11 +357,8 @@ impl<'t> TxnEmitter<'t> {
             "Will use {} workers per endpoint for a total of {} endpoint clients and {} accounts",
             workers_per_endpoint, num_workers, num_accounts
         );
-        let mut account_minter = AccountMinter::new(
-            self.root_account,
-            self.txn_factory.clone(),
-            self.rng.clone(),
-        );
+        let mut account_minter =
+            AccountMinter::new(root_account, self.txn_factory.clone(), self.rng.clone());
         let mut new_accounts = account_minter
             .create_accounts(&req, &mode_params, num_accounts)
             .await?;
@@ -422,7 +398,7 @@ impl<'t> TxnEmitter<'t> {
                     NFTMintGeneratorCreator::new(
                         self.from_rng(),
                         txn_factory.clone(),
-                        self.root_account,
+                        root_account,
                         req.rest_clients[0].clone(),
                     )
                     .await,
@@ -517,10 +493,11 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn emit_txn_for(
         &mut self,
+        root_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
-        let job = self.start_job(emit_job_request).await?;
+        let job = self.start_job(root_account, emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
@@ -531,12 +508,13 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn emit_txn_for_with_stats(
         &mut self,
+        root_account: &mut LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
     ) -> Result<TxnStats> {
         info!("Starting emitting txns for {} secs", duration.as_secs());
-        let job = self.start_job(emit_job_request).await?;
+        let job = self.start_job(root_account, emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;

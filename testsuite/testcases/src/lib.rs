@@ -16,9 +16,11 @@ pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
 use anyhow::{anyhow, ensure};
+use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{
-    NetworkContext, NetworkTest, NodeExt, Result, Swarm, Test, TxnEmitter, TxnStats, Version,
+    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, Test, TxnEmitter,
+    TxnStats, Version,
 };
 use rand::SeedableRng;
 use std::time::{Duration, Instant};
@@ -46,19 +48,12 @@ async fn batch_update(
     Ok(())
 }
 
-pub fn generate_traffic<'t>(
-    ctx: &mut NetworkContext<'t>,
+pub fn create_emitter_and_request(
+    ctx: &mut NetworkContext<'_>,
     nodes: &[PeerId],
-    duration: Duration,
     gas_price: u64,
-) -> Result<TxnStats> {
+) -> Result<(TxnEmitter, EmitJobRequest)> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
-    let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.enable_all();
-    runtime_builder.worker_threads(64);
-    let rt = runtime_builder
-        .build()
-        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
 
     // as we are loading nodes, use higher client timeout
@@ -80,18 +75,33 @@ pub fn generate_traffic<'t>(
     let mut emit_job_request = ctx.emit_job.clone();
     let chain_info = ctx.swarm().chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
-    let mut emitter = TxnEmitter::new(
-        chain_info.root_account,
-        // TODO: swap this with a random client
-        all_node_clients[0].clone(),
-        transaction_factory,
-        rng,
-    );
+    let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
         .rest_clients(all_node_clients)
         .gas_price(gas_price);
-    let stats = rt.block_on(emitter.emit_txn_for(emit_job_request, duration))?;
+    Ok((emitter, emit_job_request))
+}
+
+pub fn generate_traffic(
+    ctx: &mut NetworkContext<'_>,
+    nodes: &[PeerId],
+    duration: Duration,
+    gas_price: u64,
+) -> Result<TxnStats> {
+    let (mut emitter, emit_job_request) = create_emitter_and_request(ctx, nodes, gas_price)?;
+
+    let mut runtime_builder = Builder::new_multi_thread();
+    runtime_builder.enable_all();
+    runtime_builder.worker_threads(64);
+    let rt = runtime_builder
+        .build()
+        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
+    let stats = rt.block_on(emitter.emit_txn_for(
+        ctx.swarm().chain_info().root_account,
+        emit_job_request,
+        duration,
+    ))?;
 
     Ok(stats)
 }
@@ -107,7 +117,11 @@ pub trait NetworkLoadTest: Test {
     fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
         Ok(LoadDestination::AllNodes)
     }
-    fn test(&self, _swarm: &mut dyn Swarm, _duration: Duration) -> Result<()> {
+    // Load is started before this funciton is called, and stops after this function returns.
+    // Expected duration is passed into this function, expecting this function to take that much
+    // time to finish. How long this function takes will dictate how long the actual test lasts.
+    fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+        std::thread::sleep(duration);
         Ok(())
     }
     fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
@@ -139,9 +153,26 @@ impl NetworkTest for dyn NetworkLoadTest {
         };
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &nodes_to_send_load_to, duration, 1)?;
+
+        let (mut emitter, emit_job_request) =
+            create_emitter_and_request(ctx, &nodes_to_send_load_to, 1)?;
+
+        let mut runtime_builder = Builder::new_multi_thread();
+        runtime_builder.enable_all();
+        runtime_builder.worker_threads(64);
+        let rt = runtime_builder
+            .build()
+            .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
+
+        let job = rt
+            .block_on(emitter.start_job(ctx.swarm().chain_info().root_account, emit_job_request))?;
+        info!("Starting emitting txns for {} secs", duration.as_secs());
 
         self.test(ctx.swarm(), duration)?;
+
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
+        let txn_stat = rt.block_on(emitter.stop_job(job));
+        info!("Stopped job");
 
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);

@@ -13,7 +13,7 @@ pub struct ContinuousProgressTest {
 
 impl Test for ContinuousProgressTest {
     fn name(&self) -> &'static str {
-        "performance benchmark"
+        "continuous progress test"
     }
 }
 
@@ -21,9 +21,9 @@ impl NetworkLoadTest for ContinuousProgressTest {
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         let runtime = Runtime::new().unwrap();
 
-        // Check that every 20s all nodes make progress,
+        // Check that every 30s all nodes make progress,
         // without any failures.
-        let check_period_s: usize = 20;
+        let check_period_s: usize = 30;
         let target_tps = self.target_tps;
 
         runtime.block_on(test_consensus_fault_tolerance(
@@ -32,16 +32,29 @@ impl NetworkLoadTest for ContinuousProgressTest {
             check_period_s as f32,
             1,
             no_failure_injection(),
-            Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+            Box::new(move |_, _, _, _, cur, previous| {
+                // Make sure that every node is making progress, so we compare min(cur) vs max(previous)
+                let epochs = cur.iter().map(|s| s.epoch).min().unwrap()
+                    - previous.iter().map(|s| s.epoch).max().unwrap();
+                let rounds = cur
+                    .iter()
+                    .map(|s| s.round)
+                    .min()
+                    .unwrap()
+                    .saturating_sub(previous.iter().map(|s| s.round).max().unwrap());
+                let transactions = cur.iter().map(|s| s.version).min().unwrap()
+                    - previous.iter().map(|s| s.version).max().unwrap();
+
                 assert!(
-                    executed_transactions >= (target_tps * check_period_s / 2) as u64,
+                    transactions >= (target_tps * check_period_s / 2) as u64,
                     "no progress with active consensus, only {} transactions",
-                    executed_transactions
+                    transactions
                 );
                 assert!(
-                    executed_rounds >= (check_period_s / 2) as u64,
-                    "no progress with active consensus, only {} rounds",
-                    executed_rounds
+                    epochs > 0 || rounds >= (check_period_s / 2) as u64,
+                    "no progress with active consensus, only {} epochs and {} rounds",
+                    epochs,
+                    rounds
                 );
             }),
             true,

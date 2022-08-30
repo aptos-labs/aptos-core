@@ -445,7 +445,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config
             .with_network_tests(&[&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, None)),
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None)),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
@@ -480,6 +480,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(240)),
             )),
+        // maximizing number of rounds and epochs within a given time, to stress test consensus
+        // so using small constant traffic, small blocks and fast rounds, and short epochs.
         "consensus_stress_test" => config
             .with_network_tests(&[&ContinuousProgressTest { target_tps: 100 }])
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
