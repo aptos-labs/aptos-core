@@ -10,6 +10,8 @@ import { BCS, TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from 
 import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
 import { TOKEN_ABIS } from "./abis";
 
+export const CONTENT_HASH_PROPERTY_KEY: string = "content_hash";
+
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
  */
@@ -91,6 +93,68 @@ export class TokenClient {
     property_types: Array<string> = [],
   ): Promise<string> {
     // <:!:createToken
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::create_token_script",
+      [],
+      [
+        collectionName,
+        name,
+        description,
+        supply,
+        max,
+        uri,
+        royalty_payee_address,
+        royalty_points_denominator,
+        royalty_points_numerator,
+        [false, false, false, false, false],
+        property_keys,
+        property_values,
+        property_types,
+      ],
+    );
+
+    return this.aptosClient.generateSignSubmitTransaction(account, payload);
+  }
+
+  /**
+   * Creates a new NFT within the specified account
+   *
+   * @param account AptosAccount where token will be created
+   * @param collectionName Name of collection, that token belongs to
+   * @param name Token name
+   * @param description Token description
+   * @param supply Token supply
+   * @param uri URL to additional info about token
+   * @param content_hash the sha hash corresponding to the media content which can verify content authenticity
+   * @param max The maxium of tokens can be minted from this token
+   * @param royalty_payee_address the address to receive the royalty, the address can be a shared account address.
+   * @param royalty_points_denominator the denominator for calculating royalty
+   * @param royalty_points_numerator the numerator for calculating royalty
+   * @param property_keys the property keys for storing on-chain properties
+   * @param property_values the property values to be stored on-chain
+   * @param property_types the type of property values
+   * @returns The hash of the transaction submitted to the API
+   */
+  async createTokenWithContentHash(
+    account: AptosAccount,
+    collectionName: string,
+    name: string,
+    description: string,
+    supply: number,
+    uri: string,
+    content_hash: string,
+    max: BCS.AnyNumber = MAX_U64_BIG_INT,
+    royalty_payee_address: MaybeHexString = account.address(),
+    royalty_points_denominator: number = 0,
+    royalty_points_numerator: number = 0,
+    property_keys: Array<string> = [],
+    property_values: Array<string> = [],
+    property_types: Array<string> = [],
+  ): Promise<string> {
+    // <:!:createToken
+    property_keys.push(CONTENT_HASH_PROPERTY_KEY);
+    property_values.push(content_hash);
+    property_types.push("0x1::string::String");
     const payload = this.transactionBuilder.buildTransactionPayload(
       "0x3::token::create_token_script",
       [],
