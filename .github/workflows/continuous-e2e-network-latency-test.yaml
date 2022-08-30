@@ -10,8 +10,9 @@ on:
     - cron: "0 */3 * * *"
 
 jobs:
-  # Test under sub optimal circumstances (network delay / loss)
-  run-forge-chaos:
+  # Test under sub optimal circumstances (network delay)
+  run-forge-network-latency:
+
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
