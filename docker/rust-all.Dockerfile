@@ -31,15 +31,27 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
 
+# cargo profile and features
+ARG PROFILE
+ENV PROFILE ${PROFILE}
+ARG FEATURES
+ENV FEATURES ${FEATURES}
+
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###
 FROM debian-base AS validator
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    # Needed to run debugging tools like perf
+    linux-perf \
+    sudo \
+    procps \
+    gdb \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
-### Needed to run debugging tools like perf
-RUN apt-get update && apt-get install -y linux-perf sudo procps gdb
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
@@ -80,7 +92,14 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base AS indexer
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
@@ -105,7 +124,14 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base AS node-checker
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
@@ -129,10 +155,16 @@ FROM debian-base AS tools
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
-RUN apt-get update && \
-    apt-get --no-install-recommends --yes install wget curl libssl1.1 ca-certificates socat python3-botocore/bullseye awscli/bullseye && \
-    apt-get clean && \
-    rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get --no-install-recommends -y \
+    install \
+    wget \
+    curl \
+    libssl1.1 \
+    ca-certificates \
+    socat \
+    python3-botocore/bullseye \
+    awscli/bullseye \ 
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python
 COPY --link docker/tools/boto.cfg /etc/boto.cfg
@@ -167,7 +199,14 @@ ENV GIT_SHA ${GIT_SHA}
 ### Faucet Image ###
 FROM debian-base AS faucet
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tools tcpdump iproute2 netcat \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    nano \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /aptos/client/data/wallet/
@@ -196,7 +235,15 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base as forge
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates openssh-client wget busybox git unzip awscli && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl1.1 \
+    ca-certificates \
+    openssh-client \
+    wget \
+    busybox \
+    git \
+    unzip \
+    awscli \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir /aptos
 
@@ -228,7 +275,14 @@ ENTRYPOINT ["/tini", "--", "forge"]
 
 FROM debian-base AS telemetry-service
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
@@ -243,3 +297,31 @@ ARG GIT_BRANCH
 ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
+
+
+### EXPERIMENTAL ###
+
+### Validator Image ###
+FROM validator AS validator-testing
+
+RUN apt-get update && apt-get install -y \
+    # Extra goodies for debugging
+    less \
+    vim \
+    nano \
+    libjemalloc-dev \
+    binutils \
+    graphviz \
+    ghostscript \
+    strace \
+    htop \
+    valgrind \
+    bpfcc-tools \
+    python-bpfcc \
+    libbpfcc \
+    libbpfcc-dev \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+# Capture backtrace on error
+ENV RUST_BACKTRACE 1
+ENV RUST_LOG_FORMAT=json

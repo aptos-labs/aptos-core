@@ -33,6 +33,8 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - devnet
       - testnet
       - chaotic
+      # XXX: remove this after testing
+      - rustielin/docker-failpoints
 
 # cancel redundant builds
 concurrency:
@@ -121,6 +123,70 @@ jobs:
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
+          LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
+
+  # TODO(rustielin): build these images continuously rather than on PR
+  rust-images-testing:
+    # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
+    needs: [permission-check, determine-last-green-commit]
+
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - uses: ./.github/actions/gar-auth
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - uses: ./.github/actions/docker-buildx-setup
+
+      - name: Build and Push Experimental Rust images
+        run: docker/docker-bake-rust-all.sh
+        env:
+          PROFILE: release
+          FEATURES: failpoints
+          BUILD_TEST_IMAGES: true
+          LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
+
+  # TODO(rustielin): build these images continuously rather than on PR
+  rust-images-performance:
+    # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
+    needs: [permission-check, determine-last-green-commit]
+
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - uses: ./.github/actions/gar-auth
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - uses: ./.github/actions/docker-buildx-setup
+
+      - name: Build and Push Performance Rust images
+        run: docker/docker-bake-rust-all.sh
+        env:
+          PROFILE: performance
           LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-release:

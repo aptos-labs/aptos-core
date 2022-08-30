@@ -40,6 +40,29 @@ variable "ecr_base" {
 variable "normalized_branch_or_pr" {
   default = regex_replace("${TARGET_CACHE_ID}", "[^a-zA-Z0-9]", "-")
 }
+variable "BUILD_TEST_IMAGES" {
+  // Whether to build test images
+  default = "false"
+}
+variable "PROFILE" {
+  // Cargo compilation profile
+  default = "release"
+}
+variable "FEATURES" {
+  // Cargo features to enable, as a comma separated string
+  default = ""
+}
+variable "normalized_features_list" {
+  default = regex_replace("${FEATURES}", "[^a-zA-Z0-9]", "-")
+}
+variable "image_tag_prefix" {
+  // prefix to add to the image tag in the case of a non-default (cargo profile or feature) build
+  default = PROFILE == "release" ? (
+    FEATURES == "" ? "" : "${normalized_features_list}_"
+    ) : (
+    FEATURES == "" ? "${PROFILE}_" : "${PROFILE}_${normalized_features_list}_"
+  )
+}
 
 target "builder" {
   target     = "builder"
@@ -48,24 +71,29 @@ target "builder" {
   cache-from = generate_cache_from("builder")
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
-  args       = {
-    GIT_SHA         = "${GIT_SHA}"
-    GIT_BRANCH      = "${GIT_BRANCH}"
-    GIT_TAG         = "${GIT_TAG}"
+  args = {
+    PROFILE            = "${PROFILE}"
+    FEATURES           = "${FEATURES}"
+    GIT_SHA            = "${GIT_SHA}"
+    GIT_BRANCH         = "${GIT_BRANCH}"
+    GIT_TAG            = "${GIT_TAG}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }
 
 group "all" {
-  targets = [
+  targets = flatten([
     "validator",
     "indexer",
     "node-checker",
     "tools",
     "faucet",
     "forge",
-    "telemetry-service"
-  ]
+    "telemetry-service",
+    BUILD_TEST_IMAGES == "true" ? [
+      "validator-testing"
+    ] : []
+  ])
 }
 
 target "_common" {
@@ -81,6 +109,9 @@ target "_common" {
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
     generate_cache_from("telemetry-service"),
+
+    // testing targets
+    generate_cache_from("validator-testing"),
   ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
@@ -88,10 +119,10 @@ target "_common" {
     "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
   args = {
-    GIT_SHA         = "${GIT_SHA}"
-    GIT_BRANCH      = "${GIT_BRANCH}"
-    GIT_TAG         = "${GIT_TAG}"
-    BUILD_DATE      = "${BUILD_DATE}"
+    GIT_SHA            = "${GIT_SHA}"
+    GIT_BRANCH         = "${GIT_BRANCH}"
+    GIT_TAG            = "${GIT_TAG}"
+    BUILD_DATE         = "${BUILD_DATE}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }
@@ -101,6 +132,13 @@ target "validator" {
   target   = "validator"
   cache-to = generate_cache_to("validator")
   tags     = generate_tags("validator")
+}
+
+target "validator-testing" {
+  inherits = ["_common"]
+  target   = "validator-testing"
+  cache-to = generate_cache_to("validator-testing")
+  tags     = generate_tags("validator-testing")
 }
 
 target "indexer" {
@@ -140,7 +178,7 @@ target "forge" {
 
 target "telemetry-service" {
   inherits = ["_common"]
-  target = "telemetry-service"
+  target   = "telemetry-service"
   cache-to = generate_cache_to("telemetry-service")
   tags     = generate_tags("telemetry-service")
 }
@@ -148,9 +186,9 @@ target "telemetry-service" {
 function "generate_cache_from" {
   params = [target]
   result = CI == "true" ? [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:main",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${normalized_branch_or_pr}",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${image_tag_prefix}main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${image_tag_prefix}${normalized_branch_or_pr}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${image_tag_prefix}${GIT_SHA}",
   ] : []
 }
 
@@ -163,12 +201,12 @@ function "generate_cache_to" {
 function "generate_tags" {
   params = [target]
   result = TARGET_REGISTRY == "gcp" ? [
-    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
-    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${normalized_branch_or_pr}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${image_tag_prefix}${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${image_tag_prefix}${normalized_branch_or_pr}",
     ] : TARGET_REGISTRY == "aws" ? [
-    "${ecr_base}/${target}:${GIT_SHA}",
+    "${ecr_base}/${target}:${image_tag_prefix}${GIT_SHA}",
     ] : [
-    "aptos-core/${target}:${GIT_SHA}-from-local",
-    "aptos-core/${target}:from-local",
+    "aptos-core/${target}:${image_tag_prefix}${GIT_SHA}-from-local",
+    "aptos-core/${target}:${image_tag_prefix}from-local",
   ]
 }
