@@ -118,6 +118,8 @@ jobs:
 
       - uses: ./.github/actions/docker-buildx-setup
 
+      - uses: imjasonh/setup-crane@v0.1
+
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
