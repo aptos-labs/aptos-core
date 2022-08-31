@@ -199,7 +199,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             )?;
         }
 
-        self.commit_queue.lock().dequeue()?;
+        self.commit_queue
+            .lock()
+            .dequeue()
+            .expect("commit_queue.deque() failed.");
         Ok(to_commit)
     }
 
