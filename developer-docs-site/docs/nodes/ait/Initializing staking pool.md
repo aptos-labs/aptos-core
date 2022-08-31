@@ -119,7 +119,7 @@ The next steps can only be taken AFTER you have [initialized the Staking Pool](#
 2. Make sure the wallet is connected with your **owner** account.
 3. click the **INCREASE LOCKUP** button. You will see a green snackbar indicating that the transaction is successful.
 
-#### Some additional CLI commands
+# Some additional CLI commands
 
 - Switch operator
 
