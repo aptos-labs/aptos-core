@@ -7,7 +7,7 @@ slug: "whats-new-in-docs"
 
 ## 25 August 2022
 
-- A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted. 
+- A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted.
 
 
 ## 24 August 2022
@@ -36,4 +36,4 @@ slug: "whats-new-in-docs"
 
 ## 02 August 2022
 
-- A new [Guide for System Integrators](/guides/guide-for-system-integrators) is posted.
+- A new [Guide for System Integrators](/guides/system-integrators-guide) is posted.

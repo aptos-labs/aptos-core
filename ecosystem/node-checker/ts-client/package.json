@@ -1,6 +1,6 @@
 {
-  "name": "aptos",
-  "description": "Aptos SDK",
+  "name": "aptos-node-checker-client",
+  "description": "Generated client for the Aptos Node Health Checker",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=11.0.0"
@@ -11,13 +11,8 @@
   "scripts": {
     "prepack": "tsdx build",
     "build": "tsdx build",
-    "lint": "eslint \"**/*.ts\"",
     "test": "jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
-    "fmt": "yarn _fmt --write",
-    "fmt:check": "yarn _fmt --check",
-    "cov:clean": "rm -rf coverage",
-    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "generate-client": "openapi -i ../doc/spec.yaml -o ./src -c axios --name NodeCheckerClient --exportSchemas true --useOptions",
     "checked-publish": "./checked_publish.sh"
   },
   "repository": {
@@ -32,15 +27,10 @@
   "keywords": [
     "Aptos",
     "Aptos Labs",
-    "Move"
+    "Node Health Checker"
   ],
   "dependencies": {
-    "@scure/bip39": "^1.1.0",
-    "axios": "^0.27.2",
-    "ed25519-hd-key": "^1.2.0",
-    "js-sha3": "^0.8.0",
-    "tweetnacl": "^1.0.3",
-    "typescript-memoize": "^1.1.0"
+    "axios": "^0.27.2"
   },
   "devDependencies": {
     "@types/jest": "^28.1.8",
@@ -48,20 +38,13 @@
     "@typescript-eslint/eslint-plugin": "^5.36.0",
     "@typescript-eslint/parser": "^5.36.0",
     "dotenv": "^16.0.1",
-    "eslint": "^8.22.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-config-airbnb-typescript": "^17.0.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-import": "^2.25.4",
     "jest": "^28.1.3",
     "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz",
-    "prettier": "^2.6.2",
-    "standard-version": "^9.5.0",
     "ts-jest": "^28.0.7",
     "ts-loader": "^9.3.1",
     "ts-node": "^10.9.1",
     "tsdx": "^0.14.1",
     "typescript": "4.8.2"
   },
-  "version": "1.3.11"
+  "version": "0.0.1"
 }
