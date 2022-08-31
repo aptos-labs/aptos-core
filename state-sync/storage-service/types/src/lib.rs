@@ -26,7 +26,7 @@ pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
 
 /// A storage service error that can be returned to the client on a failure
 /// to process a service request.
-#[derive(Clone, Debug, Deserialize, Eq, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum StorageServiceError {
     #[error("Internal service error: {0}")]
     InternalError(String),

@@ -7,7 +7,7 @@ use move_deps::move_core_types::{language_storage::StructTag, parser::parse_stru
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Resource {
     #[serde(rename = "type", deserialize_with = "deserialize_resource_type")]
     pub resource_type: StructTag,

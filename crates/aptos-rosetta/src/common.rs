@@ -260,10 +260,10 @@ impl FromStr for BlockHash {
         };
 
         if iter.next().is_some() {
-            return Err(ApiError::InvalidInput(Some(format!(
+            Err(ApiError::InvalidInput(Some(format!(
                 "Invalid block hash, too many hyphens {}",
                 str
-            ))));
+            ))))
         } else {
             Ok(BlockHash::new(chain_id, block_height))
         }

@@ -19,7 +19,7 @@ use std::{
     fmt,
 };
 
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 pub struct AccountState {
     address: AccountAddress,
     data: BTreeMap<Vec<u8>, Vec<u8>>,

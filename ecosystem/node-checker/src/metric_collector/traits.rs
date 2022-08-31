@@ -8,7 +8,7 @@ use thiserror::Error as ThisError;
 
 // TODO: Consider using thiserror.
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SystemInformation(pub HashMap<String, String>);
 
 #[derive(Debug, ThisError)]

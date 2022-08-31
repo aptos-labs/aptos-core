@@ -734,7 +734,7 @@ pub struct AnalyzeValidatorPerformance {
     pub(crate) profile_options: ProfileOptions,
 }
 
-#[derive(PartialEq, clap::ArgEnum, Clone)]
+#[derive(PartialEq, Eq, clap::ArgEnum, Clone)]
 pub enum AnalyzeMode {
     /// Print all other modes simultaneously
     All,

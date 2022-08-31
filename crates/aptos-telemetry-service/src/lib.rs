@@ -158,7 +158,7 @@ impl TelemetryServiceConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GCPBigQueryConfig {
     pub project_id: String,

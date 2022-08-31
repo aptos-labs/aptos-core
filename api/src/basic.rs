@@ -27,7 +27,7 @@ pub struct BasicApi {
     pub context: Arc<Context>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Object)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Object)]
 pub struct HealthCheckSuccess {
     message: String,
 }

@@ -11,7 +11,7 @@ use move_deps::{
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AggregatorState {
     // If aggregator stores a known value.
     Data,

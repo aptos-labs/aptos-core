@@ -158,23 +158,23 @@ async fn check_stateful_set_status(
                 if let Some(phase) = status.phase.as_ref() {
                     info!("Pod {} at phase {}", &pod_name, phase)
                 }
-                return Err(WorkloadScalingError::RetryableError(format!(
+                Err(WorkloadScalingError::RetryableError(format!(
                     "Retry due to pod {} status",
                     &pod_name
-                )));
+                )))
             } else {
-                return Err(WorkloadScalingError::FinalError(format!(
+                Err(WorkloadScalingError::FinalError(format!(
                     "Pod {} status not found",
                     &pod_name
-                )));
+                )))
             }
         }
         Err(e) => {
             info!("Failed to get StatefulSet: {}", e);
-            return Err(WorkloadScalingError::RetryableError(format!(
+            Err(WorkloadScalingError::RetryableError(format!(
                 "Failed to get StatefulSet: {}",
                 e
-            )));
+            )))
         }
     }
 }
@@ -258,7 +258,7 @@ pub async fn check_for_container_restart(
             let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
             Box::pin(async move {
                 // Get the StatefulSet's Pod status
-                return if let Some(status) = pod_api
+                if let Some(status) = pod_api
                     .get_status(format!("{}-0", sts_name).as_str())
                     .await?
                     .status
@@ -279,7 +279,7 @@ pub async fn check_for_container_restart(
                     Ok(())
                 } else {
                     bail!("Can't query the pod status for {}", sts_name)
-                };
+                }
             })
         },
     )

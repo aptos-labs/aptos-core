@@ -227,7 +227,7 @@ impl ::core::clone::Clone for TestAptosCryptoHasher {
     fn clone(&self) -> TestAptosCryptoHasher {
         match *self {
             TestAptosCryptoHasher(ref __self_0_0) => {
-                TestAptosCryptoHasher(::core::clone::Clone::clone(&(*__self_0_0)))
+                TestAptosCryptoHasher(::core::clone::Clone::clone(__self_0_0))
             }
         }
     }

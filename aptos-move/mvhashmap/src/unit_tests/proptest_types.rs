@@ -25,7 +25,7 @@ enum Operator<V: Debug + Clone> {
     Update(DeltaOp),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     NotInMap,
     Deleted,

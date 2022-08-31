@@ -733,7 +733,7 @@ fn response_on_block_retrieval() {
                     _ => panic!("block retrieval failure"),
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::Succeeded);
-                assert_eq!(response.blocks().get(0).unwrap().id(), block_id);
+                assert_eq!(response.blocks().first().unwrap().id(), block_id);
             }
             _ => panic!("block retrieval failure"),
         }
@@ -780,7 +780,7 @@ fn response_on_block_retrieval() {
                     _ => panic!("block retrieval failure"),
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::NotEnoughBlocks);
-                assert_eq!(block_id, response.blocks().get(0).unwrap().id());
+                assert_eq!(block_id, response.blocks().first().unwrap().id());
                 assert_eq!(
                     node.block_store.ordered_root().id(),
                     response.blocks().get(1).unwrap().id()
