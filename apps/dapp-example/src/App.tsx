@@ -11,7 +11,7 @@ function App() {
   const [isSigningMessage, setIsSigningMessage] = useState<boolean>(false);
 
   const transaction = {
-    arguments: [address, '717'],
+    arguments: [address, 717],
     function: '0x1::coin::transfer',
     type: 'entry_function_payload',
     type_arguments: ['0x1::aptos_coin::AptosCoin'],
