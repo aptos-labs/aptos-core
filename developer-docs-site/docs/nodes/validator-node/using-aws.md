@@ -21,6 +21,10 @@ Make sure you complete these pre-requisite steps before you proceed:
 
 ## Install
 
+:::tip One validator node + one validator fullnode
+When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
+:::
+
 1. Create a working directory for your node configuration.
 
     * Choose a workspace name, for example, `testnet`. **Note**: This defines the Terraform workspace name, which, in turn, is used to form the resource names.
