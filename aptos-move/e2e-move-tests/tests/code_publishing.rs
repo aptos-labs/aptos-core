@@ -24,9 +24,7 @@ struct State {
 
 #[test]
 fn code_publishing_basic() {
-    // Parallel execution and code publishing don't work well yet, hence all test harness created
-    // here have this off
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(
         &acc,
@@ -63,7 +61,7 @@ fn code_publishing_basic() {
 
 #[test]
 fn code_publishing_upgrade_success_no_compat() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with no compat requirements
@@ -81,7 +79,7 @@ fn code_publishing_upgrade_success_no_compat() {
 
 #[test]
 fn code_publishing_upgrade_success_compat() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
@@ -99,7 +97,7 @@ fn code_publishing_upgrade_success_compat() {
 
 #[test]
 fn code_publishing_upgrade_fail_compat() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
@@ -118,7 +116,7 @@ fn code_publishing_upgrade_fail_compat() {
 
 #[test]
 fn code_publishing_upgrade_fail_immutable() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with immutable requirements
@@ -137,7 +135,7 @@ fn code_publishing_upgrade_fail_immutable() {
 
 #[test]
 fn code_publishing_upgrade_fail_overlapping_module() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version
@@ -163,7 +161,7 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Create a sequence of package upgrades
@@ -196,7 +194,7 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 
 #[test]
 fn code_publishing_framework_upgrade() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.aptos_framework_account();
 
     // We should be able to upgrade move-stdlib, as our local package has only
@@ -209,7 +207,7 @@ fn code_publishing_framework_upgrade() {
 
 #[test]
 fn code_publishing_framework_upgrade_fail() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.aptos_framework_account();
 
     // We should not be able to upgrade move-stdlib because we removed a function
@@ -223,7 +221,7 @@ fn code_publishing_framework_upgrade_fail() {
 
 #[test]
 fn code_publishing_weak_dep_fail() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     let mut weak = PackageBuilder::new("WeakPackage").with_policy(UpgradePolicy::arbitrary());
@@ -248,7 +246,7 @@ fn code_publishing_weak_dep_fail() {
 
 #[test]
 fn code_publishing_arbitray_dep_different_address() {
-    let mut h = MoveHarness::new_no_parallel();
+    let mut h = MoveHarness::new();
     let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
 
