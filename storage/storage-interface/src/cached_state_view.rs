@@ -4,7 +4,8 @@
 use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::{state_storage_usage::StateStorageUsage, StateView, StateViewId};
+use aptos_state_view::{StateView, StateViewId};
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},

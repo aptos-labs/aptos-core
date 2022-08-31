@@ -12,7 +12,7 @@ use crate::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    NibbleExt, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, StateSnapshotProgress, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{
@@ -20,6 +20,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -721,35 +722,55 @@ where
 struct StateValueRestore<K, V> {
     version: Version,
     db: Arc<dyn StateValueWriter<K, V>>,
-    num_items: usize,
-    total_bytes: usize,
 }
 
-impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
+impl<K: crate::Key + CryptoHash + Eq + Hash, V: crate::Value> StateValueRestore<K, V> {
     pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self {
-            version,
-            db,
-            num_items: 0,
-            total_bytes: 0,
-        }
+        Self { version, db }
     }
 
-    pub fn add_chunk(&mut self, chunk: Vec<(K, V)>) -> Result<()> {
+    pub fn add_chunk(&mut self, mut chunk: Vec<(K, V)>) -> Result<()> {
+        // load progress
+        let progress_opt = self.db.get_progress(self.version)?;
+
+        // skip overlaps
+        if let Some(progress) = progress_opt {
+            let idx = chunk
+                .iter()
+                .position(|(k, _v)| CryptoHash::hash(k) > progress.key_hash)
+                .unwrap_or(chunk.len());
+            chunk = chunk.split_off(idx);
+        }
+
+        // quit if all skipped
+        if chunk.is_empty() {
+            return Ok(());
+        }
+
+        // save
+        let mut usage = progress_opt.map_or(StateStorageUsage::zero(), |p| p.usage);
+        let (last_key, _last_value) = chunk.last().unwrap();
+        let last_key_hash = CryptoHash::hash(last_key);
         let kv_batch = chunk
             .into_iter()
             .map(|(k, v)| {
-                self.num_items += 1;
-                self.total_bytes += k.key_size() + v.value_size();
+                usage.add_item(k.key_size() + v.value_size());
                 ((k, self.version), Some(v))
             })
             .collect();
-        self.db.write_kv_batch(&kv_batch)
+        self.db.write_kv_batch(
+            self.version,
+            &kv_batch,
+            StateSnapshotProgress::new(last_key_hash, usage),
+        )
     }
 
     pub fn finish(self) -> Result<()> {
-        self.db
-            .write_usage(self.version, self.num_items, self.total_bytes)
+        let progress = self.db.get_progress(self.version)?;
+        self.db.write_usage(
+            self.version,
+            progress.map_or(StateStorageUsage::zero(), |p| p.usage),
+        )
     }
 }
 
