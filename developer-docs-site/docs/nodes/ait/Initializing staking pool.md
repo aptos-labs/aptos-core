@@ -1,6 +1,6 @@
 ---
 title: "Connecting to Aptos Incentivized Testnet"
-slug: "connect-to-testnet"
+slug: "initializing-staking-pool"
 sidebar_position: 14
 ---
 
