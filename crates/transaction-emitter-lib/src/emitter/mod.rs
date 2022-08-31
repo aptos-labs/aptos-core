@@ -44,9 +44,10 @@ use aptos_sdk::transaction_builder::aptos_stdlib;
 use rand::rngs::StdRng;
 use stats::{StatsAccumulator, TxnStats};
 
-// Max is 10k TPS for a full day.
-const MAX_TXNS: u64 = 10_000_000_000;
+// Max is 100k TPS for a full day.
+const MAX_TXNS: u64 = 100_000_000_000;
 const SEND_AMOUNT: u64 = 1;
+const GAS_AMOUNT: u64 = 1000;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -82,19 +83,19 @@ pub enum EmitJobMode {
 }
 
 impl EmitJobMode {
-    pub fn create(mempool_backlog: usize, target_tps: usize) -> Self {
-        if mempool_backlog > 0 {
+    pub fn create(mempool_backlog: Option<usize>, target_tps: Option<usize>) -> Self {
+        if let Some(mempool_backlog_val) = mempool_backlog {
             assert!(
-                target_tps == 0,
+                target_tps.is_none(),
                 "Cannot set both mempool_backlog and target_tps"
             );
-            Self::MaxLoad { mempool_backlog }
+            Self::MaxLoad {
+                mempool_backlog: mempool_backlog_val,
+            }
         } else {
-            assert!(
-                target_tps > 0,
-                "Need to set either mempool_backlog or target_tps"
-            );
-            Self::ConstTps { tps: target_tps }
+            Self::ConstTps {
+                tps: target_tps.expect("Need to set either mempool_backlog or target_tps"),
+            }
         }
     }
 }
