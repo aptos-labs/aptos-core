@@ -102,4 +102,6 @@ sources={{
 
 6. If you are selected, then proceed to **Iniatilize staking pool** step. 
 
-See these sections for how to Initialize staking pool and Join validator set.
+### See these sections for how to Initialize staking pool and Join validator set.
+
+ [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet)
