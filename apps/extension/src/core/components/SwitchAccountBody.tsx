@@ -12,10 +12,6 @@ import React, { useMemo } from 'react';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import { Routes } from 'core/routes';
 import { Account } from 'shared/types';
-import {
-  switchAccountErrorToast,
-  switchAccountToast,
-} from 'core/components/Toast';
 import { secondaryHeaderInputBgColor } from 'core/colors';
 import { useNavigate } from 'react-router-dom';
 import AccountView from './AccountView';
@@ -25,20 +21,9 @@ export const boxShadow = 'rgba(0, 0, 0, 0.05) 0px 4px 24px 0px';
 export default function SwitchAccountBody() {
   const {
     accounts,
-    switchAccount,
   } = useUnlockedAccounts();
   const { colorMode } = useColorMode();
   const navigate = useNavigate();
-
-  const onSwitchAccount = (address: string) => {
-    try {
-      switchAccount(address);
-      switchAccountToast(address);
-      navigate(Routes.wallet.path);
-    } catch {
-      switchAccountErrorToast();
-    }
-  };
 
   const accountsList: Account[] = useMemo(() => Object.values(accounts), [accounts]);
 
@@ -47,24 +32,21 @@ export default function SwitchAccountBody() {
   };
 
   return (
-    <VStack spacing={2} pt={2} alignItems="stretch" height="100%">
+    <VStack spacing={2} pt={4} alignItems="stretch" height="100%">
       <VStack gap={1} flex={1} overflow="scroll">
         {
-        accountsList.map((account: Account) => (
-          <Box px={4} width="100%" key={account.address}>
-            <AccountView
-              account={account}
-              showCheck
-              boxShadow={boxShadow}
-              onClick={onSwitchAccount}
-              bgColor={{
-                dark: 'gray.700',
-                light: 'white',
-              }}
-            />
-          </Box>
-        ))
-      }
+          accountsList.map((account: Account) => (
+            <Box px={4} width="100%" key={account.address}>
+              <AccountView
+                account={account}
+                bgColor={{
+                  dark: 'gray.700',
+                  light: 'white',
+                }}
+              />
+            </Box>
+          ))
+        }
       </VStack>
       <Box px={4} width="100%">
         <Button

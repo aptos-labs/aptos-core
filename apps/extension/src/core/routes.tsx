@@ -93,10 +93,6 @@ export const Routes = Object.freeze({
     element: <Network />,
     path: '/settings/network',
   },
-  security_privacy: {
-    element: <SecurityPrivacy />,
-    path: '/settings/security_privacy',
-  },
   noWallet: {
     element: <NoWallet />,
     path: '/no-wallet',
@@ -113,17 +109,21 @@ export const Routes = Object.freeze({
     element: <RenameAccount />,
     path: '/settings/rename_account',
   },
+  security_privacy: {
+    element: <SecurityPrivacy />,
+    path: '/settings/security_privacy',
+  },
   settings: {
     element: <Settings />,
     path: '/settings',
   },
-  switchAccount: {
-    element: <SwitchAccount />,
-    path: '/switch-account',
-  },
   stake: {
     element: <Stake />,
     path: '/stake',
+  },
+  switchAccount: {
+    element: <SwitchAccount />,
+    path: '/switch-account',
   },
   token: {
     element: <Token />,

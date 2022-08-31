@@ -3,7 +3,6 @@
 
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
-// import { BsShieldFill } from '@react-icons/all-files/bs/BsShieldFill';
 import Routes from 'core/routes';
 import { settingsItemLabel } from 'core/constants';
 import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
@@ -26,7 +25,7 @@ export const secondaryGridHoverTextColor = {
   light: 'black',
 };
 
-function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
+export default function getSettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
   let items: SettingsListItemProps[] = [
     {
       iconAfter: FiChevronRight,
@@ -88,5 +87,3 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
 
   return items;
 }
-
-export default SettingsPaths;

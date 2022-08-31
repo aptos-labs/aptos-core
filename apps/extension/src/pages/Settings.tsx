@@ -48,20 +48,21 @@ function Account() {
   const { activeAccount } = useActiveAccount();
   const { activeNetwork } = useNetworks();
   const mnemonic = activeAccount?.mnemonic;
+  const settingsPaths = SettingsPaths(mnemonic !== undefined);
 
   return (
     <WalletLayout title="Settings">
       <VStack width="100%" paddingTop={4} px={4} pb={4} spacing={2}>
         <AccountView allowEdit />
         {
-            SettingsPaths(mnemonic !== undefined).map((value) => (
-              <SettingsListItem
-                key={value.path}
-                network={activeNetwork}
-                {...value}
-              />
-            ))
-          }
+          settingsPaths.map((value) => (
+            <SettingsListItem
+              key={value.title}
+              network={activeNetwork}
+              {...value}
+            />
+          ))
+        }
       </VStack>
     </WalletLayout>
   );

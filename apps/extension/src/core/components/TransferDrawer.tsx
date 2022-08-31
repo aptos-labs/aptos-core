@@ -61,7 +61,6 @@ function TransferDrawer() {
   } = useDisclosure();
   const [
     drawerPage,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setDrawerPage,
   ] = useState<TransferDrawerPage>(
     TransferDrawerPage.ADD_ADDRESS_AND_AMOUNT,
