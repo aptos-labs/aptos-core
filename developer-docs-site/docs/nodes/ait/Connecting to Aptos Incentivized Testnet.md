@@ -201,7 +201,7 @@ Go to the bottom of this page if you want to know how to Add Monitoring Componen
 
 ## Leaving Validator Set
 
-A node can choose to leave validator set at anytime, or it would happen automatically when there's not sufficient stake on the validator account. Before you shutdown the node, you should also need to make sure you leave validator set first (will take effect in next epoch). To leave validator set, you can perform the following steps:
+A node can choose to leave validator set at anytime, or it would happen automatically when there's not sufficient stake on the validator account. Before you shutdown the node, you also need to leave the validator set first. This will take effect in next epoch. To leave validator set, you can perform the following steps:
 
 1. Leave validator set (will take effect in next epoch)
 
@@ -210,12 +210,12 @@ A node can choose to leave validator set at anytime, or it would happen automati
     ```
 ## Shutdown Nodes for Incentivized Testnet
 
-If you have ensured that your node left the validator set, you can now take down the validator node and cleanup the resources used by the node.
+If you have ensured that your node has left the validator set, you can now take down the validator node.
 
 ### Using source code
 
 - Stop your node.
-- Remove the data directory: `rm -rf <your-data-directory>`
+- Remove the data directory: `rm <your-data-directory>`
 - Remove the genesis blob file and waypoint
 - Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
 
