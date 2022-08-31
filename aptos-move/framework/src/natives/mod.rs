@@ -9,6 +9,7 @@ pub mod cryptography;
 pub mod event;
 pub mod hash;
 mod helpers;
+pub mod network_address;
 pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
@@ -46,6 +47,7 @@ pub struct GasParameters {
     pub state_storage: state_storage::GasParameters,
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
+    pub network_address: network_address::GasParameters,
 }
 
 impl GasParameters {
@@ -160,6 +162,12 @@ impl GasParameters {
             aggregator_factory: aggregator_factory::GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
+            network_address: network_address::GasParameters {
+                validate_network_addresses: network_address::NetworkAddressGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
+            },
         }
     }
 }
@@ -214,6 +222,10 @@ pub fn all_natives(
     add_natives_from_module!(
         "aggregator_factory",
         aggregator_factory::make_all(gas_params.aggregator_factory)
+    );
+    add_natives_from_module!(
+        "network_address",
+        network_address::make_all(gas_params.network_address)
     );
 
     make_table_from_iter(framework_addr, natives)
