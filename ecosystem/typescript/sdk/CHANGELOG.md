@@ -8,6 +8,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 - Upgraded typescript version from 4.7.4 to 4.8.2, as well as linter package versions.
 - **[Breaking Change]** ModuleBundle transaction support is removed. Instead, SDK users should use `AptosClient.publishPackage` to publish Move packages.
+- Expose detailed API errors.
 
 ## 1.3.10 (2022-08-26)
 
