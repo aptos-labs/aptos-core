@@ -57,7 +57,7 @@ impl TcpWriter {
                     Ok(())
                 }
                 Err(e) => {
-                    //eprintln!("[Logging] Failed to connect: {}", e);
+                    eprintln!("[Logging] Failed to connect: {}", e);
                     STRUCT_LOG_CONNECT_ERROR_COUNT.inc();
                     Err(e)
                 }
