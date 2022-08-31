@@ -4,63 +4,40 @@ slug: "additional-doc"
 sidebar_position: 15
 ---
 
-## Shutdown Nodes for Incentivized Testnet
+## Initializing staking pool
 
-Follow this instruction when you need to take down the validator node and cleanup the resources used by the node.
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
 
+Alternatively, you can also use CLI to intialize staking pool:
 
-Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch)
+- Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
 
-    ```
-    aptos node leave-validator-set --profile ait3-operator
-    ```
+  ```
+  aptos init --profile ait3-owner \
+    --rest-url https://ait3.aptosdev.com
+  ```
 
-### Using source code
+- Initialize staking pool using CLI
 
-- Stop your node.
-- Remove the data directory: `rm -rf <your-data-directory>`
-- Remove the genesis blob file and waypoint
-- Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
+  ```
+  aptos stake initialize-stake-owner \
+    --initial-stake-amount 100000000000000 \
+    --operator-address <operator-address> \
+    --voter-address <voter-address> \
+    --profile ait3-owner
+  ```
 
-### Using Docker
+- Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
 
-- Stop your node and remove the data volumes, `docker compose down --volumes`
-- Remove the genesis blob file and waypoint
-- Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
-
-### Using Terraform
-
-- Stop your node and delete all the resources: `terraform destroy`
-
-
-## Add Monitoring Components
-
-Note: This is currently only supported using Terraform.
-
-1. Set the `enable_monitoring` variable in your terraform module. For example:
-
-    ```
-    module "aptos-node" {
-      ...
-      enable_monitoring           = true
-      utility_instance_num        = 3  # this will add one more utility instance to run monitoring component
-    }
-    ```
-
-2. Apply the changes: `terraform apply`
-
-3. You should see a new pod getting created. Run `kubectl get pods` to check.
-
-4. Access the dashboard
-
-    First, find the IP/DNS for the monitoring load balancer.
-
-    ```
-    kubectl get svc ${WORKSPACE}-mon-aptos-monitoring --output jsonpath='{.status.loadBalancer.ingress[0]}'
-    ```
-
-    You can access the dashboard on `http://<ip/DNS>`
-
+  ```
+  aptos account create --account <operator-account> --profile ait3-owner
+  
+  aptos account transfer \
+  --account <operator-account> \
+  --amount 5000 \
+  --profile ait3-owner
+  ```
+  
 ## Staking with CLI
 
 We now have a UI to support some staking operation, but in any case if you need to do operations not supported in UI, you can use CLI for it.
