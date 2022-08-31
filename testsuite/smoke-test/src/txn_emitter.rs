@@ -51,6 +51,7 @@ pub async fn generate_traffic(
         .await
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
