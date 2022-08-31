@@ -56,6 +56,7 @@ export class AptosClient {
    * }
    * ```
    */
+  @parseApiError
   async getAccount(accountAddress: MaybeHexString): Promise<Gen.AccountData> {
     return this.client.accounts.getAccount(HexString.ensure(accountAddress).hex());
   }
@@ -68,6 +69,7 @@ export class AptosClient {
    * @param query?.limit The max number of transactions should be returned for the page. Default is 25.
    * @returns An array of on-chain transactions, sent by account
    */
+  @parseApiError
   async getAccountTransactions(
     accountAddress: MaybeHexString,
     query?: { start?: BigInt | number; limit?: number },
@@ -87,6 +89,7 @@ export class AptosClient {
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
    * which is JSON representation of a module
    */
+  @parseApiError
   async getAccountModules(
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: BigInt | number },
@@ -106,6 +109,7 @@ export class AptosClient {
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
    * which JSON representation of a module
    */
+  @parseApiError
   async getAccountModule(
     accountAddress: MaybeHexString,
     moduleName: string,
@@ -131,6 +135,7 @@ export class AptosClient {
    * }
    * ```
    */
+  @parseApiError
   async getAccountResources(
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: BigInt | number },
@@ -155,6 +160,7 @@ export class AptosClient {
    * }
    * ```
    */
+  @parseApiError
   async getAccountResource(
     accountAddress: MaybeHexString,
     resourceType: Gen.MoveStructTag,
@@ -255,6 +261,7 @@ export class AptosClient {
    * of `guid` field in the Move struct `EventHandle`
    * @returns Array of events assotiated with given key
    */
+  @parseApiError
   async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
     return this.client.events.getEventsByEventKey(eventKey);
   }
@@ -272,6 +279,7 @@ export class AptosClient {
    * @param query?.limit The number of events to be returned for the page default is 5
    * @returns Array of events
    */
+  @parseApiError
   async getEventsByEventHandle(
     address: MaybeHexString,
     eventHandleStruct: Gen.MoveStructTag,
@@ -342,6 +350,7 @@ export class AptosClient {
    * @param query?.limit The max number of transactions should be returned for the page. Default is 25
    * @returns Array of on-chain transactions
    */
+  @parseApiError
   async getTransactions(query?: { start?: BigInt | number; limit?: number }): Promise<Gen.Transaction[]> {
     return this.client.transactions.getTransactions(query?.start?.toString(), query?.limit);
   }
@@ -351,6 +360,7 @@ export class AptosClient {
    * Transaction version is an uint64 number.
    * @returns Transaction from mempool or on-chain transaction
    */
+  @parseApiError
   async getTransactionByHash(txnHash: string): Promise<Gen.Transaction> {
     return this.client.transactions.getTransactionByHash(txnHash);
   }
@@ -360,6 +370,7 @@ export class AptosClient {
    * Transaction version is an uint64 number.
    * @returns Transaction from mempool or on-chain transaction
    */
+  @parseApiError
   async getTransactionByVersion(txnVersion: BigInt | number): Promise<Gen.Transaction> {
     return this.client.transactions.getTransactionByVersion(txnVersion.toString());
   }
@@ -381,8 +392,8 @@ export class AptosClient {
       const response = await this.client.transactions.getTransactionByHash(txnHash);
       return response.type === "pending_transaction";
     } catch (e) {
-      if (e instanceof Gen.ApiError) {
-        return e.status === 404;
+      if (e?.status === 404) {
+        return true;
       }
       throw e;
     }
@@ -508,6 +519,7 @@ export class AptosClient {
    * }
    * ```
    */
+  @parseApiError
   async getLedgerInfo(): Promise<Gen.IndexResponse> {
     return this.client.general.getLedgerInfo();
   }
@@ -532,6 +544,7 @@ export class AptosClient {
    * @param params Request params
    * @returns Table item value rendered in JSON
    */
+  @parseApiError
   async getTableItem(
     handle: string,
     data: Gen.TableItemRequest,
@@ -656,6 +669,17 @@ export class AptosClient {
   }
 }
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly message: string,
+    public readonly errorCode?: string,
+    public readonly vmErrorCode?: string,
+  ) {
+    super(message);
+  }
+}
+
 /**
  * This error is used by `waitForTransactionWithResult` when waiting for a
  * transaction times out.
@@ -680,4 +704,29 @@ export class FailedTransactionError extends Error {
     super(message);
     this.transaction = transaction;
   }
+}
+
+/**
+ * Creates a decorator to parse Gen.ApiError and return a wrapped error that is more developer friendly
+ */
+function parseApiError(target: unknown, propertyKey: string, descriptor: PropertyDescriptor) {
+  const childFunction = descriptor.value;
+  // eslint-disable-next-line no-param-reassign
+  descriptor.value = async function wrapper(...args: any[]) {
+    try {
+      const res = await childFunction.apply(this, [...args]);
+      return res;
+    } catch (e) {
+      if (e instanceof Gen.ApiError) {
+        throw new ApiError(
+          e.status,
+          JSON.stringify({ message: e.message, ...e.body }),
+          e.body?.error_code,
+          e.body?.vm_error_code,
+        );
+      }
+      throw e;
+    }
+  };
+  return descriptor;
 }
