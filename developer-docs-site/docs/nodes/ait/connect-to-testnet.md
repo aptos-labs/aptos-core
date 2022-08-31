@@ -8,40 +8,6 @@ sidebar_position: 14
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
-## Initializing staking pool
-
-In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
-
-Alternatively, you can also use CLI to intialize staking pool:
-
-- Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
-
-  ```
-  aptos init --profile ait3-owner \
-    --rest-url https://ait3.aptosdev.com
-  ```
-
-- Initialize staking pool using CLI
-
-  ```
-  aptos stake initialize-stake-owner \
-    --initial-stake-amount 100000000000000 \
-    --operator-address <operator-address> \
-    --voter-address <voter-address> \
-    --profile ait3-owner
-  ```
-
-- Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
-
-  ```
-  aptos account create --account <operator-account> --profile ait3-owner
-  
-  aptos account transfer \
-  --account <operator-account> \
-  --amount 5000 \
-  --profile ait3-owner
-  ```
-
 ## Bootstrapping validator node
 
 Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
@@ -227,13 +193,64 @@ You can check the details about node liveness definition [here](https://aptos.de
     
     You should expect the active value for your StakePool to keep increasing. It's updated at every epoch, so it will be every two hours.
 
+Go to the bottom of this page if you want to know how to Add Monitoring Components (terraform only).
 
 ## Leaving Validator Set
 
-A node can choose to leave validator set at anytime, or it would happen automatically when there's not sufficient stake on the validator account. To leave validator set, you can perform the following steps:
+A node can choose to leave validator set at anytime, or it would happen automatically when there's not sufficient stake on the validator account. Before you shutdown the node, you should also need to make sure you leave validator set first (will take effect in next epoch). To leave validator set, you can perform the following steps:
 
 1. Leave validator set (will take effect in next epoch)
 
     ```
     aptos node leave-validator-set --profile ait3-operator --pool-address <owner-address>
     ```
+## Shutdown Nodes for Incentivized Testnet
+
+If you have ensured that your node left the validator set, you can now take down the validator node and cleanup the resources used by the node.
+
+### Using source code
+
+- Stop your node.
+- Remove the data directory: `rm -rf <your-data-directory>`
+- Remove the genesis blob file and waypoint
+- Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
+
+### Using Docker
+
+- Stop your node and remove the data volumes, `docker compose down --volumes`
+- Remove the genesis blob file and waypoint
+- Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
+
+### Using Terraform
+
+- Stop your node and delete all the resources: `terraform destroy`
+
+
+## Add Monitoring Components
+
+Note: This is currently only supported using Terraform.
+
+1. Set the `enable_monitoring` variable in your terraform module. For example:
+
+    ```
+    module "aptos-node" {
+      ...
+      enable_monitoring           = true
+      utility_instance_num        = 3  # this will add one more utility instance to run monitoring component
+    }
+    ```
+
+2. Apply the changes: `terraform apply`
+
+3. You should see a new pod getting created. Run `kubectl get pods` to check.
+
+4. Access the dashboard
+
+    First, find the IP/DNS for the monitoring load balancer.
+
+    ```
+    kubectl get svc ${WORKSPACE}-mon-aptos-monitoring --output jsonpath='{.status.loadBalancer.ingress[0]}'
+    ```
+
+    You can access the dashboard on `http://<ip/DNS>`
+
