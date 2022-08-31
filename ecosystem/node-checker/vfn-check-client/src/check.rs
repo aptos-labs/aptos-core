@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
 use anyhow::Result;
 use aptos_node_checker_lib::EvaluationSummary;
 use aptos_sdk::rest_client::Client as AptosClient;
@@ -95,6 +94,9 @@ pub enum SingleCheckResult {
 
     /// The account does not have a VFN registered on chain.
     NoVfnRegistered(NoVfnRegistered),
+
+    /// A network address on chain for this account could not be deserialized.
+    InvalidNetworkAddress(InvalidNetworkAddress),
 }
 
 #[derive(Debug, Serialize)]
@@ -158,6 +160,9 @@ pub enum SingleCheckFailureCode {
 #[derive(Debug, Serialize)]
 pub struct NoVfnRegistered;
 
+#[derive(Debug, Serialize)]
+pub struct InvalidNetworkAddress;
+
 /// Get all the on chain validator info.
 pub async fn get_validator_info(node_address: Url) -> Result<Vec<ValidatorInfo>> {
     let client = AptosClient::new(node_address.clone());
@@ -179,7 +184,7 @@ pub async fn check_vfns(
     nhc_client: &ReqwestClient,
     check_args: &CheckArgs,
     validator_infos: Vec<ValidatorInfo>,
-) -> Result<HashMap<AccountAddress, Vec<SingleCheck>>> {
+) -> HashMap<AccountAddress, Vec<SingleCheck>> {
     let mut nhc_address = check_args.nhc_address.clone();
     nhc_address.set_path("/check_node");
 
@@ -198,10 +203,19 @@ pub async fn check_vfns(
         {
             continue;
         }
-        let vfn_addresses = validator_info
-            .config()
-            .fullnode_network_addresses()
-            .context("Failed to deserialize VFN network addresses")?;
+        let vfn_addresses = match validator_info.config().fullnode_network_addresses() {
+            Ok(vfn_addresses) => vfn_addresses,
+            Err(_e) => {
+                nhc_responses
+                    .entry(*account_address)
+                    .or_insert_with(Vec::new)
+                    .push(SingleCheck::new(
+                        SingleCheckResult::InvalidNetworkAddress(InvalidNetworkAddress),
+                        None,
+                    ));
+                continue;
+            }
+        };
         if vfn_addresses.is_empty() {
             nhc_responses
                 .entry(*account_address)
@@ -233,14 +247,16 @@ pub async fn check_vfns(
             SingleCheckResult::Failure(_) => {
                 info!("NHC returned a non 200 for {}", vfn_address);
             }
-            SingleCheckResult::NoVfnRegistered(_) => panic!("Shouldn't be possible"),
+            SingleCheckResult::NoVfnRegistered(_) | SingleCheckResult::InvalidNetworkAddress(_) => {
+                panic!("Shouldn't be possible")
+            }
         }
         nhc_responses
             .entry(account_address)
             .or_insert_with(Vec::new)
             .push(SingleCheck::new(single_check_result, Some(vfn_address)));
     }
-    Ok(nhc_responses)
+    nhc_responses
 }
 
 // This just exists to make joining futures easy.
