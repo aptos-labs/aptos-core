@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as SHA3 from "js-sha3";
-import { Buffer } from "buffer/";
 import { MemoizeExpiring } from "typescript-memoize";
 import {
   Ed25519PublicKey,
@@ -83,7 +82,7 @@ export class TransactionBuilder<F extends SigningFn> {
     mergedArray.set(prefix);
     mergedArray.set(body, prefix.length);
 
-    return Buffer.from(mergedArray);
+    return mergedArray;
   }
 }
 

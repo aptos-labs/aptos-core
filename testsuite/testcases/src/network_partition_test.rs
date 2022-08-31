@@ -17,7 +17,7 @@ impl Test for NetworkPartitionTest {
 
 impl NetworkTest for NetworkPartitionTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
 
         let partition = SwarmChaos::Partition(SwarmNetworkPartition {
             partition_percentage: PARTITION_PERCENTAGE,

@@ -46,7 +46,7 @@ async fn test_db_restore() {
     // we need to wait for all nodes to see it, as client_1 is different node from the
     // one creating accounts above
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(30))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -150,7 +150,7 @@ async fn test_db_restore() {
         .unwrap();
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 

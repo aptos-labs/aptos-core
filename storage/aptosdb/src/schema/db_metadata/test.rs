@@ -8,11 +8,11 @@ use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 proptest! {
     #[test]
     fn test_encode_decode(
-        tag in any::<PrunerTag>(),
-        version in any::<PrunerMetadata>(),
+        tag in any::<DbMetadataKey>(),
+        data in any::<DbMetadataValue>(),
     ) {
-        assert_encode_decode::<PrunerMetadataSchema>(&tag, &version);
+        assert_encode_decode::<DbMetadataSchema>(&tag, &data);
     }
 }
 
-test_no_panic_decoding!(PrunerMetadataSchema);
+test_no_panic_decoding!(DbMetadataSchema);

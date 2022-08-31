@@ -11,7 +11,9 @@ class It3sController < ApplicationController
   before_action :ensure_registration_open!
 
   def show
-    @it3_registration_closed = Flipper.enabled?(:it3_registration_closed, current_user)
+    @it3_registration_closed = Flipper.enabled?(:it3_registration_closed) && !Flipper.enabled?(
+      :it3_registration_override, current_user
+    )
     @steps = [
       connect_discord_step,
       connect_wallet_step,

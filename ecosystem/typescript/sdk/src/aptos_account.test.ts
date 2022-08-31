@@ -60,7 +60,7 @@ test("Serializes/Deserializes", () => {
 
 test("Signs Strings", () => {
   const a1 = AptosAccount.fromAptosAccountObject(aptosAccountObject);
-  expect(a1.signHexString("0x77777").hex()).toBe(
+  expect(a1.signHexString("0x7777").hex()).toBe(
     // eslint-disable-next-line max-len
     "0xc5de9e40ac00b371cd83b1c197fa5b665b7449b33cd3cdd305bb78222e06a671a49625ab9aea8a039d4bb70e275768084d62b094bc1b31964f2357b7c1af7e0d",
   );

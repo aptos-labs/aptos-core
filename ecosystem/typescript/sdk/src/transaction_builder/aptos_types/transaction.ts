@@ -563,7 +563,7 @@ export abstract class Transaction {
 
   getHashSalt(): Bytes {
     const hash = SHA3.sha3_256.create();
-    hash.update(Buffer.from("APTOS::Transaction"));
+    hash.update("APTOS::Transaction");
     return new Uint8Array(hash.arrayBuffer());
   }
 

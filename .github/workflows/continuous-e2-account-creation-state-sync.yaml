@@ -1,4 +1,4 @@
-name: Continuous E2E Performance Test
+name: Continuous E2E Account Creation State Sync Test
 
 permissions:
   issues: write
@@ -12,14 +12,12 @@ on:
 jobs:
   ### Please remember to use different namespace for different tests
   # Performance test in an optimal setting
-  run-forge-performance:
+  run-forge-account-creation-ss:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-performance
+      FORGE_NAMESPACE: forge-account-creation-ss
       FORGE_CLUSTER_NAME: aptos-forge-big-1
-      # Run for 2 hours
-      FORGE_RUNNER_DURATION_SECS: 7200
-      # Land blocking is performance test
-      FORGE_TEST_SUITE: land_blocking
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: account_creation_state_sync
       POST_TO_SLACK: true

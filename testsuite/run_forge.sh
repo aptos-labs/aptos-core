@@ -253,7 +253,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
     prometheus_port_forward_pid=$!
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --duration-secs $FORGE_RUNNER_DURATION_SECS \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --upgrade-image-tag $UPGRADE_IMAGE_TAG \
