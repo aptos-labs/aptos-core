@@ -51,7 +51,7 @@ function Account() {
 
   return (
     <WalletLayout title="Settings">
-      <VStack width="100%" paddingTop={8} px={4} pb={4} spacing={2}>
+      <VStack width="100%" paddingTop={2} px={2} spacing={2}>
         <AccountView allowEdit />
         {
             SettingsPaths(mnemonic !== undefined).map((value) => (
