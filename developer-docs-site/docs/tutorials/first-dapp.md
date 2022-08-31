@@ -11,9 +11,9 @@ For this tutorial, we will use the Move Module `HelloBlockchain` described in [Y
 
 We will use:
 
-- The [Aptos SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk).
-- The [Aptos Wallet](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/web-wallet), and
-- The [Aptos CLI](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos) to interact with blockchain.
+- The [Aptos Typescript SDK][ts_sdk],
+- The [Aptos Wallet][building_wallet], and
+- The [Aptos CLI][installing_cli] to interact with blockchain.
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos Blockchain.
 
@@ -38,7 +38,7 @@ Ensure that your account has sufficient funds to perform transactions by clickin
 
 ### Aptos CLI
 
-1. Install the [Aptos CLI](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos).
+1. Install the [Aptos CLI][install_cli].
 
 2. Run `aptos init`, and when it asks for your private key, paste the private key from the Aptos Wallet that you copied earlier. This will initialize the Aptos CLI to use the same account as used by the Aptos Wallet.
 
@@ -548,3 +548,7 @@ function App() {
 ```
 
 That concludes this tutorial.
+
+[building_wallet]: /guides/building-wallet-extension
+[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
+[ts_sdk]: /sdks/typescript-sdk
