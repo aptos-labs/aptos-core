@@ -21,6 +21,8 @@ class It3sControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'it loads correctly' do
+    FactoryBot.create(:it3_profile, user: @user)
+    @user.update(kyc_status: 'completed')
     get it3_path
     assert_response :success
   end

@@ -26,6 +26,8 @@ ActiveAdmin.register It3Profile do
     column :validator_verified
     column :fullnode_address
     column :fullnode_port
+    column :fullnode_metrics_port
+    column :fullnode_api_port
     column :fullnode_network_key
     column :created_at
     column :updated_at
@@ -41,6 +43,10 @@ ActiveAdmin.register It3Profile do
   filter :validator_port
   filter :validator_metrics_port
   filter :validator_api_port
+  filter :fullnode_address
+  filter :fullnode_port
+  filter :fullnode_metrics_port
+  filter :fullnode_api_port
   filter :validator_verified
   filter :created_at
   filter :updated_at

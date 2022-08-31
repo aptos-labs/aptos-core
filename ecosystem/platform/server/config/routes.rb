@@ -70,7 +70,7 @@ Rails.application.routes.draw do
 
   # IT3
   resource :it3, only: %i[show update]
-  resources :it3_profiles, except: %i[index destroy]
+  resources :it3_profiles, except: %i[show create new index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
   # Leaderboards

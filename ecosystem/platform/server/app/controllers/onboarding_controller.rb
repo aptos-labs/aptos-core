@@ -57,7 +57,7 @@ class OnboardingController < ApplicationController
     end
 
     unless current_user.it3_profile&.validator_verified?
-      path = current_user.it3_profile.present? ? edit_it3_profile_path(current_user.it3_profile) : new_it3_profile_path
+      path = current_user.it3_profile.present? ? edit_it3_profile_path(current_user.it3_profile) : root_path
       redirect_to path, error: 'Must register and validate node first' and return
     end
 
