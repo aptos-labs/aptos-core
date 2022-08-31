@@ -54,36 +54,6 @@ Proceed to the below steps only if you are selected to participate in the AIT-3.
 7. Proceed to **Connect to AIT-3 and join the validator set**.
 
 
-Alternatively, you can also use CLI to intialize staking pool:
-
-- Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
-
-  ```
-  aptos init --profile ait3-owner \
-    --rest-url https://ait3.aptosdev.com
-  ```
-
-- Initialize staking pool using CLI
-
-  ```
-  aptos stake initialize-stake-owner \
-    --initial-stake-amount 100000000000000 \
-    --operator-address <operator-address> \
-    --voter-address <voter-address> \
-    --profile ait3-owner
-  ```
-
-- Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
-
-  ```
-  aptos account create --account <operator-account> --profile ait3-owner
-  
-  aptos account transfer \
-  --account <operator-account> \
-  --amount 5000 \
-  --profile ait3-owner
-  ```
-  
 ## Staking with CLI
 
 We now have a UI to support some staking operation, but in any case if you need to do operations not supported in UI, you can use CLI for it.
@@ -107,15 +77,17 @@ We now have a UI to support some staking operation, but in any case if you need 
     --profile ait3-owner
   ```
 
-- Transfer coin between accounts
+- Transfer coin between accounts. Don't forget to transfer some coin to your operator account to pay gas.
 
   ```
+  aptos account create --account <operator-account> --profile ait3-owner
+  
   aptos account transfer \
-    --account <operator-address> \
-    --amount <amount> \
-    --profile ait3-owner
+  --account <operator-account> \
+  --amount 5000 \
+  --profile ait3-owner
   ```
-
+  
 - Switch operator
 
   ```
