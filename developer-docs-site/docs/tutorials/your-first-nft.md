@@ -261,7 +261,7 @@ Coming soon!
 
 Now begins the process of creating tokens. First, the creator must create a collection to store tokens. A collection can contain zero, one, or many distinct tokens within it. The collection does not restrict the attributes of the tokens, as it is only a container.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `createCollection`:
@@ -296,7 +296,7 @@ Coming soon!
 
 To create a token, the creator must specify an associated collection. A token must be associated with a collection and that collection must have remaining tokens that can be minted. There are many attributes associated with a token, but the helper API only exposes the minimal amount required to create static content.
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 Your application will call `createToken`:
@@ -331,7 +331,7 @@ Coming soon!
 
 Both the collection and token metadata are stored on the creator's account within their `Collections` in a table. The SDKs provide convenience wrappers around querying these specific tables:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 To read a collection's metadata:
@@ -378,7 +378,7 @@ Coming soon!
 
 Each token within Aptos is a distinct asset, the assets owned by the user are stored within their `TokenStore`. To get the balance:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 ```ts
@@ -403,7 +403,7 @@ Many users have received unwanted tokens that may cause minimally embarrassment 
 
 To offer a token:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 ```ts
@@ -424,7 +424,7 @@ Coming soon!
 
 To claim a token:
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 ```ts
@@ -446,7 +446,7 @@ Coming soon!
 ### Step 4.9: Safe unilateral transferring of a token
 
 To support safe unilateral transfers of a token, the sender may first ask the recipient to acknowledge off-chain about a pending transfer. This comes in the form of a multiagent transaction request. Multiagent transactions contain multiple signatures, one for each on-chain account. Move then can leverage this to give `signer` level permissions to all that signed. For token transfers, this ensures that the receiving party does indeed desire to receive this token without requiring the use of the token transfer framework described above.
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
 ```ts
@@ -469,7 +469,7 @@ Coming soon!
 
 Coming soon!
 
-<Tabs>
+<Tabs groupId="sdk-examples">
   <TabItem value="python" label="Python">
 
 Coming soon!
