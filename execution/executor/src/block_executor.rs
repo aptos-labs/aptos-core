@@ -166,6 +166,7 @@ where
         let parent_output = &parent_block.output;
         let parent_view = &parent_output.result_view;
         let parent_accumulator = parent_view.txn_accumulator();
+        parent_block.ensure_has_child(block_id)?;
 
         if let Some(b) = block_vec.pop().expect("Must exist") {
             // this is a retry
