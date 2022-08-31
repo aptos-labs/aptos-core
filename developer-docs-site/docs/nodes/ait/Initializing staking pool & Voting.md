@@ -1,12 +1,12 @@
 ---
 title: "Connecting to Aptos Incentivized Testnet"
-slug: "initializing-staking-pool"
+slug: "initializing-staking-pool-and-voting"
 sidebar_position: 14
 ---
 
 ## Initializing staking pool & Voting
 
-In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool). We have also created a voting UI, which you can see from below
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool-and-voting). We have also created a voting UI, which you can see from below
 
 Once you have completed the following sections, you can go to [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) for detailed steps on how to get your node connected to the blockchain
 
@@ -143,7 +143,7 @@ The next steps can only be taken AFTER you have [initialized the Staking Pool](#
   aptos stake add-stake \
     --amount <amount> \
     --profile ait3-owner \
-    --max gas 5000 # you can play around with the max gas here
+    --max gas 5000 # You can adjust the amount of max gas here.
   ```
 
 - Increase stake lockup
