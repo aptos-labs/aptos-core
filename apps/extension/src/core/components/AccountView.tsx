@@ -102,7 +102,7 @@ const AccountView = React.forwardRef(({
       </Center>
       <VStack width="100%" alignItems="flex-start" spacing={0}>
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
-          {activeAccount?.name}
+          {account?.name}
         </Text>
         <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
           <Text
