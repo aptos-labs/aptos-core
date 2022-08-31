@@ -4,7 +4,7 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{account_address::AccountAddress, PeerId},
@@ -125,12 +125,25 @@ impl LocalNode {
             )
         })?;
 
-        println!(
+        // We print out the commands and PIDs for debugging of local swarms
+        info!(
             "Started node {:?} (PID: {:?}) with command: {:?}",
             self.name,
             process.id(),
             node_command
         );
+
+        // We print out the API endpoints of each node for local debugging
+        info!(
+            "Node {:?} REST API is listening at: 127.0.0.1:{:?}/v1",
+            self.name,
+            self.config.api.address.port()
+        );
+        info!(
+            "Node {:?} Inspection service is listening at 127.0.0.1:{:?}",
+            self.name, self.config.inspection_service.port
+        );
+
         self.process = Some(Process(process));
 
         Ok(())

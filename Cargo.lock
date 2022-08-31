@@ -662,6 +662,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-global-constants",
  "aptos-keygen",
+ "aptos-logger",
  "aptos-secure-storage",
  "aptos-state-view",
  "aptos-temppath",

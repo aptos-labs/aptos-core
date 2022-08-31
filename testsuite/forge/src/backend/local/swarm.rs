@@ -201,6 +201,14 @@ impl LocalSwarm {
                 Ok((validator.peer_id(), public_network))
             })
             .collect::<Result<HashMap<_, _>>>()?;
+
+        // We print out the root key to make it easy for users to deploy a local faucet
+        let encoded_root_key = hex::encode_upper(&root_key.to_bytes());
+        info!(
+            "The root (or mint) key for the swarm is: 0x{}",
+            encoded_root_key
+        );
+
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
             aptos_sdk::types::account_config::aptos_test_root_address(),
