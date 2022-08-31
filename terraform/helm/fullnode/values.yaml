@@ -39,7 +39,7 @@ image:
 
 resources:
   limits:
-    cpu: 6.5
+    cpu: 7
     memory: 14Gi
   requests:
     cpu: 6.5
