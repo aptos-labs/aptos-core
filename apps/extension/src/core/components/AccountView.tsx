@@ -51,18 +51,9 @@ const AccountView = React.forwardRef(({
   const { activeAccount } = useActiveAccount();
   const [opacity, setOpacity] = useState(0);
 
-  const displayActiveAccountAddress = useMemo(() => {
-    const displayActiveAccount = account || activeAccount;
+  const displayAccount = useMemo(() => account ?? activeAccount, [account, activeAccount]);
 
-    if (!displayActiveAccount) return '';
-    if (typeof displayActiveAccount?.address === 'string') {
-      return displayActiveAccount?.address;
-    }
-
-    return displayActiveAccount?.address;
-  }, [account, activeAccount]);
-
-  const { hasCopied, onCopy } = useClipboard(displayActiveAccountAddress || '');
+  const { hasCopied, onCopy } = useClipboard(displayAccount?.address || '');
 
   const handleClickEditAccount = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -72,12 +63,12 @@ const AccountView = React.forwardRef(({
   const handleClickAccount = (e: React.MouseEvent<HTMLDivElement>) => {
     if (onClick && opacity === 0) {
       e.preventDefault();
-      onClick(displayActiveAccountAddress);
+      onClick(displayAccount?.address);
     }
   };
 
-  const beginAddress = useMemo(() => displayActiveAccountAddress?.slice(0, 6) || '', [displayActiveAccountAddress]);
-  const endAddress = useMemo(() => displayActiveAccountAddress?.slice(62) || '', [displayActiveAccountAddress]);
+  const beginAddress = useMemo(() => displayAccount.address?.slice(0, 6) || '', [displayAccount]);
+  const endAddress = useMemo(() => displayAccount.address?.slice(62) || '', [displayAccount]);
 
   return (
     <Grid
@@ -98,11 +89,11 @@ const AccountView = React.forwardRef(({
       }}
     >
       <Center width="100%">
-        <AccountCircle account={account} size={40} />
+        <AccountCircle account={displayAccount} size={40} />
       </Center>
       <VStack width="100%" alignItems="flex-start" spacing={0}>
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
-          {account?.name}
+          {displayAccount.name}
         </Text>
         <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
           <Text
@@ -123,7 +114,7 @@ const AccountView = React.forwardRef(({
           </Text>
         </Tooltip>
       </VStack>
-      {(activeAccount.address === displayActiveAccountAddress && showCheck
+      {(activeAccount.address === displayAccount.address && showCheck
         ? <AiFillCheckCircle size={32} color={checkCircleSuccessBg[colorMode]} /> : null)}
       {(allowEdit ? (
         <Button bg="none" p={0} onClick={handleClickEditAccount}>
