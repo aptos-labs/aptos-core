@@ -21,3 +21,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: state_sync
       POST_TO_SLACK: true
+      USE_NEW_WRAPPER: true
