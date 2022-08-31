@@ -1013,13 +1013,15 @@ impl Client {
         Ok(Response::new(response.bytes().await?, state))
     }
 
-    pub async fn try_until_ok<F, Fut, T>(
+    pub async fn try_until_ok<F, Fut, RetryFun, T>(
         total_wait: Option<Duration>,
         initial_interval: Option<Duration>,
+        should_retry: RetryFun,
         function: F,
     ) -> AptosResult<T>
     where
         F: Fn() -> Fut,
+        RetryFun: Fn(StatusCode, Option<AptosError>) -> bool,
         Fut: Future<Output = AptosResult<T>>,
     {
         let total_wait = total_wait.unwrap_or(DEFAULT_MAX_WAIT_DURATION);
@@ -1034,8 +1036,10 @@ impl Client {
             let retry = match &result {
                 Ok(_) => break,
                 Err(err) => match err {
-                    RestError::Api(inner) => is_retriable_status_code(inner.status_code.as_u16()),
-                    RestError::Http(inner) => is_retriable_status_code(*inner),
+                    RestError::Api(inner) => {
+                        should_retry(inner.status_code, Some(inner.error.clone()))
+                    }
+                    RestError::Http(inner) => should_retry(*inner, None),
                     RestError::Bcs(_)
                     | RestError::Json(_)
                     | RestError::Timeout(_)
@@ -1062,8 +1066,20 @@ impl Client {
     }
 }
 
-fn is_retriable_status_code(status_code: u16) -> bool {
-    (500..600).contains(&status_code) || status_code == 404 || status_code == 429
+pub fn retriable_with_404(status_code: StatusCode, aptos_error: Option<AptosError>) -> bool {
+    retriable(status_code, aptos_error) | matches!(status_code, StatusCode::NOT_FOUND)
+}
+
+pub fn retriable(status_code: StatusCode, _aptos_error: Option<AptosError>) -> bool {
+    matches!(
+        status_code,
+        StatusCode::TOO_MANY_REQUESTS
+            | StatusCode::SERVICE_UNAVAILABLE
+            | StatusCode::INTERNAL_SERVER_ERROR
+            | StatusCode::GATEWAY_TIMEOUT
+            | StatusCode::BAD_GATEWAY
+            | StatusCode::INSUFFICIENT_STORAGE
+    )
 }
 
 impl From<(ReqwestClient, Url)> for Client {
@@ -1101,6 +1117,6 @@ async fn parse_error(response: reqwest::Response) -> RestError {
     let maybe_state = parse_state_optional(&response);
     match response.json::<AptosError>().await {
         Ok(error) => (error, maybe_state, status_code).into(),
-        Err(_) => RestError::Http(status_code.as_u16()),
+        Err(_) => RestError::Http(status_code),
     }
 }
