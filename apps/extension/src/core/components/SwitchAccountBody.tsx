@@ -47,7 +47,7 @@ export default function SwitchAccountBody() {
   };
 
   return (
-    <VStack spacing={2} alignItems="stretch" height="100%">
+    <VStack spacing={2} pt={2} alignItems="stretch" height="100%">
       <VStack gap={1} flex={1} overflow="scroll">
         {
         accountsList.map((account: Account) => (
