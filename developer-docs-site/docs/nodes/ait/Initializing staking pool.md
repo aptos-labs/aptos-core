@@ -4,11 +4,11 @@ slug: "initializing-staking-pool"
 sidebar_position: 14
 ---
 
-## Initializing staking pool
+## Initializing staking pool & Voting
 
-In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool). We have also created a voting UI, which you can see from below
 
-Once you have completed the below, you can go to [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) for detailed steps on how to get your node connected to the blockchain
+Once you have completed the following sections, you can go to [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) for detailed steps on how to get your node connected to the blockchain
 
 ## Initialize staking pool
 
@@ -88,6 +88,39 @@ We now have a UI to support some staking operation, but in any case if you need 
   --profile ait3-owner
   ```
   
+## Vote
+
+You will test the voting feature in this step.
+
+1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals?network=ait3).
+2. View the proposals. When you are ready to vote on a proposal, click on the proposal. 
+3. Make sure you connected the wallet with your **voter** wallet account. 
+4. Provide your **owner** account address and vote “For” or “Against”. 
+5. You will see a green snackbar indicating that the transaction is successful.
+
+:::caution Before you proceed
+The next steps can only be taken AFTER you have [initialized the Staking Pool](#stake-delegate).
+:::
+
+## Reset operator account
+1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
+2. Make sure the wallet is connected with your **owner** account.
+3. Provide the **new operator** address in the input that says **New Operator Address**
+4. click the **CHANGE OPERATOR** button. You will see a green snackbar indicating that the transaction is successful.
+
+## Reset voter account
+1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
+2. Make sure the wallet is connected with your **owner** account.
+3. Provide the **new voter** address in the input that says **New Voter Address**
+4. click the **CHANGE VOTER** button. You will see a green snackbar indicating that the transaction is successful.
+
+## Increase lockup duration
+1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
+2. Make sure the wallet is connected with your **owner** account.
+3. click the **INCREASE LOCKUP** button. You will see a green snackbar indicating that the transaction is successful.
+
+#### Some additional CLI commands
+
 - Switch operator
 
   ```
@@ -134,35 +167,3 @@ We now have a UI to support some staking operation, but in any case if you need 
     --amount <amount> \
     --profile ait3-owner
   ```
-
-## Vote
-
-You will test the voting feature in this step.
-
-1. From the Chrome browser, go to the [**Proposals section** of the Aptos Governance page for AIT-3](https://explorer.devnet.aptos.dev/proposals?network=ait3).
-2. View the proposals. When you are ready to vote on a proposal, click on the proposal. 
-3. Make sure you connected the wallet with your **voter** wallet account. 
-4. Provide your **owner** account address and vote “For” or “Against”. 
-5. You will see a green snackbar indicating that the transaction is successful.
-
-:::caution Before you proceed
-The next steps can only be taken AFTER you have [initialized the Staking Pool](#stake-delegate).
-:::
-
-## Reset operator account
-1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
-2. Make sure the wallet is connected with your **owner** account.
-3. Provide the **new operator** address in the input that says **New Operator Address**
-4. click the **CHANGE OPERATOR** button. You will see a green snackbar indicating that the transaction is successful.
-
-## Reset voter account
-1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
-2. Make sure the wallet is connected with your **owner** account.
-3. Provide the **new voter** address in the input that says **New Voter Address**
-4. click the **CHANGE VOTER** button. You will see a green snackbar indicating that the transaction is successful.
-
-## Increase lockup duration
-1. From the Chrome browser, go to the [Staking page](https://explorer.devnet.aptos.dev/proposals/staking?network=ait3)
-2. Make sure the wallet is connected with your **owner** account.
-3. click the **INCREASE LOCKUP** button. You will see a green snackbar indicating that the transaction is successful.
-
