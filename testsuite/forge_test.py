@@ -14,7 +14,7 @@ from .forge import (
     Git, K8sForgeRunner, ListClusterResult, SystemContext, assert_aws_token_expiration, find_recent_images, format_comment,
     format_pre_comment, format_report, get_all_forge_jobs, get_dashboard_link, get_humio_logs_link,
     get_validator_logs_link, list_eks_clusters, list_jobs, main, ForgeContext, LocalForgeRunner, FakeShell,
-    FakeFilesystem, RunResult, FakeProcesses
+    FakeFilesystem, RunResult, FakeProcesses, sanitize_forge_namespace
 )
 
 
@@ -321,6 +321,15 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             "testFormatReport.fixture",
         )
 
+    def testSanitizeForgeNamespaceSlashes(self) -> None:
+        namespace_with_slash = "banana/apple"
+        namespace = sanitize_forge_namespace(namespace_with_slash)
+        self.assertEqual(namespace, "banana-apple")
+
+    def testSanitizeForgeNamespaceTooLong(self) -> None:
+        namespace_too_long = "a" * 10000
+        namespace = sanitize_forge_namespace(namespace_too_long)
+        self.assertEqual(namespace, "a"*64)
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None

@@ -22,9 +22,9 @@ import textwrap
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, TypedDict, Union
+from typing import Any, Callable, Generator, List, Optional, Sequence, Tuple, TypedDict, Union
 
 
 @dataclass
@@ -965,6 +965,19 @@ def image_exists(shell: Shell, image_tag: str) -> bool:
     return result.exit_code == 0
 
 
+def sanitize_forge_namespace(forge_namespace: str) -> str:
+    max_length = 64
+    sanitized_namespace = ""
+    for i, c in enumerate(forge_namespace):
+        if i >= max_length:
+            break
+        if c.isalnum():
+            sanitized_namespace += c
+        else:
+            sanitized_namespace += "-"
+    return sanitized_namespace
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1078,6 +1091,8 @@ def test(
 
     if forge_namespace is None:
         forge_namespace = f"forge-{get_current_user()}-{time.epoch()}"
+
+    forge_namespace = sanitize_forge_namespace(forge_namespace)
 
     assert forge_namespace is not None, "Forge namespace is required"
 
@@ -1290,6 +1305,9 @@ def tail(
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
     context = SystemContext(shell, filesystem, processes)
+
+    job_name = sanitize_forge_namespace(job_name)
+
     all_jobs = asyncio.run(get_all_forge_jobs(context))
     found_jobs = [job for job in all_jobs if job.name == job_name]
     if not found_jobs:
