@@ -212,25 +212,56 @@ export class TypeTagParser {
   }
 }
 
+export function ensureBoolean(val: boolean | string): boolean {
+  assertType(val, ["boolean", "string"]);
+  if (typeof val === "boolean") {
+    return val;
+  }
+
+  if (val === "true") {
+    return true;
+  }
+  if (val === "false") {
+    return false;
+  }
+
+  throw new Error("Invalid boolean string.");
+}
+
+export function ensureNumber(val: number | string): number {
+  assertType(val, ["number", "string"]);
+  if (typeof val === "number") {
+    return val;
+  }
+
+  const res = Number.parseInt(val, 10);
+  if (Number.isNaN(res)) {
+    throw new Error("Invalid number string.");
+  }
+
+  return res;
+}
+
+export function ensureBigInt(val: number | bigint | string): bigint {
+  assertType(val, ["number", "bigint", "string"]);
+  return BigInt(val);
+}
+
 export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializer) {
   if (argType instanceof TypeTagBool) {
-    assertType(argVal, "boolean");
-    serializer.serializeBool(argVal);
+    serializer.serializeBool(ensureBoolean(argVal));
     return;
   }
   if (argType instanceof TypeTagU8) {
-    assertType(argVal, "number");
-    serializer.serializeU8(argVal);
+    serializer.serializeU8(ensureNumber(argVal));
     return;
   }
   if (argType instanceof TypeTagU64) {
-    assertType(argVal, ["number", "bigint"]);
-    serializer.serializeU64(argVal);
+    serializer.serializeU64(ensureBigInt(argVal));
     return;
   }
   if (argType instanceof TypeTagU128) {
-    assertType(argVal, ["number", "bigint"]);
-    serializer.serializeU128(argVal);
+    serializer.serializeU128(ensureBigInt(argVal));
     return;
   }
   if (argType instanceof TypeTagAddress) {
@@ -287,24 +318,20 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
 
 export function argToTransactionArgument(argVal: any, argType: TypeTag): TransactionArgument {
   if (argType instanceof TypeTagBool) {
-    assertType(argVal, "boolean");
-    return new TransactionArgumentBool(argVal);
+    return new TransactionArgumentBool(ensureBoolean(argVal));
   }
   if (argType instanceof TypeTagU8) {
-    assertType(argVal, "number");
-    return new TransactionArgumentU8(argVal);
+    return new TransactionArgumentU8(ensureNumber(argVal));
   }
   if (argType instanceof TypeTagU64) {
-    assertType(argVal, ["number", "bigint"]);
-    return new TransactionArgumentU64(argVal);
+    return new TransactionArgumentU64(ensureBigInt(argVal));
   }
   if (argType instanceof TypeTagU128) {
-    assertType(argVal, ["number", "bigint"]);
-    return new TransactionArgumentU128(argVal);
+    return new TransactionArgumentU128(ensureBigInt(argVal));
   }
   if (argType instanceof TypeTagAddress) {
     let addr: AccountAddress;
-    if (typeof argVal === "string") {
+    if (typeof argVal === "string" || argVal instanceof HexString) {
       addr = AccountAddress.fromHex(argVal);
     } else if (argVal instanceof AccountAddress) {
       addr = argVal;
