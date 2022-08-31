@@ -4,7 +4,7 @@
 use std::thread;
 
 use aptos_logger::info;
-use forge::{FullNode, NetworkContext, NetworkTest, Result, Test};
+use forge::{NetworkContext, NetworkTest, Result, Test};
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,
@@ -22,19 +22,6 @@ impl Test for ForgeSetupTest {
     }
 }
 
-async fn wipe_fullnode(fullnode: &mut dyn FullNode) -> Result<()> {
-    fullnode.stop().await?;
-    info!("Clear its storage");
-    fullnode.clear_storage()?;
-    info!("Start it up again");
-    if let Err(e) = fullnode.start().await {
-        info!("Error on fullnode startup: {}", e);
-    } else {
-        info!("Fullnode started successfully");
-    }
-    Ok(())
-}
-
 impl NetworkTest for ForgeSetupTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         let mut rng = StdRng::from_seed(OsRng.gen());
@@ -47,7 +34,7 @@ impl NetworkTest for ForgeSetupTest {
 
         info!("Pick one fullnode to stop");
         let fullnode = swarm.full_node_mut(*fullnode_id).unwrap();
-        runtime.block_on(wipe_fullnode(fullnode))?;
+        fullnode.clear_storage()?;
 
         let fullnode = swarm.full_node(*fullnode_id).unwrap();
         let fullnode_name = fullnode.name();
