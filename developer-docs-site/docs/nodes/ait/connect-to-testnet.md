@@ -153,7 +153,8 @@ At this point you already used your owner account to initialized a validator sta
     ```
     aptos node join-validator-set \
       --pool-address <owner-address> \
-      --profile ait3-operator
+      --profile ait3-operator \ 
+      --max-gas 10000 # You can play with the amt of max gas here. Make sure you have sent your operator enough tokens for them to pay gas fee
     ```
 
     ValidatorSet will be updated at every epoch change, which is **once every 2 hours**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
