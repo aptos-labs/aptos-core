@@ -169,6 +169,7 @@ where
 
         if let Some(b) = block_vec.pop().expect("Must exist") {
             // this is a retry
+            parent_block.ensure_has_child(block_id)?;
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
