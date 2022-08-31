@@ -71,7 +71,7 @@ impl FromStr for GithubRepo {
             Err(CliError::CommandArgumentError("Invalid repository must be of the form 'owner/repository` e.g. 'aptos-labs/aptos-core'".to_string()))
         } else {
             Ok(GithubRepo {
-                owner: parts.get(0).unwrap().to_string(),
+                owner: parts.first().unwrap().to_string(),
                 repository: parts.get(1).unwrap().to_string(),
             })
         }

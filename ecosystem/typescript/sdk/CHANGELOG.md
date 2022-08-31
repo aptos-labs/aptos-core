@@ -5,7 +5,15 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+
+N/A
+
+## 1.3.11 (2022-08-31)
+
 - Upgraded typescript version from 4.7.4 to 4.8.2, as well as linter package versions.
+- **[Breaking Change]** ModuleBundle transaction support is removed. Instead, SDK users should use `AptosClient.publishPackage` to publish Move packages.
+- Expose detailed API errors.
+- Accept stringified values as transaction payload parameters.
 
 ## 1.3.10 (2022-08-26)
 

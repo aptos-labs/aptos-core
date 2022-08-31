@@ -339,7 +339,9 @@ async fn construction_metadata(
     };
 
     let suggested_fee = Amount {
-        value: format!("-{}", gas_price_per_unit.saturating_mul(max_gas_amount)),
+        value: gas_price_per_unit
+            .saturating_mul(max_gas_amount)
+            .to_string(),
         currency: native_coin(),
     };
 
@@ -497,7 +499,7 @@ fn parse_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
@@ -533,7 +535,7 @@ fn parse_account_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(

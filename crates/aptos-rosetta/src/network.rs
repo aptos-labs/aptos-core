@@ -109,7 +109,7 @@ async fn network_options(
         operation_types,
         errors,
         historical_balance_lookup: true,
-        timestamp_start_index: 1,
+        timestamp_start_index: 2,
         call_methods: vec![],
         balance_exemptions: vec![],
         mempool_coins: false,

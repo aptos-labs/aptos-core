@@ -5,7 +5,7 @@ use futures::channel::{mpsc::SendError, oneshot::Canceled};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found in the network! Error: {0}")]
     DataIsUnavailable(String),

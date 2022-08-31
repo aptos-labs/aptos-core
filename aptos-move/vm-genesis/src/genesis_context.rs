@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_deps::move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;

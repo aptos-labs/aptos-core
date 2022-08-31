@@ -16,6 +16,7 @@ use aptos_gas::{
     ToOnChainGasSchedule,
 };
 use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::network_address::NetworkAddress;
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -41,6 +42,7 @@ use move_deps::{
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -370,7 +372,7 @@ fn publish_framework(session: &mut SessionExt<impl MoveResolver>, framework: &Re
 /// Publish the given package.
 fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePackage) {
     let modules = pack.sorted_code_and_modules();
-    let addr = *modules.get(0).unwrap().1.self_id().address();
+    let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
         .into_iter()
         .map(|(c, _)| c.to_vec())
@@ -518,8 +520,11 @@ impl TestValidator {
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
             .to_bytes()
             .to_vec();
-        let network_address = [0u8; 0].to_vec();
-        let full_node_network_address = [0u8; 0].to_vec();
+        // TODO: Replace this with a more reasonable address for tests.
+        let addr_str = "/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0";
+        let network_addresses = vec![NetworkAddress::from_str(addr_str).unwrap()];
+        let network_addresses_bytes = bcs::to_bytes(&network_addresses).unwrap();
+        let full_node_network_addresses_bytes = bcs::to_bytes(&network_addresses).unwrap();
 
         let stake_amount = if let Some(amount) = initial_stake {
             amount
@@ -532,8 +537,8 @@ impl TestValidator {
             proof_of_possession,
             operator_address: owner_address,
             voter_address: owner_address,
-            network_addresses: network_address,
-            full_node_network_addresses: full_node_network_address,
+            network_addresses: network_addresses_bytes,
+            full_node_network_addresses: full_node_network_addresses_bytes,
             stake_amount,
         };
         Self {

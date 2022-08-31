@@ -185,7 +185,7 @@ async fn test_old_indexer() {
         assert!(bmt2.is_none());
         assert!(wsc2.len() > 1);
         assert_eq!(events2.len(), 2);
-        assert_eq!(events2.get(0).unwrap().type_, "0x1::coin::WithdrawEvent");
+        assert_eq!(events2.first().unwrap().type_, "0x1::coin::WithdrawEvent");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
     }
 }

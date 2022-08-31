@@ -859,7 +859,7 @@ fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
                 .to_string(),
         ));
     }
-    let address = load_account_arg(ids.get(0).unwrap())?;
+    let address = load_account_arg(ids.first().unwrap())?;
     let module = Identifier::from_str(ids.get(1).unwrap())
         .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
     let member_id = Identifier::from_str(ids.get(2).unwrap())

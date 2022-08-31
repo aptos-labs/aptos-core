@@ -6,8 +6,8 @@ use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
 use aptos_crypto::HashValue;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,

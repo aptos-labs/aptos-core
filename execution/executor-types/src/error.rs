@@ -7,7 +7,7 @@ use thiserror::Error;
 use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 /// Different reasons for proposal rejection
 pub enum Error {
     #[error("Cannot find speculation result for block id {0}")]

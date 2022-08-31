@@ -1,0 +1,18 @@
+yarn-error.log
+.env
+.DS_Store
+*/**/.DS_Store
+npm-debug.log
+.npm/
+/coverage
+/tmp
+node_modules
+.idea/
+.history/
+.vscode/
+dist/
+.nyc_output/
+build/
+
+# Doc generation output
+docs/
