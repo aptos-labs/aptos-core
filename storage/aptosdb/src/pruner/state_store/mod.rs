@@ -174,7 +174,7 @@ where
     fn record_progress_impl(&self, min_readable_version: Version, is_fully_pruned: bool) {
         *self.progress.lock() = (min_readable_version, is_fully_pruned);
         PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["state_store"])
+            .with_label_values(&[S::name()])
             .set(min_readable_version as i64);
     }
 
