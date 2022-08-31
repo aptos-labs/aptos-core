@@ -3,10 +3,10 @@
 
 use crate::emitter::wait_for_single_account_sequence;
 use crate::{
-    emitter::{MAX_TXNS, RETRY_POLICY, SEND_AMOUNT},
+    emitter::{GAS_AMOUNT, MAX_TXNS, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_numbers, EmitJobRequest, EmitModeParams,
 };
-use anyhow::{format_err, Context, Result};
+use anyhow::{anyhow, format_err, Context, Result};
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_infallible::Mutex;
@@ -77,16 +77,39 @@ impl<'t> AccountMinter<'t> {
                 (total_requested_accounts / 50).max(1)
             };
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
-        let coins_per_account = MAX_TXNS * (SEND_AMOUNT + 10); // extra coins for secure to pay none zero gas price
+        let coins_per_account = (MAX_TXNS / total_requested_accounts as u64)
+            .checked_mul(SEND_AMOUNT + GAS_AMOUNT)
+            .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
-
-        let coins_per_seed_account = num_accounts as u64 * (coins_per_account + 1_000_000);
+        let coins_per_seed_account = (num_accounts as u64)
+            .checked_mul(coins_per_account + 1_000_000)
+            .unwrap();
+        let coins_for_root = coins_per_seed_account
+            .checked_mul(expected_num_seed_accounts as u64)
+            .unwrap()
+            .checked_add(1_000_000)
+            .unwrap();
         if req.mint_to_root {
-            self.mint_to_root(
-                &req.rest_clients,
-                coins_per_seed_account * expected_num_seed_accounts as u64 + 1_000_000,
-            )
-            .await?;
+            self.mint_to_root(&req.rest_clients, coins_for_root).await?;
+        } else {
+            let balance = &self
+                .pick_mint_client(&req.rest_clients)
+                .get_account_balance(self.root_account.address())
+                .await?
+                .into_inner();
+            info!(
+                "Root account current balances are {}, requested {} coins",
+                balance.get(),
+                coins_for_root
+            );
+            if balance.get() < coins_for_root {
+                return Err(anyhow!(
+                    "Root ({}) doesn't have enough coins, balance {} < needed {}",
+                    self.root_account.address(),
+                    balance.get(),
+                    coins_for_root
+                ));
+            }
         }
 
         let failed_requests = AtomicUsize::new(0);
