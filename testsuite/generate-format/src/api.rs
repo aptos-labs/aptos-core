@@ -76,8 +76,5 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_api_types::TransactionData>(&samples)?;
     tracer.trace_type::<aptos_api_types::TransactionOnChainData>(&samples)?;
 
-    // first type to fail due to serde... Also name clashing?
-    tracer.trace_type::<aptos_api_types::Transaction>(&samples)?;
-
     tracer.registry()
 }
