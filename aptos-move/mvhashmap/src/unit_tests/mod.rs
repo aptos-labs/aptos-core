@@ -9,7 +9,7 @@ use aptos_aggregator::{
 
 mod proptest_types;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct Value(Vec<usize>);
 
 impl TransactionWrite for Value {

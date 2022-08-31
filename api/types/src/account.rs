@@ -7,7 +7,7 @@ use aptos_types::account_config::AccountResource;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct AccountData {
     pub sequence_number: U64,
     pub authentication_key: HexEncodedBytes,

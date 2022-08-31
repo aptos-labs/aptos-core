@@ -27,7 +27,7 @@ use schemadb::{
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct VersionData {
     pub state_items: usize,

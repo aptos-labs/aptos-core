@@ -5,7 +5,7 @@ use aptos_config::config::ApiConfig;
 use std::{convert::Infallible, net::SocketAddr};
 use warp::{Filter, Reply};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebServer {
     pub address: SocketAddr,
     pub tls_cert_path: Option<String>,

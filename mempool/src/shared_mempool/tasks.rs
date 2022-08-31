@@ -118,7 +118,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
     let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state);
     log_txn_process_results(&statuses, None);
 
-    if let Some(status) = statuses.get(0) {
+    if let Some(status) = statuses.first() {
         if callback.send(Ok(status.1.clone())).is_err() {
             error!(LogSchema::event_log(
                 LogEntry::JsonRpc,

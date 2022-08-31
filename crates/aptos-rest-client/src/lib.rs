@@ -479,7 +479,7 @@ impl Client {
             tokio::time::sleep(DEFAULT_DELAY).await;
         }
 
-        return Err(anyhow!("Timed out waiting for transaction").into());
+        Err(anyhow!("Timed out waiting for transaction").into())
     }
 
     pub async fn wait_for_version(&self, version: u64) -> Result<State> {

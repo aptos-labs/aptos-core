@@ -30,7 +30,7 @@ type Bytes = Vec<u8>;
 ///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {

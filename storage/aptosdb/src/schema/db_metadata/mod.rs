@@ -32,7 +32,7 @@ impl DbMetadataValue {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub enum DbMetadataKey {
     LedgerPrunerProgress,

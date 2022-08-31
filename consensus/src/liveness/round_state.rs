@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
 
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
-#[derive(Serialize, Eq, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Eq)]
 pub enum NewRoundReason {
     QCReady,
     Timeout,

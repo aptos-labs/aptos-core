@@ -11,14 +11,14 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum StreamMessage {
     Header(StreamHeader),
     Fragment(StreamFragment),
 }
 
-#[derive(Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct StreamHeader {
     pub request_id: u32,
@@ -27,7 +27,7 @@ pub struct StreamHeader {
     pub message: NetworkMessage,
 }
 
-#[derive(Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct StreamFragment {
     pub request_id: u32,
