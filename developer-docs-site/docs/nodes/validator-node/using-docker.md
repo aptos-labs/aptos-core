@@ -128,7 +128,8 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
 
-9. To recap, in your working directory, you should have a list of files:
+9. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
+
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder, which includes:
       - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 4).
