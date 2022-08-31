@@ -38,6 +38,20 @@ variable "ecr_base" {
 }
 
 variable "NORMALIZED_GIT_BRANCH_OR_PR" {}
+variable "IMAGE_TAG_PREFIX" {}
+variable "BUILD_TEST_IMAGES" {
+  // Whether to build test images
+  default = "false"
+}
+variable "PROFILE" {
+  // Cargo compilation profile
+  default = "release"
+}
+variable "FEATURES" {
+  // Cargo features to enable, as a comma separated string
+  default = ""
+}
+
 
 target "builder" {
   target     = "builder"
@@ -47,6 +61,8 @@ target "builder" {
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
   args = {
+    PROFILE            = "${PROFILE}"
+    FEATURES           = "${FEATURES}"
     GIT_SHA            = "${GIT_SHA}"
     GIT_BRANCH         = "${GIT_BRANCH}"
     GIT_TAG            = "${GIT_TAG}"
@@ -55,15 +71,18 @@ target "builder" {
 }
 
 group "all" {
-  targets = [
+  targets = flatten([
     "validator",
     "indexer",
     "node-checker",
     "tools",
     "faucet",
     "forge",
-    "telemetry-service"
-  ]
+    "telemetry-service",
+    BUILD_TEST_IMAGES == "true" ? [
+      "validator-testing"
+    ] : []
+  ])
 }
 
 target "_common" {
@@ -79,6 +98,9 @@ target "_common" {
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
     generate_cache_from("telemetry-service"),
+
+    // testing targets
+    generate_cache_from("validator-testing"),
   ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
@@ -99,6 +121,13 @@ target "validator" {
   target   = "validator"
   cache-to = generate_cache_to("validator")
   tags     = generate_tags("validator")
+}
+
+target "validator-testing" {
+  inherits = ["_common"]
+  target   = "validator-testing"
+  cache-to = generate_cache_to("validator-testing")
+  tags     = generate_tags("validator-testing")
 }
 
 target "indexer" {
@@ -146,26 +175,26 @@ target "telemetry-service" {
 function "generate_cache_from" {
   params = [target]
   result = CI == "true" ? [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${NORMALIZED_GIT_BRANCH_OR_PR}",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_SHA}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${GIT_SHA}",
   ] : []
 }
 
 ## we only cache to GCP because AWS ECR doesn't support cache manifests
 function "generate_cache_to" {
   params = [target]
-  result = TARGET_REGISTRY == "remote" ? ["type=registry,mode=max,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${NORMALIZED_GIT_BRANCH_OR_PR}"] : []
+  result = TARGET_REGISTRY == "remote" ? ["type=registry,mode=max,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}"] : []
 }
 
 function "generate_tags" {
   params = [target]
   result = TARGET_REGISTRY == "remote" ? [
-    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
-    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${NORMALIZED_GIT_BRANCH_OR_PR}",
-    "${ecr_base}/${target}:${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     ] : [
-    "aptos-core/${target}:${GIT_SHA}-from-local",
-    "aptos-core/${target}:from-local",
+    "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
+    "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
   ]
 }
