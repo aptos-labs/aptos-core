@@ -38,7 +38,7 @@ on:
       USE_NEW_WRAPPER:
         required: false
         type: boolean
-        default: false
+        default: true
         description: Set to true to enable new wrapper
       TIMEOUT_MINUTES:
         required: false

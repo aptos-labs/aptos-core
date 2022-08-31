@@ -17,7 +17,7 @@ use storage_interface::{DbReader, Order};
 use super::fetch_metadata::ValidatorInfo;
 
 /// Single validator stats
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ValidatorStats {
     /// Number of successful proposals
     pub proposal_successes: u32,

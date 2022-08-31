@@ -8,7 +8,7 @@ use poem_openapi::Object as PoemObject;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PoemObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PoemObject)]
 pub struct LedgerInfo {
     pub chain_id: u8,
     pub epoch: U64,

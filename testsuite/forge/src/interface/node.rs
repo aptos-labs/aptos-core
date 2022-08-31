@@ -57,8 +57,8 @@ pub trait Node: Send + Sync {
     /// This should be a noop if the Node isn't running.
     async fn stop(&mut self) -> Result<()>;
 
-    /// Clears this Node's Storage
-    fn clear_storage(&mut self) -> Result<()>;
+    /// Clears this Node's Storage. This stops the node as well
+    async fn clear_storage(&mut self) -> Result<()>;
 
     /// Performs a Health Check on the Node
     async fn health_check(&mut self) -> Result<(), HealthCheckError>;

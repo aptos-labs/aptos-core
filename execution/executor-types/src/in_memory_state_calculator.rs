@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,

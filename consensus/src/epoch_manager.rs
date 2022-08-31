@@ -305,7 +305,7 @@ impl EpochManager {
             }
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
-                let default_proposer = proposers.get(0).unwrap();
+                let default_proposer = proposers.first().unwrap();
                 Box::new(RoundProposer::new(
                     round_proposers.clone(),
                     *default_proposer,

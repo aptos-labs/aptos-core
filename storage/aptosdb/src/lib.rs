@@ -62,8 +62,8 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::proof::TransactionAccumulatorSummary;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},

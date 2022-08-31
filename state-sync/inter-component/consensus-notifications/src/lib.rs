@@ -21,7 +21,7 @@ use std::{
 use thiserror::Error;
 use tokio::time::timeout;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Notification failed: {0}")]
     NotificationError(String),

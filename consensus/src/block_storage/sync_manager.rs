@@ -29,7 +29,7 @@ use fail::fail_point;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
 pub enum NeedFetchResult {
     QCRoundBeforeRoot,

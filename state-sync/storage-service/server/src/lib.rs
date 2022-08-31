@@ -55,7 +55,7 @@ mod tests;
 const STORAGE_SERVER_VERSION: u64 = 1;
 const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Invalid request received: {0}")]
     InvalidRequest(String),
@@ -481,7 +481,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     match storage_response {
         Ok(storage_response) => match &storage_response.get_data_response() {
             Ok(DataResponse::EpochEndingLedgerInfos(epoch_change_proof)) => {
-                if let Some(ledger_info) = epoch_change_proof.ledger_info_with_sigs.get(0) {
+                if let Some(ledger_info) = epoch_change_proof.ledger_info_with_sigs.first() {
                     Ok(ledger_info.clone())
                 } else {
                     Err(Error::UnexpectedErrorEncountered(

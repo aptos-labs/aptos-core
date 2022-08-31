@@ -36,7 +36,7 @@ const MAX_NUM_KEY_VERSIONS: u32 = 4;
 const DEFAULT_CONNECTION_TIMEOUT_MS: u64 = 1_000;
 const DEFAULT_RESPONSE_TIMEOUT_MS: u64 = 1_000;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
     #[error("Http error, status code: {0}, status text: {1}, body: {2}")]
     HttpError(u16, String, String),
@@ -769,7 +769,7 @@ pub fn process_unsealed_response(resp: Response) -> Result<bool, Error> {
 /// This is intended to be a very simple application of it only for the purpose of introducing a
 /// single key with no versioning history into Vault. This is /only/ for test purposes and not
 /// intended for production use cases.
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct KeyBackup {
     policy: KeyBackupPolicy,
 }
@@ -810,7 +810,7 @@ impl KeyBackup {
     }
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct KeyBackupPolicy {
     name: String,
     keys: BTreeMap<u32, KeyBackupInfo>,
@@ -835,7 +835,7 @@ pub struct KeyBackupPolicy {
     storage_prefix: String,
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct KeyBackupInfo {
     key: Option<String>,
     hhmac_key: Option<String>,
@@ -849,7 +849,7 @@ pub struct KeyBackupInfo {
     creation_time: u32,
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct BackupInfo {
     time: String,
     version: u32,
@@ -901,13 +901,13 @@ impl<T> ReadResponse<T> {
 ///     "orphan": false
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct CreateTokenResponse {
     auth: CreateTokenAuth,
 }
 
 /// See CreateTokenResponse
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct CreateTokenAuth {
     client_token: String,
 }
@@ -922,12 +922,12 @@ struct CreateTokenAuth {
 ///    }
 ///  }
 ///}
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ExportKeyResponse {
     data: ExportKey,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ExportKey {
     name: String,
     keys: BTreeMap<u32, String>,
@@ -937,7 +937,7 @@ struct ExportKey {
 /// {
 ///   "policies": ["root", "deploy"]
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ListPoliciesResponse {
     policies: Vec<String>,
 }
@@ -952,12 +952,12 @@ struct ListPoliciesResponse {
 ///   "lease_id": "",
 ///   "renewable": false
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ListKeysResponse {
     data: ListKeys,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ListKeys {
     keys: Vec<String>,
 }
@@ -982,12 +982,12 @@ struct ListKeys {
 ///     "supports_signing": false
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadKeyResponse {
     data: ReadKeys,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadKeys {
     keys: BTreeMap<u32, ReadKey>,
     name: String,
@@ -995,7 +995,7 @@ struct ReadKeys {
     key_type: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ReadKey {
     creation_time: String,
     public_key: String,
@@ -1009,13 +1009,13 @@ pub struct ReadKey {
 ///     "keys": ["foo", "foo/"]
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadSecretListResponse {
     data: ReadSecretListData,
 }
 
 /// See ReadSecretListResponse
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadSecretListData {
     keys: Vec<String>,
 }
@@ -1035,26 +1035,26 @@ struct ReadSecretListData {
 ///     }
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadSecretResponse {
     data: ReadSecretData,
 }
 
 /// See ReadPolicyResponse
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadSecretData {
     data: BTreeMap<String, Value>,
     metadata: ReadSecretMetadata,
 }
 
 /// See ReadPolicyResponse
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct ReadSecretMetadata {
     created_time: String,
     version: u32,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct WriteSecretResponse {
     data: ReadSecretMetadata,
 }
@@ -1070,12 +1070,12 @@ struct WriteSecretResponse {
 ///     "renewable": true
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct RenewTokenResponse {
     auth: RenewTokenAuth,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct RenewTokenAuth {
     lease_duration: u32,
 }
@@ -1094,7 +1094,7 @@ struct RenewTokenAuth {
 /// }
 /// Note: Vault claims rules is deprecated and policy should be used instead, but that doesn't seem
 /// to work and makes the reading asymmetrical from the writing.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct Policy {
     #[serde(skip)]
     internal_rules: PolicyPaths,
@@ -1138,19 +1138,19 @@ impl TryFrom<&Policy> for serde_json::Value {
 }
 
 /// Represents the policy for a given path.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct PolicyPaths {
     path: BTreeMap<String, PathPolicy>,
 }
 
 /// Represents the set of capabilities used within a policy.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct PathPolicy {
     capabilities: Vec<Capability>,
 }
 
 /// The various set of capabilities available to a policy within Vault.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Capability {
     Create,
@@ -1168,12 +1168,12 @@ pub enum Capability {
 ///     "signature": "vault:v1:MEUCIQCyb869d7KWuA0hBM9b5NJrmWzMW3/pT+0XYCM9VmGR+QIgWWF6ufi4OS2xo1eS2V5IeJQfsi59qeMWtgX0LipxEHI="
 ///   }
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct SignatureResponse {
     data: Signature,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct Signature {
     signature: String,
 }
@@ -1191,7 +1191,7 @@ struct Signature {
 ///   "cluster_id": "3e8b3fec-3749-e056-ba41-b62a63b997e8",
 ///   "nonce": "ef05d55d-4d2c-c594-a5e8-55bc88604c24"
 /// }
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 struct SealStatusResponse {
     sealed: bool,
 }

@@ -12,7 +12,7 @@ use std::{
 
 const GENESIS_DEFAULT: &str = "genesis.blob";
 
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecutionConfig {
     #[serde(skip)]

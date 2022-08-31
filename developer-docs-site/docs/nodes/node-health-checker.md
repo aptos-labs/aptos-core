@@ -206,8 +206,8 @@ There are more options available for which ports to use. Pass `-h` to see more o
 To generate the OpenAPI specs, run the following commands:
 
 ```
-cargo run -- server generate-openapi -f yaml > openapi.yaml
-cargo run -- server generate-openapi -f json > openapi.json
+cargo run -- server generate-openapi -f yaml > doc/spec.yaml
+cargo run -- server generate-openapi -f json > doc/spec.json
 ```
 
-You can also hit the `/spec_yaml` and `/spec_json` endpoints of the running service.
+You can also hit the `/spec.yaml` and `/spec.json` endpoints of the running service.

@@ -137,7 +137,7 @@ impl SingleCheckFailure {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub enum SingleCheckFailureCode {
     // The network address in the validator set config cannot be used for
     // querying NHC.

@@ -63,7 +63,7 @@ pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     OnChainConsensusConfig::CONFIG_ID,
 ];
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OnChainConfigPayload {
     epoch: u64,
     configs: Arc<HashMap<ConfigID, Vec<u8>>>,

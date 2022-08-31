@@ -13,7 +13,7 @@
   "paths": {
     "/check_node": {
       "get": {
-        "summary": "Check the health of a given target node. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.",
+        "summary": "Check the health of a given target node. You may specify a baseline\nnode configuration to use for the evaluation. If you don't specify\na baseline node configuration, we will attempt to determine the\nappropriate baseline based on your target node.",
         "parameters": [
           {
             "name": "node_url",
@@ -24,7 +24,8 @@
             "in": "query",
             "description": "The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com",
             "required": true,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "baseline_configuration_name",
@@ -34,7 +35,8 @@
             "in": "query",
             "description": "The name of the baseline node configuration to use for the evaluation, e.g. devnet_fullnode",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "metrics_port",
@@ -45,7 +47,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "api_port",
@@ -56,7 +59,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           },
           {
             "name": "noise_port",
@@ -67,7 +71,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -86,7 +91,7 @@
     },
     "/check_preconfigured_node": {
       "get": {
-        "summary": "Check the health of the preconfigured node. If none was specified when this instance of the node checker was started, this will return an error. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.",
+        "summary": "Check the health of the preconfigured node. If none was specified when\nthis instance of the node checker was started, this will return an error.\nYou may specify a baseline node configuration to use for the evaluation.\nIf you don't specify a baseline node configuration, we will attempt to\ndetermine the appropriate baseline based on your target node.",
         "parameters": [
           {
             "name": "baseline_configuration_name",
@@ -95,7 +100,8 @@
             },
             "in": "query",
             "required": false,
-            "deprecated": false
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -114,6 +120,7 @@
     },
     "/get_configurations": {
       "get": {
+        "summary": "Get the different baseline configurations the instance of NHC is\nconfigured with. This method is best effort, it is infeasible to\nderive (or even represent) some fields of the spec via OpenAPI,\nso note that some fields will be missing from the response.",
         "responses": {
           "200": {
             "description": "",
@@ -133,6 +140,7 @@
     },
     "/get_configuration_keys": {
       "get": {
+        "summary": "Get just the keys and pretty names for the configurations, meaning\nthe configuration_name and configuration_name_pretty fields.",
         "responses": {
           "200": {
             "description": "",
@@ -141,7 +149,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/ConfigurationKey"
                   }
                 }
               }
@@ -156,17 +164,56 @@
       "BlockingRunnerArgs": {
         "type": "object",
         "required": [
-          "metrics_fetch_delay_secs"
+          "metrics_fetch_delay_secs",
+          "api_client_timeout_secs"
         ],
         "properties": {
           "metrics_fetch_delay_secs": {
             "type": "integer",
             "format": "uint64"
+          },
+          "api_client_timeout_secs": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "BuildVersionEvaluatorArgs": {
+        "type": "object"
+      },
+      "ConfigurationKey": {
+        "type": "object",
+        "required": [
+          "key",
+          "pretty_name"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "pretty_name": {
+            "type": "string"
           }
         }
       },
       "ConsensusProposalsEvaluatorArgs": {
         "type": "object"
+      },
+      "ConsensusRoundEvaluatorArgs": {
+        "type": "object"
+      },
+      "ConsensusTimeoutsEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "allowed_consensus_timeouts"
+        ],
+        "properties": {
+          "allowed_consensus_timeouts": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The amount by which timeouts are allowed to increase between each\nround of metrics collection."
+          }
+        }
       },
       "EvaluationResult": {
         "type": "object",
@@ -238,19 +285,138 @@
       "EvaluatorArgs": {
         "type": "object",
         "required": [
-          "state_sync_version_args",
+          "build_version_args",
           "consensus_proposals_args",
-          "system_information_build_version_args"
+          "consensus_round_args",
+          "consensus_timeouts_args",
+          "hardware_args",
+          "latency_args",
+          "network_minimum_peers_args",
+          "network_peers_tolerance_args",
+          "node_identity_args",
+          "state_sync_version_args",
+          "transaction_availability_args"
         ],
         "properties": {
-          "state_sync_version_args": {
-            "$ref": "#/components/schemas/StateSyncVersionEvaluatorArgs"
+          "build_version_args": {
+            "$ref": "#/components/schemas/BuildVersionEvaluatorArgs"
           },
           "consensus_proposals_args": {
             "$ref": "#/components/schemas/ConsensusProposalsEvaluatorArgs"
           },
-          "system_information_build_version_args": {
-            "$ref": "#/components/schemas/SystemInformationBuildVersionEvaluatorArgs"
+          "consensus_round_args": {
+            "$ref": "#/components/schemas/ConsensusRoundEvaluatorArgs"
+          },
+          "consensus_timeouts_args": {
+            "$ref": "#/components/schemas/ConsensusTimeoutsEvaluatorArgs"
+          },
+          "hardware_args": {
+            "$ref": "#/components/schemas/HardwareEvaluatorArgs"
+          },
+          "latency_args": {
+            "$ref": "#/components/schemas/LatencyEvaluatorArgs"
+          },
+          "network_minimum_peers_args": {
+            "$ref": "#/components/schemas/NetworkMinimumPeersEvaluatorArgs"
+          },
+          "network_peers_tolerance_args": {
+            "$ref": "#/components/schemas/NetworkPeersWithinToleranceEvaluatorArgs"
+          },
+          "node_identity_args": {
+            "$ref": "#/components/schemas/NodeIdentityEvaluatorArgs"
+          },
+          "state_sync_version_args": {
+            "$ref": "#/components/schemas/StateSyncVersionEvaluatorArgs"
+          },
+          "transaction_availability_args": {
+            "$ref": "#/components/schemas/TransactionAvailabilityEvaluatorArgs"
+          }
+        }
+      },
+      "HardwareEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "min_cpu_cores",
+          "min_ram_gb"
+        ],
+        "properties": {
+          "min_cpu_cores": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The minimum number of physical CPU cores the machine must have."
+          },
+          "min_ram_gb": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The minimum amount of RAM in GB (not GiB) the machine must have."
+          }
+        }
+      },
+      "LatencyEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "num_samples",
+          "delay_between_samples_ms",
+          "num_allowed_errors",
+          "max_api_latency_ms"
+        ],
+        "properties": {
+          "num_samples": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "The number of times to hit the node to check latency."
+          },
+          "delay_between_samples_ms": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The delay between each call."
+          },
+          "num_allowed_errors": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "The number of responses that are allowed to be errors."
+          },
+          "max_api_latency_ms": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "NetworkMinimumPeersEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "minimum_peers_inbound",
+          "minimum_peers_outbound"
+        ],
+        "properties": {
+          "minimum_peers_inbound": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The minimum number of inbound connections required to be able to pass.\nFor fullnodes, it only matters that this is greater than zero if the\nnode operator wants to seed data to other nodes."
+          },
+          "minimum_peers_outbound": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The minimum number of outbound connections required to be able to pass.\nThis must be greater than zero for the node to be able to synchronize."
+          }
+        }
+      },
+      "NetworkPeersWithinToleranceEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "inbound_peers_tolerance",
+          "outbound_peers_tolerance"
+        ],
+        "properties": {
+          "inbound_peers_tolerance": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The evaluator will ensure that the inbound connections count is\nwithin this tolerance of the value retrieved from the baseline."
+          },
+          "outbound_peers_tolerance": {
+            "type": "integer",
+            "format": "uint64",
+            "description": "The evaluator will ensure that the outbound connections count is\nwithin this tolerance of the value retrieved from the baseline."
           }
         }
       },
@@ -313,18 +479,9 @@
             "type": "string",
             "description": "This is the name we will show for this configuration to users.\nFor example, if someone opens the NHC frontend, they will see this name\nin a dropdown list of configurations they can test their node against.\ne.g. \"Devnet FullNode\", \"Testnet Validator Node\", etc."
           },
-          "chain_id": {
-            "type": "integer",
-            "format": "uint16",
-            "description": "The chain ID we expect to find when we speak to the node.\nIf not given, we will just assume the value we find is correct.\nIf given, we will check that the value is correct, exiting if not."
-          },
-          "role_type": {
-            "type": "string",
-            "description": "The role type we expect to find when we speak to the node.\nIf not given, we will just assume the value we find is correct.\nIf given, we will check that the value is correct, exiting if not.\ne.g. \"full_node\", \"validator_node\", etc."
-          },
           "evaluators": {
             "type": "array",
-            "description": "The (metric) evaluators to use, e.g. state_sync, api, etc.",
+            "description": "The evaluators to use, e.g. state_sync_version, consensus_proposals, etc.",
             "items": {
               "type": "string"
             }
@@ -336,6 +493,9 @@
             "$ref": "#/components/schemas/RunnerArgs"
           }
         }
+      },
+      "NodeIdentityEvaluatorArgs": {
+        "type": "object"
       },
       "RunnerArgs": {
         "type": "object",
@@ -360,7 +520,7 @@
           }
         }
       },
-      "SystemInformationBuildVersionEvaluatorArgs": {
+      "TransactionAvailabilityEvaluatorArgs": {
         "type": "object"
       }
     }

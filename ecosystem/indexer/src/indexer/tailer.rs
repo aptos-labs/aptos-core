@@ -767,7 +767,7 @@ mod test {
         assert!(bmt2.is_none());
 
         assert_eq!(events2.len(), 2);
-        assert_eq!(events2.get(0).unwrap().type_, "0x1::Whatever::FakeEvent1");
+        assert_eq!(events2.first().unwrap().type_, "0x1::Whatever::FakeEvent1");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::Whatever::FakeEvent2");
         assert_eq!(wsc2.len(), 2);
 

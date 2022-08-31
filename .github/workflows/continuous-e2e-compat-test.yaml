@@ -22,3 +22,4 @@ jobs:
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: testnet
       POST_TO_SLACK: true
+      USE_NEW_WRAPPER: true

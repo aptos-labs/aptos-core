@@ -49,8 +49,7 @@ impl NetworkTest for StateSyncPerformance {
         info!("Deleting all fullnode data!");
         for fullnode_id in &all_fullnodes {
             let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
-            runtime.block_on(async { fullnode.stop().await })?;
-            fullnode.clear_storage()?;
+            runtime.block_on(async { fullnode.clear_storage().await })?;
         }
 
         // Fetch the highest synced version from the swarm

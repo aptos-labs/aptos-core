@@ -6,7 +6,7 @@ use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TableItemRequest {
     pub key_type: MoveType,
     pub value_type: MoveType,
