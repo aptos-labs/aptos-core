@@ -4,7 +4,8 @@ slug: "run-validator-node-using-azure"
 sidebar_position: 11
 ---
 
-## Run on AWS
+## Run on Azure
+
 This guide assumes you already have Azure account setup.
 
 Install pre-requisites if needed:
@@ -13,6 +14,10 @@ Install pre-requisites if needed:
    * Terraform 1.2.4: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
    * Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+
+:::tip One validator node + one validator fullnode
+When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
+:::
 
 1. Create a working directory for your configuration.
 

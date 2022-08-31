@@ -6,6 +6,10 @@ sidebar_position: 13
 
 # Using Aptos-core source code
 
+:::tip For validator fullnode
+Use the `fullnode.yaml` to run a validator fullnode. See [Step 13](#source-code-vfn).
+:::
+
 1. Clone the Aptos repo.
 
       ```
@@ -159,7 +163,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
     Modify the config files to update the data directory, key path, genesis file path, waypoint path.
     User must have write access to data directory.
 
-13. <span id="source-code-files">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
+13. <span id="source-code-vfn">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
 
     - `config` folder, which includes:
       - `validator.yaml` validator config file
