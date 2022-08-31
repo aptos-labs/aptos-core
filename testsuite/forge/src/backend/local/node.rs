@@ -245,7 +245,7 @@ impl Node for LocalNode {
         Ok(())
     }
 
-    fn clear_storage(&mut self) -> Result<()> {
+    async fn clear_storage(&mut self) -> Result<()> {
         // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
@@ -284,6 +284,9 @@ impl Node for LocalNode {
                 .map_err(anyhow::Error::from)
                 .context("Failed to delete secure_storage_db_path")?;
         }
+
+        // Stop the node to clear buffers
+        self.stop();
 
         Ok(())
     }
