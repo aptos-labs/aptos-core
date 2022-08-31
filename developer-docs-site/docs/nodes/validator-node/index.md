@@ -17,7 +17,6 @@ The following guides provide step-by-step instructions for running fullnode, val
 - Similarly, if you use source code, see [Step 13](/nodes/validator-node/run-validator-node-using-source#source-code-files) in the source code instructions. Make sure to follow the subsequent steps for running the validator fullnode.
 :::
 
-
 - ### [On AWS](using-aws.md)
 - ### [On Azure](using-azure.md)
 - ### [On GCP](using-gcp.md)
