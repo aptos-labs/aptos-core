@@ -1,0 +1,51 @@
+name: Sync Grafana Dashboards
+
+permissions:
+  # Permissions to push to branch and create a PR
+  pull-requests: write
+  contents: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+env:
+  GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+
+jobs:
+  grafana-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install grafana-sync
+        run: |
+          wget https://github.com/mpostument/grafana-sync/releases/download/1.4.8/grafana-sync_1.4.8_Linux_x86_64.tar.gz
+          tar -xvf grafana-sync_1.4.8_Linux_x86_64.tar.gz
+          sha=$(shasum grafana-sync_1.4.8_Linux_x86_64.tar.gz | awk '{ print $1 }')
+          [ "$sha" != "b6a213bc30ff6aa05d9eb91127de1bb5eebb9b24" ] && echo "shasum mismatch" && exit 1
+          chmod +x grafana-sync
+      - name: Pull dashboards
+        run: ./grafana-sync pull-dashboards --apikey="${GRAFANA_API_KEY}" --directory="dashboards" --url https://o11y.aptosdev.com --folderName="aptos-core"
+      - name: Format dashboards to be more readable
+        working-directory: ./dashboards
+        run: |
+          for d in *.json; do
+            echo "Reformatting ${d}"
+            cp $d "${d}.tmp"
+            cat "${d}.tmp" | python -m json.tool > $d
+            rm "${d}.tmp"
+          done
+      - name: Compress dashboards
+        working-directory: ./dashboards
+        run: gzip -fkn *.json
+      - name: Check dashboard changes
+        working-directory: ./dashboards
+        run: git status
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          add-paths: dashboards
+          commit-message: "[dashboards] sync grafana dashboards"
+          branch: sync-grafana-dashboards
+          delete-branch: true
