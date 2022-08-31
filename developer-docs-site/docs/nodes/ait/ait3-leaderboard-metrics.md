@@ -5,7 +5,7 @@ slug: "ait-3-leaderboard-metrics"
 
 # AIT-3 Leaderboard Metrics
 
-This document explains how the rewards for AIT-3 validator are evaluated and displayed on the [AIT-3 Validator Status](https://community.staging.gcp.aptosdev.com/leaderboard/it3?sort=-rewards_growth) page. 
+This document explains how the rewards for AIT-3 validator are evaluated and displayed on the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
 
 ## How are rewards calculated
 
@@ -36,9 +36,9 @@ The reward a leader receives is calculated by multiplying the maximum possible r
 Note also that the reward rate is the same for every validator. Hence the maxumum reward is directly proportional to the staking amount, i.e., the more a validator stakes, the more the validator can earn in absolute terms.
 :::
 
-## Reward performance
+## Rewards performance
 
-- The reward performance of a validator is calculated as a % of reward earned by the validator out of the maximum reward earning opportunity i.e., `(rewards earned across the epochs)/(maximum reward opportunity across the epochs)`. **This is a cumulative metric across all the epochs.**
+- The REWARDS PERFORMANCE column shows the rewards performance of a validator. It is calculated as a % of reward earned by the validator out of the maximum reward earning opportunity i.e., `(rewards earned across the epochs)/(maximum reward opportunity across the epochs)`. **This is a cumulative metric across all the epochs.**
 - A validator can improve their performance by improving their proposal success rate.
 
 ## Last epoch performance
@@ -52,9 +52,5 @@ The LAST EPOCH PERFORMANCE column shown on the leaderboard is reported as `(numb
 
 The GOVERNANCE VOTES column shown on the leaderboard is reported as `(governance proposals voted on)/(total governance votes)`.
 
-
-
-
-        
         
       
