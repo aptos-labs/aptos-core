@@ -531,11 +531,10 @@ impl TestContext {
         &self,
         poem_address: SocketAddr,
     ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-        let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
+        warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),
-        ));
-        proxy
+        ))
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {

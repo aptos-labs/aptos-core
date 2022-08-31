@@ -741,6 +741,9 @@ impl StateStore {
             }
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
+        for version in begin..end {
+            db_batch.delete::<VersionDataSchema>(&version)?;
+        }
         Ok(())
     }
 

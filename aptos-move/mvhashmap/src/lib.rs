@@ -82,7 +82,7 @@ pub struct MVHashMap<K, V> {
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MVHashMapError {
     /// No prior entry is found.
     NotFound,
@@ -95,7 +95,7 @@ pub enum MVHashMapError {
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MVHashMapOutput<V> {
     /// Result of resolved delta op, always u128. Unlike with `Version`, we return
     /// actual data because u128 is cheap to copy amd validation can be done correctly
@@ -117,7 +117,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
 
     /// For processing outputs - removes the BTreeMap from the MVHashMap.
     pub fn entry_map_for_key(&self, key: &K) -> Option<BTreeMap<TxnIndex, CachePadded<Entry<V>>>> {
-        self.data.remove(&*key).map(|(_, tree)| tree)
+        self.data.remove(key).map(|(_, tree)| tree)
     }
 
     /// Add a write of versioned data at a specified key. If the entry is overwritten, asserts

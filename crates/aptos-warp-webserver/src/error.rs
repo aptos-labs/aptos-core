@@ -9,7 +9,7 @@ use std::{
 };
 use warp::{http::StatusCode, reject::Reject};
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Error {
     pub code: u16,
     pub message: String,

@@ -234,7 +234,7 @@ impl FromStr for HostAndPort {
                 "Invalid host and port, must be of the form 'host:port` e.g. '127.0.0.1:6180'",
             ))
         } else {
-            let host = DnsName::from_str(*parts.get(0).unwrap())?;
+            let host = DnsName::from_str(*parts.first().unwrap())?;
             let port = u16::from_str(parts.get(1).unwrap())?;
             Ok(HostAndPort { host, port })
         }

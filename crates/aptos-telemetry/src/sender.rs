@@ -90,8 +90,6 @@ impl TelemetrySender {
     ) -> Result<(), anyhow::Error> {
         debug!("Sending Prometheus Metrics");
 
-        let token = self.get_auth_token().await?;
-
         let scraped_metrics =
             prometheus::TextEncoder::new().encode_to_string(&registry.gather())?;
 
@@ -104,7 +102,6 @@ impl TelemetrySender {
                 self.client
                     .post(format!("{}/push-metrics", self.base_url))
                     .header(CONTENT_ENCODING, "gzip")
-                    .bearer_auth(token)
                     .body(compressed_bytes),
             )
             .await;

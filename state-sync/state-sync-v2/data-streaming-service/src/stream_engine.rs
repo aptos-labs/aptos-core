@@ -554,18 +554,18 @@ impl ContinuousTransactionStreamEngine {
                 }
                 response_payload => {
                     // TODO(joshlind): eventually we want to notify the data client of the bad response
-                    return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                    Err(Error::AptosDataClientResponseIsInvalid(format!(
                         "Received an incorrect number of epoch ending ledger infos. Response: {:?}",
                         response_payload
-                    )));
+                    )))
                 }
             }
         } else {
             // TODO(joshlind): eventually we want to notify the data client of the bad response
-            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+            Err(Error::AptosDataClientResponseIsInvalid(format!(
                 "Expected an epoch ending ledger response but got: {:?}",
                 response_payload
-            )));
+            )))
         }
     }
 

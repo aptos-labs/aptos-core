@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct BlockOutput {
     #[prost(uint64, tag = "1")]
     pub height: u64,
@@ -11,7 +11,7 @@ pub struct BlockOutput {
     #[prost(uint32, tag = "3")]
     pub chain_id: u32,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct TransactionOutput {
     #[prost(message, optional, tag = "1")]
     pub transaction_info_output: ::core::option::Option<TransactionInfoOutput>,
@@ -24,7 +24,7 @@ pub struct TransactionOutput {
 }
 /// Nested message and enum types in `TransactionOutput`.
 pub mod transaction_output {
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Oneof)]
     pub enum TxnData {
         #[prost(message, tag = "2")]
         BlockMetadata(super::BlockMetadataTransactionOutput),
@@ -34,7 +34,7 @@ pub mod transaction_output {
         Genesis(super::GenesisTransactionOutput),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct TransactionInfoOutput {
     #[prost(bytes = "vec", tag = "1")]
     pub hash: ::prost::alloc::vec::Vec<u8>,
@@ -63,7 +63,7 @@ pub struct TransactionInfoOutput {
     #[prost(message, optional, tag = "12")]
     pub timestamp: ::core::option::Option<super::super::util::timestamp::Timestamp>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct BlockMetadataTransactionOutput {
     #[prost(uint64, tag = "1")]
     pub version: u64,
@@ -82,7 +82,7 @@ pub struct BlockMetadataTransactionOutput {
     #[prost(uint64, tag = "8")]
     pub epoch: u64,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct UserTransactionOutput {
     #[prost(uint64, tag = "1")]
     pub version: u64,
@@ -105,12 +105,12 @@ pub struct UserTransactionOutput {
     #[prost(string, tag = "10")]
     pub payload: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct GenesisTransactionOutput {
     #[prost(string, tag = "1")]
     pub payload: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct SignatureOutput {
     #[prost(uint64, tag = "1")]
     pub version: u64,
@@ -133,7 +133,7 @@ pub struct SignatureOutput {
     #[prost(uint32, tag = "10")]
     pub multi_sig_index: u32,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct EventOutput {
     #[prost(uint64, tag = "1")]
     pub version: u64,
@@ -146,14 +146,14 @@ pub struct EventOutput {
     #[prost(string, tag = "5")]
     pub data: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct EventKeyOutput {
     #[prost(uint64, tag = "1")]
     pub creation_number: u64,
     #[prost(string, tag = "2")]
     pub account_address: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct WriteSetChangeOutput {
     #[prost(uint64, tag = "1")]
     pub version: u64,
@@ -166,7 +166,7 @@ pub struct WriteSetChangeOutput {
 }
 /// Nested message and enum types in `WriteSetChangeOutput`.
 pub mod write_set_change_output {
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag = "4")]
         MoveModule(super::MoveModuleOutput),
@@ -176,7 +176,7 @@ pub mod write_set_change_output {
         TableItem(super::TableItemOutput),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct MoveModuleOutput {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -196,7 +196,7 @@ pub struct MoveModuleOutput {
     #[prost(uint64, tag = "8")]
     pub wsc_index: u64,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct MoveResourceOutput {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
@@ -213,7 +213,7 @@ pub struct MoveResourceOutput {
     #[prost(uint64, tag = "8")]
     pub wsc_index: u64,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct TableItemOutput {
     #[prost(string, tag = "1")]
     pub handle: ::prost::alloc::string::String,

@@ -104,7 +104,7 @@ pub(crate) async fn handle_custom_event(
         .await
         .map_err(|e| {
             error!("unable to insert row into bigquery: {}", e);
-            return ServiceError::from(anyhow!("unable to insert row into bigquery"));
+            ServiceError::from(anyhow!("unable to insert row into bigquery"))
         })?;
 
     debug!("row inserted succeefully: {:?}", &row);

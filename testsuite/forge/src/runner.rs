@@ -91,7 +91,7 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, EmitJobRequest::default());
+    let forge = Forge::new(options, tests, Duration::from_secs(300), factory);
 
     if options.list {
         forge.list()?;
@@ -139,6 +139,9 @@ pub struct ForgeConfig<'cfg> {
 
     /// Optional node helm values init function
     node_helm_config_fn: Option<NodeConfigFn>,
+
+    /// Transaction workload to run on the swarm
+    emit_job_request: EmitJobRequest,
 
     /// Success criteria
     success_criteria: SuccessCriteria,
@@ -199,6 +202,11 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn with_emit_job(mut self, emit_job_request: EmitJobRequest) -> Self {
+        self.emit_job_request = emit_job_request;
+        self
+    }
+
     pub fn with_success_criteria(mut self, success_criteria: SuccessCriteria) -> Self {
         self.success_criteria = success_criteria;
         self
@@ -229,6 +237,9 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             genesis_config: None,
             genesis_helm_config_fn: None,
             node_helm_config_fn: None,
+            emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                mempool_backlog: 30000,
+            }),
             success_criteria: SuccessCriteria::new(3500, 10000, None),
         }
     }
@@ -237,22 +248,22 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
 pub struct Forge<'cfg, F> {
     options: &'cfg Options,
     tests: ForgeConfig<'cfg>,
+    global_duration: Duration,
     factory: F,
-    global_job_request: EmitJobRequest,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
     pub fn new(
         options: &'cfg Options,
         tests: ForgeConfig<'cfg>,
+        global_duration: Duration,
         factory: F,
-        global_job_request: EmitJobRequest,
     ) -> Self {
         Self {
             options,
             tests,
+            global_duration,
             factory,
-            global_job_request,
         }
     }
 
@@ -310,8 +321,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
-                self.global_job_request.duration
-                    + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
                 self.tests.genesis_helm_config_fn.clone(),
                 self.tests.node_helm_config_fn.clone(),
             ))?;
@@ -345,7 +355,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     CoreContext::from_rng(&mut rng),
                     &mut *swarm,
                     &mut report,
-                    self.global_job_request.clone(),
+                    self.global_duration,
+                    self.tests.emit_job_request.clone(),
                     self.tests.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));

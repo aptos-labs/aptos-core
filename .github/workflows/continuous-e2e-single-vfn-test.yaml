@@ -6,10 +6,12 @@ permissions:
 
 on:
   workflow_dispatch:
+    schedule:
+      - cron: "0 */12 * * *"
 
 jobs:
   # Test transaction processing throughput at a single VFN
-  run-forge-chaos:
+  run-forge-single-vfn-perf:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:

@@ -6,6 +6,10 @@ sidebar_position: 12
 
 # Using Docker
 
+:::tip For validator fullnode
+Use the `fullnode.yaml` to run a validator fullnode. See [Step 11](#docker-vfn).
+:::
+
 1. Install Docker and Docker-Compose, [Aptos CLI 0.3.1](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli).
 
 :::caution Note on Apple M1
@@ -128,7 +132,8 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
 
-9. To recap, in your working directory, you should have a list of files:
+9. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
+
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder, which includes:
       - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 4).
@@ -147,15 +152,16 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
 Now you have completed setting up your validator node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
 
-11. [Optional] Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.
+11.  [Optional] <span id="docker-vfn">Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.</span>
+
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
     ```
 
-12. Edit `fullnode.yaml` file to update the IP address for Validator node.
+12.  Edit `fullnode.yaml` file to update the IP address for Validator node.
 
-13. [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
+13.  [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
 
-14. [Optional] Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
+14.  [Optional] Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.

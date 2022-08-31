@@ -9,7 +9,7 @@ use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
 }
@@ -83,7 +83,7 @@ impl OnChainConfig for OnChainConsensusConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub decoupled_execution: bool,
     pub back_pressure_limit: u64,

@@ -20,7 +20,7 @@ impl Test for StateSyncPerformance {
 
 impl NetworkTest for StateSyncPerformance {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let emit_txn_duration = ctx.global_job.duration; // How long we'll emit txns for
+        let emit_txn_duration = ctx.global_duration; // How long we'll emit txns for
         let fullnode_sync_duration = emit_txn_duration.saturating_mul(2); // Limits state sync to half txn throughput
 
         // Generate some traffic through the fullnodes

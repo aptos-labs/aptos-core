@@ -1,4 +1,5 @@
 from __future__ import annotations
+import atexit
 
 import json
 import multiprocessing
@@ -8,7 +9,7 @@ import multiprocessing
 multiprocessing.set_start_method('spawn')
 
 
-from optparse import Option
+import asyncio
 import os
 import pwd
 import random
@@ -21,7 +22,7 @@ import textwrap
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, TypedDict, Union
 
@@ -42,7 +43,10 @@ class RunResult:
 
 class Shell:
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
-        raise NotImplementedError
+        raise NotImplementedError()
+
+    async def gen_run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        raise NotImplementedError()
 
 
 @dataclass
@@ -66,10 +70,41 @@ class LocalShell(Shell):
             output += reader.read()
         return RunResult(process.returncode, output)
 
+    async def gen_run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        # Write to a temp file, stream to stdout
+        tmpname = tempfile.mkstemp()[1]
+        with open(tmpname, 'wb') as writer, open(tmpname, 'rb') as reader:
+            if self.verbose:
+                print(f"+ {' '.join(command)}")
+            try:
+                process = await asyncio.create_subprocess_exec(command[0], *command[1:], stdout=writer, stderr=writer)
+            except Exception as e:
+                raise Exception(f"Failed running {command}") from e
+            output = b""
+            while True:
+                wait_task = asyncio.create_task(process.wait())
+                finished, running = await asyncio.wait({wait_task}, timeout=1)
+                assert bool(finished) ^ bool(running), "Cannot have both finished and running"
+                if finished:
+                    break
+                chunk = reader.read()
+                output += chunk
+                if stream_output:
+                    sys.stdout.write(chunk.decode("utf-8"))
+                await asyncio.sleep(0.1)
+            output += reader.read()
+        exit_code = process.returncode
+        assert exit_code is not None, "Process must have exited"
+        return RunResult(exit_code, output)
+
+
 
 class FakeShell(Shell):
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
         return RunResult(0, b'output')
+
+    async def gen_run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        return RunResult(0, b'async output')
 
 
 def install_dependency(dependency: str) -> None:
@@ -135,6 +170,9 @@ class Filesystem:
     def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
         raise NotImplementedError()
 
+    def unlink(self, filename: str) -> None:
+        raise NotImplementedError()
+
 
 class FakeFilesystem(Filesystem):
     def write(self, filename: str, contents: bytes) -> None:
@@ -147,6 +185,9 @@ class FakeFilesystem(Filesystem):
         return "temp"
 
     def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
+        return
+
+    def unlink(self, filename: str) -> None:
         return
 
 
@@ -165,6 +206,10 @@ class LocalFilesystem(Filesystem):
     def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
         resource.setrlimit(resource_type, (soft, hard))
 
+    def unlink(self, filename: str) -> None:
+        os.unlink(filename)
+
+
 # o11y resources
 INTERN_ES_DEFAULT_INDEX = "90037930-aafc-11ec-acce-2d961187411f"
 INTERN_ES_BASE_URL = "https://es.intern.aptosdev.com"
@@ -180,23 +225,23 @@ DEVINFRA_GRAFANA_BASE_URL = (
 )
 HUMIO_LOGS_LINK = (
     "https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_insta"
-    "nce%3Dvalidator-0%29%20%7C%20$FORGE_NAMESPACE%20&live=true&start=24h&widge"
-    "tType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3"
-    "A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7"
-    "D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22forma"
-    "t%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22"
-    "openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTempla"
-    "te%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B"
-    "%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7"
-    "B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%2"
-    "0PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%"
-    "22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7"
-    "D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%"
-    "22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field"
-    "%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%"
-    "22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3"
-    "A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showO"
-    "nlyFirstLine=false"
+    "nce%3D%2A%29%20%7C%20forge-compat%20&live=false&start=1661893461000&end=16"
+    "61894266000&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C"
+    "%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%2"
+    "2width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22le"
+    "vel%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3"
+    "A%22link%22%2C%22openInNewBrowserTab%22%3A***%2C%22style%22%3A%22button%22"
+    "%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-c"
+    "ore%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTem"
+    "plate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header"
+    "%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22"
+    "%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22"
+    "width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s"
+    ".pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22ty"
+    "pe%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22form"
+    "at%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%"
+    "22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtB"
+    "ottom=***&showOnlyFirstLine=false"
 )
 
 
@@ -238,6 +283,9 @@ class Processes:
         raise NotImplementedError()
 
     def spawn(self, target: Callable[[], None]) -> Process:
+        raise NotImplementedError()
+
+    def atexit(self, callback: Callable[[], None]) -> None:
         raise NotImplementedError()
 
 
@@ -282,8 +330,14 @@ class SystemProcesses(Processes):
         process.start()
         return MultiProcessingProcess(process)
 
+    def atexit(self, callback: Callable[[], None]) -> None:
+        atexit.register(callback)
+
 
 class FakeProcesses(Processes):
+    def __init__(self) -> None:
+        self.exit_callbacks = []
+
     def processes(self) -> Generator[Process, None, None]:
         yield FakeProcess("concensus", 1)
 
@@ -292,6 +346,9 @@ class FakeProcesses(Processes):
 
     def spawn(self, target: Callable[[], None]) -> Process:
         return FakeProcess("child", 2)
+
+    def atexit(self, callback: Callable[[], None]) -> None:
+        return self.exit_callbacks.append(callback)
 
 
 class ForgeState(Enum):
@@ -339,10 +396,13 @@ class ForgeResult:
         result._start_time = context.time.now()
         try:
             yield result
+            result.set_debugging_output(
+                dump_forge_state(context.shell, context.forge_namespace)
+            )
         except Exception as e:
             result.set_state(ForgeState.FAIL)
             result.set_debugging_output(
-                "Error: {}\nDebugging Output:{}\n".format(
+                "{}\n{}\n".format(
                     str(e),
                     dump_forge_state(context.shell, context.forge_namespace)
                 )
@@ -390,6 +450,13 @@ class FakeTime(Time):
 
 
 @dataclass
+class SystemContext:
+    shell: Shell
+    filesystem: Filesystem
+    processes: Processes
+
+
+@dataclass
 class ForgeContext:
     shell: Shell
     filesystem: Filesystem
@@ -430,7 +497,7 @@ class ForgeContext:
 
     @property
     def forge_chain_name(self) -> str:
-        forge_chain_name = self.forge_namespace.lstrip("aptos-")
+        forge_chain_name = self.forge_cluster_name.lstrip("aptos-")
         if "forge" not in forge_chain_name:
             forge_chain_name += "net"
         return forge_chain_name
@@ -474,7 +541,7 @@ def format_report(context: ForgeContext, result: ForgeResult) -> str:
     try:
         report_text = json.loads(report_output).get("text")
     except Exception as e:
-        return "Forge report malformed: {}\n{}\n{}".format(e, report_output, debugging_appendix)
+        return "Forge report malformed: {}\n{}\n{}".format(e, repr(report_output), debugging_appendix)
     if not report_text:
         return "Forge report text empty. See test runner output.\n{}".format(debugging_appendix)
     else:
@@ -560,9 +627,8 @@ def get_dashboard_link(
     if time_filter is True:
         grafana_time_filter = "&refresh=10s&from=now-15m&to=now"
     elif isinstance(time_filter, tuple):
-        milliseconds = lambda dt: int(dt.strftime("%f")) / 1000
-        start_ms = milliseconds(time_filter[0])
-        end_ms = milliseconds(time_filter[1])
+        start_ms = int(time_filter[0].timestamp()) * 1000
+        end_ms = int(time_filter[1].timestamp()) * 1000
         grafana_time_filter = f"&from={start_ms}&to={end_ms}"
     else:
         raise Exception(f"Invalid refresh argument: {time_filter}")
@@ -582,11 +648,16 @@ def format_github_info(context: ForgeContext) -> str:
           * [Test runner output]({context.github_job_url})
           * Test run is {'' if context.forge_blocking else 'not '}land-blocking
         """
-    )
+    ).lstrip().strip()
 
 
 def format_pre_comment(context: ForgeContext) -> str:
-    dashboard_link = "https://banana"
+    dashboard_link = get_dashboard_link(
+        context.forge_cluster_name,
+        context.forge_namespace,
+        context.forge_chain_name,
+        True,
+    )
     validator_logs_link = get_validator_logs_link(context.forge_namespace, context.forge_chain_name, True)
     humio_logs_link = get_humio_logs_link(context.forge_namespace)
 
@@ -594,10 +665,10 @@ def format_pre_comment(context: ForgeContext) -> str:
         f"""
         ### Forge is running with `{context.image_tag}`
         * [Grafana dashboard (auto-refresh)]({dashboard_link})
-        * [Validator 0 logs (auto-refresh)]({validator_logs_link})
         * [Humio Logs]({humio_logs_link})
+        * [(Deprecated) OpenSearch Logs]({validator_logs_link})
         """
-    ).strip() + format_github_info(context)
+    ).lstrip() + format_github_info(context)
 
 
 def format_comment(context: ForgeContext, result: ForgeResult) -> str:
@@ -628,14 +699,12 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         {forge_comment_header}
         ```
         """
-    ) + format_report(context, result) + textwrap.dedent(
+    ).lstrip() + format_report(context, result) + textwrap.dedent(
         f"""
         ```
-        * [Grafana dashboard (auto-refresh)]({dashboard_link})
-        * [Validator 0 logs (auto-refresh)]({validator_logs_link})
+        * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
-
-        {result.format()}
+        * [(Deprecated) OpenSearch Logs]({validator_logs_link})
         """
     ) + format_github_info(context)
 
@@ -741,15 +810,21 @@ class K8sForgeRunner(ForgeRunner):
             context.shell.run([
                 "kubectl", "wait", "-n", "default", "--timeout=5m", "--for=condition=Ready", f"pod/{forge_pod_name}"
             ]).unwrap()
-            forge_logs = context.shell.run([
-                "kubectl", "logs", "-n", "default", "-f", forge_pod_name
-            ], stream_output=True)
-
-            forge_result.set_output(forge_logs.output.decode())
-
             state = None
             attempts = 100
+            streaming = True
             while state is None:
+                forge_logs = context.shell.run([
+                    "kubectl", "logs", "-n", "default", "-f", forge_pod_name
+                ], stream_output=streaming)
+
+                # After the first invocation, stop streaming duplicate logs
+                if streaming:
+                    streaming = False
+
+                if forge_logs.succeeded():
+                    forge_result.set_output(forge_logs.output.decode())
+
                 # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
                 forge_status = context.shell.run([
                     "kubectl", "get", "pod", "-n", "default", forge_pod_name, "-o", "jsonpath='{.status.phase}'"
@@ -819,6 +894,14 @@ def list_eks_clusters(shell: Shell) -> List[str]:
 
 def set_current_cluster(shell: Shell, forge_cluster_name: str) -> None:
     shell.run(["aws", "eks", "update-kubeconfig", "--name", forge_cluster_name]).unwrap()
+
+
+async def write_cluster_config(shell: Shell, forge_cluster_name: str, temp: str) -> None:
+    (await shell.gen_run([
+        "aws", "eks", "update-kubeconfig",
+        "--name", forge_cluster_name,
+        "--kubeconfig", temp
+    ])).unwrap()
 
 
 def update_aws_auth(shell: Shell, aws_auth_script: Optional[str] = None) -> None:
@@ -946,6 +1029,7 @@ def test(
     github_run_id: Optional[str],
     github_step_summary: Optional[str],
 ) -> None:
+    """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)
     filesystem = LocalFilesystem()
@@ -1084,10 +1168,11 @@ def test(
 class ForgeJob:
     name: str
     phase: str
+    cluster: ForgeCluster
 
     @classmethod
-    def from_pod(cls, pod: Dict[str, Any]) -> ForgeJob:
-        return cls(name=pod["metadata"]["name"], phase=pod["status"]["phase"])
+    def from_pod(cls, cluster: ForgeCluster, pod: GetPodsItem) -> ForgeJob:
+        return cls(name=pod["metadata"]["name"], phase=pod["status"]["phase"], cluster=cluster)
 
     def running(self):
         return self.phase == "Running"
@@ -1099,14 +1184,66 @@ class ForgeJob:
         return self.phase == "Failed"
 
 
-def get_forge_jobs(shell: Shell) -> Generator[ForgeJob, None, None]:
-    pod_result = shell.run([
-        "kubectl", "get", "pods", "-n", "default", "-o", "json"
-    ]).unwrap().decode()
-    pods = json.loads(pod_result)["items"]
-    for pod in pods:
-        if pod["metadata"]["name"].startswith("forge-"):
-            yield ForgeJob.from_pod(pod)
+class GetPodsItemMetadata(TypedDict):
+    name: str
+
+
+class GetPodsItemStatus(TypedDict):
+    phase: str
+
+
+class GetPodsItem(TypedDict):
+    metadata: GetPodsItemMetadata
+    status: GetPodsItemStatus
+
+
+class GetPodsResult(TypedDict):
+    items: List[GetPodsItem]
+
+
+@dataclass
+class ForgeCluster:
+    name: str
+    kubeconf: str
+
+    async def write(self, shell: Shell) -> None:
+        await write_cluster_config(shell, self.name, self.kubeconf)
+
+    async def get_jobs(self, shell: Shell) -> List[ForgeJob]:
+        pod_result = (await shell.gen_run([
+            "kubectl", "get", "pods",
+            "-n", "default",
+            "--kubeconfig", self.kubeconf,
+            "-o", "json"
+        ])).unwrap().decode()
+        pods_result: GetPodsResult = json.loads(pod_result)
+        pods = pods_result["items"]
+        return [
+            ForgeJob.from_pod(self, pod)
+            for pod in pods
+            if pod["metadata"]["name"].startswith("forge-")
+        ]
+
+
+async def get_all_forge_jobs(context: SystemContext) -> List[ForgeJob]:
+    # Get all cluster contexts
+    all_jobs = []
+    tempfiles = []
+    for cluster in list_eks_clusters(context.shell):
+        temp = context.filesystem.mkstemp()
+        tempfiles.append(temp)
+        config = ForgeCluster(name=cluster, kubeconf=temp)
+        await config.write(context.shell)
+        all_jobs.extend(await config.get_jobs(context.shell))
+
+    def unlink_tempfiles():
+        for temp in tempfiles:
+            context.filesystem.unlink(temp)
+
+    # Delay the deletion of cluster files till the process terminates
+    context.processes.atexit(unlink_tempfiles)
+
+    return all_jobs
 
 
 @main.command("list-jobs")
@@ -1118,28 +1255,52 @@ def list_jobs(
 ) -> None:
     """List all available clusters"""
     shell = LocalShell()
-    old_cluster = get_current_cluster_name(shell)
-    pattern = re.compile(regex or ".*")
-    try:
-        for cluster in list_eks_clusters(shell):
-            set_current_cluster(shell, cluster)
-            print("Cluster:", cluster)
-            for job in get_forge_jobs(shell):
-                if not pattern.match(job.name) or phase and job.phase not in phase:
-                    continue
-                if job.succeeded():
-                    fg = "green"
-                elif job.failed():
-                    fg = "red"
-                elif job.running():
-                    fg = "yellow"
-                else:
-                    fg = "white"
+    filesystem = LocalFilesystem()
+    processes = SystemProcesses()
+    context = SystemContext(shell, filesystem, processes)
 
-                click.secho(f"{job.name} {job.phase}", fg=fg)
-    except Exception as e:
-        set_current_cluster(shell, old_cluster)
-        raise e
+    # Default to show running jobs
+    phase = phase or ["Running"]
+
+    pattern = re.compile(regex or ".*")
+    jobs = asyncio.run(get_all_forge_jobs(context))
+
+    for job in jobs:
+        if not pattern.match(job.name) or phase and job.phase not in phase:
+            continue
+        if job.succeeded():
+            fg = "green"
+        elif job.failed():
+            fg = "red"
+        elif job.running():
+            fg = "yellow"
+        else:
+            fg = "white"
+
+        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+
+
+@main.command()
+@click.argument("job_name")
+def tail(
+    job_name: str,
+) -> None:
+    """Tail the logs for a running job"""
+    shell = LocalShell()
+    filesystem = LocalFilesystem()
+    processes = SystemProcesses()
+    context = SystemContext(shell, filesystem, processes)
+    all_jobs = asyncio.run(get_all_forge_jobs(context))
+    found_jobs = [job for job in all_jobs if job.name == job_name]
+    if not found_jobs:
+        other_jobs = "".join(["\n\t- " + job.name for job in all_jobs if job.phase == "Running"])
+        raise Exception(f"Couldnt find job {job_name}, instead found {other_jobs}")
+    elif len(found_jobs) > 1:
+        raise Exception(f"Found multiple jobs for name {job_name}")
+    job = found_jobs[0]
+    shell.run([
+        "kubectl", "logs", "--kubeconfig", job.cluster.kubeconf, "-n", "default", "-f", job_name
+    ], stream_output=True).unwrap()
 
 
 if __name__ == "__main__":

@@ -497,7 +497,7 @@ fn parse_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
@@ -533,7 +533,7 @@ fn parse_account_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(

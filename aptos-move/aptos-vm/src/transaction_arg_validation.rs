@@ -90,7 +90,7 @@ fn is_valid_txn_arg<S: MoveResolverExt>(session: &SessionExt<S>, typ: &Type) -> 
     use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
     match typ {
         Bool | U8 | U64 | U128 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, &(*inner)),
+        Vector(inner) => is_valid_txn_arg(session, inner),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);

@@ -23,3 +23,4 @@ jobs:
       USE_NEW_WRAPPER: true
       # Give us 12 hour timeout
       TIMEOUT_MINUTES: 720
+      USE_NEW_WRAPPER: true

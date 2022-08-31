@@ -371,7 +371,7 @@ In Typescript, just calling `coinClient.transfer` is sufficient to wait for the 
 
 You can set `checkSuccess` to true when calling `transfer` if you'd like it to throw if the transaction was not committed successfully:
 ```ts
-:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6
+:!: static/sdks/typescript/examples/typescript/transfer_coin.ts section_6a
 ```
 
   </TabItem>

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Entropy error: {0}")]
     EntropyError(String),
