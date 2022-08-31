@@ -8,7 +8,9 @@ sidebar_position: 15
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want. 
 
-Make sure that you have already initialized your staking pool 
+Make sure that you have already initialized your staking pool from the initialize staking pool page.
+
+Make sure that you have pre-built a node based on https://aptos.dev/nodes/validator-node/validators
 
 ## Bootstrapping validator node
 
