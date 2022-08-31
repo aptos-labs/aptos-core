@@ -73,7 +73,10 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 // myself. See https://github.com/poem-web/poem/issues/241.
 #[OpenApi]
 impl<M: MetricCollector, R: Runner> Api<M, R> {
-    /// Check the health of a given target node. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
+    /// Check the health of a given target node. You may specify a baseline
+    /// node configuration to use for the evaluation. If you don't specify
+    /// a baseline node configuration, we will attempt to determine the
+    /// appropriate baseline based on your target node.
     #[oai(path = "/check_node", method = "get")]
     async fn check_node(
         &self,
@@ -125,7 +128,11 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         }
     }
 
-    /// Check the health of the preconfigured node. If none was specified when this instance of the node checker was started, this will return an error. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
+    /// Check the health of the preconfigured node. If none was specified when
+    /// this instance of the node checker was started, this will return an error.
+    /// You may specify a baseline node configuration to use for the evaluation.
+    /// If you don't specify a baseline node configuration, we will attempt to
+    /// determine the appropriate baseline based on your target node.
     #[oai(path = "/check_preconfigured_node", method = "get")]
     async fn check_preconfigured_node(
         &self,
@@ -177,15 +184,18 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         )
     }
 
-    /// Get just the keys for the configurations, i.e. the configuration_name
-    /// field.
+    /// Get just the keys and pretty names for the configurations, meaning
+    /// the configuration_name and configuration_name_pretty fields.
     #[oai(path = "/get_configuration_keys", method = "get")]
-    async fn get_configuration_keys(&self) -> Json<Vec<String>> {
+    async fn get_configuration_keys(&self) -> Json<Vec<ConfigurationKey>> {
         Json(
             self.configurations_manager
                 .configurations
-                .keys()
-                .cloned()
+                .values()
+                .map(|n| ConfigurationKey {
+                    key: n.node_configuration.configuration_name.clone(),
+                    pretty_name: n.node_configuration.configuration_name_pretty.clone(),
+                })
                 .collect(),
         )
     }
@@ -201,10 +211,16 @@ struct CheckNodeRequest {
 impl Example for CheckNodeRequest {
     fn example() -> Self {
         Self {
-            baseline_configuration_name: Some("Devnet Full Node".to_string()),
+            baseline_configuration_name: Some("devnet_fullnode".to_string()),
             target_node: NodeAddress::example(),
         }
     }
+}
+
+#[derive(Clone, Debug, PoemObject)]
+struct ConfigurationKey {
+    pub key: String,
+    pub pretty_name: String,
 }
 
 pub fn build_openapi_service<M: MetricCollector, R: Runner>(
@@ -215,6 +231,6 @@ pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     // These should have already been validated at this point, so we panic.
     let url: Url = server_args
         .try_into()
-        .expect("Failed to parse liten address");
+        .expect("Failed to parse listen address");
     OpenApiService::new(api, "Aptos Node Checker", version).server(url)
 }

@@ -104,9 +104,9 @@ pub async fn run(args: Run) -> Result<()> {
     .run(
         Route::new()
             .nest(api_endpoint, api_service)
-            .nest("/docs", ui)
-            .at("/spec_json", spec_json)
-            .at("/spec_yaml", spec_yaml),
+            .nest("/spec", ui)
+            .at("/spec.json", spec_json)
+            .at("/spec.yaml", spec_yaml),
     )
     .await
     .map_err(anyhow::Error::msg)
