@@ -158,7 +158,7 @@ pub enum RestError {
     #[error("Unknown error {0}")]
     Unknown(anyhow::Error),
     #[error("Http error {0}")]
-    Http(u16),
+    Http(StatusCode),
 }
 
 impl From<(AptosError, Option<State>, StatusCode)> for RestError {
@@ -198,7 +198,7 @@ impl From<anyhow::Error> for RestError {
 impl From<reqwest::Error> for RestError {
     fn from(err: reqwest::Error) -> Self {
         if let Some(status) = err.status() {
-            RestError::Http(status.as_u16())
+            RestError::Http(status)
         } else {
             RestError::Unknown(err.into())
         }

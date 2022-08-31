@@ -3,7 +3,7 @@
 
 use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_logger::prelude::*;
-use aptos_rest_client::{Client as RestClient, State, Transaction};
+use aptos_rest_client::{retriable, retriable_with_404, Client as RestClient, State, Transaction};
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
@@ -45,9 +45,12 @@ impl Fetcher {
     }
 
     pub async fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
-        let res = RestClient::try_until_ok(Some(MAX_RETRY_TIME), Some(STARTING_RETRY_TIME), || {
-            self.client.get_ledger_information()
-        })
+        let res = RestClient::try_until_ok(
+            Some(MAX_RETRY_TIME),
+            Some(STARTING_RETRY_TIME),
+            retriable,
+            || self.client.get_ledger_information(),
+        )
         .await?;
         let state = res.state();
         self.highest_known_version = state.version;
@@ -111,9 +114,12 @@ impl Fetcher {
 /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
 /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
 async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transaction> {
-    let res = RestClient::try_until_ok(Some(MAX_RETRY_TIME), Some(STARTING_RETRY_TIME), || {
-        client.get_transactions(Some(starting_version), Some(TRANSACTION_FETCH_BATCH_SIZE))
-    })
+    let res = RestClient::try_until_ok(
+        Some(MAX_RETRY_TIME),
+        Some(STARTING_RETRY_TIME),
+        retriable_with_404,
+        || client.get_transactions(Some(starting_version), Some(TRANSACTION_FETCH_BATCH_SIZE)),
+    )
     .await;
     match res {
         Ok(response) => {
@@ -176,7 +182,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
     /// In the event it can't, it will keep retrying every RETRY_TIME_MILLIS ms
     async fn fetch_version(&self, version: u64) -> Transaction {
         loop {
-            let res = RestClient::try_until_ok(None, None, || {
+            let res = RestClient::try_until_ok(None, None, retriable_with_404, || {
                 self.client.get_transaction_by_version(version)
             })
             .await;
@@ -200,7 +206,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
     }
 
     async fn fetch_ledger_info(&mut self) -> State {
-        let res = RestClient::try_until_ok(Some(MAX_RETRY_TIME), None, || {
+        let res = RestClient::try_until_ok(Some(MAX_RETRY_TIME), None, retriable, || {
             self.client.get_ledger_information()
         })
         .await;
