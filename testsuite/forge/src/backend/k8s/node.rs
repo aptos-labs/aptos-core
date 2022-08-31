@@ -11,8 +11,11 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
+use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
+use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use reqwest::Url;
 use serde_json::Value;
+use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     fmt::{Debug, Formatter},
     process::{Command, Stdio},
@@ -20,6 +23,8 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+
+const APTOS_DATA_DIR: &str = "/opt/aptos/data";
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -160,18 +165,30 @@ impl Node for K8sNode {
             .expect("Invalid URL.")
     }
 
-    fn clear_storage(&mut self) -> Result<()> {
-        let sts_name = self.stateful_set_name.clone();
-        let pvc_name = if sts_name.contains("fullnode") {
-            format!("fn-{}-0", sts_name)
-        } else {
-            sts_name
-        };
-        let delete_pvc_args = ["delete", "pvc", &pvc_name];
-        info!("{:?}", delete_pvc_args);
+    async fn clear_storage(&mut self) -> Result<()> {
+        // Remove all storage files
+        let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_NAME);
+        let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_NAME);
+        let secure_storage_db_path = format!("{}/{}", APTOS_DATA_DIR, SECURE_STORAGE_DB_NAME);
+        let state_sync_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_SYNC_DB_NAME);
+
+        let delete_storage_paths = [
+            "-n",
+            self.namespace(),
+            "exec",
+            &format!("sts/{}", self.stateful_set_name()),
+            "--",
+            "rm",
+            "-rf",
+            &ledger_db_path,
+            &state_db_path,
+            &secure_storage_db_path,
+            &state_sync_db_path,
+        ];
+        info!("{:?}", delete_storage_paths);
         let cleanup_output = Command::new(KUBECTL_BIN)
             .stdout(Stdio::inherit())
-            .args(&delete_pvc_args)
+            .args(&delete_storage_paths)
             .output()
             .expect("failed to clear node storage");
         assert!(
@@ -179,6 +196,10 @@ impl Node for K8sNode {
             "{}",
             String::from_utf8(cleanup_output.stderr).unwrap()
         );
+
+        // Stop the node to clear buffers
+        // This step must be done after removing the storage files, since clearing storage involves exec into the (running) node
+        self.stop().await?;
 
         Ok(())
     }

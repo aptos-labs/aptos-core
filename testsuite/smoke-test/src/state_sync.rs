@@ -386,7 +386,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
 
     // Stop the validator and delete the storage
     let validator = validator_peer_ids[validator_index_to_test];
-    stop_validator_and_delete_storage(swarm, validator);
+    stop_validator_and_delete_storage(swarm, validator).await;
 
     // Execute more transactions
     execute_transactions(swarm, &validator_client_0, &mut account_1, &account_0, true).await;
@@ -455,7 +455,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -472,7 +472,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -588,8 +588,8 @@ async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAcc
 }
 
 /// Stops the specified validator and deletes storage
-fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
+async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
     let validator = swarm.validator_mut(validator).unwrap();
-    validator.stop();
-    validator.clear_storage().unwrap();
+    // the validator is stopped during the clear_storage step as well
+    validator.clear_storage().await.unwrap();
 }
