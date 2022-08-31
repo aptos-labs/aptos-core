@@ -114,7 +114,8 @@ We now have a UI to support some staking operation, but in any case if you need 
   ```
   aptos stake add-stake \
     --amount <amount> \
-    --profile ait3-owner
+    --profile ait3-owner \
+    --max gas 5000 # you can play around with the max gas here
   ```
 
 - Increase stake lockup
