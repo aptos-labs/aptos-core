@@ -25,6 +25,7 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
+    use aptos_std::network_address::validate_network_addresses;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
@@ -74,6 +75,12 @@ module aptos_framework::stake {
     const EVOTING_POWER_INCREASE_EXCEEDS_LIMIT: u64 = 19;
     /// Stake pool does not exist at the provided pool address.
     const ESTAKE_POOL_DOES_NOT_EXIST: u64 = 20;
+    /// Fullnode addresses are not valid.
+    const EINVALID_FULLNODE_ADDRESSES: u64 = 21;
+    /// Validator addresses are not valid.
+    const EINVALID_VALIDATOR_ADDRESSES: u64 = 22;
+    /// Validator addresses are required.
+    const EINVALID_VALIDATOR_ADDRESSES_REQUIRED: u64 = 23;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -411,6 +418,8 @@ module aptos_framework::stake {
                 &proof_of_possession_from_bytes(proof_of_possession))
         ), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
+        validate_validator_and_fullnode_addresses(network_addresses, fullnode_addresses);
+
         initialize_owner(account);
         move_to(account, ValidatorConfig {
             consensus_pubkey,
@@ -626,6 +635,8 @@ module aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
+        validate_validator_and_fullnode_addresses(new_network_addresses, new_fullnode_addresses);
+
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
@@ -1133,6 +1144,25 @@ module aptos_framework::stake {
         assert!(exists<StakePool>(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
     }
 
+    fun validate_validator_and_fullnode_addresses(validator_addresses: vector<u8>, fullnode_addresses: vector<u8>) {
+        assert!(
+            vector::length(&validator_addresses) > 0,
+            error::invalid_argument(EINVALID_VALIDATOR_ADDRESSES_REQUIRED),
+        );
+        assert!(
+            validate_network_addresses(validator_addresses),
+            error::invalid_argument(EINVALID_VALIDATOR_ADDRESSES),
+        );
+
+        // Fullnode addresses are optional but need to be valid if present.
+        if (vector::length(&fullnode_addresses) > 0) {
+            assert!(
+                validate_network_addresses(fullnode_addresses),
+                error::invalid_argument(EINVALID_FULLNODE_ADDRESSES),
+            );
+        }
+    }
+
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
@@ -1152,6 +1182,12 @@ module aptos_framework::stake {
 
     #[test_only]
     const LOCKUP_CYCLE_SECONDS: u64 = 3600;
+
+    #[test_only]
+    const VALID_NETWORK_ADDRESSES: vector<u8> = x"012d04002e658ef80524180720e3fe73572d76390fe4baff708d5c7546f972aff825e5377a536804488dc933720800";
+
+    #[test_only]
+    const VALID_FULLNODE_ADDRESSES: vector<u8> = x"012d04008b3b80a205261807201b517f18fbbca65994c9d216175d077546226470b98021846280192a208c2f570800";
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
@@ -1224,7 +1260,7 @@ module aptos_framework::stake {
             account::create_account_for_test(validator_address);
         };
 
-        initialize_validator(validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
+        initialize_validator(validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, VALID_NETWORK_ADDRESSES, vector::empty());
 
         if (amount > 0) {
             mint_and_add_stake(validator, amount);
@@ -1923,15 +1959,70 @@ module aptos_framework::stake {
         assert!(validator_config.consensus_pubkey == CONSENSUS_KEY_2, 2);
 
         // Operator can update network and fullnode addresses.
-        update_network_and_fullnode_addresses(&validator, pool_address, b"1", b"2");
+        update_network_and_fullnode_addresses(
+            &validator,
+            pool_address,
+            VALID_NETWORK_ADDRESSES,
+            VALID_FULLNODE_ADDRESSES,
+        );
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
-        assert!(validator_config.network_addresses == b"1", 3);
-        assert!(validator_config.fullnode_addresses == b"2", 4);
+        assert!(validator_config.network_addresses == VALID_NETWORK_ADDRESSES, 3);
+        assert!(validator_config.fullnode_addresses == VALID_FULLNODE_ADDRESSES, 4);
 
         // Cleanups.
         coin::register<AptosCoin>(&validator);
         coin::deposit<AptosCoin>(pool_address, coins);
         deposit_owner_cap(&validator, owner_cap);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    public entry fun test_update_fullnode_addresses_optional(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_test_validator(validator, 0, false ,false);
+
+        update_network_and_fullnode_addresses(validator, signer::address_of(validator), VALID_NETWORK_ADDRESSES, b"");
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10017)]
+    public entry fun test_update_network_addresses_not_optional(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_test_validator(validator, 0, false ,false);
+
+        update_network_and_fullnode_addresses(
+            validator, signer::address_of(validator), b"", VALID_FULLNODE_ADDRESSES);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10016)]
+    public entry fun test_update_invalid_network_addresses_should_fail(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_test_validator(validator, 0, false ,false);
+
+        update_network_and_fullnode_addresses(
+            validator, signer::address_of(validator), b"invalid", VALID_FULLNODE_ADDRESSES);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10015)]
+    public entry fun test_update_invalid_fullnode_addresses_should_fail(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_test_validator(validator, 0, false ,false);
+
+        update_network_and_fullnode_addresses(
+            validator, signer::address_of(validator), VALID_NETWORK_ADDRESSES, b"invalid");
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
