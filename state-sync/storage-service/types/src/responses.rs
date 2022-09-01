@@ -28,7 +28,7 @@ use thiserror::Error;
 /// 5k TPS for a 5 second delay, which should be more than enough.
 pub const OPTIMISTIC_FETCH_VERSION_DELTA: u64 = 25000;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Data range cannot be degenerate!")]
     DegenerateRangeError,

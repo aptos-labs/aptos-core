@@ -15,9 +15,9 @@ use aptos_config::config::{
     StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::{TransactionToCommit, Version};
 use aptos_types::{
     proof::SparseMerkleLeafNode,

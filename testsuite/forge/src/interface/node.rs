@@ -57,8 +57,8 @@ pub trait Node: Send + Sync {
     /// This should be a noop if the Node isn't running.
     async fn stop(&mut self) -> Result<()>;
 
-    /// Clears this Node's Storage
-    fn clear_storage(&mut self) -> Result<()>;
+    /// Clears this Node's Storage. This stops the node as well
+    async fn clear_storage(&mut self) -> Result<()>;
 
     /// Performs a Health Check on the Node
     async fn health_check(&mut self) -> Result<(), HealthCheckError>;
@@ -134,6 +134,11 @@ pub trait NodeExt: Node {
     /// Return REST API client of this Node
     fn rest_client(&self) -> RestClient {
         RestClient::new(self.rest_api_endpoint())
+    }
+
+    /// Return REST API client of this Node
+    fn rest_client_with_timeout(&self, timeout: Duration) -> RestClient {
+        RestClient::new_with_timeout(self.rest_api_endpoint(), timeout)
     }
 
     /// Return an InspectionClient for this Node

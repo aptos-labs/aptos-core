@@ -26,7 +26,7 @@ use std::{
 
 /// Result of the vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.

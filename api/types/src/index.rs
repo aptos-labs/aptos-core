@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 /// The struct holding all data returned to the client by the
 /// index endpoint (i.e., GET "/").
-#[derive(Clone, Debug, Deserialize, PartialEq, PoemObject, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PoemObject, Serialize)]
 pub struct IndexResponse {
     pub chain_id: u8,
     pub epoch: U64,

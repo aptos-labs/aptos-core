@@ -509,7 +509,7 @@ fn test_transaction(seq_num: u64) -> TestTransaction {
 fn test_metric_cache_ignore_shared_txns() {
     let (mut harness, validators) =
         TestHarness::bootstrap_validator_network(2, Some(MempoolOverrideConfig::new()));
-    let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+    let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
     let txns = test_transactions(0, 3);
     harness.add_txns(v_a, test_transactions(0, 3));
@@ -548,7 +548,7 @@ fn test_max_broadcast_limit() {
 
     let (mut harness, validators) =
         TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
-    let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+    let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
     let pool_txns = test_transactions(0, 6);
     harness.add_txns(v_a, pool_txns);
@@ -567,7 +567,7 @@ fn test_max_broadcast_limit() {
         true,
         true,
     );
-    assert_eq!(0, txns.get(0).unwrap().sequence_number());
+    assert_eq!(0, txns.first().unwrap().sequence_number());
 
     for seq_num in 1..3 {
         let (txns, _) = harness.broadcast_txns(
@@ -580,7 +580,7 @@ fn test_max_broadcast_limit() {
             false,
             false,
         );
-        assert_eq!(seq_num, txns.get(0).unwrap().sequence_number());
+        assert_eq!(seq_num, txns.first().unwrap().sequence_number());
     }
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
@@ -602,7 +602,7 @@ fn test_max_broadcast_limit() {
         true,
         true,
     );
-    assert_eq!(3, txns.get(0).unwrap().sequence_number());
+    assert_eq!(3, txns.first().unwrap().sequence_number());
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
@@ -621,7 +621,7 @@ fn test_max_batch_size() {
 
         let (mut harness, validators) =
             TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
-        let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+        let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
         let num_batch_sends = 3;
         let pool_txns = test_transactions(0, (broadcast_batch_size * num_batch_sends * 10) as u64); // Add more than enough txns
@@ -664,7 +664,7 @@ fn test_max_network_byte_size() {
 
         let (mut harness, validators) =
             TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
-        let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
+        let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
         let num_batch_sends = 3;
         let pool_txns =

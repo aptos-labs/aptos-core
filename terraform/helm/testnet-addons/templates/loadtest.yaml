@@ -57,11 +57,9 @@ spec:
           # This with terminates on line 77
           {{- with .Values.load_test }}
             - --mempool-backlog={{ .config.mempool_backlog }}
+            - --target-tps={{ .config.target_tps }}
             - --duration={{ .config.duration }}
             - --txn-expiration-time-secs={{ .config.txn_expiration_time_secs }}
-            {{- if .config.enableBurst }}
-            - --burst
-            - --wait-millis={{ .config.waitMillis }}
             {{- end }}
             env:
             - name: RUST_BACKTRACE

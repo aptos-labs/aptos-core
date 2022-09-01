@@ -119,7 +119,7 @@ impl CliTestFramework {
         // Create account if it doesn't exist (and there's a faucet)
         let client = aptos_rest_client::Client::new(self.endpoint.clone());
         let address = self.account_id(index);
-        return client.get_account(address).await.is_ok();
+        client.get_account(address).await.is_ok()
     }
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
@@ -489,7 +489,7 @@ impl CliTestFramework {
 
     pub async fn account_balance_now(&self, index: usize) -> CliTypedResult<u64> {
         let result = self.list_account(index, ListQuery::Balance).await?;
-        Ok(json_account_to_balance(result.get(0).unwrap()))
+        Ok(json_account_to_balance(result.first().unwrap()))
     }
 
     pub async fn assert_account_balance_now(&self, index: usize, expected: u64) {
@@ -502,7 +502,7 @@ impl CliTestFramework {
             self.last_n_transactions_details(10).await
         );
         let accounts = result.unwrap();
-        let account = accounts.get(0).unwrap();
+        let account = accounts.first().unwrap();
         let coin = json_account_to_balance(account);
         assert_eq!(
             coin,
@@ -793,6 +793,7 @@ impl CliTestFramework {
                 .unwrap(),
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
+            prompt_options: PromptOptions::yes(),
             ..Default::default()
         }
     }

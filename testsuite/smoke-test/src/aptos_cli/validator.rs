@@ -19,7 +19,7 @@ use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -135,7 +135,7 @@ async fn test_large_total_stake() {
     );
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(20))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(20))
         .await
         .unwrap();
 }
@@ -248,7 +248,7 @@ async fn test_nodes_rewards() {
     )
     .await;
 
-    cli.fund_account(validator_cli_indices[3], Some(10000))
+    cli.fund_account(validator_cli_indices[3], Some(30000))
         .await
         .unwrap();
 
@@ -591,7 +591,8 @@ async fn test_join_and_leave_validator() {
     let rest_client = swarm.validators().next().unwrap().rest_client();
 
     let mut keygen = KeyGen::from_os_rng();
-    let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen, None).await;
+    let (validator_cli_index, keys) =
+        init_validator_account(&mut cli, &mut keygen, Some(DEFAULT_FUNDED_COINS * 3)).await;
     let mut gas_used = 0;
 
     // faucet can make our root LocalAccount sequence number get out of sync.
@@ -619,7 +620,7 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    cli.assert_account_balance_now(validator_cli_index, DEFAULT_FUNDED_COINS - gas_used)
+    cli.assert_account_balance_now(validator_cli_index, (3 * DEFAULT_FUNDED_COINS) - gas_used)
         .await;
 
     let stake_coins = 7;
@@ -631,7 +632,7 @@ async fn test_join_and_leave_validator() {
 
     cli.assert_account_balance_now(
         validator_cli_index,
-        DEFAULT_FUNDED_COINS - stake_coins - gas_used,
+        (3 * DEFAULT_FUNDED_COINS) - stake_coins - gas_used,
     )
     .await;
 
@@ -696,7 +697,7 @@ async fn test_join_and_leave_validator() {
 
     cli.assert_account_balance_now(
         validator_cli_index,
-        DEFAULT_FUNDED_COINS - stake_coins - gas_used,
+        (3 * DEFAULT_FUNDED_COINS) - stake_coins - gas_used,
     )
     .await;
 
@@ -721,7 +722,7 @@ async fn test_join_and_leave_validator() {
 
     cli.assert_account_balance_now(
         validator_cli_index,
-        DEFAULT_FUNDED_COINS - stake_coins + withdraw_stake - gas_used,
+        (3 * DEFAULT_FUNDED_COINS) - stake_coins + withdraw_stake - gas_used,
     )
     .await;
 }

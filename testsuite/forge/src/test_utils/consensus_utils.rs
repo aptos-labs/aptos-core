@@ -131,13 +131,9 @@ pub async fn test_consensus_fault_tolerance(
     println!("Largest version {}", largest_v);
     let target_v = largest_v + 10;
 
-    wait_for_all_nodes_to_catchup_to_version(
-        &validator_clients,
-        target_v,
-        Instant::now() + Duration::from_secs(30),
-    )
-    .await
-    .unwrap();
+    wait_for_all_nodes_to_catchup_to_version(&validator_clients, target_v, Duration::from_secs(30))
+        .await
+        .unwrap();
 
     let transactions: Vec<_> =
         join_all(validator_clients.iter().cloned().map(move |v| async move {
@@ -152,7 +148,7 @@ pub async fn test_consensus_fault_tolerance(
         .await;
 
     for i in 1..transactions.len() {
-        let txns_a = transactions.get(0).unwrap();
+        let txns_a = transactions.first().unwrap();
         let txns_b = transactions.get(i).unwrap();
         assert_eq!(txns_a.len(), txns_b.len());
         for i in 0..txns_a.len() {

@@ -474,6 +474,7 @@ impl BufferManager {
     /// note that there might be other signed items after the signing root
     async fn retry_broadcasting_commit_votes(&mut self) {
         let mut cursor = *self.buffer.head_cursor();
+        let mut count = 0;
         while cursor.is_some() {
             {
                 let item = self.buffer.get(&cursor);
@@ -484,9 +485,11 @@ impl BufferManager {
                 self.commit_msg_tx
                     .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
+                count += 1;
             }
             cursor = self.buffer.get_next(&cursor);
         }
+        info!("Rebroadcasting {} commit votes", count);
     }
 
     pub async fn start(mut self) {

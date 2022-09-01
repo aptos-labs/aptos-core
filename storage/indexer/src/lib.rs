@@ -7,7 +7,7 @@ mod schema;
 
 use crate::{
     db::INDEX_DB_NAME,
-    metadata::{Metadata, MetadataTag},
+    metadata::{MetadataKey, MetadataValue},
     schema::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
@@ -63,10 +63,8 @@ impl Indexer {
         )?;
 
         let next_version = db
-            .get::<IndexerMetadataSchema>(&MetadataTag::LatestVersion)?
-            .map_or(0, |meta| match meta {
-                Metadata::LatestVersion(version) => version + 1,
-            });
+            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)?
+            .map_or(0, |v| v.expect_version());
 
         Ok(Self {
             db,
@@ -124,8 +122,8 @@ impl Indexer {
         let mut batch = SchemaBatch::new();
         table_info_parser.finish(&mut batch)?;
         batch.put::<IndexerMetadataSchema>(
-            &MetadataTag::LatestVersion,
-            &Metadata::LatestVersion(end_version - 1),
+            &MetadataKey::LatestVersion,
+            &MetadataValue::Version(end_version - 1),
         )?;
         self.db.write_schemas(batch)?;
         self.next_version.store(end_version, Ordering::Relaxed);

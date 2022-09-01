@@ -7,8 +7,8 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 use anyhow::format_err;
 use anyhow::Error;
 use aptos_logger::prelude::*;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::ConfigStorage,

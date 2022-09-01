@@ -6,13 +6,13 @@ use aptos_infallible::NonZeroUsize;
 use aptos_types::account_address::AccountAddress;
 
 /// This represents a proposal message from a validator
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct ProposalMsg {
     msg: String,
 }
 
 /// This represents a vote message from a validator
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct VoteMsg {
     msg: String,
 }

@@ -93,17 +93,20 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         );
         prompt_yes_with_override(
             "Do you want to submit this proposal?",
-            self.compile_proposal_args.prompt_options,
+            self.txn_options.prompt_options,
         )?;
 
         let txn = self
             .txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                self.pool_address_args.pool_address,
-                script_hash.to_vec(),
-                self.metadata_url.to_string().as_bytes().to_vec(),
-                metadata_hash.to_hex().as_bytes().to_vec(),
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_create_proposal(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                ),
+                None,
+            )
             .await?;
         let txn_summary = TransactionSummary::from(&txn);
         if let Transaction::UserTransaction(inner) = txn {
@@ -223,8 +226,6 @@ pub struct SubmitVote {
     pub(crate) no: bool,
 
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
-    #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
@@ -251,15 +252,18 @@ impl CliCommand<TransactionSummary> for SubmitVote {
 
         prompt_yes_with_override(
             &format!("Are you sure you want to vote {}", vote_str),
-            self.prompt_options,
+            self.txn_options.prompt_options,
         )?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                self.pool_address_args.pool_address,
-                self.proposal_id,
-                vote,
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_vote(
+                    self.pool_address_args.pool_address,
+                    self.proposal_id,
+                    vote,
+                ),
+                None,
+            )
             .await
             .map(TransactionSummary::from)
     }
@@ -381,7 +385,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
-            .submit_transaction(txn)
+            .submit_transaction(txn, None)
             .await
             .map(TransactionSummary::from)
     }

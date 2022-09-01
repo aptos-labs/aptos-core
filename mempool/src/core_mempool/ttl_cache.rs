@@ -36,16 +36,15 @@ where
     }
 
     pub fn insert(&mut self, key: K, value: V) {
-        // Remove old entry if it exists.
-        match self.data.get(&key) {
+        // Remove the old entry from data and ttl_index (if it exists)
+        match self.data.remove(&key) {
             Some(info) => {
                 self.ttl_index.remove(&info.ttl);
             }
             None => {
-                // Remove oldest entry if cache is still full.
+                // Remove the oldest entry if the cache is still full
                 if self.data.len() == self.capacity {
-                    let first_entry = self.ttl_index.keys().next().cloned();
-                    if let Some(tst) = first_entry {
+                    if let Some(tst) = self.ttl_index.keys().next().cloned() {
                         if let Some(key) = self.ttl_index.remove(&tst) {
                             self.data.remove(&key);
                         }
@@ -54,13 +53,13 @@ where
             }
         }
 
-        // Insert the new transaction.
+        // Insert the new transaction
         if let Some(expiration_time) = SystemTime::now().checked_add(self.default_timeout) {
-            self.ttl_index.insert(expiration_time, key.clone());
             let value_info = ValueInfo {
                 value,
                 ttl: expiration_time,
             };
+            self.ttl_index.insert(expiration_time, key.clone());
             self.data.insert(key, value_info);
         }
     }

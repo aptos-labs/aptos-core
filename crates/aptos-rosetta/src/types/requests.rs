@@ -282,7 +282,7 @@ pub struct ConstructionPayloadsResponse {
 /// This should be able to run without a running full node connection
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionPreprocessRequest.html)
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConstructionPreprocessRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
@@ -292,7 +292,7 @@ pub struct ConstructionPreprocessRequest {
     pub metadata: Option<PreprocessMetadata>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct PreprocessMetadata {
     /// Expiry time of the transaction in unix epoch seconds
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -51,12 +51,10 @@ load_test:
     mint_key:
     # -- Number of transactions outstanding in mempool
     mempool_backlog: 5000
+    # -- Whether to target a constant TPS, or 0 if not used. Cannot be used with mempool_backlog.
+    target_tps: 0
     # -- How long to emit transactions for
     duration: 300
-    # -- Whether to send a burst of transactions without waiting
-    enableBurst: false
-    # -- How long to wait for transactions to be finalized
-    waitMillis: 1000
     # -- How long to wait for transactions to be expired
     txn_expiration_time_secs: 30
     # -- Whether to submit transactions through validator REST API

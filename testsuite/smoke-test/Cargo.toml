@@ -33,13 +33,11 @@ aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["fuzzing"] }
-aptosdb = { path = "../../storage/aptosdb" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 consensus = { path = "../../consensus" }
 forge = { path = "../forge" }
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }
-state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 
 [dev-dependencies]
 base64 = "0.13.0"

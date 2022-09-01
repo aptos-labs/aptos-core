@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_state_view::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::move_binary_format::errors::PartialVMError;

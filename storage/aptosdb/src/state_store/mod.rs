@@ -3,6 +3,7 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue};
 use crate::{
     epoch_by_version::EpochByVersionSchema,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
@@ -10,7 +11,7 @@ use crate::{
     stale_state_value_index::StaleStateValueIndexSchema,
     state_merkle_db::StateMerkleDb,
     state_store::buffered_state::BufferedState,
-    version_data::{VersionData, VersionDataSchema},
+    version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
@@ -21,10 +22,12 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
-    iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
+    iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateSnapshotProgress,
+    StateValueWriter,
 };
 use aptos_logger::info;
-use aptos_state_view::{state_storage_usage::StateStorageUsage, StateViewId};
+use aptos_state_view::StateViewId;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
@@ -741,6 +744,9 @@ impl StateStore {
             }
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
+        for version in begin..end {
+            db_batch.delete::<VersionDataSchema>(&version)?;
+        }
         Ok(())
     }
 
@@ -769,20 +775,31 @@ impl StateStore {
 }
 
 impl StateValueWriter<StateKey, StateValue> for StateStore {
-    fn write_kv_batch(&self, node_batch: &StateValueBatch) -> Result<()> {
+    fn write_kv_batch(
+        &self,
+        version: Version,
+        node_batch: &StateValueBatch,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateSnapshotRestoreProgress(version),
+            &DbMetadataValue::StateSnapshotProgress(progress),
+        )?;
         self.ledger_db.write_schemas(batch)
     }
 
-    fn write_usage(&self, version: Version, items: usize, total_bytes: usize) -> Result<()> {
-        self.ledger_db.put::<VersionDataSchema>(
-            &version,
-            &VersionData {
-                state_items: items,
-                total_state_bytes: total_bytes,
-            },
-        )
+    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.ledger_db
+            .put::<VersionDataSchema>(&version, &usage.into())
+    }
+
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(self
+            .ledger_db
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
+            .map(|v| v.expect_state_snapshot_progress()))
     }
 }
 

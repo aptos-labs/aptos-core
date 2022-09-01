@@ -6,6 +6,7 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
+pub(crate) mod db_metadata;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
 pub(crate) mod event_accumulator;
@@ -13,7 +14,6 @@ pub(crate) mod event_by_key;
 pub(crate) mod event_by_version;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_info;
-pub(crate) mod pruner_metadata;
 pub(crate) mod stale_node_index;
 pub(crate) mod stale_node_index_cross_epoch;
 pub(crate) mod stale_state_value_index;
@@ -87,7 +87,7 @@ pub mod fuzzing {
                 data,
             );
             assert_no_panic_decoding::<super::ledger_info::LedgerInfoSchema>(data);
-            assert_no_panic_decoding::<super::pruner_metadata::PrunerMetadataSchema>(data);
+            assert_no_panic_decoding::<super::db_metadata::DbMetadataSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
             assert_no_panic_decoding::<
                 super::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,

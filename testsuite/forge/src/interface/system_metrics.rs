@@ -139,7 +139,7 @@ async fn get_prometheus_range_metrics(
     Ok(response
         .as_range()
         .ok_or_else(|| anyhow!("Failed to get range from prometheus response"))?
-        .get(0)
+        .first()
         .ok_or_else(|| anyhow!("Empty range vector returned from prometheus"))?
         .samples()
         .to_vec())

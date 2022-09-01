@@ -282,7 +282,7 @@ impl Operation {
         operator: AccountAddress,
     ) -> Operation {
         Operation::new(
-            OperationType::Withdraw,
+            OperationType::SetOperator,
             operation_index,
             status,
             address,
@@ -319,9 +319,9 @@ impl std::cmp::Ord for Operation {
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    sender: Option<AccountIdentifier>,
+    pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    operator: Option<AccountIdentifier>,
+    pub operator: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -557,9 +557,10 @@ fn parse_operations_from_txn_payload(
                     && module.0 == aptos_coin_module_identifier()
                     && name.0 == aptos_coin_resource_identifier()
                 {
-                    let receiver =
-                        serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
-                            .unwrap();
+                    let receiver = serde_json::from_value::<Address>(
+                        inner.arguments.first().cloned().unwrap(),
+                    )
+                    .unwrap();
                     let amount =
                         serde_json::from_value::<U64>(inner.arguments.get(1).cloned().unwrap())
                             .unwrap()
@@ -585,7 +586,7 @@ fn parse_operations_from_txn_payload(
             && create_account_function_identifier() == inner.function.name.0
         {
             let address =
-                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                serde_json::from_value::<Address>(inner.arguments.first().cloned().unwrap())
                     .unwrap();
             operations.push(Operation::create_account(
                 operation_index,
@@ -598,7 +599,7 @@ fn parse_operations_from_txn_payload(
             && set_operator_function_identifier() == inner.function.name.0
         {
             let operator =
-                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                serde_json::from_value::<Address>(inner.arguments.first().cloned().unwrap())
                     .unwrap();
             operations.push(Operation::set_operator(
                 operation_index,
@@ -665,8 +666,7 @@ fn parse_operations_from_write_set(
                 }
             }
         } else if data.typ == stake_pool_tag {
-            // Account sequence number increase (possibly creation)
-            // Find out if it's the 0th sequence number (creation)
+            // Find set operator events
             for (id, value) in data.data.0.iter() {
                 if id.0 == set_operator_events_field_identifier() {
                     serde_json::from_value::<EventId>(value.clone()).unwrap();
@@ -986,8 +986,6 @@ pub struct CoinEvent {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetOperatorEvent {
-    _pool_address: Address,
-    _old_operator: Address,
     new_operator: Address,
 }
 

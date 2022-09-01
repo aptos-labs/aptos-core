@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress, account_config::AccountSequenceInfo,
@@ -46,6 +47,9 @@ impl MempoolTransaction {
     }
     pub(crate) fn get_committed_hash(&self) -> HashValue {
         self.txn.clone().committed_hash()
+    }
+    pub(crate) fn get_estimated_bytes(&self) -> usize {
+        std::mem::size_of_val(self) + TXN_INDEX_ESTIMATED_BYTES
     }
 }
 

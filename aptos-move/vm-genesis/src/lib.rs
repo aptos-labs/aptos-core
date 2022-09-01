@@ -370,7 +370,7 @@ fn publish_framework(session: &mut SessionExt<impl MoveResolver>, framework: &Re
 /// Publish the given package.
 fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePackage) {
     let modules = pack.sorted_code_and_modules();
-    let addr = *modules.get(0).unwrap().1.self_id().address();
+    let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
         .into_iter()
         .map(|(c, _)| c.to_vec())

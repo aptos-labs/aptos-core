@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::info;
-use poem::{listener::TcpListener, Route, Server};
+use poem::{http::Method, listener::TcpListener, middleware::Cors, EndpointExt, Route, Server};
 use url::Url;
 
 use super::{
@@ -97,6 +97,8 @@ pub async fn run(args: Run) -> Result<()> {
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
 
+    let cors = Cors::new().allow_methods(vec![Method::GET]);
+
     Server::new(TcpListener::bind((
         args.server_args.listen_address,
         args.server_args.listen_port,
@@ -104,9 +106,10 @@ pub async fn run(args: Run) -> Result<()> {
     .run(
         Route::new()
             .nest(api_endpoint, api_service)
-            .nest("/docs", ui)
-            .at("/spec_json", spec_json)
-            .at("/spec_yaml", spec_yaml),
+            .nest("/spec", ui)
+            .at("/spec.json", spec_json)
+            .at("/spec.yaml", spec_yaml)
+            .with(cors),
     )
     .await
     .map_err(anyhow::Error::msg)

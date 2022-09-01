@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
 use anyhow::Result;
 use aptos_node_checker_lib::EvaluationSummary;
 use aptos_sdk::rest_client::Client as AptosClient;
@@ -88,13 +87,42 @@ pub enum SingleCheckResult {
     /// The node was successfully checked. Note: The evaulation itself could
     /// indicate, a problem with the node, this just states that we were able
     /// to check the node sucessfully with NHC.
-    Success(EvaluationSummary),
+    Success(SingleCheckSuccess),
 
     /// Something went wrong with checking the node.
     Failure(SingleCheckFailure),
 
     /// The account does not have a VFN registered on chain.
     NoVfnRegistered(NoVfnRegistered),
+
+    /// A network address on chain for this account could not be deserialized.
+    InvalidNetworkAddress(InvalidNetworkAddress),
+}
+
+#[derive(Debug, Serialize)]
+pub struct SingleCheckSuccess {
+    /// The evaluation summary returned by NHC. This doesn't necessarily imply
+    /// that the node passed the evaluation, just that an evaluation was returned
+    /// successfully and it passed the API available check.
+    pub evaluation_summary: EvaluationSummary,
+
+    /// This is the address that we used to get this successful evaluation.
+    /// This is presented in a normal URL format, not the NetworkAddress
+    /// representation. Example value for this field: http://65.109.17.29:8080.
+    /// Note, sometimes the address we started with was a DNS name, and we resolved
+    /// it to an IP address. As such, this IP address may become incorrect down
+    /// the line. In that case, refer to vfn_address in SingleCheck, or just
+    /// run this tool again.
+    pub vfn_address_url: String,
+}
+
+impl SingleCheckSuccess {
+    pub fn new(evaluation_summary: EvaluationSummary, vfn_address_url: String) -> Self {
+        Self {
+            evaluation_summary,
+            vfn_address_url,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -109,7 +137,7 @@ impl SingleCheckFailure {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub enum SingleCheckFailureCode {
     // The network address in the validator set config cannot be used for
     // querying NHC.
@@ -132,6 +160,9 @@ pub enum SingleCheckFailureCode {
 #[derive(Debug, Serialize)]
 pub struct NoVfnRegistered;
 
+#[derive(Debug, Serialize)]
+pub struct InvalidNetworkAddress;
+
 /// Get all the on chain validator info.
 pub async fn get_validator_info(node_address: Url) -> Result<Vec<ValidatorInfo>> {
     let client = AptosClient::new(node_address.clone());
@@ -153,7 +184,7 @@ pub async fn check_vfns(
     nhc_client: &ReqwestClient,
     check_args: &CheckArgs,
     validator_infos: Vec<ValidatorInfo>,
-) -> Result<HashMap<AccountAddress, Vec<SingleCheck>>> {
+) -> HashMap<AccountAddress, Vec<SingleCheck>> {
     let mut nhc_address = check_args.nhc_address.clone();
     nhc_address.set_path("/check_node");
 
@@ -172,10 +203,19 @@ pub async fn check_vfns(
         {
             continue;
         }
-        let vfn_addresses = validator_info
-            .config()
-            .fullnode_network_addresses()
-            .context("Failed to deserialize VFN network addresses")?;
+        let vfn_addresses = match validator_info.config().fullnode_network_addresses() {
+            Ok(vfn_addresses) => vfn_addresses,
+            Err(_e) => {
+                nhc_responses
+                    .entry(*account_address)
+                    .or_insert_with(Vec::new)
+                    .push(SingleCheck::new(
+                        SingleCheckResult::InvalidNetworkAddress(InvalidNetworkAddress),
+                        None,
+                    ));
+                continue;
+            }
+        };
         if vfn_addresses.is_empty() {
             nhc_responses
                 .entry(*account_address)
@@ -207,14 +247,16 @@ pub async fn check_vfns(
             SingleCheckResult::Failure(_) => {
                 info!("NHC returned a non 200 for {}", vfn_address);
             }
-            SingleCheckResult::NoVfnRegistered(_) => panic!("Shouldn't be possible"),
+            SingleCheckResult::NoVfnRegistered(_) | SingleCheckResult::InvalidNetworkAddress(_) => {
+                panic!("Shouldn't be possible")
+            }
         }
         nhc_responses
             .entry(account_address)
             .or_insert_with(Vec::new)
             .push(SingleCheck::new(single_check_result, Some(vfn_address)));
     }
-    Ok(nhc_responses)
+    nhc_responses
 }
 
 // This just exists to make joining futures easy.
@@ -307,10 +349,8 @@ async fn check_single_vfn_one_api_port(
     params.insert("api_port", &api_port_string);
     params.insert("baseline_configuration_name", nhc_baseline_config_name);
 
-    debug!(
-        "Querying NHC at address: {}:{}",
-        vfn_url_string, api_port_string
-    );
+    let address_single_string = format!("{}:{}", vfn_url_string, api_port_string);
+    debug!("Querying NHC at address: {}", address_single_string);
 
     // Send the request and parse the response.
     let response = match nhc_client
@@ -365,5 +405,8 @@ async fn check_single_vfn_one_api_port(
         ));
     }
 
-    SingleCheckResult::Success(evaluation_summary)
+    SingleCheckResult::Success(SingleCheckSuccess::new(
+        evaluation_summary,
+        address_single_string,
+    ))
 }

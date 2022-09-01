@@ -16,16 +16,11 @@ export GIT_BRANCH=$(git symbolic-ref --short HEAD)
 export GIT_TAG=$(git tag -l --contains HEAD)
 export BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 export BUILT_VIA_BUILDKIT="true"
+export NORMALIZED_GIT_BRANCH_OR_PR=$(printf "$TARGET_CACHE_ID" | sed -e 's/[^a-zA-Z0-9]/-/g')
 
 if [ "$CI" == "true" ]; then
-  # builder target is the one that builds the rust binaries and is the most expensive.
-  # Its output is used by all the other targets that follow.
-  # This will also push the builder image as an image to GCP (+ inline cache manifests) even though we don't use this image directly
-  TARGET_REGISTRY=gcp docker buildx bake --progress=plain --file docker/docker-bake-rust-all.hcl builder --push
-  # build and push the actual images that we use (+ inline cache manifests)
-  TARGET_REGISTRY=gcp docker buildx bake --progress=plain --file docker/docker-bake-rust-all.hcl all --push
-  # push everything also to AWS - this step will literally just reuse the layers from the previous step so should be kinda fast
-  TARGET_REGISTRY=aws docker buildx bake --progress=plain --file docker/docker-bake-rust-all.hcl all --push
+  TARGET_REGISTRY=remote docker buildx bake --progress=plain --file docker/docker-bake-rust-all.hcl all --push
+  REGISTRY_BASE="$GCP_DOCKER_ARTIFACT_REPO" SOURCE_TAG="cache-$NORMALIZED_GIT_BRANCH_OR_PR" TARGET_TAG="cache-$GIT_SHA" ./docker/retag-rust-images.sh
 else
   BUILD_TARGET="${1:-all}"
   TARGET_REGISTRY=local docker buildx bake --file docker/docker-bake-rust-all.hcl $BUILD_TARGET

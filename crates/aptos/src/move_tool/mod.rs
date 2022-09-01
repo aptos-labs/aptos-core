@@ -509,9 +509,10 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if legacy_flow {
             // Send the compiled module using a module bundle
             txn_options
-                .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
-                    compiled_units,
-                )))
+                .submit_transaction(
+                    TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units)),
+                    None,
+                )
                 .await
                 .map(TransactionSummary::from)
         } else {
@@ -532,7 +533,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 )));
             }
             txn_options
-                .submit_transaction(payload)
+                .submit_transaction(payload, None)
                 .await
                 .map(TransactionSummary::from)
         }
@@ -750,12 +751,15 @@ impl CliCommand<TransactionSummary> for RunFunction {
         }
 
         self.txn_options
-            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id,
-                self.function_id.member_id,
-                type_args,
-                args,
-            )))
+            .submit_transaction(
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    self.function_id.module_id,
+                    self.function_id.member_id,
+                    type_args,
+                    args,
+                )),
+                None,
+            )
             .await
             .map(TransactionSummary::from)
     }
@@ -859,7 +863,7 @@ fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
                 .to_string(),
         ));
     }
-    let address = load_account_arg(ids.get(0).unwrap())?;
+    let address = load_account_arg(ids.first().unwrap())?;
     let module = Identifier::from_str(ids.get(1).unwrap())
         .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
     let member_id = Identifier::from_str(ids.get(2).unwrap())

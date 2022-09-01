@@ -44,13 +44,13 @@ fn publish_metrics_test() {
     let metric_families = r.gather();
 
     assert_eq!(metric_families.len(), 1);
-    let m: &MetricFamily = metric_families.get(0).unwrap();
+    let m: &MetricFamily = metric_families.first().unwrap();
     assert_eq!("test counter help", m.get_help());
     assert_eq!("test_counter", m.get_name());
 
     let metrics = m.get_metric();
     assert_eq!(metrics.len(), 1);
-    assert_approx_eq!(1.0, metrics.get(0).unwrap().get_counter().get_value());
+    assert_approx_eq!(1.0, metrics.first().unwrap().get_counter().get_value());
 }
 
 rusty_fork_test! {
