@@ -1208,13 +1208,20 @@ impl TransactionOptions {
             .value
             .0;
 
-        let max_possible_gas = if let Some(amount) = amount_transfer {
+        let max_possible_gas = if gas_price == 0 {
+            MAX_POSSIBLE_GAS_UNITS
+        } else if let Some(amount) = amount_transfer {
             std::cmp::min(
-                account_balance.saturating_sub(amount) / gas_price,
+                account_balance
+                    .saturating_sub(amount)
+                    .saturating_div(gas_price),
                 MAX_POSSIBLE_GAS_UNITS,
             )
         } else {
-            std::cmp::min(account_balance / gas_price, MAX_POSSIBLE_GAS_UNITS)
+            std::cmp::min(
+                account_balance.saturating_div(gas_price),
+                MAX_POSSIBLE_GAS_UNITS,
+            )
         };
 
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
