@@ -82,6 +82,7 @@ pub fn encode_genesis_transaction(
     framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: GenesisConfiguration,
+    initial_balances: &[InitialBalance],
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
@@ -92,6 +93,7 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
+        initial_balances,
     )))
 }
 
@@ -102,6 +104,7 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
+    initial_balances: &[InitialBalance],
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -124,7 +127,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
-        initialize_aptos_coin(&mut session);
+        initialize_aptos_coin(&mut session, initial_balances);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
@@ -285,13 +288,21 @@ fn initialize(
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_aptos_coin(
+    session: &mut SessionExt<impl MoveResolver>,
+    initial_balances: &[InitialBalance],
+) {
+    // This might not actually work because hashmap might not serialize to simple map :(
+    let balances_bytes =
+        bcs::to_bytes(initial_balances).expect("Initial balances can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(balances_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        serialized_values,
     );
 }
 
@@ -495,6 +506,12 @@ pub struct Validator {
     pub full_node_network_addresses: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitialBalance {
+    owner_address: Ed25519PublicKey,
+    balance: u64,
+}
+
 pub struct TestValidator {
     pub key: Ed25519PrivateKey,
     pub consensus_key: bls12381::PrivateKey,
@@ -551,6 +568,8 @@ pub fn generate_test_genesis(
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
+    let _initial_balances = Vec::new();
+    let initial_balances = &_initial_balances;
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
@@ -572,6 +591,7 @@ pub fn generate_test_genesis(
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
         },
+        initial_balances,
     );
     (genesis, test_validators)
 }
@@ -584,6 +604,8 @@ pub fn generate_mainnet_genesis(
     let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
+    let _initial_balances = Vec::new();
+    let initial_balances = &_initial_balances;
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
@@ -606,6 +628,7 @@ pub fn generate_mainnet_genesis(
             voting_duration_secs: 7 * 24 * 3600, // 7 days
             voting_power_increase_limit: 30,
         },
+        initial_balances,
     );
     (genesis, test_validators)
 }

@@ -30,6 +30,12 @@ module aptos_framework::genesis {
         full_node_network_addresses: vector<u8>,
     }
 
+    /// Container for the initial layout of balance distribution
+    struct InitialBalance has store, drop {
+        owner_address: address,
+        balance: u64,
+    }
+
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
     fun initialize(
         gas_schedule: vector<u8>,
@@ -102,14 +108,26 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
-    /// Genesis step 2: Initialize Aptos coin.
-    fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
+    /// Genesis step 2: Initialize Aptos coin and mint initial balances.
+    fun initialize_aptos_coin(
+        aptos_framework: &signer,
+        initial_balances: vector<InitialBalance>,
+    ): MintCapability<AptosCoin> {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
+        // Mint initial balances
+        let i = 0;
+        let len = vector::length(&initial_balances);
+        while (i < len) {
+            let balance = vector::borrow(&initial_balances, i);
+            aptos_coin::mint(aptos_framework, balance.owner_address, balance.balance);
+            i = i + 1;
+        };
 
         mint_cap
     }
@@ -121,7 +139,7 @@ module aptos_framework::genesis {
     ) {
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
-        let mint_cap = initialize_aptos_coin(aptos_framework);
+        let mint_cap = initialize_aptos_coin(aptos_framework, vector::empty());
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 

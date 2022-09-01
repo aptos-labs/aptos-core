@@ -23,7 +23,7 @@ use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
-use vm_genesis::Validator;
+use vm_genesis::{InitialBalance, Validator};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -60,6 +60,9 @@ pub struct GenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+
+    /// Initial distribution of balances.
+    pub initial_balances: Vec<InitialBalance>,
 }
 
 impl GenesisInfo {
@@ -75,6 +78,8 @@ impl GenesisInfo {
         for config in configs {
             validators.push(config.try_into()?)
         }
+
+        let initial_balances = Vec::new();
 
         Ok(GenesisInfo {
             chain_id,
@@ -93,6 +98,7 @@ impl GenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            initial_balances,
         })
     }
 
@@ -124,6 +130,7 @@ impl GenesisInfo {
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
             },
+            &self.initial_balances,
         )
     }
 
