@@ -169,7 +169,7 @@ full_node_networks:
 See [Ports and port settings](/nodes/ait/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
 :::
 
-Once you start your FullNode with a static identity you can allow others to connect to devnet through your node.
+Once you start your FullNode with a static identity you can allow others to connect to Aptos network through your node.
 
 :::note
 

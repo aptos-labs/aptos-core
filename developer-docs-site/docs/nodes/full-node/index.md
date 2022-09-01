@@ -4,9 +4,9 @@ slug: "fullnode-for-devnet"
 hidden: false
 ---
 
-# FullNode for Devnet
+# Running Public Fullnodes
 
-This section explains how to install a public FullNode to connect to the Aptos devnet.
+This section explains how to install a public fullnode to connect to the Aptos network.
 
 ## [Using Aptos source and Docker](fullnode-source-code-or-docker.md)
 
