@@ -9,9 +9,6 @@ on:
       TARGET_CACHE_ID:
         required: true
         type: string
-      LAST_GREEN_COMMIT:
-        required: false
-        type: string
       FEATURES:
         required: false
         type: string
@@ -63,4 +60,3 @@ jobs:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}
           BUILD_TEST_IMAGES: ${{ env.BUILD_TEST_IMAGES }}
-          LAST_GREEN_COMMIT: ${{ env.LAST_GREEN_COMMIT }}

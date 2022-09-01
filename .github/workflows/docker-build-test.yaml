@@ -84,16 +84,6 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
-  determine-last-green-commit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: talentpair/last-green-commit-action@d95cfa836b22ef047dd0a8ddb1e6d9567982d702
-        id: last-green-commit
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-    outputs:
-      lastGreenCommit: ${{ steps.last-green-commit.outputs.result  }}
-
   # Because the docker build happens in a reusable workflow, have a separate job that collects the right metadata
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
   determine-docker-build-metadata:
@@ -108,17 +98,16 @@ jobs:
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
 
   rust-images:
-    needs: [permission-check, determine-last-green-commit, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
-      LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   rust-images-testing:
-    needs: [permission-check, determine-last-green-commit, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
@@ -127,17 +116,15 @@ jobs:
       PROFILE: release
       FEATURES: failpoints
       BUILD_TEST_IMAGES: true
-      LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   rust-images-performance:
-    needs: [permission-check, determine-last-green-commit, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: performance
-      LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-release:
     needs: [rust-images, determine-docker-build-metadata]

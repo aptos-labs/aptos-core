@@ -22,8 +22,6 @@ variable "GIT_TAG" {}
 
 variable "BUILT_VIA_BUILDKIT" {}
 
-variable "LAST_GREEN_COMMIT" {}
-
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
