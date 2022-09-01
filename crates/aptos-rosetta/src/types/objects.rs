@@ -282,7 +282,7 @@ impl Operation {
         operator: AccountAddress,
     ) -> Operation {
         Operation::new(
-            OperationType::Withdraw,
+            OperationType::SetOperator,
             operation_index,
             status,
             address,
@@ -319,9 +319,9 @@ impl std::cmp::Ord for Operation {
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    sender: Option<AccountIdentifier>,
+    pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    operator: Option<AccountIdentifier>,
+    pub operator: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -666,8 +666,7 @@ fn parse_operations_from_write_set(
                 }
             }
         } else if data.typ == stake_pool_tag {
-            // Account sequence number increase (possibly creation)
-            // Find out if it's the 0th sequence number (creation)
+            // Find set operator events
             for (id, value) in data.data.0.iter() {
                 if id.0 == set_operator_events_field_identifier() {
                     serde_json::from_value::<EventId>(value.clone()).unwrap();
@@ -987,8 +986,6 @@ pub struct CoinEvent {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetOperatorEvent {
-    _pool_address: Address,
-    _old_operator: Address,
     new_operator: Address,
 }
 
