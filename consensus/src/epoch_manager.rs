@@ -731,14 +731,15 @@ impl EpochManager {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {
-                    sender.push(peer_id, buffer_manager_event)?;
+                    monitor!(
+                        "buffer_manager_push_message",
+                        sender.push(peer_id, buffer_manager_event)?
+                    );
                 } else {
                     bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
                 }
             }
-            round_manager_event => {
-                self.forward_to_round_manager(peer_id, round_manager_event);
-            }
+            round_manager_event => self.forward_to_round_manager(peer_id, round_manager_event),
         }
         Ok(())
     }
@@ -748,9 +749,12 @@ impl EpochManager {
             .round_manager_tx
             .as_mut()
             .expect("RoundManager not started");
-        if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
-            error!("Failed to send event to round manager {:?}", e);
-        }
+        monitor!(
+            "round_manager_push_message",
+            if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
+                error!("Failed to send event to round manager {:?}", e);
+            }
+        );
     }
 
     async fn process_block_retrieval(

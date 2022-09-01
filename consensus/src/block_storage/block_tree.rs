@@ -5,6 +5,7 @@ use crate::{
     block_storage::block_store::update_counters_for_committed_blocks,
     counters,
     logging::{LogEvent, LogSchema},
+    monitor,
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::bail;
@@ -439,12 +440,15 @@ impl BlockTree {
         );
 
         let id_to_remove = self.find_blocks_to_prune(block_to_commit.id());
-        if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
-            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-            // up dangling blocks, and we need to prune the tree to keep the root consistent with
-            // executor.
-            error!(error = ?e, "fail to delete block");
-        }
+        monitor!(
+            "block_retreival_prune_tree",
+            if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
+                // it's fine to fail here, as long as the commit succeeds, the next restart will clean
+                // up dangling blocks, and we need to prune the tree to keep the root consistent with
+                // executor.
+                error!(error = ?e, "fail to delete block");
+            }
+        );
         self.process_pruned_blocks(id_to_remove);
         self.update_highest_commit_cert(commit_proof);
     }

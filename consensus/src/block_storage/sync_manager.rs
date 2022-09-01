@@ -4,6 +4,7 @@
 use crate::{
     block_storage::{BlockReader, BlockStore},
     logging::{LogEvent, LogSchema},
+    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -355,7 +356,9 @@ impl BlockStore {
         let mut status = BlockRetrievalStatus::Succeeded;
         let mut id = request.req.block_id();
         while (blocks.len() as u64) < request.req.num_blocks() {
-            if let Some(executed_block) = self.get_block(id) {
+            let result = monitor!("block_retreival_get_block", self.get_block(id));
+
+            if let Some(executed_block) = result {
                 blocks.push(executed_block.block().clone());
                 if request.req.match_target_id(id) {
                     status = BlockRetrievalStatus::SucceededWithTarget;
