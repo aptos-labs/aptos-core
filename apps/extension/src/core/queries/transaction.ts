@@ -3,7 +3,7 @@
 
 import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { EntryFunctionPayload, UserTransaction } from 'aptos/dist/generated';
+import { EntryFunctionPayload, Event, UserTransaction } from 'aptos/dist/generated';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { accountNamespace, coinNamespace } from 'core/constants';
 
@@ -36,6 +36,21 @@ export async function getEntryFunctionTransactions(
   return transactions
     .filter((t) => t.payload.type === 'entry_function_payload'
       && functionNames.indexOf((t.payload as EntryFunctionPayload).function) >= 0);
+}
+
+export async function getTransactionEvents(
+  aptosClient: AptosClient,
+  address: string,
+  eventType: string | string[],
+) {
+  const transactions = await getUserTransactions(aptosClient, address);
+  const eventTypes = Array.isArray(eventType) ? eventType : [eventType];
+  const events: Event[] = [];
+  transactions.forEach((t) => {
+    const foundEvents = t.events.filter((event) => eventTypes.indexOf(event.type) !== -1);
+    events.push(...foundEvents);
+  });
+  return events;
 }
 
 // region Use transactions

@@ -36,9 +36,9 @@ export type MetadataJson = {
   external_url?: string;
   image: string;
   name: string;
-  properties: MetadataJsonProperties;
-  seller_fee_basis_points: number;
-  symbol: string;
+  properties?: MetadataJsonProperties;
+  seller_fee_basis_points?: number;
+  symbol?: string;
 };
 
 export interface TokenAttributes {

@@ -11,7 +11,7 @@ export const getTokenIdStringFromDict = ({
   collection,
   creator,
   name,
-}: TokenId) => `${creator}::${collection}::${name}`;
+}: TokenId) => encodeURIComponent(`${collection}::${creator}::${name}`);
 
 interface GetTokenIdStringFromDictProps {
   tokenId: string;
@@ -20,7 +20,7 @@ interface GetTokenIdStringFromDictProps {
 export const getTokenIdDictFromString = ({
   tokenId,
 }: GetTokenIdStringFromDictProps): TokenId => {
-  const [creator, collection, name] = tokenId.split('::');
+  const [collection, creator, name] = tokenId.split('::');
   return {
     collection,
     creator,

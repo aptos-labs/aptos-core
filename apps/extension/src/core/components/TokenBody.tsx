@@ -131,7 +131,7 @@ function TokenBody() {
           rel="noreferrer"
         >
           <SquareImage
-            src={data?.metadata?.image || imageNotFound}
+            src={data?.metadata?.image || data?.uri || imageNotFound}
             boxShadow={imageBoxShadow}
             borderRadius=".5rem"
           />
@@ -198,7 +198,7 @@ function TokenBody() {
           </Heading>
           <Wrap pt={4}>
             {
-              data?.metadata?.properties.creators.map((creator) => (
+              data?.metadata?.properties?.creators.map((creator) => (
                 <CreatorTag key={creator.address} address={creator.address} />
               ))
             }

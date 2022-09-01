@@ -10,21 +10,23 @@ import { useQuery, UseQueryOptions } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import { MetadataJson } from 'core/types/tokenMetadata';
 import { useCallback } from 'react';
-import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
+import { getTokenIdDictFromString, getTokenIdStringFromDict, TokenId } from 'core/utils/token';
 import { EntryFunctionPayload } from 'aptos/dist/generated';
 import {
   getEntryFunctionTransactions,
+  getTransactionEvents,
 } from 'core/queries/transaction';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
 
 export const collectiblesQueryKeys = Object.freeze({
+  getDepositTokens: 'getDepositTokens',
   getGalleryItems: 'getGalleryItems',
   getTokenData: 'getTokenData',
   isValidMetadataStructure: 'isValidMetadataStructure',
 } as const);
 
-interface TokenAttributes {
+export interface TokenAttributes {
   description?: string;
   id?: TokenId,
   imageUri?: string;
@@ -35,6 +37,86 @@ interface TokenAttributes {
 }
 
 type CollectionDict = Record<string, TokenAttributes[]>;
+
+export function useDepositTokens(
+  options?: UseQueryOptions<TokenAttributes[]>,
+) {
+  const { activeAccountAddress } = useActiveAccount();
+  const { aptosClient } = useNetworks();
+
+  async function getDepositTokens() {
+    const depositEvents = await getTransactionEvents(
+      aptosClient,
+      activeAccountAddress,
+      ['0x3::token::DepositEvent', '0x3::token::WithdrawEvent'],
+    );
+    const collectionDict: CollectionDict = {};
+    const tokenClient = new TokenClient(aptosClient);
+    const tokenCounterDict: Record<string, number> = {};
+    await Promise.all(depositEvents.map(async (event) => {
+      const { collection, creator, name } = event.data.id.token_data_id;
+      const tokenString = getTokenIdStringFromDict({ collection, creator, name });
+      const result = await tokenClient.getTokenData(creator, collection, name);
+
+      if (!(collection in collectionDict)) {
+        collectionDict[collection] = [];
+      }
+      if (!(tokenString in tokenCounterDict)) {
+        tokenCounterDict[tokenString] = 0;
+      }
+
+      if (event.type === '0x3::token::DepositEvent') {
+        tokenCounterDict[tokenString] += 1;
+      } else if (event.type === '0x3::token::WithdrawEvent') {
+        tokenCounterDict[tokenString] -= 1;
+      }
+      const currentCollection = collectionDict[collection];
+      if (currentCollection.find((token) => token.name === name) === undefined) {
+        const { uri } = result;
+        const metadata = (await axios.get<MetadataJson>(uri)).data;
+        collectionDict[collection].push({
+          id: {
+            collection,
+            creator,
+            name,
+          },
+          imageUri: result.uri,
+          metadata: {
+            animation_url: metadata?.animation_url,
+            attributes: metadata?.attributes,
+            collection: metadata?.collection ?? collection,
+            description: metadata?.description ?? result.description,
+            external_url: metadata?.external_url,
+            image: metadata?.image ?? uri,
+            name: metadata?.name ?? name,
+            properties: metadata?.properties,
+            seller_fee_basis_points: metadata?.seller_fee_basis_points,
+            symbol: metadata?.symbol,
+          },
+          name,
+          uri: result.uri,
+        });
+      }
+    }));
+
+    return Array.from(Object.values(collectionDict)).flat(1).filter((token) => {
+      if (!token.id) {
+        return false;
+      }
+      const tokenString = getTokenIdStringFromDict(token.id);
+      return tokenCounterDict[tokenString] > 0;
+    });
+  }
+
+  return useQuery<TokenAttributes[]>(
+    [collectiblesQueryKeys.getDepositTokens],
+    getDepositTokens,
+    {
+      ...options,
+      enabled: Boolean(activeAccountAddress && aptosClient) && options?.enabled,
+    },
+  );
+}
 
 export function useGalleryItems(
   options?: UseQueryOptions<TokenAttributes[]>,
@@ -115,6 +197,7 @@ async function getTokenData(aptosClient: AptosClient, tokenId: string) {
   const reformattedTokenData = (
     tokenData as unknown as TokenDataResponse
   );
+  reformattedTokenData.collection = reformattedTokenData.collection || collection;
 
   // Get Arweave / IPFS link
   const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
