@@ -7,7 +7,7 @@ FactoryBot.define do
   factory :wallet do
     user
     network { 'ait3' }
+    wallet_name { 'petra' }
     public_key { "0x#{Faker::Crypto.sha256}" }
-    verified { false }
   end
 end
