@@ -17,7 +17,7 @@ aptos node leave-validator-set --profile ait3-operator
 ### Using source code
 
 - Stop your node.
-- Remove the data directory: `rm -rf <your-data-directory>`.
+- Remove the data directory: `rm -r <your-data-directory>`.
 - Remove the genesis blob file and waypoint.
 - Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
 
