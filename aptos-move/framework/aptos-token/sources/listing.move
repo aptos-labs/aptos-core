@@ -5,6 +5,8 @@ module aptos_token::listing {
     use aptos_token::token::{Self, TokenId};
     use aptos_std::guid::{Self, ID};
     use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
+
 
     const EOWNER_NOT_HAVING_ENOUGH_TOKEN: u64 = 1;
     const ELISTING_NOT_EXIST:u64 = 2;
@@ -46,9 +48,27 @@ module aptos_token::listing {
         }
     }
 
+    struct ListingEvent has copy, drop, store {
+        id: ID,
+        token_id: TokenId,
+        amount: u64,
+        min_price: u64,
+        instant_sale: bool,
+        start_sec: u64,
+        expiration_sec: u64,
+        market_address: address,
+    }
+
+    struct CancelListingEvent has copy, drop, store {
+        id: ID,
+        market_address: address,
+    }
+
     /// store listings on the owner's account
     struct ListingRecords<phantom CoinType> has key {
-        records: Table<ID, Listing<CoinType>>
+        records: Table<ID, Listing<CoinType>>,
+        listing_event: EventHandle<ListingEvent>,
+        cancel_listing_event: EventHandle<CancelListingEvent>,
     }
 
     public fun initialize_listing_records<CoinType>(owner: &signer){
@@ -59,6 +79,8 @@ module aptos_token::listing {
                 owner,
                 ListingRecords<CoinType> {
                     records: table::new(),
+                    listing_event: account::new_event_handle<ListingEvent>(owner),
+                    cancel_listing_event: account::new_event_handle<CancelListingEvent>(owner),
                 }
             );
         };
@@ -89,6 +111,19 @@ module aptos_token::listing {
         let id = create_listing_id(owner);
         // add a new record to the listing
         table::add(&mut records.records, id, record);
+        event::emit_event<ListingEvent>(
+            &mut records.listing_event,
+            ListingEvent {
+                id,
+                token_id,
+                amount,
+                min_price,
+                instant_sale,
+                start_sec,
+                expiration_sec,
+                market_address: owner_addr,
+            },
+        );
         id
     }
 
@@ -116,9 +151,17 @@ module aptos_token::listing {
     ) acquires ListingRecords {
         let listing_id = guid::create_id(signer::address_of(owner), listing_id_creation_number);
         let owner_addr = signer::address_of(owner);
-        let records = &mut borrow_global_mut<ListingRecords<CoinType>>(owner_addr).records;
-        assert!(table::contains(records, listing_id), ELISTING_NOT_EXIST);
-        table::remove(records, listing_id);
+        let records = borrow_global_mut<ListingRecords<CoinType>>(owner_addr);
+        assert!(table::contains(&records.records, listing_id), ELISTING_NOT_EXIST);
+        table::remove(&mut records.records, listing_id);
+
+        event::emit_event<CancelListingEvent>(
+            &mut records.cancel_listing_event,
+            CancelListingEvent {
+                id: listing_id,
+                market_address: signer::address_of(owner),
+            },
+        );
     }
 
     /// internal function for assigned a global unique id for a listing
@@ -164,10 +207,26 @@ module aptos_token::listing {
         list.instant_sale
     }
 
+    public fun create_listing_event(
+        id: ID,
+        token_id: TokenId,
+        amount: u64,
+        min_price: u64,
+        instant_sale: bool,
+        start_sec: u64,
+        expiration_sec: u64,
+        market_address: address,
+    ): ListingEvent {
+        ListingEvent {
+            id, token_id, amount, min_price, instant_sale, start_sec, expiration_sec, market_address
+        }
+    }
+
     #[test(owner = @0xAF)]
     public fun test_cancel_listing(owner: signer)acquires ListingRecords {
         use aptos_framework::coin;
 
+        account::create_account_for_test(signer::address_of(&owner));
         let token_id = token::create_collection_and_token(&owner, 2, 2, 2);
         let listing_id = create_list_under_user_account<coin::FakeMoney>(
             &owner,

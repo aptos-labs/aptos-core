@@ -908,6 +908,23 @@ module aptos_token::token {
         deposit_token(&owner, token);
     }
 
+    public fun unwrap_token_id(token_id: TokenId): (address, String, String, u64) {
+        (
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version
+        )
+    }
+
+    public fun unwrap_token_data_id(token_data_id: TokenDataId): (address, String, String) {
+        (
+            token_data_id.creator,
+            token_data_id.collection,
+            token_data_id.name,
+        )
+    }
+
     #[test(creator = @0xCC, owner = @0xCB)]
     public fun create_withdraw_deposit(
         creator: signer,
