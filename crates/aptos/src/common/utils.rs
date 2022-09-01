@@ -14,12 +14,13 @@ use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
     env,
     fs::OpenOptions,
     io::Write,
-    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},

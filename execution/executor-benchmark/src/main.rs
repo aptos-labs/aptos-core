@@ -9,6 +9,7 @@ use aptos_vm::AptosVM;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+#[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
