@@ -12,6 +12,7 @@ module aptos_token::token_coin_swap {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
+    use aptos_framework::coin::Coin;
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;
     const ETOKEN_LISTING_NOT_EXIST: u64 = 2;
@@ -62,6 +63,14 @@ module aptos_token::token_coin_swap {
         token_amount: u64,
         coin_amount: u64,
         coin_type_info: TypeInfo,
+    }
+
+    public fun is_listing_exist<CoinType>(
+        token_owner: address,
+        token_id: TokenId
+    ): bool acquires TokenListings {
+        let token_listing = borrow_global<TokenListings<CoinType>>(token_owner);
+        table::contains(&token_listing.listings, token_id)
     }
 
     /// Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
