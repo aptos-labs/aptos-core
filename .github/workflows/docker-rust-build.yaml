@@ -1,0 +1,62 @@
+name: "Build+Push Rust Docker Images"
+
+on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+      TARGET_CACHE_ID:
+        required: true
+        type: string
+      FEATURES:
+        required: false
+        type: string
+      PROFILE:
+        default: release
+        required: false
+        type: string
+      BUILD_TEST_IMAGES:
+        default: false
+        required: false
+        type: boolean
+
+env:
+  GIT_SHA: ${{ inputs.GIT_SHA }}
+  TARGET_CACHE_ID: ${{ inputs.TARGET_CACHE_ID }}
+  PROFILE: ${{ inputs.PROFILE }}
+  FEATURES: ${{ inputs.FEATURES }}
+  BUILD_TEST_IMAGES: ${{ inputs.BUILD_TEST_IMAGES }}
+  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+  AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+
+jobs:
+  rust-all:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - uses: ./.github/actions/gar-auth
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - uses: ./.github/actions/docker-buildx-setup
+
+      - uses: imjasonh/setup-crane@v0.1
+
+      - name: Build and Push Rust images
+        run: docker/docker-bake-rust-all.sh
+        env:
+          PROFILE: ${{ env.PROFILE }}
+          FEATURES: ${{ env.FEATURES }}
+          BUILD_TEST_IMAGES: ${{ env.BUILD_TEST_IMAGES }}

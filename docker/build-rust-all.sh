@@ -3,8 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-# Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
+PROFILE=${PROFILE:-release}
+FEATURES=${FEATURES:-""}
+
+# Build all the rust binaries
+RUSTFLAGS="--cfg tokio_unstable" cargo build --profile=$PROFILE \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
@@ -19,6 +22,12 @@ RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p forge-cli \
         -p transaction-emitter \
         "$@"
+
+# Build and overwrite the aptos-node binary with features if specified
+if [ -n "$FEATURES" ]; then
+    echo "Building aptos-node with features ${FEATURES}"
+    (cd aptos-node && cargo build --profile=$PROFILE --features=$FEATURES "$@")
+fi
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
@@ -43,7 +52,7 @@ mkdir dist
 
 for BIN in "${BINS[@]}"
 do
-    cp target/release/$BIN dist/$BIN
+    cp target/$PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
