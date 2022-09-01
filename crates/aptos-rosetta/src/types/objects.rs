@@ -427,10 +427,12 @@ pub struct Transaction {
     pub metadata: TransactionMetadata,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionMetadata {
     pub transaction_type: TransactionType,
     pub version: U64,
+    pub failed: bool,
+    pub vm_status: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -526,6 +528,8 @@ impl Transaction {
             metadata: TransactionMetadata {
                 transaction_type: txn_type,
                 version: txn_info.version,
+                failed: !txn_info.success,
+                vm_status: txn_info.vm_status,
             },
         })
     }
