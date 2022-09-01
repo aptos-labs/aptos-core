@@ -188,9 +188,6 @@ pub struct SetOperatorCommand {
     /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_operator: AccountAddress,
-    /// The amount of coins to send
-    #[clap(long)]
-    amount: u64,
 }
 
 impl SetOperatorCommand {
