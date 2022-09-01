@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_26_211508) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -192,15 +192,15 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_26_211508) do
 
   create_table "it3_profiles", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "owner_key", null: false
-    t.string "consensus_key", null: false
-    t.string "account_key", null: false
-    t.string "network_key", null: false
+    t.string "owner_key"
+    t.string "consensus_key"
+    t.string "account_key"
+    t.string "network_key"
     t.string "validator_ip"
-    t.string "validator_address", null: false
-    t.integer "validator_port", null: false
-    t.integer "validator_metrics_port", null: false
-    t.integer "validator_api_port", null: false
+    t.string "validator_address"
+    t.integer "validator_port"
+    t.integer "validator_metrics_port"
+    t.integer "validator_api_port"
     t.boolean "validator_verified", default: false, null: false
     t.string "fullnode_address"
     t.integer "fullnode_port"
@@ -211,11 +211,13 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_26_211508) do
     t.jsonb "metrics_data"
     t.string "nhc_job_id"
     t.text "nhc_output"
-    t.string "account_address", null: false
+    t.string "account_address"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "consensus_pop"
     t.string "owner_address"
+    t.integer "fullnode_metrics_port"
+    t.integer "fullnode_api_port"
     t.index ["account_address"], name: "index_it3_profiles_on_account_address", unique: true
     t.index ["account_key"], name: "index_it3_profiles_on_account_key", unique: true
     t.index ["consensus_key"], name: "index_it3_profiles_on_consensus_key", unique: true
