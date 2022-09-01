@@ -679,7 +679,6 @@ module aptos_token::token {
                 property_types,
             },
         );
-
         token_data_id
     }
 
