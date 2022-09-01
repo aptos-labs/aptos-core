@@ -1128,6 +1128,7 @@ async fn test_notifications_transactions_multiple_streams() {
     }
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_stream_states() {
     // Create a new streaming client and service
