@@ -643,19 +643,22 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // same epoch -> run well-formedness + signature check
-            let verified_event = unverified_event
-                .clone()
-                .verify(&self.epoch_state().verifier)
-                .context("[EpochManager] Verify event")
-                .map_err(|err| {
-                    error!(
-                        SecurityEvent::ConsensusInvalidMessage,
-                        remote_peer = peer_id,
-                        error = ?err,
-                        unverified_event = unverified_event
-                    );
-                    err
-                })?;
+            let verified_event = monitor!(
+                "verify_message",
+                unverified_event
+                    .clone()
+                    .verify(&self.epoch_state().verifier)
+            )
+            .context("[EpochManager] Verify event")
+            .map_err(|err| {
+                error!(
+                    SecurityEvent::ConsensusInvalidMessage,
+                    remote_peer = peer_id,
+                    error = ?err,
+                    unverified_event = unverified_event
+                );
+                err
+            })?;
 
             // process the verified event
             self.process_event(peer_id, verified_event)?;
@@ -755,7 +758,10 @@ impl EpochManager {
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         if let Some(block_store) = &self.block_store {
-            block_store.process_block_retrieval(request).await
+            monitor!(
+                "process_block_retrieval",
+                block_store.process_block_retrieval(request).await
+            )
         } else {
             Err(anyhow::anyhow!("Round manager not started"))
         }
