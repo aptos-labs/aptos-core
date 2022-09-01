@@ -15,7 +15,7 @@ class WalletCreatorTest < ActiveSupport::TestCase
     wallet = FactoryBot.build(:wallet, public_key: "0x#{RbNaCl::Util.bin2hex(verify_key)}")
 
     assert_difference('Wallet.count') do
-      result = WalletCreator.new.create_wallet(wallet, challenge, signed_challenge)
+      result = WalletCreator.new.create_wallet(wallet:, challenge:, signed_challenge:)
       assert result.created?
     end
   end
@@ -28,7 +28,7 @@ class WalletCreatorTest < ActiveSupport::TestCase
     wallet = FactoryBot.build(:wallet, public_key: "0x#{Faker::Crypto.sha256}")
 
     assert_no_difference('Wallet.count') do
-      result = WalletCreator.new.create_wallet(wallet, challenge, signed_challenge)
+      result = WalletCreator.new.create_wallet(wallet:, challenge:, signed_challenge:)
       refute result.created?
     end
   end

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class WalletCreator
-  def create_wallet(wallet, challenge, signed_challenge)
+  def create_wallet(wallet:, challenge:, signed_challenge:)
     public_key_bytes = RbNaCl::Util.hex2bin(wallet.public_key[2..])
     verify_key = RbNaCl::VerifyKey.new(public_key_bytes)
 
