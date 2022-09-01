@@ -35,6 +35,12 @@ module aptos_framework::aptos_coin {
         inner: vector<DelegatedMintCapability>,
     }
 
+    /// Container for the initial layout of balance distribution
+    struct InitialBalance has store, drop {
+        owner_address: address,
+        balance: u64,
+    }
+
     /// Can only called during genesis to initialize the Aptos coin.
     public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -145,6 +151,19 @@ module aptos_framework::aptos_coin {
             i = i + 1;
         };
         index
+    }
+
+    public entry fun mint_initial_balances(
+        aptos_framework: &signer,
+        initial_balances: vector<InitialBalance>,
+    ) acquires MintCapStore {
+        let i = 0;
+        let len = vector::length(&initial_balances);
+        while (i < len) {
+            let balance = vector::borrow(&initial_balances, i);
+            mint(aptos_framework, balance.owner_address, balance.balance);
+            i = i + 1;
+        }
     }
 
     #[test_only]

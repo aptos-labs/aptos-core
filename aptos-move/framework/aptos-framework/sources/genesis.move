@@ -2,7 +2,7 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::aggregator_factory;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::aptos_coin::{Self, AptosCoin, InitialBalance};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
@@ -102,14 +102,20 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
-    /// Genesis step 2: Initialize Aptos coin.
-    fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
+    /// Genesis step 2: Initialize Aptos coin and mint initial balances.
+    fun initialize_aptos_coin(
+        aptos_framework: &signer,
+        initial_balances: vector<InitialBalance>,
+    ): MintCapability<AptosCoin> {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
+        // Mint initial balances
+        aptos_coin::mint_initial_balances(aptos_framework, initial_balances);
 
         mint_cap
     }
@@ -121,7 +127,7 @@ module aptos_framework::genesis {
     ) {
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
-        let mint_cap = initialize_aptos_coin(aptos_framework);
+        let mint_cap = initialize_aptos_coin(aptos_framework, vector::empty());
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
