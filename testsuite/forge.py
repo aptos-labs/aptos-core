@@ -770,7 +770,7 @@ class LocalForgeRunner(ForgeRunner):
 
 class K8sForgeRunner(ForgeRunner):
     def run(self, context: ForgeContext) -> ForgeResult:
-        forge_pod_name = f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}"[:64]
+        forge_pod_name = sanitize_forge_resource_name(f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}")
         context.shell.run([
             "kubectl", "delete", "pod",
             "-n", "default",
@@ -942,33 +942,40 @@ def find_recent_images(
     num_images: int,
     # Set a generoush threshold in case of failures
     commit_threshold: int = 100,
+    enable_failpoints: bool = False,
 ) -> Generator[str, None, None]:
+    # If we are using the testing image, or are using failpoints, we need to check for those images
+    # In general, any image not compiled as the default release profile will be named differently
+    image_tag_prefix = "failpoints_" if enable_failpoints else ""
+    image_name = "aptos/validator"
+
     i = 0
-    j = 0
     for revision in git.last(commit_threshold):
-        exists = image_exists(shell, revision)
+        image_tag = f"{image_tag_prefix}{revision}"
+        exists = image_exists(shell, image_name, image_tag)
         if exists:
             i += 1
-            yield revision
+            yield image_tag
         if i >= num_images:
             break
     if i < num_images:
         raise Exception(f"Could not find {num_images} recent images")
 
 
-def image_exists(shell: Shell, image_tag: str) -> bool:
+def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
     result = shell.run([
         "aws", "ecr", "describe-images",
-        "--repository-name", "aptos/validator",
+        "--repository-name", f"{image_name}",
         "--image-ids", f"imageTag={image_tag}"
     ])
     return result.exit_code == 0
 
 
-def sanitize_forge_namespace(forge_namespace: str) -> str:
+def sanitize_forge_resource_name(forge_resource: str) -> str:
+    """Sanitize the intended forge resource name to be a valid k8s resource name"""
     max_length = 64
     sanitized_namespace = ""
-    for i, c in enumerate(forge_namespace):
+    for i, c in enumerate(forge_resource):
         if i >= max_length:
             break
         if c.isalnum():
@@ -994,6 +1001,7 @@ def sanitize_forge_namespace(forge_namespace: str) -> str:
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
+@envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_TEST_SUITE", "land_blocking")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
@@ -1023,6 +1031,7 @@ def test(
     forge_cluster_name: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
+    forge_enable_failpoints: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
@@ -1092,17 +1101,21 @@ def test(
     if forge_namespace is None:
         forge_namespace = f"forge-{get_current_user()}-{time.epoch()}"
 
-    forge_namespace = sanitize_forge_namespace(forge_namespace)
+    forge_namespace = sanitize_forge_resource_name(forge_namespace)
 
     assert forge_namespace is not None, "Forge namespace is required"
 
-    default_latest_image, second_latest_image = list(find_recent_images(shell, git, 2))
     if forge_test_suite == "compat":
+        # Compat uses 2 image tags
+        default_latest_image, second_latest_image = list(find_recent_images(shell, git, 2, enable_failpoints=forge_enable_failpoints))
         # This might not work as intended because we dont know if that revision passed forge
         image_tag = image_tag or second_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
     else:
+        # All other tests use just one image tag
+        # Only try finding exactly 1 image
+        default_latest_image = list(find_recent_images(shell, git, 1, enable_failpoints=forge_enable_failpoints))[0]
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
@@ -1110,6 +1123,11 @@ def test(
     assert image_tag is not None, "Image tag is required"
     assert forge_image_tag is not None, "Forge image tag is required"
     assert upgrade_image_tag is not None, "Upgrade image tag is required"
+
+    print("Using the following image tags:")
+    print("\tforge: ", forge_image_tag)
+    print("\tswarm: ", image_tag)
+    print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
 
     context = ForgeContext(
         shell=shell,
@@ -1306,7 +1324,7 @@ def tail(
     processes = SystemProcesses()
     context = SystemContext(shell, filesystem, processes)
 
-    job_name = sanitize_forge_namespace(job_name)
+    job_name = sanitize_forge_resource_name(job_name)
 
     all_jobs = asyncio.run(get_all_forge_jobs(context))
     found_jobs = [job for job in all_jobs if job.name == job_name]
