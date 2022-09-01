@@ -7,7 +7,7 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/30 * * * *"
 
 jobs:
   # Run a faster chaos forge to quickly surface correctness failures
@@ -16,7 +16,6 @@ jobs:
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-shadow
-      FORGE_RUNNER_DURATION_SECS: 300
-      FORGE_RUNNER_TPS_THRESHOLD: 1000
+      FORGE_RUNNER_DURATION_SECS: 60
       FORGE_TEST_SUITE: chaos
       USE_NEW_WRAPPER: true

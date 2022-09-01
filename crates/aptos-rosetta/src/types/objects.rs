@@ -557,9 +557,10 @@ fn parse_operations_from_txn_payload(
                     && module.0 == aptos_coin_module_identifier()
                     && name.0 == aptos_coin_resource_identifier()
                 {
-                    let receiver =
-                        serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
-                            .unwrap();
+                    let receiver = serde_json::from_value::<Address>(
+                        inner.arguments.first().cloned().unwrap(),
+                    )
+                    .unwrap();
                     let amount =
                         serde_json::from_value::<U64>(inner.arguments.get(1).cloned().unwrap())
                             .unwrap()
@@ -585,7 +586,7 @@ fn parse_operations_from_txn_payload(
             && create_account_function_identifier() == inner.function.name.0
         {
             let address =
-                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                serde_json::from_value::<Address>(inner.arguments.first().cloned().unwrap())
                     .unwrap();
             operations.push(Operation::create_account(
                 operation_index,
@@ -598,7 +599,7 @@ fn parse_operations_from_txn_payload(
             && set_operator_function_identifier() == inner.function.name.0
         {
             let operator =
-                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                serde_json::from_value::<Address>(inner.arguments.first().cloned().unwrap())
                     .unwrap();
             operations.push(Operation::set_operator(
                 operation_index,
@@ -853,7 +854,7 @@ impl InternalOperation {
             InternalOperation::Transfer(transfer) => {
                 is_native_coin(&transfer.currency)?;
                 (
-                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount),
+                    aptos_stdlib::aptos_account_transfer(transfer.receiver, transfer.amount.0),
                     transfer.sender,
                 )
             }
@@ -877,7 +878,7 @@ pub struct CreateAccount {
 pub struct Transfer {
     pub sender: AccountAddress,
     pub receiver: AccountAddress,
-    pub amount: u64,
+    pub amount: U64,
     pub currency: Currency,
 }
 
@@ -966,7 +967,7 @@ impl Transfer {
         Ok(Transfer {
             sender,
             receiver,
-            amount,
+            amount: amount.into(),
             currency,
         })
     }

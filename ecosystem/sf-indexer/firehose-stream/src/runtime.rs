@@ -44,13 +44,15 @@ pub fn bootstrap(
     runtime.spawn(async move {
         let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
         let context_arc = Arc::new(context);
-        // Let the env variable take precedence over the config file
-        let config_starting_version = node_config.firehose_stream.starting_version.unwrap_or(0);
-        let starting_version = std::env::var("STARTING_VERSION")
-            .map(|v| v.parse::<u64>().unwrap_or(config_starting_version))
-            .unwrap_or(config_starting_version);
-
-        let mut streamer = FirehoseStreamer::new(context_arc, starting_version, Some(mp_sender));
+        // Let the env variable take precedence over the config file, (if env is not set it just default to 0)
+        let config_starting_block = node_config.firehose_stream.starting_block.unwrap_or(0);
+        let mut starting_block = std::env::var("STARTING_BLOCK")
+            .map(|v| v.parse::<u64>().unwrap_or(0))
+            .unwrap_or(0);
+        if starting_block == 0 {
+            starting_block = config_starting_block;
+        }
+        let mut streamer = FirehoseStreamer::new(context_arc, starting_block, Some(mp_sender));
         streamer.start().await;
     });
     Some(Ok(runtime))
@@ -68,17 +70,17 @@ pub struct FirehoseStreamer {
 impl FirehoseStreamer {
     pub fn new(
         context: Arc<Context>,
-        starting_version: u64,
+        starting_block: u64,
         mp_client_sender: Option<MempoolClientSender>,
     ) -> Self {
         let resolver = Arc::new(context.move_resolver().unwrap());
-        let (_block_start_version, _block_last_versionn, block_event) = context
+        let (_block_start_version, _block_last_version, block_event) = context
             .db
-            .get_block_info_by_version(starting_version)
+            .get_block_info_by_height(starting_block)
             .unwrap_or_else(|_| {
                 panic!(
-                    "Could not get block_info for starting version {}",
-                    starting_version,
+                    "Could not get block_info for starting block {}",
+                    starting_block,
                 )
             });
 
@@ -176,16 +178,31 @@ impl FirehoseStreamer {
         let mut curr_version = block_start_version;
         for onchain_txn in transactions {
             let txn_version = onchain_txn.version;
-            let txn = self
-                .resolver
-                .as_converter(self.context.db.clone())
-                .try_into_onchain_transaction(block_timestamp, onchain_txn)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Could not convert onchain transaction version {} into transaction: {:?}",
-                        txn_version, e
-                    )
-                });
+            let mut txn: Option<Transaction> = None;
+            let mut retries = 0;
+            while txn.is_none() {
+                match self
+                    .resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_onchain_transaction(block_timestamp, onchain_txn.clone())
+                {
+                    Ok(transaction) => {
+                        txn = Some(transaction);
+                    }
+                    Err(err) => {
+                        if retries == 0 {
+                            aptos_logger::debug!(
+                                "Could not convert onchain transaction, trying again with updated resolver",
+                            );
+                        } else {
+                            panic!("Could not convert onchain transaction, error: {:?}", err);
+                        }
+                        retries += 1;
+                        self.resolver = Arc::new(self.context.move_resolver().unwrap());
+                    }
+                }
+            }
+            let txn = txn.unwrap();
             if !self.validate_transaction_type(curr_version == block_start_version, &txn) {
                 error!(
                             "Block {} failed validation: first transaction has to be block metadata or genesis",

@@ -43,7 +43,7 @@ use tokio::runtime::Runtime;
 const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpcBcs;
 const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DummyMsg(pub Vec<u8>);
 
 pub fn network_endpoint_config() -> AppConfig {

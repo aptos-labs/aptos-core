@@ -245,6 +245,7 @@ impl EntryFunctionCall {
                 "Clone".to_string(),
                 "Debug".to_string(),
                 "PartialEq".to_string(),
+                "Eq".to_string(),
             ])
             .with_custom_derive_block(custom_derive_block)
             .output(&mut self.out, &script_registry)

@@ -12,7 +12,6 @@ use crate::{
     state_store::state_key::StateKey,
 };
 use aptos_crypto::hash::CryptoHash;
-use mirai_annotations::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
@@ -91,14 +90,14 @@ prop_compose! {
 impl NibblePath {
     /// Creates a new `NibblePath` from a vector of bytes assuming each byte has 2 nibbles.
     pub fn new_even(bytes: Vec<u8>) -> Self {
-        checked_precondition!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
+        assert!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
         let num_nibbles = bytes.len() * 2;
         NibblePath { num_nibbles, bytes }
     }
 
-    /// Similar to `new()` but assumes that the bytes have one less nibble.
+    /// Similar to `new()` but asserts that the bytes have one less nibble.
     pub fn new_odd(bytes: Vec<u8>) -> Self {
-        checked_precondition!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
+        assert!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
         assert_eq!(
             bytes.last().expect("Should have odd number of nibbles.") & 0x0f,
             0,
@@ -113,18 +112,18 @@ impl NibblePath {
     }
 
     fn new_from_byte_array(bytes: &[u8], num_nibbles: usize) -> Self {
-        checked_precondition!(num_nibbles <= ROOT_NIBBLE_HEIGHT);
+        assert!(num_nibbles <= ROOT_NIBBLE_HEIGHT);
         if num_nibbles % 2 == 1 {
             // Rounded up number of bytes to be considered
             let num_bytes = (num_nibbles + 1) / 2;
-            checked_precondition!(bytes.len() >= num_bytes);
+            assert!(bytes.len() >= num_bytes);
             let mut nibble_bytes = bytes[..num_bytes].to_vec();
             // If number of nibbles is odd, make sure to pad the last nibble with 0s.
             let last_byte_padded = bytes[num_bytes - 1] & 0xF0;
             nibble_bytes[num_bytes - 1] = last_byte_padded;
             NibblePath::new_odd(nibble_bytes)
         } else {
-            checked_precondition!(bytes.len() >= num_nibbles / 2);
+            assert!(bytes.len() >= num_nibbles / 2);
             NibblePath::new_even(bytes[..num_nibbles / 2].to_vec())
         }
     }
@@ -184,7 +183,6 @@ impl NibblePath {
 
     /// Get a bit iterator iterates over the whole nibble path.
     pub fn bits(&self) -> BitIterator {
-        assume!(self.num_nibbles <= ROOT_NIBBLE_HEIGHT); // invariant
         BitIterator {
             nibble_path: self,
             pos: (0..self.num_nibbles * 4),
@@ -193,7 +191,6 @@ impl NibblePath {
 
     /// Get a nibble iterator iterates over the whole nibble path.
     pub fn nibbles(&self) -> NibbleIterator {
-        assume!(self.num_nibbles <= ROOT_NIBBLE_HEIGHT); // invariant
         NibbleIterator::new(self, 0, self.num_nibbles)
     }
 
@@ -299,9 +296,9 @@ impl<'a> Peekable for NibbleIterator<'a> {
 
 impl<'a> NibbleIterator<'a> {
     fn new(nibble_path: &'a NibblePath, start: usize, end: usize) -> Self {
-        precondition!(start <= end);
-        precondition!(start <= ROOT_NIBBLE_HEIGHT);
-        precondition!(end <= ROOT_NIBBLE_HEIGHT);
+        assert!(start <= end);
+        assert!(start <= ROOT_NIBBLE_HEIGHT);
+        assert!(end <= ROOT_NIBBLE_HEIGHT);
         Self {
             nibble_path,
             pos: (start..end),
@@ -311,22 +308,16 @@ impl<'a> NibbleIterator<'a> {
 
     /// Returns a nibble iterator that iterates all visited nibbles.
     pub fn visited_nibbles(&self) -> NibbleIterator<'a> {
-        assume!(self.start <= self.pos.start); // invariant
-        assume!(self.pos.start <= ROOT_NIBBLE_HEIGHT); // invariant
         Self::new(self.nibble_path, self.start, self.pos.start)
     }
 
     /// Returns a nibble iterator that iterates all remaining nibbles.
     pub fn remaining_nibbles(&self) -> NibbleIterator<'a> {
-        assume!(self.pos.start <= self.pos.end); // invariant
-        assume!(self.pos.end <= ROOT_NIBBLE_HEIGHT); // invariant
         Self::new(self.nibble_path, self.pos.start, self.pos.end)
     }
 
     /// Turn it into a `BitIterator`.
     pub fn bits(&self) -> BitIterator<'a> {
-        assume!(self.pos.start <= self.pos.end); // invariant
-        assume!(self.pos.end <= ROOT_NIBBLE_HEIGHT); // invariant
         BitIterator {
             nibble_path: self.nibble_path,
             pos: (self.pos.start * 4..self.pos.end * 4),
@@ -343,7 +334,7 @@ impl<'a> NibbleIterator<'a> {
 
     /// Get the number of nibbles that this iterator covers.
     pub fn num_nibbles(&self) -> usize {
-        assume!(self.start <= self.pos.end); // invariant
+        assert!(self.start <= self.pos.end); // invariant
         self.pos.end - self.start
     }
 

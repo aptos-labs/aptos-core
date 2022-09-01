@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct Request {
     #[prost(int64, tag = "1")]
     pub start_block_num: i64,
@@ -42,12 +42,12 @@ pub mod response {
         Data(super::BlockScopedData),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct InitialSnapshotComplete {
     #[prost(string, tag = "1")]
     pub cursor: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct InitialSnapshotData {
     #[prost(string, tag = "1")]
     pub module_name: ::prost::alloc::string::String,
@@ -92,12 +92,12 @@ pub mod module_output {
         StoreDeltas(super::StoreDeltas),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct ModulesProgress {
     #[prost(message, repeated, tag = "1")]
     pub modules: ::prost::alloc::vec::Vec<ModuleProgress>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct ModuleProgress {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -106,24 +106,24 @@ pub struct ModuleProgress {
 }
 /// Nested message and enum types in `ModuleProgress`.
 pub mod module_progress {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct ProcessedRange {
         #[prost(message, repeated, tag = "1")]
         pub processed_ranges: ::prost::alloc::vec::Vec<super::BlockRange>,
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct InitialState {
         #[prost(uint64, tag = "2")]
         pub available_up_to_block: u64,
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct ProcessedBytes {
         #[prost(uint64, tag = "1")]
         pub total_bytes_read: u64,
         #[prost(uint64, tag = "2")]
         pub total_bytes_written: u64,
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct Failed {
         #[prost(string, tag = "1")]
         pub reason: ::prost::alloc::string::String,
@@ -134,7 +134,7 @@ pub mod module_progress {
         #[prost(bool, tag = "3")]
         pub logs_truncated: bool,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Oneof)]
     pub enum Type {
         #[prost(message, tag = "2")]
         ProcessedRanges(ProcessedRange),
@@ -146,19 +146,19 @@ pub mod module_progress {
         Failed(Failed),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct BlockRange {
     #[prost(uint64, tag = "1")]
     pub start_block: u64,
     #[prost(uint64, tag = "2")]
     pub end_block: u64,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct StoreDeltas {
     #[prost(message, repeated, tag = "1")]
     pub deltas: ::prost::alloc::vec::Vec<StoreDelta>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct StoreDelta {
     #[prost(enumeration = "store_delta::Operation", tag = "1")]
     pub operation: i32,
@@ -207,7 +207,7 @@ pub struct Output {
     #[prost(message, optional, tag = "10")]
     pub value: ::core::option::Option<::prost_types::Any>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct Modules {
     #[prost(message, repeated, tag = "1")]
     pub modules: ::prost::alloc::vec::Vec<Module>,
@@ -215,14 +215,14 @@ pub struct Modules {
     pub binaries: ::prost::alloc::vec::Vec<Binary>,
 }
 /// Binary represents some code compiled to its binary form.
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct Binary {
     #[prost(string, tag = "1")]
     pub r#type: ::prost::alloc::string::String,
     #[prost(bytes = "vec", tag = "2")]
     pub content: ::prost::alloc::vec::Vec<u8>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct Module {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -241,12 +241,12 @@ pub struct Module {
 }
 /// Nested message and enum types in `Module`.
 pub mod module {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct KindMap {
         #[prost(string, tag = "1")]
         pub output_type: ::prost::alloc::string::String,
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct KindStore {
         /// The `update_policy` determines the functions available to mutate the store
         /// (like `set()`, `set_if_not_exists()` or `sum()`, etc..) in
@@ -297,26 +297,26 @@ pub mod module {
             }
         }
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct Input {
         #[prost(oneof = "input::Input", tags = "1, 2, 3")]
         pub input: ::core::option::Option<input::Input>,
     }
     /// Nested message and enum types in `Input`.
     pub mod input {
-        #[derive(Clone, PartialEq, ::prost::Message)]
+        #[derive(Clone, PartialEq, Eq, ::prost::Message)]
         pub struct Source {
             /// ex: "sf.ethereum.type.v1.Block"
             #[prost(string, tag = "1")]
             pub r#type: ::prost::alloc::string::String,
         }
-        #[derive(Clone, PartialEq, ::prost::Message)]
+        #[derive(Clone, PartialEq, Eq, ::prost::Message)]
         pub struct Map {
             /// ex: "block_to_pairs"
             #[prost(string, tag = "1")]
             pub module_name: ::prost::alloc::string::String,
         }
-        #[derive(Clone, PartialEq, ::prost::Message)]
+        #[derive(Clone, PartialEq, Eq, ::prost::Message)]
         pub struct Store {
             #[prost(string, tag = "1")]
             pub module_name: ::prost::alloc::string::String,
@@ -348,7 +348,7 @@ pub mod module {
                 }
             }
         }
-        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, Eq, ::prost::Oneof)]
         pub enum Input {
             #[prost(message, tag = "1")]
             Source(Source),
@@ -358,12 +358,12 @@ pub mod module {
             Store(Store),
         }
     }
-    #[derive(Clone, PartialEq, ::prost::Message)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Message)]
     pub struct Output {
         #[prost(string, tag = "1")]
         pub r#type: ::prost::alloc::string::String,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, Eq, ::prost::Oneof)]
     pub enum Kind {
         #[prost(message, tag = "2")]
         KindMap(KindMap),
@@ -371,7 +371,7 @@ pub mod module {
         KindStore(KindStore),
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct Clock {
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
@@ -395,7 +395,7 @@ pub struct Package {
     #[prost(message, repeated, tag = "8")]
     pub package_meta: ::prost::alloc::vec::Vec<PackageMetadata>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct PackageMetadata {
     #[prost(string, tag = "1")]
     pub version: ::prost::alloc::string::String,
@@ -406,7 +406,7 @@ pub struct PackageMetadata {
     #[prost(string, tag = "4")]
     pub doc: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct ModuleMetadata {
     /// Corresponds to the index in `Package.metadata.package_meta`
     #[prost(uint64, tag = "1")]

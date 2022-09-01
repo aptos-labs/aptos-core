@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct AuthRequest {
     pub chain_id: ChainId,
     pub peer_id: PeerId,
+    #[serde(default = "default_role_type")]
     pub role_type: RoleType,
     pub server_public_key: x25519::PublicKey,
     pub handshake_msg: Vec<u8>,
@@ -20,7 +21,7 @@ pub struct AuthResponse {
     pub handshake_msg: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Claims {
     pub chain_id: ChainId,
     pub peer_id: PeerId,
@@ -28,4 +29,8 @@ pub struct Claims {
     pub epoch: u64,
     pub exp: usize,
     pub iat: usize,
+}
+
+fn default_role_type() -> RoleType {
+    RoleType::Validator
 }

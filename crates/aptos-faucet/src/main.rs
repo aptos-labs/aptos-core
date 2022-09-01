@@ -241,7 +241,7 @@ mod tests {
         TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
-    #[derive(Clone, Debug, Serialize, PartialEq)]
+    #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
     pub struct Error {
         pub code: u16,
         pub message: String,

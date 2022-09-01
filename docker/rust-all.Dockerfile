@@ -1,13 +1,13 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:buster-20220228@sha256:fd510d85d7e0691ca551fe08e8a2516a86c7f24601a940a299b5fe5cdd22c03a AS debian-base
+FROM debian:buster-20220822@sha256:faa416b9eeda2cbdb796544422eedd698e716dbd99841138521a94db51bf6123 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.61-buster AS rust-base
+FROM rust:1.63.0-buster@sha256:0110d1b4193029735f1db1c0ed661676ed4b6f705b11b1ebe95c655b52e6906f AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 
@@ -31,7 +31,7 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
 
-RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
+RUN docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -84,6 +84,9 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
+# streamingfast indexer
+COPY --link --from=builder /aptos/dist/aptos-sf-indexer /usr/local/bin/aptos-sf-indexer
+COPY --link --from=builder /aptos/ecosystem/sf-indexer/aptos-substreams/*.spkg /aptos-substreams/
 
 ENV RUST_LOG_FORMAT=json
 
@@ -143,6 +146,7 @@ COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup
 COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
+COPY --link --from=builder /aptos/dist/aptos-vfn-check-client /usr/local/bin/aptos-vfn-check-client
 COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
 
 ### Get Aptos Move releases for genesis ceremony

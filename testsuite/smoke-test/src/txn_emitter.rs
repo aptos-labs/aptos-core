@@ -4,7 +4,9 @@
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use anyhow::ensure;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{EmitJobRequest, NodeExt, Result, Swarm, TxnEmitter, TxnStats};
+use forge::{
+    EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+};
 use rand::{rngs::OsRng, SeedableRng};
 use std::time::Duration;
 use tokio::runtime::Builder;
@@ -30,7 +32,6 @@ pub async fn generate_traffic(
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
     let mut emitter = TxnEmitter::new(
         chain_info.root_account,
-        // TODO: swap this with a random client
         validator_clients[0].clone(),
         transaction_factory,
         rng,
@@ -39,24 +40,28 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
-        .duration(duration);
-    let stats = emitter.emit_txn_for(emit_job_request).await?;
-
-    Ok(stats)
+        .transaction_mix(vec![
+            (TransactionType::P2P, 70),
+            (TransactionType::AccountGeneration, 20),
+            (TransactionType::NftMint, 10),
+        ])
+        .mode(EmitJobMode::ConstTps { tps: 20 });
+    emitter
+        .emit_txn_for_with_stats(emit_job_request, duration, 3)
+        .await
 }
 
 #[tokio::test]
 async fn test_txn_emmitter() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
-    // emit to all validator
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     let txn_stat = generate_traffic(&mut swarm, &all_validators, Duration::from_secs(10), 1)
         .await
         .unwrap();
-    println!("{:?}", txn_stat);
+    println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
     // assert some much smaller number than expected, so it doesn't fail under contention
-    assert!(txn_stat.submitted > 100);
-    assert!(txn_stat.committed > 100);
+    assert!(txn_stat.submitted > 30);
+    assert!(txn_stat.committed > 30);
 }

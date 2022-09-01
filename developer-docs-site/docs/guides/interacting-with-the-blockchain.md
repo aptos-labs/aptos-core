@@ -9,7 +9,7 @@ The Aptos Blockchain uses the [Move][move_url] virtual machine (VM) for executin
 native operations, Aptos delegates all operations to Move, including: account creation, fund transfer and publishing Move modules.
 To support these operations, blockchains built on top of Move must provide a framework (akin to
 an operating system for a computer or a minimal viable set of functions) for interacting with the blockchain. In this section, we discuss
-these functions, exposed via the Aptos Framework's `script` functions. 
+these functions, exposed via the Aptos Framework's `script` functions.
 
 This guide (in concert with the [Move module tutorial][your-first-move-module]) will unlock the minimal amount of information required to start building rich applications on top of the Aptos Blockchain. Note: the Aptos Framework is under heavy development and this document may not
 be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
@@ -77,7 +77,7 @@ It is important to note that the Move bytecode must specify the same address as 
 
 [accounts]: /concepts/basics-accounts
 [your-first-coin]: /tutorials/your-first-coin
-[your-first-move-module]: /tutorials/your-first-move-module
+[your-first-move-module]: /tutorials/first-move-module
 [your-first-transaction]: /tutorials/your-first-transaction
 [move_url]: https://diem.github.io/move/
 [aptos_framework]: https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-framework/sources

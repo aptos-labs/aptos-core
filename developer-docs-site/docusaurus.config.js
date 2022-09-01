@@ -12,8 +12,8 @@ const config = {
   tagline: "Developer Documentation",
   url: "https://aptos.dev",
   baseUrl: "/",
-  onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
+  onBrokenLinks: "throw",
+  onBrokenMarkdownLinks: "throw",
   favicon: "img/favicon.ico",
   organizationName: "aptos-labs", // Usually your GitHub org/user name.
   projectName: "aptos-core", // Usually your repo name.
@@ -98,11 +98,13 @@ const config = {
                 label: "Your First DApp",
                 docId: "tutorials/first-dapp",
               },
+              /*
               {
                 type: "doc",
                 label: "Your First Coin",
                 docId: "tutorials/first-coin",
               },
+              */
               {
                 type: "doc",
                 label: "Your First NFT",
@@ -291,6 +293,18 @@ const config = {
           {
             to: "/concepts/staking",
             from: "/nodes/staking",
+          },
+          {
+            to: "/tutorials/your-first-nft",
+            from: "/tutorials/your-first-nft-sdk",
+          },
+          {
+            to: "/tutorials/your-first-transaction",
+            from: "/tutorials/your-first-transaction-sdk",
+          },
+          {
+            to: "/tutorials/first-move-module",
+            from: "/tutorials/first-move-module-cli",
           },
         ],
       },

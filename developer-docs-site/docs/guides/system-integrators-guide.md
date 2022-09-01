@@ -58,13 +58,15 @@ Aptos currently has two SDKs:
 
 ## Accounts on Aptos
 
-An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L398) or explicitly via [`account::create_account`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L370).
+An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) or explicitly via [`aptos_account::create_account`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L13).
 
-At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L20) contains:
+At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/account.move#L23) contains:
 * A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
 * An authentication key associated with their current public, private key(s).
 * A strictly increasing sequence number that represents the account's next transaction's sequence number to prevent replay attacks.
+* A strictly increasing number that represents the next distinct guid creation number.
 * An event stream for all new types of coins added to the account.
+* An event stream for all key rotations for the account.
 
 ### Account identifiers
 
@@ -151,7 +153,7 @@ Within a given transaction, the target of execution can be one of two types:
 - An entry point (formerly known as script function), and/or
 - A script (payload). 
 
-Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
+Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`. 
 
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
 
@@ -218,7 +220,7 @@ Coins are stored within an account under the resource `CoinStore<T>`. At account
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
 
 :::caution
 It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.

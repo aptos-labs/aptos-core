@@ -3,8 +3,8 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
@@ -59,7 +59,7 @@ pub trait StateSnapshotReceiver<K, V>: Send {
     fn finish_box(self: Box<Self>) -> Result<()>;
 }
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Service error: {:?}", error)]
     ServiceError { error: String },
@@ -479,7 +479,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<usize> {
+    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
         unimplemented!()
     }
 

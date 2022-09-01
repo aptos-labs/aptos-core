@@ -6,15 +6,11 @@ use crate::{
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use std::{
-    fs,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -390,7 +386,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
 
     // Stop the validator and delete the storage
     let validator = validator_peer_ids[validator_index_to_test];
-    stop_validator_and_delete_storage(swarm, validator);
+    stop_validator_and_delete_storage(swarm, validator).await;
 
     // Execute more transactions
     execute_transactions(swarm, &validator_client_0, &mut account_1, &account_0, true).await;
@@ -459,7 +455,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -476,7 +472,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -578,7 +574,7 @@ async fn execute_transactions_and_wait(
 /// Waits for all nodes to catch up
 async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_SECS))
         .await
         .unwrap();
 }
@@ -592,28 +588,8 @@ async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAcc
 }
 
 /// Stops the specified validator and deletes storage
-fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
-    // Stop the validator
-    swarm.validator_mut(validator).unwrap().stop();
-
-    // Delete the validator storage
-    let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
-    let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-    let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
-    info!(
-        "Deleting ledger, state and state sync db paths ({:?}, {:?}, {:?}) for validator {:?}",
-        ledger_db_path.as_path(),
-        state_db_path.as_path(),
-        state_sync_db_path.as_path(),
-        validator
-    );
-    assert!(
-        ledger_db_path.as_path().exists()
-            && state_db_path.as_path().exists()
-            && state_sync_db_path.as_path().exists()
-    );
-    fs::remove_dir_all(ledger_db_path).unwrap();
-    fs::remove_dir_all(state_db_path).unwrap();
-    fs::remove_dir_all(state_sync_db_path).unwrap();
+async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
+    let validator = swarm.validator_mut(validator).unwrap();
+    // the validator is stopped during the clear_storage step as well
+    validator.clear_storage().await.unwrap();
 }

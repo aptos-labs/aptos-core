@@ -10,13 +10,15 @@ Do this only if you received the confirmation email from Aptos team for your eli
 
 ## Initializing staking pool
 
-In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool). Alternatively, you can also use CLI to intialize staking pool:
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
+
+Alternatively, you can also use CLI to intialize staking pool:
 
 - Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
 
   ```
   aptos init --profile ait3-owner \
-    --rest-url http://ait3.aptosdev.com
+    --rest-url https://ait3.aptosdev.com
   ```
 
 - Initialize staking pool using CLI
@@ -46,27 +48,27 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ### Using source code
 
-- Stop your node and remove the data directory. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
+- Stop your node and remove the data directory. **Make sure you remove the secure-data.json file too**, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
-- Pull the latest changes on `testnet` branch
+- Pull the latest changes on `testnet` branch. It should be commit `b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
 ### Using Docker
 
-- Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
+- Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data.json file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
-- Update your docker image to use tag `testnet`
+- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update `chain_id` to 43.
-- Update your docker image to use tag `testnet`
+- Update `chain_id` to 47.
+- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
@@ -106,7 +108,7 @@ At this point you already used your owner account to initialized a validator sta
     ```
     aptos init --profile ait3-operator \
     --private-key <operator_account_private_key> \
-    --rest-url http://ait3.aptosdev.com \
+    --rest-url https://ait3.aptosdev.com \
     --skip-faucet
     ```
     
@@ -182,8 +184,8 @@ You can check the details about node liveness definition [here](https://aptos.de
     The command will output the number of inbound and outbound connections of your Validator node. For example:
 
     ```
-    aptos_connections{direction="inbound",network_id="Validator",peer_id="2a40eeab",role_type="validator"} 5
-    aptos_connections{direction="outbound",network_id="Validator",peer_id="2a40eeab",role_type="validator"} 2
+    aptos_connections{direction="inbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 5
+    aptos_connections{direction="outbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 2
     ```
 
     As long as one of the metrics is greater than zero, your node is connected to at least one of the peers on the testnet.
@@ -232,5 +234,5 @@ A node can choose to leave validator set at anytime, or it would happen automati
 1. Leave validator set (will take effect in next epoch)
 
     ```
-    aptos node leave-validator-set --profile ait3-operator
+    aptos node leave-validator-set --profile ait3-operator --pool-address <owner-address>
     ```

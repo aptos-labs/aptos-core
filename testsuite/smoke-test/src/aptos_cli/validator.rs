@@ -15,7 +15,7 @@ use aptos_rest_client::{Client, State};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::network_address::DnsName;
 use aptos_types::PeerId;
-use forge::{reconfig, NodeExt, Swarm};
+use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -73,6 +73,71 @@ async fn test_show_validator_set() {
             .account_address(),
         &swarm.validators().next().unwrap().peer_id()
     );
+}
+
+#[tokio::test]
+async fn test_large_total_stake() {
+    // just barelly below u64::MAX
+    const BASE: u64 = 10_000_000_000_000_000_000;
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_init_config(Arc::new(|_, _, genesis_stake_amount| {
+            // make sure we have quorum
+            *genesis_stake_amount = BASE;
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.allow_new_validators = true;
+            genesis_config.epoch_duration_secs = 4;
+            genesis_config.recurring_lockup_duration_secs = 4;
+            genesis_config.voting_duration_secs = 3;
+        }))
+        .build_with_cli(0)
+        .await;
+
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let mut keygen = KeyGen::from_os_rng();
+    let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen, None).await;
+    // faucet can make our root LocalAccount sequence number get out of sync.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+
+    cli.initialize_validator(
+        validator_cli_index,
+        keys.consensus_public_key(),
+        keys.consensus_proof_of_possession(),
+        HostAndPort {
+            host: dns_name("0.0.0.0"),
+            port: 1234,
+        },
+        keys.network_public_key(),
+    )
+    .await
+    .unwrap();
+
+    cli.join_validator_set(validator_cli_index, None)
+        .await
+        .unwrap();
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    assert_eq!(
+        get_validator_state(&cli, validator_cli_index).await,
+        ValidatorState::ACTIVE
+    );
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(20))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

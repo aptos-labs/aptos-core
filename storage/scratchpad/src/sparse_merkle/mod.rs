@@ -89,7 +89,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
 use std::{
@@ -127,7 +127,7 @@ impl<V> BranchTracker<V> {
         }))
     }
 
-    fn become_oldest(
+    fn set_head(
         &mut self,
         head: &Arc<Inner<V>>,
         next: Option<&Arc<Inner<V>>>,
@@ -148,6 +148,11 @@ impl<V> BranchTracker<V> {
 
     fn head(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Inner<V>>> {
         // if `head.upgrade()` failed, it's that the head is being dropped.
+        //
+        // Notice the starting of the drop a SMT is not protected by the family lock -- but
+        // change of the links between the branch trackers and SMTs are always protected by the
+        // family lock.
+        // see `impl<V> Drop for Inner<V>`
         self.head.upgrade().or_else(|| self.next.upgrade())
     }
 }
@@ -181,8 +186,8 @@ struct Inner<V> {
 
 impl<V> Drop for Inner<V> {
     fn drop(&mut self) {
-        // to prevent recursively locking the family, buffer all processed descendants outside.
-        let mut processed_decendents = Vec::new();
+        // To prevent recursively locking the family, buffer all descendants outside.
+        let mut processed_descendants = Vec::new();
 
         {
             let locked_family = self.family_lock.lock();
@@ -191,15 +196,27 @@ impl<V> Drop for Inner<V> {
 
             while let Some(descendant) = stack.pop() {
                 if Arc::strong_count(&descendant) == 1 {
-                    // The only ref is the one we are now holding, so the structure will be dropped
-                    // after we free the `Arc`, which results in a chain of such structures being
-                    // dropped recursively and that might trigger a stack overflow. To prevent that we
-                    // follow the chain further to disconnect things beforehand.
+                    // The only ref is the one we are now holding, and there's no weak ref that can
+                    // upgrade because the only `Weak<Inner<V>>`s are held by `BranchTracker`s and
+                    // they try to upgrade only when under the protection of the family lock. So the
+                    // descendant will be dropped after we free the `Arc`, which results in a chain
+                    // of such structures being dropped recursively and that might trigger a stack
+                    // overflow. To prevent that we follow the chain further to disconnect things
+                    // beforehand.
                     stack.extend(descendant.drain_children_for_drop(&locked_family));
+                    // Note: After the above call, there is not even weak refs to `descendant`
+                    // because all relevant `BranchTrackers` now point their heads to one of the
+                    // children.
                 }
-                processed_decendents.push(descendant);
+                // All descendants process must be pushed, because they can become droppable after
+                // the ref count check above, since the family lock doesn't protect de-refs to the
+                // SMTs. -- all drops must NOT be recursive because we will be trying to lock the
+                // family again.
+                processed_descendants.push(descendant);
             }
         };
+        // Now that the lock is released, those in `processed_descendants` will be dropped in turn
+        // if applicable.
     }
 }
 
@@ -223,9 +240,9 @@ impl<V> Inner<V> {
         {
             let links_locked = self.links.lock();
             let mut branch_tracker_locked = links_locked.branch_tracker.lock();
-            branch_tracker_locked.become_oldest(
-                &self,
-                links_locked.children.first(),
+            branch_tracker_locked.set_head(
+                &self,                         /* head */
+                links_locked.children.first(), /* next */
                 locked_family,
             );
         }
@@ -290,6 +307,8 @@ impl<V> Inner<V> {
     }
 
     fn get_oldest_ancestor(self: &Arc<Self>) -> Arc<Self> {
+        // Under the protection of family_lock, the branching structure won't change,
+        // so we can follow the links and find the head of the oldest branch tracker.
         let locked_family = self.family_lock.lock();
         let (mut ret, mut parent) = {
             let branch_tracker = self.links.lock().branch_tracker.clone();
@@ -302,16 +321,12 @@ impl<V> Inner<V> {
             )
         };
 
-        while let Some(branch_tracker) = parent {
-            let branch_tracker_locked = branch_tracker.lock();
-            if let Some(head) = branch_tracker_locked.head(&locked_family) {
-                // Whenever it forks, the first branch shares the BranchTracker with the parent,
-                // hence this
-                if head.generation < self.generation {
-                    ret = head;
-                    parent = branch_tracker_locked.parent(&locked_family);
-                    continue;
-                }
+        while let Some(parent_bt) = parent {
+            let parent_bt_locked = parent_bt.lock();
+            if let Some(parent_bt_head) = parent_bt_locked.head(&locked_family) {
+                ret = parent_bt_head;
+                parent = parent_bt_locked.parent(&locked_family);
+                continue;
             }
             break;
         }

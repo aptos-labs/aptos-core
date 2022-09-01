@@ -18,7 +18,7 @@ rule_files:
 {{- end }}
 
 scrape_configs:
-{{ if .Values.monitoring.fullKubernetesScrape }}
+{{ if .Values.monitoring.prometheus.fullKubernetesScrape }}
 - job_name: 'kubernetes-apiservers'
   scheme: https
   tls_config:
@@ -51,11 +51,15 @@ scrape_configs:
   kubernetes_sd_configs:
   - role: node
 
-  {{ if not .Values.monitoring.fullKubernetesScrape }}
+  {{ if not .Values.monitoring.prometheus.fullKubernetesScrape }}
   metric_relabel_configs:
   - source_labels: [namespace]
     action: keep
     regex: "{{ .Release.Namespace }}"
+  # Explicitly drop spammy metrics
+  - source_labels: [__name__]
+    regex: 'storage_operation_duration_seconds_bucket'
+    action: drop
   {{ end }}
 
   relabel_configs:
@@ -85,18 +89,12 @@ scrape_configs:
     target_label: __metrics_path__
     replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 
- {{ if not .Values.monitoring.fullKubernetesScrape }}
+  {{ if not .Values.monitoring.prometheus.fullKubernetesScrape }}
   metric_relabel_configs:
-  - source_labels: [namespace, pod]
+  - source_labels: [pod]
     action: keep
-    regex: "{{ .Release.Namespace }};{{ .Release.Name }}-.*"
+    regex: "{{ .Release.Name }}-.*"
   {{ end }}
-
-{{ if .Values.monitoring.useKubeStateMetrics }}
-- job_name: 'kube-state-metrics'
-  static_configs:
-  - targets: ['kube-state-metrics.default.svc.cluster.local:8080']
-{{ end }}
 
 - job_name: "prom-pod-annotation"
 
@@ -122,10 +120,9 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_pod_name]
     action: replace
     target_label: kubernetes_pod_name
-
-  metric_relabel_configs:
-  - source_labels: [__name__]
-    regex: 'vector_files_(.+)_total'
+  # Explicitly drop all vector metrics
+  - source_labels: [namespace]
+    regex: 'vector'
     action: drop
 
 - job_name: "aptos-procs"

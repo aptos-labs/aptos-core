@@ -18,7 +18,7 @@ pub trait PrunerManager: Debug + Sync {
 
     fn is_pruner_enabled(&self) -> bool;
 
-    fn get_pruner_window(&self) -> Version;
+    fn get_prune_window(&self) -> Version;
 
     fn get_min_viable_version(&self) -> Version;
 

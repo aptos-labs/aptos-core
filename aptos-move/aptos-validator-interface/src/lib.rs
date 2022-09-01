@@ -6,8 +6,8 @@ mod storage_interface;
 pub use crate::storage_interface::DBDebuggerInterface;
 
 use anyhow::{anyhow, Result};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,

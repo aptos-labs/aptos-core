@@ -10,7 +10,9 @@ class It3sControllerTest < ActionDispatch::IntegrationTest
 
   setup do
     Flipper.enable(:it3_registration_open)
+    Flipper.enable(:it3_registration_closed)
     @user = FactoryBot.create(:user)
+    Flipper.enable(:it3_registration_override, @user)
     sign_in @user
   end
 
@@ -19,6 +21,8 @@ class It3sControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'it loads correctly' do
+    FactoryBot.create(:it3_profile, user: @user)
+    @user.update(kyc_status: 'completed')
     get it3_path
     assert_response :success
   end

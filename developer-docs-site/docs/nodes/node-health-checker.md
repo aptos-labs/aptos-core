@@ -38,7 +38,7 @@ mkdir /tmp/nhc && cd /tmp/nhc && wget https://raw.githubusercontent.com/aptos-la
 Start the NHC service by providing the above-downloaded `devnet_fullnode.yaml` baseline configuration YAML file:
 
 ```
-docker run -v /tmp/nhc:/nhc -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /nhc/devnet_fullnode.yaml
+docker run -v /tmp/nhc:/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /nhc/devnet_fullnode.yaml
 ```
 
 ### Step 3: Send a request to NHC service
@@ -206,8 +206,8 @@ There are more options available for which ports to use. Pass `-h` to see more o
 To generate the OpenAPI specs, run the following commands:
 
 ```
-cargo run -- server generate-openapi -f yaml > openapi.yaml
-cargo run -- server generate-openapi -f json > openapi.json
+cargo run -- server generate-openapi -f yaml > doc/spec.yaml
+cargo run -- server generate-openapi -f json > doc/spec.json
 ```
 
-You can also hit the `/spec_yaml` and `/spec_json` endpoints of the running service.
+You can also hit the `/spec.yaml` and `/spec.json` endpoints of the running service.

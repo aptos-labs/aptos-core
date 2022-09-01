@@ -88,12 +88,12 @@ impl MockTransactionAccumulator {
     }
 
     fn children(&self, parent: HashValue) -> Option<Children> {
-        // precondition: parent in internal node set
+        // assert: parent in internal node set
         self.p2c.borrow().get(&parent).copied()
     }
 
     fn height(&self, subtree_root: HashValue) -> u64 {
-        // precondition: subtree_root in internal node set
+        // assert: subtree_root in internal node set
         match self.children(subtree_root) {
             // leaves have no children
             None => 0,
@@ -105,7 +105,7 @@ impl MockTransactionAccumulator {
     /// or both of its children are complete. Note that a complete right child
     /// also implies that the left child is complete (since this is an accumulator).
     fn is_frozen(&self, subtree_root: HashValue) -> bool {
-        // precondition: subtree_root in internal node set
+        // assert: subtree_root in internal node set
         match self.children(subtree_root) {
             // leaf node ==> frozen
             None => true,
@@ -119,7 +119,7 @@ impl MockTransactionAccumulator {
     /// f(n) := if n.is_frozen => [n]
     ///         else           => f(n.left) || f(n.right)
     fn frozen_subtrees(&self, subtree_root: HashValue) -> Vec<HashValue> {
-        // precondition: subtree_root in internal node set
+        // assert: subtree_root in internal node set
         if self.is_frozen(subtree_root) {
             vec![subtree_root]
         } else {
@@ -194,7 +194,7 @@ impl MockTransactionAccumulator {
         new_subtree: HashValue,
         height_diff: u64,
     ) -> Vec<HashValue> {
-        // precondition: Some(old_subtree) and new_subtree in internal node set
+        // assert: Some(old_subtree) and new_subtree in internal node set
 
         let old_subtree = match maybe_old_subtree {
             Some(old_subtree) => old_subtree,

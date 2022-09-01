@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :project do
-    user { nil }
+    user { build :user }
     title { Faker::Company.name }
     short_description { Faker::Company.catch_phrase }
     full_description { Faker::Lorem.paragraphs(number: 3).map { |p| "<p>#{p}</p>" }.join }
@@ -18,8 +18,8 @@ FactoryBot.define do
     youtube_url { Faker::Internet.url(host: 'www.youtube.com') }
     thumbnail { Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') }
     public { true }
-    project_categories { build_list(:project_category, 3).uniq(&:category_id) }
-    project_members { build_list :project_member, 3 }
+    project_categories { build_list(:project_category, 3, project: instance).uniq(&:category_id) }
+    project_members { build_list(:project_member, 3, project: instance) }
     screenshots { 4.times.map { |_| Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') } }
   end
 end

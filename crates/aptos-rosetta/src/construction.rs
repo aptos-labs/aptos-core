@@ -271,10 +271,24 @@ async fn construction_metadata(
             .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
             .into_inner();
 
-        let maximum_possible_gas = std::cmp::min(
-            account_balance.coin.value.0 / gas_price_per_unit,
-            MAX_GAS_UNITS_PER_REQUEST,
-        );
+        let maximum_possible_gas =
+            if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
+                std::cmp::min(
+                    (account_balance
+                        .coin
+                        .value
+                        .0
+                        .saturating_sub(transfer.amount.0))
+                        / gas_price_per_unit,
+                    MAX_GAS_UNITS_PER_REQUEST,
+                )
+            } else {
+                std::cmp::min(
+                    account_balance.coin.value.0 / gas_price_per_unit,
+                    MAX_GAS_UNITS_PER_REQUEST,
+                )
+            };
+
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(gas_price_per_unit)
             .with_max_gas_amount(maximum_possible_gas);
@@ -325,7 +339,9 @@ async fn construction_metadata(
     };
 
     let suggested_fee = Amount {
-        value: format!("-{}", gas_price_per_unit.saturating_mul(max_gas_amount)),
+        value: gas_price_per_unit
+            .saturating_mul(max_gas_amount)
+            .to_string(),
         currency: native_coin(),
     };
 
@@ -483,7 +499,7 @@ fn parse_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(
@@ -519,7 +535,7 @@ fn parse_account_transfer_operation(
 
     // Retrieve the args for the operations
 
-    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+    let receiver: AccountAddress = if let Some(receiver) = args.first() {
         bcs::from_bytes(receiver)?
     } else {
         return Err(ApiError::TransactionParseError(Some(

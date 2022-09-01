@@ -4,10 +4,11 @@
 use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MempoolConfig {
     pub capacity: usize,
+    pub capacity_bytes: usize,
     pub capacity_per_user: usize,
     // number of failovers to broadcast to when the primary network is alive
     pub default_failovers: usize,
@@ -36,6 +37,7 @@ impl Default for MempoolConfig {
             max_broadcasts_per_peer: 1,
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,
+            capacity_bytes: 2_147_483_648,
             capacity_per_user: 100,
             default_failovers: 3,
             system_transaction_timeout_secs: 600,

@@ -5,8 +5,8 @@
 
 FactoryBot.define do
   factory :project_member do
-    project { nil }
-    user { build :user }
+    project { build(:project, project_members: [instance]) }
+    user { build(:user) }
     role { 'admin' }
     public { true }
   end

@@ -64,7 +64,7 @@ module aptos_framework::genesis {
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
 
         // put reserved framework reserved accounts under aptos governance
-        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0x10];
+        let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         let i = 0;
         while (!vector::is_empty(&framework_reserved_addresses)){
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
@@ -217,6 +217,6 @@ module aptos_framework::genesis {
         assert!(account::exists_at(@0x7), 1);
         assert!(account::exists_at(@0x8), 1);
         assert!(account::exists_at(@0x9), 1);
-        assert!(account::exists_at(@0x10), 1);
+        assert!(account::exists_at(@0xa), 1);
     }
 }

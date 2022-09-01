@@ -8,7 +8,7 @@ use std::fmt::Formatter;
 
 /// This is the generic struct we use for all API errors, it contains a string
 /// message and an Aptos API specific error code.
-#[derive(Debug, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct AptosError {
     /// A message describing the error
     pub message: String,

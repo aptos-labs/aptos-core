@@ -15,9 +15,9 @@ use aptos_config::config::{
     StateMerklePrunerConfig, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::transaction::{TransactionToCommit, Version};
 use aptos_types::{
     proof::SparseMerkleLeafNode,
@@ -100,7 +100,7 @@ fn test_pruner_config() {
             },
         );
         assert_eq!(state_pruner.is_pruner_enabled(), enable);
-        assert_eq!(state_pruner.get_pruner_window(), 20);
+        assert_eq!(state_pruner.get_prune_window(), 20);
 
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&aptos_db.ledger_db),
@@ -113,7 +113,7 @@ fn test_pruner_config() {
             },
         );
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
-        assert_eq!(ledger_pruner.get_pruner_window(), 100);
+        assert_eq!(ledger_pruner.get_prune_window(), 100);
     }
 }
 

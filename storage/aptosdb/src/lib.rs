@@ -62,8 +62,8 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::proof::TransactionAccumulatorSummary;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -1450,9 +1450,13 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_prune_window(&self) -> Result<usize> {
+    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
         gauged_api("get_state_prune_window", || {
-            Ok(self.state_store.state_db.state_pruner.get_pruner_window() as usize)
+            Ok(self
+                .state_store
+                .state_db
+                .epoch_snapshot_pruner
+                .get_prune_window() as usize)
         })
     }
 
@@ -1464,7 +1468,7 @@ impl DbReader for AptosDB {
 
     fn get_ledger_prune_window(&self) -> Result<usize> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self.ledger_pruner.get_pruner_window() as usize)
+            Ok(self.ledger_pruner.get_prune_window() as usize)
         })
     }
 

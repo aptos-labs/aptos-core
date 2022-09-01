@@ -118,6 +118,10 @@ pub struct InitPackage {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// For test: use the given local reference to the aptos framework
+    #[clap(skip)]
+    pub(crate) for_test_framework: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -137,10 +141,10 @@ impl CliCommand<()> for InitPackage {
         init_move_dir(
             package_dir.as_path(),
             &self.name,
-            // TODO(@davidiw) return back to main once lands and then cherry-pick for devnet
-            Some("conversions".to_string()),
+            Some("main".to_string()),
             addresses,
             self.prompt_options,
+            self.for_test_framework,
         )
     }
 }
@@ -151,6 +155,7 @@ pub fn init_move_dir(
     rev: Option<String>,
     addresses: BTreeMap<String, ManifestNamedAddress>,
     prompt_options: PromptOptions,
+    for_test_framework: Option<PathBuf>,
 ) -> CliTypedResult<()> {
     let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
     check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -162,13 +167,24 @@ pub fn init_move_dir(
 
     // Add the framework dependency if it's provided
     let mut dependencies = BTreeMap::new();
-    if let Some(rev) = rev {
+    if let Some(path) = for_test_framework {
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: Some(path.display().to_string()),
+                git: None,
+                rev: None,
+                subdir: None,
+                aptos: None,
+                address: None,
+            },
+        );
+    } else if let Some(rev) = rev {
         dependencies.insert(
             "AptosFramework".to_string(),
             Dependency {
                 local: None,
-                // TODO(@davidiw) return back to aptos-core once lands
-                git: Some("https://github.com/davidiw/aptos-core.git".to_string()),
+                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
                 rev: Some(rev),
                 subdir: Some("aptos-move/framework/aptos-framework".to_string()),
                 aptos: None,
@@ -201,6 +217,13 @@ pub fn init_move_dir(
 pub struct CompilePackage {
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+    /// Artifacts to be generated when building this package.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
+    /// Whether package metadata should be generated and stored in the package's build directory.
+    /// This metadata can be used to construct a transaction to publish a package.
+    #[clap(long)]
+    pub(crate) save_metadata: bool,
 }
 
 #[async_trait]
@@ -211,15 +234,16 @@ impl CliCommand<Vec<String>> for CompilePackage {
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_options = BuildOptions {
-            with_srcs: false,
-            with_abis: true,
-            with_source_maps: true,
-            with_error_map: true,
             install_dir: self.move_options.output_dir.clone(),
-            named_addresses: self.move_options.named_addresses(),
+            ..self
+                .included_artifacts
+                .build_options(self.move_options.named_addresses())
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        if self.save_metadata {
+            pack.extract_metadata_and_save()?;
+        }
         let mut ids = Vec::new();
         for module in pack.modules() {
             verify_module_init_function(module)
@@ -835,7 +859,7 @@ fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
                 .to_string(),
         ));
     }
-    let address = load_account_arg(ids.get(0).unwrap())?;
+    let address = load_account_arg(ids.first().unwrap())?;
     let module = Identifier::from_str(ids.get(1).unwrap())
         .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
     let member_id = Identifier::from_str(ids.get(2).unwrap())

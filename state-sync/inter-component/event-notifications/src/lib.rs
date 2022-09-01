@@ -39,7 +39,7 @@ mod tests;
 const EVENT_NOTIFICATION_CHANNEL_SIZE: usize = 100;
 const RECONFIG_NOTIFICATION_CHANNEL_SIZE: usize = 1;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Cannot subscribe to zero event keys!")]
     CannotSubscribeToZeroEventKeys,

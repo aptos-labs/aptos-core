@@ -498,7 +498,7 @@ where
                     // DeserializeError's are recoverable so we'll let the other
                     // peer know about the error and log the issue, but we won't
                     // close the connection.
-                    let message_type = frame_prefix.as_ref().get(0).unwrap_or(&0);
+                    let message_type = frame_prefix.as_ref().first().unwrap_or(&0);
                     let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);

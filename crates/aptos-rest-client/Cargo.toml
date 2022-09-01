@@ -28,6 +28,7 @@ url = "2.2.2"
 
 aptos-api-types = { path = "../../api/types" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptos-logger = { path = "../aptos-logger" }
 aptos-types = { path = "../../types" }
 
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }

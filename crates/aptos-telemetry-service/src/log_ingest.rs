@@ -22,7 +22,7 @@ pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::Unknown],
+            vec![PeerRole::Validator, PeerRole::ValidatorFullNode],
         ))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))

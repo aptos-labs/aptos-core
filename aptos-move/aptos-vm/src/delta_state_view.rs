@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::{state_storage_usage::StateStorageUsage, StateView, StateViewId};
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::write_set::{WriteOp, WriteSet};
 
 pub struct DeltaStateView<'a, 'b, S> {

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
-use aptos_rest_client::{Client as RestClient, State, Transaction};
+use aptos_logger::prelude::*;
+use aptos_rest_client::{retriable, retriable_with_404, Client as RestClient, State, Transaction};
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
@@ -12,10 +13,12 @@ use url::Url;
 
 // TODO: make this configurable
 const RETRY_TIME_MILLIS: u64 = 1000;
+const MAX_RETRY_TIME_MILLIS: u64 = 120000;
 const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const MAX_THREADS: usize = 10;
-const MAX_RETRIES: usize = 5;
+static STARTING_RETRY_TIME: Duration = Duration::from_millis(RETRY_TIME_MILLIS);
+static MAX_RETRY_TIME: Duration = Duration::from_millis(MAX_RETRY_TIME_MILLIS);
 
 #[derive(Debug)]
 pub struct Fetcher {
@@ -41,27 +44,36 @@ impl Fetcher {
         }
     }
 
-    pub async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
-    }
-
-    pub async fn set_highest_known_version(&mut self) {
-        let info = self.client.get_ledger_information().await;
-        let res = info.unwrap();
+    pub async fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
+        let res = RestClient::try_until_ok(
+            Some(MAX_RETRY_TIME),
+            Some(STARTING_RETRY_TIME),
+            retriable,
+            || self.client.get_ledger_information(),
+        )
+        .await?;
         let state = res.state();
         self.highest_known_version = state.version;
         self.chain_id = state.chain_id;
+        Ok(())
     }
 
     pub async fn run(&mut self) {
         loop {
             if self.current_version >= self.highest_known_version {
-                tokio::time::sleep(Duration::from_millis(200)).await;
-                self.set_highest_known_version().await;
+                tokio::time::sleep(STARTING_RETRY_TIME).await;
+                if let Err(err) = self.set_highest_known_version().await {
+                    error!("Failed to set highest known version. Err: {:?}", err);
+                    continue;
+                } else {
+                    sample!(
+                        SampleRate::Frequency(10),
+                        aptos_logger::info!(
+                            "Found {} as the new highest known version",
+                            self.highest_known_version
+                        )
+                    );
+                }
             }
 
             let num_missing = self.highest_known_version - self.current_version;
@@ -77,6 +89,7 @@ impl Fetcher {
                 ));
             }
             let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            // Sort by first transaction of batch's version
             res.sort_by(|a, b| {
                 a.first()
                     .unwrap()
@@ -85,9 +98,13 @@ impl Fetcher {
                     .cmp(&b.first().unwrap().version().unwrap())
             });
 
+            // Send keeping track of the last version sent by the batch
             for batch in res {
                 self.current_version = batch.last().unwrap().version().unwrap();
-                self.transactions_sender.send(batch).await.unwrap();
+                self.transactions_sender
+                    .send(batch)
+                    .await
+                    .expect("Should be able to send transaction on channel");
             }
         }
     }
@@ -97,47 +114,32 @@ impl Fetcher {
 /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
 /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
 async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transaction> {
-    let mut retries = 0;
-    while retries < MAX_RETRIES {
-        retries += 1;
-
-        let res = client
-            .get_transactions(Some(starting_version), Some(TRANSACTION_FETCH_BATCH_SIZE))
-            .await;
-
-        match res {
-            Ok(response) => {
-                FETCHED_TRANSACTION.inc();
-                return remove_null_bytes_from_txns(response.into_inner());
-            }
-            Err(err) => {
-                let err_str = err.to_string();
-                // If it's a 404, then we're all caught up; no need to increment the `UNABLE_TO_FETCH_TRANSACTION` counter
-                if err_str.contains("404") {
-                    aptos_logger::debug!(
-                            "Could not fetch {} transactions starting at {}: all caught up. Will check again in {}ms.",
-                            TRANSACTION_FETCH_BATCH_SIZE,
-                            starting_version,
-                            RETRY_TIME_MILLIS,
-                        );
-                }
-                UNABLE_TO_FETCH_TRANSACTION.inc();
-                aptos_logger::error!(
-                    "Could not fetch {} transactions starting at {}, will retry in {}ms. Err: {:?}",
-                    TRANSACTION_FETCH_BATCH_SIZE,
-                    starting_version,
-                    RETRY_TIME_MILLIS,
-                    err
-                );
-            }
+    let res = RestClient::try_until_ok(
+        Some(MAX_RETRY_TIME),
+        Some(STARTING_RETRY_TIME),
+        retriable_with_404,
+        || client.get_transactions(Some(starting_version), Some(TRANSACTION_FETCH_BATCH_SIZE)),
+    )
+    .await;
+    match res {
+        Ok(response) => {
+            FETCHED_TRANSACTION.inc();
+            remove_null_bytes_from_txns(response.into_inner())
         }
-        tokio::time::sleep(Duration::from_millis(RETRY_TIME_MILLIS)).await;
+        Err(err) => {
+            UNABLE_TO_FETCH_TRANSACTION.inc();
+            aptos_logger::error!(
+                "Could not fetch {} transactions starting at {}. Err: {:?}",
+                TRANSACTION_FETCH_BATCH_SIZE,
+                starting_version,
+                err
+            );
+            panic!(
+                "Could not fetch {} transactions starting at {} in {}ms!",
+                TRANSACTION_FETCH_BATCH_SIZE, starting_version, MAX_RETRY_TIME_MILLIS
+            );
+        }
     }
-
-    panic!(
-        "Could not fetch {} transactions starting at {}!",
-        TRANSACTION_FETCH_BATCH_SIZE, starting_version
-    );
 }
 
 #[derive(Debug)]
@@ -169,17 +171,21 @@ impl TransactionFetcher {
 #[async_trait::async_trait]
 impl TransactionFetcherTrait for TransactionFetcher {
     /// Fetches the next batch based on its internal version counter
-    /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
-    /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
     async fn fetch_next_batch(&mut self) -> Vec<Transaction> {
-        self.transaction_receiver.next().await.unwrap()
+        self.transaction_receiver
+            .next()
+            .await
+            .expect("No transactions, producer of batches died")
     }
 
     /// fetches one version; this used for error checking/repair/etc
     /// In the event it can't, it will keep retrying every RETRY_TIME_MILLIS ms
     async fn fetch_version(&self, version: u64) -> Transaction {
         loop {
-            let res = self.client.get_transaction_by_version(version).await;
+            let res = RestClient::try_until_ok(None, None, retriable_with_404, || {
+                self.client.get_transaction_by_version(version)
+            })
+            .await;
             match res {
                 Ok(response) => {
                     FETCHED_TRANSACTION.inc();
@@ -193,18 +199,25 @@ impl TransactionFetcherTrait for TransactionFetcher {
                         RETRY_TIME_MILLIS,
                         err
                     );
-                    tokio::time::sleep(Duration::from_millis(RETRY_TIME_MILLIS)).await;
+                    tokio::time::sleep(STARTING_RETRY_TIME).await;
                 }
             };
         }
     }
 
     async fn fetch_ledger_info(&mut self) -> State {
-        self.client
-            .get_ledger_information()
-            .await
-            .expect("ledger info must be present")
-            .into_inner()
+        let res = RestClient::try_until_ok(Some(MAX_RETRY_TIME), None, retriable, || {
+            self.client.get_ledger_information()
+        })
+        .await;
+        match res {
+            Ok(inner) => inner.into_inner(),
+            Err(err) => panic!(
+                "Failed to get ledger info in {}ms: {:?}",
+                MAX_RETRY_TIME.as_millis(),
+                err
+            ),
+        }
     }
 
     async fn set_version(&mut self, version: u64) {

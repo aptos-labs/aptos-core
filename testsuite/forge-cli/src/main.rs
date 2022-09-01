@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Result};
+use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, *};
-use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
@@ -26,16 +25,14 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "30000")]
-    mempool_backlog: u64,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
     #[structopt(long)]
     num_validators: Option<usize>,
-    #[structopt(flatten)]
-    success_criteria: SuccessCriteriaArgs,
+    #[structopt(long)]
+    num_validator_fullnodes: Option<usize>,
     #[structopt(
         long,
         help = "Specify a test suite to run",
@@ -48,18 +45,6 @@ struct Args {
     // subcommand groups
     #[structopt(flatten)]
     cli_cmd: CliCommand,
-}
-
-#[derive(Debug, StructOpt)]
-#[structopt(about = "Forge success criteria that includes a bunch of performance metrics")]
-pub struct SuccessCriteriaArgs {
-    // general options
-    #[structopt(long, default_value = "3500")]
-    avg_tps: usize,
-    #[structopt(long, default_value = "10000")]
-    max_latency_ms: usize,
-    #[structopt(long)]
-    wait_for_all_nodes_to_catchup_secs: Option<u64>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -189,54 +174,60 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let global_emit_job_request = EmitJobRequest::default()
-        .duration(Duration::from_secs(args.duration_secs as u64))
-        .thread_params(EmitThreadParams::default())
-        .mempool_backlog(args.mempool_backlog.try_into().unwrap());
-
-    let success_criteria = SuccessCriteria::new(
-        args.success_criteria.avg_tps,
-        args.success_criteria.max_latency_ms,
-        args.success_criteria
-            .wait_for_all_nodes_to_catchup_secs
-            .map(Duration::from_secs),
-    );
+    let duration = Duration::from_secs(args.duration_secs as u64);
+    let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
-            let mut test_suite = get_test_suite(args.suite.as_ref())?;
+            let mut test_suite = get_test_suite(suite_name, duration)?;
+
+            // Identify the number of validators and fullnodes to run
+            // (if overriding what test has specified)
             if let Some(num_validators) = args.num_validators {
-                match NonZeroUsize::new(num_validators) {
-                    Some(num_validators) => {
-                        test_suite = test_suite.with_initial_validator_count(num_validators)
-                    }
-                    None => {
+                let num_validators_non_zero = NonZeroUsize::new(num_validators)
+                    .context("--num-validators must be positive!")?;
+                test_suite = test_suite.with_initial_validator_count(num_validators_non_zero);
+
+                // Verify the number of fullnodes is less than the validators
+                if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+                    if num_validator_fullnodes > num_validators {
                         return Err(format_err!(
-                            "--num-validators must be positive! Given: {:?}!",
-                            num_validators
-                        ))
+                            "Cannot have more fullnodes than validators! Fullnodes: {:?}, validators: {:?}.",
+                            num_validator_fullnodes, num_validators
+                        ));
                     }
                 }
+            }
+            if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+                test_suite = test_suite.with_initial_fullnode_count(num_validator_fullnodes)
             }
 
             // Run the test suite
             match test_cmd {
-                TestCommand::LocalSwarm(..) => run_forge(
-                    test_suite,
-                    LocalFactory::from_workspace()?,
-                    &args.options,
-                    success_criteria,
-                    args.changelog.clone(),
-                    global_emit_job_request,
-                ),
+                TestCommand::LocalSwarm(..) => {
+                    // Loosen all criteria for local runs
+                    let test_suite = test_suite
+                        .with_success_criteria(SuccessCriteria::new(400, 60000, None))
+                        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                            mempool_backlog: 5000,
+                        }));
+                    run_forge(
+                        duration,
+                        test_suite,
+                        LocalFactory::from_workspace()?,
+                        &args.options,
+                        args.changelog.clone(),
+                    )
+                }
                 TestCommand::K8sSwarm(k8s) => {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
                     run_forge(
+                        duration,
                         test_suite,
                         K8sFactory::new(
                             k8s.namespace.clone(),
@@ -249,9 +240,7 @@ fn main() -> Result<()> {
                         )
                         .unwrap(),
                         &args.options,
-                        success_criteria,
                         args.changelog,
-                        global_emit_job_request,
                     )?;
                     Ok(())
                 }
@@ -296,20 +285,13 @@ fn main() -> Result<()> {
 }
 
 pub fn run_forge<F: Factory>(
+    global_duration: Duration,
     tests: ForgeConfig<'_>,
     factory: F,
     options: &Options,
-    success_criteria: SuccessCriteria,
     logs: Option<Vec<String>>,
-    global_job_request: EmitJobRequest,
 ) -> Result<()> {
-    let forge = Forge::new(
-        options,
-        tests,
-        factory,
-        global_job_request,
-        success_criteria,
-    );
+    let forge = Forge::new(options, tests, global_duration, factory);
 
     if options.list {
         forge.list()?;
@@ -385,15 +367,15 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
     }
 }
 
-fn get_test_suite(suite_name: &str) -> Result<ForgeConfig<'static>> {
+fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite()),
+        "land_blocking" => Ok(land_blocking_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
-        "chaos" => Ok(chaos_test_suite()),
+        "chaos" => Ok(chaos_test_suite(duration)),
         single_test => single_test_suite(single_test),
     }
 }
@@ -439,14 +421,23 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             })),
         "state_sync" => config
-            .with_initial_fullnode_count(1)
-            .with_network_tests(&[&StateSyncPerformance]),
+            .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+            .with_initial_fullnode_count(4)
+            .with_network_tests(&[&StateSyncPerformance])
+            .with_success_criteria(SuccessCriteria::new(5000, 10000, None)),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
-            .with_network_tests(&[&SimpleValidatorUpgrade]),
+            .with_network_tests(&[&SimpleValidatorUpgrade])
+            .with_success_criteria(SuccessCriteria::new(
+                5000,
+                10000,
+                Some(Duration::from_secs(240)),
+            )),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
-        "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
+        "network_latency" => config
+            .with_network_tests(&[&NetworkLatencyTest])
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, None)),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
@@ -454,17 +445,58 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "single_vfn_perf" => config
             .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
             .with_initial_fullnode_count(1)
-            .with_network_tests(&[&PerformanceBenchmarkWithFN]),
+            .with_network_tests(&[&PerformanceBenchmarkWithFN])
+            .with_success_criteria(SuccessCriteria::new(
+                5000,
+                10000,
+                Some(Duration::from_secs(240)),
+            )),
+        "account_creation_state_sync" => config
+            .with_network_tests(&[&PerformanceBenchmarkWithFN])
+            .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+            .with_initial_fullnode_count(3)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 1200.into();
+            }))
+            .with_emit_job(
+                EmitJobRequest::default()
+                    .mode(EmitJobMode::MaxLoad {
+                        mempool_backlog: 30000,
+                    })
+                    .transaction_type(TransactionType::AccountGeneration),
+            )
+            .with_success_criteria(SuccessCriteria::new(
+                4000,
+                10000,
+                Some(Duration::from_secs(240)),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
 }
 
-fn land_blocking_test_suite() -> ForgeConfig<'static> {
+fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(&[&PerformanceBenchmarkWithFN])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(SuccessCriteria::new(
+            if duration.as_secs() > 1200 {
+                5000
+            } else {
+                6000
+            },
+            10000,
+            Some(Duration::from_secs(if duration.as_secs() > 1200 {
+                240
+            } else {
+                60
+            })),
+        ))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
@@ -473,10 +505,19 @@ fn pre_release_suite() -> ForgeConfig<'static> {
         .with_network_tests(&[&NetworkBandwidthTest])
 }
 
-fn chaos_test_suite() -> ForgeConfig<'static> {
+fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(&[&NetworkBandwidthTest, &NetworkLatencyTest, &NetworkLossTest])
+        .with_success_criteria(SuccessCriteria::new(
+            if duration > Duration::from_secs(1200) {
+                100
+            } else {
+                1000
+            },
+            10000,
+            None,
+        ))
 }
 
 /// A simple test that runs the swarm forever. This is useful for

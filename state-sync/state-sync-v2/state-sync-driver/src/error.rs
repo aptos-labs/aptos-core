@@ -6,7 +6,7 @@ use futures::channel::{mpsc::SendError, oneshot::Canceled};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("State sync has already finished bootstrapping! Error: {0}")]
     AlreadyBootstrapped(String),

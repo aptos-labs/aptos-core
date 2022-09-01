@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Buffer } from "buffer/"; // the trailing slash is important!
+import { bytesToHex, hexToBytes } from "./bytes_to_hex.js";
 import { HexEncodedBytes } from "./generated";
 
 // eslint-disable-next-line no-use-before-define
@@ -20,8 +20,8 @@ export class HexString {
    * @param buffer A buffer to convert
    * @returns New HexString
    */
-  static fromBuffer(buffer: Buffer): HexString {
-    return new HexString(buffer.toString("hex"));
+  static fromBuffer(buffer: Uint8Array): HexString {
+    return HexString.fromUint8Array(buffer);
   }
 
   /**
@@ -30,7 +30,7 @@ export class HexString {
    * @returns New HexString
    */
   static fromUint8Array(arr: Uint8Array): HexString {
-    return HexString.fromBuffer(Buffer.from(arr));
+    return new HexString(bytesToHex(arr));
   }
 
   /**
@@ -113,18 +113,10 @@ export class HexString {
   }
 
   /**
-   * Converts hex string to a Buffer in hex encoding
-   * @returns Buffer from inner hexString without prefix
-   */
-  toBuffer(): Buffer {
-    return Buffer.from(this.noPrefix(), "hex");
-  }
-
-  /**
    * Converts hex string to a Uint8Array
    * @returns Uint8Array from inner hexString without prefix
    */
   toUint8Array(): Uint8Array {
-    return Uint8Array.from(this.toBuffer());
+    return Uint8Array.from(hexToBytes(this.noPrefix()));
   }
 }

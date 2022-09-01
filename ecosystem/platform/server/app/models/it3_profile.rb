@@ -12,20 +12,23 @@ class It3Profile < ApplicationRecord
 
   has_one :location, as: :item
 
-  validates :owner_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
-  validates :consensus_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{96}\z/i }
-  validates :consensus_pop, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{192}\z/i }
-  validates :account_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
-  validates :network_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
+  validates :owner_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }, allow_nil: true, allow_blank: true
+  validates :consensus_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{96}\z/i }, allow_nil: true,
+                            allow_blank: true
+  validates :consensus_pop, uniqueness: true, format: { with: /\A0x[a-f0-9]{192}\z/i }, allow_nil: true,
+                            allow_blank: true
+  validates :account_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }, allow_nil: true, allow_blank: true
+  validates :network_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }, allow_nil: true, allow_blank: true
 
-  validates :validator_address, presence: true
-  validates :validator_port, presence: true, numericality: { only_integer: true }
-  validates :validator_api_port, presence: true, numericality: { only_integer: true }
-  validates :validator_metrics_port, presence: true, numericality: { only_integer: true }
+  validates :validator_port, numericality: { only_integer: true }, allow_nil: true
+  validates :validator_api_port, numericality: { only_integer: true }, allow_nil: true
+  validates :validator_metrics_port, numericality: { only_integer: true }, allow_nil: true
 
-  validates :fullnode_port, numericality: { only_integer: true }, allow_nil: true
-  validates :fullnode_network_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }, allow_nil: true,
-                                   allow_blank: true
+  validates :fullnode_address, presence: true
+  validates :fullnode_network_key, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }, presence: true
+  validates :fullnode_port, numericality: { only_integer: true }, presence: true
+  validates :fullnode_metrics_port, numericality: { only_integer: true }, presence: true
+  validates :fullnode_api_port, numericality: { only_integer: true }, presence: true
 
   validates :terms_accepted, acceptance: true
 
@@ -47,6 +50,18 @@ class It3Profile < ApplicationRecord
 
   def validator_metrics_port
     self[:validator_metrics_port] || 9101
+  end
+
+  def fullnode_port
+    self[:fullnode_port] || 6180
+  end
+
+  def fullnode_api_port
+    self[:fullnode_api_port] || 8080
+  end
+
+  def fullnode_metrics_port
+    self[:fullnode_metrics_port] || 9101
   end
 
   def needs_revalidation?
@@ -79,7 +94,13 @@ class It3Profile < ApplicationRecord
   private
 
   def set_account_address
+    return unless account_key
+
     self.account_address = self.class.address_from_key account_key
+  end
+
+  def set_owner_address
+    self.owner_address = self.class.address_from_key owner_key
   end
 
   def check_validator_ipv4

@@ -17,5 +17,4 @@ Start here to get into the core concepts of the Aptos blockchain.
 - ### [Validator Nodes](basics-validator-nodes.md)
 - ### [Node Networks and Synchronization](basics-node-networks-sync.md)
 - ### [Staking](staking)
-
-
+- ### [Governance](governance)

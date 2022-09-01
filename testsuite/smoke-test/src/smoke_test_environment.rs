@@ -20,6 +20,7 @@ use tokio::task::JoinHandle;
 pub struct SwarmBuilder {
     local: bool,
     num_validators: NonZeroUsize,
+    num_fullnodes: usize,
     genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
@@ -30,6 +31,7 @@ impl SwarmBuilder {
         Self {
             local,
             num_validators: NonZeroUsize::new(num_validators).unwrap(),
+            num_fullnodes: 0,
             genesis_framework: None,
             init_config: None,
             init_genesis_config: None,
@@ -55,6 +57,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_num_fullnodes(mut self, num_fullnodes: usize) -> Self {
+        self.num_fullnodes = num_fullnodes;
+        self
+    }
+
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build(self) -> LocalSwarm {
         ::aptos_logger::Logger::new().init();
@@ -77,6 +84,7 @@ impl SwarmBuilder {
             .new_swarm_with_version(
                 OsRng,
                 self.num_validators,
+                self.num_fullnodes,
                 &version,
                 self.genesis_framework,
                 self.init_config,

@@ -204,8 +204,11 @@ impl Tailer {
             for t in &transactions[start_index..end_index] {
                 txns.push(t.clone());
             }
-            let task = tokio::task::spawn(async move { self2.process_transactions(txns).await });
-            tasks.push(task);
+            if !txns.is_empty() {
+                let task =
+                    tokio::task::spawn(async move { self2.process_transactions(txns).await });
+                tasks.push(task);
+            }
         }
         let results: Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> =
             await_tasks(tasks).await;
@@ -242,10 +245,12 @@ pub async fn await_tasks<T: Debug>(tasks: Vec<JoinHandle<T>>) -> Vec<T> {
     let mut results = vec![];
     for task in tasks {
         let result = task.await;
-        if result.is_err() {
-            aptos_logger::error!("Error joining task: {:?}", &result);
+        match result {
+            Ok(_) => results.push(result.unwrap()),
+            Err(err) => {
+                panic!("Error joining task: {:?}", err);
+            }
         }
-        results.push(result.unwrap());
     }
     results
 }
@@ -762,7 +767,7 @@ mod test {
         assert!(bmt2.is_none());
 
         assert_eq!(events2.len(), 2);
-        assert_eq!(events2.get(0).unwrap().type_, "0x1::Whatever::FakeEvent1");
+        assert_eq!(events2.first().unwrap().type_, "0x1::Whatever::FakeEvent1");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::Whatever::FakeEvent2");
         assert_eq!(wsc2.len(), 2);
 

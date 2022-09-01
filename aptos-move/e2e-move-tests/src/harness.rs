@@ -3,6 +3,8 @@
 
 use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{PrivateKey, Uniform};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -18,6 +20,10 @@ use language_e2e_tests::{
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
+use rand::{
+    rngs::{OsRng, StdRng},
+    Rng, SeedableRng,
+};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -80,6 +86,19 @@ impl MoveHarness {
         data.account().clone()
     }
 
+    // Creates an account for the given static address with a randomly generated key pair
+    pub fn new_account_with_key_pair(&mut self) -> Account {
+        let mut rng = StdRng::from_seed(OsRng.gen());
+
+        let privkey = Ed25519PrivateKey::generate(&mut rng);
+        let pubkey = privkey.public_key();
+        let acc = Account::with_keypair(privkey, pubkey);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), 10);
+        data.account().clone()
+    }
+
     /// Gets the account where the Aptos framework is installed (0x1).
     pub fn aptos_framework_account(&mut self) -> Account {
         self.new_account_at(AccountAddress::ONE)
@@ -112,13 +131,13 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> SignedTransaction {
-        // We initialize for some reason with 10, so use 10 as the first value here too
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = *seq_no_ref;
         *seq_no_ref += 1;
         account
             .transaction()
             .sequence_number(seq_no)
+            .max_gas_amount(1_000_000)
             .gas_unit_price(1)
             .payload(payload)
             .sign()
@@ -308,10 +327,11 @@ macro_rules! assert_success {
 #[macro_export]
 macro_rules! assert_abort {
     ($s:expr, $c:pat) => {{
-        use aptos_types::transaction::*;
         assert!(matches!(
             $s,
-            TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: $c, .. })
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+            ),
         ));
     }};
 }

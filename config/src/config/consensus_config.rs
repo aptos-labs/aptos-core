@@ -16,6 +16,8 @@ pub struct ConsensusConfig {
     // Timeout for consensus to pull transactions from mempool and get a response (in milliseconds)
     pub mempool_txn_pull_timeout_ms: u64,
     pub round_initial_timeout_ms: u64,
+    pub round_timeout_backoff_exponent_base: f64,
+    pub round_timeout_backoff_max_exponent: usize,
     pub safety_rules: SafetyRulesConfig,
     // Only sync committed transactions but not vote for any pending blocks. This is useful when
     // validators coordinate on the latest version to apply a manual transaction.
@@ -34,11 +36,15 @@ impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
             max_block_txns: 6000,
-            max_block_bytes: 10 * 1024 * 1024, // 10MB
+            max_block_bytes: 5 * 1024 * 1024, // 5MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
             round_initial_timeout_ms: 1500,
+            // 1.2^6 ~= 3
+            // Timeout goes from initial_timeout to initial_timeout*3 in 6 steps
+            round_timeout_backoff_exponent_base: 1.2,
+            round_timeout_backoff_max_exponent: 6,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded

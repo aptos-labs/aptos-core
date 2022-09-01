@@ -5,7 +5,7 @@ use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
     #[serde(default = "default_enabled")]

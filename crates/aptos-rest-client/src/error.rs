@@ -151,14 +151,14 @@ pub enum RestError {
     Bcs(bcs::Error),
     #[error("JSON er/de error {0}")]
     Json(serde_json::Error),
-    #[error("Web client error {0}")]
-    WebClient(reqwest::Error),
     #[error("URL Parse error {0}")]
     UrlParse(url::ParseError),
     #[error("Timeout waiting for transaction {0}")]
     Timeout(&'static str),
     #[error("Unknown error {0}")]
     Unknown(anyhow::Error),
+    #[error("Http error {0}")]
+    Http(StatusCode),
 }
 
 impl From<(AptosError, Option<State>, StatusCode)> for RestError {
@@ -189,15 +189,19 @@ impl From<serde_json::Error> for RestError {
     }
 }
 
-impl From<reqwest::Error> for RestError {
-    fn from(err: reqwest::Error) -> Self {
-        Self::WebClient(err)
-    }
-}
-
 impl From<anyhow::Error> for RestError {
     fn from(err: anyhow::Error) -> Self {
         Self::Unknown(err)
+    }
+}
+
+impl From<reqwest::Error> for RestError {
+    fn from(err: reqwest::Error) -> Self {
+        if let Some(status) = err.status() {
+            RestError::Http(status)
+        } else {
+            RestError::Unknown(err.into())
+        }
     }
 }
 

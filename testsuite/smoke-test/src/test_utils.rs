@@ -11,14 +11,8 @@ use forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use rand::random;
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
-    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    let mut chain_info = swarm.chain_info().into_aptos_public_info();
-    chain_info
-        .create_user_account(account.public_key())
-        .await
-        .unwrap();
-    chain_info.mint(account.address(), amount).await.unwrap();
-    account
+    let mut info = swarm.aptos_public_info();
+    info.create_and_fund_user_account(amount).await.unwrap()
 }
 
 pub async fn transfer_coins_non_blocking(

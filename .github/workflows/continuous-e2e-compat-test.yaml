@@ -7,19 +7,19 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    # Run every hour - TODO: Decrease the frequency once things stabilizes
     - cron: "0 */3 * * *"
 
+jobs:
   run-forge-compat:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-compat
-      FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 5 minutes
       FORGE_RUNNER_DURATION_SECS: 300
-      # We expect slightly lower tps on longer timeline
-      FORGE_RUNNER_TPS_THRESHOLD: 5000
-      # This will upgrade from devnet to the latest main
+      # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
+      IMAGE_TAG: testnet
       POST_TO_SLACK: true
+      USE_NEW_WRAPPER: true

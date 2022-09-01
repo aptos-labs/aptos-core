@@ -6,8 +6,8 @@ use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
 use aptos_crypto::HashValue;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -418,5 +418,11 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValu
     for (k, v) in kvs {
         let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
         assert_eq!(&v_from_db, if pruned { &None } else { v });
+    }
+
+    if pruned {
+        assert!(state_store.get_usage(Some(version)).is_err())
+    } else {
+        assert!(state_store.get_usage(Some(version)).is_ok())
     }
 }

@@ -70,12 +70,13 @@ Rails.application.routes.draw do
 
   # IT3
   resource :it3, only: %i[show update]
-  resources :it3_profiles, except: %i[index destroy]
+  resources :it3_profiles, except: %i[show create new index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
+  get 'leaderboard/it3'
 
   # IT1
   get 'it1', to: 'leaderboard#it1'
