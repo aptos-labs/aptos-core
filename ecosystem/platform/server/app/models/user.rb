@@ -33,6 +33,7 @@ class User < ApplicationRecord
   has_many :projects
   has_many :notifications, as: :recipient, dependent: :destroy
   has_many :notification_preferences, dependent: :destroy
+  has_many :wallets, dependent: :destroy
 
   has_one_attached :avatar
 
