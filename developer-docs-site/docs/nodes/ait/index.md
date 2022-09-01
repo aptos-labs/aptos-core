@@ -38,7 +38,7 @@ See [Node network topology](/concepts/basics-node-networks-sync.md) and the Medi
 
 ### Success criteria
 
-- The functionality and performance of a validator node or of a validator fullnode (VFN)should not be impacted during this test.
+- The functionality and performance of a validator node or of a validator fullnode (VFN) is not expected to be impacted during this test.
 - The public fullnode (PFN) is expected to sync, catchup and perform.
 - Rate limiting should work as expected.
 - We look to the community to support each other using the Aptos documentation.
@@ -59,25 +59,26 @@ See [Node network topology](/concepts/basics-node-networks-sync.md) and the Medi
   Follow the steps described in [Allowing other FullNodes to connect](/nodes/full-node/network-identity-fullnode/#allowing-other-fullnodes-to-connect) to allow others to connect to the Aptos network through your node.
   :::
 
-- Use the following **Discord** channels for your public fullnode discussions and help:
+5. Use the following **Discord** channels for your public fullnode discussions and help:
     - `#ait3-fullnode-support` for participants to communicate internally and support each other.
     - `#advertise-ait3-fullnode` channel to share identity information.
 
-- The node health checker (NHC) will health check the selected public fullnodes, and the pass or fail decision will be made on the NHC results and the telemetry data submitted by the public fullnode. 
-- The Aptos AIT-3 team will run load testing by submitting transactions through the selected public fullnodes.
+6. The node health checker [(NHC)](/nodes/node-health-checker) will health check the selected public fullnodes, and the pass or fail decision will be made on the NHC results and the [telemetry](/reference/telemetry) data submitted by the public fullnode. 
+
+7. The Aptos AIT-3 team will run load testing by submitting transactions through the selected public fullnodes.
 
 ### Rewards
 
 - Successful public fullnode operators will receive 200 Aptos tokens.
 
-### Reward criteria
+### Rewards criteria
 
 The participating public fullnodes:
 
 - Must have a static identity.
-- Meet node liveness as defined by metrics push data ≥ 95%.
-- Pass the node health checker (NHC) more than 90% of the time.
-- Perform any node operations requested by the Aptos team within 24 hours of notice in the Aptos Discord channel.
+- Meet [node liveness](/nodes/ait/node-liveness-criteria) as defined by metrics push data ≥ 95%.
+- Pass the node health checker [NHC](/nodes/node-health-checker) more than 90% of the time.
+- Perform any node operations requested by the Aptos team within 24 hours of notice posted in the Aptos Discord channel.
 
 ### Running public fullnode for AIT-3
 
