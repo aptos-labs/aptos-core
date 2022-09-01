@@ -14,7 +14,7 @@ from .forge import (
     Git, K8sForgeRunner, ListClusterResult, SystemContext, assert_aws_token_expiration, find_recent_images, format_comment,
     format_pre_comment, format_report, get_all_forge_jobs, get_dashboard_link, get_humio_logs_link,
     get_validator_logs_link, list_eks_clusters, list_jobs, main, ForgeContext, LocalForgeRunner, FakeShell,
-    FakeFilesystem, RunResult, FakeProcesses, sanitize_forge_namespace
+    FakeFilesystem, RunResult, FakeProcesses, sanitize_forge_resource_name
 )
 
 
@@ -232,6 +232,16 @@ class TestFindRecentImage(unittest.TestCase):
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
+    def testFindRecentFailpointsImage(self) -> None:
+        shell = SpyShell(OrderedDict([
+            ("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
+            ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=failpoints_tomato", RunResult(0, b"")),
+        ]))
+        git = Git(shell)
+        image_tags = find_recent_images(shell, git, 1, enable_failpoints=True)
+        self.assertEqual(list(image_tags), ["failpoints_tomato"])
+        shell.assert_commands(self)
+
     def testDidntFindRecentImage(self) -> None:
         shell = SpyShell(OrderedDict([
             ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
@@ -323,12 +333,12 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
 
     def testSanitizeForgeNamespaceSlashes(self) -> None:
         namespace_with_slash = "banana/apple"
-        namespace = sanitize_forge_namespace(namespace_with_slash)
+        namespace = sanitize_forge_resource_name(namespace_with_slash)
         self.assertEqual(namespace, "banana-apple")
 
     def testSanitizeForgeNamespaceTooLong(self) -> None:
         namespace_too_long = "a" * 10000
-        namespace = sanitize_forge_namespace(namespace_too_long)
+        namespace = sanitize_forge_resource_name(namespace_too_long)
         self.assertEqual(namespace, "a"*64)
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
