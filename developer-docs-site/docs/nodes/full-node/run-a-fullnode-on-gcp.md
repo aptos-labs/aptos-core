@@ -139,7 +139,7 @@ Once Terraform apply finished, you can follow this section to validate your depl
 4. Check REST API, make sure the ledge version is increasing.
   ```
   $ curl http://<IP>/v1
-  # Example: curl http://104.198.36.142/v1
+  # Example command syntax: curl http://104.198.36.142/v1
   ```
 
 5. To verify the correctness of your FullNode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
