@@ -3,7 +3,8 @@ module aptos_token::listing {
     use std::string::String;
     use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, TokenId};
-    use std::guid::{Self, ID};
+    use aptos_std::guid::{Self, ID};
+    use aptos_framework::account;
 
     const EOWNER_NOT_HAVING_ENOUGH_TOKEN: u64 = 1;
     const ELISTING_NOT_EXIST:u64 = 2;
@@ -16,7 +17,8 @@ module aptos_token::listing {
         amount: u64,
         min_price: u64,
         instant_sale: bool, // true for marketplace and false for auction
-        expiration_sec: u64, // timestamp in secs for the listing expiration date
+        start_sec: u64, // timestamp in secs for the listing starting time
+        expiration_sec: u64, // timestamp in secs for the listing expiration time
     }
 
     /// return a listing struct, marketplace owner can use this function to create a listing and store it in its inventory
@@ -26,6 +28,7 @@ module aptos_token::listing {
         amount: u64,
         min_price: u64,
         instant_sale: bool,
+        start_sec: u64,
         expiration_sec: u64
     ): Listing<CoinType> {
         let owner_addr = signer::address_of(owner);
@@ -38,6 +41,7 @@ module aptos_token::listing {
             amount,
             min_price,
             instant_sale,
+            start_sec,
             expiration_sec,
         }
     }
@@ -66,10 +70,19 @@ module aptos_token::listing {
         amount: u64,
         min_price: u64,
         instant_sale: bool,
+        start_sec: u64,
         expiration_sec: u64
     ): ID acquires ListingRecords {
         let owner_addr = signer::address_of(owner);
-        let record = create_list<CoinType>(owner, token_id, amount, min_price, instant_sale, expiration_sec);
+        let record = create_list<CoinType>(
+            owner,
+            token_id,
+            amount,
+            min_price,
+            instant_sale,
+            start_sec,
+            expiration_sec
+        );
         initialize_listing_records<CoinType>(owner);
         let records = borrow_global_mut<ListingRecords<CoinType>>(owner_addr);
 
@@ -89,10 +102,11 @@ module aptos_token::listing {
         amount: u64,
         min_price: u64,
         instant_sale: bool, // indicate if this listing is for sale or for auction
+        start_sec: u64,
         expiration_sec: u64
     ) acquires ListingRecords {
         let token_id = token::create_token_id_raw(creator, collection_name, token_name, property_version);
-        create_list_under_user_account<CoinType>(owner, token_id, amount, min_price, instant_sale, expiration_sec);
+        create_list_under_user_account<CoinType>(owner, token_id, amount, min_price, instant_sale, start_sec, expiration_sec);
     }
 
     /// remove a listing for the direct listing records
@@ -109,7 +123,7 @@ module aptos_token::listing {
 
     /// internal function for assigned a global unique id for a listing
     fun create_listing_id(owner: &signer): ID {
-        let gid = guid::create(owner);
+        let gid = account::create_guid(owner);
         guid::id(&gid)
     }
 
@@ -132,6 +146,10 @@ module aptos_token::listing {
 
     public fun get_listing_expiration<CoinType>(list: &Listing<CoinType>): u64 {
         list.expiration_sec
+    }
+
+    public fun get_listing_start<CoinType>(list: &Listing<CoinType>): u64 {
+        list.start_sec
     }
 
     public fun get_listing_min_price<CoinType>(list: &Listing<CoinType>): u64 {
@@ -157,6 +175,7 @@ module aptos_token::listing {
             1,
             1,
             false,
+            0,
             10000
         );
         cancel_direct_list<coin::FakeMoney>(&owner, guid::id_creation_num(&listing_id));

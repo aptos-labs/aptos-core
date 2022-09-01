@@ -1,27 +1,29 @@
 module aptos_token::bid {
+    use std::signer;
+    use std::error;
     use aptos_token::listing::{Self, Listing};
     use aptos_token::token::{Self, TokenId};
-    use std::guid::{Self, ID};
-    use std::signer;
+    use aptos_std::guid::{Self, ID};
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::timestamp;
+    use aptos_framework::account;
     use aptos_std::table::{Self, Table};
 
     const ENO_SUFFICIENT_FUND: u64 = 1;
     const ETOKEN_ID_NOT_MATCH: u64 = 2;
     const ELISTING_EXPIRED: u64 = 3;
-    const ETOKEN_AMOUNT_NOT_MATCH: u64 = 4;
-    const EBID_NOT_EXIST: u64 = 5;
-    const ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME: u64 = 6;
-    const ELISTING_ID_NOT_MATCH: u64 = 7;
+    const ELISTING_NOT_STARTED: u64 = 4;
+    const ETOKEN_AMOUNT_NOT_MATCH: u64 = 5;
+    const EBID_NOT_EXIST: u64 = 6;
+    const ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME: u64 = 7;
+    const ELISTING_ID_NOT_MATCH: u64 = 8;
 
     /// hold the bid info and coin at user account
     /// ensure the coin cannot be withdrawn or transferred during the auction
     struct Bid<phantom CoinType> has store {
         bidder: address,
         coin: Coin<CoinType>,
-        token_id: TokenId,
-        token_amount: u64,
+        offer_price: u64,
         lock_until_sec: u64, // coin can be extracted from the Bid only after lock time expires
         listing_id: ID, // ensure the bid is only executed for the chosen listing_id
     }
@@ -44,28 +46,53 @@ module aptos_token::bid {
         };
     }
 
+    public fun assert_bid_for_a_listing<CoinType>(
+        bidder: address,
+        token_id: TokenId,
+        offer_price: u64,
+        token_amount: u64,
+        lock_until_sec: u64,
+        entry: &Listing<CoinType>
+    ) acquires BidRecords {
+        let bid_records = &mut borrow_global_mut<BidRecords<CoinType>>(bidder).records;
+
+        let token_owner = listing::get_listing_owner(entry);
+        // validate token_id match
+        assert!(token_id == listing::get_listing_token_id(entry), ETOKEN_ID_NOT_MATCH);
+        // validate offerred amount and price
+        let listed_amount =  listing::get_listing_token_amount(entry);
+        let min_total = listing::get_listing_min_price(entry) * listed_amount;
+        assert!(offer_price * token_amount >= min_total, ENO_SUFFICIENT_FUND);
+        assert!(token_amount == listed_amount, ETOKEN_AMOUNT_NOT_MATCH);
+        // validate expiration time
+        let now = timestamp::now_seconds();
+        // only when lock time expires, funds can be extracted for executions
+        assert!(lock_until_sec >= listing::get_listing_expiration(entry), ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME)
+    }
+
     /// withdraw the coin and store them in bid struct and return a global unique bid id
     public fun bid<CoinType>(
         bidder: &signer,
         token_id: TokenId,
         token_amount:u64,
-        withdraw_amount: u64,
+        offer_price: u64,
         lock_until_sec: u64,
-        listing_id: ID,
+        entry: &Listing<CoinType>,
     ): ID acquires BidRecords {
         let bidder_address = signer::address_of(bidder);
-
-        assert!(coin::balance<CoinType>(bidder_address) >= withdraw_amount, ENO_SUFFICIENT_FUND);
+        // check the bid is legit for the listing
+        assert_bid_for_a_listing(bidder_address, token_id, offer_price * token_amount, token_amount, lock_until_sec, entry);
+        // check bidder has sufficient balance
+        assert!(coin::balance<CoinType>(bidder_address) >= offer_price * token_amount, error::invalid_argument(ENO_SUFFICIENT_FUND));
         // withdraw the coin and store them in escrow to ensure the fund is avaliable until expiration_sec
-        let coin = coin::withdraw<CoinType>(bidder, withdraw_amount);
+        let coin = coin::withdraw<CoinType>(bidder, offer_price * token_amount);
 
         let bid = Bid<CoinType> {
             bidder: bidder_address,
             coin,
-            token_id,
-            token_amount,
+            offer_price,
             lock_until_sec,
-            listing_id,
+            listing_id: listing::get_listing_id(entry),
         };
         let bid_id = create_bid_id(bidder);
         initialize_bid_records<CoinType>(bidder);
@@ -74,8 +101,8 @@ module aptos_token::bid {
         bid_id
     }
 
-    /// bidder can cancel a bid and get fund back
-    public entry fun cancel_bid<CoinType>(
+    /// bidder can withdraw fund from any bid when lock time ends
+    public entry fun withdraw_fun_from_bid<CoinType>(
         bidder: &signer,
         bid_id_creation_number: u64,
     ) acquires BidRecords {
@@ -98,19 +125,17 @@ module aptos_token::bid {
 
         let coin_owner = bid.bidder;
         let token_owner = listing::get_listing_owner(&entry);
-        // validate token_id match
-        assert!(bid.token_id == listing::get_listing_token_id(&entry), ETOKEN_ID_NOT_MATCH);
         // validate offerred amount and price
         let listed_amount =  listing::get_listing_token_amount(&entry);
         let min_total = listing::get_listing_min_price(&entry) * listed_amount;
         assert!(coin::value(&bid.coin) >= min_total, ENO_SUFFICIENT_FUND);
-        assert!(bid.token_amount == listed_amount, ETOKEN_AMOUNT_NOT_MATCH);
         // validate expiration time
         let now = timestamp::now_seconds();
         // only when lock time expires, funds can be extracted for executions
         assert!(bid.lock_until_sec <= now, ECANNOT_DRAW_FUND_BEFORE_EXPIRATION_TIME);
         // listing should expire after auction ends
         assert!(listing::get_listing_expiration(&entry) >= now, ELISTING_EXPIRED);
+        assert!(listing::get_listing_start(&entry) <= now, ELISTING_NOT_STARTED);
         //listing_id matches
         assert!(listing::get_listing_id(&entry) == bid.listing_id, ELISTING_ID_NOT_MATCH);
 
@@ -127,17 +152,29 @@ module aptos_token::bid {
         let Bid {
             bidder: _,
             coin,
-            token_id: _,
-            token_amount: _,
+            offer_price: _,
             lock_until_sec: _,
             listing_id: _,
         } = bid;
         coin
     }
 
+    public fun get_bid_info<CoinType>(
+        bidder_address: address,
+        bid_id_creation_number: u64
+    ): (u64, u64, ID) acquires BidRecords {
+        let bid_id = guid::create_id(bidder_address, bid_id_creation_number);
+
+        let bid_records = &mut borrow_global_mut<BidRecords<CoinType>>(bidder_address).records;
+        assert!(table::contains(bid_records, bid_id), EBID_NOT_EXIST);
+
+        let bid = table::remove(bid_records, bid_id);
+        ( bid.offer_price, bid.lock_until_sec, bid.listing_id )
+    }
+
     /// internal function for assigned a global unique id for a listing
     fun create_bid_id(owner: &signer): ID {
-        let gid = guid::create(owner);
+        let gid = account::create_guid(owner);
         guid::id(&gid)
     }
 
