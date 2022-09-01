@@ -32,8 +32,8 @@ export default function SwitchAccountBody() {
   };
 
   return (
-    <VStack spacing={2} pt={4} alignItems="stretch" height="100%">
-      <VStack gap={1} flex={1} overflow="scroll">
+    <VStack pt={4} alignItems="stretch" height="100%" pb={4}>
+      <VStack width="100%" px={0} gap={1} flex={1}>
         {
           accountsList.map((account: Account) => (
             <Box px={4} width="100%" key={account.address}>
@@ -48,7 +48,7 @@ export default function SwitchAccountBody() {
           ))
         }
       </VStack>
-      <Box px={4} width="100%">
+      <Box px={4} width="100%" pb={4} pt={4}>
         <Button
           size="lg"
           width="100%"
