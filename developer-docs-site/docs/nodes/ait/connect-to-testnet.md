@@ -228,7 +228,7 @@ Once your validator node joined the validator set, you can verify the correctnes
     
 5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=ait3`
 
-    ```json
+    ```
     0x1::stake::StakePool
 
     "active": {
