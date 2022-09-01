@@ -315,7 +315,7 @@ impl EpochManager {
         }
     }
 
-    async fn process_epoch_retrieval(
+    fn process_epoch_retrieval(
         &mut self,
         request: EpochRetrievalRequest,
         peer_id: AccountAddress,
@@ -339,7 +339,7 @@ impl EpochManager {
         ))
     }
 
-    async fn process_different_epoch(
+    fn process_different_epoch(
         &mut self,
         different_epoch: u64,
         peer_id: AccountAddress,
@@ -352,16 +352,13 @@ impl EpochManager {
         );
         match different_epoch.cmp(&self.epoch()) {
             // We try to help nodes that have lower epoch than us
-            Ordering::Less => {
-                self.process_epoch_retrieval(
-                    EpochRetrievalRequest {
-                        start_epoch: different_epoch,
-                        end_epoch: self.epoch(),
-                    },
-                    peer_id,
-                )
-                .await
-            }
+            Ordering::Less => self.process_epoch_retrieval(
+                EpochRetrievalRequest {
+                    start_epoch: different_epoch,
+                    end_epoch: self.epoch(),
+                },
+                peer_id,
+            ),
             // We request proof to join higher epoch
             Ordering::Greater => {
                 let request = EpochRetrievalRequest {
@@ -712,7 +709,7 @@ impl EpochManager {
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch(), peer_id).await
+                        self.process_different_epoch(event.epoch(), peer_id)
                     )?;
                 }
             }
@@ -741,7 +738,7 @@ impl EpochManager {
                 );
                 monitor!(
                     "process_epoch_retrieval",
-                    self.process_epoch_retrieval(*request, peer_id).await
+                    self.process_epoch_retrieval(*request, peer_id)
                 )?;
             }
             _ => {
@@ -782,7 +779,7 @@ impl EpochManager {
         }
     }
 
-    async fn process_block_retrieval(
+    fn process_block_retrieval(
         &self,
         peer_id: Author,
         request: IncomingBlockRetrievalRequest,
@@ -826,7 +823,7 @@ impl EpochManager {
                     }
                 }
                 Some((peer, request)) = network_receivers.block_retrieval.next() => {
-                    if let Err(e) = self.process_block_retrieval(peer, request).await {
+                    if let Err(e) = self.process_block_retrieval(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 }
