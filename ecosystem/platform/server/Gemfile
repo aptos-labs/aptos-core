@@ -76,6 +76,9 @@ gem 'httparty'
 # Address deriviation (sha_256)
 gem 'sha3'
 
+# Cryptography
+gem 'rbnacl', '~> 7.1'
+
 # Zip files
 gem 'rubyzip'
 
