@@ -70,7 +70,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
 
-    ```json
+    ```rust
     module "aptos-node" {
         ...
 
