@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-// eslint-disable-next-line max-classes-per-file
+/* eslint-disable max-classes-per-file */
+
+import { ApiError } from 'aptos';
+
 class ExtendableError extends Error {
   constructor(message: string) {
     super();
@@ -33,11 +36,20 @@ export const DappErrorType = Object.freeze({
   USER_REJECTION: new DappError(4001, 'Rejected', 'The user rejected the request'),
 });
 
-export function makeTransactionError(error: Error): DappError {
-  let message = 'Transaction failed';
-  const anyError = error as any;
-  if (anyError.body && anyError.body.message) {
-    message = anyError.body.message;
+/**
+ * Determine a good error message to pass over to the dapp.
+ * Ideally we should only pass errors relative to generating or submitting a transaction,
+ * but errors thrown under `AptosClient.generateTransaction` have generic type `Error`
+ * @param error error parsed to determine the message
+ */
+export function makeTransactionError(error: unknown): DappError {
+  let message;
+  if (error instanceof ApiError) {
+    message = error.message;
+  } else if (error instanceof Error) {
+    message = error.message;
+  } else {
+    message = 'Transaction failed';
   }
   return new DappError(-30000, 'Transaction Failed', message);
 }

@@ -31,7 +31,7 @@ axios.defaults.adapter = fetchAdapter;
  */
 async function getCurrentDomain() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs[0].url === undefined) {
+  if (tabs[0]?.url === undefined) {
     throw new Error("Couldn't retrieve tab URL");
   }
   const url = new URL(tabs[0].url);
@@ -215,8 +215,11 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     try {
       const signedTxn = await signTransaction(aptosClient, address, payload);
       return await aptosClient.submitTransaction(signedTxn);
-    } catch (error: any) {
-      throw makeTransactionError(error);
+    } catch (err) {
+      // Trace original error without rethrowing (this is a dapp error)
+      // eslint-disable-next-line no-console
+      console.trace(err);
+      throw makeTransactionError(err);
     }
   },
 
@@ -264,8 +267,11 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     const aptosClient = new AptosClient(nodeUrl);
     try {
       return await signTransaction(aptosClient, address, payload);
-    } catch (error: any) {
-      throw makeTransactionError(error);
+    } catch (err) {
+      // Trace original error without rethrowing (this is a dapp error)
+      // eslint-disable-next-line no-console
+      console.trace(err);
+      throw makeTransactionError(err);
     }
   },
 };

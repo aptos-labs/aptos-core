@@ -34,10 +34,9 @@ chrome.runtime.onMessage.addListener((
         sendResponse(makeProxiedResponse(request.id, error));
       } else {
         sendResponse(makeProxiedResponse(request.id, DappErrorType.INTERNAL_ERROR));
+        // Internal unexpected error, rethrow so we can inspect
+        throw error;
       }
-
-      // Error is rethrown so that it can be inspected
-      throw error;
     });
 
   // Return true to indicate the response is asynchronous
