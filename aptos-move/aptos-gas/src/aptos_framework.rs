@@ -93,8 +93,5 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.aggregator.read.base, "aggregator.read.base", 1],
     [.aggregator.sub.base, "aggregator.sub.base", 1],
     [.aggregator.destroy.base, "aggregator.destroy.base", 1],
-    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 1],
-
-    [.network_address.validate_network_addresses.base, "network_address.validate_network_addresses.base", 1],
-    [.network_address.validate_network_addresses.per_byte, "network_address.validate_network_addresses.per_byte", 1],
+    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 1]
 ]);
