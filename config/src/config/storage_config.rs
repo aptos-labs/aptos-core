@@ -71,7 +71,6 @@ impl Default for RocksdbConfigs {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
-    pub address: SocketAddr,
     pub backup_service_address: SocketAddr,
     pub dir: PathBuf,
     pub storage_pruner_config: PrunerConfig,
@@ -220,7 +219,6 @@ impl Default for EpochSnapshotPrunerConfig {
 impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
-            address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6666),
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
             dir: PathBuf::from("db"),
             // The prune window must at least out live a RPC request because its sub requests are
@@ -253,7 +251,6 @@ impl StorageConfig {
     }
 
     pub fn randomize_ports(&mut self) {
-        self.address.set_port(utils::get_available_port());
         self.backup_service_address
             .set_port(utils::get_available_port());
     }
