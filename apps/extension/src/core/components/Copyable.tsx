@@ -1,4 +1,4 @@
-import React, { SyntheticEvent } from 'react';
+import React from 'react';
 import { Box, Tooltip, useClipboard } from '@chakra-ui/react';
 
 export const defaultTimeout = 500;
@@ -30,8 +30,10 @@ export default function Copyable({
   const { hasCopied, onCopy } = useClipboard(value, { timeout });
 
   // Callback wrapper to prevent bubbling up
-  const onClick = (e: SyntheticEvent) => {
+  const onClick = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
     onCopy();
   };
 

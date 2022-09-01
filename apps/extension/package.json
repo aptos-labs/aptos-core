@@ -38,8 +38,8 @@
     "react-router-dom": "^6.3.0",
     "react-scripts": "5.0.1",
     "react-text-mask": "^5.4.3",
-    "text-mask-addons": "^3.8.0",
     "stream-browserify": "^3.0.0",
+    "text-mask-addons": "^3.8.0",
     "tweetnacl": "^1.0.3",
     "webextension-polyfill": "^0.9.0"
   },
