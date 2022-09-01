@@ -33,8 +33,6 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - devnet
       - testnet
       - chaotic
-      # XXX: remove this after testing
-      - rustielin/docker-failpoints
 
 # cancel redundant builds
 concurrency:
@@ -156,7 +154,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
   forge-e2e-test:
-    needs: [rust-images, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
