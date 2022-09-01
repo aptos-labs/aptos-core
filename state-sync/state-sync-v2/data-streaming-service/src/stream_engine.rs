@@ -229,12 +229,8 @@ impl DataStreamEngine for StateStreamEngine {
         }
     }
 
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
-        AdvertisedData::contains_range(
-            self.request.version,
-            self.request.version,
-            &advertised_data.states,
-        )
+    fn is_remaining_data_available(&self, _advertised_data: &AdvertisedData) -> bool {
+        true // Ignore invalid advertisements for now
     }
 
     fn is_stream_complete(&self) -> bool {
