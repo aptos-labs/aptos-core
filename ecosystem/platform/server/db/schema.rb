@@ -420,9 +420,10 @@ ActiveRecord::Schema[7.0].define(version: 2022_09_01_173630) do
 
   create_table "wallets", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "network", null: false, comment: "The network that the account exists on (e.g. \"ait3\")."
+    t.string "network", null: false, comment: "The network that the account exists on (e.g. 'ait3')."
+    t.string "wallet_name", null: false, comment: "The name of the wallet (e.g. 'petra')."
     t.string "public_key", null: false, comment: "The public key of the account."
-    t.boolean "verified", default: false, null: false, comment: "Whether the user has been verified as the owner of this wallet."
+    t.string "address", null: false, comment: "The account address."
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["public_key", "network"], name: "index_wallets_on_public_key_and_network", unique: true
