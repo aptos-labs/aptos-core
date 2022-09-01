@@ -395,6 +395,8 @@ GEM
       activerecord (>= 6.1.5)
       activesupport (>= 6.1.5)
       i18n
+    rbnacl (7.1.1)
+      ffi
     recaptcha (5.10.0)
       json
     redis (4.7.1)
@@ -546,6 +548,7 @@ DEPENDENCIES
   puma (~> 5.0)
   rack-cors
   rails (~> 7.0.2, >= 7.0.3.1)
+  rbnacl (~> 7.1)
   recaptcha (~> 5.10)
   redis (~> 4.7)
   rspec-rails
