@@ -44,6 +44,22 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
+    /// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
+    /// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
+    /// private key on a valid RotationProofChallenge (`cap_update_table`) verifies that the user has the capability to update the
+    /// value at key `auth_key` on the `OriginatingAddress` table. `from_scheme` refers to the scheme of the `from_public_key` and
+    /// `to_scheme` refers to the scheme of the `to_public_key`. A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to
+    /// Multi-Ed25519 keys.
+    AccountRotateAuthenticationKey {
+        from_scheme: u8,
+        from_public_key_bytes: Vec<u8>,
+        to_scheme: u8,
+        to_public_key_bytes: Vec<u8>,
+        cap_rotate_key: Vec<u8>,
+        cap_update_table: Vec<u8>,
+    },
+
     /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
     /// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
     /// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
@@ -277,6 +293,21 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountRotateAuthenticationKey {
+                from_scheme,
+                from_public_key_bytes,
+                to_scheme,
+                to_public_key_bytes,
+                cap_rotate_key,
+                cap_update_table,
+            } => account_rotate_authentication_key(
+                from_scheme,
+                from_public_key_bytes,
+                to_scheme,
+                to_public_key_bytes,
+                cap_rotate_key,
+                cap_update_table,
+            ),
             AccountRotateAuthenticationKeyEd25519 {
                 curr_sig_bytes,
                 new_sig_bytes,
@@ -442,6 +473,42 @@ pub fn account_offer_rotation_capability_ed25519(
             bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
+/// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
+/// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
+/// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
+/// private key on a valid RotationProofChallenge (`cap_update_table`) verifies that the user has the capability to update the
+/// value at key `auth_key` on the `OriginatingAddress` table. `from_scheme` refers to the scheme of the `from_public_key` and
+/// `to_scheme` refers to the scheme of the `to_public_key`. A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to
+/// Multi-Ed25519 keys.
+pub fn account_rotate_authentication_key(
+    from_scheme: u8,
+    from_public_key_bytes: Vec<u8>,
+    to_scheme: u8,
+    to_public_key_bytes: Vec<u8>,
+    cap_rotate_key: Vec<u8>,
+    cap_update_table: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&from_scheme).unwrap(),
+            bcs::to_bytes(&from_public_key_bytes).unwrap(),
+            bcs::to_bytes(&to_scheme).unwrap(),
+            bcs::to_bytes(&to_public_key_bytes).unwrap(),
+            bcs::to_bytes(&cap_rotate_key).unwrap(),
+            bcs::to_bytes(&cap_update_table).unwrap(),
         ],
     ))
 }
@@ -1112,6 +1179,23 @@ mod decoder {
         }
     }
 
+    pub fn account_rotate_authentication_key(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountRotateAuthenticationKey {
+                from_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                from_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                to_scheme: bcs::from_bytes(script.args().get(2)?).ok()?,
+                to_public_key_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
+                cap_rotate_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                cap_update_table: bcs::from_bytes(script.args().get(5)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key_ed25519(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1498,6 +1582,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_rotation_capability_ed25519".to_string(),
             Box::new(decoder::account_offer_rotation_capability_ed25519),
+        );
+        map.insert(
+            "account_rotate_authentication_key".to_string(),
+            Box::new(decoder::account_rotate_authentication_key),
         );
         map.insert(
             "account_rotate_authentication_key_ed25519".to_string(),

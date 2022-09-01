@@ -12,6 +12,7 @@ module aptos_framework::account {
     use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
+    use aptos_std::multi_ed25519;
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -66,6 +67,9 @@ module aptos_framework::account {
 
     const MAX_U64: u128 = 18446744073709551615;
 
+    const ED25519_SCHEME: u8 = 0;
+    const MULTI_ED25519_SCHEME: u8 = 1;
+
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
     /// Account does not exist
@@ -88,6 +92,8 @@ module aptos_framework::account {
     const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
     ///
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
+    const EINVALID_SCHEME: u64 = 12;
+    const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
 
     native fun create_signer(addr: address): signer;
 
@@ -201,51 +207,85 @@ module aptos_framework::account {
         curr_pk_bytes: vector<u8>,
         new_pk_bytes: vector<u8>,
     ) acquires Account, OriginatingAddress {
-        // Get the originating address of the account owner
+        rotate_authentication_key(account, 0, curr_pk_bytes, 0, new_pk_bytes, curr_sig_bytes, new_sig_bytes);
+    }
+
+    fun verify_key_rotation_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge) : vector<u8> {
+        if (scheme == ED25519_SCHEME) {
+            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = ed25519::new_signature_from_bytes(signature);
+            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else {
+            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
+            let sig = multi_ed25519::new_signature_from_bytes(signature);
+            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        }
+    }
+
+    /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
+    /// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
+    /// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
+    /// private key on a valid RotationProofChallenge (`cap_update_table`) verifies that the user has the capability to update the
+    /// value at key `auth_key` on the `OriginatingAddress` table. `from_scheme` refers to the scheme of the `from_public_key` and
+    /// `to_scheme` refers to the scheme of the `to_public_key`. A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to
+    /// Multi-Ed25519 keys.
+    public entry fun rotate_authentication_key(
+        account: &signer,
+        from_scheme: u8,
+        from_public_key_bytes: vector<u8>,
+        to_scheme: u8,
+        to_public_key_bytes: vector<u8>,
+        cap_rotate_key: vector<u8>,
+        cap_update_table: vector<u8>,
+    ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!((from_scheme == ED25519_SCHEME || from_scheme == MULTI_ED25519_SCHEME), EINVALID_SCHEME);
+        assert!((to_scheme == ED25519_SCHEME || to_scheme == MULTI_ED25519_SCHEME), EINVALID_SCHEME);
 
-        let curr_pk = ed25519::new_unvalidated_public_key_from_bytes(curr_pk_bytes);
-        let curr_sig = ed25519::new_signature_from_bytes(curr_sig_bytes);
-        let curr_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
-
-        // Get the current authentication key of the account and verify that it matches with `curr_pk_bytes`
         let account_resource = borrow_global_mut<Account>(addr);
-        assert!(account_resource.authentication_key == curr_auth_key, std::error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
 
-        // Construct a RotationProofChallenge struct
+        // verify the public key matches the current authentication key
+        if (from_scheme == ED25519_SCHEME) {
+            let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        } else {
+            let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
+            let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
+            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        };
+
         let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
+        // construct a RotationProofChallenge to prove that the user intends to do a key rotation
         let challenge = RotationProofChallenge {
             sequence_number: account_resource.sequence_number,
             originator: addr,
             current_auth_key: curr_auth_key,
-            new_public_key: new_pk_bytes,
+            new_public_key: to_public_key_bytes,
         };
 
-        // Verify a digital-signature-based capability that assures us this key rotation was intended by the account owner
-        assert!(ed25519::signature_verify_strict_t(&curr_sig, &curr_pk, copy challenge), std::error::permission_denied(ENO_CAPABILITY));
+        // verify that the challenge signed by the current private key and the previous private key are both valid
+        let curr_auth_key = verify_key_rotation_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
+        let new_auth_key = verify_key_rotation_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
 
-        // Verify a proof-of-knowledge of the new public key we are rotating to
-        let new_pk = ed25519::new_unvalidated_public_key_from_bytes(new_pk_bytes);
-        let new_sig = ed25519::new_signature_from_bytes(new_sig_bytes);
-        assert!(ed25519::signature_verify_strict_t(&new_sig, &new_pk, challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-
-        // Update the originating address map: i.e., set this account's new address to point to the originating address.
-        // Begin by removing the entry for the current authentication key, if there is one.
+        // update the address_map table, so that we can reference to the originating address using the current address
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let originating_address = addr;
-        if (table::contains(address_map, curr_auth_key)) {
-            originating_address = table::remove(address_map, curr_auth_key);
-        };
-
-        // Derive the authentication key of the new PK
-        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+        let curr_address = from_bcs::to_address(curr_auth_key);
         let new_address = from_bcs::to_address(new_auth_key);
 
-        // Update the originating address map
-        table::add(address_map, new_address, originating_address);
+        if (table::contains(address_map, curr_address)) {
+            // assert that we're calling from the same account of the originating address
+            // for example, if we have already rotated from keypair_a to keypair_b, and are trying to rotate from
+            // keypair_b to keypair_c, we expect the call to come from the signer of address_a
+            assert!(addr == table::remove(address_map, curr_address), EINVALID_ORIGINATING_ADDRESS);
+        };
+        table::add(address_map, new_address, addr);
 
-        // Update the account with the new authentication key
+        // update the authentication key of the current account
+        let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
     }
 
@@ -271,13 +311,11 @@ module aptos_framework::account {
         assert!(account_resource.authentication_key == auth_key, EWRONG_CURRENT_PUBLIC_KEY);
 
         //  Construct a RotationCapabilityOfferProofChallenge struct
-        std::debug::print(account_resource);
         let rotation_capability_offer_proof_challenge = RotationCapabilityOfferProofChallenge {
             sequence_number: account_resource.sequence_number,
             recipient_address,
         };
 
-        std::debug::print(&account_resource.sequence_number);
         // Verify a digital-signature-based capability that assures us this rotation capability offer was intended by the account owner
         assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, rotation_capability_offer_proof_challenge), EINVALID_PROOF_OF_KNOWLEDGE);
 
@@ -528,5 +566,55 @@ module aptos_framework::account {
         assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
 
         accept_rotation_capability_ed25519(&bob, signer::address_of(&charlie));
+    }
+
+    #[test(account = @aptos_framework)]
+    public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519(account: signer) acquires Account, OriginatingAddress {
+        initialize(&account);
+        let curr_pk_bytes = x"26885bfb2e41746ffce3ab6ee9b5c9d15f4fbcba241362e814650a961daabb3464a19c23cf3b21ddda4b1370d2cf38aebd33732628049c7a00b97d4baf5b221d5ac38ef40f3fc7e8cd5c72229c0427b5fe68f580dbb9e297b544613e6948539e0328f304d79e0796c50344562a4b017019423b3dd6784495bada7e096cb9302f653e9618cf7b063de024db9adfb9d0b77dbb0048d312f167146f2807d991499fe21702f0df26ea83d418ccf8fd5fb6611c0cfb87c01e680e527a0b3fd7c0ac9b6e742db658fda20f93b446ac4b011430f8d455d71e29df2dca88a772bd598d5953f9fab64b9c5f7e0f424cd8659fb033aee099abeab7ce21463a8d4f84b803cd970ad8812196438311a72fc30720f42f863234ad30ba335d91281bf5c2c09e74e4c37b2f8d18781735e1301c0bd24d8b8e564a1e380cd862e4d058b99645efc98f27e1857f38ede528deb50f9310b2ee68756bac74279990de5dfd3557dbb0e631dc83e71e51abfa928bffff19b5e8ec751073fb371e3444272899cef16789a8812c21d54a4ae7fedd80623e2ed80f7652aa6a6ed97813d69c7f636b4a832088ed2d981e809dddf25566b926cb1677ba80793b4aa70087ef27c8b54d4c28f15ad2fe702293e628888fc548851063b89bcd1b0d8547a2856dbd9814bbff331e2e5a6ea7bb9cd6881ea498f46b3552d4815fed985b8c94c7800355f334b0e81fa7e3eb8ed19d83ac19d14d1bf0c4e978f339818514e36e9253172d8cb8ae4b194c2b507cb498e2c15fa567d17ef0be9d8cfd9eb17d46e71c0741bc81def63b6ff5559e83cd0a8f616ffa0b7c0f5b4c874d95ec92e97e7711b85cb2fef5a6f4fd4902";
+        let new_pk_bytes = x"a63203808ff99ba9ea9133d4e1dafc42109c36ce4de07920ee6cae6136f97719cffa6ecd1582144a41c4388fa20a955339f96834c3901d98e7263ffe455266d1e14e07851e068243e3953bcc3ded766056f7a9586a1bd17fbaefc60c39c8e966a931455983b2b2004101bd7dabab7f5df17fd9281bee392cc7d65bff7f2b7730899c517c0035a971527f9e23d349c5e002e6208465b84a93bbdfb33f670ba4d69ac72f7bae9e577db6480ffef0559839c0317a00cb9cc7577fd18268dbf3b67f68b4f8a1cacd3fbd226e61fa2e849da1ed1f1d131a6b598957a022bdb462254871bd7dc490ac7675b638c1e750b1c7f6f035681abcca48b6b4f96367e4c75c8cd4da5321ec31899cb036469d478e028b5173b78336fc390be06b6a811d8d1022182fb3e8a4a94fd62267be02734b685beb24cf59bd1081216b11404a185df033aa8f546fd2fefd182dc364d48223d462dd8e4e1fa29889b526f67984b4862744ef7282cd606ff2aee79b05c4d366c7280dc92ade0415a3711a09d2d760a00e9f4960dcb1eb71fee22489f54cba68838816e6a0b3e83e85433ee836da1e4738229ec1ca8ad64c675fffbf0bc26022a39ddedae215286427a5bb1b84ca280d83dbe6ecef2dadceef0cd12347393f787e1e5e1b26f7a4fcfbae768e0e4f538141109ca98def3c85a8f7e54fc96e4547626a7a46536710a0c341ca4196676797a8590f";
+        let cap_rotate_key = x"ddf094fd2039546fe229cc86b5c664aeaa7b40670aec18232e61eb591474ba33bccc63af9a5efe0563d03e11025b87bd820a5d8c72c0ac15ea1ff5632acb160808bb16b4088b9f985a3133c194bf67c2be4c34f788a857b26d5dd6c2ebb69bfcf959f44fbb2a96bd88da0091fe38eb029225ef3239e316372a35e08c5f10c70dc0000000";
+        let cap_update_table = x"26dd17b80c92c5a1cbacf79edc1b46ff55dcba108559b14385dc3f91166d6194347ebcff7d1b1bf6864b342865c3a43e88b8203003b9a668b13921abbc6cad071479d0290c3639527d061b71596e0cbab07603f7cc69e6b1fd2ed7215d464c886e81e2bdf750a868180faea77b727b3f001b77b8cd8beb903a1b0a4228f01706870db6464656537e35a0a4584c9838cce37b14f97b81161239b48a1c596c2dc3e0177b3b9882b801a6cec5411346b4309f4ee6ab539ae0ffe0a40c678960f00c28c12fd8404e701115bcee7d07036cf8baae12869c4242a354836c82fa890c2bd396df231609e376d7faf0c31d5f6bb4d3b887a316f08a79b8e1054ed92a860b51c15b6bb53ffe515c22fff0638fc866320d0fce21a53776318b424a9dd2003efa3e8c3c142af50d556ae0c719cb0cca616128068b7b9671b53d7747ed4c870d76e00f8a32595fb04b31590271c34feac567596355ac13ce3bb784c34e81235fa021127e6395c35f3dd67134a1f78105982a923e259319114b04d060b2fdeb07d34bc50ec89f0ba7e749b164970449f95a5b865a3c6cd32e2bfc7f53ae02a3439f5f0259cdfa84eecba7f97302eca29ca33b89e4d8ba328017bbb6450ce1e70f426dcefec406ab7ad64f0ba6c0d8eeb273b1098ea2b2139b5828edfb847a68dadf43b956777c756152fca8d5c14cd66aa2a6e1c9d28d873a2bb118044e35c30cc9d21454821a516691cd301cedfc53a5ebb13310644dcd7ba1ac899cb8c895b8f9fdcd08b5b1096e338a5a92ff379a6395331a0629d97479231d186b418ed406e22974f3e0db1e4c8320427650f5048b7a2ffb6c9c168bf0e268e9915a42e15bb9c659f6fdf130fd2a5a8b841dde53920916b4c3fef07c692b583d41ea75a20cf7d77ab710816adf07a5773b3cd08ff6a95d5ef1ba036909e3c90801ec78b37bca8af036fd712684385a192e535aace4ea5871bfd32433184c48a51ea8491c05380ae41117d3a5b7e8480604087aa23c3f0fce2eda25da006c2ea181ff0efc0097d9bab5c95d6129c63fdb28faea20d76e7c52d74df81ac3009f1107d64dbc0406cc7d3fee03d9b77b06509d1be0a73cee18cbd0fbe9551de100e5eb8831c1e0b122f846de988076d9db22a600225454e877307692d0e8e9eea1341d48a5720163120187a2264d671299fd5a28f52a9bee534008fa4a0390238c9ae426507218f903acedd135708a33092c2e2bddb671237fd2b3cf434a1d08a8596ae215fe02b008fd2932940a2e925e923e04d20e8f8d9a6f40ce0eb550687885fcdecc98ddbd54d6b73217fc212a480841820e0d67894edb84538c2a0d4ae342868194d204fffe0000";
+
+        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(curr_pk_bytes);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
+        let alice_address = from_bcs::to_address(curr_auth_key);
+        let alice = create_account_unchecked(alice_address);
+
+        rotate_authentication_key(&alice, MULTI_ED25519_SCHEME, curr_pk_bytes, MULTI_ED25519_SCHEME, new_pk_bytes, cap_rotate_key, cap_update_table);
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let new_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(new_pk_bytes);
+        let new_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+        let new_address = from_bcs::to_address(new_auth_key);
+        let expected_originating_address = table::borrow(address_map, new_address);
+        assert!(*expected_originating_address == alice_address, 0);
+
+        let account_resource = borrow_global_mut<Account>(alice_address);
+        assert!(account_resource.authentication_key == new_auth_key, 0);
+    }
+
+    #[test(account = @aptos_framework)]
+    public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519(account: signer) acquires Account, OriginatingAddress {
+        initialize(&account);
+        let curr_pk_bytes = x"26885bfb2e41746ffce3ab6ee9b5c9d15f4fbcba241362e814650a961daabb3464a19c23cf3b21ddda4b1370d2cf38aebd33732628049c7a00b97d4baf5b221d5ac38ef40f3fc7e8cd5c72229c0427b5fe68f580dbb9e297b544613e6948539e0328f304d79e0796c50344562a4b017019423b3dd6784495bada7e096cb9302f653e9618cf7b063de024db9adfb9d0b77dbb0048d312f167146f2807d991499fe21702f0df26ea83d418ccf8fd5fb6611c0cfb87c01e680e527a0b3fd7c0ac9b6e742db658fda20f93b446ac4b011430f8d455d71e29df2dca88a772bd598d5953f9fab64b9c5f7e0f424cd8659fb033aee099abeab7ce21463a8d4f84b803cd970ad8812196438311a72fc30720f42f863234ad30ba335d91281bf5c2c09e74e4c37b2f8d18781735e1301c0bd24d8b8e564a1e380cd862e4d058b99645efc98f27e1857f38ede528deb50f9310b2ee68756bac74279990de5dfd3557dbb0e631dc83e71e51abfa928bffff19b5e8ec751073fb371e3444272899cef16789a8812c21d54a4ae7fedd80623e2ed80f7652aa6a6ed97813d69c7f636b4a832088ed2d981e809dddf25566b926cb1677ba80793b4aa70087ef27c8b54d4c28f15ad2fe702293e628888fc548851063b89bcd1b0d8547a2856dbd9814bbff331e2e5a6ea7bb9cd6881ea498f46b3552d4815fed985b8c94c7800355f334b0e81fa7e3eb8ed19d83ac19d14d1bf0c4e978f339818514e36e9253172d8cb8ae4b194c2b507cb498e2c15fa567d17ef0be9d8cfd9eb17d46e71c0741bc81def63b6ff5559e83cd0a8f616ffa0b7c0f5b4c874d95ec92e97e7711b85cb2fef5a6f4fd4902";
+        let new_pk_bytes = x"20fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144";
+        let cap_rotate_key = x"0bc503a99ee09a2bfaeb0039a092abda54cf7493608c01a2e0ac4a0c49958fcbf7eb0521e388ec73b03b978dce79ffda20194aca52cdd13f35c4776de8d27808f0d8c0dbeb14700b46e3c927d848aeba74e0749cdc6429fa1aba1d3e7ef57948bef0810125ccaa2de25a167d13f5725bbc85fcac1b03dff944275d4b4cad3c0ac0000000";
+        let cap_update_table = x"dcb63645f22c9c3f9ff6b05293dc3c0e22e4bd6d6c4001d68869139e78a645d4c0745b61538916b0f6e42736f0dbba19dbd6d1eee5bdd5ef3e7c1d0617b72d01";
+
+        let curr_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(curr_pk_bytes);
+        let curr_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&curr_pk);
+        let alice_address = from_bcs::to_address(curr_auth_key);
+        let alice = create_account_unchecked(alice_address);
+
+        rotate_authentication_key(&alice, MULTI_ED25519_SCHEME, curr_pk_bytes, ED25519_SCHEME, new_pk_bytes, cap_rotate_key, cap_update_table);
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let new_pk = ed25519::new_unvalidated_public_key_from_bytes(new_pk_bytes);
+        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk);
+        let new_address = from_bcs::to_address(new_auth_key);
+        let expected_originating_address = table::borrow(address_map, new_address);
+        assert!(*expected_originating_address == alice_address, 0);
+
+        let account_resource = borrow_global_mut<Account>(alice_address);
+        assert!(account_resource.authentication_key == new_auth_key, 0);
     }
 }
