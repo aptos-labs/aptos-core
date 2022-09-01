@@ -1230,6 +1230,8 @@ dependencies = [
  "field_count",
  "futures",
  "http",
+ "hyper",
+ "inspection-service",
  "once_cell",
  "pbjson",
  "prost 0.10.4",

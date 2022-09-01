@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters::LATEST_PROCESSED_VERSION,
     database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{
         errors::BlockProcessingError, processing_result::ProcessingResult,
@@ -441,8 +442,9 @@ impl SubstreamProcessor for BlockOutputSubstreamProcessor {
 
         let (txns, txn_details, events, wscs, wsc_details) =
             TransactionModel::from_transactions(&block_output.transactions);
-        let conn = Self::get_conn(self.connection_pool());
+        let last_version = txns.last().unwrap().version;
 
+        let conn = Self::get_conn(self.connection_pool());
         let tx_result = insert_block(
             &conn,
             self.substream_module_name(),
@@ -455,10 +457,15 @@ impl SubstreamProcessor for BlockOutputSubstreamProcessor {
         );
 
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(
-                self.substream_module_name(),
-                block_height,
-            )),
+            Ok(_) => {
+                LATEST_PROCESSED_VERSION
+                    .with_label_values(&[self.substream_module_name()])
+                    .set(last_version);
+                Ok(ProcessingResult::new(
+                    self.substream_module_name(),
+                    block_height,
+                ))
+            }
             Err(err) => Err(BlockProcessingError::BlockCommitError((
                 anyhow::Error::from(err),
                 block_height,
