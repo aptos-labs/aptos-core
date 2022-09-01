@@ -3,6 +3,7 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
+use aptos::common::types::GasOptions;
 use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::PersistableConfig;
@@ -206,7 +207,14 @@ async fn test_account_balance() {
 
     // Failed transaction spends gas
     let _ = cli
-        .transfer_invalid_addr(0, TRANSFER_AMOUNT, None)
+        .transfer_invalid_addr(
+            0,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: None,
+                max_gas: Some(1000),
+            }),
+        )
         .await
         .unwrap_err();
 
@@ -1052,7 +1060,14 @@ async fn test_invalid_transaction_gas_charged() {
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;
     let _ = cli
-        .transfer_invalid_addr(0, TRANSFER_AMOUNT, None)
+        .transfer_invalid_addr(
+            0,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: None,
+                max_gas: Some(1000),
+            }),
+        )
         .await
         .unwrap_err();
 
