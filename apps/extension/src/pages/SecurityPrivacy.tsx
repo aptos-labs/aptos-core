@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiChevronRight } from '@react-icons/all-files/fi/FiChevronRight';
 import {
   Icon,
@@ -17,8 +18,25 @@ import {
   secondaryAddressFontColor,
 } from 'core/colors';
 import WalletLayout from 'core/layouts/WalletLayout';
-import { useNavigate } from 'react-router-dom';
-import SecurityPrivacyPaths, { type SecurityPrivacyItem } from 'core/components/SecurityPrivacyPaths';
+import { Routes } from 'core/routes';
+
+export type SecurityPrivacyItem = {
+  id: number;
+  label: string;
+  path: string;
+};
+
+const securityPrivacyPaths = (): SecurityPrivacyItem[] => {
+  const items: SecurityPrivacyItem[] = [
+    {
+      id: 1,
+      label: 'Change password',
+      path: Routes.change_password.path,
+    },
+  ];
+
+  return items;
+};
 
 function SecurityPrivacy() {
   const navigate = useNavigate();
@@ -33,7 +51,7 @@ function SecurityPrivacy() {
   return (
     <WalletLayout title="Security and Privacy" showBackButton>
       <VStack width="100%" paddingTop={4} px={4} pb={4} spacing={2}>
-        {SecurityPrivacyPaths()?.map((item: SecurityPrivacyItem) => (
+        {securityPrivacyPaths().map((item: SecurityPrivacyItem) => (
           <Grid
             key={item.id}
             templateColumns="1fr 32px"

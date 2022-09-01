@@ -169,7 +169,7 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
 
     // incorrect current password
     if (!plaintext) {
-      return Promise.reject(new Error('Incorrect current password'));
+      throw new Error('Incorrect current password');
     }
 
     const decodedPlaintext = Buffer.from(plaintext).toString();
@@ -198,8 +198,6 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
         encryptionKey: bs58.encode(newEncryptionKey),
       }),
     ]);
-
-    return Promise.resolve();
   };
 
   return {

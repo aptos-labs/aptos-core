@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -16,6 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
 import WalletLayout from 'core/layouts/WalletLayout';
+import { useForm } from 'react-hook-form';
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
@@ -25,18 +26,35 @@ import {
   changePasswordIncorrectCurrentPasswordErrorToast,
 } from 'core/components/Toast';
 import { Routes } from 'core/routes';
-import { inputChangePasswordBgColor, lockIconBgColor, lockIconColor } from 'core/colors';
+import { lockIconBgColor, lockIconColor } from 'core/colors';
+
+const inputChangePasswordBgColor = {
+  dark: 'gray.800',
+  light: 'gray.200',
+};
 
 function ChangePassword() {
-  const [currentPassword, setCurrentPassword] = useState<string>('');
-  const [newPassword, setNewPassword] = useState<string>('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState<string>('');
-  const [show, setShow] = useState<boolean>(false);
+  const {
+    getValues, register, setValue, watch,
+  } = useForm({
+    defaultValues: {
+      confirmNewPassword: '',
+      currentPassword: '',
+      newPassword: '',
+      show: false,
+    },
+  });
+
+  const currentPassword: string = watch('currentPassword');
+  const newPassword: string = watch('newPassword');
+  const confirmNewPassword: string = watch('confirmNewPassword');
+  const show: boolean = watch('show');
+
   const { changePassword } = useInitializedAccounts();
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
 
-  const handleClickShow = () => setShow(!show);
+  const handleClickShow = () => setValue('show', !getValues('show'));
 
   const handleClickSave = async () => {
     if (newPassword !== confirmNewPassword) {
@@ -75,10 +93,9 @@ function ChangePassword() {
           </Text>
           <InputGroup>
             <Input
+              {...register('currentPassword')}
               placeholder="Current password"
               type={show ? 'text' : 'password'}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
               bgColor={inputChangePasswordBgColor[colorMode]}
               paddingTop={6}
               paddingBottom={6}
@@ -90,19 +107,17 @@ function ChangePassword() {
             </InputRightElement>
           </InputGroup>
           <Input
+            {...register('newPassword')}
             placeholder="New password"
             type={show ? 'text' : 'password'}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
             bgColor={inputChangePasswordBgColor[colorMode]}
             paddingTop={6}
             paddingBottom={6}
           />
           <Input
+            {...register('confirmNewPassword')}
             placeholder="Confirm new password"
             type={show ? 'text' : 'password'}
-            value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
             bgColor={inputChangePasswordBgColor[colorMode]}
             paddingTop={6}
             paddingBottom={6}

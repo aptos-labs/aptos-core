@@ -50,11 +50,6 @@ export const checkCircleSuccessBg = {
   light: '#48BB78',
 };
 
-export const inputChangePasswordBgColor = {
-  dark: 'gray.800',
-  light: 'gray.200',
-};
-
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',
