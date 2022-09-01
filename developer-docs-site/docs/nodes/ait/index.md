@@ -66,7 +66,7 @@ See [Node network topology](/concepts/basics-node-networks-sync.md) and the Medi
 - The node health checker (NHC) will health check the selected public fullnodes, and the pass or fail decision will be made on the NHC results and the telemetry data submitted by the public fullnode. 
 - The Aptos AIT-3 team will run load testing by submitting transactions through the selected public fullnodes.
 
-### Rewards:
+### Rewards
 
 - Successful public fullnode operators will receive 200 Aptos tokens.
 
