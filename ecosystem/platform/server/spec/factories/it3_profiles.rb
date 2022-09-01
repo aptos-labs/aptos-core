@@ -12,7 +12,7 @@ FactoryBot.define do
     account_key { "0x#{Faker::Crypto.sha256}" }
     network_key { "0x#{Faker::Crypto.sha256}" }
     fullnode_network_key { "0x#{Faker::Crypto.sha256}" }
-    fullnode_address { "0x#{Faker::Crypto.sha256}" }
+    fullnode_address { Faker::Internet.ip_v4_address }
     fullnode_port { 6180 }
     fullnode_api_port { 8080 }
     fullnode_metrics_port { 9101 }
