@@ -771,7 +771,7 @@ async fn parse_block_transactions(
         let actual_txn_info = actual_txn
             .transaction_info()
             .expect("Actual transaction should not be pending and have transaction info");
-        let txn_metadata = transaction.metadata;
+        let txn_metadata = &transaction.metadata;
 
         // Ensure transaction identifier is correct
         assert_eq!(
@@ -784,13 +784,34 @@ async fn parse_block_transactions(
             "Transaction hash should match the actual hash"
         );
 
+        // Ensure the status is correct
+        assert_eq!(txn_metadata.failed, !actual_txn_info.success);
+        assert_eq!(txn_metadata.vm_status, actual_txn_info.vm_status);
+
         // Type specific checks
         match txn_metadata.transaction_type {
             TransactionType::Genesis => {
+                // For this test, there should only be one genesis
                 assert_eq!(0, *current_version);
+                assert!(matches!(actual_txn, Transaction::GenesisTransaction(_)));
             }
-            TransactionType::User => {}
-            TransactionType::BlockMetadata | TransactionType::StateCheckpoint => {
+            TransactionType::User => {
+                assert!(matches!(actual_txn, Transaction::UserTransaction(_)));
+                // Must have a gas fee
+                assert!(!transaction.operations.is_empty());
+            }
+            TransactionType::BlockMetadata => {
+                assert!(matches!(
+                    actual_txn,
+                    Transaction::BlockMetadataTransaction(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            }
+            TransactionType::StateCheckpoint => {
+                assert!(matches!(
+                    actual_txn,
+                    Transaction::StateCheckpointTransaction(_)
+                ));
                 assert!(transaction.operations.is_empty());
             }
         }
@@ -1174,7 +1195,7 @@ fn assert_transfer_transaction(
         rosetta_txn.transaction_identifier.hash
     );
 
-    let rosetta_txn_metadata = rosetta_txn.metadata;
+    let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
     assert_eq!(rosetta_txn.operations.len(), 3);
