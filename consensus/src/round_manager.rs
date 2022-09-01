@@ -48,7 +48,6 @@ use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
-use termion::color::*;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -585,9 +584,7 @@ impl RoundManager {
             self.block_store.highest_2chain_timeout_cert().as_deref(),
         );
         let vote = vote_result.context(format!(
-            "[RoundManager] SafetyRules {}Rejected{} {}",
-            Fg(Red),
-            Fg(Reset),
+            "[RoundManager] SafetyRules Rejected {}",
             executed_block.block()
         ))?;
         if !executed_block.block().is_nil_block() {

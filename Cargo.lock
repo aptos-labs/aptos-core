@@ -2628,7 +2628,6 @@ dependencies = [
  "short-hex-str",
  "storage-interface",
  "tempfile",
- "termion",
  "thiserror",
  "tokio",
  "vm-validator",
@@ -9825,7 +9824,6 @@ dependencies = [
  "itertools",
  "rand 0.7.3",
  "rand_core 0.5.1",
- "termion",
  "tokio",
  "transaction-emitter-lib",
 ]
