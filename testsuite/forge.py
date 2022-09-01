@@ -940,14 +940,18 @@ def find_recent_images(
     shell: Shell,
     git: Git,
     num_images: int,
+    image_name: str = "aptos/validator",
     # Set a generoush threshold in case of failures
     commit_threshold: int = 100,
     enable_failpoints: bool = False,
 ) -> Generator[str, None, None]:
-    # If we are using the testing image, or are using failpoints, we need to check for those images
-    # In general, any image not compiled as the default release profile will be named differently
+    """
+    Find the last `num_images` images built from the current git repo by searching the git commit history
+    For images built with different features or profiles than the default release profile, the image searching logic
+    will be more complicated. We use a combination of image_tag prefixes and different image names to distinguish
+    """
+
     image_tag_prefix = "failpoints_" if enable_failpoints else ""
-    image_name = "aptos/validator"
 
     i = 0
     for revision in git.last(commit_threshold):
