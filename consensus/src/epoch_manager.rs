@@ -121,7 +121,8 @@ pub struct EpochManager {
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
     epoch_state: Option<EpochState>,
-    block_store: Option<Arc<BlockStore>>,
+    block_retrieval_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
 }
 
 impl EpochManager {
@@ -158,7 +159,7 @@ impl EpochManager {
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             epoch_state: None,
-            block_store: None,
+            block_retrieval_tx: None,
         }
     }
 
@@ -418,6 +419,28 @@ impl EpochManager {
         spawn_named!("Quorum Store", quorum_store.start());
     }
 
+    fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
+        let (request_tx, mut request_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
+        );
+        let task = async move {
+            info!(epoch = epoch, "Block retrieval task starts");
+            while let Some(request) = request_rx.next().await {
+                if let Err(e) = monitor!(
+                    "process_block_retrieval",
+                    block_store.process_block_retrieval(request).await
+                ) {
+                    error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                }
+            }
+            info!(epoch = epoch, "Block retrieval task stops");
+        };
+        self.block_retrieval_tx = Some(request_tx);
+        tokio::spawn(task);
+    }
+
     /// this function spawns the phases and a buffer manager
     /// it sets `self.commit_msg_tx` to a new aptos_channel::Sender and returns an OrderingStateComputer
     fn spawn_decoupled_execution(
@@ -491,6 +514,9 @@ impl EpochManager {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
+
+        // Shutdown the block retrieval task by dropping the sender
+        self.block_retrieval_tx = None;
     }
 
     async fn start_round_manager(
@@ -601,8 +627,9 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
-        self.block_store = Some(block_store);
         tokio::spawn(round_manager.start(round_manager_rx));
+
+        self.spawn_block_retrieval_task(epoch, block_store);
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
@@ -755,13 +782,11 @@ impl EpochManager {
 
     async fn process_block_retrieval(
         &self,
+        peer_id: Author,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
-        if let Some(block_store) = &self.block_store {
-            monitor!(
-                "process_block_retrieval",
-                block_store.process_block_retrieval(request).await
-            )
+        if let Some(tx) = &self.block_retrieval_tx {
+            tx.push(peer_id, request)
         } else {
             Err(anyhow::anyhow!("Round manager not started"))
         }
@@ -795,8 +820,8 @@ impl EpochManager {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 }
-                Some(request) = network_receivers.block_retrieval.next() => {
-                    if let Err(e) = self.process_block_retrieval(request).await {
+                Some((peer, request)) = network_receivers.block_retrieval.next() => {
+                    if let Err(e) = self.process_block_retrieval(peer, request).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 }
