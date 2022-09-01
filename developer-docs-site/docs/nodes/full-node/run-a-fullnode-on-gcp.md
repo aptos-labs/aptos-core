@@ -13,20 +13,23 @@ Read [Run a Fullnode](/nodes/full-node/fullnode-for-devnet) if you want other al
 
 ## Prerequisites
 
-You can run the commands in this guide to deploy your full node on Google Kubernetes Engine from any machine you want. From a [VM on GCP](https://cloud.google.com/compute), [Google Cloud Shell](https://cloud.google.com/shell), or your personal computer.
+You can run the commands in this guide to deploy your FullNode on Google Kubernetes Engine from any machine you want: From a [VM on GCP](https://cloud.google.com/compute), or [Google Cloud Shell](https://cloud.google.com/shell), or your personal computer.
 
-The following packages come pre-installed with Cloud Shell. Make sure to review the [documentation around ephermability](https://cloud.google.com/shell/docs/using-cloud-shell#choosing_ephemeral_mode) if you choose to use Cloud Shell. But if you are running the installation from your laptop or another machine, you need to install:
+The following packages are pre-installed with Cloud Shell. **Make sure to review** the [documentation around ephemeral mode](https://cloud.google.com/shell/docs/using-cloud-shell/#choose_ephemeral_mode) if you choose to use Cloud Shell. 
+
+However, if you are running the installation from your laptop or another machine, you need to install:
+
 * Terraform 1.1.7: https://www.terraform.io/downloads.html
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
 
-Once you have installed the gcloud CLI, log into GCP using gcloud (https://cloud.google.com/sdk/gcloud/reference/auth/login):
+After you have installed the gcloud CLI, [log into GCP using gcloud](https://cloud.google.com/sdk/gcloud/reference/auth/login):
 
 ```bash
 gcloud auth login --update-adc
 ```
 
-If you already have a GCP account setup, jump right into [Getting Started](#getting-started). To set up a GCP account, follow the below sections to create and configure your GCP account.
+If you already have a GCP account setup, skip to [Getting Started](#getting-started). If you do not have a GCP account, then follow the below sections to create and configure your GCP account.
 
 ### GCP setup
 
