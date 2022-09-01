@@ -379,7 +379,7 @@ impl BlockStore {
         request
             .response_sender
             .send(Ok(response_bytes.into()))
-            .map_err(|e| anyhow::anyhow!("{:?}", e))
+            .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
     }
 }
 
