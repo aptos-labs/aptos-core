@@ -827,17 +827,17 @@ impl EpochManager {
                 "main_loop",
                 ::futures::select! {
                     (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
-                        if let Err(e) = self.process_message(peer, msg).await {
+                        if let Err(e) = monitor!("process_message", self.process_message(peer, msg).await) {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                         }
                     },
                     (peer, request) = network_receivers.block_retrieval.select_next_some() => {
-                        if let Err(e) = self.process_block_retrieval(peer, request) {
+                        if let Err(e) = monitor!("send_block_retrieval", self.process_block_retrieval(peer, request).await) {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                         }
                     },
                     round = round_timeout_sender_rx.select_next_some() => {
-                        self.process_local_timeout(round);
+                        monitor!("send_timeout", self.process_local_timeout(round));
                     },
                 }
             );
