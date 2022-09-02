@@ -388,9 +388,9 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem.assert_writes(self)
 
     def testHumioLogLink(self) -> None:
-        self.assertFixture(
-            get_humio_logs_link("forge-pr-2983"), "testHumioLogLink.fixture"
-        )
+        link = get_humio_logs_link("forge-pr-2983")
+        self.assertFixture(link, "testHumioLogLink.fixture")
+        self.assertIn("forge-pr-2983", link)
 
     def testValidatorLogsLink(self) -> None:
         self.assertFixture(
