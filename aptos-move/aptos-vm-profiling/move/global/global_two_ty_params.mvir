@@ -1,0 +1,32 @@
+module 0x1.M {
+    import 0x1.Test;
+
+    struct Foo<phantom T, phantom U> has key, store, drop { x: u64 }
+
+    run() acquires Foo {
+        let i: u64;
+        let x: u64;
+
+        let s: signer;
+        let f: Self.Foo<bool, bool>;
+        let b: bool;
+        let r: &Self.Foo<bool, bool>;
+
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+
+        s = Test.create_signer(0x1);
+        move_to<Foo<bool, bool>>(&s, Foo<bool, bool> { x: 100 });
+        b = exists<Foo<bool, bool>>(0x1);
+        r = borrow_global<Foo<bool, bool>>(0x1);
+        _ = move(r);
+        f = move_from<Foo<bool, bool>>(0x1);
+
+        i = move(i) + 1;
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+}
