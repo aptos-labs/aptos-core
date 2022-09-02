@@ -4,6 +4,7 @@
 import { PetraPublicApiImpl, isAllowedMethodName } from 'shared/petra';
 import { isProxiedRequest, makeProxiedResponse, ProxiedResponse } from 'shared/types';
 import { DappError, DappErrorType } from 'core/types/errors';
+import { SessionStorage, PersistentStorage } from 'shared/storage';
 
 type SendProxiedResult = (result: ProxiedResponse) => void;
 
@@ -12,6 +13,11 @@ chrome.runtime.onMessage.addListener((
   sender,
   sendResponse: SendProxiedResult,
 ) => {
+  // clear all pending alarm to prevent wallet being locked while being used
+  if (request.type === 'popupOpened') {
+    chrome.alarms.clearAll();
+  }
+
   if (!isProxiedRequest(request)) {
     return false;
   }
@@ -41,4 +47,26 @@ chrome.runtime.onMessage.addListener((
 
   // Return true to indicate the response is asynchronous
   return true;
+});
+
+// lock account as soon as alarm timer elapsed
+chrome.alarms.onAlarm.addListener(async () => {
+  await SessionStorage.set({
+    accounts: undefined,
+    encryptionKey: undefined,
+  });
+});
+
+chrome.runtime.onConnect.addListener((port) => {
+  port.onDisconnect.addListener(async () => {
+    const { autolockTimer } = await PersistentStorage.get(['autolockTimer']);
+
+    // if autolock timer not yet set, exit early
+    if (!autolockTimer) return;
+
+    // starts timer as soon as user close the wallet and become 'inactive'
+    chrome.alarms.create('autolockTimer', {
+      delayInMinutes: autolockTimer,
+    });
+  });
 });

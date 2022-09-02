@@ -26,7 +26,7 @@ import {
   changePasswordIncorrectCurrentPasswordErrorToast,
 } from 'core/components/Toast';
 import { Routes } from 'core/routes';
-import { lockIconBgColor, lockIconColor } from 'core/colors';
+import { iconBgColor, iconColor } from 'core/colors';
 
 const inputChangePasswordBgColor = {
   dark: 'gray.800',
@@ -80,7 +80,7 @@ function ChangePassword() {
       <VStack width="100%" height="100%" display="flex" paddingTop={8} px={6}>
         <VStack width="100%" gap={4} flex={1}>
           <Box px={4} pb={0} width="100%" alignItems="center" display="flex" justifyContent="center">
-            <Circle size={16} bgColor={lockIconBgColor[colorMode]} color={lockIconColor[colorMode]}>
+            <Circle size={16} bgColor={iconBgColor[colorMode]} color={iconColor[colorMode]}>
               <FaLock size={36} />
             </Circle>
           </Box>

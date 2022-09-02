@@ -6,6 +6,13 @@ export default class Browser {
     return !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
   }
 
+  public static runtime() {
+    if (this.isDev()) {
+      return null;
+    }
+    return chrome.runtime;
+  }
+
   public static persistentStorage() {
     if (this.isDev()) {
       return null;

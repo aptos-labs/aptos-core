@@ -23,7 +23,8 @@
   },
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "alarms"
   ],
   "icons": {
     "16": "icon16.png",

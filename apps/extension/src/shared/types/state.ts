@@ -8,6 +8,7 @@ export interface PersistentState {
   activeAccountAddress: string | undefined,
   activeAccountPublicKey: string | undefined,
   activeNetworkName: string | undefined,
+  autolockTimer: number | undefined,
   customNetworks: Networks | undefined,
   encryptedAccounts: EncryptedAccounts | undefined,
   encryptedStateVersion: number,

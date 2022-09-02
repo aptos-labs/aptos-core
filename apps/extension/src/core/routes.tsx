@@ -28,6 +28,7 @@ import RenameAccount from 'pages/RenameAccount';
 import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
 import Stake from 'pages/Stake';
 import ChangePassword from 'pages/ChangePassword';
+import AutoLockTimer from 'pages/AutoLockTimer';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -53,6 +54,10 @@ export const Routes = Object.freeze({
   addNetwork: {
     element: <AddNetwork />,
     path: '/settings/add-network',
+  },
+  autolock_timer: {
+    element: <AutoLockTimer />,
+    path: '/settings/security_privacy/autolock_timer',
   },
   change_password: {
     element: <ChangePassword />,
@@ -163,6 +168,7 @@ export const routes = [
         children: [
           {
             children: [
+              Routes.autolock_timer,
               Routes.wallet,
               Routes.gallery,
               Routes.token,

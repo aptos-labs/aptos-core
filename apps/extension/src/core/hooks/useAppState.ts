@@ -5,6 +5,7 @@ import constate from 'constate';
 import { useEffect, useState } from 'react';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import { PersistentState, SessionState } from 'shared/types';
+import Browser from 'core/utils/browser';
 
 /**
  * Hook/provider for the app global state.
@@ -19,11 +20,20 @@ export const [AppStateProvider, useAppState] = constate(() => {
   const [isAppStateReady, setIsAppStateReady] = useState<boolean>(false);
 
   useEffect(() => {
+    // chrome.runtime only works in extension mode and not dev/browser mode
+    // attempt to connect and notify background script that extension popup is opened
+    const runtime = Browser.runtime();
+    if (runtime) {
+      runtime.connect();
+      runtime.sendMessage({ type: 'popupOpened' });
+    }
+
     Promise.all([
       PersistentStorage.get([
         'activeAccountAddress',
         'activeAccountPublicKey',
         'activeNetworkName',
+        'autolockTimer',
         'customNetworks',
         'encryptedAccounts',
         'salt',

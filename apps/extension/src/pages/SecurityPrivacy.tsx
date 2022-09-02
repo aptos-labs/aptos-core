@@ -33,6 +33,11 @@ const securityPrivacyPaths = (): SecurityPrivacyItem[] => {
       label: 'Change password',
       path: Routes.change_password.path,
     },
+    {
+      id: 2,
+      label: 'Auto-lock Timer',
+      path: Routes.autolock_timer.path,
+    },
   ];
 
   return items;

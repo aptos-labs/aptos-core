@@ -122,12 +122,12 @@ export const secondaryWalletHomeCardBgColor = {
   light: 'gray.50',
 };
 
-export const lockIconBgColor = {
+export const iconBgColor = {
   dark: 'gray.700',
   light: 'gray.100',
 };
 
-export const lockIconColor = {
+export const iconColor = {
   dark: 'white',
   light: 'gray.600',
 };
