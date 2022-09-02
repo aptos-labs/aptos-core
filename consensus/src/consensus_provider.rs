@@ -21,9 +21,13 @@ use event_notifications::ReconfigNotificationListener;
 use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::thread;
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
+use tokio::time::Duration;
+use tokio_metrics::RuntimeMonitor;
 
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
@@ -37,10 +41,25 @@ pub fn start_consensus(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
     let runtime = runtime::Builder::new_multi_thread()
-        .thread_name("consensus")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("consensus-{}", id)
+        })
+        .on_thread_start(|| {
+            let handle = thread::current();
+            info!("RUNTIME: {:?} started", handle.name());
+        })
+        .on_thread_stop(|| {
+            let handle = thread::current();
+            info!("RUNTIME: {:?} stoped", handle.name());
+        })
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
+    // We should .disable_lifo_slost() which is tokio unstable , but its not yet available in tokio 18.2.
+    // https://docs.rs/tokio/latest/tokio/runtime/struct.Builder.html
+
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),
@@ -81,6 +100,22 @@ pub fn start_consensus(
 
     runtime.spawn(network_task.start());
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+
+    let metrics_frequency = Duration::from_secs(60);
+
+    // print runtime metrics every 500ms
+    runtime.spawn(async move {
+        let handle = tokio::runtime::Handle::current();
+        let runtime_monitor = RuntimeMonitor::new(&handle);
+
+        tokio::spawn(async move {
+            for interval in runtime_monitor.intervals() {
+                // pretty-print the metric interval
+                info!("EPOCH RUNTIME: {:?}", interval);
+                tokio::time::sleep(metrics_frequency).await;
+            }
+        });
+    });
 
     debug!("Consensus started.");
     runtime

@@ -80,6 +80,8 @@ use std::{
     thread,
 };
 
+use tokio_metrics::TaskMonitor;
+
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
@@ -871,6 +873,31 @@ impl EpochManager {
             None
         };
 
+        let consensus_messages_monitor = TaskMonitor::new();
+        let block_retrieval_monitor = TaskMonitor::new();
+        let round_timeout_monitor = TaskMonitor::new();
+
+        let metrics_frequency = Duration::from_secs(60);
+        let consensus_intervals = consensus_messages_monitor.intervals();
+        let block_intervals = block_retrieval_monitor.intervals();
+        let timeout_intervals = round_timeout_monitor.intervals();
+
+        // zip the metrics streams together
+        let tmp_intervals = block_intervals.zip(timeout_intervals);
+        let intervals = consensus_intervals.zip(tmp_intervals);
+
+        tokio::spawn(async move {
+            // call `.intervals()` on each monitor to get an endless
+            // iterator of metrics sampled from that monitor
+            // print the metrics for each monitor to stdout
+            for (consensus, (block, timeout)) in intervals {
+                info!("METRICS: consensus = {:#?}", consensus);
+                info!("METRICS: block = {:#?}", block);
+                info!("METRICS: timeout = {:#?}", timeout);
+                tokio::time::sleep(metrics_frequency).await;
+            }
+        });
+
         let epoch_manager_shared = Arc::new(tokio::sync::Mutex::new(self));
         let epoch_manager_shared_1 = epoch_manager_shared.clone();
         let epoch_manager_shared_2 = epoch_manager_shared.clone();
@@ -893,6 +920,7 @@ impl EpochManager {
                 active.store(false, std::sync::atomic::Ordering::Relaxed);
             }
         };
+
         let block_task = async move {
             while let Some((peer, request)) = block_retrieval.next().await {
                 let locked = epoch_manager_shared_1.lock().await;
@@ -904,6 +932,7 @@ impl EpochManager {
                 );
             }
         };
+
         let timeout_task = async move {
             while let Some(round) = round_timeout_sender_rx.next().await {
                 monitor!(
@@ -915,8 +944,10 @@ impl EpochManager {
                 );
             }
         };
-        tokio::spawn(consensus_task);
-        tokio::spawn(block_task);
-        tokio::spawn(timeout_task);
+        _ = tokio::join!(
+            tokio::spawn(consensus_messages_monitor.instrument(consensus_task)),
+            tokio::spawn(block_retrieval_monitor.instrument(block_task)),
+            tokio::spawn(round_timeout_monitor.instrument(timeout_task)),
+        );
     }
 }
