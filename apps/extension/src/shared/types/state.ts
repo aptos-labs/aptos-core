@@ -10,6 +10,7 @@ export interface PersistentState {
   activeNetworkName: string | undefined,
   customNetworks: Networks | undefined,
   encryptedAccounts: EncryptedAccounts | undefined,
+  encryptedStateVersion: number,
   salt: string | undefined,
 }
 

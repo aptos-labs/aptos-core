@@ -132,6 +132,7 @@ function PromptState() {
     accounts,
     activeAccountAddress,
     encryptedAccounts,
+    encryptedStateVersion,
     encryptionKey,
     isAppStateReady,
     salt,
@@ -197,7 +198,11 @@ function PromptState() {
   } if (!areAccountsUnlocked) {
     return (
       <AccountsProvider>
-        <InitializedAccountsProvider encryptedAccounts={encryptedAccounts} salt={salt}>
+        <InitializedAccountsProvider
+          encryptedAccounts={encryptedAccounts}
+          salt={salt}
+          encryptedStateVersion={encryptedStateVersion ?? 0}
+        >
           <VStack w="100vw" h="100vh">
             <Password />
           </VStack>

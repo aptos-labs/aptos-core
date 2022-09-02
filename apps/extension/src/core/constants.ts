@@ -9,6 +9,8 @@ export const coinStoreStructTag = `${coinNamespace}::CoinStore` as const;
 export const aptosCoinStoreStructTag = `${coinStoreStructTag}<${aptosCoinStructTag}>` as const;
 export const aptosStakePoolStructTag = `${stakeNamespace}::StakePool` as const;
 
+export const latestVersion = 1;
+
 export const validStorageUris = [
   'amazonaws.com',
   'ipfs.io',

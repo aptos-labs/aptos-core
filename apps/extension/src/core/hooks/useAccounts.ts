@@ -12,6 +12,7 @@ import { useAppState } from 'core/hooks/useAppState';
 import {
   Account, Accounts, EncryptedAccounts,
 } from 'shared/types';
+import { latestVersion } from 'core/constants';
 
 const pbkdf2Iterations = 10000;
 const pbkdf2Digest = 'sha256';
@@ -46,6 +47,7 @@ export const [AccountsProvider, useAccounts] = constate(() => {
     accounts,
     activeAccountAddress,
     encryptedAccounts,
+    encryptedStateVersion,
     encryptionKey,
     salt,
     updatePersistentState,
@@ -82,6 +84,7 @@ export const [AccountsProvider, useAccounts] = constate(() => {
         activeAccountAddress: firstAvailableAccount?.address,
         activeAccountPublicKey: firstAvailableAccount?.publicKey,
         encryptedAccounts: newEncryptedAccounts,
+        encryptedStateVersion: latestVersion,
         salt: bs58.encode(newSalt),
       }),
       updateSessionState({
@@ -95,6 +98,7 @@ export const [AccountsProvider, useAccounts] = constate(() => {
     accounts,
     activeAccountAddress,
     encryptedAccounts,
+    encryptedStateVersion,
     encryptionKey,
     initAccounts,
     salt,
@@ -103,7 +107,8 @@ export const [AccountsProvider, useAccounts] = constate(() => {
 
 export interface UseInitializedAccountsProps {
   encryptedAccounts: EncryptedAccounts,
-  salt: string,
+  encryptedStateVersion: number,
+  salt: string
 }
 
 /**
@@ -112,6 +117,7 @@ export interface UseInitializedAccountsProps {
  */
 export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
   encryptedAccounts,
+  encryptedStateVersion,
   salt,
 }: UseInitializedAccountsProps) => {
   const {
@@ -133,6 +139,34 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
     });
   };
 
+  const migrateEncryptedState = async (accounts: Accounts, encryptionKey: Uint8Array) => {
+    if (encryptedStateVersion === latestVersion) {
+      return accounts;
+    }
+
+    const newAccounts = accounts;
+    // migration to version 1
+    if (encryptedStateVersion < 1) {
+      Object.keys(newAccounts).forEach((key) => {
+        delete newAccounts[key].mnemonic;
+      });
+    }
+
+    // Re-encrypt migrated accounts
+    const newPlaintext = JSON.stringify(newAccounts);
+    const newNonce = randomBytes(secretbox.nonceLength);
+    const newCiphertext = secretbox(Buffer.from(newPlaintext), newNonce, encryptionKey);
+    const newEncryptedAccounts = {
+      ciphertext: bs58.encode(newCiphertext),
+      nonce: bs58.encode(newNonce),
+    };
+    await updatePersistentState({
+      encryptedAccounts: newEncryptedAccounts,
+      encryptedStateVersion: 1,
+    });
+    return newAccounts;
+  };
+
   const unlockAccounts = async (password: string) => {
     const ciphertext = bs58.decode(encryptedAccounts.ciphertext);
     const nonce = bs58.decode(encryptedAccounts.nonce);
@@ -143,7 +177,10 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
     // Retrieved unencrypted value
     const plaintext = secretbox.open(ciphertext, nonce, newEncryptionKey)!;
     const decodedPlaintext = Buffer.from(plaintext).toString();
-    const newAccounts = JSON.parse(decodedPlaintext) as Accounts;
+    let newAccounts = JSON.parse(decodedPlaintext) as Accounts;
+
+    // Migrate if needed
+    newAccounts = await migrateEncryptedState(newAccounts, newEncryptionKey);
 
     // Update state
     await updateSessionState({

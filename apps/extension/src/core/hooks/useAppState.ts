@@ -27,6 +27,7 @@ export const [AppStateProvider, useAppState] = constate(() => {
         'customNetworks',
         'encryptedAccounts',
         'salt',
+        'encryptedStateVersion',
       ]),
       SessionStorage.get([
         'accounts',

@@ -18,11 +18,15 @@ import { Routes } from 'core/routes';
  * Will provide the initialized accounts for children
  */
 export function InitializedAccountsGuard() {
-  const { encryptedAccounts, salt } = useAccounts();
+  const { encryptedAccounts, encryptedStateVersion, salt } = useAccounts();
 
   const areAccountsInitialized = encryptedAccounts !== undefined && salt !== undefined;
   return areAccountsInitialized ? (
-    <InitializedAccountsProvider encryptedAccounts={encryptedAccounts} salt={salt}>
+    <InitializedAccountsProvider
+      encryptedAccounts={encryptedAccounts}
+      salt={salt}
+      encryptedStateVersion={encryptedStateVersion ?? 0}
+    >
       <Outlet />
     </InitializedAccountsProvider>
   ) : <Navigate to={Routes.noWallet.path} />;
