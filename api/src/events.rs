@@ -40,8 +40,15 @@ impl EventsApi {
         &self,
         accept_type: AcceptType,
         // TODO: https://github.com/aptos-labs/aptos-core/issues/2278
+        /// Event key to retrieve events by
         event_key: Path<EventKey>,
+        /// Starting sequence number of events.
+        ///
+        /// By default, will retrieve the most recent events
         start: Query<Option<U64>>,
+        /// Max number of events to retrieve.
+        ///
+        /// Mo value defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
@@ -73,10 +80,19 @@ impl EventsApi {
     async fn get_events_by_event_handle(
         &self,
         accept_type: AcceptType,
+        /// Address of account with or without a `0x` prefix
         address: Path<Address>,
+        /// Name of struct to lookup event handle e.g. `0x1::account::Account`
         event_handle: Path<MoveStructTag>,
+        /// Name of field to lookup event handle e.g. `withdraw_events`
         field_name: Path<IdentifierWrapper>,
+        /// Starting sequence number of events.
+        ///
+        /// By default, will retrieve the most recent events
         start: Query<Option<U64>>,
+        /// Max number of events to retrieve.
+        ///
+        /// Mo value defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         // TODO: Assert that Event represents u64s as strings.
@@ -93,6 +109,7 @@ impl EventsApi {
 }
 
 impl EventsApi {
+    /// List events from an [`EventKey`]
     fn list(
         &self,
         latest_ledger_info: LedgerInfo,

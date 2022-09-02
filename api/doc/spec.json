@@ -21,7 +21,7 @@
   "tags": [
     {
       "name": "Accounts",
-      "description": "Access to account resources and modules"
+      "description": "Access to accounts, resources, and modules"
     },
     {
       "name": "Blocks",
@@ -51,7 +51,7 @@
           "Accounts"
         ],
         "summary": "Get account",
-        "description": "Return high level information about an account such as its sequence number.",
+        "description": "Retrieves high level information about an account such as its sequence number and\nauthentication key\n\nReturns a 404 if the account doesn't exist",
         "parameters": [
           {
             "name": "address",
@@ -59,6 +59,7 @@
               "$ref": "#/components/schemas/Address"
             },
             "in": "path",
+            "description": "Address of account",
             "required": true,
             "deprecated": false,
             "explode": true
@@ -69,6 +70,7 @@
               "$ref": "#/components/schemas/U64"
             },
             "in": "query",
+            "description": "Ledger version to get account",
             "required": false,
             "deprecated": false,
             "explode": true
@@ -95,6 +97,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -103,6 +106,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -111,6 +115,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -119,6 +124,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -127,6 +133,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -135,6 +142,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -143,6 +151,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -528,7 +537,7 @@
           "Accounts"
         ],
         "summary": "Get account resources",
-        "description": "This endpoint returns all account resources at a given address at a\nspecific ledger version (AKA transaction version). If the ledger\nversion is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "description": "Retrieves all account resources for a given account and a specific ledger version.  If the\nledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "address",
@@ -575,6 +584,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -583,6 +593,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -591,6 +602,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -599,6 +611,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -607,6 +620,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -615,6 +629,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -623,6 +638,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1008,7 +1024,7 @@
           "Accounts"
         ],
         "summary": "Get account modules",
-        "description": "This endpoint returns all account modules at a given address at a\nspecific ledger version (AKA transaction version). If the ledger\nversion is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "description": "Retrieves all account modules' bytecode for a given account and a specific ledger version.\nIf the ledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "address",
@@ -1055,6 +1071,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1063,6 +1080,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1071,6 +1089,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1079,6 +1098,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1087,6 +1107,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1095,6 +1116,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1103,6 +1125,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1545,6 +1568,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1553,6 +1577,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1561,6 +1586,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1569,6 +1595,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1577,6 +1604,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1585,6 +1613,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1593,6 +1622,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1734,7 +1764,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by height",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.\n\nIf the block is pruned, it will return a 410",
         "parameters": [
           {
             "name": "block_height",
@@ -1779,6 +1809,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1787,6 +1818,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1795,6 +1827,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1803,6 +1836,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1811,6 +1845,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1819,6 +1854,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1827,6 +1863,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2212,7 +2249,7 @@
           "Blocks"
         ],
         "summary": "Get blocks by version",
-        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.\n\nIf the block is pruned, it will return a 410",
         "parameters": [
           {
             "name": "version",
@@ -2257,6 +2294,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2265,6 +2303,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2273,6 +2312,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2281,6 +2321,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2289,6 +2330,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2297,6 +2339,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2305,6 +2348,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2748,6 +2792,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2756,6 +2801,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2764,6 +2810,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2772,6 +2819,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2780,6 +2828,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2788,6 +2837,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2796,6 +2846,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3259,6 +3310,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3267,6 +3319,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3275,6 +3328,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3283,6 +3337,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3291,6 +3346,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3299,6 +3355,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3307,6 +3364,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3714,6 +3772,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3722,6 +3781,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3730,6 +3790,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3738,6 +3799,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3746,6 +3808,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3754,6 +3817,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -3762,6 +3826,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4024,8 +4089,8 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Get specific account resource",
-        "description": "This endpoint returns the resource of a specific type residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "summary": "Get account resource",
+        "description": "Retrieves an individual resource from a given account and a specific ledger version. If the\nledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "address",
@@ -4079,6 +4144,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4087,6 +4153,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4095,6 +4162,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4103,6 +4171,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4111,6 +4180,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4119,6 +4189,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4127,6 +4198,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4511,8 +4583,8 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Get specific account module",
-        "description": "This endpoint returns the module with a specific name residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "summary": "Get account module",
+        "description": "Retrieves an individual module from a given account and a specific ledger version. If the\nledger version is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "address",
@@ -4566,6 +4638,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4574,6 +4647,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4582,6 +4656,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4590,6 +4665,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4598,6 +4674,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4606,6 +4683,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4614,6 +4692,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -4999,7 +5078,7 @@
           "Tables"
         ],
         "summary": "Get table item",
-        "description": "Get a table item from the table identified by {table_handle} in the\npath and the \"key\" (TableItemRequest) provided in the request body.\n\nThis is a POST endpoint because the \"key\" for requesting a specific\ntable item (TableItemRequest) could be quite complex, as each of its\nfields could themselves be composed of other structs. This makes it\nimpractical to express using query params, meaning GET isn't an option.",
+        "description": "Get a table item at a specific ledger version from the table identified by {table_handle}\nin the path and the \"key\" (TableItemRequest) provided in the request body.\n\nThis is a POST endpoint because the \"key\" for requesting a specific\ntable item (TableItemRequest) could be quite complex, as each of its\nfields could themselves be composed of other structs. This makes it\nimpractical to express using query params, meaning GET isn't an option.\n\nThe Aptos nodes prune account state history, via a configurable time window.\nIf the requested ledger version has been pruned, the server responds with a 410.",
         "parameters": [
           {
             "name": "table_handle",
@@ -5053,6 +5132,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5061,6 +5141,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5069,6 +5150,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5077,6 +5159,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5085,6 +5168,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5093,6 +5177,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5101,6 +5186,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5486,7 +5572,7 @@
           "Transactions"
         ],
         "summary": "Get transactions",
-        "description": "Get on-chain (meaning, committed) transactions. You may specify from\nwhen you want the transactions and how to include in the response.",
+        "description": "Retrieve on-chain committed transactions.  The page size and start can be provided to\nget a specific sequence of transactions.\n\nIf the version has been pruned, then a 410 will be returned",
         "parameters": [
           {
             "name": "start",
@@ -5534,6 +5620,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5542,6 +5629,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5550,6 +5638,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5558,6 +5647,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5566,6 +5656,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5574,6 +5665,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -5582,6 +5674,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6006,6 +6099,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6014,6 +6108,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6022,6 +6117,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6030,6 +6126,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6038,6 +6135,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6046,6 +6144,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6054,6 +6153,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6473,6 +6573,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6481,6 +6582,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6489,6 +6591,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6497,6 +6600,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6505,6 +6609,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6513,6 +6618,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6521,6 +6627,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6906,7 +7013,7 @@
           "Transactions"
         ],
         "summary": "Get transaction by version",
-        "description": "todo",
+        "description": "Retrieves a transaction by a given version.  If the version has been pruned, a 410 will\nbe returned.",
         "parameters": [
           {
             "name": "txn_version",
@@ -6940,6 +7047,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6948,6 +7056,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6956,6 +7065,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6964,6 +7074,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6972,6 +7083,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6980,6 +7092,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -6988,6 +7101,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7373,7 +7487,7 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "todo",
+        "description": "Retrieves transactions from an account.  If the start version is too far in the past\na 410 will be returned.\n\nIf no start version is given, it will start at 0",
         "parameters": [
           {
             "name": "address",
@@ -7431,6 +7545,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7439,6 +7554,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7447,6 +7563,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7455,6 +7572,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7463,6 +7581,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7471,6 +7590,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7479,6 +7599,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7863,6 +7984,8 @@
         "tags": [
           "Transactions"
         ],
+        "summary": "Submit batch transactions",
+        "description": "This allows you to submit multiple transactions.  The response has three outcomes:\n\n1. All transactions succeed, and it will return a 202\n2. Some transactions succeed, and it will return the failed transactions and a 206\n3. No transactions succeed, and it will also return the failed transactions and a 206\n\nTo submit a transaction as JSON, you must submit a SubmitTransactionRequest.\nTo build this request, do the following:\n\n1. Encode the transaction as BCS. If you are using a language that has\nnative BCS support, make sure of that library. If not, you may take\nadvantage of /transactions/encode_submission. When using this\nendpoint, make sure you trust the node you're talking to, as it is\npossible they could manipulate your request.\n2. Sign the encoded transaction and use it to create a TransactionSignature.\n3. Submit the request. Make sure to use the \"application/json\" Content-Type.\n\nTo submit a transaction as BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7906,6 +8029,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7914,6 +8038,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7922,6 +8047,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7930,6 +8056,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7938,6 +8065,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7946,6 +8074,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7954,6 +8083,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7983,6 +8113,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7991,6 +8122,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -7999,6 +8131,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8007,6 +8140,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8015,6 +8149,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8023,6 +8158,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8031,6 +8167,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8416,7 +8553,7 @@
           "Transactions"
         ],
         "summary": "Simulate transaction",
-        "description": "Simulate submitting a transaction. To use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.\n\nTo use this endpoint with BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
+        "description": "The output of the transaction will have the exact transaction outputs and events that running\nan actual signed transaction would have.  However, it will not have the associated state\nhashes, as they are not updated in storage.  This can be used to estimate the maximum gas\nunits for a submitted transaction.\n\nTo use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.\n\nTo use this endpoint with BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8460,6 +8597,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8468,6 +8606,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8476,6 +8615,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8484,6 +8624,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8492,6 +8633,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8500,6 +8642,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8508,6 +8651,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8925,6 +9069,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8933,6 +9078,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8941,6 +9087,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8949,6 +9096,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8957,6 +9105,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8965,6 +9114,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -8973,6 +9123,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9236,6 +9387,7 @@
           "Transactions"
         ],
         "summary": "Estimate gas price",
+        "description": "Currently, the gas estimation is handled by taking the median of the last 100,000 transactions\nIf a user wants to prioritize their transaction and is willing to pay, they can pay more\nthan the gas price.  If they're willing to wait longer, they can pay less.  Note that the\ngas price moves with the fee market, and should only increase when demand outweighs supply.\n\nIf there have been no transactions in the last 100,000 transactions, the price will be 1.",
         "responses": {
           "200": {
             "description": "",
@@ -9257,6 +9409,7 @@
             },
             "headers": {
               "X-APTOS-CHAIN-ID": {
+                "description": "Chain ID of the current chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9265,6 +9418,7 @@
                 }
               },
               "X-APTOS-LEDGER-VERSION": {
+                "description": "Current ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9273,6 +9427,7 @@
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "description": "Oldest non-pruned ledger version of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9281,6 +9436,7 @@
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "description": "Current timestamp of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9289,6 +9445,7 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "description": "Current epoch of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9297,6 +9454,7 @@
                 }
               },
               "X-APTOS-BLOCK-HEIGHT": {
+                "description": "Current block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9305,6 +9463,7 @@
                 }
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "description": "Oldest non-pruned block height of the chain",
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -9567,21 +9726,37 @@
     "schemas": {
       "AccountData": {
         "type": "object",
+        "description": "Account data\n\nA simplified version of the onchain Account resource",
         "required": [
           "sequence_number",
           "authentication_key"
         ],
         "properties": {
           "sequence_number": {
-            "$ref": "#/components/schemas/U64"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/U64"
+              },
+              {
+                "description": "Next sequence number of the account\n\nThis will be the sequence number of the next transaction committed on this account"
+              }
+            ]
           },
           "authentication_key": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "Authentication key\n\nA SHA-256 of public keys and authentication scheme of the account"
+              }
+            ]
           }
         }
       },
       "AccountSignature": {
         "type": "object",
+        "description": "Account signature scheme\n\nThe account signature scheme allows you to have two types of accounts:\n\n1. A single Ed25519 key account, one private key\n2. A k-of-n multi-Ed25519 key account, multiple private keys, such that k-of-n must sign a transaction.",
         "oneOf": [
           {
             "$ref": "#/components/schemas/AccountSignature_Ed25519Signature"
@@ -9699,6 +9874,7 @@
       },
       "Block": {
         "type": "object",
+        "description": "A Block with or without transactions\n\nThis contains the information about a transactions along with\nassociated transactions if requested",
         "required": [
           "block_height",
           "block_hash",
@@ -9708,22 +9884,58 @@
         ],
         "properties": {
           "block_height": {
-            "$ref": "#/components/schemas/U64"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/U64"
+              },
+              {
+                "description": "The block height (number of the block from 0)"
+              }
+            ]
           },
           "block_hash": {
-            "$ref": "#/components/schemas/HashValue"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HashValue"
+              },
+              {
+                "description": "The block hash"
+              }
+            ]
           },
           "block_timestamp": {
-            "$ref": "#/components/schemas/U64"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/U64"
+              },
+              {
+                "description": "The block timestamp in Unix epoch microseconds"
+              }
+            ]
           },
           "first_version": {
-            "$ref": "#/components/schemas/U64"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/U64"
+              },
+              {
+                "description": "The first ledger version of the block inclusive"
+              }
+            ]
           },
           "last_version": {
-            "$ref": "#/components/schemas/U64"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/U64"
+              },
+              {
+                "description": "The last ledger version of the block inclusive"
+              }
+            ]
           },
           "transactions": {
             "type": "array",
+            "description": "The transactions in the block in sequential order",
             "items": {
               "$ref": "#/components/schemas/Transaction"
             }
@@ -9937,16 +10149,31 @@
       },
       "Ed25519Signature": {
         "type": "object",
+        "description": "A single Ed25519 signature",
         "required": [
           "public_key",
           "signature"
         ],
         "properties": {
           "public_key": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "Ed25519 public key of the account"
+              }
+            ]
           },
           "signature": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "Signature of the transaction"
+              }
+            ]
           }
         }
       },
@@ -10044,13 +10271,15 @@
       },
       "GasEstimation": {
         "type": "object",
+        "description": "Struct holding the outputs of the estimate gas API",
         "required": [
           "gas_estimate"
         ],
         "properties": {
           "gas_estimate": {
             "type": "integer",
-            "format": "uint64"
+            "format": "uint64",
+            "description": "The current estimate for the gas unit price"
           }
         }
       },
@@ -10152,6 +10381,7 @@
       },
       "HealthCheckSuccess": {
         "type": "object",
+        "description": "Struct for healthcheck",
         "required": [
           "message"
         ],
@@ -10506,6 +10736,7 @@
       },
       "MultiAgentSignature": {
         "type": "object",
+        "description": "Multi agent signature for multi agent transactions\n\nThis allows you to have transactions across multiple accounts",
         "required": [
           "sender",
           "secondary_signer_addresses",
@@ -10513,16 +10744,25 @@
         ],
         "properties": {
           "sender": {
-            "$ref": "#/components/schemas/AccountSignature"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccountSignature"
+              },
+              {
+                "description": "Sender of the transaction, which will pay for gas"
+              }
+            ]
           },
           "secondary_signer_addresses": {
             "type": "array",
+            "description": "The other involved parties' addresses",
             "items": {
               "$ref": "#/components/schemas/Address"
             }
           },
           "secondary_signers": {
             "type": "array",
+            "description": "The associated signatures, in the same order as the secondary addresses",
             "items": {
               "$ref": "#/components/schemas/AccountSignature"
             }
@@ -10531,6 +10771,7 @@
       },
       "MultiEd25519Signature": {
         "type": "object",
+        "description": "A Ed25519 multi-sig signature\n\nThis allows k-of-n signing for a transaction",
         "required": [
           "public_keys",
           "signatures",
@@ -10540,22 +10781,32 @@
         "properties": {
           "public_keys": {
             "type": "array",
+            "description": "The public keys for the Ed25519 signature",
             "items": {
               "$ref": "#/components/schemas/HexEncodedBytes"
             }
           },
           "signatures": {
             "type": "array",
+            "description": "Signature associated with the public keys in the same order",
             "items": {
               "$ref": "#/components/schemas/HexEncodedBytes"
             }
           },
           "threshold": {
             "type": "integer",
-            "format": "uint8"
+            "format": "uint8",
+            "description": "The number of signatures required for a successful transaction"
           },
           "bitmap": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "The bitmap representing which keys are being used"
+              }
+            ]
           }
         }
       },
@@ -10858,6 +11109,7 @@
       },
       "TransactionSignature": {
         "type": "object",
+        "description": "An enum representing the different transaction signatures available",
         "oneOf": [
           {
             "$ref": "#/components/schemas/TransactionSignature_Ed25519Signature"
@@ -11439,6 +11691,7 @@
       },
       "WriteTableItem": {
         "type": "object",
+        "description": "Change set to write a table item",
         "required": [
           "state_key_hash",
           "handle",

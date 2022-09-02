@@ -25,9 +25,10 @@ mod state;
 pub mod tests;
 mod transactions;
 
+/// API categories for the OpenAPI spec
 #[derive(Tags)]
 pub enum ApiTags {
-    /// Access to account resources and modules
+    /// Access to accounts, resources, and modules
     Accounts,
     /// Access to blocks
     Blocks,
