@@ -73,6 +73,17 @@
             "required": false,
             "deprecated": false,
             "explode": true
+          },
+          {
+            "name": "public_key",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "A public key for the node, e.g. 0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f.\nThis is only necessary for certain evaluators, e.g. HandshakeEvaluator.",
+            "required": false,
+            "deprecated": false,
+            "explode": true
           }
         ],
         "responses": {
@@ -289,6 +300,7 @@
           "consensus_proposals_args",
           "consensus_round_args",
           "consensus_timeouts_args",
+          "handshake_args",
           "hardware_args",
           "latency_args",
           "network_minimum_peers_args",
@@ -309,6 +321,9 @@
           },
           "consensus_timeouts_args": {
             "$ref": "#/components/schemas/ConsensusTimeoutsEvaluatorArgs"
+          },
+          "handshake_args": {
+            "$ref": "#/components/schemas/HandshakeEvaluatorArgs"
           },
           "hardware_args": {
             "$ref": "#/components/schemas/HardwareEvaluatorArgs"
@@ -332,6 +347,9 @@
             "$ref": "#/components/schemas/TransactionAvailabilityEvaluatorArgs"
           }
         }
+      },
+      "HandshakeEvaluatorArgs": {
+        "type": "object"
       },
       "HardwareEvaluatorArgs": {
         "type": "object",

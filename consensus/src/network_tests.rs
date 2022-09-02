@@ -725,7 +725,7 @@ mod tests {
         // verify request block rpc
         let mut block_retrieval = receiver_1.block_retrieval;
         let on_request_block = async move {
-            while let Some(request) = block_retrieval.next().await {
+            while let Some((_, request)) = block_retrieval.next().await {
                 // make sure the network task is not blocked during RPC
                 // we limit the network notification queue size to 1 so if it's blocked,
                 // we can not process 2 votes and the test will timeout

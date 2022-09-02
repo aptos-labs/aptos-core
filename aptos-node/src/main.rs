@@ -6,6 +6,7 @@
 use aptos_node::AptosNodeArgs;
 use clap::Parser;
 
+#[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 

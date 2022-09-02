@@ -1,12 +1,17 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
+# Owners for the `.github` directory and all its subdirectories.
+/.github/ @aptos-labs/prod-eng
+
 # Owners for the `/api` directory and all its subdirectories. 
 /api/ @banool @gregnazario
 
 # Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`. 
 /aptos-move/aptos-gas/ @vgao1996
 /aptos-move/aptos-vm/ @davidiw @wrwg @zekun000
+/aptos-move/e2e-tests/src/account.rs @alinush
 /aptos-move/framework/ @davidiw @movekevin @wrwg
+/aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
 
 # Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
@@ -39,6 +44,9 @@
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
 
+# Owners for the `/dashboards` directory and all its subdirectories.
+/dashboards/ @aptos-labs/prod-eng
+
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
 /developer-docs-site/ @davidiw @rajkaramchedu
 
@@ -66,3 +74,5 @@
 
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
+
+/types/src/transaction/authenticator.rs @alinush

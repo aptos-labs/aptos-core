@@ -16,7 +16,6 @@ clap = "3.1.8"
 fail = "0.5.0"
 futures = "0.3.21"
 hex = "0.4.3"
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 rand = "0.7.3"
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-stream = "0.1.8"
@@ -58,6 +57,9 @@ state-sync-driver = { path = "../state-sync/state-sync-v2/state-sync-driver" }
 storage-interface = { path = "../storage/storage-interface" }
 storage-service-client = { path = "../state-sync/storage-service/client" }
 storage-service-server = { path = "../state-sync/storage-service/server" }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 
 [features]
 default = []
