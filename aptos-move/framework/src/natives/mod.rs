@@ -115,6 +115,10 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
+                keccak256: hash::Keccak256HashGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
             },
             type_info: type_info::GasParameters {
                 type_of: type_info::TypeOfGasParameters {
