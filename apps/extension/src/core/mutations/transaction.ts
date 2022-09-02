@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { UserTransaction } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import { UseMutationOptions, useQueryClient, UseQueryOptions } from 'react-query';
 import {
   useTransactionSimulation,
@@ -16,6 +16,8 @@ export interface UseCoinTransferParams {
   doesRecipientExist: boolean | undefined,
   recipient: string | undefined,
 }
+
+type UserTransaction = Types.UserTransaction;
 
 /**
  * Query a coin transfer simulation for the specified recipient and amount

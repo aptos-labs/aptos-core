@@ -10,7 +10,7 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
-import { UserTransaction } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import { secondaryBorderColor } from 'core/colors';
 import ActivityItem from 'core/components/ActivityItem';
 
@@ -27,7 +27,7 @@ function NoActivity() {
 
 interface TransactionListProps {
   isLoading?: boolean,
-  transactions?: UserTransaction[]
+  transactions?: Types.UserTransaction[]
 }
 
 export function TransactionList({

@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { UserTransaction } from 'aptos/dist/generated';
-import { RawTransaction, TransactionPayload } from 'aptos/dist/transaction_builder/aptos_types';
+import { Types, TxnBuilderTypes } from 'aptos';
 import {
   buildRawTransaction as buildRawTransactionInternal,
   simulateTransaction as simulateTransactionInternal,
@@ -17,6 +16,10 @@ import {
 import { useNetworks } from 'core/hooks/useNetworks';
 import { MoveVmError, MoveStatusCode } from 'shared/move';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+
+type UserTransaction = Types.UserTransaction;
+type RawTransaction = TxnBuilderTypes.RawTransaction;
+type TransactionPayload = TxnBuilderTypes.TransactionPayload;
 
 function isSequenceNumberTooOldError(err: unknown) {
   return err instanceof MoveVmError

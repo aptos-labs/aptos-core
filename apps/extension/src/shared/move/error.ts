@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosError } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 
 /**
  * Move VM status codes that describe an error in the VM
@@ -61,7 +61,7 @@ export function parseMoveMiscError(vmStatus: string) {
  * Parse status code from an `AptosError`
  * @param error error returned from the API
  */
-export function parseMoveVmError(error: AptosError) {
+export function parseMoveVmError(error: Types.AptosError) {
   const match = error.message.match(vmErrorPattern);
   return match !== null
     ? match[1] as MoveStatusCodeKey

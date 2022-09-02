@@ -11,13 +11,15 @@ import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { useParams } from 'react-router-dom';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { UserTransaction, EntryFunctionPayload } from 'aptos/dist/generated';
-import { MaybeHexString } from 'aptos';
+import { MaybeHexString, Types } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
 import { collapseHexString } from 'core/utils/hex';
 import TransactionList from 'core/components/TransactionList';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+
+type UserTransaction = Types.UserTransaction;
+type EntryFunctionPayload = Types.EntryFunctionPayload;
 
 function filterByRecipient(recipient: MaybeHexString) {
   return (txn: UserTransaction) => {

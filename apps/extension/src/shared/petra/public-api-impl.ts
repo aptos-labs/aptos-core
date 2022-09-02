@@ -6,8 +6,8 @@ import {
   AptosAccount,
   AptosClient, BCS,
   HexString,
+  Types,
 } from 'aptos';
-import { EntryFunctionPayload } from 'aptos/dist/generated';
 import axios from 'axios';
 import { Buffer } from 'buffer';
 import { Permission, warningPrompt } from 'core/types/dappTypes';
@@ -120,7 +120,7 @@ async function getAptosAccount(address: string) {
 async function signTransaction(
   client: AptosClient,
   signerAddress: string,
-  payload: EntryFunctionPayload,
+  payload: Types.EntryFunctionPayload,
 ) {
   const signer = await getAptosAccount(signerAddress);
   const txn = await client.generateTransaction(signerAddress, payload);
@@ -197,7 +197,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
    * @throws {DappErrorType.USER_REJECTION} if the request was rejected
    * @throws {DappError} if the transaction fails
    */
-  async signAndSubmitTransaction(payload: EntryFunctionPayload) {
+  async signAndSubmitTransaction(payload: Types.EntryFunctionPayload) {
     const { address } = await ensureAccountConnected();
     const domain = await getCurrentDomain();
     const permission = await Permissions.requestPermissions(
@@ -247,7 +247,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
    * @throws {DappErrorType.USER_REJECTION} if the request was rejected
    * @throws {DappError} if the transaction fails
    */
-  async signTransaction(payload: EntryFunctionPayload) {
+  async signTransaction(payload: Types.EntryFunctionPayload) {
     const { address } = await ensureAccountConnected();
     const domain = await getCurrentDomain();
     const allowed = await Permissions.requestPermissions(

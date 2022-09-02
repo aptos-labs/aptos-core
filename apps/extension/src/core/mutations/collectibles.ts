@@ -5,6 +5,7 @@ import {
   AptosAccount,
   AptosClient,
   TokenClient,
+  Types,
 } from 'aptos';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
@@ -14,7 +15,8 @@ import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
-import { UserTransaction } from 'aptos/dist/generated';
+
+type UserTransaction = Types.UserTransaction;
 
 export const defaultRequestErrorAttributes = {
   config: {},

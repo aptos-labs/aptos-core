@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
-import { UserTransaction, EntryFunctionPayload } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import ChakraLink from 'core/components/ChakraLink';
 import { collapseHexString } from 'core/utils/hex';
 import {
@@ -23,6 +23,9 @@ import {
 } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatCoinName } from 'core/hooks/useTransactionDetails';
+
+type EntryFunctionPayload = Types.EntryFunctionPayload;
+type UserTransaction = Types.UserTransaction;
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference

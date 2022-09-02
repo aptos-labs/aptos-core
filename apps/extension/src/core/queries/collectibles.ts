@@ -4,6 +4,7 @@
 import {
   AptosClient,
   TokenClient,
+  Types,
 } from 'aptos';
 import axios from 'axios';
 import { useQuery, UseQueryOptions } from 'react-query';
@@ -11,7 +12,6 @@ import { validStorageUris } from 'core/constants';
 import { MetadataJson } from 'core/types/tokenMetadata';
 import { useCallback } from 'react';
 import { getTokenIdDictFromString, getTokenIdStringFromDict, TokenId } from 'core/utils/token';
-import { EntryFunctionPayload } from 'aptos/dist/generated';
 import {
   getEntryFunctionTransactions,
   getTransactionEvents,
@@ -134,7 +134,7 @@ export function useGalleryItems(
     const collectionDict: CollectionDict = {};
 
     await Promise.all(createTokenTxns.map(async (txn) => {
-      const payload = txn.payload as EntryFunctionPayload;
+      const payload = txn.payload as Types.EntryFunctionPayload;
 
       // TODO: do we need to go through HexString to deserialize the parameters?
       const creator = txn.sender;

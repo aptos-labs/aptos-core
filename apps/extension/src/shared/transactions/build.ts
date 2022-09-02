@@ -2,18 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  BCS, MaybeHexString, TransactionBuilder, TxnBuilderTypes,
+  BCS, MaybeHexString, TxnBuilderTypes,
 } from 'aptos';
-import {
-  AccountAddress,
-  ChainId,
-  EntryFunction,
-  RawTransaction,
-  StructTag,
-  TransactionPayload,
-  TransactionPayloadEntryFunction,
-  TypeTagStruct,
-} from 'aptos/dist/transaction_builder/aptos_types';
 import { accountNamespace, aptosCoinStructTag, coinNamespace } from 'core/constants';
 
 export interface TransactionOptions {
@@ -28,13 +18,25 @@ export const defaultTransactionOptions = {
   maxGasAmount: 10000n,
 };
 
+type TransactionPayload = TxnBuilderTypes.TransactionPayload;
+
+const {
+  AccountAddress,
+  ChainId,
+  EntryFunction,
+  RawTransaction,
+  StructTag,
+  TransactionPayloadEntryFunction,
+  TypeTagStruct,
+} = TxnBuilderTypes;
+
 export function buildRawTransaction(
   senderAddress: MaybeHexString,
   sequenceNumber: number | bigint,
   chainId: number,
   payload: TransactionPayload,
   options?: TransactionOptions,
-): TxnBuilderTypes.RawTransaction {
+) {
   const {
     expirationSecondsFromNow,
     gasUnitPrice,
@@ -52,10 +54,6 @@ export function buildRawTransaction(
     BigInt(expirationTimestamp),
     new ChainId(Number(chainId)),
   );
-}
-
-export function getSigningMessage(rawTransaction: TxnBuilderTypes.RawTransaction) {
-  return TransactionBuilder.getSigningMessage(rawTransaction).toString('hex');
 }
 
 /**

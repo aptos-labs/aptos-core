@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { EntryFunctionPayload } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import { useTransaction } from 'core/queries/transaction';
 import numeral from 'numeral';
 
@@ -30,7 +30,7 @@ export default function useTransactionDetails(version?: number) {
     year: 'numeric',
   });
 
-  const payload = txn.payload as EntryFunctionPayload;
+  const payload = txn.payload as Types.EntryFunctionPayload;
   const recipient = payload.arguments[0] as string;
   const amount = numeral(Number(payload.arguments[1])).format('0,0');
   const defaultCoinName = payload.type_arguments[0]?.split('::').pop();

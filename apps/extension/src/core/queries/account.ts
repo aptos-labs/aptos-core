@@ -1,11 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, MaybeHexString } from 'aptos';
+import { AptosClient, MaybeHexString, Types } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
-import { ApiError } from 'aptos/dist/generated';
+
+const { ApiError } = Types;
 
 /**
  * QUERY KEYS

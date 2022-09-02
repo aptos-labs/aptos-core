@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from 'aptos';
+import { AptosClient, Types } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { EntryFunctionPayload, Event, UserTransaction } from 'aptos/dist/generated';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { accountNamespace, coinNamespace } from 'core/constants';
+
+type EntryFunctionPayload = Types.EntryFunctionPayload;
+type UserTransaction = Types.UserTransaction;
 
 export const transactionQueryKeys = Object.freeze({
   getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
@@ -45,7 +47,7 @@ export async function getTransactionEvents(
 ) {
   const transactions = await getUserTransactions(aptosClient, address);
   const eventTypes = Array.isArray(eventType) ? eventType : [eventType];
-  const events: Event[] = [];
+  const events: Types.Event[] = [];
   transactions.forEach((t) => {
     const foundEvents = t.events.filter((event) => eventTypes.indexOf(event.type) !== -1);
     events.push(...foundEvents);

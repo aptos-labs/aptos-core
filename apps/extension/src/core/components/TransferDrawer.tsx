@@ -19,7 +19,7 @@ import {
   useDisclosure,
   VStack,
 } from '@chakra-ui/react';
-import { UserTransaction } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import { FormProvider, useForm } from 'react-hook-form';
 import React, { useState } from 'react';
 import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
@@ -44,6 +44,8 @@ import { parseMoveAbortDetails } from 'shared/move';
 import TransferInput from './TransferInput';
 import TransferAvatar from './TransferAvatar';
 import TransferSummary from './TransferSummary';
+
+type UserTransaction = Types.UserTransaction;
 
 enum TransferDrawerPage {
   ADD_ADDRESS_AND_AMOUNT = 'Add an address and amount',

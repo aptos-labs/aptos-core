@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { PublicAccount } from 'shared/types';
-import {
-  EntryFunctionPayload,
-  PendingTransaction,
-} from 'aptos/dist/generated';
+import { Types } from 'aptos';
+
+type EntryFunctionPayload = Types.EntryFunctionPayload;
+type PendingTransaction = Types.PendingTransaction;
 
 export interface PetraPublicApi {
   account(): Promise<PublicAccount>;
