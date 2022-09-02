@@ -62,6 +62,15 @@ pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counts the total number of progress checks called
+pub static PROGRESS_CHECK_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_progress_check",
+        "Total number of progress checks in main loop"
+    )
+    .unwrap()
+});
+
 //////////////////////
 // PROPOSAL ELECTION
 //////////////////////
