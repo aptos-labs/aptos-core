@@ -7,10 +7,10 @@ module aptos_framework::reconfiguration {
 
     use aptos_framework::account;
     use aptos_framework::stake;
-    use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::storage_gas;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
@@ -117,7 +117,7 @@ module aptos_framework::reconfiguration {
 
         // Call stake to compute the new validator set and distribute rewards.
         stake::on_new_epoch();
-        state_storage::on_reconfig();
+        storage_gas::on_reconfig();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
