@@ -98,7 +98,13 @@ function App() {
     if (!isSigningMessage && address) {
       setIsSigningMessage(true);
       try {
-        const response = await window.aptos.signMessage('Hello');
+        const response = await window.aptos.signMessage({
+          address: true,
+          application: true,
+          chainId: true,
+          message: 'Hello',
+          nonce: Date.now().toString(),
+        });
         console.log(response);
       } catch (error) {
         console.error(error);

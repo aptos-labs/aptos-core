@@ -4,7 +4,7 @@
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import {
   AptosAccount,
-  AptosClient, BCS,
+  AptosClient,
   HexString,
   Types,
 } from 'aptos';
@@ -18,7 +18,7 @@ import PromptPresenter from 'core/utils/promptPresenter';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import { defaultCustomNetworks, defaultNetworkName, defaultNetworks } from 'shared/types';
 import { sign } from 'tweetnacl';
-import { PetraPublicApi } from './public-api';
+import { PetraPublicApi, SignMessagePayload } from './public-api';
 
 // The fetch adapter is necessary to use axios from a service worker
 // TODO: maybe move this under background.ts
@@ -223,24 +223,61 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     }
   },
 
-  async signMessage(message: string) {
-    const { address } = await ensureAccountConnected();
+  async signMessage({
+    address = false,
+    application = false,
+    chainId = false,
+    message,
+    nonce,
+  }: SignMessagePayload) {
+    const { nodeUrl } = await getActiveNetwork();
+    const aptosClient = new AptosClient(nodeUrl);
+    const clientChainId = await aptosClient.getChainId();
+    const { address: accountAddress } = await ensureAccountConnected();
     const domain = await getCurrentDomain();
     const permission = await Permissions.requestPermissions(
       Permission.SIGN_MESSAGE,
       domain,
-      address,
+      accountAddress,
     );
 
     if (!permission) {
       throw DappErrorType.USER_REJECTION;
     }
 
-    const signer = await getAptosAccount(address);
-    const serializer = new BCS.Serializer();
-    serializer.serializeStr(message);
-    const signature = sign(serializer.getBytes(), signer.signingKey.secretKey);
-    return Buffer.from(signature).toString('hex');
+    const signer = await getAptosAccount(accountAddress);
+    const encoder = new TextEncoder();
+    const prefix = 'APTOS';
+    let messageToBeSigned = prefix;
+
+    if (address) {
+      messageToBeSigned += `\naddress: ${accountAddress}`;
+    }
+
+    if (application) {
+      messageToBeSigned += `\napplication: ${domain}`;
+    }
+
+    if (chainId) {
+      messageToBeSigned += `\nchainId: ${clientChainId}`;
+    }
+
+    messageToBeSigned += `\nmessage: ${message}`;
+    messageToBeSigned += `\nnonce: ${nonce}`;
+
+    const messageBytes = encoder.encode(messageToBeSigned);
+    const signature = sign(messageBytes, signer.signingKey.secretKey);
+    const signatureString = Buffer.from(signature).toString('hex');
+    return {
+      address: accountAddress,
+      application: domain,
+      chainId: clientChainId,
+      fullMessage: messageToBeSigned,
+      message,
+      nonce,
+      prefix,
+      signature: signatureString,
+    };
   },
 
   /**
