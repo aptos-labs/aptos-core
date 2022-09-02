@@ -46,6 +46,7 @@ pub struct LocalNode {
     version: LocalVersion,
     process: Option<Process>,
     name: String,
+    index: usize,
     account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     peer_id: AccountAddress,
     directory: PathBuf,
@@ -56,6 +57,7 @@ impl LocalNode {
     pub fn new(
         version: LocalVersion,
         name: String,
+        index: usize,
         directory: PathBuf,
         account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     ) -> Result<Self> {
@@ -70,6 +72,7 @@ impl LocalNode {
             version,
             process: None,
             name,
+            index,
             account_private_key,
             peer_id,
             directory,
@@ -221,6 +224,10 @@ impl LocalNode {
 impl Node for LocalNode {
     fn peer_id(&self) -> PeerId {
         self.peer_id()
+    }
+
+    fn index(&self) -> usize {
+        self.index
     }
 
     fn name(&self) -> &str {

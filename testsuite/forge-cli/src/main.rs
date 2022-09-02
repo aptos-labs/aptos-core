@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
+use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
 use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
@@ -177,6 +178,9 @@ fn main() -> Result<()> {
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    let duration = Duration::from_secs(1800);
+    let suite_name = "changing_working_quorum_test";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -486,14 +490,73 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             }))
             .with_node_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["consensus"]["max_block_txns"] = 50.into();
-                helm_values["consensus"]["round_initial_timeout_ms"] = 500.into();
-                helm_values["consensus"]["round_timeout_backoff_exponent_base"] = 1.0.into();
-                helm_values["consensus"]["quorum_store_poll_count"] = 1.into();
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
+                helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
+                    500.into();
+                helm_values["validator"]["config"]["consensus"]
+                    ["round_timeout_backoff_exponent_base"] = 1.0.into();
+                helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
+                    1.into();
             }))
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
             .with_success_criteria(SuccessCriteria::new(
                 80,
+                10000,
+                true,
+                Some(Duration::from_secs(30)),
+            )),
+        "changing_working_quorum_test" => config
+            .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+            .with_network_tests(&[&ChangingWorkingQuorumTest {
+                target_tps: 100,
+                max_down_nodes: 30,
+                few_large_validators: false,
+                add_execution_delay: false,
+            }])
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 120.into();
+            }))
+            .with_node_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
+                helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
+                    500.into();
+                helm_values["validator"]["config"]["consensus"]
+                    ["round_timeout_backoff_exponent_base"] = 1.0.into();
+                helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
+                    1.into();
+            }))
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_success_criteria(SuccessCriteria::new(
+                60,
+                10000,
+                true,
+                Some(Duration::from_secs(30)),
+            )),
+        "different_node_speed_and_reliability_test" => config
+            .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
+            .with_network_tests(&[&ChangingWorkingQuorumTest {
+                target_tps: 100,
+                max_down_nodes: 5,
+                few_large_validators: true,
+                add_execution_delay: true,
+            }])
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 120.into();
+            }))
+            .with_node_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
+                helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
+                    500.into();
+                helm_values["validator"]["config"]["consensus"]
+                    ["round_timeout_backoff_exponent_base"] = 1.0.into();
+                helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
+                    1.into();
+            }))
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_success_criteria(SuccessCriteria::new(
+                60,
                 10000,
                 true,
                 Some(Duration::from_secs(30)),
