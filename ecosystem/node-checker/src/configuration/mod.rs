@@ -26,10 +26,10 @@ pub struct Configuration {
 
 #[derive(Clone, Debug, Subcommand)]
 enum Command {
-    /// todo
+    /// Create a new baseline configuration.
     Create(Create),
 
-    /// todo
+    /// Validate an existing baseline configuration.
     Validate(Validate),
 }
 

@@ -937,6 +937,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
+ "aptos-network-checker",
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",

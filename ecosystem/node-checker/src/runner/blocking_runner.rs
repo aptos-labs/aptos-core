@@ -180,6 +180,11 @@ impl<M: MetricCollector> BlockingRunner<M> {
                         .evaluate(direct_evaluator_input)
                         .err_into::<RunnerError>(),
                 ),
+                EvaluatorType::Noise(evaluator) => Box::pin(
+                    evaluator
+                        .evaluate(direct_evaluator_input)
+                        .err_into::<RunnerError>(),
+                ),
                 _ => continue,
             });
         }
@@ -266,5 +271,9 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         let complete_evaluation = EvaluationSummary::from(evaluation_results);
 
         Ok(complete_evaluation)
+    }
+
+    fn get_evaluator_set(&self) -> &EvaluatorSet {
+        &self.evaluator_set
     }
 }

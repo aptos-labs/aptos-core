@@ -19,6 +19,10 @@ export const $EvaluatorArgs = {
             type: 'ConsensusTimeoutsEvaluatorArgs',
             isRequired: true,
         },
+        handshake_args: {
+            type: 'HandshakeEvaluatorArgs',
+            isRequired: true,
+        },
         hardware_args: {
             type: 'HardwareEvaluatorArgs',
             isRequired: true,

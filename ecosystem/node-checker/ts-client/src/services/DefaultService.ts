@@ -26,6 +26,7 @@ export class DefaultService {
         metricsPort = 9101,
         apiPort = 8080,
         noisePort = 6180,
+        publicKey,
     }: {
         /**
          * The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com
@@ -38,6 +39,11 @@ export class DefaultService {
         metricsPort?: number,
         apiPort?: number,
         noisePort?: number,
+        /**
+         * A public key for the node, e.g. 0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f.
+         * This is only necessary for certain evaluators, e.g. HandshakeEvaluator.
+         */
+        publicKey?: string,
     }): CancelablePromise<EvaluationSummary> {
         return this.httpRequest.request({
             method: 'GET',
@@ -48,6 +54,7 @@ export class DefaultService {
                 'metrics_port': metricsPort,
                 'api_port': apiPort,
                 'noise_port': noisePort,
+                'public_key': publicKey,
             },
         });
     }

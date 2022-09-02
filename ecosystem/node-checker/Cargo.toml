@@ -33,6 +33,7 @@ aptos-api = { path = "../../api" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-network-checker = { path = "../../crates/aptos-network-checker" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 
