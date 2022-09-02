@@ -116,7 +116,6 @@ pub enum VerifiedEvent {
     CommitDecision(Box<CommitDecision>),
     // local messages
     LocalTimeout(Round),
-    Shutdown(oneshot::Sender<()>),
 }
 
 #[cfg(test)]
@@ -759,45 +758,51 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
+        close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
-        while let Some((peer_id, event)) = event_rx.next().await {
-            let result = match event {
-                VerifiedEvent::ProposalMsg(proposal_msg) => {
-                    monitor!(
-                        "process_proposal",
-                        self.process_proposal_msg(*proposal_msg).await
-                    )
-                }
-                VerifiedEvent::VoteMsg(vote_msg) => {
-                    monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
-                }
-                VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
-                    monitor!(
-                        "process_sync_info",
-                        self.process_sync_info_msg(*sync_info, peer_id).await
-                    )
-                }
-                VerifiedEvent::LocalTimeout(round) => monitor!(
-                    "process_local_timeout",
-                    self.process_local_timeout(round).await
-                ),
-                VerifiedEvent::Shutdown(ack_sender) => {
-                    ack_sender
-                        .send(())
-                        .expect("[RoundManager] Fail to ack shutdown");
-                    break;
-                }
-                unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
-            }
-            .with_context(|| format!("from peer {}", peer_id));
+        let mut close_rx = close_rx.into_stream();
+        loop {
+            futures::select! {
+                (peer_id, event) = event_rx.select_next_some() => {
+                    let result = match event {
+                        VerifiedEvent::ProposalMsg(proposal_msg) => {
+                            monitor!(
+                                "process_proposal",
+                                self.process_proposal_msg(*proposal_msg).await
+                            )
+                        }
+                        VerifiedEvent::VoteMsg(vote_msg) => {
+                            monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                        }
+                        VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
+                            monitor!(
+                                "process_sync_info",
+                                self.process_sync_info_msg(*sync_info, peer_id).await
+                            )
+                        }
+                        VerifiedEvent::LocalTimeout(round) => monitor!(
+                            "process_local_timeout",
+                            self.process_local_timeout(round).await
+                        ),
+                        unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
+                    }
+                    .with_context(|| format!("from peer {}", peer_id));
 
-            let round_state = self.round_state();
-            match result {
-                Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
-                Err(e) => {
-                    counters::ERROR_COUNT.inc();
-                    error!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                    let round_state = self.round_state();
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            error!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                        }
+                    }
+                }
+                close_req = close_rx.select_next_some() => {
+                    if let Ok(ack_sender) = close_req {
+                        ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");
+                    }
+                    break;
                 }
             }
         }
