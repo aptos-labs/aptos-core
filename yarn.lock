@@ -3735,19 +3735,17 @@ anymatch@^3.0.3, anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aptos@^1.3.10:
-  version "1.3.10"
-  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.10.tgz#a801e25456159485d27d0ff738c5e1fbd9fe073d"
-  integrity sha512-a5DUuFR22gwxLBZqyXxIO656oA5pjHfON8Ll0sYdQGwUwnFYnbgJd9C7TFJok2/kGrRkM1rwyMdqsECVRPpqYA==
+aptos@1.3.11, aptos@^1.3.11:
+  version "1.3.11"
+  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.11.tgz#6063113c734e18909b0d7f7233a99cc574153fd4"
+  integrity sha512-IaiXvKGFrL7/dg931KjOU6ny59lCV724NyNNJF/L4zigTsV0+EIGGAyaJBOvWedPr43qrY6CKiEdkDjXsOQJSA==
   dependencies:
     "@scure/bip39" "^1.1.0"
     axios "^0.27.2"
-    buffer "^6.0.3"
     ed25519-hd-key "^1.2.0"
     js-sha3 "^0.8.0"
     tweetnacl "^1.0.3"
     typescript-memoize "^1.1.0"
-    yarn "^1.22.19"
 
 arg@^5.0.2:
   version "5.0.2"
@@ -14093,11 +14091,6 @@ yargs@^16.2.0:
     string-width "^4.2.0"
     y18n "^5.0.5"
     yargs-parser "^20.2.2"
-
-yarn@^1.22.19:
-  version "1.22.19"
-  resolved "https://registry.yarnpkg.com/yarn/-/yarn-1.22.19.tgz#4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
-  integrity sha512-/0V5q0WbslqnwP91tirOvldvYISzaqhClxzyUKXYxs07yUILIs5jx/k6CFe8bvKSkds5w+eiOqta39Wk3WxdcQ==
 
 yocto-queue@^0.1.0:
   version "0.1.0"
