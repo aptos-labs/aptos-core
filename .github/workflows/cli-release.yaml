@@ -22,7 +22,7 @@ on:
 jobs:
   build-linux-binary:
     name: "Build Linux binary"
-    runs-on: "ubuntu-latest"
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -50,11 +50,27 @@ jobs:
           name: cli-builds
           path: aptos-cli-*.zip
 
+  build-windows-binary:
+    name: "Build Windows binary"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - name: Build CLI
+        run: scripts\cli\build_cli_release.ps1
+      - name: Upload Binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: cli-builds
+          path: aptos-cli-*.zip
+
   release-binaries:
     name: "Release binaries"
     needs:
       - build-linux-binary
       - build-os-x-binary
+      - build-windows-latest
     runs-on: ubuntu-latest
     permissions:
       contents: "write"
