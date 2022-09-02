@@ -1,0 +1,45 @@
+# DOS Testing Tools
+
+## Listner
+A target server that reports the number of connections it received per second.
+
+$ ./target/debug/listner -h
+listner 0.1.0
+TCP listner
+
+USAGE:
+    listner [OPTIONS]
+
+OPTIONS:
+    -a, --addr <ADDR>    listner ip:port
+    -h, --help           Print help information
+    -V, --version        Print version information
+
+Will reply with a "Hello world!\n" to first 8 connections each epoch i.e., second. -- Good for sanity.
+Will reply with an endless random stream of bytes to any other non zero string. -- Used for testing Whitelist
+
+## Sender
+A DOS generator, creating TCP connections to target server.
+Has three modes of operation that can be combined in a single command.
+	- BURST  creates a burst of N connections that send "Hello world!\n"
+	- Stream creates a single stream that requests CAP bytes
+	- load   creates an endless stream of TCP connections with HERTZ connections/s.
+		 0 HERTZ means as fast as you can.
+
+$ ./target/debug/sender --help
+sender 0.1.0
+TCP sender
+
+USAGE:
+    sender [OPTIONS]
+
+OPTIONS:
+    -a, --addr <ADDR>      listner ip:port
+    -b, --burst <BURST>    [default: 0]
+    -c, --cap <CAP>        [default: 0]
+    -h, --hertz <HERTZ>    [default: 128]
+        --help             Print help information
+    -l, --load
+    -s, --stream
+    -V, --version          Print version information
+
