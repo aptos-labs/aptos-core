@@ -120,6 +120,7 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
@@ -158,6 +159,7 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
         }
@@ -489,11 +491,12 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
-        if self.round_manager_tx.is_some() {
+        if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
-            let event = VerifiedEvent::Shutdown(ack_tx);
-            self.forward_to_round_manager(self.author, event);
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop round manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop round manager");
@@ -627,7 +630,9 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
-        tokio::spawn(round_manager.start(round_manager_rx));
+        let (close_tx, close_rx) = oneshot::channel();
+        self.round_manager_close_tx = Some(close_tx);
+        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }
