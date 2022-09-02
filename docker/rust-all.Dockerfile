@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y \
     sudo \
     procps \
     gdb \
+    curl \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Because build machine perf might not match run machine perf, we have to symlink
