@@ -116,6 +116,8 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
+    "testsuite/dos/listner",
+    "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",
