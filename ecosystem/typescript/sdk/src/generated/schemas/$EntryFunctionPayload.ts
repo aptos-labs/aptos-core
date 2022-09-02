@@ -2,9 +2,13 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $EntryFunctionPayload = {
+    description: `Payload which runs a single entry function`,
     properties: {
         function: {
-            type: 'EntryFunctionId',
+            type: 'all-of',
+            contains: [{
+                type: 'EntryFunctionId',
+            }],
             isRequired: true,
         },
         type_arguments: {

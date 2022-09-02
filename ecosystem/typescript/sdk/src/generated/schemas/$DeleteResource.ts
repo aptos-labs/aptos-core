@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $DeleteResource = {
+    description: `Delete a resource`,
     properties: {
         address: {
             type: 'Address',

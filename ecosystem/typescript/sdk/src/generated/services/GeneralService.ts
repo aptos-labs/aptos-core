@@ -34,7 +34,9 @@ export class GeneralService {
      * 200 if the following condition is true:
      *
      * `server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`
-     * @param durationSecs
+     * @param durationSecs Threshold in seconds that the server can be behind to be considered healthy
+     *
+     * If not provided, the healthcheck will always succeed
      * @returns HealthCheckSuccess
      * @throws ApiError
      */

@@ -2,9 +2,15 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MultiAgentSignature = {
+    description: `Multi agent signature for multi agent transactions
+
+    This allows you to have transactions across multiple accounts`,
     properties: {
         sender: {
-            type: 'AccountSignature',
+            type: 'all-of',
+            contains: [{
+                type: 'AccountSignature',
+            }],
             isRequired: true,
         },
         secondary_signer_addresses: {

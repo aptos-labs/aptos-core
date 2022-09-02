@@ -2,13 +2,20 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveModule = {
+    description: `A Move module`,
     properties: {
         address: {
-            type: 'Address',
+            type: 'all-of',
+            contains: [{
+                type: 'Address',
+            }],
             isRequired: true,
         },
         name: {
-            type: 'IdentifierWrapper',
+            type: 'all-of',
+            contains: [{
+                type: 'IdentifierWrapper',
+            }],
             isRequired: true,
         },
         friends: {

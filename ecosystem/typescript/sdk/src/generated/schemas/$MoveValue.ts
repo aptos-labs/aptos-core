@@ -3,6 +3,7 @@
 /* eslint-disable */
 export const $MoveValue = {
     type: 'any-of',
+    description: `An enum of the possible Move value types`,
     contains: [{
         type: 'number',
         format: 'uint8',

@@ -2,37 +2,62 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $PendingTransaction = {
+    description: `A transaction waiting in mempool`,
     properties: {
         hash: {
-            type: 'HashValue',
+            type: 'all-of',
+            contains: [{
+                type: 'HashValue',
+            }],
             isRequired: true,
         },
         sender: {
-            type: 'Address',
+            type: 'all-of',
+            contains: [{
+                type: 'Address',
+            }],
             isRequired: true,
         },
         sequence_number: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         max_gas_amount: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         gas_unit_price: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         expiration_timestamp_secs: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         payload: {
-            type: 'TransactionPayload',
+            type: 'all-of',
+            contains: [{
+                type: 'TransactionPayload',
+            }],
             isRequired: true,
         },
         signature: {
-            type: 'TransactionSignature',
+            type: 'all-of',
+            contains: [{
+                type: 'TransactionSignature',
+            }],
         },
     },
 } as const;
