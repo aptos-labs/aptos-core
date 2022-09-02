@@ -3986,6 +3986,7 @@ dependencies = [
  "smallvec",
  "structopt 0.3.26",
  "tempfile",
+ "tiny-keccak",
 ]
 
 [[package]]
