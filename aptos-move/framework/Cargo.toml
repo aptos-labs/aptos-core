@@ -35,6 +35,7 @@ siphasher = "0.3.10"
 smallvec = "1.8.0"
 structopt = "0.3.21"
 tempfile = "3.3.0"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
 aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
