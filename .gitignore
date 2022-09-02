@@ -97,3 +97,6 @@ node_modules
 
 # Cached python files
 __pycache__
+
+# Grafana sync
+grafana-sync*
