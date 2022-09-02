@@ -126,6 +126,7 @@ members = [
 ]
 
 exclude =[
+    "crates/aptos-protos",
     "ecosystem/sf-indexer/aptos-substreams",
 ]
 
