@@ -3,6 +3,7 @@ locals {
   chaos_mesh_helm_chart_path          = "${path.module}/../helm/chaos"
   testnet_addons_helm_chart_path      = "${path.module}/../helm/testnet-addons"
   node_health_checker_helm_chart_path = "${path.module}/../helm/node-health-checker"
+  # node_backup_restore_helm_chart_path = "${path.module}/../helm/testnet-addons"
 }
 
 resource "helm_release" "metrics-server" {
@@ -266,6 +267,20 @@ resource "helm_release" "testnet-addons" {
     value = sha1(join("", [for f in fileset(local.testnet_addons_helm_chart_path, "**") : filesha1("${local.testnet_addons_helm_chart_path}/${f}")]))
   }
 }
+
+# resource "helm_release" "backup" {
+#   count       = var.enable_node_health_checker ? 1 : 0
+#   name        = "node-health-checker"
+#   chart       = local.node_health_checker_helm_chart_path
+#   max_history = 5
+# }
+# 
+# resource "helm_release" "restore" {
+#   count       = var.enable_node_health_checker ? 1 : 0
+#   name        = "node-health-checker"
+#   chart       = local.node_health_checker_helm_chart_path
+#   max_history = 5
+# }
 
 resource "helm_release" "node-health-checker" {
   count       = var.enable_node_health_checker ? 1 : 0
