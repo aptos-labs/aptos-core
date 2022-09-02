@@ -22,7 +22,7 @@ on:
 jobs:
   build-linux-binary:
     name: "Build Linux binary"
-    runs-on: "ubuntu-latest"
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -38,6 +38,21 @@ jobs:
   build-os-x-binary:
     name: "Build OS X binary"
     runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh
+      - name: Upload Binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: cli-builds
+          path: aptos-cli-*.zip
+
+  build-windows-binary:
+    name: "Build Windows binary"
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
