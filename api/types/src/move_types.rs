@@ -32,11 +32,14 @@ use std::{
     str::FromStr,
 };
 
+/// A parsed Move resource
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
+    /// The Move struct tag e.g. 0x1::account::Account
     #[serde(rename = "type")]
     #[oai(rename = "type")]
     pub typ: MoveStructTag,
+    /// The JSON struct data converted from the Move resource
     pub data: MoveStructValue,
 }
 
@@ -51,6 +54,9 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
+/// A string encoded U64
+///
+/// Encoded as a string to encode into JSON
 #[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
 pub struct U64(pub u64);
 
@@ -112,6 +118,9 @@ impl FromStr for U64 {
     }
 }
 
+/// A string encoded U128
+///
+/// Encoded as a string to encode into JSON
 #[derive(Clone, Debug, Default, PartialEq, Eq, Copy)]
 pub struct U128(pub u128);
 
@@ -169,6 +178,7 @@ impl FromStr for U128 {
     }
 }
 
+/// Hex encoded bytes to allow for having bytes represented in JSON
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexEncodedBytes(pub Vec<u8>);
 
@@ -255,6 +265,7 @@ impl HexEncodedBytes {
     }
 }
 
+/// A JSON map representation of a Move struct's inner types
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
@@ -269,16 +280,26 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     }
 }
 
+/// An enum of the possible Move value types
 #[derive(Clone, Debug, PartialEq, Union)]
 pub enum MoveValue {
+    /// A u8 Move type
     U8(u8),
+    /// A u64 Move type
     U64(U64),
+    /// A u128 Move type
     U128(U128),
+    /// A bool Move type
     Bool(bool),
+    /// A 32-byte address Move type
     Address(Address),
+    /// A vector Move type.  May have any other [`MoveValue`] nested inside it
     Vector(Vec<MoveValue>),
+    /// A bytes Move type, hex encoded
     Bytes(HexEncodedBytes),
+    /// A struct Move type, with a map of fields inside it
     Struct(MoveStructValue),
+    /// A string Move type
     String(String),
 }
 
@@ -358,11 +379,16 @@ impl Serialize for MoveValue {
     }
 }
 
+/// A Move struct tag for referencing an onchain struct type
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoveStructTag {
+    /// The address of the struct's module
     pub address: Address,
+    /// The module name containing the struct
     pub module: IdentifierWrapper,
+    /// The name of the struct
     pub name: IdentifierWrapper,
+    /// Generic type parameters associated with the struct
     pub generic_type_params: Vec<MoveType>,
 }
 
@@ -448,18 +474,30 @@ impl TryFrom<MoveStructTag> for StructTag {
     }
 }
 
+/// An enum of Move's possible types on-chain
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MoveType {
+    /// A bool type
     Bool,
+    /// An 8-bit unsigned int
     U8,
+    /// A 64-bit unsigned int
     U64,
+    /// A 128-bit unsigned int
     U128,
+    /// A 32-byte account address
     Address,
+    /// An account signer
     Signer,
+    /// A Vector of [`MoveType`]
     Vector { items: Box<MoveType> },
+    /// A struct of [`MoveStructTag`]
     Struct(MoveStructTag),
+    /// A generic type param with index
     GenericTypeParam { index: u16 },
+    /// A reference
     Reference { mutable: bool, to: Box<MoveType> },
+    /// An un-parsable move type
     Unparsable(String),
 }
 
@@ -618,12 +656,18 @@ impl TryFrom<MoveType> for TypeTag {
     }
 }
 
+/// A Move module
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveModule {
+    /// Address of the move module
     pub address: Address,
+    /// Name of the module
     pub name: IdentifierWrapper,
+    /// Friends of the module
     pub friends: Vec<MoveModuleId>,
+    /// Public functions of the module
     pub exposed_functions: Vec<MoveFunction>,
+    /// Structs of the module
     pub structs: Vec<MoveStruct>,
 }
 
@@ -656,9 +700,12 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
+/// A Move module Id
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MoveModuleId {
+    /// Address of the module
     pub address: Address,
+    /// Name of the module
     pub name: IdentifierWrapper,
 }
 
@@ -719,15 +766,22 @@ impl<'de> Deserialize<'de> for MoveModuleId {
     }
 }
 
+/// A move struct
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
+    /// Name of the struct
     pub name: IdentifierWrapper,
+    /// Whether the struct is a native struct of Move
     pub is_native: bool,
+    /// Abilities associated with the struct
     pub abilities: Vec<MoveAbility>,
+    /// Generic types associated with the struct
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
+    /// Fields associated with the struct
     pub fields: Vec<MoveStructField>,
 }
 
+/// A move ability e.g. drop, store
 // TODO: Consider finding a way to derive NewType here instead of using the
 // custom macro, since some of the enum type information (such as the
 // variants) is currently being lost.
@@ -788,9 +842,12 @@ impl<'de> Deserialize<'de> for MoveAbility {
     }
 }
 
+/// Move generic type param
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStructGenericTypeParam {
+    /// Move abilities tied to the generic type param and associated with the type that uses it
     pub constraints: Vec<MoveAbility>,
+    /// Whether the type is a phantom type
     #[oai(skip)]
     pub is_phantom: bool,
 }
@@ -808,21 +865,31 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
     }
 }
 
+/// Move struct field
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStructField {
+    /// Name of the field
     pub name: IdentifierWrapper,
+    /// The move type associated with the field. e.g. bool
     #[serde(rename = "type")]
     #[oai(rename = "type")]
     pub typ: MoveType,
 }
 
+/// Move function
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveFunction {
+    /// Name of the function
     pub name: IdentifierWrapper,
+    /// Visibility of the function e.g. public
     pub visibility: MoveFunctionVisibility,
+    /// Whether the function can be called as an entry function directly in a transaction
     pub is_entry: bool,
+    /// Generic type params associated with the Move function
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
+    /// Parameters associated with the move function
     pub params: Vec<MoveType>,
+    /// Return type of the function
     #[serde(rename = "return")]
     #[oai(rename = "return")]
     pub return_: Vec<MoveType>,
@@ -850,12 +917,16 @@ impl From<&CompiledScript> for MoveFunction {
     }
 }
 
+/// Move function visibility
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
 #[oai(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
+    /// Visible only by this module
     Private,
+    /// Visible by all modules
     Public,
+    /// Visible by friend modules
     Friend,
 }
 
@@ -879,8 +950,10 @@ impl From<MoveFunctionVisibility> for Visibility {
     }
 }
 
+/// Move function generic type param
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveFunctionGenericTypeParam {
+    /// Move abilities tied to the generic type param and associated with the function that uses it
     pub constraints: Vec<MoveAbility>,
 }
 
@@ -892,9 +965,12 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
     }
 }
 
+/// Move module bytecode along with it's ABI
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveModuleBytecode {
+    /// Hex encoded bytecode of the module
     pub bytecode: HexEncodedBytes,
+    /// ABI of the module
     // We don't need deserialize MoveModule as it should be serialized
     // from `bytecode`.
     #[serde(skip_deserializing)]
@@ -928,9 +1004,12 @@ impl From<Module> for MoveModuleBytecode {
     }
 }
 
+/// Move script bytecode
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveScriptBytecode {
+    /// Hex encoded bytecode of the script
     pub bytecode: HexEncodedBytes,
+    /// ABI of the script
     // We don't need deserialize MoveModule as it should be serialized
     // from `bytecode`.
     #[serde(skip_deserializing)]
@@ -958,9 +1037,12 @@ impl MoveScriptBytecode {
     }
 }
 
+/// Entry function id
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EntryFunctionId {
+    /// Module Id e.g. 0x1::address
     pub module: MoveModuleId,
+    /// Function name
     pub name: IdentifierWrapper,
 }
 

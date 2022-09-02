@@ -76,6 +76,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
 
 // TODO: Figure out how to have certain fields be borrowed, like in the
 // original implementation.
+/// HTTP request log, keeping track of the requests
 #[derive(Schema)]
 pub struct HttpRequestLog {
     #[schema(display)]

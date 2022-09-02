@@ -93,6 +93,7 @@ impl EventsApi {
 }
 
 impl EventsApi {
+    /// List events from an [`EventKey`]
     fn list(
         &self,
         latest_ledger_info: LedgerInfo,

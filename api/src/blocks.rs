@@ -11,6 +11,7 @@ use poem_openapi::param::{Path, Query};
 use poem_openapi::OpenApi;
 use std::sync::Arc;
 
+/// API for block transactions and information
 pub struct BlocksApi {
     pub context: Arc<Context>,
 }
@@ -21,6 +22,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information.
+    ///
+    /// If the block is pruned, it will return a 410
     #[oai(
         path = "/blocks/by_height/:block_height",
         method = "get",
@@ -47,6 +50,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information given a version in the block.
+    ///
+    /// If the block is pruned, it will return a 410
     #[oai(
         path = "/blocks/by_version/:version",
         method = "get",
@@ -101,6 +106,7 @@ impl BlocksApi {
         self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
     }
 
+    /// Renders a [`BcsBlock`] into a [`Block`] if it's a JSON accept type
     fn render_bcs_block(
         &self,
         accept_type: &AcceptType,

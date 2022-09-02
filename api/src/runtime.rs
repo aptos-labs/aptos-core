@@ -55,6 +55,7 @@ pub fn bootstrap(
 // TODO: https://github.com/poem-web/poem/issues/332
 // TODO: https://github.com/poem-web/poem/issues/333
 
+/// Generate the top level API service
 pub fn get_api_service(
     context: Arc<Context>,
 ) -> OpenApiService<
@@ -130,6 +131,7 @@ pub fn attach_poem_to_runtime(
         address.set_port(0);
     }
 
+    // Build listener with or without TLS
     let listener = match (&config.api.tls_cert_path, &config.api.tls_key_path) {
         (Some(tls_cert_path), Some(tls_key_path)) => {
             info!("Using TLS for API");
@@ -165,6 +167,8 @@ pub fn attach_poem_to_runtime(
         let cors = Cors::new()
             .allow_methods(vec![Method::GET, Method::POST])
             .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
+
+        // Build routes for the API
         let route = Route::new()
             .nest(
                 "/v1",

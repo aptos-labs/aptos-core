@@ -31,21 +31,20 @@ use poem_openapi::{
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::state_view::DbStateView;
 
+/// API for retrieving individual state
 pub struct StateApi {
     pub context: Arc<Context>,
 }
 
 #[OpenApi]
 impl StateApi {
-    /// Get specific account resource
+    /// Get account resource
     ///
-    /// This endpoint returns the resource of a specific type residing at a given
-    /// account at a specified ledger version (AKA transaction version). If the
-    /// ledger version is not specified in the request, the latest ledger version
-    /// is used.
+    /// Retrieves an individual resource from a given account and a specific ledger version. If the
+    /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window (link).
-    /// If the requested data has been pruned, the server responds with a 404.
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/resource/:resource_type",
         method = "get",
@@ -70,15 +69,13 @@ impl StateApi {
         )
     }
 
-    /// Get specific account module
+    /// Get account module
     ///
-    /// This endpoint returns the module with a specific name residing at a given
-    /// account at a specified ledger version (AKA transaction version). If the
-    /// ledger version is not specified in the request, the latest ledger version
-    /// is used.
+    /// Retrieves an individual module from a given account and a specific ledger version. If the
+    /// ledger version is not specified in the request, the latest ledger version is used.
     ///
-    /// The Aptos nodes prune account state history, via a configurable time window (link).
-    /// If the requested data has been pruned, the server responds with a 404.
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/accounts/:address/module/:module_name",
         method = "get",
@@ -100,13 +97,16 @@ impl StateApi {
 
     /// Get table item
     ///
-    /// Get a table item from the table identified by {table_handle} in the
-    /// path and the "key" (TableItemRequest) provided in the request body.
+    /// Get a table item at a specific ledger version from the table identified by {table_handle}
+    /// in the path and the "key" (TableItemRequest) provided in the request body.
     ///
     /// This is a POST endpoint because the "key" for requesting a specific
     /// table item (TableItemRequest) could be quite complex, as each of its
     /// fields could themselves be composed of other structs. This makes it
     /// impractical to express using query params, meaning GET isn't an option.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
     #[oai(
         path = "/tables/:table_handle/item",
         method = "post",
@@ -133,6 +133,7 @@ impl StateApi {
 }
 
 impl StateApi {
+    /// Retrieve state at the requested ledger version
     fn preprocess_request<E: StdApiError>(
         &self,
         requested_ledger_version: Option<u64>,
@@ -151,6 +152,10 @@ impl StateApi {
         Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
+    /// Read a resource at the ledger version
+    ///
+    /// JSON: Convert to MoveResource
+    /// BCS: Leave it encoded as the resource
     fn resource(
         &self,
         accept_type: &AcceptType,
@@ -205,6 +210,10 @@ impl StateApi {
         }
     }
 
+    /// Retrieve the module
+    ///
+    /// JSON: Parse ABI and bytecode
+    /// BCS: Leave bytecode as is BCS encoded
     pub fn module(
         &self,
         accept_type: &AcceptType,
@@ -252,6 +261,7 @@ impl StateApi {
         }
     }
 
+    /// Retrieve table item for a specific ledger version
     pub fn table_item(
         &self,
         accept_type: &AcceptType,
@@ -259,6 +269,7 @@ impl StateApi {
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
+        // Parse the key and value types for the table
         let key_type = table_item_request
             .key_type
             .try_into()
@@ -266,6 +277,7 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
+        let key = table_item_request.key;
         let value_type = table_item_request
             .value_type
             .try_into()
@@ -273,14 +285,15 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        let key = table_item_request.key;
 
+        // Retrieve local state
         let (ledger_info, ledger_version, state_view) =
             self.preprocess_request(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
 
+        // Convert key to lookup version for DB
         let vm_key = converter
             .try_into_vm_value(&key_type, key.clone())
             .map_err(|err| {
@@ -298,6 +311,7 @@ impl StateApi {
             )
         })?;
 
+        // Retrieve value from the state key
         let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
         let bytes = state_view
             .get_state_value(&state_key)

@@ -19,6 +19,7 @@ use poem_openapi::{
     ApiResponse,
 };
 
+/// A wrapper struct for BCS encoded bytes
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Bcs(pub Vec<u8>);
 

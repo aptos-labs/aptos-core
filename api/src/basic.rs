@@ -23,10 +23,12 @@ generate_success_response!(HealthCheckResponse, (200, Ok));
 generate_error_response!(HealthCheckError, (503, ServiceUnavailable), (500, Internal));
 pub type HealthCheckResult<T> = poem::Result<HealthCheckResponse<T>, HealthCheckError>;
 
+/// Basic API does healthchecking and shows the OpenAPI spec
 pub struct BasicApi {
     pub context: Arc<Context>,
 }
 
+/// Struct for healthcheck
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Object)]
 pub struct HealthCheckSuccess {
     message: String,
@@ -77,6 +79,8 @@ impl BasicApi {
         duration_secs: Query<Option<u32>>,
     ) -> HealthCheckResult<HealthCheckSuccess> {
         let ledger_info = self.context.get_latest_ledger_info()?;
+
+        // If we have a duration, check that it's close to the current time, otherwise it's ok
         if let Some(duration) = duration_secs.0 {
             let timestamp = ledger_info.timestamp();
 

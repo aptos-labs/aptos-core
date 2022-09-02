@@ -15,6 +15,7 @@ use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
+/// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
 
