@@ -102,10 +102,12 @@ impl NetworkSender {
 
         ensure!(from != self.author, "Retrieve block from self");
         let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        eprintln!("BCHO DEBUG before send_rpc to {}", from);
         let response_msg = monitor!(
             "block_retrieval",
             self.network_sender.send_rpc(from, msg, timeout).await
         )?;
+        eprintln!("BCHO DEBUG after send_rpc");
         let response = match response_msg {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
             _ => return Err(anyhow!("Invalid response to request")),

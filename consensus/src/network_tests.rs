@@ -657,6 +657,7 @@ mod tests {
     #[test]
     fn test_rpc() {
         let mut runtime = consensus_runtime();
+        eprintln!("runtime.num_workers: {}", runtime.metrics().num_workers());
         let num_nodes = 2;
         let mut senders = Vec::new();
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
@@ -725,12 +726,16 @@ mod tests {
         // verify request block rpc
         let mut block_retrieval = receiver_1.block_retrieval;
         let on_request_block = async move {
+            eprintln!("BCHO block retrieval next await from {:?}", block_retrieval);
             while let Some((_, request)) = block_retrieval.next().await {
                 // make sure the network task is not blocked during RPC
                 // we limit the network notification queue size to 1 so if it's blocked,
                 // we can not process 2 votes and the test will timeout
+                eprintln!("BCHO send_vote 1");
                 node0.send_vote(vote_msg.clone(), vec![peer1]).await;
+                eprintln!("BCHO send_vote 2");
                 node0.send_vote(vote_msg.clone(), vec![peer1]).await;
+                eprintln!("BCHO wait for messages");
                 playground
                     .wait_for_messages(2, NetworkPlayground::votes_only)
                     .await;
@@ -738,6 +743,7 @@ mod tests {
                     BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
                 let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
                 let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
+                eprintln!("BCHO send");
                 request.response_sender.send(Ok(bytes)).unwrap();
             }
         };

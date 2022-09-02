@@ -100,10 +100,12 @@ impl PeerManagerRequestSender {
             res_tx,
             timeout,
         };
+        eprintln!("BCHO before inner.push");
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendRpc(peer_id, request),
         )?;
+        eprintln!("BCHO before await");
         res_rx.await?
     }
 }
