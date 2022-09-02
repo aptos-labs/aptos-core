@@ -3,54 +3,24 @@
 
 mod latency;
 mod node_identity;
+mod state_sync;
 mod transaction_availability;
 
-use anyhow::{Error, Result};
-use aptos_rest_client::IndexResponse;
+use anyhow::Error;
 pub use latency::{LatencyEvaluator, LatencyEvaluatorArgs};
 pub use node_identity::{
     get_node_identity, NodeIdentityEvaluator, NodeIdentityEvaluatorArgs, NodeIdentityEvaluatorError,
 };
-use std::time::Duration;
+pub use state_sync::{StateSyncVersionEvaluator, StateSyncVersionEvaluatorArgs};
 use thiserror::Error as ThisError;
 pub use transaction_availability::{
     TransactionAvailabilityEvaluator, TransactionAvailabilityEvaluatorArgs,
 };
 
-use crate::{configuration::NodeAddress, evaluator::EvaluationResult};
-
 pub const API_CATEGORY: &str = "api";
 
 #[derive(Debug, ThisError)]
 pub enum ApiEvaluatorError {
-    #[error("API returned an error for endpoint {0}: {1:#}")]
+    #[error("API returned an error for endpoint \"{0}\": {1:#}")]
     EndpointError(String, Error),
-}
-
-pub async fn get_index_response(
-    node_address: &NodeAddress,
-    timeout: Duration,
-) -> Result<IndexResponse> {
-    Ok(node_address
-        .get_api_client(timeout)
-        .get_index()
-        .await?
-        .into_inner())
-}
-
-pub async fn get_index_response_or_evaluation_result(
-    node_address: &NodeAddress,
-    timeout: Duration,
-) -> Result<IndexResponse, EvaluationResult> {
-    match get_index_response(node_address, timeout).await {
-        Ok(index_response) => Ok(index_response),
-        Err(error) => Err(EvaluationResult {
-            headline: "Failed to read response from / on API".to_string(),
-            score: 0,
-            explanation: format!("We received an error response hitting / (the index) of the API of your node, make sure your API port ({}) is publicly accessible: {}.", node_address.api_port, error),
-            category: API_CATEGORY.to_string(),
-            evaluator_name: "index_response".to_string(),
-            links: vec![],
-        })
-    }
 }
