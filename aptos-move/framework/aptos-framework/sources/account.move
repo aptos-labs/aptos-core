@@ -65,6 +65,16 @@ module aptos_framework::account {
         recipient_address: address,
     }
 
+    struct SignerCapabilityOfferProofChallenge has drop {
+        sequence_number: u64,
+        recipient_address: address,
+    }
+
+    struct SignerAuthority has key {
+        offer: Table<address, CapabilityOffer<SignerCapability>>,
+        auto_account: bool,
+    }
+
     const MAX_U64: u128 = 18446744073709551615;
 
     const ED25519_SCHEME: u8 = 0;
@@ -89,7 +99,7 @@ module aptos_framework::account {
     /// The caller does not have a digital-signature-based capability to call this function
     const ENO_CAPABILITY: u64 = 9;
     /// The caller does not have a valid rotation capability offer from the other account
-    const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
+    const EINVALID_ACCEPT_CAPABILITY_OFFER: u64 = 10;
     ///
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
     const EINVALID_SCHEME: u64 = 12;
@@ -330,7 +340,7 @@ module aptos_framework::account {
         // Check if there's an existing rotation capability offer from the offerer
         let account_resource = borrow_global_mut<Account>(offerer_address);
         let addr = signer::address_of(account);
-        assert!(option::contains(&account_resource.rotation_capability_offer.for, &addr), EINVALID_ACCEPT_ROTATION_CAPABILITY);
+        assert!(option::contains(&account_resource.rotation_capability_offer.for, &addr), EINVALID_ACCEPT_CAPABILITY_OFFER);
 
         // If there's an existing rotation capability offer for this account in the offerer's account,
         // we create a RotationCapability of offerer and return the RotationCapability
@@ -340,6 +350,75 @@ module aptos_framework::account {
         option::extract(&mut account_resource.rotation_capability_offer.for);
 
         rotation_capability
+    }
+
+    public entry fun offer_signer_capability(account: &signer, signer_capability_sig_bytes: vector<u8>, account_scheme: u8, account_public_key_bytes: vector<u8>, recipient_address: address) acquires Account {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr) && exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!(account_scheme == 0 || account_scheme == 1, error::invalid_argument(EINVALID_SCHEME));
+
+        let account_resource = borrow_global_mut<Account>(addr);
+        let signer_capability_offer_proof_challenge = SignerCapabilityOfferProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            recipient_address,
+        };
+
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let matching_auth_key_to_public_key_bytes = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == matching_auth_key_to_public_key_bytes, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let signer_capability_sig = ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
+            assert!(ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, signer_capability_offer_proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            if (option::is_some(&account_resource.signer_capability_offer.for)) {
+                option::swap(&mut account_resource.signer_capability_offer.for, recipient_address);
+            } else {
+                option::fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+            }
+        }
+        else {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let matching_auth_key_to_public_key_bytes = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == matching_auth_key_to_public_key_bytes, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
+            assert!(multi_ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, signer_capability_offer_proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+            if (option::is_some(&account_resource.signer_capability_offer.for)) {
+                option::swap(&mut account_resource.signer_capability_offer.for, recipient_address);
+            } else {
+                option::fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+            };
+        }
+    }
+
+    public fun accept_signer_capability(account: &signer, offerer_address: address) acquires Account, SignerAuthority {
+        assert!(exists_at(offerer_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+
+        let account_resource = borrow_global_mut<Account>(offerer_address);
+        let addr = signer::address_of(account);
+        assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::invalid_argument(EINVALID_ACCEPT_CAPABILITY_OFFER));
+
+        let signer_authority: SignerAuthority;
+        if (!exists<SignerAuthority>(signer::address_of(account))) {
+            signer_authority = SignerAuthority {
+                offer: table::new(),
+                auto_account: false,
+            };
+        } else {
+            signer_authority = borrow_global_mut<SignerAuthority>(signer::address_of(account));
+        };
+
+        table::add(&mut signer_authority.offer, offerer_address, CapabilityOffer<SignerCapability>{
+            for: option::some(offerer_address),
+        });
+    }
+
+    public fun acquire_signer(account: &signer, from_address: address): signer acquires SignerAuthority {
+        assert!(exists_at(from_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+
+        let capability_offers = borrow_global_mut<SignerAuthority>(signer::address_of(account)).offer;
+        assert!(table::contains(&capability_offers, from_address), ENO_CAPABILITY);
+        create_signer(from_address)
     }
 
     ///////////////////////////////////////////////////////////////////////////
