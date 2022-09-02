@@ -26,7 +26,7 @@ module aptos_framework::gas_schedule {
     /// Only called during genesis.
     public(friend) fun initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(vector::length(&gas_schedule_blob) > 0, error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         // TODO(Gas): check if gas schedule is consistent
         move_to<GasSchedule>(aptos_framework, from_bytes(gas_schedule_blob));
@@ -35,7 +35,7 @@ module aptos_framework::gas_schedule {
     /// This can be called by on-chain governance to update gas schedule.
     public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(vector::length(&gas_schedule_blob) > 0, error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         // TODO(Gas): check if gas schedule is consistent
         let gas_schedule = borrow_global_mut<GasSchedule>(@aptos_framework);
