@@ -818,21 +818,24 @@ impl EpochManager {
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
-            tokio::select! {
-                Some((peer, msg)) = network_receivers.consensus_messages.next() => {
-                    if let Err(e) = self.process_message(peer, msg).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+            monitor!(
+                "main_loop",
+                tokio::select! {
+                    Some((peer, msg)) = network_receivers.consensus_messages.next() => {
+                        if let Err(e) = monitor!("process_message", self.process_message(peer, msg).await) {
+                            error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        }
+                    }
+                    Some((peer, request)) = network_receivers.block_retrieval.next() => {
+                        if let Err(e) = monitor!("send_block_retrieval", self.process_block_retrieval(peer, request).await) {
+                            error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                        }
+                    }
+                    Some(round) = round_timeout_sender_rx.next() => {
+                        monitor!("send_timeout", self.process_local_timeout(round));
                     }
                 }
-                Some((peer, request)) = network_receivers.block_retrieval.next() => {
-                    if let Err(e) = self.process_block_retrieval(peer, request).await {
-                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                    }
-                }
-                Some(round) = round_timeout_sender_rx.next() => {
-                    self.process_local_timeout(round);
-                }
-            }
+            );
             // Continually capture the time of consensus process to ensure that clock skew between
             // validators is reasonable and to find any unusual (possibly byzantine) clock behavior.
             counters::OP_COUNTERS
