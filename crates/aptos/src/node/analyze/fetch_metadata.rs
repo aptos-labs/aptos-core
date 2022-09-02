@@ -72,6 +72,25 @@ impl FetchMetadata {
         }
     }
 
+    async fn get_transactions(
+        client: &RestClient,
+        start: u64,
+        last: u64,
+    ) -> Result<Vec<Transaction>> {
+        let mut result = Vec::new();
+        let mut cursor = start;
+        while cursor < last {
+            let limit = std::cmp::min(1000, last - cursor);
+            let mut current = client
+                .get_transactions(Some(cursor), Some(limit as u16))
+                .await?
+                .into_inner();
+            result.append(&mut current);
+            cursor += limit
+        }
+        Ok(result)
+    }
+
     fn get_validators_from_transaction(transaction: &Transaction) -> Result<Vec<ValidatorInfo>> {
         if let Ok(info) = transaction.transaction_info() {
             for change in &info.changes {
@@ -204,13 +223,12 @@ impl FetchMetadata {
                     } else {
                         let last = current.last().cloned();
                         if let Some(last) = last {
-                            let transactions = client
-                                .get_transactions(
-                                    Some(last.version),
-                                    Some(u16::try_from(event.version - last.version).unwrap()),
-                                )
-                                .await?
-                                .into_inner();
+                            let transactions = FetchMetadata::get_transactions(
+                                client,
+                                last.version,
+                                event.version,
+                            )
+                            .await?;
                             assert_eq!(
                                 transactions.first().unwrap().version().unwrap(),
                                 last.version
