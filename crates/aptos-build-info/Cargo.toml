@@ -11,8 +11,8 @@ publish = false
 build = "build.rs"
 
 [dependencies]
-shadow-rs = "0.16.2"
+shadow-rs = "0.16.1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [build-dependencies]
-shadow-rs = "0.16.2"
+shadow-rs = "0.16.1"
