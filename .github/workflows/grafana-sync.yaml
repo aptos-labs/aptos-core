@@ -24,6 +24,8 @@ jobs:
         uses: peter-evans/create-pull-request@v4
         with:
           add-paths: dashboards
+          title: "[dashboards] sync grafana dashboards"
+          body: Automated dashboard sync from Grafana
           commit-message: "[dashboards] sync grafana dashboards"
           branch: sync-grafana-dashboards
           delete-branch: true
