@@ -11,11 +11,13 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
-use aptos_protos::block_output::v1::{
-    transaction_output::TxnData, BlockMetadataTransactionOutput, TransactionInfoOutput,
-    TransactionOutput, UserTransactionOutput,
+use aptos_protos::{
+    block_output::v1::{
+        transaction_output::TxnData, BlockMetadataTransactionOutput, TransactionInfoOutput,
+        TransactionOutput, UserTransactionOutput,
+    },
+    util::timestamp::Timestamp,
 };
-use aptos_protos::util::timestamp::Timestamp;
 use aptos_rest_client::aptos_api_types::HexEncodedBytes;
 use field_count::FieldCount;
 use serde::Serialize;

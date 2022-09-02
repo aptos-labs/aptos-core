@@ -13,9 +13,10 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
-use storage_interface::state_view::DbStateView;
 use storage_interface::{
-    cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
+    cached_state_view::CachedDbStateView,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
 };
 
 #[cfg(test)]

@@ -1,23 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{state_store::state_storage_usage::StateStorageUsage, vm_status::StatusCode};
 use better_any::{Tid, TidAble};
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_core_types::gas_algebra::InternalGas;
-use move_deps::move_vm_types::{
-    loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    values::{Struct, Value},
-};
 use move_deps::{
-    move_binary_format::errors::PartialVMResult,
+    move_binary_format::errors::{PartialVMError, PartialVMResult},
+    move_core_types::gas_algebra::InternalGas,
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
+    move_vm_types::{
+        loaded_data::runtime_types::Type,
+        natives::function::NativeResult,
+        values::{Struct, Value},
+    },
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Ability to reveal the state storage utilization info.
 pub trait StateStorageUsageResolver {

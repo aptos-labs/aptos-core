@@ -4,8 +4,7 @@
 use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_logger::prelude::*;
 use aptos_rest_client::{retriable, retriable_with_404, Client as RestClient, State, Transaction};
-use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use serde_json::Value;
 use std::time::Duration;
 use tokio::task::JoinHandle;

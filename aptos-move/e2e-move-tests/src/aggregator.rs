@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::assert_success;
-use crate::harness::MoveHarness;
+use crate::{assert_success, harness::MoveHarness};
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use language_e2e_tests::account::Account;
 use std::path::PathBuf;

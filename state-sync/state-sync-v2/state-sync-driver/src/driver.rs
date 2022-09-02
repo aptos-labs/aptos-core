@@ -35,8 +35,10 @@ use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::SystemTime};
 use storage_interface::DbReader;
-use tokio::task::yield_now;
-use tokio::time::{interval, Duration};
+use tokio::{
+    task::yield_now,
+    time::{interval, Duration},
+};
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver

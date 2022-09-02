@@ -18,11 +18,11 @@ use serde_generate::{
 use heck::CamelCase;
 use move_deps::move_core_types::language_storage::StructTag;
 use once_cell::sync::Lazy;
-use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
+    str::FromStr,
 };
 
 /// Output transaction builders and decoders in Go for the given ABIs.

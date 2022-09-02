@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::move_tool::MemberId;
-use aptos::test::CliTestFramework;
+use aptos::{move_tool::MemberId, test::CliTestFramework};
 use aptos_logger::info;
 use framework::{BuildOptions, BuiltPackage};
-use move_deps::move_core_types::account_address::AccountAddress;
-use move_deps::move_package::source_package::manifest_parser::parse_move_manifest_from_file;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::str::FromStr;
+use move_deps::{
+    move_core_types::account_address::AccountAddress,
+    move_package::source_package::manifest_parser::parse_move_manifest_from_file,
+};
+use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
 
 const PACKAGE_NAME: &str = "AwesomePackage";
 const HELLO_BLOCKCHAIN: &str = "hello_blockchain";

@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::built_package::{BuildOptions, BuiltPackage};
-use crate::path_relative_to_crate;
-use crate::release_bundle::{ReleaseBundle, ReleasePackage};
+use crate::{
+    built_package::{BuildOptions, BuiltPackage},
+    path_relative_to_crate,
+    release_bundle::{ReleaseBundle, ReleasePackage},
+};
 use anyhow::anyhow;
 use aptos_sdk_builder::rust;
 use aptos_types::transaction::EntryABI;

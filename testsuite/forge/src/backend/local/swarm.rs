@@ -1,15 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
-    SwarmExt, Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, ChainInfo, FullNode, HealthCheckError,
+    LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_config::config::NetworkConfig;
-use aptos_config::network_id::NetworkId;
-use aptos_config::{config::NodeConfig, keys::ConfigKey};
+use aptos_config::{
+    config::{NetworkConfig, NodeConfig},
+    keys::ConfigKey,
+    network_id::NetworkId,
+};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};

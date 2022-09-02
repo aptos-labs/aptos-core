@@ -20,7 +20,8 @@ use core::{
     ops::{Add, Index, IndexMut, Mul, Neg},
 };
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT, edwards::CompressedEdwardsY, edwards::EdwardsPoint,
+    constants::ED25519_BASEPOINT_POINT,
+    edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
 };
 use ed25519_dalek::ed25519::signature::Verifier as _;

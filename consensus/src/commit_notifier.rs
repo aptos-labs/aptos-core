@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::QuorumStoreError;
-use crate::monitor;
+use crate::{error::QuorumStoreError, monitor};
 use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
 use consensus_types::{common::Round, request_response::ConsensusRequest};

@@ -7,8 +7,7 @@ use aptos_rest_client::{
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
 use aptos_types::account_address::AccountAddress;
-use std::convert::TryFrom;
-use std::str::FromStr;
+use std::{convert::TryFrom, str::FromStr};
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub struct ValidatorInfo {

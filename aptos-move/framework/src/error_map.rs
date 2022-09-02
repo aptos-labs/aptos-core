@@ -8,16 +8,21 @@
 //! leveraged to do whole program traversals and analysis.
 
 use crate::built_package::BuildOptions;
-use move_deps::move_core_types::account_address::AccountAddress;
-use move_deps::move_core_types::errmap::{ErrorDescription, ErrorMapping};
-use move_deps::move_core_types::identifier::Identifier;
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::move_model::ast::Value;
-use move_deps::move_model::model::{GlobalEnv, ModuleEnv, NamedConstantEnv};
-use move_deps::move_model::symbol::Symbol;
-use move_deps::move_package::{BuildConfig, ModelConfig};
-use std::path::Path;
-use std::{convert::TryFrom, rc::Rc};
+use move_deps::{
+    move_core_types::{
+        account_address::AccountAddress,
+        errmap::{ErrorDescription, ErrorMapping},
+        identifier::Identifier,
+        language_storage::ModuleId,
+    },
+    move_model::{
+        ast::Value,
+        model::{GlobalEnv, ModuleEnv, NamedConstantEnv},
+        symbol::Symbol,
+    },
+    move_package::{BuildConfig, ModelConfig},
+};
+use std::{convert::TryFrom, path::Path, rc::Rc};
 
 const ERROR_PREFIX: &str = "E";
 

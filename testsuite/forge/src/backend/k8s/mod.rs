@@ -5,8 +5,7 @@ use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
-use std::time::Duration;
-use std::{convert::TryInto, num::NonZeroUsize};
+use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
 
 pub mod chaos;
 mod cluster_helper;

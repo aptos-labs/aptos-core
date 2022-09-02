@@ -29,8 +29,7 @@ use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blst::BLST_ERROR;
 use serde::Serialize;
-use std::convert::TryFrom;
-use std::fmt;
+use std::{convert::TryFrom, fmt};
 
 #[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// Either (1) a BLS signature share from an individual signer, (2) a BLS multisignature or (3) a

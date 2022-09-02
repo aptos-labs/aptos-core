@@ -1,26 +1,31 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::requests::DataRequest::{
-    GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof, GetNewTransactionsWithProof,
-    GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
-    GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsWithProof,
+use crate::{
+    requests::DataRequest::{
+        GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof, GetNewTransactionsWithProof,
+        GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
+        GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsWithProof,
+    },
+    responses::Error::DegenerateRangeError,
+    Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
 };
-use crate::responses::Error::DegenerateRangeError;
-use crate::{Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL};
-use aptos_compression::metrics::CompressionClient;
-use aptos_compression::{CompressedData, CompressionError};
+use aptos_compression::{metrics::CompressionClient, CompressedData, CompressionError};
 use aptos_config::config::StorageServiceConfig;
-use aptos_types::epoch_change::EpochChangeProof;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::state_store::state_value::StateValueChunkWithProof;
-use aptos_types::transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version};
+use aptos_types::{
+    epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValueChunkWithProof,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+};
 use num_traits::{PrimInt, Zero};
 #[cfg(test)]
 use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::fmt::{Display, Formatter};
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Formatter},
+};
 use thiserror::Error;
 
 /// The version delta we'll tolerate when considering if a peer is eligible

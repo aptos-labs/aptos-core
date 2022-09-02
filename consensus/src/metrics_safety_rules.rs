@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::persistent_liveness_storage::PersistentLivenessStorage;
+use crate::{monitor, persistent_liveness_storage::PersistentLivenessStorage};
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::info;
 use aptos_types::{

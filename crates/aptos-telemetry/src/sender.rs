@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics;
-use crate::metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by};
+use crate::{
+    metrics,
+    metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by},
+};
 use anyhow::{anyhow, Error};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
@@ -18,8 +20,7 @@ use aptos_telemetry_service::types::{
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
 use prometheus::{default_registry, Registry};
-use reqwest::header::CONTENT_ENCODING;
-use reqwest::{RequestBuilder, Response, StatusCode};
+use reqwest::{header::CONTENT_ENCODING, RequestBuilder, Response, StatusCode};
 use std::{io::Write, sync::Arc};
 
 struct AuthContext {

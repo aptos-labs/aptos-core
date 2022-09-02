@@ -12,8 +12,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::RwLock;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
 use proptest::{collection::btree_map, prelude::*};
 use std::{
     collections::{BTreeMap, HashMap},

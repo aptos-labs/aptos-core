@@ -1,21 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::keys::PublicIdentity;
 use crate::{
     config::ValidatorConfiguration,
-    keys::{generate_key_objects, PrivateIdentity},
+    keys::{generate_key_objects, PrivateIdentity, PublicIdentity},
     GenesisInfo,
 };
 use anyhow::ensure;
-use aptos_config::config::RocksDbStorageConfig;
-use aptos_config::keys::ConfigKey;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend, WaypointConfig,
+        NodeConfig, PeerRole, RocksDbStorageConfig, RoleType, SafetyRulesService, SecureBackend,
+        WaypointConfig,
     },
     generator::build_seed_for_network,
+    keys::ConfigKey,
     network_id::NetworkId,
 };
 use aptos_crypto::{

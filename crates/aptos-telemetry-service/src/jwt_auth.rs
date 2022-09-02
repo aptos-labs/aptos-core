@@ -11,8 +11,7 @@ use warp::{
     reject, Rejection,
 };
 
-use crate::error::ServiceError;
-use crate::{context::Context, types::auth::Claims};
+use crate::{context::Context, error::ServiceError, types::auth::Claims};
 
 const BEARER: &str = "BEARER ";
 

@@ -10,10 +10,9 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::definition::NodeInProof;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
-    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
+    proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,
 };
 use proptest::prelude::*;

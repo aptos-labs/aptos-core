@@ -11,8 +11,7 @@ use move_deps::{
     },
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so its accessible from

@@ -3,8 +3,8 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,

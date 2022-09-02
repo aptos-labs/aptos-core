@@ -3,8 +3,7 @@
 
 use crate::common::test_dir_path;
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::package_builder::PackageBuilder;
-use e2e_move_tests::MoveHarness;
+use e2e_move_tests::{package_builder::PackageBuilder, MoveHarness};
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 

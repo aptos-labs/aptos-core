@@ -3,10 +3,12 @@
 
 use std::sync::Arc;
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::response::{BasicResponse, BasicResponseStatus, BasicResult};
-use crate::ApiTags;
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    response::{BasicResponse, BasicResponseStatus, BasicResult},
+    ApiTags,
+};
 use aptos_api_types::IndexResponse;
 use poem_openapi::OpenApi;
 

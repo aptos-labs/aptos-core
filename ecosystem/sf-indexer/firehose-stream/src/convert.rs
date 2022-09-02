@@ -11,8 +11,7 @@ use aptos_api_types::{
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
-use aptos_protos::extractor::v1 as extractor;
-use aptos_protos::util::timestamp;
+use aptos_protos::{extractor::v1 as extractor, util::timestamp};
 use hex;
 use move_deps::move_binary_format::file_format::Ability;
 use std::time::Duration;

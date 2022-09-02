@@ -14,8 +14,8 @@ use aptos_types::{
 
 use accumulator::HashReader;
 use aptos_config::config::LedgerPrunerConfig;
-use aptos_types::proof::position::Position;
 use aptos_types::{
+    proof::position::Position,
     transaction::{TransactionInfo, Version},
     write_set::WriteSet,
 };

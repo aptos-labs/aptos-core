@@ -6,8 +6,11 @@ use crate::{
     transaction_generator::TransactionGenerator,
     EmitModeParams,
 };
-use aptos_logger::sample::Sampling;
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{
+    sample,
+    sample::{SampleRate, Sampling},
+    warn,
+};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use core::{
@@ -17,10 +20,11 @@ use core::{
     time::Duration,
 };
 use futures::future::try_join_all;
-use rand::seq::IteratorRandom;
-use rand::Rng;
-use std::sync::atomic::AtomicU64;
-use std::{sync::Arc, time::Instant};
+use rand::{seq::IteratorRandom, Rng};
+use std::{
+    sync::{atomic::AtomicU64, Arc},
+    time::Instant,
+};
 use tokio::time::sleep;
 
 pub struct SubmissionWorker {

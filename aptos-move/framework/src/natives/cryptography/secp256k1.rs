@@ -8,13 +8,14 @@
  *
  **************************************************************************************************/
 use crate::natives::util::make_native_from_func;
-use move_deps::move_binary_format::errors::PartialVMResult;
-use move_deps::move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
-use move_deps::move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_deps::move_vm_types::loaded_data::runtime_types::Type;
-use move_deps::move_vm_types::natives::function::NativeResult;
-use move_deps::move_vm_types::pop_arg;
-use move_deps::move_vm_types::values::Value;
+use move_deps::{
+    move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs},
+    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
+    move_vm_types::{
+        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+    },
+};
 use smallvec::smallvec;
 use std::collections::VecDeque;
 

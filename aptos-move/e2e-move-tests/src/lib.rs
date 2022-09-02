@@ -9,9 +9,10 @@ pub mod stake;
 use anyhow::bail;
 use framework::UPGRADE_POLICY_CUSTOM_FIELD;
 pub use harness::*;
-use move_deps::move_package::package_hooks::PackageHooks;
-use move_deps::move_package::source_package::parsed_manifest::CustomDepInfo;
-use move_deps::move_symbol_pool::Symbol;
+use move_deps::{
+    move_package::{package_hooks::PackageHooks, source_package::parsed_manifest::CustomDepInfo},
+    move_symbol_pool::Symbol,
+};
 pub use stake::*;
 
 pub(crate) struct AptosPackageHooks {}

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use crate::{
     lru_node_cache::LruNodeCache, metrics::NODE_CACHE_SECONDS,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    stale_node_index::StaleNodeIndexSchema, versioned_node_cache::VersionedNodeCache,
-    OTHER_TIMERS_SECONDS,
+    stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+    versioned_node_cache::VersionedNodeCache, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};

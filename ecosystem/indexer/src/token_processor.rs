@@ -1,16 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::database::get_chunks;
-use crate::models::token::{
-    CreateCollectionEventType, CreateTokenDataEventType, MintTokenEventType,
-    MutateTokenPropertyMapEventType, TokenData, TokenEvent,
-};
-use crate::schema::token_datas::dsl::token_datas;
-use crate::schema::token_datas::{last_minted_at, supply};
-use crate::util::{ensure_not_negative, u64_to_bigdecimal};
 use crate::{
-    database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+    database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{
         errors::TransactionProcessingError, metadata_fetcher::MetaDataFetcher,
         processing_result::ProcessingResult, transaction_processor::TransactionProcessor,
@@ -19,11 +11,19 @@ use crate::{
         collection::Collection,
         metadata::Metadata,
         ownership::Ownership,
+        token::{
+            CreateCollectionEventType, CreateTokenDataEventType, MintTokenEventType,
+            MutateTokenPropertyMapEventType, TokenData, TokenEvent,
+        },
         token_property::TokenProperty,
         transactions::{TransactionModel, UserTransaction},
     },
     schema,
-    schema::ownerships::{dsl::amount as ownership_amount, ownership_id},
+    schema::{
+        ownerships::{dsl::amount as ownership_amount, ownership_id},
+        token_datas::{dsl::token_datas, last_minted_at, supply},
+    },
+    util::{ensure_not_negative, u64_to_bigdecimal},
 };
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;

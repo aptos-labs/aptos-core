@@ -4,8 +4,7 @@
 #![forbid(unsafe_code)]
 
 use clap::Parser;
-use framework::ReleaseOptions;
-use framework::ReleaseTarget;
+use framework::{ReleaseOptions, ReleaseTarget};
 
 #[derive(Parser)]
 #[clap(name = "aptos-framework", author, version, propagate_version = true)]

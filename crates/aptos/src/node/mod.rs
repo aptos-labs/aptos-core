@@ -3,40 +3,42 @@
 
 pub mod analyze;
 
-use crate::common::types::{
-    ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions, TransactionSummary,
-};
-use crate::common::utils::prompt_yes_with_override;
-use crate::config::GlobalConfig;
-use crate::node::analyze::analyze_validators::AnalyzeValidators;
-use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
-            TransactionOptions,
+            CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+            OptionalPoolAddressArgs, ProfileOptions, PromptOptions, RestOptions,
+            TransactionOptions, TransactionSummary,
         },
-        utils::read_from_file,
+        utils::{prompt_yes_with_override, read_from_file},
     },
+    config::GlobalConfig,
     genesis::git::from_yaml,
+    node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata},
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
-use aptos_types::chain_id::ChainId;
-use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
+use aptos_types::{
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
+};
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use hex::FromHex;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::{path::PathBuf, thread, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 use tokio::time::Instant;
 
 /// Tool for operations related to nodes

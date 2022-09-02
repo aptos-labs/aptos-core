@@ -6,11 +6,13 @@ use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
 
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::pruner_manager::PrunerManager;
-use crate::{utils, StateStore};
+use crate::{
+    pruner::{
+        db_pruner::DBPruner, ledger_pruner_worker::LedgerPrunerWorker,
+        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
+    },
+    utils, StateStore,
+};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};

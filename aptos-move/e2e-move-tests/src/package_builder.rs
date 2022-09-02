@@ -3,8 +3,10 @@
 
 use framework::natives::code::UpgradePolicy;
 use itertools::Itertools;
-use move_deps::move_command_line_common::files::MOVE_EXTENSION;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
+use move_deps::{
+    move_command_line_common::files::MOVE_EXTENSION,
+    move_package::compilation::package_layout::CompiledPackageLayout,
+};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 

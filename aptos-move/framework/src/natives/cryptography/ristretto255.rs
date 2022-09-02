@@ -1,14 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::{ristretto255_point, ristretto255_scalar};
-use crate::natives::util::make_native_from_func;
+use crate::natives::{
+    cryptography::{ristretto255_point, ristretto255_scalar},
+    util::make_native_from_func,
+};
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
-use move_deps::move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_deps::move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
-use move_deps::move_vm_types::values::{Reference, StructRef, Value};
-use move_deps::{move_vm_runtime::native_functions::NativeFunction, move_vm_types::pop_arg};
+use move_deps::{
+    move_binary_format::errors::{PartialVMError, PartialVMResult},
+    move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte},
+    move_vm_runtime::native_functions::NativeFunction,
+    move_vm_types::{
+        pop_arg,
+        values::{Reference, StructRef, Value},
+    },
+};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]

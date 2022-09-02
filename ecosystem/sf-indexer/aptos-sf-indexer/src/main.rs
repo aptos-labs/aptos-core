@@ -5,14 +5,14 @@
 #![forbid(unsafe_code)]
 
 use aptos_logger::{debug, info};
-use aptos_sf_indexer::indexer::substream_processor::{
-    get_start_block, run_migrations, SubstreamProcessor,
+use aptos_sf_indexer::{
+    indexer::substream_processor::{get_start_block, run_migrations, SubstreamProcessor},
+    proto,
 };
-use aptos_sf_indexer::proto;
 
 use anyhow::{format_err, Context, Error};
-use aptos_sf_indexer::database::new_db_pool;
 use aptos_sf_indexer::{
+    database::new_db_pool,
     substream_processors::block_output_processor::BlockOutputSubstreamProcessor,
     substreams::SubstreamsEndpoint,
     substreams_stream::{BlockResponse, SubstreamsStream},

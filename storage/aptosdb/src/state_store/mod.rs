@@ -3,8 +3,8 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
-use crate::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue};
 use crate::{
+    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
@@ -27,12 +27,12 @@ use aptos_jellyfish_merkle::{
 };
 use aptos_logger::info;
 use aptos_state_view::StateViewId;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
+        state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
     },
     transaction::Version,

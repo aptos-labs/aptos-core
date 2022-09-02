@@ -13,8 +13,7 @@
 use crate::{bls12381::PublicKey, validatable::Validate, CryptoMaterialError, ValidCryptoMaterial};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::hash::Hash;
+use std::{convert::TryFrom, hash::Hash};
 
 /// An unvalidated `PublicKey`
 #[derive(Debug, Clone, Eq)]

@@ -81,14 +81,16 @@ pub mod test_helper;
 
 use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::proof::SparseMerkleProofExt;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
-    proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::{state_key::StateKey, state_value::StateValue},
+    proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey};

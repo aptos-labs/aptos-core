@@ -1,19 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::OptionalPoolAddressArgs;
-use crate::common::utils::read_from_file;
-use crate::genesis::git::from_yaml;
-use crate::genesis::git::FRAMEWORK_NAME;
-use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
-        types::{PromptOptions, RngArgs},
-        utils::write_to_file,
+        types::{OptionalPoolAddressArgs, PromptOptions, RngArgs},
+        utils::{read_from_file, write_to_file},
     },
     genesis::{
-        git::{GitOptions, SetupGit},
-        keys::{GenerateKeys, SetValidatorConfiguration},
+        git::{from_yaml, GitOptions, SetupGit, FRAMEWORK_NAME},
+        keys::{GenerateKeys, GenerateLayoutTemplate, SetValidatorConfiguration, PUBLIC_KEYS_FILE},
         GenerateGenesis,
     },
     CliCommand,

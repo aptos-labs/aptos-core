@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     error::Error,
+    metadata_storage::PersistentMetadataStorage,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
         ErrorNotificationListener, MempoolNotificationHandler,
@@ -24,9 +24,10 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+    transaction::{TransactionOutputListWithProof, Version},
 };
 use claim::assert_matches;
 use data_streaming_service::data_notification::NotificationId;

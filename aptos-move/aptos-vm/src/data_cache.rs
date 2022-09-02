@@ -8,11 +8,10 @@ use anyhow::format_err;
 use anyhow::Error;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::ConfigStorage,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     vm_status::StatusCode,
     write_set::{WriteOp, WriteSet},
 };

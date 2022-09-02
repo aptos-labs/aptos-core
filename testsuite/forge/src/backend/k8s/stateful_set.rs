@@ -290,10 +290,9 @@ pub async fn check_for_container_restart(
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use k8s_openapi::api::apps::v1::StatefulSet;
-    use k8s_openapi::api::apps::v1::{StatefulSetSpec, StatefulSetStatus};
-    use k8s_openapi::api::core::v1::{
-        ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus,
+    use k8s_openapi::api::{
+        apps::v1::{StatefulSet, StatefulSetSpec, StatefulSetStatus},
+        core::v1::{ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus},
     };
     use kube::{api::ObjectMeta, Error as KubeError};
 

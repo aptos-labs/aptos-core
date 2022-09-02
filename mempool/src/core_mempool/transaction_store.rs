@@ -22,9 +22,9 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
-use std::mem::size_of;
 use std::{
     collections::HashMap,
+    mem::size_of,
     ops::Bound,
     time::{Duration, SystemTime},
 };

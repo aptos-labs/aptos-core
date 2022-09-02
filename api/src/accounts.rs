@@ -1,36 +1,39 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::response::{
-    account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    failpoint::fail_point_poem,
+    response::{
+        account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
+        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveStructTag, U64,
 };
-use aptos_types::access_path::AccessPath;
-use aptos_types::account_config::AccountResource;
-use aptos_types::account_state::AccountState;
-use aptos_types::event::EventHandle;
-use aptos_types::event::EventKey;
-use aptos_types::state_store::state_key::StateKey;
-use move_deps::move_core_types::value::MoveValue;
+use aptos_types::{
+    access_path::AccessPath,
+    account_config::AccountResource,
+    account_state::AccountState,
+    event::{EventHandle, EventKey},
+    state_store::state_key::StateKey,
+};
 use move_deps::move_core_types::{
     identifier::Identifier,
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
+    value::MoveValue,
 };
-use poem_openapi::param::Query;
-use poem_openapi::{param::Path, OpenApi};
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::sync::Arc;
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
+use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
 
 pub struct AccountsApi {
     pub context: Arc<Context>,

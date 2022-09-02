@@ -3,10 +3,12 @@
 
 #![forbid(unsafe_code)]
 
-use crate::metrics::increment_network_frame_overflow;
 use crate::{
     logging::{LogEntry, LogSchema},
-    metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
+    metrics::{
+        increment_counter, increment_network_frame_overflow, start_timer, LRU_CACHE_HIT,
+        LRU_CACHE_PROBE,
+    },
     network::{ResponseSender, StorageServiceNetworkEvents},
 };
 use ::network::ProtocolId;
@@ -32,15 +34,17 @@ use std::{
     time::{Duration, Instant},
 };
 use storage_interface::DbReader;
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+use storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
+        StorageServiceRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+        StorageServerSummary, StorageServiceResponse,
+    },
+    Result, StorageServiceError,
 };
-use storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceResponse,
-};
-use storage_service_types::{Result, StorageServiceError};
 use thiserror::Error;
 use tokio::runtime::Handle;
 

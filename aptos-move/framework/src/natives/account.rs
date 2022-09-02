@@ -10,8 +10,7 @@ use move_deps::{
     },
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun create_address

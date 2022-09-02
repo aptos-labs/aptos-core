@@ -10,8 +10,10 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
-use aptos_types::mempool_status::MempoolStatusCode;
-use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
+use aptos_types::{
+    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
+    transaction::SignedTransaction,
+};
 use std::{
     collections::HashSet,
     time::{Duration, SystemTime},

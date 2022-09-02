@@ -24,8 +24,7 @@ use crate::{
 use anyhow::format_err;
 use aptos_protos::block_output::v1::BlockOutput;
 use async_trait::async_trait;
-use diesel::ExpressionMethods;
-use diesel::{pg::upsert::excluded, result::Error};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use prost::Message;
 use std::fmt::Debug;

@@ -5,8 +5,10 @@ use aptos_rest_client::Client as RestClient;
 use async_trait::async_trait;
 use core::time;
 use futures::future::join_all;
-use std::time::Duration;
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 
 use crate::{wait_for_all_nodes_to_catchup_to_version, Swarm, SwarmExt};
 

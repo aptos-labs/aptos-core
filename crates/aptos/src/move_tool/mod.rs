@@ -10,39 +10,36 @@ mod transactional_tests_runner;
 
 pub use stored_package::*;
 
-use crate::common::types::MoveManifestAccountWrapper;
-use crate::common::types::{ProfileOptions, RestOptions};
-use crate::common::utils::{
-    create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
-};
-use crate::move_tool::manifest::{
-    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
-};
 use crate::{
     common::{
         types::{
-            load_account_arg, CliError, CliTypedResult, MovePackageDir, PromptOptions,
-            TransactionOptions, TransactionSummary,
+            load_account_arg, CliError, CliTypedResult, MoveManifestAccountWrapper, MovePackageDir,
+            ProfileOptions, PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
-        utils::check_if_file_exists,
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            prompt_yes_with_override, write_to_file,
+        },
     },
+    move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     CliCommand, CliResult,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{EntryFunction, ModuleBundle, TransactionPayload},
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
-use framework::natives::code::UpgradePolicy;
-use framework::{BuildOptions, BuiltPackage};
+use framework::{natives::code::UpgradePolicy, BuildOptions, BuiltPackage};
 use itertools::Itertools;
-use move_deps::move_cli::base::test::UnitTestResult;
-use move_deps::move_command_line_common::env::MOVE_HOME;
 use move_deps::{
     move_cli,
+    move_cli::base::test::UnitTestResult,
+    move_command_line_common::env::MOVE_HOME,
     move_core_types::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
@@ -51,10 +48,10 @@ use move_deps::{
     move_prover, move_prover_boogie_backend,
     move_unit_test::UnitTestingConfig,
 };
-use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
+    fmt::{Display, Formatter},
     path::{Path, PathBuf},
     str::FromStr,
 };

@@ -24,8 +24,7 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use futures::channel::mpsc;
-use futures::{stream::FusedStream, SinkExt, Stream};
+use futures::{channel::mpsc, stream::FusedStream, SinkExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     pin::Pin,

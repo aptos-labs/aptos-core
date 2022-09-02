@@ -4,15 +4,18 @@
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
 
-use crate::natives::cryptography::ristretto255::{pop_64_byte_slice, GasParameters};
-use crate::natives::cryptography::ristretto255::{pop_scalar_from_bytes, scalar_from_struct};
+use crate::natives::cryptography::ristretto255::{
+    pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, GasParameters,
+};
 use better_any::{Tid, TidAble};
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
-use move_deps::move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    traits::{Identity, VartimeMultiscalarMul},
+};
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes},
     move_vm_runtime::native_functions::NativeContext,
     move_vm_types::{
         loaded_data::runtime_types::Type,
@@ -23,8 +26,13 @@ use move_deps::{
 };
 use sha2::Sha512;
 use smallvec::smallvec;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use std::{cell::RefCell, collections::VecDeque, convert::TryFrom, fmt::Display};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    convert::TryFrom,
+    fmt::Display,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 //
 // Public Data Structures and Constants

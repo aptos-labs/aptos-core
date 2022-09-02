@@ -3,22 +3,23 @@
 
 use anyhow::Result;
 use aptos_node_checker_lib::EvaluationSummary;
-use aptos_sdk::rest_client::Client as AptosClient;
-use aptos_sdk::types::account_address::AccountAddress;
-use aptos_sdk::types::account_config::CORE_CODE_ADDRESS;
-use aptos_sdk::types::network_address::NetworkAddress;
-use aptos_sdk::types::on_chain_config::ValidatorSet;
-use aptos_sdk::types::validator_info::ValidatorInfo;
+use aptos_sdk::{
+    rest_client::Client as AptosClient,
+    types::{
+        account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+        network_address::NetworkAddress, on_chain_config::ValidatorSet,
+        validator_info::ValidatorInfo,
+    },
+};
 use clap::Parser;
 use log::{debug, info};
-use reqwest::Client as ReqwestClient;
-use reqwest::Url;
+use reqwest::{Client as ReqwestClient, Url};
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::sync::Semaphore;
 
 use crate::helpers::extract_network_address;

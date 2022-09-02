@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics;
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
+    metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
     },

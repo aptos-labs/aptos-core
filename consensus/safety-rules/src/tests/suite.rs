@@ -3,8 +3,8 @@
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

@@ -20,12 +20,13 @@ use aptos_types::{
     validator_verifier::generate_validator_verifier,
     waypoint::Waypoint,
 };
-use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::{
+        TwoChainTimeout, TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures,
+    },
     vote::Vote,
     vote_data::VoteData,
     vote_proposal::VoteProposal,

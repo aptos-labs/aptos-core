@@ -12,8 +12,10 @@ use futures::{AsyncReadExt, AsyncWriteExt};
 use network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
-    transport::{resolve_and_connect, TcpSocket},
-    transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
+    transport::{
+        resolve_and_connect, upgrade_outbound, TcpSocket, UpgradeContext,
+        SUPPORTED_MESSAGING_PROTOCOL,
+    },
 };
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;

@@ -1,24 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::built_package::BuiltPackage;
-use crate::natives::code::PackageMetadata;
-use crate::path_in_crate;
+use crate::{built_package::BuiltPackage, natives::code::PackageMetadata, path_in_crate};
 use anyhow::Context;
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_binary_format::access::ModuleAccess;
-use move_deps::move_binary_format::errors::PartialVMError;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_command_line_common::files::{
-    extension_equals, find_filenames, MOVE_EXTENSION,
+use move_deps::{
+    move_binary_format::{access::ModuleAccess, errors::PartialVMError, CompiledModule},
+    move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION},
+    move_core_types::language_storage::ModuleId,
+    move_model::{code_writer::CodeWriter, emit, emitln, model::Loc},
 };
-use move_deps::move_core_types::language_storage::ModuleId;
-use move_deps::move_model::code_writer::CodeWriter;
-use move_deps::move_model::model::Loc;
-use move_deps::move_model::{emit, emitln};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// A release bundle consists of a list of release packages.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

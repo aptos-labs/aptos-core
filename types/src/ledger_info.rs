@@ -16,8 +16,8 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::{
+    collections::BTreeMap,
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
 };

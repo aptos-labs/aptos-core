@@ -29,10 +29,9 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
-use aptos_types::account_config::new_block_event_key;
-use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
+    account_config::new_block_event_key,
     block_metadata::BlockMetadata,
     on_chain_config::{new_epoch_event_key, GasSchedule, Version},
     transaction::{
@@ -40,7 +39,7 @@ use aptos_types::{
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use fail::fail_point;
@@ -62,12 +61,14 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::BTreeSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
+    collections::BTreeSet,
     convert::{AsMut, AsRef},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();

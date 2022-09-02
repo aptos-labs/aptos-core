@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
-    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+    interface::system_metrics::SystemMetricsThreshold, AptosPublicInfo, ChainInfo, FullNode,
+    NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;

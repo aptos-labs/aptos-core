@@ -18,8 +18,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
 use executor_types::ProofReader;
-use proptest::sample::Index;
-use proptest::{collection::vec, prelude::*};
+use proptest::{collection::vec, prelude::*, sample::Index};
 use scratchpad::SparseMerkleTree;
 
 prop_compose! {

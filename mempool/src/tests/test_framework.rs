@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::BatchId;
-use crate::tests::common;
 use crate::{
     core_mempool::CoreMempool,
     network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
-    shared_mempool::start_shared_mempool,
-    tests::common::TestTransaction,
+    shared_mempool::{start_shared_mempool, types::BatchId},
+    tests::{common, common::TestTransaction},
     MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
 };
 use aptos_config::{

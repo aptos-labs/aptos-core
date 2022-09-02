@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::rocks_db::RocksDbStorage;
 use crate::{
-    CryptoStorage, Error, GetResponse, GitHubStorage, InMemoryStorage, KVStorage, Namespaced,
-    OnDiskStorage, PublicKeyResponse, VaultStorage,
+    rocks_db::RocksDbStorage, CryptoStorage, Error, GetResponse, GitHubStorage, InMemoryStorage,
+    KVStorage, Namespaced, OnDiskStorage, PublicKeyResponse, VaultStorage,
 };
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature};
 use enum_dispatch::enum_dispatch;

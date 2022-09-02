@@ -16,11 +16,10 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, NotificationFeedback},
 };
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;

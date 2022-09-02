@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::package_builder::PackageBuilder;
-use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, MoveHarness};
+use e2e_move_tests::{
+    assert_abort, assert_success, assert_vm_status, package_builder::PackageBuilder, MoveHarness,
+};
 use framework::natives::code::{PackageRegistry, UpgradePolicy};
-use move_deps::move_core_types::parser::parse_struct_tag;
-use move_deps::move_core_types::vm_status::StatusCode;
+use move_deps::move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
 mod common;

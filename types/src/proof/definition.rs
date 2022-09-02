@@ -20,8 +20,7 @@ use aptos_crypto::{
     HashValue,
 };
 use serde::{Deserialize, Serialize};
-use std::any::type_name;
-use std::marker::PhantomData;
+use std::{any::type_name, marker::PhantomData};
 
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_crypto::hash::TestOnlyHasher;

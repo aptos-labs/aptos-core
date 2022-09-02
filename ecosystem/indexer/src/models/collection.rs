@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::schema::collections;
-use crate::util::u64_to_bigdecimal;
+use crate::{schema::collections, util::u64_to_bigdecimal};
 use serde::Serialize;
 
 #[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize, Clone)]

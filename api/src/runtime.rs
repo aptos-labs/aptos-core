@@ -3,13 +3,10 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
-use crate::blocks::BlocksApi;
-use crate::log::middleware_log;
-use crate::set_failpoints;
 use crate::{
-    accounts::AccountsApi, basic::BasicApi, check_size::PostSizeLimit, context::Context,
-    error_converter::convert_error, events::EventsApi, index::IndexApi, state::StateApi,
-    transactions::TransactionsApi,
+    accounts::AccountsApi, basic::BasicApi, blocks::BlocksApi, check_size::PostSizeLimit,
+    context::Context, error_converter::convert_error, events::EventsApi, index::IndexApi,
+    log::middleware_log, set_failpoints, state::StateApi, transactions::TransactionsApi,
 };
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;

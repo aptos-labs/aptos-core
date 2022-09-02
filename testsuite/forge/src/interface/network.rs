@@ -4,8 +4,7 @@
 use std::time::Duration;
 
 use super::Test;
-use crate::success_criteria::SuccessCriteria;
-use crate::{CoreContext, Result, Swarm, TestReport};
+use crate::{success_criteria::SuccessCriteria, CoreContext, Result, Swarm, TestReport};
 use tokio::runtime::Runtime;
 use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 

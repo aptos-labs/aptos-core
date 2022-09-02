@@ -6,28 +6,29 @@ pub mod keys;
 #[cfg(test)]
 mod tests;
 
-use crate::common::utils::dir_default_to_current;
-use crate::genesis::git::{OPERATOR_FILE, OWNER_FILE};
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
-        utils::{check_if_file_exists, write_to_file},
+        utils::{check_if_file_exists, dir_default_to_current, write_to_file},
     },
-    genesis::git::{Client, GitOptions, LAYOUT_FILE},
+    genesis::git::{Client, GitOptions, LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE},
     CliCommand, CliResult,
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_genesis::builder::GenesisConfiguration;
-use aptos_genesis::config::{StringOperatorConfiguration, StringOwnerConfiguration};
 use aptos_genesis::{
-    config::{Layout, ValidatorConfiguration},
+    builder::GenesisConfiguration,
+    config::{
+        Layout, StringOperatorConfiguration, StringOwnerConfiguration, ValidatorConfiguration,
+    },
     GenesisInfo,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";

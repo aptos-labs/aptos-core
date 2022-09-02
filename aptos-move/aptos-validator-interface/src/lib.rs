@@ -7,7 +7,6 @@ pub use crate::storage_interface::DBDebuggerInterface;
 
 use anyhow::{anyhow, Result};
 use aptos_state_view::StateView;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
@@ -16,7 +15,9 @@ use aptos_types::{
     contract_event::EventWithVersion,
     event::EventKey,
     on_chain_config::ValidatorSet,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, Version},
 };
 use move_deps::move_binary_format::file_format::CompiledModule;

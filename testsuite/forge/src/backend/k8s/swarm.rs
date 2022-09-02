@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
     chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
+    interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold},
     node::K8sNode,
     prometheus::{self, query_with_metadata},
     query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,

@@ -8,9 +8,7 @@ use aptos_config::config::NodeConfig;
 use aptos_rest_client::Client as RestClient;
 use aptos_types::account_address::AccountAddress;
 use cached_packages::aptos_stdlib;
-use forge::NodeExt;
-use forge::Result;
-use forge::Swarm;
+use forge::{NodeExt, Result, Swarm};
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 

@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::Version;
-use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
+use crate::{
+    proof::SparseMerkleRangeProof, state_store::state_key::StateKey, transaction::Version,
+};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,

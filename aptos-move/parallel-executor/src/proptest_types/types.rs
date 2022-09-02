@@ -20,9 +20,8 @@ use aptos_types::{
 };
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
-use std::collections::hash_map::DefaultHasher;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},

@@ -3,8 +3,7 @@
 
 use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -17,16 +16,17 @@ use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
-use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
-use move_deps::move_package::package_hooks::register_package_hooks;
+use move_deps::{
+    move_core_types::language_storage::{ResourceKey, StructTag, TypeTag},
+    move_package::package_hooks::register_package_hooks,
+};
 use project_root::get_project_root;
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
 use serde::de::DeserializeOwned;
-use std::collections::BTreeMap;
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 
 /// A simple test harness for defining Move e2e tests.
 ///

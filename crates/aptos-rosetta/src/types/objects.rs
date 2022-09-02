@@ -5,40 +5,35 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::native_coin_tag;
-use crate::types::{
-    account_module_identifier, aptos_coin_module_identifier, aptos_coin_resource_identifier,
-    coin_module_identifier, create_account_function_identifier,
-    set_operator_events_field_identifier, set_operator_function_identifier,
-    stake_module_identifier, stake_pool_resource_identifier, transfer_function_identifier,
-};
 use crate::{
-    common::{is_native_coin, native_coin},
+    common::{is_native_coin, native_coin, native_coin_tag},
     error::ApiResult,
     types::{
-        account_resource_identifier, coin_store_resource_identifier,
-        deposit_events_field_identifier, sequence_number_field_identifier,
-        withdraw_events_field_identifier, AccountIdentifier, BlockIdentifier, Error,
-        OperationIdentifier, OperationStatus, OperationStatusType, OperationType,
-        TransactionIdentifier,
+        account_module_identifier, account_resource_identifier, aptos_coin_module_identifier,
+        aptos_coin_resource_identifier, coin_module_identifier, coin_store_resource_identifier,
+        create_account_function_identifier, deposit_events_field_identifier,
+        sequence_number_field_identifier, set_operator_events_field_identifier,
+        set_operator_function_identifier, stake_module_identifier, stake_pool_resource_identifier,
+        transfer_function_identifier, withdraw_events_field_identifier, AccountIdentifier,
+        BlockIdentifier, Error, OperationIdentifier, OperationStatus, OperationStatusType,
+        OperationType, TransactionIdentifier,
     },
     ApiError,
 };
 use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
-use aptos_rest_client::aptos_api_types::{
-    Address, Event, MoveStructTag, MoveType, TransactionPayload, UserTransactionRequest,
-    WriteResource,
-};
 use aptos_rest_client::{
     aptos::Balance,
-    aptos_api_types::{WriteSetChange, U64},
+    aptos_api_types::{
+        Address, Event, MoveStructTag, MoveType, TransactionPayload, UserTransactionRequest,
+        WriteResource, WriteSetChange, U64,
+    },
 };
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use cached_packages::aptos_stdlib;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
-use std::cmp::Ordering;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},

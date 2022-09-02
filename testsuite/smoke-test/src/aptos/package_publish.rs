@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::aptos::move_test_helpers;
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::{aptos::move_test_helpers, smoke_test_environment::new_local_swarm_with_aptos};
 use forge::Swarm;
 
 #[tokio::test]

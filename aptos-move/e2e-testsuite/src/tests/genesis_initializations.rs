@@ -3,10 +3,10 @@
 
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use language_e2e_tests::executor::FakeExecutor;
-use move_deps::move_core_types::vm_status::StatusCode;
 use move_deps::move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
+    vm_status::StatusCode,
 };
 
 #[test]

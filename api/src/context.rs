@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::response::{
-    bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-    block_pruned_by_height, json_api_disabled, version_not_found, version_pruned, ForbiddenError,
-    InternalError, ServiceUnavailableError, StdApiError,
+use crate::{
+    accept_type::AcceptType,
+    response::{
+        bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
+        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
+        ForbiddenError, InternalError, ServiceUnavailableError, StdApiError,
+    },
 };
 use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
@@ -13,22 +15,23 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::NewBlockEvent,
     account_state::AccountState,
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
 use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapterOwned};
 use futures::{channel::oneshot, SinkExt};
-use std::sync::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,

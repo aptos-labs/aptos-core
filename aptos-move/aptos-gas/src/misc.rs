@@ -3,8 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use crate::algebra::{AbstractValueSize, AbstractValueSizePerArg};
-use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+use crate::{
+    algebra::{AbstractValueSize, AbstractValueSizePerArg},
+    gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
+};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs};
 use move_vm_types::views::{ValueView, ValueVisitor};
 

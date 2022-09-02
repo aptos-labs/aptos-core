@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
-use aptos_logger::sample::Sampling;
-use aptos_logger::{info, sample, sample::SampleRate};
+use aptos_logger::{
+    info, sample,
+    sample::{SampleRate, Sampling},
+};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use rand::prelude::StdRng;
-use rand::Rng;
+use rand::{prelude::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub struct AccountGenerator {
     rng: StdRng,

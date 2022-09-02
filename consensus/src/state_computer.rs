@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     commit_notifier::CommitNotifier,
     counters,
     error::StateSyncError,
+    monitor,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     txn_notifier::TxnNotifier,
 };

@@ -16,17 +16,16 @@ use aptos_config::config::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::transaction::{TransactionToCommit, Version};
 use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{ExecutionStatus, TransactionInfo},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
+    transaction::{ExecutionStatus, TransactionInfo, TransactionToCommit, Version},
 };
 use proptest::prelude::*;
-use std::collections::HashSet;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 

@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{aptos_coin_module_identifier, aptos_coin_resource_identifier};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
+        aptos_coin_module_identifier, aptos_coin_resource_identifier, Currency, CurrencyMetadata,
+        MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
     },
     RosettaContext,
 };

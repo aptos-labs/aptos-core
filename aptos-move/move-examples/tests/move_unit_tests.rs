@@ -4,9 +4,8 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::account_address::AccountAddress;
 use aptos_vm::natives;
-use move_deps::move_unit_test::UnitTestingConfig;
 use move_deps::{
-    move_cli::base::test::run_move_unit_tests,
+    move_cli::base::test::run_move_unit_tests, move_unit_test::UnitTestingConfig,
     move_vm_runtime::native_functions::NativeFunctionTable,
 };
 use std::{collections::BTreeMap, path::PathBuf};

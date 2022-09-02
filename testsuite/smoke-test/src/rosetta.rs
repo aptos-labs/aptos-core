@@ -3,39 +3,46 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::common::types::GasOptions;
-use aptos::test::INVALID_ACCOUNT;
-use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_config::config::PersistableConfig;
-use aptos_config::{config::ApiConfig, utils::get_available_port};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
-use aptos_crypto::{HashValue, PrivateKey};
-use aptos_rest_client::aptos_api_types::{TransactionPayload, UserTransaction};
-use aptos_rest_client::Transaction;
-use aptos_rosetta::common::BlockHash;
-use aptos_rosetta::types::{
-    AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
-    TransactionType,
+use aptos::{
+    account::create::DEFAULT_FUNDED_COINS,
+    common::types::GasOptions,
+    test::{CliTestFramework, INVALID_ACCOUNT},
+};
+use aptos_config::{
+    config::{ApiConfig, PersistableConfig},
+    utils::get_available_port,
+};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    HashValue, PrivateKey,
+};
+use aptos_rest_client::{
+    aptos_api_types::{TransactionPayload, UserTransaction},
+    Transaction,
 };
 use aptos_rosetta::{
     client::RosettaClient,
-    common::{native_coin, BLOCKCHAIN, Y2K_MS},
+    common::{native_coin, BlockHash, BLOCKCHAIN, Y2K_MS},
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, BlockIdentifier, BlockRequest,
-        NetworkIdentifier, NetworkRequest, PartialBlockIdentifier,
+        AccountBalanceRequest, AccountBalanceResponse, AccountIdentifier, BlockIdentifier,
+        BlockRequest, BlockResponse, NetworkIdentifier, NetworkRequest, Operation,
+        OperationStatusType, OperationType, PartialBlockIdentifier, TransactionType,
     },
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_types::transaction::SignedTransaction;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction,
+};
 use cached_packages::aptos_stdlib;
 use forge::{LocalSwarm, Node, NodeExt, Swarm};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::str::FromStr;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{future::Future, time::Duration};
+use std::{
+    collections::BTreeMap,
+    convert::TryFrom,
+    future::Future,
+    str::FromStr,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::{task::JoinHandle, time::Instant};
 
 const DEFAULT_MAX_WAIT_MS: u64 = 5000;

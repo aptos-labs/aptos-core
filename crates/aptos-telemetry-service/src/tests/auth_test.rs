@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{Peer, PeerRole, PeerSet, RoleType};
-use aptos_crypto::noise::{InitiatorHandshakeState, NoiseConfig};
-use aptos_crypto::{noise, x25519, Uniform};
-use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};
+use aptos_crypto::{
+    noise,
+    noise::{InitiatorHandshakeState, NoiseConfig},
+    x25519, Uniform,
+};
 use aptos_types::{
     account_address,
     chain_id::ChainId,
-    network_address::{DnsName, NetworkAddress},
+    network_address::{
+        DnsName, NetworkAddress,
+        Protocol::{Dns, Handshake, NoiseIK, Tcp},
+    },
     PeerId,
 };
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};

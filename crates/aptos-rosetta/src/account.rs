@@ -6,10 +6,6 @@
 //! See: [Account API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 //!
 
-use crate::types::{
-    account_module_identifier, account_resource_identifier, coin_module_identifier,
-    AccountBalanceMetadata,
-};
 use crate::{
     common::{
         check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
@@ -17,16 +13,16 @@ use crate::{
     },
     error::{ApiError, ApiResult},
     types::{
-        coin_store_resource_identifier, AccountBalanceRequest, AccountBalanceResponse, Amount,
-        Currency, CurrencyMetadata,
+        account_module_identifier, account_resource_identifier, coin_module_identifier,
+        coin_store_resource_identifier, AccountBalanceMetadata, AccountBalanceRequest,
+        AccountBalanceResponse, Amount, Currency, CurrencyMetadata,
     },
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_rest_client::aptos_api_types::AccountData;
 use aptos_rest_client::{
     aptos::{AptosCoin, Balance},
-    aptos_api_types::U64,
+    aptos_api_types::{AccountData, U64},
 };
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;

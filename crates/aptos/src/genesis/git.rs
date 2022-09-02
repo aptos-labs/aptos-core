@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::create_dir_if_not_exist;
 use crate::{
     common::{
         types::{CliError, CliTypedResult},
-        utils::write_to_file,
+        utils::{create_dir_if_not_exist, write_to_file},
     },
     CliCommand,
 };
@@ -16,8 +15,12 @@ use async_trait::async_trait;
 use clap::Parser;
 use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
-use std::path::Path;
-use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
+use std::{
+    fmt::Debug,
+    io::Read,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 pub const LAYOUT_FILE: &str = "layout.yaml";
 pub const OPERATOR_FILE: &str = "operator.yaml";

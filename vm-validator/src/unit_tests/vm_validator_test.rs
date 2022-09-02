@@ -16,8 +16,7 @@ use aptosdb::AptosDB;
 use cached_packages::aptos_stdlib;
 use move_deps::move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
-use storage_interface::state_view::LatestDbStateCheckpointView;
-use storage_interface::DbReaderWriter;
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 

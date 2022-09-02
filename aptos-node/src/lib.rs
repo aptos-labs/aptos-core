@@ -17,8 +17,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::telemetry_log_writer::TelemetryLog;
-use aptos_logger::{prelude::*, Level};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{

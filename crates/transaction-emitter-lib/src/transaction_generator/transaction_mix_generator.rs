@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
-use rand::prelude::StdRng;
-use rand::Rng;
+use rand::{prelude::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
 
 pub struct TxnMixGenerator {

@@ -1,14 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::response::{BasicResponse, BasicResponseStatus, BasicResultWith404};
-use crate::ApiTags;
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    failpoint::fail_point_poem,
+    response::{BasicResponse, BasicResponseStatus, BasicResultWith404},
+    ApiTags,
+};
 use aptos_api_types::{BcsBlock, Block, LedgerInfo};
-use poem_openapi::param::{Path, Query};
-use poem_openapi::OpenApi;
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
 use std::sync::Arc;
 
 pub struct BlocksApi {

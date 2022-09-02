@@ -5,19 +5,25 @@ use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::SuccessCriteria;
-use forge::{ForgeConfig, Options, *};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::{env, num::NonZeroUsize, process, thread, time::Duration};
+use forge::{success_criteria::SuccessCriteria, ForgeConfig, Options, *};
+use std::{
+    env,
+    num::NonZeroUsize,
+    process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 use structopt::StructOpt;
-use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_latency_test::NetworkLatencyTest;
-use testcases::network_loss_test::NetworkLossTest;
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
-    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
+    network_bandwidth_test::NetworkBandwidthTest, network_latency_test::NetworkLatencyTest,
+    network_loss_test::NetworkLossTest, network_partition_test::NetworkPartitionTest,
+    performance_test::PerformanceBenchmark,
+    performance_with_fullnode_test::PerformanceBenchmarkWithFN,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
 use tokio::runtime::Runtime;

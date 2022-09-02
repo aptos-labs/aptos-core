@@ -14,8 +14,7 @@ use crate::{
     runner::Runner,
 };
 use anyhow::anyhow;
-use aptos_crypto::x25519;
-use aptos_crypto::ValidCryptoMaterialStringExt;
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use poem::{http::StatusCode, Error as PoemError, Result as PoemResult};
 use poem_openapi::{
     param::Query, payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService,

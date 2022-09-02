@@ -13,8 +13,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::definition::NodeInProof;
-use aptos_types::proof::{SparseMerkleLeafNode, SparseMerkleProofExt};
+use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
 use std::cmp::Ordering;
 
 type Result<T> = std::result::Result<T, UpdateError>;

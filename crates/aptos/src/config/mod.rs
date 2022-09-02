@@ -1,26 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, ProfileSummary,
-    CONFIG_FOLDER,
+use crate::{
+    common::{
+        types::{
+            CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+            ProfileSummary, CONFIG_FOLDER,
+        },
+        utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file},
+    },
+    genesis::git::{from_yaml, to_yaml},
+    Tool,
 };
-use crate::common::utils::{
-    create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
-};
-use crate::genesis::git::{from_yaml, to_yaml};
-use crate::Tool;
 use async_trait::async_trait;
-use clap::ArgEnum;
-use clap::CommandFactory;
-use clap::Parser;
+use clap::{ArgEnum, CommandFactory, Parser};
 use clap_complete::{generate, Shell};
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
-use std::path::PathBuf;
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 
 /// Tool for interacting with configuration of the Aptos CLI tool
 ///

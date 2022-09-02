@@ -8,8 +8,10 @@ use heck::CamelCase;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use once_cell::sync::Lazy;
 use serde_reflection::{ContainerFormat, Format, Named, VariantFormat};
-use std::collections::{BTreeMap, BTreeSet};
-use std::str::FromStr;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    str::FromStr,
+};
 
 /// Useful error message.
 pub(crate) fn type_not_allowed(type_tag: &TypeTag) -> ! {

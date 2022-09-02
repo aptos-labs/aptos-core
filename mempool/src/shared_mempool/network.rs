@@ -40,12 +40,10 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::RandomState;
-use std::hash::BuildHasher;
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashMap},
-    hash::Hasher,
+    collections::{hash_map::RandomState, BTreeMap, HashMap},
+    hash::{BuildHasher, Hasher},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},

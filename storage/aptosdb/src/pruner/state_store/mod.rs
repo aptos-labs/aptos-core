@@ -1,21 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_metadata::DbMetadataSchema;
-use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
-use crate::schema::db_metadata::DbMetadataValue;
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, utils, StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
+    db_metadata::DbMetadataSchema,
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    metrics::PRUNER_LEAST_READABLE_VERSION,
+    pruner::{db_pruner::DBPruner, state_store::generics::StaleNodeIndexSchemaTrait},
+    schema::db_metadata::DbMetadataValue,
+    utils, StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_jellyfish_merkle::StaleNodeIndex;
+use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::error;
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::schema::KeyCodec;
-use schemadb::{ReadOptions, SchemaBatch, DB};
+use schemadb::{schema::KeyCodec, ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
 pub mod generics;

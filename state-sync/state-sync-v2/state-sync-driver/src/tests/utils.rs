@@ -8,16 +8,16 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
     proof::{
         SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
@@ -34,12 +34,10 @@ use data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
 };
 use event_notifications::EventNotificationListener;
-use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{channel::mpsc, StreamExt};
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand::{rngs::OsRng, Rng};
 use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair

@@ -3,19 +3,20 @@
 
 use std::collections::HashMap;
 
-use crate::clients::humio;
-use crate::GCPBigQueryConfig;
-use crate::{context::Context, index, validator_cache::PeerSetCache, TelemetryServiceConfig};
+use crate::{
+    clients::humio, context::Context, index, validator_cache::PeerSetCache, GCPBigQueryConfig,
+    TelemetryServiceConfig,
+};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
-use reqwest::header::AUTHORIZATION;
-use reqwest::Url;
+use reqwest::{header::AUTHORIZATION, Url};
 use serde_json::Value;
-use warp::http::header::CONTENT_TYPE;
-use warp::http::Response;
-use warp::hyper::body::Bytes;
+use warp::{
+    http::{header::CONTENT_TYPE, Response},
+    hyper::body::Bytes,
+};
 
 pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);

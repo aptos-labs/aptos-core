@@ -8,12 +8,12 @@ use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use framework::ReleaseBundle;
 use rand::rngs::StdRng;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 mod cargo;

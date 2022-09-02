@@ -17,11 +17,10 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{GasSchedule, OnChainConfig, Version},
-    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use dashmap::DashMap;

@@ -5,10 +5,8 @@ use crate::prometheus::construct_query_with_extra_labels;
 use again::RetryPolicy;
 use anyhow::{anyhow, bail};
 use once_cell::sync::Lazy;
-use prometheus_http_query::response::Sample;
-use prometheus_http_query::Client as PrometheusClient;
-use std::collections::BTreeMap;
-use std::time::Duration;
+use prometheus_http_query::{response::Sample, Client as PrometheusClient};
+use std::{collections::BTreeMap, time::Duration};
 
 #[derive(Default, Clone, Debug)]
 pub struct SystemMetrics {

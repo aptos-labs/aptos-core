@@ -12,15 +12,17 @@ use aptos_infallible::Mutex;
 use crate::pruner::pruner_manager::PrunerManager;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_types::transaction::Version;
-use schemadb::schema::KeyCodec;
-use schemadb::DB;
+use schemadb::{schema::KeyCodec, DB};
 use std::{sync::Arc, thread::JoinHandle};
 
-use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::state_pruner_worker::StatePrunerWorker;
-use crate::pruner::state_store::generics::StaleNodeIndexSchemaTrait;
-use crate::pruner::state_store::StateMerklePruner;
-use crate::utils;
+use crate::{
+    pruner::{
+        db_pruner::DBPruner,
+        state_pruner_worker::StatePrunerWorker,
+        state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    },
+    utils,
+};
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.

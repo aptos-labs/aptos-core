@@ -374,20 +374,24 @@ fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result
 /// the internal state of the object.
 #[cfg(test)]
 mod streaming_service_tests {
-    use crate::data_stream::{DataStreamId, DataStreamListener};
-    use crate::error::Error;
-    use crate::streaming_client::{
-        GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
-        StreamRequestMessage, TerminateStreamRequest,
+    use crate::{
+        data_stream::{DataStreamId, DataStreamListener},
+        error::Error,
+        streaming_client::{
+            GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
+            StreamRequestMessage, TerminateStreamRequest,
+        },
+        tests,
+        tests::utils::MIN_ADVERTISED_STATES,
     };
-    use crate::tests;
-    use crate::tests::utils::MIN_ADVERTISED_STATES;
-    use futures::channel::oneshot;
-    use futures::channel::oneshot::Receiver;
-    use futures::FutureExt;
-    use futures::StreamExt;
-    use std::ops::Add;
-    use std::time::{Duration, Instant};
+    use futures::{
+        channel::{oneshot, oneshot::Receiver},
+        FutureExt, StreamExt,
+    };
+    use std::{
+        ops::Add,
+        time::{Duration, Instant},
+    };
     use tokio::time::timeout;
 
     const MAX_STREAM_WAIT_SECS: u64 = 60;

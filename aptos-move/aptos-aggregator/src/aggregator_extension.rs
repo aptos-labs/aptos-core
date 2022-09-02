@@ -367,10 +367,12 @@ mod test {
     use super::*;
     use crate::delta_change_set::serialize;
     use aptos_state_view::StateView;
-    use aptos_types::state_store::state_storage_usage::StateStorageUsage;
     use aptos_types::{
         account_address::AccountAddress,
-        state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle},
+        state_store::{
+            state_key::StateKey, state_storage_usage::StateStorageUsage,
+            table::TableHandle as AptosTableHandle,
+        },
     };
     use claim::{assert_err, assert_ok};
     use once_cell::sync::Lazy;

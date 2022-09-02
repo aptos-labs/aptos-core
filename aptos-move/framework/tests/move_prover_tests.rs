@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_deps::move_cli::base::prove::run_move_prover;
-use move_deps::move_prover;
+use move_deps::{move_cli::base::prove::run_move_prover, move_prover};
 use std::path::PathBuf;
 use tempfile::tempdir;
 

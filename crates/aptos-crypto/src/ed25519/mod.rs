@@ -52,6 +52,5 @@ pub use ed25519_keys::keypair_strategy;
 pub use ed25519_keys::{Ed25519PrivateKey, Ed25519PublicKey};
 pub use ed25519_sigs::Ed25519Signature;
 
-pub use ed25519_keys::Ed25519PrivateKey as PrivateKey;
-pub use ed25519_keys::Ed25519PublicKey as PublicKey;
+pub use ed25519_keys::{Ed25519PrivateKey as PrivateKey, Ed25519PublicKey as PublicKey};
 pub use ed25519_sigs::Ed25519Signature as Signature;

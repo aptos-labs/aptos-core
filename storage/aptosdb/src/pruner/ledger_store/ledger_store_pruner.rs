@@ -1,20 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_metadata::DbMetadataSchema;
-use crate::pruner::state_store::state_value_pruner::StateValuePruner;
-use crate::schema::db_metadata::DbMetadataKey;
-use crate::schema::db_metadata::DbMetadataValue;
 use crate::{
+    db_metadata::DbMetadataSchema,
     metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
         event_store::event_store_pruner::EventStorePruner,
+        state_store::state_value_pruner::StateValuePruner,
         transaction_store::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
+    schema::db_metadata::{DbMetadataKey, DbMetadataValue},
     utils, EventStore, StateStore, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};

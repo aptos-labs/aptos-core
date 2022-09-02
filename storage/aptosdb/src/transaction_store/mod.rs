@@ -3,13 +3,13 @@
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
-use crate::transaction_accumulator::TransactionAccumulatorSchema;
 use crate::{
     errors::AptosDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
+    transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
 };
 use anyhow::{ensure, format_err, Result};

@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::MempoolError;
-use crate::monitor;
+use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::TransactionStatus;

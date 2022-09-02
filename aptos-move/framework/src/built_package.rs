@@ -1,29 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error_map::generate_error_map;
-use crate::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
+use crate::{
+    error_map::generate_error_map,
+    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY,
 };
-use crate::{zip_metadata, zip_metadata_str, RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use aptos_module_verifier::module_init::verify_module_init_function;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::EntryABI;
+use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
-use move_deps::move_binary_format::CompiledModule;
-use move_deps::move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_deps::move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_deps::move_core_types::errmap::ErrorMapping;
-use move_deps::move_core_types::metadata::Metadata;
-use move_deps::move_package::compilation::compiled_package::CompiledPackage;
-use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
-use move_deps::move_package::source_package::manifest_parser::{
-    parse_move_manifest_string, parse_source_manifest,
+use move_deps::{
+    move_binary_format::CompiledModule,
+    move_command_line_common::files::MOVE_COMPILED_EXTENSION,
+    move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule},
+    move_core_types::{errmap::ErrorMapping, metadata::Metadata},
+    move_package::{
+        compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+        source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+        BuildConfig,
+    },
 };
-use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::{Path, PathBuf},
+};
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
 pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";

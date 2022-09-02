@@ -5,10 +5,10 @@ use crate::{AptosDB, EventStore, LedgerPrunerManager, PrunerManager};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
-use aptos_types::transaction::Version;
 use aptos_types::{
     contract_event::ContractEvent,
     proptest_types::{AccountInfoUniverse, ContractEventGen},
+    transaction::Version,
 };
 use proptest::{collection::vec, prelude::*, proptest};
 use schemadb::SchemaBatch;

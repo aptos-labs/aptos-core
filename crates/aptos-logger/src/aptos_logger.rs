@@ -4,7 +4,6 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
-use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
         PROCESSED_STRUCT_LOG_COUNT, SENT_STRUCT_LOG_BYTES, SENT_STRUCT_LOG_COUNT,
@@ -12,6 +11,7 @@ use crate::{
     },
     logger::Logger,
     struct_log::TcpWriter,
+    telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
     Event, Filter, Key, Level, LevelFilter, Metadata,
 };
 use aptos_infallible::RwLock;
@@ -19,18 +19,16 @@ use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
 use futures::channel;
 use once_cell::sync::Lazy;
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-use std::fmt::Debug;
-use std::io::Stdout;
-use std::time::Duration;
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     env, fmt,
-    io::Write,
+    fmt::Debug,
+    io::{Stdout, Write},
     str::FromStr,
     sync::{self, Arc},
     thread,
+    time::Duration,
 };
 use strum_macros::EnumString;
 

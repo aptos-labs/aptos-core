@@ -8,8 +8,8 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };

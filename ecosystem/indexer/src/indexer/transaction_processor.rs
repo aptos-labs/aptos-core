@@ -1,22 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::database::get_chunks;
-use crate::util::bigdecimal_to_u64;
 use crate::{
     counters::{
         GOT_CONNECTION, PROCESSOR_ERRORS, PROCESSOR_INVOCATIONS, PROCESSOR_SUCCESSES,
         UNABLE_TO_GET_CONNECTION,
     },
-    database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+    database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{errors::TransactionProcessingError, processing_result::ProcessingResult},
     models::processor_statuses::ProcessorStatusModel,
     schema,
+    util::bigdecimal_to_u64,
 };
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
-use diesel::{prelude::*, RunQueryDsl};
+use diesel::{pg::upsert::excluded, prelude::*, RunQueryDsl};
 use field_count::FieldCount;
 use schema::processor_statuses::{self, dsl};
 use std::fmt::Debug;

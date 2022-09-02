@@ -20,13 +20,13 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
         Nibble,
     },
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
+    state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
 use itertools::Itertools;

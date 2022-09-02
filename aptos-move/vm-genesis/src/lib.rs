@@ -15,9 +15,8 @@ use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, InitialGasSchedule, NativeGasParameters,
     ToOnChainGasSchedule,
 };
-use aptos_types::account_config::aptos_test_root_address;
 use aptos_types::{
-    account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},

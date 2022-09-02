@@ -10,8 +10,8 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,

@@ -4,8 +4,7 @@
 use super::{GenesisConfig, Swarm, Version};
 use crate::{GenesisConfigFn, NodeConfigFn, Result};
 use rand::rngs::StdRng;
-use std::num::NonZeroUsize;
-use std::time::Duration;
+use std::{num::NonZeroUsize, time::Duration};
 
 /// Trait used to represent a interface for constructing a launching new networks
 #[async_trait::async_trait]

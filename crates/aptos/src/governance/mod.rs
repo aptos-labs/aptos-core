@@ -1,19 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, PromptOptions, TransactionOptions,
-    TransactionSummary,
-};
-use crate::common::utils::prompt_yes_with_override;
 #[cfg(feature = "no-upload-proposal")]
 use crate::common::utils::read_from_file;
-use crate::move_tool::{init_move_dir, IncludedArtifacts};
-use crate::{CliCommand, CliResult};
+use crate::{
+    common::{
+        types::{
+            CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, PromptOptions,
+            TransactionOptions, TransactionSummary,
+        },
+        utils::prompt_yes_with_override,
+    },
+    move_tool::{init_move_dir, IncludedArtifacts},
+    CliCommand, CliResult,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::U64;
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{aptos_api_types::U64, Transaction};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, TransactionPayload},
@@ -24,10 +27,13 @@ use clap::Parser;
 use framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use move_deps::move_core_types::transaction_argument::TransactionArgument;
 use reqwest::Url;
-use serde::Deserialize;
-use serde::Serialize;
-use std::path::Path;
-use std::{collections::BTreeMap, fmt::Formatter, fs, path::PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::BTreeMap,
+    fmt::Formatter,
+    fs,
+    path::{Path, PathBuf},
+};
 use tempfile::TempDir;
 
 /// Tool for on-chain governance

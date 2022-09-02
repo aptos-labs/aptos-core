@@ -10,9 +10,8 @@ use aptos_crypto::{
     hash::{CryptoHash, TestOnlyHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::definition::NodeInProof;
 use aptos_types::{
-    proof::{SparseMerkleLeafNode, SparseMerkleProofExt},
+    proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt},
     state_store::state_value::StateValue,
 };
 use once_cell::sync::Lazy;

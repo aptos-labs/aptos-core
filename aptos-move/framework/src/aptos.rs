@@ -3,16 +3,14 @@
 
 #![forbid(unsafe_code)]
 
-use crate::release_builder::RELEASE_BUNDLE_EXTENSION;
-use crate::release_bundle::ReleaseBundle;
-use crate::{path_in_crate, BuildOptions, ReleaseOptions};
+use crate::{
+    path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION, release_bundle::ReleaseBundle,
+    BuildOptions, ReleaseOptions,
+};
 use clap::ArgEnum;
 use move_deps::move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
-use std::fmt::Display;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{collections::BTreeMap, fmt::Display, path::PathBuf, str::FromStr};
 
 // ===============================================================================================
 // Release Targets

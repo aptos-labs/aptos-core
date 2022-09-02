@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{BlockHash, Y2K_MS};
 use crate::{
     common::{
         check_network, get_block_index_from_request, get_timestamp, handle_request, with_context,
+        BlockHash, Y2K_MS,
     },
     error::ApiResult,
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},

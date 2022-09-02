@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use move_deps::move_cli::base::prove::run_move_prover;
-use move_deps::move_prover;
+use move_deps::{move_cli::base::prove::run_move_prover, move_prover};
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 

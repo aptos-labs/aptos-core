@@ -1,36 +1,40 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account::{
-    create::{CreateAccount, DEFAULT_FUNDED_COINS},
-    fund::FundWithFaucet,
-    list::{ListAccount, ListQuery},
-    transfer::{TransferCoins, TransferSummary},
+use crate::{
+    account::{
+        create::{CreateAccount, DEFAULT_FUNDED_COINS},
+        fund::FundWithFaucet,
+        list::{ListAccount, ListQuery},
+        transfer::{TransferCoins, TransferSummary},
+    },
+    common::{
+        init::InitTool,
+        types::{
+            account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
+            EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
+            MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+        },
+        utils::write_to_file,
+    },
+    move_tool::{
+        ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
+        PublishPackage, RunFunction, TestPackage,
+    },
+    node::{
+        AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
+        LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig,
+        ShowValidatorSet, ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
+        ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
+    },
+    op::key::{ExtractPeer, GenerateKey, SaveKey},
+    stake::{
+        AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator,
+        UnlockStake, WithdrawStake,
+    },
+    CliCommand,
 };
-use crate::common::init::InitTool;
-use crate::common::types::{
-    account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-    EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions, RestOptions,
-    RngArgs, SaveFile, TransactionOptions, TransactionSummary,
-};
-use crate::common::utils::write_to_file;
-use crate::move_tool::{
-    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
-    PublishPackage, RunFunction, TestPackage,
-};
-use crate::node::{
-    AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
-    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
-    ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
-};
-use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
-use crate::stake::{
-    AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
-    WithdrawStake,
-};
-use crate::CliCommand;
 use aptos_config::config::Peer;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
@@ -46,8 +50,12 @@ use aptos_types::{
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+    str::FromStr,
+    time::Duration,
+};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 

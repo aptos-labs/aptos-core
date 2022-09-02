@@ -36,13 +36,15 @@ use network::{
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+use storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
+        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{StorageServerSummary, StorageServiceResponse},
+    Epoch,
 };
-use storage_service_types::responses::{StorageServerSummary, StorageServiceResponse};
-use storage_service_types::Epoch;
 use tokio::{runtime::Handle, task::JoinHandle};
 
 mod logging;

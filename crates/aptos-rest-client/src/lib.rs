@@ -18,32 +18,31 @@ pub use aptos_api_types::{
 pub use state::State;
 pub use types::{Account, Resource};
 
-use crate::aptos::{AptosVersion, Balance};
-use crate::error::RestError;
+use crate::{
+    aptos::{AptosVersion, Balance},
+    error::RestError,
+};
 use anyhow::{anyhow, Result};
-use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData,
-    UserTransaction, VersionedEvent,
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
+    TransactionOnChainData, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_types::account_config::AccountResource;
-use aptos_types::contract_event::EventWithVersion;
-use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
-    transaction::SignedTransaction,
+    account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    contract_event::EventWithVersion,
+    transaction::{ExecutionStatus, SignedTransaction},
 };
 use move_deps::move_core_types::language_storage::StructTag;
-use reqwest::header::ACCEPT;
-use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Client as ReqwestClient, StatusCode,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::time::Duration;
+use std::{collections::BTreeMap, future::Future, time::Duration};
 use tokio::time::Instant;
 use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use url::Url;

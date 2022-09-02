@@ -14,9 +14,11 @@ use aptos_types::{
     ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
-    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    common::Author,
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
+    vote::Vote,
 };
 use std::{
     collections::{BTreeMap, HashMap},

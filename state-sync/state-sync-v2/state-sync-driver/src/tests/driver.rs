@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     driver_factory::DriverFactory,
+    metadata_storage::PersistentMetadataStorage,
     tests::utils::{
         create_event, create_ledger_info_at_version, create_transaction,
         verify_mempool_and_event_notification,

@@ -133,8 +133,12 @@ impl Arbitrary for EpochChangeProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
-    use crate::{block_info::BlockInfo, epoch_state::EpochState, waypoint::Waypoint};
+    use crate::{
+        aggregate_signature::{AggregateSignature, PartialSignatures},
+        block_info::BlockInfo,
+        epoch_state::EpochState,
+        waypoint::Waypoint,
+    };
 
     #[test]
     fn verify_epoch_change_proof() {

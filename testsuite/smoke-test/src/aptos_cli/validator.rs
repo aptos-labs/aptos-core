@@ -2,24 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::common::types::TransactionSummary;
-use aptos::node::analyze::analyze_validators::{AnalyzeValidators, EpochStats};
-use aptos::node::analyze::fetch_metadata::FetchMetadata;
-use aptos::test::{to_validator_set, ValidatorPerformance};
-use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{bls12381, x25519};
+use aptos::{
+    account::create::DEFAULT_FUNDED_COINS,
+    common::types::TransactionSummary,
+    node::analyze::{
+        analyze_validators::{AnalyzeValidators, EpochStats},
+        fetch_metadata::FetchMetadata,
+    },
+    test::{to_validator_set, CliTestFramework, ValidatorPerformance},
+};
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
-use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_types::network_address::DnsName;
-use aptos_types::PeerId;
+use aptos_types::{account_config::CORE_CODE_ADDRESS, network_address::DnsName, PeerId};
 use forge::{reconfig, NodeExt, Swarm, SwarmExt};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashMap, convert::TryFrom, sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_analyze_validators() {

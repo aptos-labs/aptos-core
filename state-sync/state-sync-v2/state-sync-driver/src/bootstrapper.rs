@@ -24,11 +24,10 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};

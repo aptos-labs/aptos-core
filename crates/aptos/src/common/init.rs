@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::ConfigSearchMode;
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
-        RngArgs,
+        ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions,
+        PromptOptions, RngArgs,
     },
     utils::{fund_account, prompt_yes_with_override, read_line},
 };

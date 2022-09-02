@@ -25,18 +25,16 @@ use aptos_config::network_id::NetworkId;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
-use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    validator_verifier::{generate_validator_verifier, random_validator_verifier},
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
@@ -46,7 +44,7 @@ use consensus_types::{
     common::{Author, Payload, Round},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeout,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     vote_msg::VoteMsg,
 };
 use futures::{

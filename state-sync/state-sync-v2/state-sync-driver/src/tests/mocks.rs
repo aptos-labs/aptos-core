@@ -1,18 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
-    error::Error, metadata_storage::MetadataStorageInterface,
-    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
+    error::Error,
+    metadata_storage::MetadataStorageInterface,
+    storage_synchronizer::StorageSynchronizerInterface,
+    tests::utils::{
+        create_empty_epoch_state, create_epoch_ending_ledger_info, create_transaction_info,
+    },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
@@ -30,12 +33,10 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use data_streaming_service::data_stream::DataStreamId;
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::NotificationId,
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch},
+    data_stream::{DataStreamId, DataStreamListener},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
 };
 use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;

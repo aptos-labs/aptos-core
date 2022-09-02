@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::common;
 use crate::{
     network::MempoolSyncMsg,
     shared_mempool::types::SharedMempoolNotification,
     tests::{
+        common,
         common::TestTransaction,
         node::{
             public_full_node_config, validator_config, vfn_config, Node, NodeId, NodeInfo,

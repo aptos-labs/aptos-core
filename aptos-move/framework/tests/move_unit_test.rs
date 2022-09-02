@@ -4,9 +4,9 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_vm::natives;
 use framework::path_in_crate;
-use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
-    move_unit_test::UnitTestingConfig, move_vm_runtime::native_functions::NativeFunctionTable,
+    move_cli::base::test::run_move_unit_tests, move_unit_test::UnitTestingConfig,
+    move_vm_runtime::native_functions::NativeFunctionTable,
 };
 use tempfile::tempdir;
 

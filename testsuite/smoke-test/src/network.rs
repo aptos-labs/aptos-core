@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
-use aptos::common::types::EncodingType;
-use aptos::test::CliTestFramework;
-use aptos_config::config::Peer;
+use aptos::{common::types::EncodingType, test::CliTestFramework};
 use aptos_config::{
-    config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet},
+    config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, Peer, PeerSet},
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};

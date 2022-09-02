@@ -51,8 +51,10 @@ use aptos_types::{
         authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
     },
 };
-use std::convert::TryFrom;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    convert::TryFrom,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use warp::Filter;
 
 pub fn combine_route(

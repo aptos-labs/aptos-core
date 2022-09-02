@@ -3,13 +3,10 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::account_config::NewBlockEvent;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
+    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -25,7 +22,9 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
+        state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,

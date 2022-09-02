@@ -1,29 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::prompt_yes_with_override;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
             chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_sequence_number, read_from_file, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
+            get_sequence_number, prompt_yes_with_override, read_from_file, start_logger,
+            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
 };
-use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
-use aptos_rest_client::error::RestError;
-use aptos_rest_client::{Client, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{HashValue, UserTransaction},
+    error::RestError,
+    Client, Transaction,
+};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::transaction::{
     authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
@@ -33,11 +33,11 @@ use clap::{ArgEnum, Parser};
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
+    convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},

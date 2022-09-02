@@ -1,23 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context;
-use crate::error::ServiceError;
-use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
-use crate::types::auth::{AuthRequest, AuthResponse, Claims};
+use crate::{
+    context::Context,
+    error::ServiceError,
+    jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header},
+    types::auth::{AuthRequest, AuthResponse, Claims},
+};
 use anyhow::{anyhow, Result};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
 use aptos_logger::{debug, error, warn};
-use aptos_types::chain_id::ChainId;
-use aptos_types::PeerId;
-use warp::filters::BoxedFilter;
+use aptos_types::{chain_id::ChainId, PeerId};
 use warp::{
-    filters::header::headers_cloned,
+    filters::{header::headers_cloned, BoxedFilter},
     http::header::{HeaderMap, HeaderValue},
-    reject, Filter, Rejection,
+    reject, reply, Filter, Rejection, Reply,
 };
-use warp::{reply, Reply};
 
 pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("auth")

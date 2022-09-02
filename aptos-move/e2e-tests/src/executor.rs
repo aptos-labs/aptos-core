@@ -11,10 +11,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
-    data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
+    data_store::{
+        FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH, GENESIS_CHANGE_SET_MAINNET,
+    },
     golden_outputs::GoldenOutputs,
 };
 use aptos_bitvec::BitVec;

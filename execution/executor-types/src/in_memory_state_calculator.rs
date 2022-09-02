@@ -9,14 +9,15 @@ use once_cell::sync::Lazy;
 use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
     on_chain_config,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };

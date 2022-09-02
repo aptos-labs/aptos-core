@@ -6,12 +6,12 @@ use std::collections::HashMap;
 use anyhow::Result;
 use aptos_bitvec::BitVec;
 use aptos_rest_client::VersionedNewBlockEvent;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
+};
 use itertools::Itertools;
-use std::cmp::Ordering;
-use std::convert::TryFrom;
-use std::ops::Add;
+use std::{cmp::Ordering, convert::TryFrom, ops::Add};
 use storage_interface::{DbReader, Order};
 
 use super::fetch_metadata::ValidatorInfo;

@@ -4,12 +4,13 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
-use framework::unzip_metadata_str;
+use framework::{
+    natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy},
+    unzip_metadata_str,
+};
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path};
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.

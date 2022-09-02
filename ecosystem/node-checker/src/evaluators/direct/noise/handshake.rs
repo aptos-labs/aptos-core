@@ -15,8 +15,7 @@ use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 
-use super::super::DirectEvaluatorInput;
-use super::{NoiseEvaluatorError, NOISE_CATEGORY};
+use super::{super::DirectEvaluatorInput, NoiseEvaluatorError, NOISE_CATEGORY};
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, PoemObject, Serialize)]
 pub struct HandshakeEvaluatorArgs {

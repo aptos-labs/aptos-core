@@ -8,9 +8,9 @@ use aptos_data_client::{
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_logger::Level;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     epoch_state::EpochState,
@@ -31,8 +31,7 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, thread, time::Duration};
-use storage_service_types::responses::CompleteDataRange;
-use storage_service_types::Epoch;
+use storage_service_types::{responses::CompleteDataRange, Epoch};
 use tokio::time::timeout;
 
 /// The number of state values held at any version

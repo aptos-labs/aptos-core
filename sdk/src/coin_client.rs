@@ -22,8 +22,7 @@ use std::{
 
 use crate::rest_client::Client as ApiClient;
 
-use crate::types::account_address::AccountAddress;
-use crate::types::LocalAccount;
+use crate::types::{account_address::AccountAddress, LocalAccount};
 
 #[derive(Clone, Debug)]
 pub struct CoinClient<'a> {

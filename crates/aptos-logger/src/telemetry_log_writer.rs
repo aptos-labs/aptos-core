@@ -3,8 +3,10 @@
 
 use crate::counters::{APTOS_LOG_INGEST_WRITER_DISCONNECTED, APTOS_LOG_INGEST_WRITER_FULL};
 use futures::channel;
-use std::io::{Error, ErrorKind};
-use std::sync;
+use std::{
+    io::{Error, ErrorKind},
+    sync,
+};
 
 #[derive(Debug)]
 pub enum TelemetryLog {

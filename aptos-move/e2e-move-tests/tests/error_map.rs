@@ -3,8 +3,10 @@
 
 extern crate core;
 
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
 use e2e_move_tests::{assert_success, MoveHarness};
 use framework::BuildOptions;
 use move_deps::move_core_types::value::MoveValue;

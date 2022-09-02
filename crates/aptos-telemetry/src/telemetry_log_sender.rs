@@ -1,12 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::increment_log_ingest_too_large_by;
-use crate::sender::TelemetrySender;
-use aptos_logger::prelude::*;
-use aptos_logger::telemetry_log_writer::TelemetryLog;
-use futures::channel::mpsc;
-use futures::StreamExt;
+use crate::{metrics::increment_log_ingest_too_large_by, sender::TelemetrySender};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};
+use futures::{channel::mpsc, StreamExt};
 use std::time::Duration;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
@@ -95,8 +92,10 @@ impl TelemetryLogSender {
 
 #[cfg(test)]
 mod tests {
-    use crate::sender::TelemetrySender;
-    use crate::telemetry_log_sender::{TelemetryLogSender, MAX_BYTES};
+    use crate::{
+        sender::TelemetrySender,
+        telemetry_log_sender::{TelemetryLogSender, MAX_BYTES},
+    };
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
 

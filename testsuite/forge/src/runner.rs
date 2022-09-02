@@ -3,13 +3,13 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
 use std::{
+    fmt::{Display, Formatter},
     io::{self, Write},
     num::NonZeroUsize,
     process,
+    sync::Arc,
+    time::Duration,
 };
 use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};

@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::{
-    aptos_api_types::{WriteResource, WriteSetChange},
+    aptos_api_types::{HashValue, WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_types::account_address::AccountAddress;

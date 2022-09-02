@@ -5,9 +5,8 @@ use crate::data_cache::{IntoMoveResolver, StorageAdapterOwned};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_parallel_executor::executor::{MVHashMapView, ReadResult};
 use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
 };

@@ -21,9 +21,7 @@ pub use release_builder::*;
 mod release_bundle;
 pub use release_bundle::*;
 
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf

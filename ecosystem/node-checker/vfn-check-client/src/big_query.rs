@@ -4,18 +4,17 @@
 use anyhow::{bail, Context, Result};
 use aptos_sdk::types::account_address::AccountAddress;
 use clap::Parser;
-use gcp_bigquery_client::error::BQError;
-use gcp_bigquery_client::model::dataset::Dataset;
-use gcp_bigquery_client::model::table::Table;
-use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
-use gcp_bigquery_client::model::table_field_schema::TableFieldSchema;
-use gcp_bigquery_client::model::table_schema::TableSchema;
-use gcp_bigquery_client::Client as BigQueryClient;
+use gcp_bigquery_client::{
+    error::BQError,
+    model::{
+        dataset::Dataset, table::Table, table_data_insert_all_request::TableDataInsertAllRequest,
+        table_field_schema::TableFieldSchema, table_schema::TableSchema,
+    },
+    Client as BigQueryClient,
+};
 use log::info;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::path::PathBuf;
+use std::{collections::HashMap, convert::TryFrom, path::PathBuf};
 
 use crate::check::SingleCheck;
 

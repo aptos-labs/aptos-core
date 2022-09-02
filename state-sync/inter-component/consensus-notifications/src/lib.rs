@@ -272,9 +272,9 @@ impl ConsensusSyncNotification {
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-    use aptos_types::aggregate_signature::AggregateSignature;
     use aptos_types::{
         account_address::AccountAddress,
+        aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         chain_id::ChainId,
         contract_event::ContractEvent,
