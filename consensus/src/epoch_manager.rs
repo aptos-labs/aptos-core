@@ -870,6 +870,7 @@ impl EpochManager {
                 info!("METRICS: process block retrival {:#?}", retrival);
             }
         });
+
         loop {
             let mut consensus_next = consensus_messages_monitor
                 .instrument(network_receivers.consensus_messages.select_next_some())
@@ -882,7 +883,7 @@ impl EpochManager {
                 .fuse();
             monitor!(
                 "main_loop",
-                tokio::select! {
+                futures::select! {
                     (peer, msg) = consensus_next =>{
                         monitor!("process_message" , if let Err(e) =  process_message_monitor.instrument(self.process_message(peer, msg)).await {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
