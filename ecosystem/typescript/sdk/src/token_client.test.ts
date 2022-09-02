@@ -95,5 +95,5 @@ test(
     const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
-  30 * 1000,
+  60 * 1000,
 );
