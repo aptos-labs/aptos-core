@@ -9,9 +9,12 @@ use crate::{
     configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
-        direct::{ApiEvaluatorError, NodeIdentityEvaluatorError, TpsEvaluatorError},
+        direct::{
+            ApiEvaluatorError, NodeIdentityEvaluatorError, NoiseEvaluatorError, TpsEvaluatorError,
+        },
         metrics::MetricsEvaluatorError,
         system_information::SystemInformationEvaluatorError,
+        EvaluatorSet,
     },
     metric_collector::{MetricCollector, MetricCollectorError},
 };
@@ -36,6 +39,9 @@ pub enum RunnerError {
     /// We failed to get the node identity.
     #[error("Failed to check identity of node: {0}")]
     NodeIdentityEvaluatorError(#[from] NodeIdentityEvaluatorError),
+
+    #[error("Failed to evaluate over noise port: {0}")]
+    NoiseEvaluatorError(#[from] NoiseEvaluatorError),
 
     /// We couldn't parse the metrics.
     #[error("Failed to parse metrics: {0}")]
@@ -71,4 +77,6 @@ pub trait Runner: Sync + Send + 'static {
         target_node_address: &NodeAddress,
         target_metric_collector: &M,
     ) -> Result<EvaluationSummary, RunnerError>;
+
+    fn get_evaluator_set(&self) -> &EvaluatorSet;
 }
