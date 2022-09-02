@@ -169,7 +169,7 @@ See the following documentation for generating valid transactions:
 - [Python example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L240).
 - [Typescript example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.test.ts#L122).
 - [CLI-based transaction publishing](http://aptos.dev/cli-tools/aptos-cli-tool/use-aptos-cli#publishing-a-move-package-with-a-named-address).
-- [Publish your first Move module](https://aptos.dev/tutorials/your-first-move-module) via Typescript, Python, and Rust.
+- [Publish your first Move module](https://aptos.dev/tutorials/first-move-module) via Typescript, Python, and Rust.
 
 :::
 
