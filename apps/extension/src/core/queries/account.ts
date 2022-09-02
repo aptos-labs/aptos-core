@@ -1,12 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, MaybeHexString, Types } from 'aptos';
+import { ApiError, AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
-
-const { ApiError } = Types;
 
 /**
  * QUERY KEYS
@@ -92,6 +90,7 @@ export function useAccountCoinBalance(
       }),
     {
       enabled: Boolean(address),
+      retry: 0,
       ...options,
     },
   );
@@ -120,6 +119,7 @@ export function useAccountStakeBalance(
       }),
     {
       enabled: Boolean(address),
+      retry: 0,
       ...options,
     },
   );
@@ -146,21 +146,25 @@ export function useAccountStakeInfo(
 
   return useQuery<StakeInfo | undefined>(
     [accountQueryKeys.getAccountStakeInfo, address],
-    async () => aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
-      .then((res: any) => ({
-        delegatedVoter: res.data.delegated_voter,
-        lockedUntilSecs: res.data.locked_until_secs,
-        operatorAddress: res.data.operator_address,
-        value: Number(res.data.active.value),
-      }))
-      .catch((err) => {
+    async () => {
+      try {
+        return await aptosClient.getAccountResource(address!, aptosStakePoolStructTag)
+          .then((res: any) => ({
+            delegatedVoter: res.data.delegated_voter,
+            lockedUntilSecs: res.data.locked_until_secs,
+            operatorAddress: res.data.operator_address,
+            value: Number(res.data.active.value),
+          } as StakeInfo));
+      } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           return undefined;
         }
         throw err;
-      }),
+      }
+    },
     {
       enabled: Boolean(address),
+      retry: 0,
       ...options,
     },
   );

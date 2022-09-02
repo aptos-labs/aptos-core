@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Types } from 'aptos';
+import { ApiError, Types } from 'aptos';
 import {
   MoveVmError,
   MoveVmStatus,
@@ -32,18 +32,13 @@ export function throwForVmError(txn: Types.UserTransaction) {
   }
 }
 
-function isAptosError(err: Types.AptosError): err is Types.AptosError {
-  return err.message !== undefined
-    && err.error_code !== undefined;
-}
-
 /**
  * Map an ApiError from the Aptos SDK into a catchable MoveVmError
  * @param err error to handle
  */
 export function handleApiError(err: any) {
-  if (err instanceof Types.ApiError && isAptosError(err.body)) {
-    const statusCodeKey = parseMoveVmError(err.body);
-    throw new MoveVmError(statusCodeKey, err.body.vm_error_code);
+  if (err instanceof ApiError) {
+    const statusCodeKey = parseMoveVmError(err.message);
+    throw new MoveVmError(statusCodeKey, 0);
   }
 }

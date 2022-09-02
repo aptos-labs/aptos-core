@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Types } from 'aptos';
-
 /**
  * Move VM status codes that describe an error in the VM
  * @see https://github.com/move-language/move/blob/3f862abe908ab09710342f1b1cc79b8961ea8a1b/language/move-core/types/src/vm_status.rs#L418
@@ -59,10 +57,10 @@ export function parseMoveMiscError(vmStatus: string) {
 
 /**
  * Parse status code from an `AptosError`
- * @param error error returned from the API
+ * @param errorMsg error message returned from the API
  */
-export function parseMoveVmError(error: Types.AptosError) {
-  const match = error.message.match(vmErrorPattern);
+export function parseMoveVmError(errorMsg: string) {
+  const match = errorMsg.match(vmErrorPattern);
   return match !== null
     ? match[1] as MoveStatusCodeKey
     : undefined;
