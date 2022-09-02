@@ -225,7 +225,7 @@ impl AptosDataBuilder {
             enable_backtrace: false,
             level: Level::Info,
             remote_level: Level::Info,
-            telemetry_level: Level::Error,
+            telemetry_level: Level::Warn,
             address: None,
             printer: Some(Box::new(StdoutWriter::new())),
             remote_log_tx: None,

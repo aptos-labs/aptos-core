@@ -703,7 +703,10 @@ impl serde::Serialize for DeleteResource {
         if !self.state_key_hash.is_empty() {
             len += 1;
         }
-        if self.resource.is_some() {
+        if self.r#type.is_some() {
+            len += 1;
+        }
+        if !self.type_str.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -717,8 +720,11 @@ impl serde::Serialize for DeleteResource {
                 pbjson::private::base64::encode(&self.state_key_hash).as_str(),
             )?;
         }
-        if let Some(v) = self.resource.as_ref() {
-            struct_ser.serialize_field("resource", v)?;
+        if let Some(v) = self.r#type.as_ref() {
+            struct_ser.serialize_field("type", v)?;
+        }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
         }
         struct_ser.end()
     }
@@ -729,13 +735,14 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["address", "stateKeyHash", "resource"];
+        const FIELDS: &[&str] = &["address", "stateKeyHash", "type", "typeStr"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Address,
             StateKeyHash,
-            Resource,
+            Type,
+            TypeStr,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -762,7 +769,8 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                         match value {
                             "address" => Ok(GeneratedField::Address),
                             "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
-                            "resource" => Ok(GeneratedField::Resource),
+                            "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -784,7 +792,8 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
             {
                 let mut address__ = None;
                 let mut state_key_hash__ = None;
-                let mut resource__ = None;
+                let mut r#type__ = None;
+                let mut type_str__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Address => {
@@ -802,18 +811,25 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                                     .0,
                             );
                         }
-                        GeneratedField::Resource => {
-                            if resource__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("resource"));
+                        GeneratedField::Type => {
+                            if r#type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            resource__ = Some(map.next_value()?);
+                            r#type__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
                         }
                     }
                 }
                 Ok(DeleteResource {
                     address: address__.unwrap_or_default(),
                     state_key_hash: state_key_hash__.unwrap_or_default(),
-                    resource: resource__,
+                    r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
                 })
             }
         }
@@ -1585,6 +1601,9 @@ impl serde::Serialize for Event {
         if self.r#type.is_some() {
             len += 1;
         }
+        if !self.type_str.is_empty() {
+            len += 1;
+        }
         if !self.data.is_empty() {
             len += 1;
         }
@@ -1601,6 +1620,9 @@ impl serde::Serialize for Event {
         if let Some(v) = self.r#type.as_ref() {
             struct_ser.serialize_field("type", v)?;
         }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
+        }
         if !self.data.is_empty() {
             struct_ser.serialize_field("data", &self.data)?;
         }
@@ -1613,13 +1635,14 @@ impl<'de> serde::Deserialize<'de> for Event {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["key", "sequenceNumber", "type", "data"];
+        const FIELDS: &[&str] = &["key", "sequenceNumber", "type", "typeStr", "data"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Key,
             SequenceNumber,
             Type,
+            TypeStr,
             Data,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -1648,6 +1671,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                             "key" => Ok(GeneratedField::Key),
                             "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
                             "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1671,6 +1695,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                 let mut key__ = None;
                 let mut sequence_number__ = None;
                 let mut r#type__ = None;
+                let mut type_str__ = None;
                 let mut data__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
@@ -1695,6 +1720,12 @@ impl<'de> serde::Deserialize<'de> for Event {
                             }
                             r#type__ = Some(map.next_value()?);
                         }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
+                        }
                         GeneratedField::Data => {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
@@ -1707,6 +1738,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                     key: key__,
                     sequence_number: sequence_number__.unwrap_or_default(),
                     r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
                     data: data__.unwrap_or_default(),
                 })
             }
@@ -2862,114 +2894,6 @@ impl<'de> serde::Deserialize<'de> for MoveModuleId {
             }
         }
         deserializer.deserialize_struct("aptos.extractor.v1.MoveModuleId", FIELDS, GeneratedVisitor)
-    }
-}
-impl serde::Serialize for MoveResource {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.r#type.is_some() {
-            len += 1;
-        }
-        if !self.data.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("aptos.extractor.v1.MoveResource", len)?;
-        if let Some(v) = self.r#type.as_ref() {
-            struct_ser.serialize_field("type", v)?;
-        }
-        if !self.data.is_empty() {
-            struct_ser.serialize_field("data", &self.data)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for MoveResource {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &["type", "data"];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            Type,
-            Data,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "type" => Ok(GeneratedField::Type),
-                            "data" => Ok(GeneratedField::Data),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = MoveResource;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.extractor.v1.MoveResource")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveResource, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut r#type__ = None;
-                let mut data__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::Type => {
-                            if r#type__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("type"));
-                            }
-                            r#type__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::Data => {
-                            if data__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("data"));
-                            }
-                            data__ = Some(map.next_value()?);
-                        }
-                    }
-                }
-                Ok(MoveResource {
-                    r#type: r#type__,
-                    data: data__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("aptos.extractor.v1.MoveResource", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveScriptBytecode {
@@ -6331,7 +6255,13 @@ impl serde::Serialize for WriteResource {
         if !self.state_key_hash.is_empty() {
             len += 1;
         }
-        if self.data.is_some() {
+        if self.r#type.is_some() {
+            len += 1;
+        }
+        if !self.type_str.is_empty() {
+            len += 1;
+        }
+        if !self.data.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -6345,8 +6275,14 @@ impl serde::Serialize for WriteResource {
                 pbjson::private::base64::encode(&self.state_key_hash).as_str(),
             )?;
         }
-        if let Some(v) = self.data.as_ref() {
-            struct_ser.serialize_field("data", v)?;
+        if let Some(v) = self.r#type.as_ref() {
+            struct_ser.serialize_field("type", v)?;
+        }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
+        }
+        if !self.data.is_empty() {
+            struct_ser.serialize_field("data", &self.data)?;
         }
         struct_ser.end()
     }
@@ -6357,12 +6293,14 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["address", "stateKeyHash", "data"];
+        const FIELDS: &[&str] = &["address", "stateKeyHash", "type", "typeStr", "data"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Address,
             StateKeyHash,
+            Type,
+            TypeStr,
             Data,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -6390,6 +6328,8 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                         match value {
                             "address" => Ok(GeneratedField::Address),
                             "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
+                            "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -6412,6 +6352,8 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
             {
                 let mut address__ = None;
                 let mut state_key_hash__ = None;
+                let mut r#type__ = None;
+                let mut type_str__ = None;
                 let mut data__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
@@ -6430,6 +6372,18 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                                     .0,
                             );
                         }
+                        GeneratedField::Type => {
+                            if r#type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("type"));
+                            }
+                            r#type__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
+                        }
                         GeneratedField::Data => {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
@@ -6441,7 +6395,9 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                 Ok(WriteResource {
                     address: address__.unwrap_or_default(),
                     state_key_hash: state_key_hash__.unwrap_or_default(),
-                    data: data__,
+                    r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
+                    data: data__.unwrap_or_default(),
                 })
             }
         }

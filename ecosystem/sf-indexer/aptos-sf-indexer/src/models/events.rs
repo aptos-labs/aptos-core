@@ -20,6 +20,7 @@ pub struct Event {
     pub transaction_block_height: i64,
     #[diesel(column_name = type)]
     pub type_: String,
+    pub type_str: String,
     pub data: serde_json::Value,
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
@@ -39,6 +40,7 @@ impl Event {
             transaction_version: event.version as i64,
             transaction_block_height: block_height as i64,
             type_: event.r#type.clone(),
+            type_str: event.type_str.clone(),
             data: serde_json::from_str(&event.data).unwrap(),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
