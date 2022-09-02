@@ -75,6 +75,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::time::interval;
+use tokio_stream::wrappers::IntervalStream;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -820,6 +822,9 @@ impl EpochManager {
         mut round_timeout_sender_rx: channel::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
+        let mut progress_check_interval =
+            IntervalStream::new(interval(Duration::from_secs(1))).fuse();
+
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
@@ -827,18 +832,23 @@ impl EpochManager {
                 "main_loop",
                 ::futures::select! {
                     (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
-                        if let Err(e) = monitor!("process_message", self.process_message(peer, msg).await) {
+                        monitor!("process_message", if let Err(e) = self.process_message(peer, msg).await {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                        }
+                        });
                     },
                     (peer, request) = network_receivers.block_retrieval.select_next_some() => {
-                        if let Err(e) = monitor!("send_block_retrieval", self.process_block_retrieval(peer, request).await) {
+                        monitor!("send_block_retrieval",
+                        if let Err(e) = self.process_block_retrieval(peer, request).await {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                        }
+                        });
                     },
                     round = round_timeout_sender_rx.select_next_some() => {
                         monitor!("send_timeout", self.process_local_timeout(round));
                     },
+                    _ = progress_check_interval.select_next_some() => {
+                        debug!("We're in the progress check interval branch!");
+                        counters::PROGRESS_CHECK_COUNT.inc();
+                    }
                 }
             );
             // Continually capture the time of consensus process to ensure that clock skew between
