@@ -1,11 +1,11 @@
 {
-  "uid": "consensus",
+  "uid": "state-sync",
   "slug": "",
-  "title": "Consensus",
+  "title": "State Sync",
   "originalTitle": "",
   "tags": [],
   "style": "dark",
-  "timezone": "browser",
+  "timezone": "",
   "editable": true,
   "hideControls": false,
   "sharedCrosshair": false,
@@ -15,7 +15,7 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "id": 20,
+      "id": 18,
       "isNew": false,
       "span": 0,
       "title": "General Health",
@@ -29,12 +29,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
-      "id": 2,
+      "id": 10,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Committed blocks per sec",
-      "description": "The rate of the committed round number.",
+      "title": "Committed Version",
+      "description": "Version of the latest ledger info committed. Any synced transactions beyond this version will not be considered committed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -67,16 +67,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"committed\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "blocks / s" },
+        { "format": "short", "logBase": 1, "show": true, "label": "version number" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -109,12 +109,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
-      "id": 6,
+      "id": 40,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Committed successful txns per sec",
-      "description": "The rate of the committed transaction version.",
+      "title": "Synced Version",
+      "description": "The version of the latest transaction synced",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -147,16 +147,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"synced\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "transactions / s" },
+        { "format": "short", "logBase": 1, "show": true, "label": "version number" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -188,11 +186,169 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
-      "id": 96,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 52,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Epoch",
+      "description": "Epoch of local state",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "aptos_state_sync_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "id": 2,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Active Upstream Peers",
+      "description": "Number of peers that are currently active and upstream. They are the set of nodes a node can make sync requests to",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "B",
+          "expr": "sum by (kubernetes_pod_name, role, network) (aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{network}} network",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "Num upstream peers" },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 54,
       "isNew": false,
       "span": 0,
-      "title": "Latency breakdown",
+      "title": "Errors",
       "transparent": false,
       "type": "row",
       "panels": [],
@@ -202,253 +358,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "id": 97,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Block creation to signed",
-      "description": "Duration between block generation time until the moment the leader signs it.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"signed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"signed\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
-      "id": 98,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Block creation to receive",
-      "description": "Duration between block generation time until the moment the node receives it in consensus.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"received\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"received\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
-      "id": 99,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Block creation to synced",
-      "description": "Duration between block generation time until the moment the node is synced and ready to execute.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"synced\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"synced\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
-      "id": 100,
+      "id": 56,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Block creation to executed",
-      "description": "Duration between block generation time until the moment the node executes the block.",
+      "title": "Failed Storage Read",
+      "description": "rate of storage read failures ",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -465,7 +381,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -480,17 +396,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"executed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"executed\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_storage_read_fail_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -523,12 +437,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
-      "id": 29,
+      "id": 64,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Block creation to vote",
-      "description": "Duration between block generation time until the moment the node votes for it.",
+      "title": "Failed Network Sends",
+      "description": "rate of number of times a aptosNet network send failed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -545,7 +459,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -560,17 +474,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"voted\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"voted\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_requests_sent_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) + rate(aptos_state_sync_responses_sent_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -603,12 +515,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
-      "id": 101,
+      "id": 60,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Block creation to QC aggregated",
-      "description": "Duration between block generation time until the moment the QC is aggregated by leader.",
+      "title": "Failed channel sends",
+      "description": "rate of number of times a channel send failed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -625,7 +537,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -640,17 +552,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "B",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_failed_channel_sends_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{type}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -683,12 +593,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
-      "id": 90,
+      "id": 62,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Block creation to QC received",
-      "description": "Duration between block generation time until the moment the node adds the QC.",
+      "title": "Commit Flow Failures",
+      "description": "rate of failures encountered in the commit flow across consensus, state sync, and mempool",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -705,7 +615,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -721,16 +631,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"qc_added\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"qc_added\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_commit_flow_fail_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{component}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -763,12 +671,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
-      "id": 89,
+      "id": 58,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Block creation to commit",
-      "description": "Duration between block generation time until the moment the node commits it.",
+      "title": "Reconfig Notification Failure",
+      "description": "rate of number of times a reconfig notification failed to happen",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -785,7 +693,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -800,15 +708,93 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "C",
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"committed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", stage=\"committed\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_reconfig_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "id": 70,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Chunk Responses Received from Downstream",
+      "description": "rate of chunk responses received from a downstream peer ",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_responses_from_downstream_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{peer}})"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -841,10 +827,10 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
-      "id": 70,
+      "id": 74,
       "isNew": false,
       "span": 0,
-      "title": "Main loop",
+      "title": "Consensus Requests",
       "transparent": false,
       "type": "row",
       "panels": [],
@@ -855,12 +841,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 35 },
-      "id": 44,
+      "id": 80,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Event Loop Idle",
-      "description": "Percent of time the main Event Loop spends idle",
+      "title": "Msgs Received",
+      "description": "number of requests (e.g. commit, sync) received from consensus",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -893,15 +879,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "1 - (rate(consensus_duration_sum{op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) + on (kubernetes_pod_name, role) rate(consensus_duration_sum{op='process_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) + on (kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='main_loop', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{type}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true, "label": "msgs" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -934,12 +919,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 35 },
-      "id": 72,
+      "id": 76,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Event Loop process consensus msg",
-      "description": "Percent of time the main Event Loop spends for block retrieval",
+      "title": "Sync Requests Completed",
+      "description": "number of sync requests from consensus completed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -972,15 +957,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='main_loop', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"complete\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1013,12 +997,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 35 },
-      "id": 71,
+      "id": 78,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Event Loop process block retrieval",
-      "description": "Percent of time the main Event Loop spends for block retrieval",
+      "title": "Failed Sync Requests",
+      "description": "rate of sync requests (from consensus) that did not succeed (e.g. failed, timed out)",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1035,7 +1019,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -1051,15 +1035,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='main_loop', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result!=\"complete\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{result}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1092,12 +1075,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 43 },
-      "id": 73,
+      "id": 92,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time process local timeout",
-      "description": "Percent of time the main loop spends for processing local timeout.",
+      "title": "Msgs Received",
+      "description": "number of requests (e.g. commit, sync) received from consensus",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1130,15 +1113,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='main_loop', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{type}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true, "label": "msg / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1171,12 +1153,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 43 },
-      "id": 74,
+      "id": 93,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Process proposal",
-      "description": "Percent time spent in process proposal compared to all consensus msg",
+      "title": "Sync Requests Completed Rate",
+      "description": "number of sync requests from consensus completed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1209,15 +1191,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_proposal', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_message',  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"complete\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true, "label": "requests / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1250,12 +1231,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 43 },
-      "id": 75,
+      "id": 84,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Process vote",
-      "description": "Percent time spent in process vote compared to all consensus msg",
+      "title": "Process Sync Msg Latency",
+      "description": "latency of processing sync msg from consensus",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1288,15 +1269,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_vote', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"sync\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"sync\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "s", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1329,12 +1309,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
-      "id": 76,
+      "id": 86,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Percent Time Process sync info",
-      "description": "Percent time spent in process sync info compared to all consensus msg",
+      "title": "Consensus Commit Fail",
+      "description": "rate of number of times a commit msg from consensus failed to be processed",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1351,7 +1331,7 @@
         "max": false,
         "min": false,
         "rightSide": false,
-        "show": false,
+        "show": true,
         "total": false,
         "values": false
       },
@@ -1367,15 +1347,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_sync_info', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on(kubernetes_pod_name, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_message', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_consensus_commit_fail{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1408,12 +1387,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
-      "id": 84,
+      "id": 82,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Main Event Loop Error rate",
-      "description": "The error rate of main loop (timeout is considered as error)",
+      "title": "Process Commit Msg Latency",
+      "description": "Latency of processing commit msg from consensus",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1446,15 +1425,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / on (kubernetes_pod_name, role) rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='main_loop', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"commit\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"commit\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
+        { "format": "s", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1486,13 +1464,27 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
-      "id": 83,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
+      "id": 36,
+      "isNew": false,
+      "span": 0,
+      "title": "Sync Statistics",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": true
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 60 },
+      "id": 16,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Main Event Loop Current running function",
-      "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
+      "title": "Apply Chunk Success",
+      "description": "number of times a chunk was successfully applied to local state",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1525,44 +1517,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_proposal_running', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: proposal",
+          "expr": "aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})",
           "format": "time_series"
-        },
-        {
-          "refId": "B",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_vote_running', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: vote"
-        },
-        {
-          "refId": "C",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='process_local_timeout_running', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: timeout"
-        },
-        {
-          "refId": "D",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='reconfig_running', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: reconfig"
-        },
-        {
-          "refId": "E",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: execute"
-        },
-        {
-          "refId": "F",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: commit"
-        },
-        {
-          "refId": "G",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: sync"
-        },
-        {
-          "refId": "H",
-          "expr": "consensus_gauge{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: rpc"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
@@ -1600,105 +1558,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
-      "id": 18,
-      "isNew": false,
-      "span": 0,
-      "title": "RoundState",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 60 },
-      "id": 45,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Current Round",
-      "description": "The current round consensus is at, the rate of this is roughly Committed blocks per sec.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "round #" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 60 },
-      "id": 14,
+      "id": 31,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Total QC rounds",
+      "title": "Apply Chunk Failure",
+      "description": "number of times a received chunk failed to be applied to local state",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1731,16 +1597,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# rounds" },
+        { "format": "short", "logBase": 1, "min": 0, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1773,12 +1639,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 60 },
-      "id": 16,
+      "id": 14,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Total timeout rounds",
-      "description": "The total number of rounds that have timeout certificate.",
+      "title": "Target Version",
+      "description": "A version a node is trying to sync up to",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1811,16 +1677,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"target\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# timeout rounds" },
+        { "format": "none", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1853,12 +1719,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 68 },
-      "id": 26,
+      "id": 89,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Total local timeout",
-      "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
+      "title": "Apply Chunk Success Rate",
+      "description": "number of times a chunk was successfully applied to local state",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1891,16 +1757,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# timeouts" },
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "success / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -1933,12 +1799,12 @@
       "editable": false,
       "error": false,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 68 },
-      "id": 27,
+      "id": 90,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Current Round timeout value",
-      "description": "The duration of a single round until it generates local timeout.",
+      "title": "Apply Chunk Failure Rate",
+      "description": "number of times a received chunk failed to be applied to local state",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -1971,16 +1837,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_round_timeout_s{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "rate(aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "ms", "logBase": 1, "min": 0, "show": true, "label": "timeout val" },
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "failures / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -2012,27 +1878,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
-      "id": 59,
-      "isNew": false,
-      "span": 0,
-      "title": "EpochState",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
-      "id": 60,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 68 },
+      "id": 6,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Current Epoch",
-      "description": "The current epoch number the node is in, the number is bumped with reconfiguration event like key rotation, validator set change etc.",
+      "title": "Transaction Replayed",
+      "description": "number of transactions state synchronizer has retrieved since last restart",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -2065,188 +1917,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_epoch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "Epoch #" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
-      "id": 61,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Number of validators",
-      "description": "Number of validators for the current epoch.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# Validators" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
-      "id": 55,
-      "isNew": false,
-      "span": 0,
-      "title": "BlockStore",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 86 },
-      "id": 8,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Pending blocks",
-      "description": "Pending blocks in the block tree, typically it should be less than 3.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_num_blocks_in_tree{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - 1",
+          "expr": "aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- {{network}}:{{sender}}",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# blocks" },
+        { "format": "short", "logBase": 1, "min": 0, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -2278,13 +1958,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 86 },
-      "id": 57,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 76 },
+      "id": 12,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Transactions per block",
-      "description": "The average number of transactions of a block, can impact the execution time and overall latency.",
+      "title": "Chunk E2E Latency",
+      "description": "How long it took to sync a chunk, from requesting a chunk to fully processing and executing it",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -2317,16 +1997,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(aptos_consensus_num_txns_per_block_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_sync_progress_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_sync_progress_duration_s_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# transactions / block" },
+        { "format": "s", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -2358,13 +2038,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 86 },
-      "id": 56,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 76 },
+      "id": 42,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Total wait duration",
-      "description": "Total time the node has to wait before inserting the block",
+      "title": "Chunk Size",
+      "description": "number of txns in a chunk",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -2397,16 +2077,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
+          "expr": "rate(aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_chunk_size_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
+        { "format": "short", "logBase": 1, "show": true, "label": "# of transactions" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -2438,1245 +2116,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 94 },
-      "id": 4,
-      "isNew": false,
-      "span": 0,
-      "title": "External call",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 95 },
-      "id": 79,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Execute block Latency",
-      "description": "The average time to execute a block.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='execute_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 95 },
-      "id": 80,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Commit block Latency",
-      "description": "The average time to commit blocks (may commit more than 1 in a single call).",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='commit_block',  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 95 },
-      "id": 85,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Safety rules Latency",
-      "description": "The average latency of talking to safety rules (of all calls).",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='safety_rules', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 103 },
-      "id": 86,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Pull txn Latency",
-      "description": "The average latency of pulling the txn from mempool.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='pull_txn', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 103 },
-      "id": 87,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Notify mempool Latency",
-      "description": "The average latency of notifying mempool about failed transactions.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_mempool', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 103 },
-      "id": 88,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Notify state sync Latency",
-      "description": "The average latency of notifying state sync of committed txn.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='notify_state_sync', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 111 },
-      "id": 21,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "State sync count",
-      "description": "The total count of call to sync to.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# state syncs" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 111 },
-      "id": 23,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Total time spent on state sync",
-      "description": "The total time spent in the external sync_to function.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='sync_to', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true, "label": "total time" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 111 },
-      "id": 62,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Total sync Info Msgs sent to help peers",
-      "description": "The total number of sync info msg sent to help peers.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_sync_info_msg_sent_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# messages" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 119 },
-      "id": 24,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Block retrieval count",
-      "description": "The total number of block retrieval the node sends. It's required when the node is missing some ancestors of the block to be executed.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# blocks" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 119 },
-      "id": 25,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Total time spent on block retrieval",
-      "description": "Total time spent in retrieval the blocks from peers. (This is blocking RPC call)",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", op='block_retrieval', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "s", "logBase": 1, "min": 0, "show": true, "label": "total time" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 127 },
-      "id": 52,
-      "isNew": false,
-      "span": 0,
-      "title": "Proposer Election",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 128 },
-      "id": 28,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Proposals rate",
-      "description": "The proposal rate of the node, indicating how many times it becomes leaders.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "proposals / s" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 128 },
-      "id": 53,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Total votes on Nil",
-      "description": "The total number the node votes on a NIL block when the round timeout. (when the proposer doesn't send proposal in time).",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_vote_nil_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
-          "format": "time_series"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# votes" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 136 },
-      "id": 64,
-      "isNew": false,
-      "span": 0,
-      "title": "Message queue",
-      "transparent": false,
-      "type": "row",
-      "panels": [],
-      "collapsed": true
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 137 },
-      "id": 65,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Network -\u003e Consensus Pending Messages",
-      "description": "The channel metrics related to network layer to consensus.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - on (kubernetes_pod_name, role) aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 137 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 76 },
       "id": 91,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Network -\u003e Consensus Dropped Messages",
-      "description": "The channel metrics related to network layer to consensus.",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "C",
-          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "show": true, "label": "dropped messages / s" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 146 },
-      "id": 67,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Consensus -\u003e Main loop (Block retrieval) Pending Messages",
-      "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
+      "title": "Transaction Replayed Rate",
+      "description": "number of transactions state synchronizer has retrieved since last restart",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -3709,14 +2155,16 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - on (kubernetes_pod_name, role) aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "expr": "rate(aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- {{network}}:{{sender}}",
+          "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "replays / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -3748,91 +2196,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 146 },
-      "id": 92,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 84 },
+      "id": 48,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Consensus -\u003e Main loop (Block retrieval) Dropped Messages",
-      "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
-      "transparent": false,
-      "type": "graph",
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "fill": 0,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "C",
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
-        }
-      ],
-      "tooltip": { "shared": true, "value_type": "individual" },
-      "xaxis": { "format": "", "logBase": 0, "show": true },
-      "yaxes": [
-        { "format": "short", "logBase": 1, "show": true, "label": "messages dropped / s" },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "",
-          "color": { "mode": "" },
-          "thresholds": { "mode": "", "steps": null },
-          "custom": {
-            "axisPlacement": "",
-            "barAlignment": 0,
-            "drawStyle": "",
-            "fillOpacity": 0,
-            "gradientMode": "",
-            "lineInterpolation": "",
-            "lineWidth": 0,
-            "pointSize": 0,
-            "showPoints": "",
-            "spanNulls": false,
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineStyle": { "fill": "" },
-            "scaleDistribution": { "type": "" },
-            "stacking": { "group": "", "mode": "" },
-            "thresholdsStyle": { "mode": "" }
-          }
-        }
-      }
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 155 },
-      "id": 66,
-      "isNew": false,
-      "renderer": "flot",
-      "span": 0,
-      "title": "Consensus -\u003e Main loop (Consensus Msg) Pending Messages",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+      "title": "Execute/Commit Chunk Latency",
+      "description": "time it takes to execute and commit a chunk (via executor proxy)",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -3865,14 +2235,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_channel_msgs_count{state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - on (kubernetes_pod_name, role) aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"} - on (kubernetes_pod_name, role) aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "expr": "rate(aptos_state_sync_execute_chunk_duration_s_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_execute_chunk_duration_s_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
+        { "format": "s", "logBase": 1, "show": true },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -3904,13 +2274,27 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 155 },
-      "id": 93,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 92 },
+      "id": 22,
+      "isNew": false,
+      "span": 0,
+      "title": "Requests and Responses",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": true
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 93 },
+      "id": 24,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Consensus -\u003e Main loop (Consensus Msg) Dropped Messages",
-      "description": "The channel metrics related to consensus network -\u003e main loop. (It only keeps one message per peer per type).",
+      "title": "Requests Sent Rate",
+      "description": "rate of number of chunk requests sent",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -3942,15 +2326,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "C",
-          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_requests_sent_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -\u003e ({{network}}:{{peer}})",
+          "format": "time_series"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "show": true, "label": "dropped messages / s" },
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "requests / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -3982,13 +2368,249 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 164 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 93 },
+      "id": 32,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Chunk Response Received Rate",
+      "description": "rate of number of chunk responses received",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"chunk_response\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "responses / s" },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 93 },
+      "id": 88,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Multicast Level",
+      "description": "number of networks the node is sending chunk requests to. =0 if the primary upstream network is healthy, else \u003e0",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "aptos_state_sync_multicast_level{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "# of networks" },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 101 },
+      "id": 72,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Process Chunk Request Success Rate",
+      "description": "rate of number of times a node successfully processed a chunk request",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_process_chunk_request_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true, "label": "requests / s" },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 101 },
       "id": 68,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Pending self message",
-      "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
+      "title": "Process Chunk Request Failure Rate",
+      "description": "rate of number of times this node failed to process an incoming chunk request",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -4021,14 +2643,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "aptos_consensus_pending_self_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "expr": "rate(aptos_state_sync_process_chunk_request_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true, "label": "failures / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -4060,13 +2682,13 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 164 },
-      "id": 94,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 101 },
+      "id": 46,
       "isNew": false,
       "renderer": "flot",
       "span": 0,
-      "title": "Pending round local timeouts",
-      "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
+      "title": "Average Chunk Response Process Latency",
+      "description": "time it takes to process a chunk response",
       "transparent": false,
       "type": "graph",
       "aliasColors": {},
@@ -4098,15 +2720,265 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "C",
-          "expr": "aptos_consensus_pending_round_timeouts{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_process_msg_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"chunk_response\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"chunk_response\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})"
         }
       ],
       "tooltip": { "shared": true, "value_type": "individual" },
       "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        { "format": "short", "logBase": 1, "show": true },
+        { "format": "s", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 109 },
+      "id": 44,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Average Chunk Request Process Latency",
+      "description": "time it takes to process a chunk request",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_process_msg_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"chunk_request\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"chunk_request\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} \u003c- ({{network}}:{{sender}})"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "s", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 109 },
+      "id": 50,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Subscription Delivery Rate",
+      "description": "rate of number of times a FN long-poll subscription was delivered (does not include times where the initial FN chunk request was immediately responded to)",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_subscription_delivery_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -\u003e {{network}}:{{recipient}} - {{result}}"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true, "label": "deliveries / s" },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 117 },
+      "id": 20,
+      "isNew": false,
+      "span": 0,
+      "title": "Timeouts",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": true
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 118 },
+      "id": 8,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Sent Chunk Request Timeout Rate",
+      "description": "rate of times a node's sent chunk request timed out",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(aptos_state_sync_timeout_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "intervalFactor": 1,
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
+          "format": "time_series"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "min": 0, "show": true, "label": "timeouts / s" },
         { "format": "short", "logBase": 1, "show": true }
       ],
       "fieldConfig": {
@@ -4203,7 +3075,10 @@
         "allValue": ".*",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(kubernetes_pod_name)",
+        "query": {
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
+        },
         "regex": "",
         "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
@@ -4221,9 +3096,9 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(role)",
+        "query": { "query": "label_values(role)", "refId": "Prometheus-role-Variable-Query" },
         "regex": "",
-        "current": { "text": ["validator"], "value": ["validator"] },
+        "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
         "hide": 0,
         "sort": 0
@@ -4257,7 +3132,7 @@
         "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
         "regex": "",
         "current": { "text": ["auto"], "value": "$__auto_interval_interval" },
-        "label": "Aggregation Interval",
+        "label": "",
         "hide": 0,
         "sort": 0
       }
@@ -4267,7 +3142,7 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
-        "datasource": "-- Grafana --",
+        "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
         "lineColor": "",
@@ -4287,7 +3162,7 @@
     ]
   },
   "refresh": false,
-  "schemaVersion": 26,
+  "schemaVersion": 36,
   "version": 4,
   "links": [
     {
@@ -4301,7 +3176,7 @@
   ],
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
   },
   "graphTooltip": 1
