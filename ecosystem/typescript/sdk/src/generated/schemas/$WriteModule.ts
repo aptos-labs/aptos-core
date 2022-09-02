@@ -2,9 +2,13 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $WriteModule = {
+    description: `Write a new module or update an existing one`,
     properties: {
         address: {
-            type: 'Address',
+            type: 'all-of',
+            contains: [{
+                type: 'Address',
+            }],
             isRequired: true,
         },
         state_key_hash: {
@@ -12,7 +16,10 @@ export const $WriteModule = {
             isRequired: true,
         },
         data: {
-            type: 'MoveModuleBytecode',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveModuleBytecode',
+            }],
             isRequired: true,
         },
     },

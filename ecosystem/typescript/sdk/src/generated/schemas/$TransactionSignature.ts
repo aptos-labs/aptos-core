@@ -3,6 +3,7 @@
 /* eslint-disable */
 export const $TransactionSignature = {
     type: 'one-of',
+    description: `An enum representing the different transaction signatures available`,
     contains: [{
         type: 'TransactionSignature_Ed25519Signature',
     }, {

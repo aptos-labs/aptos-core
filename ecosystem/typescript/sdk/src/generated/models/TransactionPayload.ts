@@ -6,5 +6,8 @@ import type { TransactionPayload_EntryFunctionPayload } from './TransactionPaylo
 import type { TransactionPayload_ModuleBundlePayload } from './TransactionPayload_ModuleBundlePayload';
 import type { TransactionPayload_ScriptPayload } from './TransactionPayload_ScriptPayload';
 
+/**
+ * An enum of the possible transaction payloads
+ */
 export type TransactionPayload = (TransactionPayload_EntryFunctionPayload | TransactionPayload_ScriptPayload | TransactionPayload_ModuleBundlePayload);
 

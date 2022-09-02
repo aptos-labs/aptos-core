@@ -19,9 +19,13 @@ export class EventsService {
      * Get events by event key
      * This endpoint allows you to get a list of events of a specific type
      * as identified by its event key, which is a globally unique ID.
-     * @param eventKey
-     * @param start
-     * @param limit
+     * @param eventKey Event key to retrieve events by
+     * @param start Starting sequence number of events.
+     *
+     * By default, will retrieve the most recent events
+     * @param limit Max number of events to retrieve.
+     *
+     * Mo value defaults to default page size
      * @returns VersionedEvent
      * @throws ApiError
      */
@@ -48,11 +52,15 @@ export class EventsService {
      * This API extracts event key from the account resource identified
      * by the `event_handle_struct` and `field_name`, then returns
      * events identified by the event key.
-     * @param address
-     * @param eventHandle
-     * @param fieldName
-     * @param start
-     * @param limit
+     * @param address Address of account with or without a `0x` prefix
+     * @param eventHandle Name of struct to lookup event handle e.g. `0x1::account::Account`
+     * @param fieldName Name of field to lookup event handle e.g. `withdraw_events`
+     * @param start Starting sequence number of events.
+     *
+     * By default, will retrieve the most recent events
+     * @param limit Max number of events to retrieve.
+     *
+     * Mo value defaults to default page size
      * @returns VersionedEvent
      * @throws ApiError
      */
