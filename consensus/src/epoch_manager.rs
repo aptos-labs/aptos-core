@@ -63,7 +63,7 @@ use futures::{
         mpsc::{unbounded, Receiver, Sender, UnboundedSender},
         oneshot,
     },
-    SinkExt, StreamExt,
+    FutureExt, SinkExt, StreamExt,
 };
 use itertools::Itertools;
 use network::protocols::network::{ApplicationNetworkSender, Event};
@@ -871,12 +871,15 @@ impl EpochManager {
             }
         });
         loop {
-            let consensus_next = consensus_messages_monitor
-                .instrument(network_receivers.consensus_messages.select_next_some());
-            let block_retrieval_next = block_retrieval_monitor
-                .instrument(network_receivers.block_retrieval.select_next_some());
-            let timeout_next =
-                round_timeout_monitor.instrument(round_timeout_sender_rx.select_next_some());
+            let mut consensus_next = consensus_messages_monitor
+                .instrument(network_receivers.consensus_messages.select_next_some())
+                .fuse();
+            let mut block_retrieval_next = block_retrieval_monitor
+                .instrument(network_receivers.block_retrieval.select_next_some())
+                .fuse();
+            let mut timeout_next = round_timeout_monitor
+                .instrument(round_timeout_sender_rx.select_next_some())
+                .fuse();
             monitor!(
                 "main_loop",
                 tokio::select! {
