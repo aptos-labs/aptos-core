@@ -90,7 +90,8 @@ message EventOutput {
   EventKeyOutput key = 2;
   uint64 sequence_number = 3;
   string type = 4;
-  string data = 5;
+  string type_str = 5;
+  string data = 6;
 }
 
 message EventKeyOutput {
@@ -124,10 +125,11 @@ message MoveModuleOutput {
 message MoveResourceOutput {
   string address = 1;
   string module = 2;
-  string name = 3;
-  repeated string generic_type_params = 4;
-  string data = 5;
-  bool is_deleted = 6;
+  string type_str = 3;
+  string name = 4;
+  repeated string generic_type_params = 5;
+  string data = 6;
+  bool is_deleted = 7;
   uint64 wsc_index = 8;
 }
 

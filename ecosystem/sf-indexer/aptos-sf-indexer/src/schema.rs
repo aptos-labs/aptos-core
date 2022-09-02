@@ -28,6 +28,7 @@ table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
+        type_str -> Text,
     }
 }
 
@@ -75,6 +76,7 @@ table! {
         data -> Nullable<Jsonb>,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        type_str -> Text,
     }
 }
 

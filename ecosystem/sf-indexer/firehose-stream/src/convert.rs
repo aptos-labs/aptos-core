@@ -4,10 +4,10 @@
 use aptos_api_types::{
     AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, Event,
     GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
-    MultiEd25519Signature, ScriptPayload, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
+    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, ScriptPayload,
+    Transaction, TransactionInfo, TransactionPayload, TransactionSignature, WriteSet,
+    WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -114,18 +114,6 @@ pub fn convert_move_module(move_module: &MoveModule) -> extractor::MoveModule {
             .iter()
             .map(convert_move_struct)
             .collect(),
-    }
-}
-
-pub fn convert_move_resource(move_resource: &MoveResource) -> extractor::MoveResource {
-    extractor::MoveResource {
-        r#type: Some(convert_move_struct_tag(&move_resource.typ)),
-        data: serde_json::to_string(&move_resource.data).unwrap_or_else(|_| {
-            panic!(
-                "Could not convert move_resource data to json '{:?}'",
-                move_resource
-            )
-        }),
     }
 }
 
@@ -319,7 +307,8 @@ pub fn convert_delete_resource(delete_resource: &DeleteResource) -> extractor::D
     extractor::DeleteResource {
         address: delete_resource.address.to_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
-        resource: Some(convert_move_struct_tag(&delete_resource.resource)),
+        r#type: Some(convert_move_struct_tag(&delete_resource.resource)),
+        type_str: delete_resource.resource.to_string(),
     }
 }
 
@@ -378,7 +367,14 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                 extractor::WriteResource {
                     address: write_resource.address.to_string(),
                     state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
-                    data: Some(convert_move_resource(&write_resource.data)),
+                    r#type: Some(convert_move_struct_tag(&write_resource.data.typ)),
+                    type_str: write_resource.data.typ.to_string(),
+                    data: serde_json::to_string(&write_resource.data).unwrap_or_else(|_| {
+                        panic!(
+                            "Could not convert move_resource data to json '{:?}'",
+                            write_resource.data
+                        )
+                    }),
                 },
             )),
         },
@@ -448,6 +444,7 @@ pub fn convert_event(event: &Event) -> extractor::Event {
         }),
         sequence_number: event.sequence_number.0,
         r#type: Some(convert_move_type(&event.typ)),
+        type_str: event.typ.to_string(),
         data: event.data.to_string(),
     }
 }
