@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  VStack, Input, Text, useColorMode,
+  VStack, Input, Text, useColorMode, Tooltip,
 } from '@chakra-ui/react';
 import { secondaryTextColor } from 'core/colors';
 import numeral from 'numeral';
@@ -11,6 +11,9 @@ import { useFormContext } from 'react-hook-form';
 import MaskedInput from 'react-text-mask';
 import { createNumberMask } from 'text-mask-addons';
 import { keyframes } from '@emotion/react';
+import {
+  APTOS_UNIT, octaToAptWithDecimals, OCTA_UNIT,
+} from 'core/utils/coin';
 import type { CoinTransferFormData } from './TransferDrawer';
 
 const bounce = keyframes`
@@ -47,9 +50,9 @@ const defaultMaskOptions = {
   decimalLimit: 8,
   decimalSymbol: '.',
   includeThousandsSeparator: true,
-  // this would be more than the supply of APT
-  // TODO: implement after we change from octa to decimal APT
-  // integerLimit: 10,
+  // this would be more than the supply of APT,
+  // we can change the mask options once other coins are introduced
+  integerLimit: 10,
   prefix: '',
   // how many digits allowed after the decimal
   suffix: ' APT',
@@ -57,6 +60,9 @@ const defaultMaskOptions = {
 };
 
 function getAmountInputFontSize(amount?: number) {
+  // TODO: change so that it is determined by string length, not amount
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const amountStringLength = String(amount).length;
   if (!amount || amount < 1e4) {
     return 64;
   }
@@ -93,8 +99,9 @@ export default function TransferInput({
   const { colorMode } = useColorMode();
   const amount = watch('amount');
   const numberAmount = numeral(amount).value() || undefined;
-  const coinBalanceString = numeral(coinBalance).format('0,0');
+  const coinBalanceString = octaToAptWithDecimals({ decimals: 4, octas: coinBalance });
   const amountInputFontSize = useMemo(() => getAmountInputFontSize(numberAmount), [numberAmount]);
+  const estimatedGasFeeInAPT = octaToAptWithDecimals({ decimals: 0, octas: estimatedGasFee });
 
   const {
     onChange: amountOnChange,
@@ -138,21 +145,23 @@ export default function TransferInput({
           />
         )}
       />
-      <Text
-        fontSize="sm"
-        color={secondaryTextColor[colorMode]}
-        position="absolute"
-        bottom={16}
-        animation={(shouldBalanceShake) ? `${bounce} 1s ease infinite` : undefined}
-      >
-        Balance:
-        {' '}
-        {`${coinBalanceString} APT`}
-        ,
-        fees:
-        {' '}
-        {`${estimatedGasFee || 0} APT`}
-      </Text>
+      <Tooltip label={`Network fee: ${estimatedGasFeeInAPT}`}>
+        <Text
+          fontSize="sm"
+          color={secondaryTextColor[colorMode]}
+          position="absolute"
+          bottom={16}
+          animation={(shouldBalanceShake) ? `${bounce} 1s ease infinite` : undefined}
+        >
+          Balance:
+          {' '}
+          {`${coinBalanceString} ${APTOS_UNIT}`}
+          ,
+          fees:
+          {' '}
+          {`${estimatedGasFee || 0} ${OCTA_UNIT}`}
+        </Text>
+      </Tooltip>
     </VStack>
   );
 }

@@ -9,9 +9,9 @@ import { useActiveAccount } from 'core/hooks/useAccounts';
 import { type StakeInfo, useAccountStakeInfo } from 'core/queries/account';
 import React, { useMemo } from 'react';
 import format from 'date-fns/format';
-import numeral from 'numeral';
 import { collapseHexString } from 'core/utils/hex';
 import { ChevronRightIcon } from '@chakra-ui/icons';
+import { APTOS_UNIT, octaToAptWithDecimals } from 'core/utils/coin';
 import { AptosLogo } from './AptosLogo';
 import ChakraLink from './ChakraLink';
 import Copyable from './Copyable';
@@ -51,7 +51,7 @@ function StakeBodyContent({
     value: stakeAmount,
   } = stakeInfo;
 
-  const stakeAmountString = numeral(stakeAmount).format('0,0');
+  const stakeAmountString = octaToAptWithDecimals({ octas: stakeAmount });
 
   const lockedUntilDateString = useMemo(() => {
     const lockedUntilDate = new Date(Number(lockedUntilSecs) * 1000);
@@ -76,7 +76,7 @@ function StakeBodyContent({
       <span>
         <Heading as="span" wordBreak="break-word" maxW="100%">{stakeAmountString}</Heading>
         <Text pl={2} pb="2px" as="span" fontSize="xl" fontWeight={600}>
-          APT
+          {APTOS_UNIT}
         </Text>
       </span>
       <Text color={secondaryAddressFontColor[colorMode]} fontSize="sm">

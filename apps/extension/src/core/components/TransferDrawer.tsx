@@ -331,7 +331,7 @@ function TransferDrawer() {
           amount={numberAmount}
           estimatedGasFee={estimatedGasFee}
           recipient={validRecipientAddress}
-          unit="APT"
+          unit={APTOS_UNIT}
         />
       </DrawerBody>
       <DrawerFooter

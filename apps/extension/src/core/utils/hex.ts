@@ -1,4 +1,6 @@
-/* eslint-disable import/prefer-default-export */
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { MaybeHexString } from 'aptos';
 
 /**
@@ -18,3 +20,5 @@ export function collapseHexString(hex: MaybeHexString, keepDigits: number = 10):
   const keepDigitsRight = Math.floor(keepDigits / 2);
   return `0x${digits.slice(0, keepDigitsLeft)}..${digits.slice(-keepDigitsRight)}`;
 }
+
+export default collapseHexString;
