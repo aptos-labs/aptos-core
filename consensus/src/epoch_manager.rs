@@ -78,6 +78,8 @@ use std::{
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
+use tokio_metrics::TaskMonitor;
+
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
@@ -827,28 +829,76 @@ impl EpochManager {
 
         // initial start of the processor
         self.await_reconfig_notification().await;
+
+        let consensus_messages_monitor = TaskMonitor::new();
+        let block_retrieval_monitor = TaskMonitor::new();
+        let round_timeout_monitor = TaskMonitor::new();
+
+        let metrics_frequency = std::time::Duration::from_secs(1);
+
+        let consensus_intervals = consensus_messages_monitor.intervals();
+        let block_intervals = block_retrieval_monitor.intervals();
+        let timeout_intervals = round_timeout_monitor.intervals();
+
+        // zip the metrics streams together
+        let tmp_intervals = block_intervals.zip(timeout_intervals);
+        let intervals = consensus_intervals.zip(tmp_intervals);
+
+        tokio::spawn(async move {
+            // call `.intervals()` on each monitor to get an endless
+            // iterator of metrics sampled from that monitor
+            // print the metrics for each monitor to stdout
+            for (consensus, (block, timeout)) in intervals {
+                info!("METRICS: consensus = {:#?}", consensus);
+                info!("METRICS: block = {:#?}", block);
+                info!("METRICS: timeout = {:#?}", timeout);
+                tokio::time::sleep(metrics_frequency).await;
+            }
+        });
+
+        let process_message_monitor = TaskMonitor::new();
+        let process_retrieval_monitor = TaskMonitor::new();
+
+        let pmm_intervals = process_message_monitor.intervals();
+        let pbr_intervals = process_retrieval_monitor.intervals();
+
+        let process_intervals = pmm_intervals.zip(pbr_intervals);
+
+        tokio::spawn(async move {
+            for (message, retrival) in process_intervals {
+                info!("METRICS: process message {:#?}", message);
+                info!("METRICS: process block retrival {:#?}", retrival);
+            }
+        });
         loop {
+            let consensus_next = consensus_messages_monitor
+                .instrument(network_receivers.consensus_messages.select_next_some());
+            let block_retrieval_next = block_retrieval_monitor
+                .instrument(network_receivers.block_retrieval.select_next_some());
+            let timeout_next =
+                round_timeout_monitor.instrument(round_timeout_sender_rx.select_next_some());
             monitor!(
                 "main_loop",
-                ::futures::select! {
-                    (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
-                        monitor!("process_message", if let Err(e) = self.process_message(peer, msg).await {
+                tokio::select! {
+                    (peer, msg) = consensus_next =>{
+                        monitor!("process_message" , if let Err(e) =  process_message_monitor.instrument(self.process_message(peer, msg)).await {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                         });
                     },
-                    (peer, request) = network_receivers.block_retrieval.select_next_some() => {
+                    (peer, request) = block_retrieval_next => {
                         monitor!("send_block_retrieval",
-                        if let Err(e) = self.process_block_retrieval(peer, request).await {
+                        if let Err(e) = process_retrieval_monitor.instrument(self.process_block_retrieval(peer, request)).await {
                             error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                         });
                     },
-                    round = round_timeout_sender_rx.select_next_some() => {
+                    round = timeout_next => {
                         monitor!("send_timeout", self.process_local_timeout(round));
                     },
                     _ = progress_check_interval.select_next_some() => {
                         debug!("We're in the progress check interval branch!");
                         counters::PROGRESS_CHECK_COUNT.inc();
                     }
+
                 }
             );
             // Continually capture the time of consensus process to ensure that clock skew between
