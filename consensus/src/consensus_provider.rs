@@ -80,7 +80,23 @@ pub fn start_consensus(
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 
     runtime.spawn(network_task.start());
-    runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+    let metrics_monitor = tokio_metrics::TaskMonitor::new();
+    let epoch_manger_instrumneted =
+        metrics_monitor.instrument(epoch_mgr.start(timeout_receiver, network_receiver));
+
+    let metrics_frequency = std::time::Duration::from_secs(1);
+    runtime.spawn(async move {
+        // call `.intervals()` on each monitor to get an endless
+        // iterator of metrics sampled from that monitor
+        let intervals = metrics_monitor.intervals();
+        // print the metrics for each monitor to stdout
+        for metrics in intervals {
+            info!("EPOCH METRICS: = {:#?}", metrics);
+            tokio::time::sleep(metrics_frequency).await;
+        }
+    });
+
+    runtime.spawn(epoch_manger_instrumneted);
 
     debug!("Consensus started.");
     runtime
