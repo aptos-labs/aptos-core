@@ -7,7 +7,7 @@ import CreateAccountBody from 'core/components/CreateAccountBody';
 import { CreateAccountFormValues, CreateAccountLayout } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
 import { AptosAccount } from 'aptos';
-import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
+import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { createAccountErrorToast, createAccountToast } from 'core/components/Toast';
@@ -28,22 +28,15 @@ function CreateAccount() {
       try {
         const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
         const aptosAccount = new AptosAccount(seed);
-        const {
-          address,
-          privateKeyHex,
-          publicKeyHex,
-        } = aptosAccount.toPrivateKeyObject();
 
-        await addAccount({
-          address: address!,
+        const newAccount = {
           mnemonic,
-          name: 'Wallet',
-          privateKey: privateKeyHex,
-          publicKey: publicKeyHex!,
-        });
+          ...keysFromAptosAccount(aptosAccount),
+        };
+        await addAccount(newAccount);
 
         if (fundAccount) {
-          await fundAccount({ address: address!, amount: 0 });
+          await fundAccount({ address: newAccount.address, amount: 0 });
         }
 
         createAccountToast();

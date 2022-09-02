@@ -6,7 +6,7 @@ import Routes from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
 import { ImportAccountMnemonicLayout, MnemonicFormValues } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
-import { generateMnemonicObject } from 'core/utils/account';
+import { generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
@@ -30,18 +30,9 @@ export default function ImportWalletMnemonic() {
       const aptosAccount = new AptosAccount(seed);
       // TODO: prompt user for confirmation if account is not on chain
 
-      const {
-        address,
-        privateKeyHex,
-        publicKeyHex,
-      } = aptosAccount.toPrivateKeyObject();
-
       await addAccount({
-        address: address!,
         mnemonic,
-        name: 'Wallet',
-        privateKey: privateKeyHex,
-        publicKey: publicKeyHex!,
+        ...keysFromAptosAccount(aptosAccount),
       });
 
       importAccountToast();

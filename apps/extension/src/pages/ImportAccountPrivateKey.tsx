@@ -9,6 +9,7 @@ import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
+import { keysFromAptosAccount } from 'core/utils/account';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
@@ -26,18 +27,7 @@ export default function ImportAccountPrivateKey() {
       const aptosAccount = new AptosAccount(encodedKey);
       // TODO: prompt user for confirmation if account is not on chain
 
-      const {
-        address,
-        privateKeyHex,
-        publicKeyHex,
-      } = aptosAccount.toPrivateKeyObject();
-
-      await addAccount({
-        address: address!,
-        name: 'Wallet',
-        privateKey: privateKeyHex,
-        publicKey: publicKeyHex!,
-      });
+      await addAccount(keysFromAptosAccount(aptosAccount));
 
       importAccountToast();
       navigate(Routes.wallet.path);

@@ -14,7 +14,7 @@ import Routes from 'core/routes';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
 import { AptosAccount } from 'aptos';
-import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
+import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
 import { useAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 
@@ -73,18 +73,10 @@ function NextButton({
       setIsLoading(true);
       const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
       const aptosAccount = new AptosAccount(seed);
-      const {
-        address,
-        privateKeyHex,
-        publicKeyHex,
-      } = aptosAccount.toPrivateKeyObject();
 
       const firstAccount = {
-        address: address!,
         mnemonic,
-        name: 'Wallet',
-        privateKey: privateKeyHex,
-        publicKey: publicKeyHex!,
+        ...keysFromAptosAccount(aptosAccount),
       };
 
       await initAccounts(confirmPassword, {
@@ -92,7 +84,7 @@ function NextButton({
       });
 
       if (fundAccount) {
-        await fundAccount({ address: address!, amount: 0 });
+        await fundAccount({ address: firstAccount.address, amount: 0 });
       }
 
       setIsLoading(false);

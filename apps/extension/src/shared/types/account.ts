@@ -13,7 +13,7 @@ export interface PublicAccount {
 
 export type Account = PublicAccount & {
   mnemonic?: string;
-  name: string;
+  name?: string;
   privateKey: string;
 };
 

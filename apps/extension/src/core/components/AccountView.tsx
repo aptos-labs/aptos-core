@@ -116,7 +116,7 @@ const AccountView = React.forwardRef(({
       </Center>
       <VStack width="100%" alignItems="flex-start" spacing={0}>
         <Text color={textColor[colorMode]} fontWeight={600} fontSize="md">
-          {displayAccount.name}
+          {displayAccount.name || 'Account'}
         </Text>
         <Copyable value={displayAccount.address}>
           <HStack alignItems="baseline">

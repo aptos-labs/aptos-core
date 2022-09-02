@@ -41,6 +41,29 @@ export async function generateMnemonicObject(mnemonicString: string): Promise<Mn
   throw new Error('Private key can not be derived');
 }
 
+/**
+ * Retrieve hex string from Uint8Array.
+ * Needed this after a breaking bug in the sdk.
+ * @param value byte array to be converted to hex string
+ */
+function hexStringFromUint8Array(value: Uint8Array) {
+  const hexString = Buffer.from(value).toString('hex');
+  return new HexString(hexString).hex();
+}
+
+/**
+ * Utility to extract keys from an AptosAccount.
+ * Mainly used during account creation within the wallet
+ * @param aptosAccount AptosAccount instance to get keys from
+ */
+export function keysFromAptosAccount(aptosAccount: AptosAccount) {
+  return {
+    address: aptosAccount.address().hex(),
+    privateKey: hexStringFromUint8Array(aptosAccount.signingKey.secretKey.slice(0, 32)),
+    publicKey: hexStringFromUint8Array(aptosAccount.signingKey.publicKey),
+  };
+}
+
 export async function getBackgroundCurrentPublicAccount(): Promise<PublicAccount | null> {
   const {
     activeAccountAddress: address,

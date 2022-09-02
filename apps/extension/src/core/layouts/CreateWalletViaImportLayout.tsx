@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
-import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
+import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import {
   importAccountErrorToast, importAccountToast, networkDoesNotExistToast,
@@ -128,19 +128,11 @@ function NextButton() {
           mnemonicString = mnemonicString.trim();
           const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
           const aptosAccount = new AptosAccount(seed);
-          const {
-            address,
-            privateKeyHex,
-            publicKeyHex,
-          } = aptosAccount.toPrivateKeyObject();
 
           // initialize password and wallet
           const firstAccount = {
-            address: address!,
             mnemonic,
-            name: 'Wallet',
-            privateKey: privateKeyHex,
-            publicKey: publicKeyHex!,
+            ...keysFromAptosAccount(aptosAccount),
           };
 
           await initAccounts(confirmPassword, {
@@ -169,19 +161,8 @@ function NextButton() {
           const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
           const aptosAccount = new AptosAccount(encodedKey);
 
-          const {
-            address,
-            privateKeyHex,
-            publicKeyHex,
-          } = aptosAccount.toPrivateKeyObject();
-
           // initialize password and wallet
-          const firstAccount = {
-            address: address!,
-            name: 'Wallet',
-            privateKey: privateKeyHex,
-            publicKey: publicKeyHex!,
-          };
+          const firstAccount = keysFromAptosAccount(aptosAccount);
 
           await initAccounts(confirmPassword, {
             [firstAccount.address]: firstAccount,
