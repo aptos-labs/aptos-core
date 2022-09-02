@@ -14,7 +14,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
 use bytes::Bytes;
-use channel::{self};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
@@ -32,7 +32,10 @@ use network::{
     },
     ProtocolId,
 };
-use std::time::Duration;
+use std::{
+    mem::{discriminant, Discriminant},
+    time::Duration,
+};
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
@@ -47,8 +50,12 @@ pub struct IncomingBlockRetrievalRequest {
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
-    pub consensus_messages: channel::Receiver<(AccountAddress, ConsensusMsg)>,
-    pub block_retrieval: channel::Receiver<(AccountAddress, IncomingBlockRetrievalRequest)>,
+    pub consensus_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub block_retrieval:
+        aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -230,8 +237,12 @@ impl NetworkSender {
 }
 
 pub struct NetworkTask {
-    consensus_messages_tx: channel::Sender<(AccountAddress, ConsensusMsg)>,
-    block_retrieval_tx: channel::Sender<(AccountAddress, IncomingBlockRetrievalRequest)>,
+    consensus_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    block_retrieval_tx:
+        aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -242,9 +253,12 @@ impl NetworkTask {
         self_receiver: channel::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
-            channel::new(1024, &counters::CONSENSUS_CHANNEL_MSGS);
-        let (block_retrieval_tx, block_retrieval) =
-            channel::new(1024, &counters::BLOCK_RETRIEVAL_CHANNEL_MSGS);
+            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),
+        );
         let all_events = Box::new(select(network_events, self_receiver));
         (
             NetworkTask {
@@ -263,7 +277,10 @@ impl NetworkTask {
         while let Some(message) = self.all_events.next().await {
             match message {
                 Event::Message(peer_id, msg) => {
-                    if let Err(e) = self.consensus_messages_tx.try_send((peer_id, msg)) {
+                    if let Err(e) = self
+                        .consensus_messages_tx
+                        .push((peer_id, discriminant(&msg)), (peer_id, msg))
+                    {
                         warn!(
                             remote_peer = peer_id,
                             error = ?e, "Error pushing consensus msg",
@@ -293,9 +310,9 @@ impl NetworkTask {
                         };
                         if let Err(e) = self
                             .block_retrieval_tx
-                            .try_send((peer_id, req_with_callback))
+                            .push(peer_id, (peer_id, req_with_callback))
                         {
-                            warn!(error = ?e, "channel full");
+                            warn!(error = ?e, "aptos channel closed");
                         }
                     }
                     _ => {
