@@ -115,12 +115,13 @@ impl Default for NetworkConfig {
 
 impl NetworkConfig {
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
+        let mutual_authentication = network_id.is_validator_network();
         let mut config = Self {
             discovery_method: DiscoveryMethod::None,
             discovery_methods: Vec::new(),
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
-            mutual_authentication: false,
+            mutual_authentication,
             network_id,
             runtime_threads: None,
             seed_addrs: HashMap::new(),
