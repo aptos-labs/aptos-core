@@ -173,7 +173,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "aptos-white-paper/index" },
-      items: ["aptos-white-paper/in-korean"],
+      items: ["aptos-white-paper/in-korean", "aptos-white-paper/in-chinese"],
     },
     "reference/glossary",
   ],
