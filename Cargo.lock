@@ -858,6 +858,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-network-checker"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-types",
+ "clap 3.2.17",
+ "fallible",
+ "futures",
+ "hex",
+ "network",
+ "serde 1.0.144",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-node"
 version = "0.1.0"
 dependencies = [
