@@ -21,6 +21,7 @@ impl Page {
         Self { start, limit }
     }
 
+    /// Compute the start of the page for transactions
     pub fn compute_start<E: BadRequestError>(
         &self,
         limit: u16,
@@ -31,6 +32,7 @@ impl Page {
         self.start(last_page_start, max, ledger_info)
     }
 
+    /// Retrieve the start of the page
     pub fn start<E: BadRequestError>(
         &self,
         default: u64,
@@ -51,10 +53,12 @@ impl Page {
         Ok(start)
     }
 
+    /// Retrieve the start version
     pub fn start_option(&self) -> Option<u64> {
         self.start
     }
 
+    /// Get the page size for the request
     pub fn limit<E: BadRequestError>(&self, ledger_info: &LedgerInfo) -> Result<u16, E> {
         let limit = self.limit.unwrap_or(DEFAULT_PAGE_SIZE);
         if limit == 0 {

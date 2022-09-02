@@ -4,6 +4,15 @@
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
+/// Event key is a global index for an event stream.
+///
+/// It is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is
+/// a combination of a `uint64` creation number and account address (without
+/// trimming leading zeros).
+///
+/// For example, event key `0x010000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:
+/// 1. `0100000000000000`: little endian `uint64` representation of `1`.
+/// 2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub struct EventKey(pub aptos_types::event::EventKey);
 
