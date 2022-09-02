@@ -708,8 +708,7 @@ function parseApiError(target: unknown, propertyKey: string, descriptor: Propert
   // eslint-disable-next-line no-param-reassign
   descriptor.value = async function wrapper(...args: any[]) {
     try {
-      const res = await childFunction.apply(this, [...args]);
-      return res;
+      return childFunction.apply(this, [...args]);
     } catch (e) {
       if (e instanceof Gen.ApiError) {
         throw new ApiError(
