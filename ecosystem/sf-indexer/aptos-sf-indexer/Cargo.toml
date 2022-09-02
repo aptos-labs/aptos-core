@@ -18,6 +18,8 @@ aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-protos = { path = "../../../crates/aptos-protos" }
 aptos-rest-client = { path = "../../../crates/aptos-rest-client" }
 aptos-types = { path = "../../../types" }
+inspection-service = { path = "../../../crates/inspection-service" }
+
 async-stream = "0.3"
 async-trait = "0.1.53"
 bigdecimal = { version = "0.1.2", features = ["serde"] }
@@ -29,6 +31,7 @@ diesel_migrations = { version = "1.4.0", features = ["postgres"] }
 field_count = "0.1.1"
 futures = "0.3.21"
 http = "0.2.3"
+hyper = { version = "0.14.18", features = ["full"] }
 once_cell = "1.10.0"
 pbjson = "0.4.0"
 prost = "0.10.4"
