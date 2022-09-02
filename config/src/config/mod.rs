@@ -325,6 +325,7 @@ impl NodeConfig {
         let mut network_ids = HashSet::new();
         if let Some(network) = &mut self.validator_network {
             network.load_validator_network()?;
+            network.mutual_authentication = true; // This should always be the default for validators
             network_ids.insert(network.network_id);
         }
         for network in &mut self.full_node_networks {
