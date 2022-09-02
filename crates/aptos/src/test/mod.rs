@@ -646,7 +646,7 @@ impl CliTestFramework {
     pub async fn compile_package(
         &self,
         account_strs: BTreeMap<&str, &str>,
-        included_artifacts: Option<IncludedArtifacts>
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
@@ -677,14 +677,14 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
-        included_artifacts: Option<IncludedArtifacts>
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
             legacy_flow,
             override_size_check: false,
-            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All)
+            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All),
         }
         .execute()
         .await

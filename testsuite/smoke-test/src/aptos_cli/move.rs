@@ -115,7 +115,10 @@ async fn test_move_publish_flow() {
     // Let's publish it
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
-    let _ = match cli.publish_package(0, None, named_addresses, false, None).await {
+    let _ = match cli
+        .publish_package(0, None, named_addresses, false, None)
+        .await
+    {
         Ok(response) => response,
         Err(err) => panic!("Should not have failed to publish package {:?}", err),
     };
