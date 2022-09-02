@@ -19,6 +19,7 @@ module aptos_framework::genesis {
     use aptos_framework::state_storage;
     use aptos_framework::version;
     use aptos_framework::chain_status;
+    use aptos_framework::storage_gas;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -88,6 +89,7 @@ module aptos_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit,
         );
+        storage_gas::initialize(&aptos_framework_account);
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
         // Ensure we can create aggregators for supply, but not enable it for common use just yet.
