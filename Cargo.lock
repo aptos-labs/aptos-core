@@ -2616,6 +2616,7 @@ dependencies = [
  "termion",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "vm-validator",
 ]
 
