@@ -53,4 +53,5 @@ throughput scalability without adding additional complexity for node operators.
 
 - **English**: Click [here for the full PDF of the Aptos White Paper](/papers/Aptos-Whitepaper.pdf).
 - **Korean**: Click [here for the Korean version full PDF of the Aptos White Paper](/papers/whitepaper-korean.pdf).
+- **Chinese**: Click [here for the Chinese version full PDF of the Aptos White Paper](/papers/whitepaper-chinese.pdf).
 :::
