@@ -81,13 +81,13 @@ impl TelemetryLogSender {
         let mut interval = IntervalStream::new(interval(MAX_BATCH_TIME)).fuse();
 
         loop {
-            tokio::select! {
-                Some(log) = rx.next() => {
+            ::futures::select! {
+                log = rx.select_next_some() => {
                     self.handle_next_log(log).await;
-                }
+                },
                 _ = interval.select_next_some() => {
                     self.flush_batch().await;
-                }
+                },
             }
         }
     }
