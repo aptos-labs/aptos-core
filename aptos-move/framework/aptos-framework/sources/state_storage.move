@@ -5,11 +5,9 @@ module aptos_framework::state_storage {
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
-    friend aptos_framework::reconfiguration;
+    friend aptos_framework::storage_gas;
 
     const ESTATE_STORAGE_USAGE: u64 = 0;
-    const EGAS_PARAMETER: u64 = 1;
-    const EEPOCH_ZERO: u64 = 2;
 
     struct Usage has copy, drop, store {
         items: u64,
@@ -23,26 +21,11 @@ module aptos_framework::state_storage {
         usage: Usage,
     }
 
-    /// This updates at reconfig and guarantees not to change elsewhere, safe
-    /// for gas calculation.
-    ///
-    /// Specifically, it copies the usage at the begining of the concluding
-    /// epoch for gas calculation of the entire next epoch. -- The data is one
-    /// epoch older than ideal, but the Vm doesn't need to worry about reloading
-    /// gas parameters after the first txn of an epoch.
-    struct GasParameter has key, store {
-        usage: Usage,
-    }
-
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<StateStorageUsage>(@aptos_framework),
             error::already_exists(ESTATE_STORAGE_USAGE)
-        );
-        assert!(
-            !exists<GasParameter>(@aptos_framework),
-            error::already_exists(EGAS_PARAMETER)
         );
         move_to(aptos_framework, StateStorageUsage {
             epoch: 0,
@@ -51,15 +34,13 @@ module aptos_framework::state_storage {
                 bytes: 0,
             }
         });
-        move_to(aptos_framework, GasParameter {
-            usage: Usage {
-                items: 0,
-                bytes: 0,
-            }
-        });
     }
 
     public(friend) fun on_new_block(epoch: u64) acquires StateStorageUsage {
+        assert!(
+            exists<StateStorageUsage>(@aptos_framework),
+            error::not_found(ESTATE_STORAGE_USAGE)
+        );
         let usage = borrow_global_mut<StateStorageUsage>(@aptos_framework);
         if (epoch != usage.epoch) {
             usage.epoch = epoch;
@@ -67,10 +48,13 @@ module aptos_framework::state_storage {
         }
     }
 
-    public(friend) fun on_reconfig() acquires StateStorageUsage, GasParameter {
-        let gas_parameter = borrow_global_mut<GasParameter>(@aptos_framework);
+    public(friend) fun current_items_and_bytes(): (u64, u64) acquires StateStorageUsage {
+        assert!(
+            exists<StateStorageUsage>(@aptos_framework),
+            error::not_found(ESTATE_STORAGE_USAGE)
+        );
         let usage = borrow_global<StateStorageUsage>(@aptos_framework);
-        gas_parameter.usage = usage.usage;
+        (usage.usage.items, usage.usage.bytes)
     }
 
     /// Warning: the result returned is based on the base state view held by the
@@ -78,4 +62,29 @@ module aptos_framework::state_storage {
     /// if called from the first transaction of the block because the execution layer
     /// guarantees a fresh state view then.
     native fun get_state_storage_usage_only_at_epoch_beginning(): Usage;
+
+    #[test_only]
+    public fun set_for_test(epoch: u64, items: u64, bytes: u64) acquires StateStorageUsage {
+        assert!(
+            exists<StateStorageUsage>(@aptos_framework),
+            error::not_found(ESTATE_STORAGE_USAGE)
+        );
+        let usage = borrow_global_mut<StateStorageUsage>(@aptos_framework);
+        usage.epoch = epoch;
+        usage.usage = Usage {
+            items,
+            bytes
+        };
+    }
+
+    // ======================== deprecated ============================
+    friend aptos_framework::reconfiguration;
+
+    struct GasParameter has key, store {
+        usage: Usage,
+    }
+
+    public(friend) fun on_reconfig() {
+        abort 0
+    }
 }
