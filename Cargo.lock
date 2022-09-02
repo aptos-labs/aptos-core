@@ -2653,6 +2653,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "vm-validator",
 ]
 
