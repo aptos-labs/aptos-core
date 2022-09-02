@@ -816,20 +816,20 @@ impl EpochManager {
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
-            tokio::select! {
-                Some((peer, msg)) = network_receivers.consensus_messages.next() => {
+            ::futures::select! {
+                (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some((peer, request)) = network_receivers.block_retrieval.next() => {
+                },
+                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
                     if let Err(e) = self.process_block_retrieval(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some(round) = round_timeout_sender_rx.next() => {
+                },
+                round = round_timeout_sender_rx.select_next_some() => {
                     self.process_local_timeout(round);
-                }
+                },
             }
             // Continually capture the time of consensus process to ensure that clock skew between
             // validators is reasonable and to find any unusual (possibly byzantine) clock behavior.
