@@ -507,7 +507,7 @@ module aptos_framework::account {
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 65538)]
+    #[expected_failure(abort_code = 262151)]
     public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let test_signature  = vector::empty<u8>();
