@@ -2,17 +2,25 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveFunction = {
+    description: `Move function`,
     properties: {
         name: {
-            type: 'IdentifierWrapper',
+            type: 'all-of',
+            contains: [{
+                type: 'IdentifierWrapper',
+            }],
             isRequired: true,
         },
         visibility: {
-            type: 'MoveFunctionVisibility',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveFunctionVisibility',
+            }],
             isRequired: true,
         },
         is_entry: {
             type: 'boolean',
+            description: `Whether the function can be called as an entry function directly in a transaction`,
             isRequired: true,
         },
         generic_type_params: {

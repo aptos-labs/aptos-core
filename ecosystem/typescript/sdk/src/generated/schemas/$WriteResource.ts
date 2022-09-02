@@ -2,9 +2,13 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $WriteResource = {
+    description: `Write a resource or update an existing one`,
     properties: {
         address: {
-            type: 'Address',
+            type: 'all-of',
+            contains: [{
+                type: 'Address',
+            }],
             isRequired: true,
         },
         state_key_hash: {
@@ -12,7 +16,10 @@ export const $WriteResource = {
             isRequired: true,
         },
         data: {
-            type: 'MoveResource',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveResource',
+            }],
             isRequired: true,
         },
     },

@@ -14,6 +14,8 @@ export class BlocksService {
      * Get blocks by height
      * This endpoint allows you to get the transactions in a block
      * and the corresponding block information.
+     *
+     * If the block is pruned, it will return a 410
      * @param blockHeight
      * @param withTransactions
      * @returns Block
@@ -39,6 +41,8 @@ export class BlocksService {
      * Get blocks by version
      * This endpoint allows you to get the transactions in a block
      * and the corresponding block information given a version in the block.
+     *
+     * If the block is pruned, it will return a 410
      * @param version
      * @param withTransactions
      * @returns Block

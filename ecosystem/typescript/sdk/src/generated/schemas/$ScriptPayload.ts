@@ -2,9 +2,13 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ScriptPayload = {
+    description: `Payload which runs a script that can run multiple functions`,
     properties: {
         code: {
-            type: 'MoveScriptBytecode',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveScriptBytecode',
+            }],
             isRequired: true,
         },
         type_arguments: {

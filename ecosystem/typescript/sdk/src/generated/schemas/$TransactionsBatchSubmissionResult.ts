@@ -2,6 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $TransactionsBatchSubmissionResult = {
+    description: `Batch transaction submission result
+
+    Tells which transactions failed`,
     properties: {
         transaction_failures: {
             type: 'array',
