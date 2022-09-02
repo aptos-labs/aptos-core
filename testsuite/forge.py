@@ -1251,6 +1251,7 @@ def test(
     github_run_id: Optional[str],
     github_step_summary: Optional[str],
 ) -> None:
+    forge_enable_failpoints = True 
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)

@@ -34,6 +34,9 @@ pub trait Node: Send + Sync {
     /// Return the PeerId of this Node
     fn peer_id(&self) -> PeerId;
 
+    /// Return index of the node
+    fn index(&self) -> usize;
+
     /// Return the human readable name of this Node
     fn name(&self) -> &str;
 

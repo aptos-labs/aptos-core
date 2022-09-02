@@ -56,13 +56,22 @@ else
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
 fi
 
+#if [ $i -lt 4 ]; then
+#    CUR_STAKE_AMOUNT=$(( 10 * STAKE_AMOUNT ))
+#else
+#    CUR_STAKE_AMOUNT=$STAKE_AMOUNT
+#fi
+
+CUR_STAKE_AMOUNT=$STAKE_AMOUNT
+
+echo "CUR_STAKE_AMOUNT=${CUR_STAKE_AMOUNT} for ${i} validator"
 
 aptos genesis generate-keys --output-dir $user_dir
 aptos genesis set-validator-configuration --owner-public-identity-file $user_dir/public-keys.yaml --local-repository-dir $WORKSPACE \
     --username $username \
     --validator-host $validator_host \
     --full-node-host $fullnode_host \
-    --stake-amount $STAKE_AMOUNT
+    --stake-amount $CUR_STAKE_AMOUNT
 done
 
 # get the framework
