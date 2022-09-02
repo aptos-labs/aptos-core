@@ -44,6 +44,14 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    /// offer signer capability to another address
+    AccountOfferSignerCapability {
+        signer_capability_sig_bytes: Vec<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, a signature by the current private key on a valid RotationProofChallenge (`cap_rotate_key`)
     /// demonstrates that the user intends to and has the capability to rotate the authentication key. A signature by the new
@@ -293,6 +301,17 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountOfferSignerCapability {
+                signer_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_signer_capability(
+                signer_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountRotateAuthenticationKey {
                 from_scheme,
                 from_public_key_bytes,
@@ -471,6 +490,32 @@ pub fn account_offer_rotation_capability_ed25519(
         vec![],
         vec![
             bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
+/// offer signer capability to another address
+pub fn account_offer_signer_capability(
+    signer_capability_sig_bytes: Vec<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_signer_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&signer_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
@@ -1179,6 +1224,21 @@ mod decoder {
         }
     }
 
+    pub fn account_offer_signer_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferSignerCapability {
+                signer_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1582,6 +1642,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_rotation_capability_ed25519".to_string(),
             Box::new(decoder::account_offer_rotation_capability_ed25519),
+        );
+        map.insert(
+            "account_offer_signer_capability".to_string(),
+            Box::new(decoder::account_offer_signer_capability),
         );
         map.insert(
             "account_rotate_authentication_key".to_string(),
