@@ -18,6 +18,7 @@ export type { ConsensusTimeoutsEvaluatorArgs } from './models/ConsensusTimeoutsE
 export type { EvaluationResult } from './models/EvaluationResult';
 export type { EvaluationSummary } from './models/EvaluationSummary';
 export type { EvaluatorArgs } from './models/EvaluatorArgs';
+export type { HandshakeEvaluatorArgs } from './models/HandshakeEvaluatorArgs';
 export type { HardwareEvaluatorArgs } from './models/HardwareEvaluatorArgs';
 export type { LatencyEvaluatorArgs } from './models/LatencyEvaluatorArgs';
 export type { NetworkMinimumPeersEvaluatorArgs } from './models/NetworkMinimumPeersEvaluatorArgs';
@@ -38,6 +39,7 @@ export { $ConsensusTimeoutsEvaluatorArgs } from './schemas/$ConsensusTimeoutsEva
 export { $EvaluationResult } from './schemas/$EvaluationResult';
 export { $EvaluationSummary } from './schemas/$EvaluationSummary';
 export { $EvaluatorArgs } from './schemas/$EvaluatorArgs';
+export { $HandshakeEvaluatorArgs } from './schemas/$HandshakeEvaluatorArgs';
 export { $HardwareEvaluatorArgs } from './schemas/$HardwareEvaluatorArgs';
 export { $LatencyEvaluatorArgs } from './schemas/$LatencyEvaluatorArgs';
 export { $NetworkMinimumPeersEvaluatorArgs } from './schemas/$NetworkMinimumPeersEvaluatorArgs';

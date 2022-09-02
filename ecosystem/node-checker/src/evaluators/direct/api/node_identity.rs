@@ -62,7 +62,7 @@ impl NodeIdentityEvaluator {
                 100,
                 format!(
                     "The node under investigation reported the same {} {} \
-                as is reported by the baseline node",
+                as is reported by the baseline node.",
                     attribute_str, target_value
                 ),
             )

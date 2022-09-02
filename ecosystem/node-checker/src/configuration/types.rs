@@ -4,8 +4,8 @@
 use crate::{
     evaluators::{
         direct::{
-            get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
-            TransactionAvailabilityEvaluatorArgs,
+            get_node_identity, HandshakeEvaluatorArgs, LatencyEvaluatorArgs,
+            NodeIdentityEvaluatorArgs, TpsEvaluatorArgs, TransactionAvailabilityEvaluatorArgs,
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
@@ -16,10 +16,11 @@ use crate::{
     },
     runner::BlockingRunnerArgs,
 };
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, format_err, Context, Result};
 use aptos_config::config::RoleType;
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_rest_client::Client as AptosRestClient;
-use aptos_sdk::types::chain_id::ChainId;
+use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use clap::Parser;
 use once_cell::sync::Lazy;
 use poem_openapi::{types::Example, Object as PoemObject};
@@ -144,6 +145,9 @@ pub struct EvaluatorArgs {
     pub consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs,
 
     #[clap(flatten)]
+    pub handshake_args: HandshakeEvaluatorArgs,
+
+    #[clap(flatten)]
     pub hardware_args: HardwareEvaluatorArgs,
 
     #[clap(flatten)]
@@ -200,6 +204,12 @@ pub struct NodeAddress {
     #[oai(default = "Self::default_noise_port")]
     #[serde(default = "NodeAddress::default_noise_port")]
     pub noise_port: u16,
+
+    /// Public key for the node. This is used for the HandshakeEvaluator.
+    /// If that evaluator is not enabled, this is not necessary.
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
+    #[oai(skip)]
+    pub public_key: Option<x25519::PublicKey>,
 }
 
 impl NodeAddress {
@@ -229,6 +239,47 @@ impl NodeAddress {
 
         AptosRestClient::from((client, self.get_api_url()))
     }
+
+    /// Gets the NodeAddress as a NetworkAddress. If the URL is a domain name,
+    /// it will automatically perform DNS resolution. This method returns an
+    /// error if `public_key` is None.
+    pub fn as_noise_network_address(&self) -> Result<NetworkAddress> {
+        // Confirm we have a public key. Technically we can build a NetworkAddress
+        // without one, but it's not useful for any of our needs without one.
+        let public_key = match self.public_key {
+            Some(public_key) => public_key,
+            None => bail!("Cannot convert NodeAddress to NetworkAddress without a public key"),
+        };
+
+        // Ensure we can get socket addrs from the URL. If the URL is a domain
+        // name, it will automatically perform DNS resolution.
+        let socket_addrs = self
+            .url
+            .socket_addrs(|| None)
+            .with_context(|| format!("Failed to get SocketAddrs from address {}", self.url))?;
+
+        // Ensure this results in exactly one SocketAddr.
+        if socket_addrs.is_empty() {
+            bail!(
+                "NodeAddress {} did not resolve to any SocketAddrs. If DNS, ensure domain name is valid",
+                self.url
+            );
+        }
+        if socket_addrs.len() > 1 {
+            aptos_logger::warn!(
+                "NodeAddress {} resolved to multiple SocketAddrs, but we're only checking the first one: {:?}",
+                self.url,
+                socket_addrs,
+            );
+        }
+
+        // Configure the SocketAddr with the provided noise port.
+        let mut socket_addr = socket_addrs[0];
+        socket_addr.set_port(self.noise_port);
+
+        // Build a network address, including the public key and protocol.
+        Ok(NetworkAddress::from(socket_addr).append_prod_protos(public_key, 0))
+    }
 }
 
 impl Example for NodeAddress {
@@ -238,6 +289,12 @@ impl Example for NodeAddress {
             metrics_port: Self::default_metrics_port(),
             api_port: Self::default_api_port(),
             noise_port: Self::default_noise_port(),
+            public_key: Some(
+                x25519::PublicKey::from_encoded_string(
+                    "0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f",
+                )
+                .unwrap(),
+            ),
         }
     }
 }
