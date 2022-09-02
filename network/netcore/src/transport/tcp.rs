@@ -242,7 +242,7 @@ impl Stream for TcpListenerStream {
                 }
                 let dialer_addr = NetworkAddress::from(addr);
 
-                println!("SERENDIP: {:?}", dialer_addr);
+                println!("SERENDIP: connection {:?}", dialer_addr);
 
                 Poll::Ready(Some(Ok((
                     future::ready(Ok(TcpSocket::new(socket))),
