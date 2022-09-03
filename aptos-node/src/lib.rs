@@ -163,6 +163,7 @@ pub struct AptosHandle {
     _api: Runtime,
     _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
+    _consensus_network_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
     _fh_stream: Option<Runtime>,
@@ -695,6 +696,7 @@ pub fn setup_environment(
     };
 
     let mut consensus_runtime = None;
+    let mut consensus_network_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
         mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
@@ -735,7 +737,7 @@ pub fn setup_environment(
 
         // Initialize and start consensus.
         instant = Instant::now();
-        consensus_runtime = Some(start_consensus(
+        let (consensus_rt, network_rt) = start_consensus(
             &node_config,
             consensus_network_sender,
             consensus_network_events,
@@ -745,7 +747,9 @@ pub fn setup_environment(
             consensus_reconfig_subscription
                 .expect("Consensus requires a reconfiguration subscription!"),
             peer_metadata_storage,
-        ));
+        );
+        consensus_runtime = Some(consensus_rt);
+        consensus_network_runtime = Some(network_rt);
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
 
@@ -762,6 +766,7 @@ pub fn setup_environment(
         _api: api_runtime,
         _backup: backup_service,
         _consensus_runtime: consensus_runtime,
+        _consensus_network_runtime: consensus_network_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _fh_stream: sf_runtime,
