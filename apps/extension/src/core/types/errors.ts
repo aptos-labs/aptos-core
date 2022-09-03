@@ -3,7 +3,7 @@
 
 /* eslint-disable max-classes-per-file */
 
-import { ApiError } from 'aptos';
+import { Types } from 'aptos';
 
 class ExtendableError extends Error {
   constructor(message: string) {
@@ -36,6 +36,11 @@ export const DappErrorType = Object.freeze({
   USER_REJECTION: new DappError(4001, 'Rejected', 'The user rejected the request'),
 });
 
+function isAptosError(error: Types.AptosError): error is Types.AptosError {
+  return error.message !== undefined
+    && error.error_code !== undefined;
+}
+
 /**
  * Determine a good error message to pass over to the dapp.
  * Ideally we should only pass errors relative to generating or submitting a transaction,
@@ -44,8 +49,8 @@ export const DappErrorType = Object.freeze({
  */
 export function makeTransactionError(error: unknown): DappError {
   let message;
-  if (error instanceof ApiError) {
-    message = error.message;
+  if (error instanceof Types.ApiError && isAptosError(error.body)) {
+    message = error.body.message;
   } else if (error instanceof Error) {
     message = error.message;
   } else {
