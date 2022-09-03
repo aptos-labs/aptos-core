@@ -32,8 +32,8 @@ use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Dur
 use super::wire::handshake::v1::ProtocolIdSet;
 use std::fmt::Debug;
 
-pub trait Message: DeserializeOwned + Serialize {}
-impl<T: DeserializeOwned + Serialize> Message for T {}
+pub trait Message: DeserializeOwned + Serialize + Send {}
+impl<T: DeserializeOwned + Serialize + Send> Message for T {}
 
 /// Events received by network clients in a validator
 ///
@@ -143,7 +143,7 @@ pub struct NetworkEvents<TMessage> {
     event_stream: Select<
         FilterMap<
             aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            future::Ready<Option<Event<TMessage>>>,
+            Box<dyn future::Future<Output = Option<Event<TMessage>>>>,
             fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
         >,
         Map<
@@ -167,10 +167,7 @@ impl<TMessage: Message> NewNetworkEvents for NetworkEvents<TMessage> {
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self {
-        let data_event_stream = peer_mgr_notifs_rx.filter_map(
-            peer_mgr_notif_to_event
-                as fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
-        );
+        let data_event_stream = peer_mgr_notifs_rx.filter_map(peer_mgr_notif_to_event);
         let control_event_stream = connection_notifs_rx
             .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
         Self {
@@ -194,36 +191,50 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
 
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
-fn peer_mgr_notif_to_event<TMessage: Message>(
+async fn peer_mgr_notif_to_event<TMessage: Message + 'static>(
     notif: PeerManagerNotification,
-) -> future::Ready<Option<Event<TMessage>>> {
-    let maybe_event = match notif {
+) -> Option<Event<TMessage>> {
+    match notif {
         PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
-            request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx))
+            let rpc_req_clone = rpc_req.clone();
+            request_to_network_event(peer_id, rpc_req_clone)
+                .await
+                .map(move |msg| {
+                    Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx)
+                })
         }
         PeerManagerNotification::RecvMessage(peer_id, request) => {
-            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+            request_to_network_event(peer_id, request)
+                .await
+                .map(move |msg| Event::Message(peer_id, msg))
         }
-    };
-    future::ready(maybe_event)
+    }
 }
 
 /// Converts a `SerializedRequest` into a network `Event` for sending to other nodes
-fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
+async fn request_to_network_event<
+    TMessage: Message + 'static,
+    Request: SerializedRequest + 'static,
+>(
     peer_id: PeerId,
-    request: &Request,
+    request: Request,
 ) -> Option<TMessage> {
-    match request.to_message() {
+    let protocol_id = request.protocol_id();
+    let data = request.data();
+    let data_prefix = hex::encode(&data[..min(16, data.len())]);
+    let res = tokio::task::spawn_blocking(move || request.to_message())
+        .await
+        .expect("spawn_blocking(to_message) failed.");
+    match res {
         Ok(msg) => Some(msg),
         Err(err) => {
-            let data = &request.data();
+            // let data = &request.data();
             warn!(
                 SecurityEvent::InvalidNetworkEvent,
                 error = ?err,
                 remote_peer_id = peer_id.short_str(),
-                protocol_id = request.protocol_id(),
-                data_prefix = hex::encode(&data[..min(16, data.len())]),
+                protocol_id = protocol_id,
+                data_prefix = data_prefix,
             );
             None
         }
@@ -376,7 +387,7 @@ pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
 }
 
 /// Generalized functionality for any request across `DirectSend` and `Rpc`.
-pub trait SerializedRequest {
+pub trait SerializedRequest: Send + Sync {
     fn protocol_id(&self) -> ProtocolId;
     fn data(&self) -> &Bytes;
 

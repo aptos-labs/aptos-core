@@ -79,7 +79,7 @@ use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
 pub mod error;
 
 /// A wrapper struct for an inbound rpc request and its associated context.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InboundRpcRequest {
     /// The [`ProtocolId`] for which of our upstream application modules should
     /// handle (i.e., deserialize and then respond to) this inbound rpc request.
