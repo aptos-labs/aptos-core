@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class Wallet < ApplicationRecord
-  VALID_NETWORKS = %w[ait3].freeze
+  VALID_NETWORKS = %w[devnet ait3].freeze
   VALID_WALLET_NAMES = %w[petra].freeze
 
   belongs_to :user

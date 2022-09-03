@@ -74,7 +74,7 @@ Rails.application.routes.draw do
   resources :it3_surveys, except: %i[index destroy]
 
   # NFTs
-  resources :nft_offers, only: %i[show]
+  resources :nft_offers, param: :slug, only: %i[show]
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')

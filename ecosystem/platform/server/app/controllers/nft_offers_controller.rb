@@ -4,36 +4,58 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class NftOffersController < ApplicationController
-  before_action :authenticate_user!
-  before_action :set_nft_offer
-  before_action :offer_dependent_logic
-
-  def show; end
-
-  def update
-    nft = Nft.find_by(user: current_user, nft_offer: @nft_offer)
-    nft ||= Nft.create(user: current_user, nft_offer: @nft_offer)
-    redirect_to nft_path(nft)
+  def show
+    store_location_for(:user, request.path)
+    slug = params.require(:slug)
+    @nft_offer = get_nft_offer(slug)
+    @steps = [
+      sign_in_step,
+      connect_wallet_step,
+      claim_nft_step
+    ].map do |h|
+      # rubocop:disable Style/OpenStructUse
+      OpenStruct.new(**h)
+      # rubocop:enable Style/OpenStructUse
+    end
+    first_incomplete = @steps.index { |step| !step.completed }
+    @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
   end
 
   private
 
-  def set_nft_offer
-    @nft_offer = NftOffer.find(params[:id])
-    return redirect_to root_path if @nft_offer.nil?
-
-    now = DateTime.now
-    valid_from = @nft_offer.valid_from
-    return redirect_to root_path if valid_from && valid_from > now
-
-    valid_until = @nft_offer.valid_until
-    return redirect_to root_path if valid_until && now >= valid_until
+  def get_nft_offer(slug)
+    case slug
+    when 'aptos-zero'
+      NftOffer.new(slug: 'aptos-zero', network: 'devnet')
+    else
+      raise ActiveRecord::RecordNotFound
+    end
   end
 
-  def offer_dependent_logic
-    case @nft_offer.name
-    when 'nft_nyc'
-      redirect_to nft_nyc_path unless current_user.authorizations.where(provider: :google).exists?
-    end
+  def sign_in_step
+    completed = user_signed_in?
+    {
+      name: :sign_in,
+      completed:,
+      href: new_user_session_path
+    }
+  end
+
+  def connect_wallet_step
+    completed = user_signed_in? && current_user.wallets.where(network: @nft_offer.network).exists?
+    {
+      name: :connect_wallet,
+      completed:,
+      dialog: completed ? nil : DialogComponent.new
+    }
+  end
+
+  def claim_nft_step
+    completed = false
+    {
+      name: :claim_nft,
+      completed:,
+      dialog: completed ? nil : DialogComponent.new
+    }
   end
 end

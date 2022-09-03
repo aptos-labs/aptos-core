@@ -7,14 +7,13 @@
 class NftOffer
   include ActiveModel::Model
 
-  attr_accessor :title,
-                :slug
+  attr_accessor :slug, :network
 
   def persisted?
     true
   end
 
   def to_key
-    slug
+    [slug]
   end
 end
