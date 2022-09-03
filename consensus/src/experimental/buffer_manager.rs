@@ -41,7 +41,7 @@ use aptos_types::epoch_change::EpochChangeProof;
 use futures::channel::mpsc::unbounded;
 use once_cell::sync::OnceCell;
 
-pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
+pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 5000;
 
 pub type ResetAck = ();
 
