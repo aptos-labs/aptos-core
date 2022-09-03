@@ -14,7 +14,10 @@ use anyhow::{format_err, Context, Error};
 use aptos_sf_indexer::{
     counters::start_inspection_service,
     database::new_db_pool,
-    substream_processors::block_output_processor::BlockOutputSubstreamProcessor,
+    substream_processors::{
+        block_output_processor::BlockOutputSubstreamProcessor,
+        tokens_processor::TokensSubstreamProcessor,
+    },
     substreams::SubstreamsEndpoint,
     substreams_stream::{BlockResponse, SubstreamsStream},
 };
@@ -22,6 +25,7 @@ use clap::Parser;
 use futures::StreamExt;
 use prost::Message;
 use std::{env, sync::Arc};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -46,6 +50,21 @@ struct IndexerArgs {
     /// Set to 0 to disable.
     #[clap(long, default_value_t = 10)]
     emit_every: usize,
+}
+
+enum Processor {
+    BlockToBlockOutput,
+    BlockOutputToToken,
+}
+
+impl Processor {
+    fn from_string(input_str: &String) -> Self {
+        match input_str.as_str() {
+            "block_to_block_output" => Self::BlockToBlockOutput,
+            "block_output_to_token" => Self::BlockOutputToToken,
+            _ => panic!("Module unsupported {}", input_str),
+        }
+    }
 }
 
 #[tokio::main]
@@ -82,12 +101,22 @@ async fn main() -> Result<(), Error> {
 
     let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
 
-    info!("Created substream endpoint");
+    info!(
+        substream_module_name = substream_module_name,
+        "Created substream endpoint"
+    );
     let start_block = get_start_block(&conn_pool, substream_module_name).unwrap_or_else(|| {
-        info!("Could not fetch max block so starting from block 0");
+        info!(
+            substream_module_name = substream_module_name,
+            "Could not fetch max block so starting from block 0"
+        );
         0
     });
-    info!(start_block = start_block, "Starting stream");
+    info!(
+        substream_module_name = substream_module_name,
+        start_block = start_block,
+        "Starting stream"
+    );
 
     let mut stream = SubstreamsStream::new(
         endpoint.clone(),
@@ -99,13 +128,15 @@ async fn main() -> Result<(), Error> {
     );
 
     let mut block_height = start_block as u64;
-    let mut processor;
-    // TODO: Create an enum w/ all the module options
-    if substream_module_name == "block_to_block_output" {
-        processor = BlockOutputSubstreamProcessor::new(conn_pool.clone());
-    } else {
-        panic!("Module unsupported {}", substream_module_name);
-    }
+    let processor: Arc<Mutex<dyn SubstreamProcessor>> =
+        match Processor::from_string(substream_module_name) {
+            Processor::BlockToBlockOutput => Arc::new(Mutex::new(
+                BlockOutputSubstreamProcessor::new(conn_pool.clone()),
+            )),
+            Processor::BlockOutputToToken => {
+                Arc::new(Mutex::new(TokensSubstreamProcessor::new(conn_pool.clone())))
+            }
+        };
     let start = chrono::Utc::now().naive_utc();
     let mut base: usize = 0;
     loop {
@@ -134,6 +165,8 @@ async fn main() -> Result<(), Error> {
             }
         };
         match processor
+            .lock()
+            .await
             .process_substream_with_status(data, block_height)
             .await
         {
@@ -148,6 +181,7 @@ async fn main() -> Result<(), Error> {
                             / 1000.0;
                         let bps = (processed_this_session as f64 / num_millis) as u64;
                         info!(
+                            substream_module_name = substream_module_name,
                             block_height = block_height,
                             blocks_per_second = bps,
                             "Finished processing block",
@@ -158,8 +192,8 @@ async fn main() -> Result<(), Error> {
             }
             Err(error) => {
                 panic!(
-                    "Error processing block {}, error: {:?}",
-                    block_height, &error
+                    "[{}] Error processing block {}, error: {:?}",
+                    substream_module_name, block_height, &error
                 );
             }
         };

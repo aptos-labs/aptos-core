@@ -17,6 +17,22 @@ table! {
 }
 
 table! {
+    collection_datas (creator_address, collection_name, transaction_version) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        description -> Text,
+        transaction_version -> Int8,
+        metadata_uri -> Text,
+        supply -> Numeric,
+        maximum -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
     events (key, sequence_number) {
         key -> Varchar,
         sequence_number -> Int8,
@@ -121,6 +137,53 @@ table! {
 }
 
 table! {
+    token_datas (creator_address, collection_name, name, transaction_version) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        transaction_version -> Int8,
+        maximum -> Numeric,
+        supply -> Numeric,
+        largest_property_version -> Numeric,
+        metadata_uri -> Text,
+        royalty_points_numerator -> Numeric,
+        royalty_points_denominator -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        properties_mutable -> Bool,
+        royalty_mutable -> Bool,
+        default_properties -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    token_ownerships (creator_address, collection_name, name, property_version, transaction_version, owner_address) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        property_version -> Numeric,
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        amount -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    tokens (creator_address, collection_name, name, property_version, transaction_version) {
+        creator_address -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        property_version -> Numeric,
+        transaction_version -> Int8,
+        token_properties -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -153,6 +216,7 @@ table! {
         gas_unit_price -> Numeric,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        entry_function_id_str -> Text,
     }
 }
 
@@ -171,6 +235,7 @@ table! {
 
 allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
+    collection_datas,
     events,
     indexer_states,
     ledger_infos,
@@ -179,6 +244,9 @@ allow_tables_to_appear_in_same_query!(
     signatures,
     table_items,
     table_metadatas,
+    token_datas,
+    token_ownerships,
+    tokens,
     transactions,
     user_transactions,
     write_set_changes,

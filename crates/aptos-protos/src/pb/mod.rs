@@ -17,6 +17,13 @@ pub mod aptos {
             // @@protoc_insertion_point(aptos.extractor.v1)
         }
     }
+    pub mod tokens {
+        // @@protoc_insertion_point(attribute:aptos.tokens.v1)
+        pub mod v1 {
+            include!("aptos.tokens.v1.rs");
+            // @@protoc_insertion_point(aptos.tokens.v1)
+        }
+    }
     pub mod util {
         // @@protoc_insertion_point(attribute:aptos.util.timestamp)
         pub mod timestamp {
