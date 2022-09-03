@@ -41,7 +41,7 @@ impl Cluster {
     ) -> Result<Self> {
         let num_peers = peers.len();
 
-        let mut instances = Vec::new();
+        let mut instance_states = Vec::new();
         let mut errors = Vec::new();
         for url in &peers {
             let instance = Instance::new(
@@ -54,7 +54,7 @@ impl Cluster {
                 None,
             );
             match instance.rest_client().get_ledger_information().await {
-                Ok(_) => instances.push(instance),
+                Ok(v) => instance_states.push((instance, v.into_inner())),
                 Err(err) => errors.push(err),
             }
         }
@@ -64,6 +64,32 @@ impl Cluster {
                 "Failed to build some endpoints for the cluster: {:?}",
                 errors
             );
+        }
+
+        let mut instances = Vec::new();
+        let max_version = instance_states
+            .iter()
+            .map(|(_, s)| s.version)
+            .max()
+            .unwrap();
+
+        for (instance, state) in instance_states.into_iter() {
+            if state.chain_id != chain_id.id() {
+                warn!(
+                    "Client {} running wrong chain {}",
+                    instance.peer_name(),
+                    state.chain_id
+                );
+            } else if state.version + 100000 < max_version {
+                warn!(
+                    "Client {} too stale, {}, while chain at {}",
+                    instance.peer_name(),
+                    state.version,
+                    max_version
+                );
+            } else {
+                instances.push(instance);
+            }
         }
 
         if instances.is_empty() {
