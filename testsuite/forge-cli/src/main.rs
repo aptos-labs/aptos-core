@@ -26,10 +26,10 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "30000")]
+    #[structopt(long, default_value = "5000")]
     mempool_backlog: u64,
     #[structopt(long, default_value = "300")]
-    duration_secs: usize,
+    _duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
     #[structopt(long)]
@@ -190,7 +190,7 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
     let global_emit_job_request = EmitJobRequest::default()
-        .duration(Duration::from_secs(args.duration_secs as u64))
+        .duration(Duration::from_secs(12 * 3600))
         .thread_params(EmitThreadParams::default())
         .mempool_backlog(args.mempool_backlog.try_into().unwrap());
 
@@ -462,7 +462,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn land_blocking_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(200).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(&[&PerformanceBenchmarkWithFN])
 }
