@@ -29,7 +29,7 @@ struct Args {
     #[structopt(long, default_value = "5000")]
     mempool_backlog: u64,
     #[structopt(long, default_value = "300")]
-    duration_secs: usize,
+    _duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
     #[structopt(long)]

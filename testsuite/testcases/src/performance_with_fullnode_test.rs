@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
-use aptos_logger::sample::SampleRate::Duration;
-use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use forge::{NetworkContext, NetworkTest, Result, Test};
-use std::time::{Duration, SystemTime};
 use tokio::runtime::Runtime;
 
 pub struct PerformanceBenchmarkWithFN;
