@@ -97,7 +97,7 @@ fn stream_blocks(
                                     None => {}
                                     Some(block_scoped_data) => {
                                         // Reset backoff because we got a good value from the stream
-                                        backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(45));
+                                        backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(3));
 
                                         let cursor = block_scoped_data.cursor.clone();
                                         yield BlockResponse::New(block_scoped_data);

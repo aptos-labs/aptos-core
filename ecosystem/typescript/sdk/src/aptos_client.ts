@@ -458,6 +458,7 @@ export class AptosClient {
           break;
         }
       } catch (e) {
+        // In short, this means we will retry if it was an ApiError and the code was 404 or 5xx.
         const isApiError = e instanceof Gen.ApiError;
         const isRequestError = isApiError && e.status !== 404 && e.status >= 400 && e.status < 500;
         if (!isApiError || isRequestError) {
@@ -708,6 +709,9 @@ function parseApiError(target: unknown, propertyKey: string, descriptor: Propert
   // eslint-disable-next-line no-param-reassign
   descriptor.value = async function wrapper(...args: any[]) {
     try {
+      // We need to explicitly await here so that the function is called and
+      // potentially throws an error. If we just return without awaiting, the
+      // promise is returned directly and the catch block cannot trigger.
       const res = await childFunction.apply(this, [...args]);
       return res;
     } catch (e) {
