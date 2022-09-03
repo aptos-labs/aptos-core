@@ -73,7 +73,11 @@ use std::{
     collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
+};
+use std::{
+    sync::atomic::{AtomicBool, AtomicU64},
+    thread,
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -822,6 +826,51 @@ impl EpochManager {
     ) {
         // initial start of the processor
         self.await_reconfig_notification().await;
+
+        let active = Arc::new(AtomicBool::new(false));
+        let active_copy = active.clone();
+        let counter = Arc::new(AtomicU64::new(0));
+        let counter_copy = counter.clone();
+        let panic_duration_s = self.config.panic_on_stuck_epoch_manager_duration_s;
+
+        let _handle = if panic_duration_s > 0 {
+            Some(
+                thread::Builder::new()
+                    .name("panic_thread".to_string())
+                    .spawn(move || {
+                        let mut last_change = Instant::now();
+                        let mut prev_value = 0;
+                        loop {
+                            let active = active_copy.load(std::sync::atomic::Ordering::Relaxed);
+                            let cur_value = counter_copy.load(std::sync::atomic::Ordering::Relaxed);
+                            if prev_value != cur_value {
+                                debug!("Progress check passed {} < {}", prev_value, cur_value);
+                                last_change = Instant::now();
+                                prev_value = cur_value;
+                            } else {
+                                error!(
+                                    "No progress in {}s, at {}, active: {}",
+                                    last_change.elapsed().as_secs(),
+                                    cur_value,
+                                    active
+                                );
+                                if last_change.elapsed().as_secs() > panic_duration_s && !active {
+                                    panic!(
+                                        "Crashing after {}s no progress",
+                                        last_change.elapsed().as_secs()
+                                    );
+                                }
+                            }
+
+                            std::thread::sleep(Duration::from_secs(30));
+                        }
+                    })
+                    .unwrap(),
+            )
+        } else {
+            None
+        };
+
         let epoch_manager_shared = Arc::new(tokio::sync::Mutex::new(self));
         let epoch_manager_shared_1 = epoch_manager_shared.clone();
         let epoch_manager_shared_2 = epoch_manager_shared.clone();
@@ -833,12 +882,15 @@ impl EpochManager {
         let consensus_task = async move {
             while let Some((peer, msg)) = consensus_messages.next().await {
                 let mut locked = epoch_manager_shared.lock().await;
+                active.store(true, std::sync::atomic::Ordering::Relaxed);
+                counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 monitor!(
                     "process_message",
                     if let Err(e) = locked.process_message(peer, msg).await {
                         error!(epoch = locked.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 );
+                active.store(false, std::sync::atomic::Ordering::Relaxed);
             }
         };
         let block_task = async move {
