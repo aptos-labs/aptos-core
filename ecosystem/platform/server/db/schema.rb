@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
+ActiveRecord::Schema[7.0].define(version: 2022_09_01_173630) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -418,6 +418,19 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  create_table "wallets", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "network", null: false, comment: "The network that the account exists on (e.g. 'ait3')."
+    t.string "wallet_name", null: false, comment: "The name of the wallet (e.g. 'petra')."
+    t.string "public_key", null: false, comment: "The public key of the account."
+    t.string "address", null: false, comment: "The account address."
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["public_key", "network"], name: "index_wallets_on_public_key_and_network", unique: true
+    t.index ["user_id"], name: "index_wallets_on_user_id"
+    t.check_constraint "public_key::text ~ '^0x[0-9a-f]{64}$'::text"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "it1_profiles", "users"
@@ -433,4 +446,5 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
   add_foreign_key "project_members", "projects"
   add_foreign_key "project_members", "users"
   add_foreign_key "projects", "users"
+  add_foreign_key "wallets", "users"
 end

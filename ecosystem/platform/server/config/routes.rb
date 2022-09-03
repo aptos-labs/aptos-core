@@ -92,6 +92,9 @@ Rails.application.routes.draw do
     get 'rewards'
   end
 
+  # Wallets
+  resources :wallets, only: %i[create]
+
   # Static pages
   get 'community', to: 'static_page#community'
   get 'incentivized-testnet', to: 'static_page#incentivized_testnet'
