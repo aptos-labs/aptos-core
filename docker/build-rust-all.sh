@@ -7,7 +7,7 @@ PROFILE=${PROFILE:-release}
 FEATURES=${FEATURES:-""}
 
 # Build all the rust binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --profile=$PROFILE \
+cargo build --profile=$PROFILE \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
