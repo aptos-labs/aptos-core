@@ -322,7 +322,7 @@ where
         &config.inspection_service.address, &config.inspection_service.port
     );
     println!(
-        "\tFullNode network: {}",
+        "\tAptosnet Fullnode network endpoint: {}",
         &config.full_node_networks[0].listen_address
     );
     if lazy {
