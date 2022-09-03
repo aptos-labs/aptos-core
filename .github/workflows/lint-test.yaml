@@ -191,3 +191,31 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 1
 
+  forge-unittests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+          # Get enough commits to compare to
+          fetch-depth: 100
+      - name: Should run tests
+        run: |
+          set -x
+
+          # We must fetch main to compare it
+          git fetch origin main
+          git diff --name-only $(git merge-base origin/main HEAD) HEAD |
+            while read file; do
+              [[ $file =~ .*testsuite/.*.py ]] && echo "::set-output name=SHOULD_RUN::true" && echo "Running unittests"
+            done
+
+        id: should-run-tests
+      - uses: actions/setup-python@v4
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+      - name: Install python deps
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: pip3 install click==8.1.3 psutil==5.9.1
+      - name: Run forge wrapper tests
+        if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
+        run: python -m unittest testsuite/forge_test.py
