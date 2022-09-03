@@ -156,10 +156,6 @@ def get_current_user() -> str:
     return pwd.getpwuid(os.getuid())[0]
 
 
-def get_utc_timestamp(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-
 @click.group()
 def main() -> None:
     # Check that the current directory is the root of the repository.
@@ -307,6 +303,9 @@ class Processes:
     def atexit(self, callback: Callable[[], None]) -> None:
         raise NotImplementedError()
 
+    def user(self) -> str:
+        raise NotImplementedError()
+
 
 @dataclass
 class SystemProcess(Process):
@@ -352,6 +351,9 @@ class SystemProcesses(Processes):
     def atexit(self, callback: Callable[[], None]) -> None:
         atexit.register(callback)
 
+    def user(self) -> str:
+        return get_current_user()
+
 
 class FakeProcesses(Processes):
     def __init__(self) -> None:
@@ -368,6 +370,9 @@ class FakeProcesses(Processes):
 
     def atexit(self, callback: Callable[[], None]) -> None:
         return self.exit_callbacks.append(callback)
+
+    def user(self) -> str:
+        return "perry"
 
 
 class ForgeState(Enum):
@@ -463,10 +468,13 @@ class SystemTime(Time):
 
 
 class FakeTime(Time):
-    _now: datetime = datetime.fromisoformat("2022-07-29T00:00:00+00:00")
+    _now: datetime = datetime.fromtimestamp(1659078000, timezone.utc)
 
     def now(self) -> datetime:
         return self._now
+
+    def epoch(self) -> str:
+        return "1659078000"
 
 
 @dataclass
@@ -1259,7 +1267,7 @@ def test(
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)
-    filesystem = LocalFilesystem()
+    filesystem = FakeFilesystem() if dry_run else LocalFilesystem() 
     processes = FakeProcesses() if dry_run else SystemProcesses()
     time = FakeTime() if dry_run else SystemTime()
 
@@ -1296,7 +1304,7 @@ def test(
     set_current_cluster(shell, forge_cluster_name)
 
     if forge_namespace is None:
-        forge_namespace = f"forge-{get_current_user()}-{time.epoch()}"
+        forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
 
     forge_namespace = sanitize_forge_resource_name(forge_namespace)
 

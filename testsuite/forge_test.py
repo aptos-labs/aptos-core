@@ -1,4 +1,5 @@
-from distutils.ccompiler import get_default_compiler
+from contextlib import ExitStack
+from importlib.metadata import files
 import json
 import os
 import unittest
@@ -7,11 +8,12 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Union
+from unittest.mock import patch
 
-from click.testing import CliRunner
+from . import forge
 from .forge import (
-    AwsError,
     FakeTime,
+    Filesystem,
     ForgeCluster,
     ForgeFormatter,
     ForgeJob,
@@ -44,6 +46,8 @@ from .forge import (
     FakeProcesses,
     sanitize_forge_resource_name,
 )
+
+from click.testing import CliRunner
 
 
 class HasAssertMultiLineEqual(Protocol):
@@ -132,6 +136,9 @@ class SpyFilesystem(FakeFilesystem):
     def write(self, filename: str, contents: bytes) -> None:
         self.writes[filename] = contents
 
+    def get_write(self, filename: str) -> bytes:
+        return self.writes[filename]
+
     def read(self, filename: str) -> bytes:
         self.reads.append(filename)
         return self.expected_reads.get(filename, b"")
@@ -205,7 +212,9 @@ class ForgeRunnerTests(unittest.TestCase):
             OrderedDict(
                 [
                     (
-                        "cargo run -p forge-cli -- --suite banana --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward",
+                        "cargo run -p forge-cli -- --suite banana --duration-se"
+                        "cs 123 test k8s-swarm --image-tag asdf --upgrade-image"
+                        "-tag upgrade_asdf --namespace potato --port-forward",
                         RunResult(0, b"orange"),
                     ),
                     ("kubectl get pods -n potato", RunResult(0, b"Pods")),
@@ -412,8 +421,8 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
                 "forge-pr-2983",
                 "forge-big-1",
                 (
-                    datetime.fromtimestamp(100000),
-                    datetime.fromtimestamp(100001),
+                    datetime.fromtimestamp(100000, timezone.utc),
+                    datetime.fromtimestamp(100001, timezone.utc),
                 ),
             ),
             "testDashboardLinkTimeInterval.fixture",
@@ -464,7 +473,59 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
 
     def testMain(self) -> None:
         runner = CliRunner()
-        with runner.isolated_filesystem():
+        shell = SpyShell(OrderedDict([
+            ('aws sts get-caller-identity', RunResult(0, b'{"Account": "123456789012"}')),
+            ('aws eks update-kubeconfig --name forge-big-1', RunResult(0, b'')),
+            ('git rev-parse HEAD~0', RunResult(0, b'banana')),
+            (
+                'aws ecr describe-images --repository-name aptos/validator --im'
+                'age-ids imageTag=banana',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl delete pod -n default -l forge-namespace=forge-perry-1659078000 '
+                '--force',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl wait -n default --for=delete pod -l '
+                'forge-namespace=forge-perry-1659078000',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl apply -n default -f temp1',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl wait -n default --timeout=5m --for=condition=Ready '
+                'pod/forge-perry-1659078000-1659078000-banana',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl logs -n default -f forge-perry-1659078000-1659078000-banana',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl get pod -n default forge-perry-1659078000-1659078000-banana -o '
+                "jsonpath='{.status.phase}'",
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl get pods -n forge-perry-1659078000',
+                RunResult(0, b''),
+            )
+        ]))
+        filesystem = SpyFilesystem({
+            "temp-comment": get_fixture_path("testMainComment.fixture").read_bytes(),
+            "temp-step-summary": get_fixture_path("testMainComment.fixture").read_bytes(),
+            "temp-pre-comment": get_fixture_path("testMainPreComment.fixture").read_bytes(),
+            "temp-report": get_fixture_path("testMainReport.fixture").read_bytes(),
+        }, {})
+        with ExitStack() as stack:
+            stack.enter_context(runner.isolated_filesystem())
+            stack.enter_context(patch.object(forge, "FakeFilesystem", lambda: filesystem))
+            stack.enter_context(patch.object(forge, "FakeShell", lambda: shell))
+
             os.mkdir(".git")
             os.mkdir("testsuite")
             template_name = "forge-test-runner-template.yaml"
@@ -476,41 +537,23 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 [
                     "test",
                     "--dry-run",
-                    "--forge-cluster-name",
-                    "forge-big-1",
-                    "--forge-report",
-                    "temp-report",
-                    "--forge-pre-comment",
-                    "temp-pre-comment",
-                    "--forge-comment",
-                    "temp-comment",
-                    "--github-step-summary",
-                    "temp-step-summary",
+                    "--forge-cluster-name", "forge-big-1",
+                    "--forge-report", "temp-report",
+                    "--forge-pre-comment", "temp-pre-comment",
+                    "--forge-comment", "temp-comment",
+                    "--github-step-summary", "temp-step-summary",
+                    "--github-server-url", "None",
+                    "--github-repository", "None",
+                    "--github-run-id", "None",
                 ],
                 catch_exceptions=False,
             )
-            self.assertEqual(
-                sorted(os.listdir(".")),
-                sorted(
-                    [
-                        "temp-report",
-                        "testsuite",
-                        "temp-pre-comment",
-                        ".git",
-                        "temp-comment",
-                        "temp-step-summary",
-                    ]
-                ),
-            )
-            report = Path("temp-report").read_text()
-            pre_comment = Path("temp-pre-comment").read_text()
-            comment = Path("temp-comment").read_text()
-            step_summary = Path("temp-comment").read_text()
-        self.assertFixture(result.output, "testMain.fixture")
-        self.assertFixture(pre_comment, "testMainPreComment.fixture")
-        self.assertFixture(report, "testMainReport.fixture")
-        self.assertFixture(comment, "testMainComment.fixture")
-        self.assertFixture(step_summary, "testMainComment.fixture")
+            shell.assert_commands(self)
+            self.assertFixture(filesystem.get_write("temp-comment").decode(), "testMainComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-step-summary").decode(), "testMainComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-pre-comment").decode(), "testMainPreComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-report").decode(), "testMainReport.fixture")
+            self.assertFixture(result.output, "testMain.fixture")
 
 
 class TestListClusters(unittest.TestCase):
