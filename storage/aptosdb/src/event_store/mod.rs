@@ -166,11 +166,13 @@ impl EventStore {
 
         let mut result = Vec::new();
         let mut cur_seq = start_seq_num;
+        let mut event_key_present = false;
         for res in iter.take(limit as usize) {
             let ((path, seq), (ver, idx)) = res?;
             if path != *event_key || ver > ledger_version {
                 break;
             }
+            event_key_present = true;
             if seq != cur_seq {
                 let msg = if cur_seq == start_seq_num {
                     "First requested event is probably pruned."
@@ -181,6 +183,12 @@ impl EventStore {
             }
             result.push((seq, ver, idx));
             cur_seq += 1;
+        }
+        // If we didn't find any events for the given key, we should return an
+        // error to indicate that the event stream doesn't exist, at least
+        // within the specified ledger version range.
+        if !event_key_present {
+            bail!("Event key not present in the DB within ledger version range");
         }
 
         Ok(result)

@@ -80,6 +80,12 @@ pub enum AptosErrorCode {
     /// Usually means the block is fully or partially pruned or the height / version is ahead
     /// of the latest version
     BlockNotFound = 108,
+    /// Event stream not found at the requested version
+    ///
+    /// This implies either that the event stream exists, but not within the
+    /// requested ledger version range, or that the event stream does not exist
+    /// at all.
+    EventStreamNotFound = 109,
 
     /// Ledger version is pruned
     VersionPruned = 200,

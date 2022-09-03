@@ -10,6 +10,7 @@ use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
     BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+    NotFoundError,
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
@@ -30,6 +31,11 @@ impl EventsApi {
     ///
     /// This endpoint allows you to get a list of events of a specific type
     /// as identified by its event key, which is a globally unique ID.
+    ///
+    /// If the given event stream exists, but has no events in it, this will
+    /// return a 200 with an empty list. If the given event stream could not
+    /// be found at all in the requested ledger version range, this will
+    /// return a 404.
     #[oai(
         path = "/events/:event_key",
         method = "get",
@@ -79,7 +85,6 @@ impl EventsApi {
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
-        // TODO: Assert that Event represents u64s as strings.
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         self.context
             .check_api_output_enabled("Get events by event handle", &accept_type)?;
@@ -109,11 +114,15 @@ impl EventsApi {
                 page.limit(&latest_ledger_info)?,
                 ledger_version,
             )
-            .context(format!("Failed to find events by key {}", event_key))
+            .context(format!(
+                "Failed to find events by key {}, there is no event \
+                    stream with the given creation number in the DB",
+                event_key
+            ))
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                BasicErrorWith404::not_found_with_code(
                     err,
-                    AptosErrorCode::InternalError,
+                    AptosErrorCode::EventStreamNotFound,
                     &latest_ledger_info,
                 )
             })?;

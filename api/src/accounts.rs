@@ -332,6 +332,7 @@ impl Account {
                     &self.latest_ledger_info,
                 )
             })?;
+
         // Deserialization may fail because the bytes are not EventHandle struct type.
         let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes)
             .context(format!(
@@ -345,6 +346,7 @@ impl Account {
                     &self.latest_ledger_info,
                 )
             })?;
+
         Ok(*event_handle.key())
     }
 

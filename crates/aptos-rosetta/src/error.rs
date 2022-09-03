@@ -41,6 +41,7 @@ pub enum ApiError {
     TransactionNotFound(Option<String>),
     TableItemNotFound(Option<String>),
     BlockNotFound(Option<String>),
+    EventStreamNotFound(Option<String>),
     VersionPruned(Option<String>),
     BlockPruned(Option<String>),
     InvalidInput(Option<String>),
@@ -87,6 +88,7 @@ impl ApiError {
             TransactionNotFound(None),
             TableItemNotFound(None),
             BlockNotFound(None),
+            EventStreamNotFound(None),
             VersionPruned(None),
             BlockPruned(None),
             InvalidInput(None),
@@ -125,6 +127,7 @@ impl ApiError {
             TransactionNotFound(_) => 23,
             TableItemNotFound(_) => 24,
             BlockNotFound(_) => 25,
+            EventStreamNotFound(_) => 33,
             VersionPruned(_) => 26,
             BlockPruned(_) => 27,
             InvalidInput(_) => 28,
@@ -139,7 +142,11 @@ impl ApiError {
         use ApiError::*;
         matches!(
             self,
-            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_) | GasEstimationFailed(_)
+            AccountNotFound(_)
+                | BlockNotFound(_)
+                | EventStreamNotFound(_)
+                | MempoolIsFull(_)
+                | GasEstimationFailed(_)
         )
     }
 
@@ -167,6 +174,7 @@ impl ApiError {
             ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
             ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
             ApiError::BlockNotFound(_) => "Block is missing events",
+            ApiError::EventStreamNotFound(_) => "Event stream could not be found",
             ApiError::TransactionParseError(_) => "Transaction failed to parse",
             ApiError::InternalError(_) => "Internal error",
             ApiError::ResourceNotFound(_) => "Resource not found",
@@ -203,6 +211,7 @@ impl ApiError {
             ApiError::TransactionNotFound(inner) => inner,
             ApiError::TableItemNotFound(inner) => inner,
             ApiError::BlockNotFound(inner) => inner,
+            ApiError::EventStreamNotFound(inner) => inner,
             ApiError::VersionPruned(inner) => inner,
             ApiError::BlockPruned(inner) => inner,
             ApiError::InvalidInput(inner) => inner,
@@ -264,6 +273,9 @@ impl From<RestError> for ApiError {
                     ApiError::TableItemNotFound(Some(err.error.message))
                 }
                 AptosErrorCode::BlockNotFound => ApiError::BlockNotFound(Some(err.error.message)),
+                AptosErrorCode::EventStreamNotFound => {
+                    ApiError::EventStreamNotFound(Some(err.error.message))
+                }
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
                 AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
