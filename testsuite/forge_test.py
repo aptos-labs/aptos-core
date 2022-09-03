@@ -27,6 +27,7 @@ from .forge import (
     K8sForgeRunner,
     ListClusterResult,
     SystemContext,
+    find_recent_images,
     find_recent_images_by_profile_or_features,
     format_comment,
     format_pre_comment,
@@ -296,7 +297,7 @@ class TestFindRecentImage(unittest.TestCase):
             )
         )
         git = Git(shell)
-        image_tags = find_recent_images_by_profile_or_features(shell, git, 1)
+        image_tags = find_recent_images(shell, git, 1, "aptos/validator")
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
@@ -314,7 +315,11 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_failpoints_feature=True
+            shell,
+            git,
+            1,
+            enable_performance_profile=False,
+            enable_failpoints_feature=True
         )
         self.assertEqual(list(image_tags), ["failpoints_tomato"])
         shell.assert_commands(self)
@@ -333,7 +338,11 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_performance_profile=True
+            shell,
+            git,
+            1,
+            enable_performance_profile=True,
+            enable_failpoints_feature=False,
         )
         self.assertEqual(list(image_tags), ["performance_potato"])
         shell.assert_commands(self)
@@ -365,8 +374,8 @@ class TestFindRecentImage(unittest.TestCase):
         git = Git(shell)
         with self.assertRaises(Exception):
             list(
-                find_recent_images_by_profile_or_features(
-                    shell, git, 1, commit_threshold=1
+                find_recent_images(
+                    shell, git, 1, "aptos/validator", commit_threshold=1
                 )
             )
 
