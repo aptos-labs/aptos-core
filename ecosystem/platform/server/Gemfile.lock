@@ -147,6 +147,7 @@ GEM
     dotenv-rails (2.8.1)
       dotenv (= 2.8.1)
       railties (>= 3.2)
+    ed25519 (1.3.0)
     erb_lint (0.1.3)
       activesupport
       better_html (~> 1.0.7)
@@ -395,8 +396,6 @@ GEM
       activerecord (>= 6.1.5)
       activesupport (>= 6.1.5)
       i18n
-    rbnacl (7.1.1)
-      ffi
     recaptcha (5.10.0)
       json
     redis (4.7.1)
@@ -522,6 +521,7 @@ DEPENDENCIES
   devise
   discourse_api
   dotenv-rails
+  ed25519 (~> 1.3)
   erb_lint
   factory_bot_rails
   faker
@@ -548,7 +548,6 @@ DEPENDENCIES
   puma (~> 5.0)
   rack-cors
   rails (~> 7.0.2, >= 7.0.3.1)
-  rbnacl (~> 7.1)
   recaptcha (~> 5.10)
   redis (~> 4.7)
   rspec-rails

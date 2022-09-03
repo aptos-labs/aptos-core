@@ -3,6 +3,8 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+require 'test_helper'
+
 class WalletsControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 

@@ -17,7 +17,7 @@ class WalletsController < ApplicationController
     signed_challenge_hex = params.require(:signed_challenge)
     return head :forbidden unless signed_challenge_hex.match(/[0-9a-f]{128}/)
 
-    signed_challenge = RbNaCl::Util.hex2bin(signed_challenge_hex)
+    signed_challenge = [signed_challenge_hex].pack('H*')
 
     wallet = Wallet.new(wallet_params)
     wallet.user = current_user

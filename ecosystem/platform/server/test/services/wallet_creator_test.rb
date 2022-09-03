@@ -7,12 +7,12 @@ require 'test_helper'
 
 class WalletCreatorTest < ActiveSupport::TestCase
   test 'the wallet is created if the signature is valid' do
-    signing_key = RbNaCl::SigningKey.generate
+    signing_key = Ed25519::SigningKey.generate
     challenge = '123456789'
     signed_challenge = signing_key.sign(challenge)
 
     verify_key = signing_key.verify_key
-    wallet = FactoryBot.build(:wallet, public_key: "0x#{RbNaCl::Util.bin2hex(verify_key)}")
+    wallet = FactoryBot.build(:wallet, public_key: "0x#{verify_key.to_bytes.unpack1('H*')}")
 
     assert_difference('Wallet.count') do
       result = WalletCreator.new.create_wallet(wallet:, challenge:, signed_challenge:)
@@ -21,7 +21,7 @@ class WalletCreatorTest < ActiveSupport::TestCase
   end
 
   test 'the wallet is not created if the signature is invalid' do
-    signing_key = RbNaCl::SigningKey.generate
+    signing_key = Ed25519::SigningKey.generate
     challenge = '123456789'
     signed_challenge = signing_key.sign(challenge)
 
