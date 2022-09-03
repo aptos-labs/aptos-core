@@ -21,7 +21,7 @@
     "build": "tsdx build",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
+    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.cjs' '*.cjs'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
