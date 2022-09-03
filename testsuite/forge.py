@@ -497,7 +497,7 @@ class ForgeContext:
     num_validator_fullnodes_args: Sequence[str]
 
     # aws related options
-    aws_account_num: str
+    aws_account_num: Optional[str]
     aws_region: str
 
     forge_image_tag: str
@@ -906,6 +906,9 @@ class K8sForgeRunner(ForgeRunner):
         )
         template = context.filesystem.read("testsuite/forge-test-runner-template.yaml")
         forge_triggered_by = "github-actions" if context.github_actions else "other"
+
+        assert context.aws_account_num is not None, "AWS account number is required"
+
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
             FORGE_TEST_SUITE=context.forge_test_suite,
@@ -1006,17 +1009,6 @@ class AwsError(Exception):
     pass
 
 
-def assert_aws_token_expiration(aws_token_expiration: Optional[str]) -> None:
-    if aws_token_expiration is None:
-        raise AwsError("AWS token is required")
-    try:
-        expiration = datetime.strptime(aws_token_expiration, "%Y-%m-%dT%H:%M:%S%z")
-    except Exception as e:
-        raise AwsError(f"Invalid date format: {aws_token_expiration}") from e
-    if datetime.now(timezone.utc) > expiration:
-        raise AwsError("AWS token has expired")
-
-
 def get_aws_account_num(shell: Shell) -> str:
     caller_id = shell.run(["aws", "sts", "get-caller-identity"])
     return json.loads(caller_id.unwrap()).get("Account")
@@ -1067,17 +1059,6 @@ async def write_cluster_config(
             ]
         )
     ).unwrap()
-
-
-def update_aws_auth(shell: Shell, aws_auth_script: Optional[str] = None) -> None:
-    if aws_auth_script is None:
-        raise AwsError("Please authenticate with AWS and rerun")
-    result = shell.run(["bash", "-c", f"source {aws_auth_script} && env | grep AWS_"])
-    for line in result.unwrap().decode().splitlines():
-        if line.startswith("AWS_"):
-            key, val = line.split("=", 1)
-            os.environ[key] = val
-    assert_aws_auth(shell)
 
 
 def get_current_cluster_name(shell: Shell) -> str:
@@ -1212,8 +1193,6 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 @envoption("FORGE_COMMENT")
 # cluster auth
 @envoption("AWS_REGION", "us-west-2")
-@envoption("AWS_TOKEN_EXPIRATION")
-@envoption("AWS_AUTH_SCRIPT")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
@@ -1250,8 +1229,6 @@ def test(
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
     aws_region: str,
-    aws_token_expiration: Optional[str],
-    aws_auth_script: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
     forge_num_validators: int,
@@ -1286,23 +1263,11 @@ def test(
     processes = FakeProcesses() if dry_run else SystemProcesses()
     time = FakeTime() if dry_run else SystemTime()
 
-    if dry_run:
-        aws_account_num = "1234"
-    # Pre flight checks
-    else:
-        try:
-            assert_aws_auth(shell)
-            aws_account_num = get_aws_account_num(shell)
-        except Exception:
-            update_aws_auth(shell, aws_auth_script)
-            aws_account_num = get_aws_account_num(shell)
-
-    if aws_auth_script and aws_token_expiration and not dry_run:
-        assert_aws_token_expiration(
-            os.getenv("AWS_TOKEN_EXPIRATION", aws_token_expiration)
-        )
-
-    assert aws_account_num is not None, "AWS account number is required"
+    aws_account_num = None
+    try:
+        aws_account_num = get_aws_account_num(shell)
+    except Exception as e:
+        print(f"Warning: failed to get AWS account number: {e}")
 
     # Perform cluster selection
     current_cluster = None
