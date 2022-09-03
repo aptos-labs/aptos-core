@@ -73,6 +73,9 @@ Rails.application.routes.draw do
   resources :it3_profiles, except: %i[show create new index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
+  # NFTs
+  resources :nft_offers, only: %i[show]
+
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
