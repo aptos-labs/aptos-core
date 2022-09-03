@@ -6,8 +6,17 @@ set -e
 PROFILE=${PROFILE:-release}
 FEATURES=${FEATURES:-""}
 
+echo "Building all rust-based docker images"
+echo "PROFILE: $PROFILE"
+echo "FEATURES: $FEATURES"
+
+FEATURES_ARGS=""
+if [ -n "$FEATURES" ]; then
+    FEATURES_ARGS="--features ${FEATURES}"
+fi
+
 # Build all the rust binaries
-cargo build --profile=$PROFILE \
+cargo build --profile=$PROFILE $FEATURES_ARGS \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
@@ -22,12 +31,6 @@ cargo build --profile=$PROFILE \
         -p forge-cli \
         -p transaction-emitter \
         "$@"
-
-# Build and overwrite the aptos-node binary with features if specified
-if [ -n "$FEATURES" ]; then
-    echo "Building aptos-node with features ${FEATURES}"
-    (cd aptos-node && cargo build --profile=$PROFILE --features=$FEATURES "$@")
-fi
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
@@ -50,10 +53,9 @@ BINS=(
 
 mkdir dist
 
-for BIN in "${BINS[@]}"
-do
+for BIN in "${BINS[@]}"; do
     cp target/$PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
-( cd dist && cargo run --package framework -- release )
+(cd dist && cargo run --package framework -- release)
