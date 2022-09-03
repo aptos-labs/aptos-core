@@ -7,7 +7,6 @@ use aptos_rest_client::{
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
 use aptos_types::account_address::AccountAddress;
-use std::convert::TryFrom;
 use std::str::FromStr;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -275,7 +274,7 @@ impl FetchMetadata {
             batch_index += 1;
             if batch_index % 100 == 0 {
                 println!(
-                    "Fetched {} epochs (in epoch {} with {} blocks) from {} transactions",
+                    "Fetched {} epochs (in epoch {} with {} blocks) from {} NewBlockEvents",
                     result.len(),
                     epoch,
                     current.len(),
