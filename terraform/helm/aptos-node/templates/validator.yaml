@@ -6,11 +6,15 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    {{- .service.labels | nindent 4 }}
+    {{- with $.Values.validator.service.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    {{- .pod.labels | nindent 4 }}
+    {{- with $.Values.validator.pod.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
   ports:
@@ -49,7 +53,12 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    {{- .statefulset.labels | nindent 4 }}
+    {{- with $.Values.validator.statefulset.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $.Values.validator.pod.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
 spec:
@@ -59,14 +68,18 @@ spec:
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      {{- .pod.labels | nindent 6 }}
+      {{- with $.Values.validator.pod.labels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       app.kubernetes.io/name: validator
       app.kubernetes.io/instance: validator-{{$i}}
   template:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        {{- .pod.labels | nindent 8 }}
+        {{- with $.Values.validator.pod.labels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
         app.kubernetes.io/name: validator
         app.kubernetes.io/instance: validator-{{$i}}
       annotations:
