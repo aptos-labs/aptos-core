@@ -9,8 +9,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/aptos.esm.js"
+      "require": "./dist/index.js",
+      "import": "./dist/aptos.esm.js"
     }
   },
   "main": "./dist/index.js",
