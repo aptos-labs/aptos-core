@@ -54,10 +54,11 @@ pub fn start_consensus(
             let handle = thread::current();
             info!("RUNTIME: {:?} stoped", handle.name());
         })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
-    // We should .disable_lifo_slost() which is tokio unstable , but its not yet available in tokio 18.2.
+    // We should .disable_lifo_slot() which is tokio unstable , but its not yet available in tokio 18.2.
     // https://docs.rs/tokio/latest/tokio/runtime/struct.Builder.html
 
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
