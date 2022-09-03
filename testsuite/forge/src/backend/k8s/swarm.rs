@@ -256,7 +256,7 @@ impl Swarm for K8sSwarm {
         Ok(())
     }
 
-    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+    async fn ensure_no_validator_restart(&self) -> Result<()> {
         for validator in &self.validators {
             if let Err(e) = check_for_container_restart(
                 &self.kube_client,
@@ -271,7 +271,7 @@ impl Swarm for K8sSwarm {
         Ok(())
     }
 
-    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+    async fn ensure_no_fullnode_restart(&self) -> Result<()> {
         for fullnode in &self.fullnodes {
             if let Err(e) = check_for_container_restart(
                 &self.kube_client,

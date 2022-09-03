@@ -249,7 +249,10 @@ pub async fn reconfig(
     let (current, state) = aptos_version.into_parts();
     let current_version = *current.major.inner();
     let txn = root_account.sign_with_transaction_builder(
-        transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
+        transaction_factory
+            .clone()
+            .with_max_gas_amount(100000)
+            .payload(aptos_stdlib::version_set_version(current_version + 1)),
     );
     let result = client.submit_and_wait(&txn).await;
     if let Err(e) = result {

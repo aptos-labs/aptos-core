@@ -11,7 +11,8 @@ use crate::{Swarm, SwarmExt};
 #[derive(Default, Clone, Debug, Serialize)]
 pub struct SuccessCriteria {
     pub avg_tps: usize,
-    max_latency_ms: usize,
+    pub max_latency_ms: usize,
+    check_no_restarts: bool,
     wait_for_all_nodes_to_catchup: Option<Duration>,
 }
 
@@ -19,11 +20,13 @@ impl SuccessCriteria {
     pub fn new(
         tps: usize,
         max_latency_ms: usize,
+        check_no_restarts: bool,
         wait_for_all_nodes_to_catchup: Option<Duration>,
     ) -> Self {
         Self {
             avg_tps: tps,
             max_latency_ms,
+            check_no_restarts,
             wait_for_all_nodes_to_catchup,
         }
     }
@@ -46,6 +49,11 @@ impl SuccessCriteria {
 
         if let Some(timeout) = self.wait_for_all_nodes_to_catchup {
             swarm.wait_for_all_nodes_to_catchup(timeout).await?;
+        }
+
+        if self.check_no_restarts {
+            swarm.ensure_no_validator_restart().await?;
+            swarm.ensure_no_fullnode_restart().await?;
         }
 
         // TODO(skedia) Add latency success criteria after we have support for querying prometheus

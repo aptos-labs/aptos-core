@@ -30,12 +30,7 @@ pub async fn generate_traffic(
     let mut emit_job_request = EmitJobRequest::default();
     let chain_info = swarm.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
-    let mut emitter = TxnEmitter::new(
-        chain_info.root_account,
-        validator_clients[0].clone(),
-        transaction_factory,
-        rng,
-    );
+    let mut emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
@@ -47,7 +42,7 @@ pub async fn generate_traffic(
         ])
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter
-        .emit_txn_for_with_stats(emit_job_request, duration, 3)
+        .emit_txn_for_with_stats(chain_info.root_account, emit_job_request, duration, 3)
         .await
 }
 

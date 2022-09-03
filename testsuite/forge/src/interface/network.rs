@@ -24,7 +24,7 @@ pub struct NetworkContext<'t> {
     pub global_duration: Duration,
     pub emit_job: EmitJobRequest,
     pub success_criteria: SuccessCriteria,
-    runtime: Runtime,
+    pub runtime: Runtime,
 }
 
 impl<'t> NetworkContext<'t> {

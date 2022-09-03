@@ -823,8 +823,6 @@ class LocalForgeRunner(ForgeRunner):
                     "--",
                     "--suite",
                     context.forge_test_suite,
-                    "--mempool-backlog",
-                    "5000",
                     "--duration-secs",
                     context.forge_runner_duration_secs,
                     "test",
