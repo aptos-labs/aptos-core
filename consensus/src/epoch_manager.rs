@@ -73,9 +73,9 @@ use std::{
     collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
-use tokio::time::interval;
+use tokio::{runtime::Runtime, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -827,6 +827,35 @@ impl EpochManager {
 
         // initial start of the processor
         self.await_reconfig_notification().await;
+
+        let panic_runtime = Runtime::new().unwrap();
+        panic_runtime.spawn(async {
+            let mut last_change = Instant::now();
+            let mut prev_value = 0;
+            loop {
+                let cur_value = counters::PROGRESS_CHECK_COUNT.get();
+                if prev_value != cur_value {
+                    debug!("Progress check passed {} < {}", prev_value, cur_value);
+                    last_change = Instant::now();
+                    prev_value = cur_value;
+                } else {
+                    error!(
+                        "No progress in {}s, at {}",
+                        last_change.elapsed().as_secs(),
+                        cur_value
+                    );
+                    if last_change.elapsed().as_secs() > 600 {
+                        panic!(
+                            "Crashing after {}s no progress",
+                            last_change.elapsed().as_secs()
+                        );
+                    }
+                }
+
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+
         loop {
             monitor!(
                 "main_loop",
