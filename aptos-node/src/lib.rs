@@ -3,6 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+mod log_build_information;
+
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
@@ -40,6 +42,7 @@ use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use framework::ReleaseBundle;
 use futures::channel::mpsc;
 use hex::FromHex;
+use log_build_information::log_build_information;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
@@ -196,6 +199,9 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         remote_log_rx = Some(rx);
     }
     let _logger = logger.build();
+
+    // Print out build information.
+    log_build_information();
 
     // Let's now log some important information, since the logger is set up
     info!(config = config, "Loaded AptosNode config");
