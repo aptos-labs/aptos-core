@@ -1,4 +1,3 @@
-Using forge cluster: forge-big-1
 Using the following image tags:
 	forge:  banana
 	swarm:  banana
@@ -11,6 +10,8 @@ Using the following image tags:
 * [Test runner output](None/None/actions/runs/None)
 * Test run is land-blocking
 === End temp-pre-comment ===
+Using cluster: forge-big-1
+Forge output: 
 Forge failed
 
 === Start temp-report ===
