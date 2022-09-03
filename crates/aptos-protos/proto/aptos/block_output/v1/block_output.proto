@@ -66,6 +66,7 @@ message UserTransactionOutput {
   aptos.util.timestamp.Timestamp timestamp = 8;
   repeated SignatureOutput signatures = 9;
   string payload = 10;
+  string entry_function_id_str = 11;
 }
 
 message GenesisTransactionOutput {
