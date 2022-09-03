@@ -71,8 +71,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],
 
-    [.hash.keccak256.base, "hash.keccak256.base", 1],
-    [.hash.keccak256.per_byte, "hash.keccak256.per_byte", 1],
+    [.hash.keccak256.base, optional "hash.keccak256.base", 1],
+    [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 1],
 
     [.type_info.type_of.base, "type_info.type_of.base", 1],
     [.type_info.type_of.per_byte_in_str, "type_info.type_of.per_abstract_memory_unit", 1],
