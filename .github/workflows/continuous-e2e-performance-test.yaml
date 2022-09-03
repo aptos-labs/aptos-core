@@ -23,4 +23,3 @@ jobs:
       # Land blocking is performance test
       FORGE_TEST_SUITE: land_blocking
       POST_TO_SLACK: true
-      USE_NEW_WRAPPER: true
