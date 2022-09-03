@@ -8,11 +8,12 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    {{- .service.labels | nindent 4 }}
+    {{- with $.Values.fullnode.service.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    {{- .pod.labels | nindent 4 }}
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
@@ -32,7 +33,12 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    {{- .statefulset.labels | nindent 4 }}
+    {{- with $.Values.fullnode.statefulset.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $.Values.fullnode.pod.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
@@ -43,7 +49,9 @@ spec:
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      {{- .pod.labels | nindent 6 }}
+      {{- with $.Values.fullnode.pod.labels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       app.kubernetes.io/name: fullnode
       app.kubernetes.io/instance: fullnode-{{$i}}
       group: {{ .name }}
@@ -61,7 +69,9 @@ spec:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        {{- .pod.labels | nindent 8 }}
+        {{- with $.Values.fullnode.pod.labels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
         app.kubernetes.io/name: fullnode
         app.kubernetes.io/instance: fullnode-{{$i}}
         group: {{ .name }}
