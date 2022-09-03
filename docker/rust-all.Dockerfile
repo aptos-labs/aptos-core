@@ -37,7 +37,7 @@ ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
 
-RUN docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
+RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
 
 ### Validator Image ###
 FROM debian-base AS validator
