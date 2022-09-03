@@ -56,13 +56,13 @@ else
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
 fi
 
-#if [ $i -lt 4 ]; then
-#    CUR_STAKE_AMOUNT=$(( 10 * STAKE_AMOUNT ))
-#else
-#    CUR_STAKE_AMOUNT=$STAKE_AMOUNT
-#fi
+if [ $i -lt 4 ]; then
+    CUR_STAKE_AMOUNT=$(( 10 * STAKE_AMOUNT ))
+else
+    CUR_STAKE_AMOUNT=$STAKE_AMOUNT
+fi
 
-CUR_STAKE_AMOUNT=$STAKE_AMOUNT
+# CUR_STAKE_AMOUNT=$STAKE_AMOUNT
 
 echo "CUR_STAKE_AMOUNT=${CUR_STAKE_AMOUNT} for ${i} validator"
 

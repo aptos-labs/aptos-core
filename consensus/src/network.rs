@@ -96,7 +96,7 @@ impl NetworkSender {
         fail_point!("consensus::send::any", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
         });
-        fail_point!("consensus::send::block_retrieval", |_| {
+        fail_point!("consensus::send::block_retrieval_request", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
         });
 
@@ -110,6 +110,14 @@ impl NetworkSender {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
             _ => return Err(anyhow!("Invalid response to request")),
         };
+
+        fail_point!("consensus::process::any", |_| {
+            Err(anyhow::anyhow!("Injected error in request_block"))
+        });
+        fail_point!("consensus::process::block_retrieval_response", |_| {
+            Err(anyhow::anyhow!("Injected error in request_block"))
+        });
+
         response
             .verify(retrieval_request, &self.validators)
             .map_err(|e| {

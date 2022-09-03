@@ -348,7 +348,7 @@ impl BlockStore {
         &self,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
-        fail_point!("consensus::process_block_retrieval", |_| {
+        fail_point!("consensus::process::block_retrieval_request", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
         });
         let mut blocks = vec![];
@@ -376,6 +376,12 @@ impl BlockStore {
         let response_bytes = request
             .protocol
             .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
+        });
+        fail_point!("consensus::send::block_retrieval_response", |_| {
+            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
+        });
         request
             .response_sender
             .send(Ok(response_bytes.into()))

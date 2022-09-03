@@ -45,28 +45,39 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             .into_inner();
         println!("ValidatorSet : {:?}", validator_set);
 
-        let (num_healthy_validators, can_fail_for_quorum, cycle_offset) = if self
-            .few_large_validators
-        {
-            let can_fail_for_quorum = (4 * 10 + (num_validators - 4) - 1) / 3;
-            let cycle_offset = can_fail_for_quorum / 4 + 1;
-            let can_fail_for_quorum =
-                std::cmp::min(self.max_down_nodes, can_fail_for_quorum - cycle_offset);
-            println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first 4 validators to have 10x larger stake", can_fail_for_quorum, num_validators, cycle_offset);
-            (4, can_fail_for_quorum, cycle_offset)
-        } else {
-            let can_fail_for_quorum = (num_validators - 1) / 3;
-            let cycle_offset = can_fail_for_quorum / 4 + 1;
-            let can_fail_for_quorum =
-                std::cmp::min(self.max_down_nodes, can_fail_for_quorum - cycle_offset);
-            println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting all validators with same stake", can_fail_for_quorum, num_validators, cycle_offset);
-            (0, can_fail_for_quorum, cycle_offset)
-        };
+        let (num_whale_validators, num_healthy_validators, can_fail_for_quorum, cycle_offset) =
+            if self.few_large_validators {
+                let can_fail_for_quorum = std::cmp::min(
+                    self.max_down_nodes / 2,
+                    (4 * 10 + (num_validators - 4) - 1) / 3,
+                );
+                let cycle_offset = can_fail_for_quorum / 3 + 1;
+                let can_fail_for_quorum = can_fail_for_quorum - cycle_offset;
+                println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first 4 validators to have 10x larger stake", can_fail_for_quorum, num_validators, cycle_offset);
+                (
+                    4,
+                    num_validators - self.max_down_nodes,
+                    can_fail_for_quorum,
+                    cycle_offset,
+                )
+            } else {
+                let can_fail_for_quorum = (num_validators - 1) / 3;
+                let cycle_offset = can_fail_for_quorum / 4 + 1;
+                let can_fail_for_quorum =
+                    std::cmp::min(self.max_down_nodes, can_fail_for_quorum - cycle_offset);
+                println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting all validators with same stake", can_fail_for_quorum, num_validators, cycle_offset);
+                (
+                    0,
+                    std::cmp::max(0, num_validators - self.max_down_nodes),
+                    can_fail_for_quorum,
+                    cycle_offset,
+                )
+            };
 
         if self.add_execution_delay {
             runtime.block_on(async {
                 let mut rng = rand::thread_rng();
-                for (name, validator) in &validators[num_healthy_validators..num_validators] {
+                for (name, validator) in &validators[num_whale_validators..num_validators] {
                     let sleep_time = rng.gen_range(20, 500);
                     let name = name.clone();
                     validator
@@ -85,7 +96,7 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
         // without any failures.
         // (make epoch length (120s) and this duration (27s) not be multiples of one another,
         // to test different timings)
-        let check_period_s: usize = 27;
+        let check_period_s: usize = 137;
         let target_tps = self.target_tps;
 
         runtime.block_on(test_consensus_fault_tolerance(
@@ -102,11 +113,11 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
                     (
                         down_indices.iter().flat_map(|i| {
                             [
-                                (
-                                    *i,
-                                    "consensus::send::any".to_string(),
-                                    "return".to_string(),
-                                ),
+                                // (
+                                //     *i,
+                                //     "consensus::send::any".to_string(),
+                                //     "return".to_string(),
+                                // ),
                                 (
                                     *i,
                                     "consensus::process::any".to_string(),

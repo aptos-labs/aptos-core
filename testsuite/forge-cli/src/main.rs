@@ -180,7 +180,7 @@ fn main() -> Result<()> {
     let suite_name: &str = args.suite.as_ref();
 
     let duration = Duration::from_secs(1800);
-    let suite_name = "changing_working_quorum_test";
+    let suite_name = "different_node_speed_and_reliability_test";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -545,12 +545,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
             .with_network_tests(&[&ChangingWorkingQuorumTest {
                 target_tps: 500,
-                max_down_nodes: 5,
+                max_down_nodes: 30,
                 few_large_validators: true,
                 add_execution_delay: true,
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-                helm_values["chain"]["epoch_duration_secs"] = 120.into();
+                helm_values["chain"]["epoch_duration_secs"] = 60.into();
             }))
             .with_node_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
