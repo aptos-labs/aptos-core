@@ -5,6 +5,14 @@
   "engines": {
     "node": ">=11.0.0"
   },
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/aptos.esm.js"
+    }
+  },
   "main": "./dist/index.js",
   "module": "./dist/aptos.esm.js",
   "types": "./dist/index.d.ts",
