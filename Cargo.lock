@@ -209,7 +209,6 @@ dependencies = [
  "aptos-types",
  "bcs",
  "better_any",
- "claim",
  "move-deps",
  "once_cell",
  "smallvec",
@@ -473,7 +472,6 @@ dependencies = [
  "async-trait",
  "bcs",
  "channel",
- "claim",
  "futures",
  "itertools",
  "maplit",
@@ -980,7 +978,6 @@ dependencies = [
  "aptos-types",
  "arc-swap",
  "bcs",
- "claim",
  "criterion",
  "crossbeam",
  "crossbeam-queue",
@@ -1857,9 +1854,9 @@ dependencies = [
 
 [[package]]
 name = "autocfg"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
@@ -2406,15 +2403,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "claim"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f81099d6bb72e1df6d50bb2347224b666a670912bb7f06dbe867a4a070ab3ce8"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "clang-sys"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2586,7 +2574,6 @@ dependencies = [
  "byteorder",
  "bytes 1.2.1",
  "channel",
- "claim",
  "consensus-notifications",
  "consensus-types",
  "event-notifications",
@@ -2628,7 +2615,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "async-trait",
- "claim",
  "futures",
  "move-deps",
  "serde 1.0.144",
@@ -3183,7 +3169,6 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "channel",
- "claim",
  "enum_dispatch",
  "futures",
  "network",
@@ -3580,7 +3565,6 @@ dependencies = [
  "async-trait",
  "bcs",
  "channel",
- "claim",
  "executor-test-helpers",
  "futures",
  "move-deps",
@@ -3912,7 +3896,6 @@ dependencies = [
  "base64 0.13.0",
  "bcs",
  "better_any",
- "claim",
  "clap 3.2.17",
  "curve25519-dalek",
  "flate2",
@@ -5336,7 +5319,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "async-trait",
- "claim",
  "futures",
  "serde 1.0.144",
  "thiserror",
@@ -8869,7 +8851,6 @@ dependencies = [
  "async-trait",
  "bcs",
  "channel",
- "claim",
  "consensus-notifications",
  "data-streaming-service",
  "event-notifications",
@@ -8960,7 +8941,6 @@ dependencies = [
  "bounded-executor",
  "bytes 1.2.1",
  "channel",
- "claim",
  "futures",
  "lru",
  "mockall",
@@ -8984,7 +8964,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "bcs",
- "claim",
  "num-traits 0.2.15",
  "proptest",
  "serde 1.0.144",
@@ -9408,10 +9387,11 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.18.2"
+version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4903bf0427cf68dddd5aa6a93220756f8be0c34fcfa9f5e6191e103e15a31395"
+checksum = "89797afd69d206ccd11fb0ea560a44bbb87731d020670e79416d442919257d42"
 dependencies = [
+ "autocfg",
  "bytes 1.2.1",
  "libc",
  "memchr",
