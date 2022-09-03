@@ -448,7 +448,13 @@ class ForgeResult:
         self.debugging_output = output
 
     def format(self) -> str:
-        return f"Forge {self.state.value.lower()}ed"
+        output = "\n".join([
+            f"Forge output: {self.output}",
+            f"Forge {self.state.value.lower()}ed",
+        ])
+        if not self.succeeded():
+            output += "\n" + self.debugging_output
+        return output
 
     def succeeded(self) -> bool:
         return self.state == ForgeState.PASS
@@ -785,7 +791,7 @@ class ForgeRunner:
 
 def dump_forge_state(shell: Shell, forge_namespace: str) -> str:
     try:
-        return (
+        output = (
             shell.run(
                 [
                     "kubectl",
@@ -798,6 +804,7 @@ def dump_forge_state(shell: Shell, forge_namespace: str) -> str:
             .unwrap()
             .decode()
         )
+        return "" if "No resources found" in output else output
     except Exception as e:
         return f"Failed to get debugging output: {e}"
 
@@ -953,11 +960,11 @@ class K8sForgeRunner(ForgeRunner):
                     "wait",
                     "-n",
                     "default",
-                    "--timeout=5m",
+                    "--timeout=1m",
                     "--for=condition=Ready",
                     f"pod/{forge_pod_name}",
                 ]
-            ).unwrap()
+            )
             state = None
             attempts = 100
             streaming = True
@@ -971,8 +978,7 @@ class K8sForgeRunner(ForgeRunner):
                 if streaming:
                     streaming = False
 
-                if forge_logs.succeeded():
-                    forge_result.set_output(forge_logs.output.decode())
+                forge_result.set_output(forge_logs.output.decode())
 
                 # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
                 forge_status = (
@@ -1275,29 +1281,16 @@ def test(
 
     # Perform cluster selection
     current_cluster = None
-    if not forge_cluster_name:
-        if interactive:
-            current_cluster = get_current_cluster_name(shell)
-            if click.confirm(f"Automatically using current cluster {current_cluster}"):
-                forge_cluster_name = current_cluster
+    try:
+        current_cluster = get_current_cluster_name(shell)
+    except Exception as e:
+        print("Warning: failed to get current cluster name: {e}")
 
     if not forge_cluster_name or balance_clusters:
         cluster_names = list_eks_clusters(shell)
         forge_cluster_name = random.choice(cluster_names)
 
     assert forge_cluster_name, "Forge cluster name is required"
-
-    click.echo(f"Using forge cluster: {forge_cluster_name}")
-    if "forge" not in forge_cluster_name and not ignore_cluster_warning:
-        click.echo(
-            "Forge cluster usually contains forge, to ignore this warning set --ignore-cluster-warning"
-        )
-        if interactive:
-            click.confirm("Continue?", abort=True)
-        else:
-            return
-
-    set_current_cluster(shell, forge_cluster_name)
 
     if forge_namespace is None:
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
@@ -1405,12 +1398,13 @@ def test(
         return
 
     try:
+        print(f"Using cluster: {forge_cluster_name}")
+        set_current_cluster(shell, forge_cluster_name)
+
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(context)
 
         print(result.format())
-        if not result.succeeded():
-            print(result.debugging_output)
 
         outputs = []
         if forge_output:
@@ -1427,6 +1421,12 @@ def test(
             raise SystemExit(1)
 
     except Exception as e:
+        if current_cluster:
+            try:
+                set_current_cluster(shell, current_cluster)
+            except Exception as ee:
+                print("Warning: failed to restore current cluster: {ee}")
+                print("Set cluster manually with aws eks update-kubeconfig --name {current_cluster}")
         raise Exception(
             "Forge state:\n" + dump_forge_state(shell, forge_namespace)
         ) from e
