@@ -244,7 +244,7 @@ class ForgeRunnerTests(unittest.TestCase):
                     ),
                     ("kubectl apply -n default -f temp1", RunResult(0, b"")),
                     (
-                        "kubectl wait -n default --timeout=5m --for=condition=Ready pod/potato-1659078000-asdf",
+                        "kubectl wait -n default --timeout=1m --for=condition=Ready pod/potato-1659078000-asdf",
                         RunResult(0, b""),
                     ),
                     (
@@ -474,13 +474,14 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
         runner = CliRunner()
         shell = SpyShell(OrderedDict([
             ('aws sts get-caller-identity', RunResult(0, b'{"Account": "123456789012"}')),
-            ('aws eks update-kubeconfig --name forge-big-1', RunResult(0, b'')),
+            ('kubectl config current-context', RunResult(0, b'aptos-banana')),
             ('git rev-parse HEAD~0', RunResult(0, b'banana')),
             (
                 'aws ecr describe-images --repository-name aptos/validator --im'
                 'age-ids imageTag=banana',
                 RunResult(0, b''),
             ),
+            ('aws eks update-kubeconfig --name forge-big-1', RunResult(0, b'')),
             (
                 'kubectl delete pod -n default -l forge-namespace=forge-perry-1659078000 '
                 '--force',
@@ -496,7 +497,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 RunResult(0, b''),
             ),
             (
-                'kubectl wait -n default --timeout=5m --for=condition=Ready '
+                'kubectl wait -n default --timeout=1m --for=condition=Ready '
                 'pod/forge-perry-1659078000-1659078000-banana',
                 RunResult(0, b''),
             ),
