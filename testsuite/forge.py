@@ -484,6 +484,8 @@ class ForgeContext:
     time: Time
 
     # forge criteria
+    forge_num_validators: int
+    forge_num_validator_fullnodes: int
     forge_test_suite: str
     forge_runner_duration_secs: str
 
@@ -823,6 +825,10 @@ class LocalForgeRunner(ForgeRunner):
                     "--",
                     "--suite",
                     context.forge_test_suite,
+                    "--num-validators",
+                    context.forge_num_validators,
+                    "--num-validator-fullnodes",
+                    context.forge_num_validator_fullnodes,
                     "--duration-secs",
                     context.forge_runner_duration_secs,
                     "test",
@@ -893,6 +899,8 @@ class K8sForgeRunner(ForgeRunner):
         forge_triggered_by = "github-actions" if context.github_actions else "other"
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
+            FORGE_NUM_VALIDATORS=context.forge_num_validators,
+            FORGE_NUM_VALIDATOR_FULLNODES=context.forge_num_validator_fullnodes,
             FORGE_TEST_SUITE=context.forge_test_suite,
             FORGE_RUNNER_DURATION_SECS=context.forge_runner_duration_secs,
             FORGE_IMAGE_TAG=context.forge_image_tag,
@@ -1177,6 +1185,9 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
+# these override the args in forge-cli
+@envoption("FORGE_NUM_VALIDATORS", 30)
+@envoption("FORGE_NUM_VALIDATOR_FULLNODES", 1)
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
@@ -1211,6 +1222,8 @@ def test(
     aws_auth_script: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
+    forge_num_validators: int,
+    forge_num_validator_fullnodes: int,
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
     forge_enable_failpoints: Optional[str],
@@ -1337,6 +1350,8 @@ def test(
         filesystem=filesystem,
         processes=processes,
         time=time,
+        forge_num_validators=forge_num_validators,
+        forge_num_validator_fullnodes=forge_num_validator_fullnodes,
         forge_test_suite=forge_test_suite,
         forge_runner_duration_secs=forge_runner_duration_secs,
         reuse_args=["--reuse"] if forge_namespace_reuse else [],
