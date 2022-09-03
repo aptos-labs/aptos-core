@@ -1111,11 +1111,9 @@ def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
     num_images: int,
-    # Set a generoush threshold in case of failures
-    commit_threshold: int = 100,
-    enable_failpoints_feature: bool = False,
-    enable_performance_profile: bool = False,
-) -> List[str]:
+    enable_failpoints_feature: Optional[bool],
+    enable_performance_profile: Optional[bool],
+) -> Generator[str, None, None]:
     image_name = "aptos/validator"
     image_tag_prefix = ""
     if enable_failpoints_feature and enable_performance_profile:
@@ -1130,7 +1128,6 @@ def find_recent_images_by_profile_or_features(
         shell,
         git,
         num_images,
-        commit_threshold,
         image_name=image_name,
         image_tag_prefix=image_tag_prefix,
     )
@@ -1140,10 +1137,9 @@ def find_recent_images(
     shell: Shell,
     git: Git,
     num_images: int,
-    # Set a generoush threshold in case of failures
-    commit_threshold: int = 100,
-    image_name: str = "aptos/validator",
+    image_name: str,
     image_tag_prefix: str = "",
+    commit_threshold: int = 100,
 ) -> Generator[str, None, None]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
@@ -1328,8 +1324,8 @@ def test(
                 shell,
                 git,
                 2,
-                enable_failpoints_feature=forge_enable_failpoints,
-                enable_performance_profile=forge_enable_performance,
+                enable_failpoints_feature=forge_enable_failpoints == "true",
+                enable_performance_profile=forge_enable_performance == "true",
             )
         )
         # This might not work as intended because we dont know if that revision passed forge
@@ -1339,15 +1335,15 @@ def test(
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
-        default_latest_image = list(
+        default_latest_image = next(
             find_recent_images_by_profile_or_features(
                 shell,
                 git,
                 1,
-                enable_failpoints_feature=forge_enable_failpoints,
-                enable_performance_profile=forge_enable_performance,
+                enable_failpoints_feature=forge_enable_failpoints == "true",
+                enable_performance_profile=forge_enable_performance == "true",
             )
-        )[0]
+        )
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
