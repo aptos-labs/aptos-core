@@ -25,7 +25,6 @@ from .forge import (
     K8sForgeRunner,
     ListClusterResult,
     SystemContext,
-    assert_aws_token_expiration,
     find_recent_images_by_profile_or_features,
     format_comment,
     format_pre_comment,
@@ -267,21 +266,6 @@ class ForgeRunnerTests(unittest.TestCase):
         filesystem.assert_writes(self)
         filesystem.assert_reads(self)
         self.assertEqual(result.state, ForgeState.PASS, result.output)
-
-
-class TestAWSTokenExpiration(unittest.TestCase):
-    def testNoAwsToken(self) -> None:
-        with self.assertRaisesRegex(AwsError, "AWS token is required"):
-            assert_aws_token_expiration(None)
-
-    def testAwsTokenExpired(self) -> None:
-        expiration = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
-        with self.assertRaisesRegex(AwsError, "AWS token has expired"):
-            assert_aws_token_expiration(expiration)
-
-    def testAwsTokenMalformed(self) -> None:
-        with self.assertRaisesRegex(AwsError, "Invalid date format:.*"):
-            assert_aws_token_expiration("asdlkfjasdlkjf")
 
 
 class TestFindRecentImage(unittest.TestCase):
