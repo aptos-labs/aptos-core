@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use shadow_rs::shadow;
+use shadow_rs::{is_release, shadow};
 
 /// Build information keys
 pub const BUILD_BRANCH: &str = "build_branch";
@@ -15,6 +15,7 @@ pub const BUILD_OS: &str = "build_os";
 pub const BUILD_PKG_VERSION: &str = "build_pkg_version";
 pub const BUILD_RUST_CHANNEL: &str = "build_rust_channel";
 pub const BUILD_RUST_VERSION: &str = "build_rust_version";
+pub const BUILD_IS_RELEASE_BUILD: &str = "build_is_release_build";
 
 /// This macro returns the build information as visible during build-time.
 /// Use of this macro is recommended over the `get_build_information`
@@ -53,6 +54,9 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     build_information.insert(BUILD_OS.into(), build::BUILD_OS.into());
     build_information.insert(BUILD_RUST_CHANNEL.into(), build::RUST_CHANNEL.into());
     build_information.insert(BUILD_RUST_VERSION.into(), build::RUST_VERSION.into());
+
+    // Compilation information
+    build_information.insert(BUILD_IS_RELEASE_BUILD.into(), is_release().to_string());
 
     // Get Git metadata from environment variables set during build-time.
     // This is applicable for docker based builds  where the cargo cannot
