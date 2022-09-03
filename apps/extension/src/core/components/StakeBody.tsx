@@ -114,7 +114,7 @@ function StakeBodyContent({
   );
 
   const operator = (
-    <ChakraLink to={`/accounts/${delegatedVoter}`} w="100%">
+    <ChakraLink to={`/accounts/${operatorAddress}`} w="100%">
       <Button
         py={10}
         width="100%"
@@ -128,7 +128,7 @@ function StakeBodyContent({
           alignItems="flex-start"
         >
           <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Operator</Text>
-          <Copyable prompt="Copy address" value={delegatedVoter}>
+          <Copyable prompt="Copy address" value={operatorAddress}>
             <Text fontSize="md">
               {collapseHexString(operatorAddress)}
             </Text>
