@@ -52,28 +52,6 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     fn set_is_chain_id_verified(&mut self);
     //* Below are helper methods that don't need to be implemented *//
 
-    /// Gets the connection.
-    /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
-    /// It's a static method because we need the connection before the processor is initialized
-    fn get_conn(pool: &PgDbPool) -> PgPoolConnection {
-        loop {
-            match pool.get() {
-                Ok(conn) => {
-                    GOT_CONNECTION.inc();
-                    return conn;
-                }
-                Err(err) => {
-                    UNABLE_TO_GET_CONNECTION.inc();
-                    aptos_logger::error!(
-                        retry_in = pool.connection_timeout(),
-                        "Could not get DB connection from pool, will retry. Error: {:?}",
-                        err
-                    );
-                }
-            };
-        }
-    }
-
     /// This is a helper method, tying together the other helper methods to allow tracking status in the DB
     async fn process_substream_with_status(
         &mut self,
@@ -143,7 +121,7 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
 
     /// Actually performs the write for a `IndexerState` changeset
     fn apply_processor_status(&self, psm: &IndexerState) {
-        let conn = Self::get_conn(self.connection_pool());
+        let conn = get_conn(self.connection_pool());
         execute_with_better_error(
             &conn,
             diesel::insert_into(indexer_states::table)
@@ -198,6 +176,28 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
     }
 }
 
+/// Gets the connection.
+/// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
+/// It's a static method because we need the connection before the processor is initialized
+pub(crate) fn get_conn(pool: &PgDbPool) -> PgPoolConnection {
+    loop {
+        match pool.get() {
+            Ok(conn) => {
+                GOT_CONNECTION.inc();
+                return conn;
+            }
+            Err(err) => {
+                UNABLE_TO_GET_CONNECTION.inc();
+                aptos_logger::error!(
+                    "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
+                    pool.connection_timeout(),
+                    err
+                );
+            }
+        };
+    }
+}
+
 pub fn run_migrations(pool: &PgDbPool) {
     info!("Running migrations...");
     embedded_migrations::run_with_output(
@@ -216,7 +216,7 @@ pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Optio
         .get()
         .expect("Could not get connection for checking starting block");
     let sql = "
-        WITH boundaries AS
+        WITH raw_boundaries AS
         (
             SELECT
                 MAX(block_height) AS MAX_V,
@@ -226,6 +226,19 @@ pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Optio
             WHERE
                 substream_module = $1
                 AND success = TRUE
+        ),
+        boundaries AS
+        (
+            SELECT
+                MAX(block_height) AS MAX_V,
+                MIN(block_height) AS MIN_V
+            FROM
+                indexer_states, raw_boundaries
+            WHERE
+                substream_module = $1
+                AND success = true
+                and block_height >= GREATEST(MAX_V - $2, 0)
+
         ),
         gap AS
         (
@@ -244,7 +257,7 @@ pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Optio
                     WHERE
                         substream_module = $1
                         AND success = TRUE
-                        AND block_height >= MAX_V - 1000000
+                        AND block_height >= GREATEST(MAX_V - $2, 0)
                 ) a
             WHERE
                 block_height + 1 <> next_block_height
@@ -252,9 +265,9 @@ pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Optio
         SELECT
             CASE
                 WHEN
-                    MIN_V <> 0
+                    MIN_V <> GREATEST(MAX_V - $2, 0)
                 THEN
-                    0
+                    GREATEST(MAX_V - $2, 0)
                 ELSE
                     COALESCE(maybe_gap, MAX_V + 1)
             END
@@ -269,6 +282,8 @@ pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Optio
     }
     let mut res: Vec<Option<Gap>> = sql_query(sql)
         .bind::<Text, _>(substream_module_name)
+        // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
+        .bind::<BigInt, _>(1500000)
         .get_results(&conn)
         .unwrap();
     res.pop().unwrap().map(|g| g.block_height)
