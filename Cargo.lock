@@ -192,7 +192,7 @@ dependencies = [
  "termcolor",
  "thiserror",
  "tokio",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "toml",
  "uuid",
  "vm-genesis",
@@ -1032,7 +1032,7 @@ dependencies = [
  "futures",
  "pin-project",
  "tokio",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
 ]
 
 [[package]]
@@ -1959,7 +1959,7 @@ dependencies = [
  "structopt 0.3.26",
  "tokio",
  "tokio-stream",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "toml",
  "warp",
 ]
@@ -4256,7 +4256,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tracing",
 ]
 
@@ -6314,7 +6314,7 @@ dependencies = [
  "proxy",
  "serde 1.0.144",
  "tokio",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "url",
 ]
 
@@ -6361,7 +6361,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
 ]
 
 [[package]]
@@ -7168,7 +7168,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
  "tokio-stream",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tracing",
  "typed-headers",
 ]
@@ -7935,7 +7935,7 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -9407,9 +9407,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.19.2"
+version = "1.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c51a52ed6686dd62c320f9b89299e9dfb46f730c7a48e635c19f21d116cb1439"
+checksum = "4903bf0427cf68dddd5aa6a93220756f8be0c34fcfa9f5e6191e103e15a31395"
 dependencies = [
  "bytes 1.2.1",
  "libc",
@@ -9543,9 +9543,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.3"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc463cd8deddc3770d20f9852143d50bf6094e640b485cb2e189a2099085ff45"
+checksum = "f988a1a1adc2fb21f9c12aa96441da33a1728193ae0b95d2be22dbd17fcb4e5c"
 dependencies = [
  "bytes 1.2.1",
  "futures-core",
@@ -9615,7 +9615,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
  "tokio-stream",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tower",
  "tower-layer",
  "tower-service",
@@ -9647,7 +9647,7 @@ dependencies = [
  "prost-derive 0.11.0",
  "tokio",
  "tokio-stream",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tower",
  "tower-layer",
  "tower-service",
@@ -9669,7 +9669,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.3",
+ "tokio-util 0.7.2",
  "tower-layer",
  "tower-service",
  "tracing",
