@@ -65,3 +65,12 @@ test("Signs Strings", () => {
     "0xc5de9e40ac00b371cd83b1c197fa5b665b7449b33cd3cdd305bb78222e06a671a49625ab9aea8a039d4bb70e275768084d62b094bc1b31964f2357b7c1af7e0d",
   );
 });
+
+test("Gets the resource account address", () => {
+  const sourceAddress = "9db1d65a321e4a86f8098cb04e76fce098890b84211fa06d65f24dc644bf0fec";
+  const seeds = "3031" // hexadecimal form of "01" which is 3031
+
+  const a1 = new AptosAccount();
+
+  expect(a1.getResourceAccountAddress(sourceAddress, seeds).hex()).toBe("0x915e47f986471a5faba9cb2f726611cd554344419ddd6d5b3e9f00bcafd30169");
+})

@@ -8,6 +8,8 @@ import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+import { AccountAddress } from "./transaction_builder/aptos_types/account_address";
+import { bcsToBytes } from "./transaction_builder/bcs/helper";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -138,6 +140,28 @@ export class AptosAccount {
   signHexString(hexString: MaybeHexString): HexString {
     const toSign = HexString.ensure(hexString).toUint8Array();
     return this.signBuffer(toSign);
+  }
+
+  /**
+   * Takes source address and seeds and returns the resource account address
+   * @param sourceAddress Address used to derive the resource account
+   * @param seeds The seeds need to be in hexadecimal format
+   * @return The resource account address
+   */
+
+  getResourceAccountAddress(sourceAddress: MaybeHexString, seeds: string): HexString {
+    const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
+    const seed = new HexString(seeds).toUint8Array();
+
+    let originBytes = new Uint8Array(source.length + seed.length);
+
+    originBytes.set(source);
+    originBytes.set(seed, source.length);
+
+    const hash = SHA3.sha3_256.create();
+    hash.update(Buffer.from(originBytes));
+
+    return new HexString(hash.hex());
   }
 
   /**
