@@ -21,7 +21,7 @@ This tutorial introduces the Aptos SDKs and how to generate, submit, and verify 
 
 Clone `aptos-core`:
 ```sh
-git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
+git clone https://github.com/aptos-labs/aptos-core.git
 ```
 
 
