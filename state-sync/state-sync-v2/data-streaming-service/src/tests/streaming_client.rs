@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::streaming_client::NotificationAndFeedback;
 use crate::{
     data_notification::DataNotification,
     data_stream::DataStreamListener,
@@ -10,14 +9,13 @@ use crate::{
         new_streaming_service_client_listener_pair, ContinuouslyStreamTransactionOutputsRequest,
         ContinuouslyStreamTransactionsRequest, DataStreamingClient,
         GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionOutputsRequest,
-        GetAllTransactionsRequest, NotificationFeedback, StreamRequest, StreamingServiceListener,
-        TerminateStreamRequest,
+        GetAllTransactionsRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
+        StreamingServiceListener, TerminateStreamRequest,
     },
     tests::utils::{create_ledger_info, initialize_logger},
 };
-use claim::assert_ok;
-use futures::channel::mpsc;
-use futures::{executor::block_on, FutureExt, StreamExt};
+use claims::assert_ok;
+use futures::{channel::mpsc, executor::block_on, FutureExt, StreamExt};
 use std::thread::JoinHandle;
 
 #[test]
