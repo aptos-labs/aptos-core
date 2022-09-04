@@ -1252,6 +1252,7 @@ def test(
     github_step_summary: Optional[str],
 ) -> None:
     forge_enable_failpoints = True 
+    forge_cluster_name = "aptos-forge-big-3"
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)

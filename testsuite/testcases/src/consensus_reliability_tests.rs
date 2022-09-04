@@ -17,8 +17,9 @@ use tokio::runtime::Runtime;
 
 pub struct ChangingWorkingQuorumTest {
     pub target_tps: usize,
+    pub always_healthy_nodes: usize,
     pub max_down_nodes: usize,
-    pub few_large_validators: bool,
+    pub num_large_validators: usize,
     pub add_execution_delay: bool,
 }
 
@@ -45,28 +46,20 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             .into_inner();
         println!("ValidatorSet : {:?}", validator_set);
 
-        let (num_healthy_validators, can_fail_for_quorum, cycle_offset) = if self
-            .few_large_validators
-        {
-            let can_fail_for_quorum = (4 * 10 + (num_validators - 4) - 1) / 3;
-            let cycle_offset = can_fail_for_quorum / 4 + 1;
-            let can_fail_for_quorum =
-                std::cmp::min(self.max_down_nodes, can_fail_for_quorum - cycle_offset);
-            println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first 4 validators to have 10x larger stake", can_fail_for_quorum, num_validators, cycle_offset);
-            (4, can_fail_for_quorum, cycle_offset)
-        } else {
-            let can_fail_for_quorum = (num_validators - 1) / 3;
-            let cycle_offset = can_fail_for_quorum / 4 + 1;
-            let can_fail_for_quorum =
-                std::cmp::min(self.max_down_nodes, can_fail_for_quorum - cycle_offset);
-            println!("Every cycle having {} nodes out of {} down, rotating {} each cycle, expecting all validators with same stake", can_fail_for_quorum, num_validators, cycle_offset);
-            (0, can_fail_for_quorum, cycle_offset)
-        };
+        let num_always_healthy = self.always_healthy_nodes;
+        let can_fail_for_quorum = std::cmp::min(
+            std::cmp::min(self.max_down_nodes, num_validators - num_always_healthy),
+            (self.num_large_validators * 10 + (num_validators - self.num_large_validators) - 1) / 3,
+        );
+        let cycle_offset = can_fail_for_quorum / 4 + 1;
+        println!(
+            "Always healthy {} nodes, every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first {} validators to have 10x larger stake",
+            num_always_healthy, can_fail_for_quorum, num_validators, cycle_offset, self.num_large_validators);
 
         if self.add_execution_delay {
             runtime.block_on(async {
                 let mut rng = rand::thread_rng();
-                for (name, validator) in &validators[num_healthy_validators..num_validators] {
+                for (name, validator) in &validators[num_always_healthy..num_validators] {
                     let sleep_time = rng.gen_range(20, 500);
                     let name = name.clone();
                     validator
@@ -96,7 +89,7 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             Box::new(FailPointFailureInjection::new(Box::new(move |cycle, part| {
                 if part == 0 {
                     let down_indices: Vec<_> = (0..can_fail_for_quorum).map(|i| {
-                        num_healthy_validators + (cycle * cycle_offset + i) % (num_validators - num_healthy_validators)
+                        num_always_healthy + (cycle * cycle_offset + i) % (num_validators - num_always_healthy)
                     }).collect();
                     println!("For cycle {} down nodes: {:?}", cycle, down_indices);
                     (
@@ -122,7 +115,7 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             }))),
             Box::new(move |cycle, _, _, _, cur, previous| {
                 let down_indices: HashSet<_> = (0..can_fail_for_quorum).map(|i| {
-                    num_healthy_validators + (cycle * cycle_offset + i) % (num_validators - num_healthy_validators)
+                    num_always_healthy + (cycle * cycle_offset + i) % (num_validators - num_always_healthy)
                 }).collect();
 
                 fn split(all: Vec<NodeState>, down_indices: &HashSet<usize>) -> (Vec<NodeState>, Vec<NodeState>) {
