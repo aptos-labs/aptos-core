@@ -92,7 +92,7 @@ pub fn generate_traffic(
     let (mut emitter, emit_job_request) = create_emitter_and_request(ctx, nodes, gas_price)?;
 
     let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.enable_all();
+    runtime_builder.disable_lifo_slot().enable_all();
     runtime_builder.worker_threads(64);
     let rt = runtime_builder
         .build()
@@ -158,7 +158,7 @@ impl NetworkTest for dyn NetworkLoadTest {
             create_emitter_and_request(ctx, &nodes_to_send_load_to, 1)?;
 
         let mut runtime_builder = Builder::new_multi_thread();
-        runtime_builder.enable_all();
+        runtime_builder.disable_lifo_slot().enable_all();
         runtime_builder.worker_threads(64);
         let rt = runtime_builder
             .build()

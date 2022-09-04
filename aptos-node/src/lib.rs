@@ -19,8 +19,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::telemetry_log_writer::TelemetryLog;
-use aptos_logger::{prelude::*, Level};
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -426,6 +425,7 @@ fn setup_data_streaming_service(
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()
         .thread_name("data-streaming-service")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
@@ -450,6 +450,7 @@ fn setup_aptos_data_client(
     // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
         .thread_name("aptos-data-client")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create aptos data client {}", err))?;
@@ -476,6 +477,7 @@ fn setup_state_sync_storage_service(
     // Create a new state sync storage service runtime
     let storage_service_runtime = Builder::new_multi_thread()
         .thread_name("storage-service-server")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to start state sync storage service {}", err))?;
@@ -591,6 +593,7 @@ pub fn setup_environment(
         debug!("Creating runtime for {}", network_config.network_id);
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder
+            .disable_lifo_slot()
             .thread_name(format!("network-{}", network_config.network_id))
             .enable_all();
         if let Some(runtime_threads) = network_config.runtime_threads {

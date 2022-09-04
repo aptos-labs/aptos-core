@@ -55,7 +55,11 @@ fn test_consensus_events_rejected_txns() {
 #[test]
 fn test_mempool_notify_committed_txns() {
     // Create runtime for the mempool notifier and listener
-    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .disable_lifo_slot()
+        .enable_all()
+        .build()
+        .unwrap();
     let _enter = runtime.enter();
 
     // Create a new mempool notifier, listener and shared mempool
