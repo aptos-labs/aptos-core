@@ -1,6 +1,6 @@
 ---
-title: "Update FullNode With New Releases"
-slug: "update-fullnode-with-new-releases"
+title: "Update FullNode With New Devnet Releases"
+slug: "update-fullnode-with-new-devnet-releases"
 sidebar_position: 11
 ---
 
