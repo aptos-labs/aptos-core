@@ -1,0 +1,29 @@
+<%= form_with id: 'connect_wallet', model: @wallet, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame } do |form| %>
+  <% if @wallet.errors.any? %>
+    <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-700">
+        <h2><%= pluralize(@wallet.errors.count, 'error') %> prohibited this wallet from being saved:</h2>
+
+        <ul>
+          <% @wallet.errors.each do |error| %>
+            <li><%= error.full_message %></li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  <% end %>
+
+  <%= form.hidden_field :network %>
+  <%= form.hidden_field :wallet_name %>
+  <%= form.hidden_field :public_key %>
+  <%= form.hidden_field :challenge %>
+  <%= form.hidden_field :signed_challenge %>
+
+  <%= render ButtonComponent.new(type: :submit, **@rest) do %>
+    <% if content %>
+      <%= content %>
+    <% else %>
+      Connect Wallet
+    <% end %>
+  <% end %>
+<% end %>

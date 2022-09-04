@@ -73,6 +73,9 @@ Rails.application.routes.draw do
   resources :it3_profiles, except: %i[show create new index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
+  # NFTs
+  resources :nft_offers, param: :slug, only: %i[show update]
+
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
@@ -93,7 +96,7 @@ Rails.application.routes.draw do
   end
 
   # Wallets
-  resources :wallets, only: %i[create]
+  resources :wallets, only: %i[show create]
 
   # Static pages
   get 'community', to: 'static_page#community'

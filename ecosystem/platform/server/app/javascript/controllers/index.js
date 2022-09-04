@@ -4,6 +4,9 @@
 
 import { application } from "./application"
 
+import ClaimNftController from "./claim_nft_controller"
+application.register("claim-nft", ClaimNftController)
+
 import ConnectWalletController from "./connect_wallet_controller"
 application.register("connect-wallet", ConnectWalletController)
 

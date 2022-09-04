@@ -6,28 +6,30 @@
 class WalletsController < ApplicationController
   before_action :authenticate_user!
 
+  def show
+    @wallet = Wallet.find(params[:id])
+    render ConnectWalletButtonComponent.new(wallet: @wallet)
+  end
+
   def create
     wallet_params = params.require(:wallet).permit(
-      :network, :wallet_name, :public_key
+      :network, :wallet_name, :public_key,
+      :challenge, :signed_challenge
     )
-
-    challenge = params.require(:challenge)
-    return head :forbidden unless challenge.match(/[0-9]{24}/)
-
-    signed_challenge_hex = params.require(:signed_challenge)
-    return head :forbidden unless signed_challenge_hex.match(/[0-9a-f]{128}/)
-
-    signed_challenge = [signed_challenge_hex].pack('H*')
 
     wallet = Wallet.new(wallet_params)
     wallet.user = current_user
 
     result = WalletCreator.new.create_wallet(
-      wallet:,
-      challenge:,
-      signed_challenge:
+      wallet:
     )
 
-    render json: { created: result.created? }
+    if result.created?
+      redirect_to stored_location_for(current_user) || result.wallet
+    else
+      render turbo_stream: turbo_stream.replace(:connect_wallet, ConnectWalletButtonComponent
+        .new(wallet: result.wallet)
+        .render_in(view_context))
+    end
   end
 end
