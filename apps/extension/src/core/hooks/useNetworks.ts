@@ -4,7 +4,6 @@
 import { AptosClient, FaucetClient } from 'aptos';
 import constate from 'constate';
 import { useMemo } from 'react';
-
 import { useAppState } from 'core/hooks/useAppState';
 import { triggerNetworkChange } from 'core/utils/providerEvents';
 import {

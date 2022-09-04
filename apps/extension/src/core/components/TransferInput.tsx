@@ -5,14 +5,12 @@ import {
   VStack, Input, Text, useColorMode, Tooltip,
 } from '@chakra-ui/react';
 import { secondaryTextColor } from 'core/colors';
-import numeral from 'numeral';
 import React, { useMemo } from 'react';
-import { useFormContext } from 'react-hook-form';
 import MaskedInput from 'react-text-mask';
 import { createNumberMask } from 'text-mask-addons';
 import { keyframes } from '@emotion/react';
-import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
-import type { CoinTransferFormData } from './TransferDrawer';
+import { APTOS_UNIT } from 'core/utils/coin';
+import { useTransferFlow } from 'core/hooks/useTransferFlow';
 
 const bounce = keyframes`
   from, 20%, 53%, 80%, to {
@@ -78,32 +76,18 @@ function getAmountInputFontSize(amount?: number) {
 
 const currencyMask = createNumberMask(defaultMaskOptions);
 
-interface TransferInputProps {
-  coinBalance?: number;
-  doesRecipientAccountExist?: boolean,
-  estimatedGasFee?: number;
-  shouldBalanceShake?: boolean;
-}
-
-export default function TransferInput({
-  coinBalance,
-  estimatedGasFee,
-  shouldBalanceShake,
-}: TransferInputProps) {
+export default function TransferInput() {
   const {
-    register,
-    watch,
-  } = useFormContext<CoinTransferFormData>();
+    amountAptNumber,
+    coinBalanceApt,
+    estimatedGasFeeApt,
+    formMethods: { register },
+    shouldBalanceShake,
+  } = useTransferFlow();
   const { colorMode } = useColorMode();
-  const amount = watch('amount');
-  const numberAmountInAPT = numeral(amount).value() || undefined;
-  console.log(coinBalance);
-  // const numberAmountInAPT = numberAmountInOcta * 1e8;
-  const coinBalanceString = formatCoin(coinBalance, { paramUnitType: 'APT', returnUnitType: 'APT' });
-  const estimatedGasFeeInAPT = formatCoin(estimatedGasFee, { decimals: 8 });
   const amountInputFontSize = useMemo(
-    () => getAmountInputFontSize(numberAmountInAPT),
-    [numberAmountInAPT],
+    () => getAmountInputFontSize(amountAptNumber),
+    [amountAptNumber],
   );
 
   const {
@@ -148,7 +132,7 @@ export default function TransferInput({
           />
         )}
       />
-      <Tooltip label={`Network fee: ${estimatedGasFeeInAPT}`}>
+      <Tooltip label={`Network fee: ${estimatedGasFeeApt}`}>
         <Text
           fontSize="sm"
           color={secondaryTextColor[colorMode]}
@@ -158,11 +142,11 @@ export default function TransferInput({
         >
           Balance:
           {' '}
-          {coinBalanceString}
+          {coinBalanceApt}
           ,
           fees:
           {' '}
-          {estimatedGasFeeInAPT}
+          {estimatedGasFeeApt}
         </Text>
       </Tooltip>
     </VStack>

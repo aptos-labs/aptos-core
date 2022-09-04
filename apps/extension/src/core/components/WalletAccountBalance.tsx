@@ -5,7 +5,7 @@ import {
   Heading, Spinner, Text, useColorMode, VStack, Wrap,
 } from '@chakra-ui/react';
 import React from 'react';
-import { useAccountAptCoinBalance } from 'core/queries/account';
+import { useAccountOctaCoinBalance } from 'core/queries/account';
 import { secondaryAddressFontColor } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatCoin } from 'core/utils/coin';
@@ -16,10 +16,10 @@ function WalletAccountBalance() {
   const {
     data: coinBalance,
     isLoading,
-  } = useAccountAptCoinBalance(activeAccountAddress, {
+  } = useAccountOctaCoinBalance(activeAccountAddress, {
     refetchInterval: 5000,
   });
-  const coinBalanceString = formatCoin(coinBalance, { includeUnit: false, paramUnitType: 'APT', returnUnitType: 'APT' });
+  const coinBalanceString = formatCoin(coinBalance, { includeUnit: false, paramUnitType: 'OCTA', returnUnitType: 'APT' });
   return (
     <VStack px={4} alignItems="left">
       <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Account balance</Text>

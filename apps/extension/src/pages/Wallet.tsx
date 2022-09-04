@@ -18,7 +18,6 @@ import {
 import React from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import WalletAccountBalance from 'core/components/WalletAccountBalance';
-import TransferDrawer from 'core/components/TransferDrawer';
 import Faucet from 'core/components/Faucet';
 import Routes from 'core/routes';
 import { useNetworks } from 'core/hooks/useNetworks';
@@ -29,6 +28,7 @@ import { useNodeStatus } from 'core/queries/network';
 import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import WalletAccountStake from 'core/components/WalletAccountStake';
+import TransferFlow from 'core/components/TransferFlow';
 
 function CopyAddressButton() {
   const { activeAccountAddress } = useActiveAccount();
@@ -76,7 +76,7 @@ function Wallet() {
           <Flex width="100%" flexDir="column" px={4}>
             <HStack spacing={4} pt={4}>
               { faucetClient && <Faucet /> }
-              <TransferDrawer />
+              <TransferFlow />
             </HStack>
           </Flex>
         </Flex>

@@ -5,36 +5,31 @@ import {
   Divider, Grid, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
 import { secondaryTextColor } from 'core/colors';
+import { useTransferFlow } from 'core/hooks/useTransferFlow';
 import { formatCoin } from 'core/utils/coin';
 import { collapseHexString } from 'core/utils/hex';
 import React from 'react';
 import Copyable from './Copyable';
 
-interface TransferSummaryProps {
-  amount?: number;
-  estimatedGasFee?: number;
-  recipient?: string;
-}
-
-export default function TransferSummary({
-  amount,
-  estimatedGasFee,
-  recipient,
-}: TransferSummaryProps) {
+export default function TransferSummary() {
   const { colorMode } = useColorMode();
-  const collapsedAddress = recipient ? collapseHexString(recipient) : '';
-  const amountAPTString = formatCoin(amount);
-  console.log(amount);
-  const estimatedGasFeeAPTString = formatCoin(estimatedGasFee);
-  const totalOctas = (amount || 0) + (estimatedGasFee || 0);
-  const totalString = formatCoin(totalOctas);
+  const {
+    amountOctaNumber,
+    estimatedGasFeeOcta,
+    validRecipientAddress,
+  } = useTransferFlow();
+  const collapsedAddress = validRecipientAddress ? collapseHexString(validRecipientAddress) : '';
+  const amountAPTString = formatCoin(amountOctaNumber);
+  const estimatedGasFeeAPTString = formatCoin(estimatedGasFeeOcta, { decimals: 8 });
+  const totalOctas = (amountOctaNumber || 0) + (estimatedGasFeeOcta || 0);
+  const totalString = formatCoin(totalOctas, { decimals: 8 });
 
   return (
     <VStack fontSize="md" divider={<Divider />} px={4} py={8} pb={24} gap={2}>
       <Grid gap={4} width="100%" templateColumns="80px 1fr">
         <Text color={secondaryTextColor[colorMode]}>Recipient</Text>
         <Text fontWeight={600} w="100%" textAlign="right">
-          <Copyable value={recipient}>
+          <Copyable value={validRecipientAddress}>
             {collapsedAddress}
           </Copyable>
         </Text>
