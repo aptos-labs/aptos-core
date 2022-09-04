@@ -72,12 +72,12 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     mem::{discriminant, Discriminant},
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use std::{
-    sync::atomic::{AtomicBool, AtomicU64},
+    sync::{
+        atomic::{AtomicBool, AtomicU64},
+        Arc,
+    },
     thread,
+    time::{Duration, Instant},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -358,16 +358,14 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // We try to help nodes that have lower epoch than us
+            // Ignore message from lower epoch, the node would see message from higher epoch and request
+            // a proof
             Ordering::Less => {
-                self.process_epoch_retrieval(
-                    EpochRetrievalRequest {
-                        start_epoch: different_epoch,
-                        end_epoch: self.epoch(),
-                    },
-                    peer_id,
-                )
-                .await
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(1)),
+                    debug!("Discard message from lower epoch");
+                );
+                Ok(())
             }
             // We request proof to join higher epoch
             Ordering::Greater => {
