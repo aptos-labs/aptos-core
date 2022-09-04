@@ -5,17 +5,17 @@ variable "region" {
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
-  default = 1
+  default     = 1
 }
 
 variable "chain_id" {
   description = "Aptos chain ID"
-  default = "TESTING"
+  default     = "TESTING"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
-  default = "testnet"
+  default     = "testnet"
 }
 
 variable "validator_name" {
@@ -72,14 +72,14 @@ variable "node_pool_sizes" {
 
 variable "k8s_viewer_groups" {
   description = "List of AD Group IDs to configure as Kubernetes viewers"
-  type = list(string)
-  default = []
+  type        = list(string)
+  default     = []
 }
 
 variable "k8s_debugger_groups" {
   description = "List of AD Group IDs to configure as Kubernetes debuggers"
-  type = list(string)
-  default = []
+  type        = list(string)
+  default     = []
 }
 
 variable "utility_instance_type" {
@@ -100,6 +100,11 @@ variable "validator_instance_type" {
 variable "validator_instance_num" {
   description = "Number of instances used for validator and fullnodes"
   default     = 2
+}
+
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint the instances in the validator nodegroup"
+  default     = false
 }
 
 variable "enable_logger" {
