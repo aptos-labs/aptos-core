@@ -18,7 +18,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use claim::{assert_lt, assert_matches, assert_ok};
+use claims::{assert_lt, assert_matches, assert_ok};
 use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
 use move_deps::move_core_types::language_storage::TypeTag;

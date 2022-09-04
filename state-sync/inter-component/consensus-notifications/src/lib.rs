@@ -272,9 +272,9 @@ impl ConsensusSyncNotification {
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-    use aptos_types::aggregate_signature::AggregateSignature;
     use aptos_types::{
         account_address::AccountAddress,
+        aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         chain_id::ChainId,
         contract_event::ContractEvent,
@@ -282,7 +282,7 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
     };
-    use claim::{assert_err, assert_matches, assert_ok};
+    use claims::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use move_deps::move_core_types::language_storage::TypeTag;
     use std::time::Duration;

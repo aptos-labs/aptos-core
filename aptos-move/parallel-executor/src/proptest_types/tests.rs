@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use claim::assert_ok;
+use claims::assert_ok;
 use num_cpus;
 use proptest::{
     collection::vec,

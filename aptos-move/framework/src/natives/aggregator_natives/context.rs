@@ -144,7 +144,7 @@ mod test {
     use super::*;
     use aptos_aggregator::aggregator_extension::AggregatorHandle;
     use aptos_types::account_address::AccountAddress;
-    use claim::assert_matches;
+    use claims::assert_matches;
     use move_deps::move_table_extension::TableHandle;
 
     struct EmptyStorage;

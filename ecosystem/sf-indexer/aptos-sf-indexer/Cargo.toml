@@ -41,7 +41,7 @@ reqwest-middleware = { version = "0.1.6" }
 reqwest-retry = { version = "0.1.5" }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
-tokio = { version = "1.18.2", features = ["full", "time"] }
+tokio = { version = "1.21.0", features = ["full", "time"] }
 tokio-retry = "0.3.0"
 tonic = { version = "0.7.2", features = ["tls-roots", "transport", "prost", "compression", "codegen"] }
 url = "2.2.2"

@@ -23,7 +23,7 @@ use aptos_types::{
     transaction::Version,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
-use claim::assert_err;
+use claims::assert_err;
 use consensus_types::common::{Author, Round};
 use itertools::Itertools;
 use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
