@@ -57,7 +57,7 @@
                   <% elsif step.name == :connect_wallet %>
                     <%= render(ConnectWalletButtonComponent.new(wallet: @wallet, scheme: :primary, class: 'w-64', turbo_frame: dom_id(@nft_offer))) %>
                   <% elsif step.name == :claim_nft %>
-                    <%= render(ButtonComponent.new(href: step.href, scheme: :primary, class: 'w-64')) { 'Claim NFT' } %>
+                    <%= render(ClaimNftButtonComponent.new(nft_offer: @nft_offer, wallet: @wallet, scheme: :primary, class: 'w-64')) %>
                   <% end %>
                 <% end %>
               <% end %>

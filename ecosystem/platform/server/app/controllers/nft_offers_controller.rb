@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class NftOffersController < ApplicationController
+  before_action :authenticate_user!, only: %i[create]
+
   def show
     store_location_for(:user, request.path)
-    slug = params.require(:slug)
-    @nft_offer = get_nft_offer(slug)
+    @nft_offer = NftOffer.find(params[:slug])
     @wallet = current_user&.wallets&.where(network: @nft_offer.network)&.first ||
               Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
     @steps = [
@@ -23,16 +24,26 @@ class NftOffersController < ApplicationController
     @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
   end
 
-  private
+  def update
+    @nft_offer = NftOffer.find(params[:slug])
+    @wallet = current_user.wallets.where(network: @nft_offer.network).first!
 
-  def get_nft_offer(slug)
-    case slug
-    when 'aptos-zero'
-      NftOffer.new(slug: 'aptos-zero', network: 'devnet')
-    else
-      raise ActiveRecord::RecordNotFound
-    end
+    result = NftClaimer.new.claim_nft(
+      nft_offer: @nft_offer,
+      wallet: @wallet
+    )
+
+    render json: {
+      wallet_name: @wallet.wallet_name,
+      module_address: @nft_offer.module_address,
+      message: result.message,
+      signature: result.signature
+    }
+  rescue NftClaimer::AccountNotFoundError
+    render json: { error: 'account_not_found' }
   end
+
+  private
 
   def sign_in_step
     completed = user_signed_in?

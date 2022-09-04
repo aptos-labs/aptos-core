@@ -1,0 +1,7 @@
+<%= render ButtonComponent.new(href: nft_offer_path(@nft_offer), **@rest) do %>
+  <% if content %>
+    <%= content %>
+  <% else %>
+    Claim NFT
+  <% end %>
+<% end %>

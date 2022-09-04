@@ -28,6 +28,17 @@ class Wallet < ApplicationRecord
     [signed_challenge[2..]].pack('H*')
   end
 
+  def api_url
+    case network
+    when 'devnet'
+      'https://fullnode.devnet.aptoslabs.com/v1'
+    when 'ait3'
+      'https://ait3.aptosdev.com/v1'
+    else
+      raise "API not mapped for #{network}!"
+    end
+  end
+
   private
 
   def set_address

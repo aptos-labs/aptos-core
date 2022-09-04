@@ -3,13 +3,17 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class ConnectWalletButtonComponent < ViewComponent::Base
+class ClaimNftButtonComponent < ViewComponent::Base
   include ActionText::Engine.helpers
 
-  def initialize(wallet:, **rest)
+  def initialize(nft_offer:, wallet:, **rest)
     @rest = rest
+    @nft_offer = nft_offer
     @wallet = wallet
-    @turbo_frame = @rest[:turbo_frame]
+
+    @rest[:data] ||= {}
+    @rest[:data][:controller] = 'claim-nft'
+    @rest[:data][:action] = 'claim-nft#handleClick'
   end
 
   private
