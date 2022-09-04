@@ -37,7 +37,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
-use aptos_infallible::Mutex;
+use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{
@@ -72,10 +72,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     mem::{discriminant, Discriminant},
-    sync::{
-        atomic::{AtomicBool, AtomicU64},
-        Arc,
-    },
+    sync::{atomic::AtomicU64, Arc},
     thread,
     time::{Duration, Instant},
 };
@@ -820,15 +817,13 @@ impl EpochManager {
     pub async fn start(
         mut self,
         mut round_timeout_sender_rx: channel::Receiver<Round>,
-        network_receivers: NetworkReceivers,
+        mut network_receivers: NetworkReceivers,
     ) {
         // initial start of the processor
         self.await_reconfig_notification().await;
 
-        let active = Arc::new(AtomicBool::new(false));
-        let active_copy = active.clone();
-        let counter = Arc::new(AtomicU64::new(0));
-        let counter_copy = counter.clone();
+        let progress_counter = Arc::new(AtomicU64::new(0));
+        let counter_copy = progress_counter.clone();
         let panic_duration_s = self.config.panic_on_stuck_epoch_manager_duration_s;
 
         let _handle = if panic_duration_s > 0 {
@@ -839,7 +834,6 @@ impl EpochManager {
                         let mut last_change = Instant::now();
                         let mut prev_value = 0;
                         loop {
-                            let active = active_copy.load(std::sync::atomic::Ordering::Relaxed);
                             let cur_value = counter_copy.load(std::sync::atomic::Ordering::Relaxed);
                             if prev_value != cur_value {
                                 debug!("Progress check passed {} < {}", prev_value, cur_value);
@@ -847,12 +841,11 @@ impl EpochManager {
                                 prev_value = cur_value;
                             } else {
                                 error!(
-                                    "No progress in {}s, at {}, active: {}",
+                                    "No progress in {}s, at {}",
                                     last_change.elapsed().as_secs(),
                                     cur_value,
-                                    active
                                 );
-                                if last_change.elapsed().as_secs() > panic_duration_s && !active {
+                                if last_change.elapsed().as_secs() > panic_duration_s {
                                     panic!(
                                         "Crashing after {}s no progress",
                                         last_change.elapsed().as_secs()
@@ -860,7 +853,7 @@ impl EpochManager {
                                 }
                             }
 
-                            std::thread::sleep(Duration::from_secs(30));
+                            thread::sleep(Duration::from_secs(30));
                         }
                     })
                     .unwrap(),
@@ -868,53 +861,29 @@ impl EpochManager {
         } else {
             None
         };
-
-        let epoch_manager_shared = Arc::new(tokio::sync::Mutex::new(self));
-        let epoch_manager_shared_1 = epoch_manager_shared.clone();
-        let epoch_manager_shared_2 = epoch_manager_shared.clone();
-        let NetworkReceivers {
-            mut consensus_messages,
-            mut block_retrieval,
-        } = network_receivers;
-
-        let consensus_task = async move {
-            while let Some((peer, msg)) = consensus_messages.next().await {
-                let mut locked = epoch_manager_shared.lock().await;
-                active.store(true, std::sync::atomic::Ordering::Relaxed);
-                counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                monitor!(
-                    "process_message",
-                    if let Err(e) = locked.process_message(peer, msg).await {
-                        error!(epoch = locked.epoch(), error = ?e, kind = error_kind(&e));
+        loop {
+            ::futures::select! {
+                (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
+                    if let Err(e) = self.process_message(peer, msg).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                );
-                active.store(false, std::sync::atomic::Ordering::Relaxed);
-            }
-        };
-        let block_task = async move {
-            while let Some((peer, request)) = block_retrieval.next().await {
-                let locked = epoch_manager_shared_1.lock().await;
-                monitor!(
-                    "send_block_retrieval",
-                    if let Err(e) = locked.process_block_retrieval(peer, request).await {
-                        error!(epoch = locked.epoch(), error = ?e, kind = error_kind(&e));
+                },
+                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
+                    if let Err(e) = self.process_block_retrieval(peer, request).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                );
+                },
+                round = round_timeout_sender_rx.select_next_some() => {
+                    self.process_local_timeout(round);
+                },
             }
-        };
-        let timeout_task = async move {
-            while let Some(round) = round_timeout_sender_rx.next().await {
-                monitor!(
-                    "send_timeout",
-                    epoch_manager_shared_2
-                        .lock()
-                        .await
-                        .process_local_timeout(round)
-                );
-            }
-        };
-        tokio::spawn(consensus_task);
-        tokio::spawn(block_task);
-        tokio::spawn(timeout_task);
+            // Progress check counter
+            progress_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // Continually capture the time of consensus process to ensure that clock skew between
+            // validators is reasonable and to find any unusual (possibly byzantine) clock behavior.
+            counters::OP_COUNTERS
+                .gauge("time_since_epoch_ms")
+                .set(duration_since_epoch().as_millis() as i64);
+        }
     }
 }
