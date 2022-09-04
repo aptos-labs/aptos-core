@@ -15,6 +15,7 @@ pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
 
     let runtime = Builder::new_multi_thread()
         .thread_name("backup")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[backup] failed to create runtime");

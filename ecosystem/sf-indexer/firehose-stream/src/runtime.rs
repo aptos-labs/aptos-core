@@ -16,10 +16,11 @@ use extractor::Transaction as TransactionPB;
 use futures::channel::mpsc::channel;
 use prost::Message;
 use std::{convert::TryInto, sync::Arc, time::Duration};
-use storage_interface::state_view::DbStateView;
-use storage_interface::DbReader;
-use tokio::runtime::{Builder, Runtime};
-use tokio::time::sleep;
+use storage_interface::{state_view::DbStateView, DbReader};
+use tokio::{
+    runtime::{Builder, Runtime},
+    time::sleep,
+};
 
 /// Creates a runtime which creates a thread pool which pushes firehose of block protobuf to SF endpoint
 /// Returns corresponding Tokio runtime
@@ -35,6 +36,7 @@ pub fn bootstrap(
 
     let runtime = Builder::new_multi_thread()
         .thread_name("fh-stream")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[fh-stream] failed to create runtime");

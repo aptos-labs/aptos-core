@@ -19,7 +19,7 @@ pub async fn generate_traffic(
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let mut runtime_builder = Builder::new_multi_thread();
-    runtime_builder.enable_all();
+    runtime_builder.disable_lifo_slot().enable_all();
     runtime_builder.worker_threads(64);
     let rng = SeedableRng::from_rng(OsRng)?;
     let validator_clients = swarm

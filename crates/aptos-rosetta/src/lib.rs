@@ -13,14 +13,10 @@ use crate::{
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::chain_id::ChainId;
-use aptos_warp_webserver::WebServer;
-use aptos_warp_webserver::{logger, Error};
-use std::collections::BTreeMap;
-use std::{convert::Infallible, sync::Arc};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_warp_webserver::{logger, Error, WebServer};
+use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
+use tokio::{sync::Mutex, task::JoinHandle};
 use warp::{
     http::{HeaderValue, Method, StatusCode},
     reply, Filter, Rejection, Reply,
@@ -81,6 +77,7 @@ pub fn bootstrap(
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name("rosetta")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[rosetta] failed to create runtime");

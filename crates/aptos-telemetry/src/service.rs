@@ -4,8 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::config::NodeConfig;
-use aptos_logger::prelude::*;
-use aptos_logger::telemetry_log_writer::TelemetryLog;
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc;
@@ -13,12 +12,11 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use rand_core::OsRng;
 use serde::Deserialize;
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::time::Duration;
 use std::{
+    collections::BTreeMap,
     env,
-    time::{SystemTime, UNIX_EPOCH},
+    future::Future,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     runtime::{Builder, Runtime},
@@ -27,18 +25,14 @@ use tokio::{
 };
 use uuid::Uuid;
 
-use crate::constants::{
-    ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS, ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS,
-    ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS, ENV_APTOS_FORCE_ENABLE_TELEMETRY,
-    ENV_TELEMETRY_SERVICE_URL, PROMETHEUS_PUSH_METRICS_FREQ_SECS,
-};
-use crate::utils::create_build_info_telemetry_event;
 use crate::{
     constants::{
         APTOS_GA_API_SECRET, APTOS_GA_MEASUREMENT_ID, ENV_APTOS_DISABLE_TELEMETRY,
-        ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, GA4_URL, HTTPBIN_URL,
+        ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS, ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS,
+        ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS, ENV_APTOS_FORCE_ENABLE_TELEMETRY,
+        ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, ENV_TELEMETRY_SERVICE_URL, GA4_URL, HTTPBIN_URL,
         NODE_CORE_METRICS_FREQ_SECS, NODE_NETWORK_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS,
-        TELEMETRY_SERVICE_URL,
+        PROMETHEUS_PUSH_METRICS_FREQ_SECS, TELEMETRY_SERVICE_URL,
     },
     core_metrics::create_core_metric_telemetry_event,
     metrics,
@@ -46,6 +40,7 @@ use crate::{
     sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
     telemetry_log_sender::TelemetryLogSender,
+    utils::create_build_info_telemetry_event,
 };
 
 // The chain ID key
@@ -111,6 +106,7 @@ pub fn start_telemetry_service(
     // Create the telemetry runtime
     let telemetry_runtime = Builder::new_multi_thread()
         .thread_name("aptos-telemetry")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");

@@ -109,6 +109,7 @@ pub fn start_inspection_service(service_address: &str, service_port: u16) {
 
         let runtime = runtime::Builder::new_current_thread()
             .enable_io()
+            .disable_lifo_slot()
             .build()
             .unwrap();
         runtime

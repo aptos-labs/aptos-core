@@ -454,6 +454,10 @@ mod tests {
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread().enable_all().build().unwrap()
+        Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .enable_all()
+            .build()
+            .unwrap()
     }
 }
