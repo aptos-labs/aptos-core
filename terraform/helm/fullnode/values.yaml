@@ -39,11 +39,11 @@ image:
 
 resources:
   limits:
-    cpu: 7
-    memory: 14Gi
+    cpu: 15
+    memory: 30Gi
   requests:
-    cpu: 6.5
-    memory: 12Gi
+    cpu: 15
+    memory: 26Gi
 
 nodeSelector: {}
 tolerations: []
