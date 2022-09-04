@@ -351,14 +351,15 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // We try to help nodes that have lower epoch than us
-            Ordering::Less => self.process_epoch_retrieval(
-                EpochRetrievalRequest {
-                    start_epoch: different_epoch,
-                    end_epoch: self.epoch(),
-                },
-                peer_id,
-            ),
+            // Ignore message from lower epoch, the node would eventually see messages from
+            // higher epoch and request a proof
+            Ordering::Less => {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(1)),
+                    debug!("Discard message from lower epoch");
+                );
+                Ok(())
+            }
             // We request proof to join higher epoch
             Ordering::Greater => {
                 let request = EpochRetrievalRequest {
