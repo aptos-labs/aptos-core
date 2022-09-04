@@ -1,4 +1,29 @@
 /// Allow stakers and operators to enter a staking contract with reward sharing.
+/// The main accounting logic in a staking contract consists of 2 parts:
+/// 1. Tracks how much commission needs to be paid out to the operator. This is tracked with an increasing principal
+/// amount that's updated every time the operator requests permission, the staker withdraws funds, or the staker
+/// switches operators.
+/// 2. Distributions of funds to operators (commissions) and stakers (stake withdrawals) use the shares model provided
+/// by the pool_u64 to track shares that increase in price as the stake pool accumulates rewards.
+///
+/// Example flow:
+/// 1. A staker creates a staking contract with an operator by calling create_staking_contract() with 100 coins of
+/// initial stake and commission = 10%. This means the operator will receive 10% of any accumulated rewards. A new stake
+/// pool will be created and hosted in a separate account that's controlled by the staking contract.
+/// 2. The operator sets up a validator node and, once ready, joins the validator set by calling stake::join_validator_set
+/// 3. After some time, the stake pool gains rewards and now has 150 coins.
+/// 4. Operator can now call request_commission. 10% of (150 - 100) = 5 coins will be unlocked from the stake pool. The
+/// staker's principal is now updated from 100 to 145 (150 coins - 5 coins of commission). The pending distribution pool
+/// has 5 coins total and the operator owns all 5 shares of it.
+/// 5. Some more time has passed. The pool now has 50 more coins in rewards and a total balance of 195. The operator
+/// calls request_commission again. Since the previous 5 coins have now become withdrawable, it'll be deposited into the
+/// operator's account first. Their new commission will be 10% of (195 coins - 145 principal) = 5 coins. Principal is
+/// updated to be 190 (195 - 5). Pending distribution pool has 5 coins and operator owns all 5 shares.
+/// 6. Staker calls unlock_stake to unlock 50 coins of stake, which gets added to the pending distribution pool. Based
+/// on shares math, staker will be owning 50 shares and operator still owns 5 shares of the 55-coin pending distribution
+/// pool.
+/// 7. Some time passes and the 55 coins become fully withdrawable from the stake pool. Due to accumulated rewards, the
+/// 55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
 module aptos_framework::staking_contract {
     use std::bcs;
     use std::error;
@@ -158,9 +183,12 @@ module aptos_framework::staking_contract {
         voter: address,
         amount: u64,
         commission_percentage: u64,
+        // Optional seed used when creating the staking contract account.
+        contract_creation_seed: vector<u8>,
     ) acquires Store {
         let staked_coins = coin::withdraw<AptosCoin>(staker, amount);
-        create_staking_contract_with_coins(staker, operator, voter, staked_coins, commission_percentage);
+        create_staking_contract_with_coins(
+            staker, operator, voter, staked_coins, commission_percentage, contract_creation_seed);
     }
 
     /// Staker can call this function to create a simple staking contract with a specified operator.
@@ -170,6 +198,8 @@ module aptos_framework::staking_contract {
         voter: address,
         coins: Coin<AptosCoin>,
         commission_percentage: u64,
+        // Optional seed used when creating the staking contract account.
+        contract_creation_seed: vector<u8>,
     ): address acquires Store {
         assert!(
             commission_percentage >= 0 && commission_percentage <= 100,
@@ -197,7 +227,8 @@ module aptos_framework::staking_contract {
 
         // Initialize the stake pool in a new resource account. This allows the same staker to contract with multiple
         // different operators.
-        let (stake_pool_signer, stake_pool_signer_cap, owner_cap) = create_stake_pool(staker, operator, voter);
+        let (stake_pool_signer, stake_pool_signer_cap, owner_cap) =
+            create_stake_pool(staker, operator, voter, contract_creation_seed);
 
         // Add the stake to the stake pool.
         stake::add_stake_with_cap(&owner_cap, coins);
@@ -470,17 +501,6 @@ module aptos_framework::staking_contract {
         );
     }
 
-    // Create a salt for generating the resource accounts that will be holding the StakePool for a given staking
-    // contract. This address should be deterministic for the same staker and operator.
-    fun create_seed(staker: address, operator: address): vector<u8> {
-        let seed = bcs::to_bytes(&staker);
-        vector::append(&mut seed, bcs::to_bytes(&operator));
-        // Include a salt to avoid conflicts with any other modules out there that might also generate
-        // deterministic resource accounts for the same staker + operator addresses.
-        vector::append(&mut seed, SALT);
-        seed
-    }
-
     // Add a new distribution for `recipient` and `amount` to the staking contract's distributions list.
     fun add_distribution(
         operator: address,
@@ -504,9 +524,10 @@ module aptos_framework::staking_contract {
 
     // Calculate accumulated rewards and commissions since last update.
     fun get_staking_contract_amounts_internal(staking_contract: &StakingContract): (u64, u64, u64) {
-        // Any outgoing flows of funds before the staker withdraws all staking_contracts can only come from operator
-        // withdrawing commissions.
-        // So to calculate rewards, we only care about current active + pending_active - last recorded principal.
+        // Pending_inactive is not included in the calculation because pending_inactive can only come from:
+        // 1. Outgoing commissions. This means commission has already been extracted.
+        // 2. Stake withdrawals from stakers. This also means commission has already been extracted as
+        // request_commission_internal is called in unlock_stake
         let (active, _, pending_active, _) = stake::get_stake(staking_contract.pool_address);
         let total_active_stake = active + pending_active;
         let accumulated_rewards = total_active_stake - staking_contract.principal;
@@ -519,11 +540,18 @@ module aptos_framework::staking_contract {
         staker: &signer,
         operator: address,
         voter: address,
+        contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability)  {
-        let seed = create_seed(signer::address_of(staker), operator);
+        // Generate a seed that will be used to create the resource account that hosts the staking contract.
+        let seed = bcs::to_bytes(&signer::address_of(staker));
+        vector::append(&mut seed, bcs::to_bytes(&operator));
+        // Include a salt to avoid conflicts with any other modules out there that might also generate
+        // deterministic resource accounts for the same staker + operator addresses.
+        vector::append(&mut seed, SALT);
+        // Add an extra salt given by the staker in case an account with the same address has already been created.
+        vector::append(&mut seed, contract_creation_seed);
+
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(staker, seed);
-        // Initialize stake pool with amount = 0 as the coins need to come from the staker, not the stake pool
-        // resource account.
         stake::initialize_stake_owner(&stake_pool_signer, 0, operator, voter);
 
         // Extract owner_cap from the StakePool, so we have control over it in the staking_contracts flow.
@@ -617,7 +645,7 @@ module aptos_framework::staking_contract {
         let operator_address = signer::address_of(operator);
 
         // Voter is initially set to operator but then updated to be staker.
-        create_staking_contract(staker, operator_address, operator_address, amount, commission);
+        create_staking_contract(staker, operator_address, operator_address, amount, commission, vector::empty<u8>());
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
@@ -714,6 +742,34 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    public entry fun test_operator_cannot_request_same_commission_multiple_times(
+        aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store {
+
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        // Operator joins the validator set.
+        join_validator_set(operator, pool_address);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        let new_balance = with_rewards(INITIAL_BALANCE);
+        stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
+
+        // Operator tries to request commision multiple times. But their distribution shouldn't change.
+        let expected_commission = (new_balance - last_recorded_principal(staker_address, operator_address)) / 10;
+        request_commission(operator, staker_address);
+        assert_distribution(staker_address, operator_address, operator_address, expected_commission);
+        request_commission(operator, staker_address);
+        assert_distribution(staker_address, operator_address, operator_address, expected_commission);
+        request_commission(operator, staker_address);
+        assert_distribution(staker_address, operator_address, operator_address, expected_commission);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
     #[expected_failure(abort_code = 0x10007)]
     public entry fun test_staker_cannot_create_same_staking_contract_multiple_times(
         aptos_framework: &signer,
@@ -723,7 +779,7 @@ module aptos_framework::staking_contract {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
         let operator_address = signer::address_of(operator);
         stake::mint(staker, INITIAL_BALANCE);
-        create_staking_contract(staker, operator_address, operator_address, INITIAL_BALANCE, 10);
+        create_staking_contract(staker, operator_address, operator_address, INITIAL_BALANCE, 10, vector::empty<u8>());
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
