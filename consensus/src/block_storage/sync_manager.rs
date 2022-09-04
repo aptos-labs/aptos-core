@@ -489,12 +489,8 @@ impl BlockRetriever {
                         e,
                     );
                     // select next peer to try
-                    if peers.is_empty() {
-                        bail!(
-                            "Failed to fetch block {} in {} attempts: no more peers available",
-                            block_id,
-                            attempt
-                        );
+                    if peers.is_empty() || attempt >= 10 {
+                        bail!("Failed to fetch block {} in {} attempts", block_id, attempt);
                     }
                     peer = self.pick_peer(attempt, peers);
                 }
