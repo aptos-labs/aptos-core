@@ -8,6 +8,8 @@ class NftOffersController < ApplicationController
     store_location_for(:user, request.path)
     slug = params.require(:slug)
     @nft_offer = get_nft_offer(slug)
+    @wallet = current_user&.wallets&.where(network: @nft_offer.network)&.first ||
+              Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
     @steps = [
       sign_in_step,
       connect_wallet_step,
@@ -36,17 +38,15 @@ class NftOffersController < ApplicationController
     completed = user_signed_in?
     {
       name: :sign_in,
-      completed:,
-      href: new_user_session_path
+      completed:
     }
   end
 
   def connect_wallet_step
-    completed = user_signed_in? && current_user.wallets.where(network: @nft_offer.network).exists?
+    completed = user_signed_in? && @wallet.persisted?
     {
       name: :connect_wallet,
-      completed:,
-      dialog: completed ? nil : DialogComponent.new
+      completed:
     }
   end
 
@@ -54,8 +54,7 @@ class NftOffersController < ApplicationController
     completed = false
     {
       name: :claim_nft,
-      completed:,
-      dialog: completed ? nil : DialogComponent.new
+      completed:
     }
   end
 end

@@ -96,7 +96,7 @@ Rails.application.routes.draw do
   end
 
   # Wallets
-  resources :wallets, only: %i[create]
+  resources :wallets, only: %i[show create]
 
   # Static pages
   get 'community', to: 'static_page#community'
