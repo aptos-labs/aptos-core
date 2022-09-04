@@ -11,7 +11,7 @@ import React, { useMemo } from 'react';
 import format from 'date-fns/format';
 import { collapseHexString } from 'core/utils/hex';
 import { ChevronRightIcon } from '@chakra-ui/icons';
-import { APTOS_UNIT, octaToAptWithDecimals } from 'core/utils/coin';
+import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
 import { AptosLogo } from './AptosLogo';
 import ChakraLink from './ChakraLink';
 import Copyable from './Copyable';
@@ -51,7 +51,7 @@ function StakeBodyContent({
     value: stakeAmount,
   } = stakeInfo;
 
-  const stakeAmountString = octaToAptWithDecimals({ octas: stakeAmount });
+  const stakeAmountString = formatCoin(stakeAmount);
 
   const lockedUntilDateString = useMemo(() => {
     const lockedUntilDate = new Date(Number(lockedUntilSecs) * 1000);

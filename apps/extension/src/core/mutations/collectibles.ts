@@ -144,7 +144,7 @@ export const useCreateTokenAndCollection = () => {
     data: CombinedEventParams | undefined,
   ) => {
     queryClient.invalidateQueries(queryKeys.getGalleryItems);
-    queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
+    queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance);
     Analytics.event({
       eventType: collectiblesEvents.CREATE_NFT,
       params: {

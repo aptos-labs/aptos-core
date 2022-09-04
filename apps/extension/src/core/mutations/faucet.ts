@@ -28,7 +28,7 @@ export function useFundAccount() {
     onSuccess: async (result, { address }: UseFundAccountParams) => {
       if (result) {
         await queryClient.invalidateQueries([
-          queryKeys.getAccountCoinBalance,
+          queryKeys.getAccountOctaCoinBalance,
           address,
         ]);
       }

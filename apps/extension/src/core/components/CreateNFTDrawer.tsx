@@ -24,7 +24,7 @@ import React from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
-import { useAccountCoinBalance } from 'core/queries/account';
+import { useAccountAptCoinBalance } from 'core/queries/account';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
 // eslint-disable-next-line global-require
@@ -35,7 +35,7 @@ export default function CreateNFTModal() {
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
   const { activeAccountAddress } = useActiveAccount();
-  const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
+  const { data: coinBalance } = useAccountAptCoinBalance(activeAccountAddress);
 
   const collectionName: string | undefined = watch('collectionName');
   const tokenName: string | undefined = watch('tokenName');

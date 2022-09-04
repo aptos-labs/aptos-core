@@ -12,8 +12,8 @@ import queryKeys from 'core/queries/queryKeys';
 import { buildAccountTransferPayload, buildCoinTransferPayload } from 'shared/transactions';
 
 export interface UseCoinTransferParams {
-  amount: number | undefined,
   doesRecipientExist: boolean | undefined,
+  octaAmount: number | undefined,
   recipient: string | undefined,
 }
 
@@ -24,21 +24,21 @@ type UserTransaction = Types.UserTransaction;
  */
 export function useCoinTransferSimulation(
   {
-    amount,
     doesRecipientExist,
+    octaAmount,
     recipient,
   }: UseCoinTransferParams,
   options?: UseQueryOptions<UserTransaction, Error> & UseTransactionSimulationOptions,
 ) {
   const isReady = recipient !== undefined
-    && amount !== undefined
-    && amount >= 0;
+    && octaAmount !== undefined
+    && octaAmount >= 0;
 
   return useTransactionSimulation(
-    [queryKeys.getCoinTransferSimulation, recipient, amount],
+    [queryKeys.getCoinTransferSimulation, recipient, octaAmount],
     () => (doesRecipientExist
-      ? buildCoinTransferPayload(recipient!, amount!)
-      : buildAccountTransferPayload(recipient!, amount!)),
+      ? buildCoinTransferPayload(recipient!, octaAmount!)
+      : buildAccountTransferPayload(recipient!, octaAmount!)),
     {
       ...options,
       enabled: isReady && options?.enabled,
@@ -72,7 +72,7 @@ export function useCoinTransferTransaction(
     {
       ...options,
       onSuccess(txn, data, ...rest) {
-        queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
+        queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance);
 
         // TODO: re-enable when fixing analytics
         // const { amount } = data;

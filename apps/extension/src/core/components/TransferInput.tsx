@@ -11,9 +11,7 @@ import { useFormContext } from 'react-hook-form';
 import MaskedInput from 'react-text-mask';
 import { createNumberMask } from 'text-mask-addons';
 import { keyframes } from '@emotion/react';
-import {
-  APTOS_UNIT, octaToAptWithDecimals, OCTA_UNIT,
-} from 'core/utils/coin';
+import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
 import type { CoinTransferFormData } from './TransferDrawer';
 
 const bounce = keyframes`
@@ -55,7 +53,7 @@ const defaultMaskOptions = {
   integerLimit: 10,
   prefix: '',
   // how many digits allowed after the decimal
-  suffix: ' APT',
+  suffix: ` ${APTOS_UNIT}`,
   thousandsSeparatorSymbol: ',',
 };
 
@@ -98,10 +96,15 @@ export default function TransferInput({
   } = useFormContext<CoinTransferFormData>();
   const { colorMode } = useColorMode();
   const amount = watch('amount');
-  const numberAmount = numeral(amount).value() || undefined;
-  const coinBalanceString = octaToAptWithDecimals({ decimals: 4, octas: coinBalance });
-  const amountInputFontSize = useMemo(() => getAmountInputFontSize(numberAmount), [numberAmount]);
-  const estimatedGasFeeInAPT = octaToAptWithDecimals({ decimals: 0, octas: estimatedGasFee });
+  const numberAmountInAPT = numeral(amount).value() || undefined;
+  console.log(coinBalance);
+  // const numberAmountInAPT = numberAmountInOcta * 1e8;
+  const coinBalanceString = formatCoin(coinBalance, { paramUnitType: 'APT', returnUnitType: 'APT' });
+  const estimatedGasFeeInAPT = formatCoin(estimatedGasFee, { decimals: 8 });
+  const amountInputFontSize = useMemo(
+    () => getAmountInputFontSize(numberAmountInAPT),
+    [numberAmountInAPT],
+  );
 
   const {
     onChange: amountOnChange,
@@ -155,11 +158,11 @@ export default function TransferInput({
         >
           Balance:
           {' '}
-          {`${coinBalanceString} ${APTOS_UNIT}`}
+          {coinBalanceString}
           ,
           fees:
           {' '}
-          {`${estimatedGasFee || 0} ${OCTA_UNIT}`}
+          {estimatedGasFeeInAPT}
         </Text>
       </Tooltip>
     </VStack>

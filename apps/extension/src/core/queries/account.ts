@@ -5,13 +5,15 @@ import { ApiError, AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
+import { OCTA_NEGATIVE_EXPONENT } from 'core/utils/coin';
 
 /**
  * QUERY KEYS
  */
 export const accountQueryKeys = Object.freeze({
-  getAccountCoinBalance: 'getAccountCoinBalance',
+  getAccountAptCoinBalance: 'getAccountAptCoinBalance',
   getAccountExists: 'getAccountExists',
+  getAccountOctaCoinBalance: 'getAccountOctaCoinBalance',
   getAccountStakeBalance: 'getAccountStakeBalance',
   getAccountStakeInfo: 'getAccountStakeInfo',
   getSequenceNumber: 'getSequenceNumber',
@@ -68,23 +70,89 @@ export const useAccountExists = ({
 };
 
 /**
- * Query coin balance for the specified account
+ * Query coin balance for the specified account in Octa -> APT * 10^-8
  * @param address account address of the balance to be queried
- * @param options query options
+ * @param options? query options
  */
-export function useAccountCoinBalance(
+export function useAccountOctaCoinBalance(
   address: string | undefined,
   options?: UseQueryOptions<number>,
 ) {
   const { aptosClient } = useNetworks();
 
   return useQuery<number>(
-    [accountQueryKeys.getAccountCoinBalance, address],
+    [accountQueryKeys.getAccountOctaCoinBalance, address],
     async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
       .then((res: any) => Number(res.data.coin.value))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
           return 0;
+        }
+        throw err;
+      }),
+    {
+      enabled: Boolean(address),
+      retry: 0,
+      ...options,
+    },
+  );
+}
+
+/**
+ * Query coin balance for the specified account in APT
+ * @param address account address of the balance to be queried
+ * @param options? query options
+ */
+export function useAccountAptCoinBalance(
+  address: string | undefined,
+  options?: UseQueryOptions<number>,
+) {
+  const { aptosClient } = useNetworks();
+
+  return useQuery<number>(
+    [accountQueryKeys.getAccountOctaCoinBalance, address],
+    async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
+      .then((res: any) => Number(res.data.coin.value * OCTA_NEGATIVE_EXPONENT))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          return 0;
+        }
+        throw err;
+      }),
+    {
+      enabled: Boolean(address),
+      retry: 0,
+      ...options,
+    },
+  );
+}
+
+interface UseAccountAptosCoinBalanceDict {
+  APT: number;
+  OCTA: number;
+}
+
+/**
+ * Query coin balance for the specified account in APT
+ * @param address account address of the balance to be queried
+ * @param options? query options
+ */
+export function useAccountAptosCoinBalance(
+  address: string | undefined,
+  options?: UseQueryOptions<UseAccountAptosCoinBalanceDict>,
+) {
+  const { aptosClient } = useNetworks();
+
+  return useQuery<UseAccountAptosCoinBalanceDict>(
+    [accountQueryKeys.getAccountOctaCoinBalance, address],
+    async () => aptosClient.getAccountResource(address!, aptosCoinStoreStructTag)
+      .then((res: any) => ({
+        APT: Number(res.data.coin.value * OCTA_NEGATIVE_EXPONENT),
+        OCTA: Number(res.data.coin.value),
+      }))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          return { APT: 0, OCTA: 0 };
         }
         throw err;
       }),

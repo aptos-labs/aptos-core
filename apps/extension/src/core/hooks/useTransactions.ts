@@ -110,7 +110,7 @@ type PayloadFactory<TParams = void> = (params: TParams) => TransactionPayload;
  * TODO: just fetch it internally in the hook, reusing the query hook for the balance
  */
 export interface UseTransactionSimulationOptions {
-  maxGasAmount?: number,
+  maxGasOctaAmount?: number,
 }
 
 export function useTransactionSimulation(
@@ -129,8 +129,8 @@ export function useTransactionSimulation(
     async () => {
       const payload = payloadFactory();
       // TODO: Should cap by maximum maxGasAmount
-      const txnOptions = options?.maxGasAmount
-        ? { maxGasAmount: options.maxGasAmount }
+      const txnOptions = options?.maxGasOctaAmount
+        ? { maxGasAmount: options.maxGasOctaAmount }
         : {};
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {

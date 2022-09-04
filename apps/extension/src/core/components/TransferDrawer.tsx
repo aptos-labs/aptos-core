@@ -24,7 +24,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import React, { useState } from 'react';
 import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
 import {
-  useAccountCoinBalance,
+  useAccountAptosCoinBalance,
   useAccountExists,
 } from 'core/queries/account';
 import {
@@ -36,11 +36,11 @@ import {
 } from '@chakra-ui/icons';
 import { secondaryDividerColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import toast from 'core/components/Toast';
-import numeral from 'numeral';
 import useDebounce from 'core/hooks/useDebounce';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatAddress, isAddressValid } from 'core/utils/address';
 import { parseMoveAbortDetails } from 'shared/move';
+import { OCTA_POSITIVE_EXPONENT } from 'core/utils/coin';
 import TransferInput from './TransferInput';
 import TransferAvatar from './TransferAvatar';
 import TransferSummary from './TransferSummary';
@@ -118,31 +118,34 @@ function TransferDrawer() {
   });
 
   const amount = watch('amount');
-  const numberAmount = numeral(amount).value() || undefined;
+  const numberAmountApt = parseFloat(amount || '0');
+  const numberAmountOcta = parseInt((numberAmountApt * OCTA_POSITIVE_EXPONENT).toString(), 10);
   const {
-    debouncedValue: debouncedAmount,
+    debouncedValue: debouncedNumberAmountOcta,
     isLoading: debouncedAmountIsLoading,
-  } = useDebounce(numberAmount, 500);
+  } = useDebounce(numberAmountOcta, 500);
   const { activeAccountAddress } = useActiveAccount();
-  const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
-  const isBalanceEnoughBeforeFee = (debouncedAmount && coinBalance !== undefined)
-    ? debouncedAmount <= coinBalance
+  const { data: coinBalance } = useAccountAptosCoinBalance(activeAccountAddress);
+  const isBalanceEnoughBeforeFee = (debouncedNumberAmountOcta && coinBalance !== undefined)
+    ? debouncedNumberAmountOcta <= coinBalance?.OCTA
     : undefined;
 
   const {
     data: simulationResult,
     error: simulationError,
   } = useCoinTransferSimulation({
-    amount: debouncedAmount,
     doesRecipientExist: doesRecipientAccountExist,
+    octaAmount: debouncedNumberAmountOcta,
     recipient: validRecipientAddress,
   }, {
     enabled: isDrawerOpen && isBalanceEnoughBeforeFee,
-    maxGasAmount: coinBalance || 0,
+    maxGasOctaAmount: coinBalance?.OCTA || 0,
     refetchInterval: 5000,
   });
 
-  const estimatedGasFee = debouncedAmount && simulationResult && Number(simulationResult.gas_used);
+  const estimatedGasFee = debouncedNumberAmountOcta
+   && simulationResult
+   && Number(simulationResult.gas_used);
   const { mutateAsync: submitCoinTransfer } = useCoinTransferTransaction({ estimatedGasFee });
 
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${recipient}`;
@@ -157,10 +160,17 @@ function TransferDrawer() {
   const canSubmitForm = validRecipientAddress !== undefined
     && !debouncedAmountIsLoading
     && doesRecipientAccountExist !== undefined
-    && debouncedAmount !== undefined
-    && debouncedAmount >= 0
+    && debouncedNumberAmountOcta !== undefined
+    && debouncedNumberAmountOcta >= 0
     && simulationResult?.success === true
     && !simulationError;
+
+  console.log(validRecipientAddress);
+  console.log(!debouncedAmountIsLoading);
+  console.log(doesRecipientAccountExist);
+  console.log(debouncedNumberAmountOcta);
+  console.log(simulationResult?.success);
+  console.log(!simulationError);
 
   const onSubmit = async () => {
     if (!canSubmitForm) {
@@ -169,13 +179,13 @@ function TransferDrawer() {
 
     try {
       const onChainTxn = await submitCoinTransfer({
-        amount: debouncedAmount,
+        amount: debouncedNumberAmountOcta,
         doesRecipientExist: doesRecipientAccountExist,
         recipient: validRecipientAddress,
       });
 
       if (onChainTxn.success) {
-        coinTransferSuccessToast(debouncedAmount, onChainTxn);
+        coinTransferSuccessToast(debouncedNumberAmountOcta, onChainTxn);
         resetForm();
         setDrawerPage(TransferDrawerPage.ADD_ADDRESS_AND_AMOUNT);
         closeDrawer();
@@ -276,7 +286,7 @@ function TransferDrawer() {
       <DrawerBody px={0} py={0}>
         <TransferInput
           estimatedGasFee={estimatedGasFee}
-          coinBalance={coinBalance}
+          coinBalance={coinBalance?.APT}
           doesRecipientAccountExist={doesRecipientAccountExist}
           shouldBalanceShake={shouldBalanceShake}
         />
@@ -328,10 +338,9 @@ function TransferDrawer() {
       </DrawerHeader>
       <DrawerBody px={0} py={0}>
         <TransferSummary
-          amount={numberAmount}
+          amount={numberAmountApt}
           estimatedGasFee={estimatedGasFee}
           recipient={validRecipientAddress}
-          unit={APTOS_UNIT}
         />
       </DrawerBody>
       <DrawerFooter
