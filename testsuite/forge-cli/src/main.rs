@@ -508,7 +508,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "changing_working_quorum_test" => config
             .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
             .with_network_tests(&[&ChangingWorkingQuorumTest {
-                target_tps: 100,
+                target_tps: 500,
                 max_down_nodes: 30,
                 few_large_validators: false,
                 add_execution_delay: false,
@@ -518,7 +518,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             }))
             .with_node_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 200.into();
                 helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                     500.into();
                 helm_values["validator"]["config"]["consensus"]
@@ -526,9 +526,17 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
                     1.into();
             }))
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_emit_job(
+                EmitJobRequest::default()
+                    .mode(EmitJobMode::ConstTps { tps: 500 })
+                    .transaction_mix(vec![
+                        (TransactionType::P2P, 75),
+                        (TransactionType::AccountGeneration, 20),
+                        (TransactionType::NftMint, 5),
+                    ]),
+            )
             .with_success_criteria(SuccessCriteria::new(
-                60,
+                300,
                 10000,
                 true,
                 Some(Duration::from_secs(30)),
@@ -536,7 +544,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "different_node_speed_and_reliability_test" => config
             .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
             .with_network_tests(&[&ChangingWorkingQuorumTest {
-                target_tps: 100,
+                target_tps: 500,
                 max_down_nodes: 5,
                 few_large_validators: true,
                 add_execution_delay: true,
@@ -546,7 +554,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             }))
             .with_node_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 50.into();
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 200.into();
                 helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                     500.into();
                 helm_values["validator"]["config"]["consensus"]
@@ -554,9 +562,17 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] =
                     1.into();
             }))
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+            .with_emit_job(
+                EmitJobRequest::default()
+                    .mode(EmitJobMode::ConstTps { tps: 500 })
+                    .transaction_mix(vec![
+                        (TransactionType::P2P, 75),
+                        (TransactionType::AccountGeneration, 20),
+                        (TransactionType::NftMint, 5),
+                    ]),
+            )
             .with_success_criteria(SuccessCriteria::new(
-                60,
+                300,
                 10000,
                 true,
                 Some(Duration::from_secs(30)),
