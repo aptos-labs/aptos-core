@@ -5,13 +5,11 @@ import {
   useColorMode,
   Box,
   VStack,
-  Center,
   Heading,
   Flex,
   Text,
   Button,
 } from '@chakra-ui/react';
-import { secondaryExtensionBodyTextColor } from 'core/colors';
 import Routes from 'core/routes';
 import React from 'react';
 import { AptosBlackLogo, AptosWhiteLogo } from './AptosLogo';
@@ -21,35 +19,44 @@ export default function NewExtensionBody() {
   const { colorMode } = useColorMode();
 
   return (
-    <VStack height="100%" pt={32}>
-      <Flex w="100%" flexDir="column">
-        <Center>
-          <Box width="75px" pb={4}>
-            {
+    <VStack height="100%">
+      <Flex w="100%" flexDir="column" height="100%">
+        <Flex w="100%" flexDir="column" flex={1}>
+          <Flex w="100%" flexDir="column" margin="auto">
+            <Box width="86px" pb={5}>
+              {
               (colorMode === 'dark')
                 ? <AptosWhiteLogo />
                 : <AptosBlackLogo />
             }
-          </Box>
-        </Center>
-        <Heading textAlign="center">Petra</Heading>
-        <Text
-          textAlign="center"
-          pb={8}
-          color={secondaryExtensionBodyTextColor[colorMode]}
-          fontSize="lg"
-        >
-          An Aptos crypto wallet
-        </Text>
+            </Box>
+            <Heading fontSize={28}>Welcome to Petra</Heading>
+            <Text
+              pb={10}
+              pt={2}
+              fontSize="md"
+            >
+              The most reliable way to engage on Aptos. Buy, store, and offer tokens & NFTs.
+            </Text>
+          </Flex>
+        </Flex>
         <VStack spacing={4}>
           <ChakraLink to={Routes.createWallet.path} width="100%">
-            <Button colorScheme="teal" variant="solid" width="100%">
-              Get started
+            <Button colorScheme="teal" variant="solid" width="100%" height={14}>
+              <Text
+                fontSize="xl"
+              >
+                Create New Wallet
+              </Text>
             </Button>
           </ChakraLink>
           <ChakraLink to={Routes.createWalletViaImportAccount.path} width="100%">
-            <Button variant="solid" width="100%">
-              Import account
+            <Button variant="solid" width="100%" height={14}>
+              <Text
+                fontSize="xl"
+              >
+                Import Wallet
+              </Text>
             </Button>
           </ChakraLink>
         </VStack>

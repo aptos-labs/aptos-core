@@ -6,7 +6,7 @@ import { OnboardingStateProvider, useOnboardingState } from 'core/hooks/useOnboa
 import CreateWalletLayout, { OnboardingPage } from 'core/layouts/CreateWalletLayout';
 import CreatePasswordBody from 'core/components/CreatePasswordBody';
 import SecretRecoveryPhraseBody from 'core/components/SecretRecoveryPhraseBody';
-import ConfirmOnboardBody from 'core/components/ConfirmOnboardBody';
+import EnterSecretRecoveryPhraseBody from 'core/components/EnterSecretRecoveryPhraseBody';
 
 function NewWalletBody() {
   const { activeStep } = useOnboardingState();
@@ -17,8 +17,8 @@ function NewWalletBody() {
         return <CreatePasswordBody />;
       case OnboardingPage.SecretRecoveryPhrase:
         return <SecretRecoveryPhraseBody />;
-      case OnboardingPage.Done:
-        return <ConfirmOnboardBody />;
+      case OnboardingPage.EnterSecretRecoveryPhrase:
+        return <EnterSecretRecoveryPhraseBody />;
       default:
         return <CreatePasswordBody />;
     }

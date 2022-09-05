@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box, Button, Flex, Grid, Tooltip, useColorMode,
+  VStack, Box, Button, Flex, Grid, Tooltip, useColorMode, HStack, IconButton,
 } from '@chakra-ui/react';
-import { Steps, Step } from 'chakra-ui-steps';
-import { secondaryBgColor } from 'core/colors';
+import { ArrowBackIcon } from '@chakra-ui/icons';
+import { secondaryBgColor, secondaryBackButtonBgColor } from 'core/colors';
 import { useOnboardingState } from 'core/hooks/useOnboardingState';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback, useMemo, useRef, useState,
+} from 'react';
 import { FormProvider, useForm, useFormContext } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { Transition, type TransitionStatus } from 'react-transition-group';
 import Routes from 'core/routes';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
@@ -18,26 +21,36 @@ import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from '
 import { useAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { passwordStrength } from 'core/constants';
+import Step from 'core/components/Step';
+import SecretPhraseConfirmationPopup from 'core/components/SecretPhraseConfirmationPopup';
+import Copyable from '../components/Copyable';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
 export enum OnboardingPage {
   CreatePassword = 0,
   SecretRecoveryPhrase = 1,
-  Done = 2,
+  EnterSecretRecoveryPhrase = 2,
 }
 
 const steps = [
   { content: null, label: 'Password' },
-  { content: null, label: 'Secret phrase' },
+  { content: null, label: 'Secret Recovery Phrase' },
+  { content: null, label: 'Enter Your Secret Recovery Phrase' },
 ];
 
 export interface CreateWalletFormValues {
   confirmPassword: string;
+  confirmPasswordFocused: boolean;
+  confirmSavedsecretRecoveryPhrase: boolean;
   initialPassword: string;
   mnemonic: string[];
   mnemonicString: string;
-  secretRecoveryPhrase: boolean;
+  mnemonicValues: { [key: number]: string },
+  savedSecretRecoveryPhrase: boolean;
+  showPassword: boolean;
+  showSecretRecoveryPhrase: boolean;
+  showSecretRecoveryPhrasePopup: boolean;
   termsOfService: boolean;
 }
 
@@ -45,69 +58,74 @@ interface NextButtonProps {
   isImport?: boolean;
 }
 
+function CopyButton() {
+  const { setValue, watch } = useFormContext<CreateWalletFormValues>();
+
+  const mnemonic = watch('mnemonic');
+  const showSecretRecoveryPhrase = watch('showSecretRecoveryPhrase');
+  const savedSecretRecoveryPhrase = watch('savedSecretRecoveryPhrase');
+  if (!showSecretRecoveryPhrase) return null;
+
+  return (
+    <Copyable value={mnemonic.join(' ')} width="100%" copiedPrompt="">
+      <Button
+        width="100%"
+        size="lg"
+        onClick={() => {
+          setValue('savedSecretRecoveryPhrase', true);
+          setTimeout(() => {
+            setValue('savedSecretRecoveryPhrase', false);
+          }, 3000);
+        }}
+      >
+        {savedSecretRecoveryPhrase ? 'Copied!' : 'Copy'}
+      </Button>
+    </Copyable>
+  );
+}
+
 function NextButton({
   isImport = false,
 }: NextButtonProps) {
-  const { watch } = useFormContext<CreateWalletFormValues>();
-  const { initAccounts } = useAccounts();
-  const { fundAccount } = useFundAccount();
-
+  const { setValue, watch } = useFormContext<CreateWalletFormValues>();
   const {
     activeStep, nextStep,
   } = useOnboardingState();
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
   const termsOfService = watch('termsOfService');
   const initialPassword = watch('initialPassword');
   const confirmPassword = watch('confirmPassword');
-  const secretRecoveryPhrase = watch('secretRecoveryPhrase');
   const mnemonicString = watch('mnemonicString');
+  const mnemonicValues = watch('mnemonicValues');
+  const savedSecretRecoveryPhrase = watch('savedSecretRecoveryPhrase');
 
   const passwordResult = zxcvbn(initialPassword);
   const passwordScore = passwordResult.score;
 
-  const nextOnClick = useCallback(async () => {
-    if (activeStep === 0) {
-      nextStep();
-    } else if (activeStep === 1) {
-      setIsLoading(true);
-      const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
-      const aptosAccount = new AptosAccount(seed);
-
-      const firstAccount = {
-        mnemonic,
-        ...keysFromAptosAccount(aptosAccount),
-      };
-
-      await initAccounts(confirmPassword, {
-        [firstAccount.address]: firstAccount,
-      });
-
-      if (fundAccount) {
-        await fundAccount({ address: firstAccount.address, amount: 0 });
+  const nextOnClick = useCallback(
+    async () => {
+      if (activeStep === 0 || activeStep === 1) {
+        nextStep();
+      } else if (activeStep === 2) {
+        setValue('showSecretRecoveryPhrasePopup', true);
       }
-
-      setIsLoading(false);
-      nextStep();
-    } else if (activeStep === 2) {
-      navigate(Routes.wallet.path);
-    }
-  }, [activeStep, initAccounts, confirmPassword, fundAccount, mnemonicString, navigate, nextStep]);
+    },
+    [setValue,
+      activeStep,
+      nextStep,
+    ],
+  );
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (
-      <Button isLoading={isLoading} size="md" onClick={nextOnClick} colorScheme="teal">
-        {activeStep === steps.length ? 'Finish' : 'Next'}
+      <Button width="100%" size="lg" onClick={nextOnClick} colorScheme="teal">
+        Continue
       </Button>
     );
 
     const disabledNextButton = (
-      <Box>
-        <Button isDisabled size="md" onClick={nextOnClick} colorScheme="teal">
-          {activeStep === steps.length ? 'Finish' : 'Next'}
-        </Button>
-      </Box>
+      <Button width="100%" isDisabled size="lg" onClick={nextOnClick} colorScheme="teal">
+        Continue
+      </Button>
     );
 
     switch (activeStep) {
@@ -122,7 +140,9 @@ function NextButton({
             <Tooltip
               label="Passwords must match"
             >
-              {disabledNextButton}
+              <Box width="100%" height="100%">
+                {disabledNextButton}
+              </Box>
             </Tooltip>
           );
         }
@@ -131,7 +151,9 @@ function NextButton({
             <Tooltip
               label={'Password strength must be at least "strong"'}
             >
-              {disabledNextButton}
+              <Box width="100%" height="100%">
+                {disabledNextButton}
+              </Box>
             </Tooltip>
           );
         }
@@ -139,48 +161,143 @@ function NextButton({
           <Tooltip
             label="You must agree to the Terms of Service"
           >
-            {disabledNextButton}
+            <Box width="100%" height="100%">
+              {disabledNextButton}
+            </Box>
           </Tooltip>
         );
       }
       case OnboardingPage.SecretRecoveryPhrase: {
-        if (secretRecoveryPhrase) {
+        if (savedSecretRecoveryPhrase) {
           return baseNextButton;
         }
         return (
           <Tooltip
             label="You must save your Secret Recovery Phrase"
           >
-            {disabledNextButton}
+            <Box width="100%" height="100%">
+              {disabledNextButton}
+            </Box>
           </Tooltip>
         );
       }
-      case OnboardingPage.Done: {
-        return baseNextButton;
+      case OnboardingPage.EnterSecretRecoveryPhrase: {
+        const sortedMnemonicEntries = Object.entries(mnemonicValues)
+          .sort((a, b) => Number(a[0]) - Number(b[0]));
+        const mnemonicInputString = sortedMnemonicEntries.map((v) => v[1]).join(' ');
+        if (mnemonicString === mnemonicInputString) {
+          return baseNextButton;
+        }
+
+        return (
+          <Tooltip
+            label="You must enter correct Secret Recovery Phrase"
+          >
+            <Box width="100%" height="100%">
+              {disabledNextButton}
+            </Box>
+          </Tooltip>
+        );
       }
       default: {
         return disabledNextButton;
       }
     }
   }, [
-    isLoading,
     nextOnClick,
+    mnemonicValues,
+    mnemonicString,
     activeStep,
     termsOfService,
     initialPassword,
     confirmPassword,
     passwordScore,
-    secretRecoveryPhrase,
+    savedSecretRecoveryPhrase,
   ]);
 
   return (isImport && activeStep >= 1) ? null : NextButtonComponent;
 }
 
-const PrevButton = () => {
+const transitionDuration = 200;
+
+interface CreateWalletLayoutProps {
+  children: React.ReactElement;
+}
+
+const buttonBorderColor = {
+  dark: 'gray.700',
+  light: 'gray.200',
+};
+
+function CreateWalletLayout({
+  children,
+}: CreateWalletLayoutProps) {
+  const { setValue, watch } = useFormContext<CreateWalletFormValues>();
+  const { initAccounts } = useAccounts();
+  const { fundAccount } = useFundAccount();
+  const [loading, setLoading] = useState<boolean>(false);
+
   const {
-    activeStep, prevStep,
+    activeStep, nextStep, prevStep,
   } = useOnboardingState();
   const navigate = useNavigate();
+  const confirmPassword = watch('confirmPassword');
+  const mnemonicString = watch('mnemonicString');
+  const showSecretRecoveryPhrase = watch('showSecretRecoveryPhrase');
+  const showSecretRecoveryPhrasePopup = watch('showSecretRecoveryPhrasePopup');
+  const ref = useRef(null);
+
+  const termsOfService = watch('termsOfService');
+  const initialPassword = watch('initialPassword');
+  const savedSecretRecoveryPhrase = watch('savedSecretRecoveryPhrase');
+
+  const passwordResult = zxcvbn(initialPassword);
+  const passwordScore = passwordResult.score;
+
+  const initAccount = async () => {
+    setLoading(true);
+    const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
+    const aptosAccount = new AptosAccount(seed);
+
+    const firstAccount = {
+      mnemonic,
+      ...keysFromAptosAccount(aptosAccount),
+    };
+
+    await initAccounts(confirmPassword, {
+      [firstAccount.address]: firstAccount,
+    });
+
+    if (fundAccount) {
+      await fundAccount({ address: firstAccount.address, amount: 0 });
+    }
+    setLoading(false);
+  };
+
+  const nextOnClick = useCallback(async () => {
+    if (activeStep === 0) {
+      if (termsOfService
+        && initialPassword === confirmPassword
+         && passwordScore >= passwordStrength) {
+        nextStep();
+      }
+    } else if (activeStep === 1) {
+      if (savedSecretRecoveryPhrase) {
+        nextStep();
+      }
+    } else if (activeStep === 3) {
+      navigate(Routes.wallet.path);
+    }
+  }, [
+    initialPassword,
+    activeStep,
+    confirmPassword,
+    passwordScore,
+    savedSecretRecoveryPhrase,
+    termsOfService,
+    navigate,
+    nextStep,
+  ]);
 
   const prevOnClick = useCallback(() => {
     if (activeStep === 0) {
@@ -189,79 +306,98 @@ const PrevButton = () => {
     prevStep();
   }, [activeStep, navigate, prevStep]);
 
-  const PrevButtonComponent = useMemo(() => {
-    const basePrevButton = (
-      <Button
-        mr={4}
-        onClick={prevOnClick}
-        size="md"
-        variant="ghost"
-      >
-        Prev
-      </Button>
-    );
-
-    return (activeStep > 1) ? null : basePrevButton;
-  }, [activeStep, prevOnClick]);
-
-  return PrevButtonComponent;
-};
-
-interface CreateWalletLayoutProps {
-  children: React.ReactElement;
-}
-
-export default function CreateWalletLayout({
-  children,
-}: CreateWalletLayoutProps) {
-  const {
-    activeStep,
-  } = useOnboardingState();
-  const mnemonic = generateMnemonic();
-  const methods = useForm<CreateWalletFormValues>({
-    defaultValues: {
-      confirmPassword: '',
-      initialPassword: '',
-      mnemonic: mnemonic.split(' '),
-      mnemonicString: mnemonic,
-    },
-  });
-
   const { colorMode } = useColorMode();
+
   return (
-    <FormProvider {...methods}>
+    <>
       <Grid
         height="100%"
         width="100%"
         maxW="100%"
-        templateRows="60px 1fr 64px"
+        templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 125 : 64}px`}
         bgColor={secondaryBgColor[colorMode]}
       >
-        <Flex px={4}>
-          <Steps
-            size="sm"
-            activeStep={activeStep}
+        <HStack width="100%" px={4} position="relative">
+          <IconButton
+            position="absolute"
+            size="md"
+            aria-label="back"
             colorScheme="teal"
-            orientation="horizontal"
-            responsive={false}
-          >
-            {steps.map(({ content, label }) => (
-              <Step label={label} key={label}>
-                {content}
-              </Step>
-            ))}
-          </Steps>
-        </Flex>
+            icon={<ArrowBackIcon fontSize={20} />}
+            variant="filled"
+            onClick={prevOnClick}
+            bgColor={secondaryBackButtonBgColor[colorMode]}
+            borderRadius="1rem"
+          />
+          <Flex justifyContent="center" width="100%">
+            <HStack spacing="0" justify="space-evenly" width="40%">
+              {steps.map(({ label }, id) => (
+                <Step
+                  key={label}
+                  cursor="pointer"
+                  onClick={activeStep > id ? prevOnClick : nextOnClick}
+                  isActive={activeStep === id}
+                  isCompleted={activeStep > id}
+                  isLastStep={id === steps.length - 1}
+                />
+              ))}
+            </HStack>
+          </Flex>
+        </HStack>
         <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
           <form>
             {children}
           </form>
         </Box>
         <Flex width="100%" justify="flex-end" alignItems="center" px={4}>
-          <PrevButton />
-          <NextButton />
+          <VStack width="full" px={4} pb={6} borderTop="1px" pt={3} borderColor={buttonBorderColor[colorMode]}>
+            <CopyButton />
+            <NextButton />
+          </VStack>
         </Flex>
       </Grid>
+      <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>
+        {(state: TransitionStatus) => (
+          <SecretPhraseConfirmationPopup
+            open={showSecretRecoveryPhrasePopup}
+            duration={transitionDuration}
+            state={state}
+            isLoading={loading}
+            goPrev={() => {
+              setValue('showSecretRecoveryPhrasePopup', false);
+            }}
+            goNext={async () => {
+              await initAccount();
+              navigate(Routes.welcome.path);
+            }}
+          />
+        )}
+      </Transition>
+    </>
+  );
+}
+
+export default function CreateWalletLayoutContainer(props: any) {
+  const mnemonic = generateMnemonic();
+  const methods = useForm<CreateWalletFormValues>({
+    defaultValues: {
+      confirmPassword: '',
+      confirmPasswordFocused: false,
+      confirmSavedsecretRecoveryPhrase: false,
+      initialPassword: '',
+      mnemonic: mnemonic.split(' '),
+      mnemonicString: mnemonic,
+      mnemonicValues: {},
+      savedSecretRecoveryPhrase: false,
+      showPassword: false,
+      showSecretRecoveryPhrase: false,
+      showSecretRecoveryPhrasePopup: false,
+    },
+  });
+
+  return (
+    <FormProvider {...methods}>
+      <CreateWalletLayout {...props} />
     </FormProvider>
   );
 }

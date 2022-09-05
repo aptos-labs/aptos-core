@@ -17,7 +17,6 @@ import { AccountsProvider } from 'core/hooks/useAccounts';
 import { NetworksProvider } from 'core/hooks/useNetworks';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
-import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
 import { routes } from 'core/routes';
 import { AnalyticsProvider } from 'core/hooks/useAnalytics';
 
@@ -34,9 +33,6 @@ const isProductionEnv = process.env.NODE_ENV === 'production';
 // });
 
 const theme: ThemeConfig = extendTheme({
-  components: {
-    Steps,
-  },
   initialColorMode: 'light',
   styles: {
     global: {

@@ -4,7 +4,6 @@
 import React from 'react';
 import {
   Box,
-  VStack,
 } from '@chakra-ui/react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import NewExtensionBody from 'core/components/NewExtensionBody';
@@ -15,11 +14,9 @@ import NewExtensionBody from 'core/components/NewExtensionBody';
 function NoWallet() {
   return (
     <WalletLayout hasWalletFooter={false} hasWalletHeader={false}>
-      <VStack width="100%" paddingTop={8}>
-        <Box px={4} pb={4} width="100%">
-          <NewExtensionBody />
-        </Box>
-      </VStack>
+      <Box px={6} pb={4} width="100%" height="100%" paddingTop={8}>
+        <NewExtensionBody />
+      </Box>
     </WalletLayout>
   );
 }

@@ -7,10 +7,12 @@ export const defaultOpenDelay = 300;
 interface CopyableProps {
   children: React.ReactNode | React.ReactNode[],
   copiedPrompt?: string,
+  height?: string,
   openDelay?: number,
   prompt?: string,
   timeout?: number,
   value: any,
+  width?: string
 }
 
 /**
@@ -19,7 +21,9 @@ interface CopyableProps {
  */
 export default function Copyable({
   children,
+  height,
   value,
+  width,
   ...options
 }: CopyableProps) {
   const prompt = options.prompt ?? 'Copy';
@@ -38,7 +42,7 @@ export default function Copyable({
   };
 
   return (
-    <Box cursor="pointer" onClick={onClick} as="span">
+    <Box cursor="pointer" onClick={onClick} as="span" width={width} height={height}>
       <Tooltip
         label={hasCopied ? copiedPrompt : prompt}
         isOpen={hasCopied || undefined}

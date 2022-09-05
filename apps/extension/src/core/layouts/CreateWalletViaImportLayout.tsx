@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box, Button, Flex, Grid, Tooltip, useColorMode,
+  Box, Button, Flex, Grid, Tooltip, useColorMode, HStack,
 } from '@chakra-ui/react';
-import { Steps, Step } from 'chakra-ui-steps';
 import { secondaryBgColor } from 'core/colors';
 import { useImportOnboardingState } from 'core/hooks/useImportOnboardingState';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -21,6 +20,7 @@ import {
 import { useAccounts } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { passwordStrength } from 'core/constants';
+import Step from 'core/components/Step';
 import { MnemonicFormValues } from './AddAccountLayout';
 
 zxcvbnOptions.setOptions(passwordOptions);
@@ -32,14 +32,6 @@ export enum ImportOnboardingPage {
   EnterPrivateKey,
   Done,
 }
-
-const ImportOnboardingPageEnumDict = {
-  [ImportOnboardingPage.CreatePassword]: 0,
-  [ImportOnboardingPage.AddAccount]: 1,
-  [ImportOnboardingPage.EnterMnemonic]: 2,
-  [ImportOnboardingPage.EnterPrivateKey]: 2,
-  [ImportOnboardingPage.Done]: 3,
-};
 
 const createViaImportSteps = [
   { content: null, label: 'Password' },
@@ -379,18 +371,18 @@ export function CreateWalletViaImportLayout({
         templateRows="60px 1fr 55px"
         bgColor={secondaryBgColor[colorMode]}
       >
-        <Flex px={4}>
-          <Steps
-            size="sm"
-            activeStep={ImportOnboardingPageEnumDict[activeStep]}
-            colorScheme="teal"
-            orientation="horizontal"
-            responsive={false}
-          >
-            {createViaImportSteps.map(({ label }, index) => (
-              <Step label={(index === activeStep) ? label : label.substring(0, 7)} key={label} />
+        <Flex justifyContent="center" width="100%">
+          <HStack spacing="0" justify="space-evenly" width="40%">
+            {createViaImportSteps.map(({ label }, id) => (
+              <Step
+                key={label}
+                cursor="pointer"
+                isActive={activeStep === id}
+                isCompleted={activeStep > id}
+                isLastStep={id === createViaImportSteps.length - 1}
+              />
             ))}
-          </Steps>
+          </HStack>
         </Flex>
         <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
           <form>

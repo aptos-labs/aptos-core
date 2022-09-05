@@ -30,7 +30,7 @@ import { iconBgColor, iconColor } from 'core/colors';
 
 const inputChangePasswordBgColor = {
   dark: 'gray.800',
-  light: 'gray.200',
+  light: 'gray.100',
 };
 
 function ChangePassword() {

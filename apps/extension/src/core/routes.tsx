@@ -29,6 +29,7 @@ import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
 import Stake from 'pages/Stake';
 import ChangePassword from 'pages/ChangePassword';
 import AutoLockTimer from 'pages/AutoLockTimer';
+import Welcome from 'pages/Welcome';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -147,6 +148,10 @@ export const Routes = Object.freeze({
     element: <Wallet />,
     path: '/wallet',
   },
+  welcome: {
+    element: <Welcome />,
+    path: '/welcome',
+  },
 } as const);
 
 export type RoutePath = typeof Routes[keyof typeof Routes]['path'];
@@ -187,6 +192,7 @@ export const routes = [
               Routes.security_privacy,
               Routes.help,
               Routes.stake,
+              Routes.welcome,
               { element: <Navigate to={Routes.wallet.path} replace />, path: '/' },
             ],
             element: <ActiveAccountGuard />,
