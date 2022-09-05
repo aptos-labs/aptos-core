@@ -24,6 +24,7 @@ use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
 use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
+use tokio::time::Instant;
 
 #[derive(StructOpt)]
 pub struct StateSnapshotBackupOpt {
@@ -88,6 +89,7 @@ impl StateSnapshotBackupController {
         let mut current_idx: usize = 0;
         let mut chunk_first_idx: usize = 0;
 
+        let start = Instant::now();
         while let Some(record_bytes) = state_snapshot_file.read_record_bytes().await? {
             if should_cut_chunk(&chunk_bytes, &record_bytes, self.max_chunk_size) {
                 let chunk = self
@@ -104,6 +106,12 @@ impl StateSnapshotBackupController {
                 chunk_bytes = vec![];
                 chunk_first_idx = current_idx + 1;
                 chunk_first_key = Self::parse_key(&record_bytes)?;
+
+                info!(
+                    last_idx = current_idx,
+                    values_per_second = (current_idx + 1) as u64 / start.elapsed().as_secs(),
+                    "Chunk written."
+                );
             }
 
             current_idx += 1;
