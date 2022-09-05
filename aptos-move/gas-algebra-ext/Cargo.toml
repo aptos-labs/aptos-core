@@ -10,4 +10,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-move-core-types = { git = "https://github.com/move-language/move", rev = "4cd47108661a5717486e4e90821a4a10f2710ea7" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "4bdf8d3e76ffaab5c83eda2fa55dfe136c380675" }
