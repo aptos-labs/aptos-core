@@ -49,7 +49,7 @@ export default class extends Controller<HTMLFormElement> {
         nonce: challenge
       });
       if ('signature' in response && typeof response.signature === 'string') {
-        return '0x' + response.signature;
+        return '0x' + response.signature.slice(0, 128);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.
