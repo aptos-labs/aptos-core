@@ -38,6 +38,7 @@ use aptos_types::{
 };
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{
     collections::{HashMap, HashSet},
@@ -682,20 +683,22 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<StateValueChunkWithProof> {
-        let result_iter = JellyfishMerkleIterator::new_by_index(
+        let keys = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
             first_index,
         )?
-        .take(chunk_size);
-        let state_key_values: Vec<(StateKey, StateValue)> = result_iter
-            .into_iter()
-            .map(|res| {
-                res.and_then(|(_, (key, version))| {
-                    Ok((key.clone(), self.expect_value_by_version(&key, version)?))
-                })
+        .take(chunk_size)
+        .collect::<Result<Vec<_>>>()?;
+
+        let state_key_values = keys
+            .into_par_iter()
+            .map(|(_key_hash, (key, version))| {
+                let value = self.expect_value_by_version(&key, version)?;
+                Ok((key, value))
             })
             .collect::<Result<Vec<_>>>()?;
+
         ensure!(
             !state_key_values.is_empty(),
             AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
