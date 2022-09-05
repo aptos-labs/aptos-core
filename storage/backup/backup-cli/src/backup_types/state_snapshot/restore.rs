@@ -31,6 +31,7 @@ use aptos_types::{
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
 use structopt::StructOpt;
+use tokio::time::Instant;
 
 #[derive(StructOpt)]
 pub struct StateSnapshotRestoreOpt {
@@ -134,10 +135,21 @@ impl StateSnapshotRestoreController {
         // FIXME update counters
         ver_gauge.set(self.version as i64);
         tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
-        for chunk in manifest.chunks {
+        let total_chunks = manifest.chunks.len();
+        let start = Instant::now();
+        for (i, chunk) in manifest.chunks.into_iter().enumerate() {
             let blobs = self.read_state_value(chunk.blobs).await?;
             let proof = self.storage.load_bcs_file(&chunk.proof).await?;
+            info!("State chunk loaded.");
             receiver.add_chunk(blobs, proof)?;
+            info!(
+                chunk = i,
+                chunks_total = total_chunks,
+                last_idx = chunk.last_idx,
+                values_per_second =
+                    ((chunk.last_idx + 1) as f64 / start.elapsed().as_secs_f64()) as u64,
+                "State chunk added.",
+            );
 
             leaf_idx.set(chunk.last_idx as i64);
         }
