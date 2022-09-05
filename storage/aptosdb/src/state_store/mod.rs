@@ -17,7 +17,7 @@ use crate::{
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -251,15 +251,21 @@ impl StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<StateValue> {
-        self.get_state_value_by_version(state_key, version)
-            .and_then(|opt| {
-                opt.ok_or_else(|| {
-                    format_err!(
-                        "State Value is missing for key {:?} by version {}",
-                        state_key,
-                        version
-                    )
-                })
+        self.ledger_db
+            .get::<StateValueSchema>(&(state_key.clone(), version))?
+            .ok_or_else(|| {
+                anyhow!(
+                    "State Value is missing for key {:?} by version {}",
+                    state_key,
+                    version
+                )
+            })?
+            .ok_or_else(|| {
+                anyhow!(
+                    "State Value is missing for key {:?} by version {}, found tombstone.",
+                    state_key,
+                    version
+                )
             })
     }
 }
