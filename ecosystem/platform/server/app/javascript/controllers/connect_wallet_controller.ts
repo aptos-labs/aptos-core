@@ -44,13 +44,18 @@ export default class extends Controller<HTMLFormElement> {
     const challenge = this.getInput(FIELD_NAMES.challenge).value;
 
     if (this.walletName === 'petra') {
-      // TODO: Implement real signMessage().
-      return `0x${'0'.repeat(128)}`;
+      const response = await window.aptos!.signMessage({
+        message: 'verify_wallet',
+        nonce: challenge
+      });
+      if ('signature' in response && typeof response.signature === 'string') {
+        return '0x' + response.signature;
+      }
     } else if (false) {
       // TODO: Add support for other wallets here.
-    } else {
-      throw 'Unable to get signed challenge.'
     }
+
+    throw 'Unable to get signed challenge.'
   }
 
   getInput(fieldName: string): HTMLInputElement {

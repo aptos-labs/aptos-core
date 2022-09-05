@@ -17,10 +17,10 @@ class WalletsControllerTest < ActionDispatch::IntegrationTest
         wallet: {
           network: 'ait3',
           wallet_name: 'petra',
-          public_key: '0x7b9bcc8610e7cc121de936ba00e214c02ff4b5cfdb3fcfb2267959a941ecc521',
+          public_key: '0x59506fcdc1f45c2f289bfd0f240c75995af54c31c5ed796b318d780b340471f6',
           challenge: '999999999999999999999999',
-          signed_challenge: '0xb843bfce9bc811dc23da5c2d9cdca7b5b59042e060b91c1dc3534cefa2c2058d15615e8e2866888eb' \
-                            '65415203222444634462e50ffd8f24fe0387859946b3209'
+          signed_challenge: '0x7b7ded9a874ea2850528c9d5690a81bddde8064b446885b22bc68a2553320ee1854cca3d52c1f9fc8135e6' \
+                            '073784164d9c07bf8437a5850787e46729ad878807'
         }
       }
     end
