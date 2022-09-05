@@ -155,6 +155,9 @@ pub struct JellyfishMerkleRestore<K> {
 
     /// When the restoration process finishes, we expect the tree to have this root hash.
     expected_root_hash: HashValue,
+
+    /// Already finished, deem all chunks overlap.
+    finished: bool,
 }
 
 impl<K> JellyfishMerkleRestore<K>
@@ -167,21 +170,32 @@ where
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         let tree_reader = Arc::clone(&store);
-        let (partial_nodes, previous_leaf) =
-            if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf()? {
-                // TODO: confirm rightmost leaf is at the desired version
-                // If the system crashed in the middle of the previous restoration attempt, we need
-                // to recover the partial nodes to the state right before the crash.
-                (
-                    Self::recover_partial_nodes(tree_reader.as_ref(), version, node_key)?,
-                    Some(leaf_node),
-                )
-            } else {
-                (
-                    vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
-                    None,
-                )
-            };
+        let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
+            tree_reader.get_node_option(&NodeKey::new_empty_path(version))?
+        {
+            info!("Previous restore is complete, checking root hash.");
+            ensure!(
+                root_node.hash() == expected_root_hash,
+                "Previous completed restore has root hash {}, expecting {}",
+                root_node.hash(),
+                expected_root_hash,
+            );
+            (true, vec![], None)
+        } else if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf()? {
+            // If the system crashed in the middle of the previous restoration attempt, we need
+            // to recover the partial nodes to the state right before the crash.
+            (
+                false,
+                Self::recover_partial_nodes(tree_reader.as_ref(), version, node_key)?,
+                Some(leaf_node),
+            )
+        } else {
+            (
+                false,
+                vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
+                None,
+            )
+        };
 
         Ok(Self {
             store,
@@ -191,6 +205,7 @@ where
             previous_leaf,
             num_keys_received: 0,
             expected_root_hash,
+            finished,
         })
     }
 
@@ -207,7 +222,17 @@ where
             previous_leaf: None,
             num_keys_received: 0,
             expected_root_hash,
+            finished: false,
         })
+    }
+
+    pub fn previous_key_hash(&self) -> Option<HashValue> {
+        if self.finished {
+            // Hack: prevent any chunk to be added.
+            Some(HashValue::new([0xff; HashValue::LENGTH]))
+        } else {
+            self.previous_leaf.as_ref().map(|leaf| leaf.account_key())
+        }
     }
 
     /// Recovers partial nodes from storage. We do this by looking at all the ancestors of the
@@ -292,6 +317,11 @@ where
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
+        if self.finished {
+            info!("State snapshot restore already finished, ignoring entire chunk.");
+            return Ok(());
+        }
+
         if let Some(prev_leaf) = &self.previous_leaf {
             let skip_until = chunk
                 .iter()
