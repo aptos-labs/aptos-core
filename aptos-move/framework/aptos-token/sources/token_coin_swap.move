@@ -65,7 +65,7 @@ module aptos_token::token_coin_swap {
         coin_type_info: TypeInfo,
     }
 
-    public fun is_listing_exist<CoinType>(
+    public fun does_listing_exist<CoinType>(
         token_owner: address,
         token_id: TokenId
     ): bool acquires TokenListings {
