@@ -6,7 +6,7 @@ hidden: false
 
 # Public Fullnode
 
-This section explains how to install a public FullNode to connect to the Aptos networks. Note that to connect to different network, you need to make sure you have correct version of:
+This section explains how to install a public FullNode to connect to the Aptos networks. Note, to connect to different network, make sure you have correct version of:
 
 - Docker image tag (e.g. devnet, testnet)
 - Source code branch (if you build the binary directly)
