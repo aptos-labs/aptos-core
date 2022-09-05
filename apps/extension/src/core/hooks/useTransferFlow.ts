@@ -14,6 +14,8 @@ import { parseMoveAbortDetails } from 'shared/move';
 import { useActiveAccount } from './useAccounts';
 import useDebounce from './useDebounce';
 
+export const transferAptFormId = 'transferApt' as const;
+
 export enum TransferDrawerPage {
   ADD_ADDRESS_AND_AMOUNT = 'Add an address and amount',
   CONFIRM_TRANSACTION = 'Confirm transaction',

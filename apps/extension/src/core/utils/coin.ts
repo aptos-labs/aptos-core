@@ -33,8 +33,11 @@ const generateUnitString = ({
       case 'APT':
         result = unitType;
         break;
-      default:
+      case 'OCTA':
         result = `${unitType}S`;
+        break;
+      default:
+        result = unitType;
         break;
     }
   }

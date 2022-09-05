@@ -16,8 +16,8 @@ function Activity() {
     data: transactions,
     isLoading,
   } = useCoinTransferTransactions(activeAccountAddress);
-
   const sortedTxns = transactions?.sort((a, b) => Number(b.version) - Number(a.version));
+
   return (
     <WalletLayout title="Activity">
       <VStack width="100%" paddingTop={8} px={4} alignItems="start">

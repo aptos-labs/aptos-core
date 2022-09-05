@@ -11,7 +11,7 @@ import {
 } from 'core/mutations/transaction';
 import useDebounce from 'core/hooks/useDebounce';
 import { OCTA_POSITIVE_EXPONENT } from 'core/utils/coin';
-import { TransferFlowProvider, useTransferFlow } from 'core/hooks/useTransferFlow';
+import { transferAptFormId, TransferFlowProvider, useTransferFlow } from 'core/hooks/useTransferFlow';
 import { SubmitHandler } from 'react-hook-form';
 import { coinTransferAbortToast, coinTransferSuccessToast, transactionErrorToast } from './Toast';
 import TransferDrawer from './TransferDrawer';
@@ -87,7 +87,7 @@ function TransferFlow() {
   return (
     <>
       <TransferButton />
-      <form id="transferApt" onSubmit={handleSubmit(onSubmit)}>
+      <form id={transferAptFormId} onSubmit={handleSubmit(onSubmit)}>
         <TransferDrawer />
       </form>
     </>

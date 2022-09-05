@@ -23,6 +23,8 @@ import {
 } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { formatCoinName } from 'core/hooks/useTransactionDetails';
+import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
+import numeral from 'numeral';
 
 type EntryFunctionPayload = Types.EntryFunctionPayload;
 type UserTransaction = Types.UserTransaction;
@@ -99,6 +101,11 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
   const absDateTime = getAbsoluteDateTime(timestampMs);
   const relTime = useRelativeTime(timestampMs);
 
+  const isSentPrefix = isSent ? '-' : '+';
+  const amountString = (formattedCoinName === APTOS_UNIT)
+    ? `${isSentPrefix}${formatCoin(Number(amount), { decimals: 8 })}`
+    : `${isSentPrefix}${numeral(amount).format('0,0')}`;
+
   return (
     <ChakraLink to={`/transactions/${transaction.version}`} w="100%">
       <HStack
@@ -130,7 +137,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
               overflow="hidden"
               textOverflow="ellipsis"
             >
-              { `${isSent ? '-' : '+'}${amount} ${formattedCoinName}` }
+              {amountString }
             </Text>
           </HStack>
           <Text color={timestampColor[colorMode]} fontSize="xs">

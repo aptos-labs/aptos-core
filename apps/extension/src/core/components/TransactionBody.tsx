@@ -99,7 +99,7 @@ function TransactionBody() {
                 { clickableAddress(txn.recipient) }
               </DetailItem>
               <DetailItem label="Amount">
-                <Text>{ `${txn.amount} ${txn.coinName}` }</Text>
+                <Text>{txn.amount}</Text>
               </DetailItem>
               <DetailItem label="Version">
                 <Text>{ txn.version }</Text>

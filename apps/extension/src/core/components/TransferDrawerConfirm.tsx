@@ -14,7 +14,7 @@ import {
   useColorMode,
 } from '@chakra-ui/react';
 import { secondaryDividerColor } from 'core/colors';
-import { TransferDrawerPage, useTransferFlow } from 'core/hooks/useTransferFlow';
+import { transferAptFormId, TransferDrawerPage, useTransferFlow } from 'core/hooks/useTransferFlow';
 import React from 'react';
 import TransferSummary from './TransferSummary';
 
@@ -69,7 +69,7 @@ export default function TransferDrawerConfirm() {
             isDisabled={!canSubmitForm}
             colorScheme="teal"
             type="submit"
-            form="transferApt"
+            form={transferAptFormId}
           >
             Send
           </Button>
