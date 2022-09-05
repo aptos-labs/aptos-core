@@ -10,6 +10,10 @@ interface ClaimDetails {
   signature: string;
 }
 
+const fromHexString = (hexString: string) =>
+  Array.from(hexString.match(/.{1,2}/g)!
+    .map((byte: string) => parseInt(byte, 16)));
+
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
   async handleClick(event: Event) {
@@ -39,24 +43,29 @@ export default class extends Controller<HTMLAnchorElement> {
   }
 
   async submitTransaction(claimDetails: ClaimDetails) {
-    // TODO: Adjust transaction payload to match module expectations.
+    // Module expects signature as array of bytes.
+    const signature = fromHexString(claimDetails.signature.substring(2));
     const transaction = {
       type: 'entry_function_payload',
       function: claimDetails.module_address + '::claim_mint',
       arguments: [
         claimDetails.message,
-        claimDetails.signature,
+        signature,
       ],
       type_arguments: [],
     };
 
     if (claimDetails.wallet_name === 'petra') {
       const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
-      // TODO: Do something with the transaction.
+      if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
+        // TODO: Do something more intelligent with the transaction.
+        window.open(`https://explorer.devnet.aptos.dev/txn/${pendingTransaction.hash}`);
+        return;
+      }
     } else if (false) {
       // TODO: Add support for other wallets here.
-    } else {
-      throw 'Unable to submit transaction.'
     }
+
+    throw 'Unable to submit transaction.'
   }
 }
