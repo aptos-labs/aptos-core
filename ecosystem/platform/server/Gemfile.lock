@@ -228,6 +228,9 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.12.0)
       concurrent-ruby (~> 1.0)
+    image_processing (1.12.2)
+      mini_magick (>= 4.9.5, < 5)
+      ruby-vips (>= 2.0.17, < 3)
     inherited_resources (1.13.1)
       actionpack (>= 5.2, < 7.1)
       has_scope (~> 0.6)
@@ -285,6 +288,7 @@ GEM
     mime-types (3.4.1)
       mime-types-data (~> 3.2015)
     mime-types-data (3.2022.0105)
+    mini_magick (4.11.0)
     mini_mime (1.1.2)
     minitest (5.16.3)
     mocha (1.14.0)
@@ -408,6 +412,7 @@ GEM
       actionpack (>= 5.0)
       railties (>= 5.0)
     rexml (3.2.5)
+    rmagick (4.2.6)
     rspec-core (3.11.0)
       rspec-support (~> 3.11.0)
     rspec-expectations (3.11.0)
@@ -444,6 +449,8 @@ GEM
       rack (>= 1.1)
       rubocop (>= 1.7.0, < 2.0)
     ruby-progressbar (1.11.0)
+    ruby-vips (2.1.4)
+      ffi (~> 1.12)
     ruby2_keywords (0.0.5)
     rubyzip (2.3.2)
     sanitize (6.0.0)
@@ -530,6 +537,7 @@ DEPENDENCIES
   flipper-ui (~> 0.25.1)
   hiredis (~> 0.6.3)
   httparty
+  image_processing
   jbuilder
   jsbundling-rails
   kaminari
@@ -550,6 +558,7 @@ DEPENDENCIES
   rails (~> 7.0.2, >= 7.0.3.1)
   recaptcha (~> 5.10)
   redis (~> 4.7)
+  rmagick
   rspec-rails
   rss
   rubocop

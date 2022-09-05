@@ -9,11 +9,14 @@ class NftOffer
 
   attr_accessor :slug, :network, :module_address, :private_key
 
+  # Constants for slugs
+  APTOS_ZERO = 'aptos-zero'
+
   def self.find(slug)
     case slug
-    when 'aptos-zero'
+    when APTOS_ZERO
       NftOffer.new(
-        slug: 'aptos-zero',
+        slug: APTOS_ZERO,
         network: 'devnet',
         module_address: ENV.fetch('APTOS_ZERO_NFT_MODULE_ADDRESS'),
         private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY')
