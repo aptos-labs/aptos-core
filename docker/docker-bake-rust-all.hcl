@@ -47,25 +47,6 @@ variable "PROFILE" {
 }
 variable "FEATURES" {
   // Cargo features to enable, as a comma separated string
-  default = ""
-}
-
-
-target "builder" {
-  target     = "builder"
-  dockerfile = "docker/rust-all.Dockerfile"
-  context    = "."
-  cache-from = generate_cache_from("builder")
-  cache-to   = generate_cache_to("builder")
-  tags       = generate_tags("builder")
-  args = {
-    PROFILE            = "${PROFILE}"
-    FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILT_VIA_BUILDKIT = "true"
-  }
 }
 
 group "all" {
@@ -88,7 +69,6 @@ target "_common" {
   context    = "."
   cache-from = flatten([
     // need to repeat all images here until https://github.com/docker/buildx/issues/934 is resolved
-    generate_cache_from("builder"),
     generate_cache_from("validator"),
     generate_cache_from("indexer"),
     generate_cache_from("node-checker"),
@@ -106,6 +86,8 @@ target "_common" {
     "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
   args = {
+    PROFILE            = "${PROFILE}"
+    FEATURES           = "${FEATURES}"
     GIT_SHA            = "${GIT_SHA}"
     GIT_BRANCH         = "${GIT_BRANCH}"
     GIT_TAG            = "${GIT_TAG}"
