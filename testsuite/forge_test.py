@@ -183,6 +183,8 @@ def fake_context(
         reuse_args=[],
         keep_args=[],
         haproxy_args=[],
+        num_validators_args=[],
+        num_validator_fullnodes_args=[],
         aws_account_num="123",
         aws_region="banana-east-1",
         forge_image_tag="forge_asdf",
@@ -202,7 +204,7 @@ class ForgeRunnerTests(unittest.TestCase):
             OrderedDict(
                 [
                     (
-                        "cargo run -p forge-cli -- --suite banana --mempool-backlog 5000 --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward",
+                        "cargo run -p forge-cli -- --suite banana --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward",
                         RunResult(0, b"orange"),
                     ),
                     ("kubectl get pods -n potato", RunResult(0, b"Pods")),

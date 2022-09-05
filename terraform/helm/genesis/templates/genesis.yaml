@@ -69,23 +69,6 @@ subjects:
 
 ---
 
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "aptos-genesis.fullname" . }}
-  labels:
-    {{- include "aptos-genesis.labels" . | nindent 4 }}
-    app.kubernetes.io/name: genesis
-spec:
-  selector:
-    app.kubernetes.io/name: genesis
-  ports:
-  - port: 80
-    targetPort: 8080
-  type: ClusterIP
-
----
-
 apiVersion: batch/v1
 kind: Job
 metadata:

@@ -10,27 +10,28 @@ echo "Building all rust-based docker images"
 echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 
-FEATURES_ARGS=""
-if [ -n "$FEATURES" ]; then
-    FEATURES_ARGS="--features ${FEATURES}"
-fi
-
 # Build all the rust binaries
-cargo build --profile=$PROFILE $FEATURES_ARGS \
-        -p aptos \
-        -p aptos-faucet \
-        -p aptos-indexer \
-        -p aptos-sf-indexer \
-        -p aptos-node \
-        -p aptos-node-checker \
-        -p aptos-openapi-spec-generator \
-        -p aptos-telemetry-service \
-        -p aptos-vfn-check-client \
-        -p backup-cli \
-        -p db-bootstrapper \
-        -p forge-cli \
-        -p transaction-emitter \
-        "$@"
+cargo build --profile=$PROFILE \
+    -p aptos \
+    -p aptos-faucet \
+    -p aptos-indexer \
+    -p aptos-sf-indexer \
+    -p aptos-node \
+    -p aptos-node-checker \
+    -p aptos-openapi-spec-generator \
+    -p aptos-telemetry-service \
+    -p aptos-vfn-check-client \
+    -p backup-cli \
+    -p db-bootstrapper \
+    -p forge-cli \
+    -p transaction-emitter \
+    "$@"
+
+# Build and overwrite the aptos-node binary with features if specified
+if [ -n "$FEATURES" ]; then
+    echo "Building aptos-node with features ${FEATURES}"
+    (cd aptos-node && cargo build --profile=$PROFILE --features=$FEATURES "$@")
+fi
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
