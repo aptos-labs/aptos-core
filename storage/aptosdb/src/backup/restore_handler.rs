@@ -54,7 +54,7 @@ impl RestoreHandler {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
-        StateSnapshotRestore::new_overwrite(
+        StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
             &self.state_store,
             version,
