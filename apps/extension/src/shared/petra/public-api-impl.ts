@@ -9,7 +9,6 @@ import {
   Types,
 } from 'aptos';
 import axios from 'axios';
-import { Buffer } from 'buffer';
 import { Permission, warningPrompt } from 'core/types/dappTypes';
 import { DappErrorType, makeTransactionError } from 'core/types/errors';
 import { PublicAccount } from 'core/types/stateTypes';
@@ -17,7 +16,6 @@ import Permissions from 'core/utils/permissions';
 import PromptPresenter from 'core/utils/promptPresenter';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import { defaultCustomNetworks, defaultNetworkName, defaultNetworks } from 'shared/types';
-import { sign } from 'tweetnacl';
 import { PetraPublicApi, SignMessagePayload } from './public-api';
 
 // The fetch adapter is necessary to use axios from a service worker
@@ -266,8 +264,8 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     messageToBeSigned += `\nnonce: ${nonce}`;
 
     const messageBytes = encoder.encode(messageToBeSigned);
-    const signature = sign(messageBytes, signer.signingKey.secretKey);
-    const signatureString = Buffer.from(signature).toString('hex');
+    const signature = signer.signBuffer(messageBytes);
+    const signatureString = signature.noPrefix();
     return {
       address: accountAddress,
       application: domain,
