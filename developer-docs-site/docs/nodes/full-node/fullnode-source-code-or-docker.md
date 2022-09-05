@@ -14,7 +14,7 @@ FullNodes can be run by anyone. This tutorial explains how to configure a public
 
 :::tip
 
-Your public FullNode will be connected to the Aptos devnet with a REST endpoint accessible on your computer at localhost:8080.
+Your public FullNode will be connected to the Aptos devnet with a REST endpoint accessible on your computer at localhost:8080, if you follow the default setup in this document. To connect to AIT3 or other network, make sure you replace all necessary info.
 
 :::
 
@@ -33,8 +33,8 @@ We recommend the following hardware resources:
 
 - For running a production grade FullNode:
 
-  - **CPU**: 4 cores (Intel Xeon Skylake or newer).
-  - **Memory**: 8GB RAM.
+  - **CPU**: 8 cores, 16 threads (Intel Xeon Skylake or newer).
+  - **Memory**: 32GB RAM.
 
 - For running the FullNode for development or testing:
 
@@ -110,6 +110,10 @@ With your development environment ready, now you can start to setup your FullNod
       ```
       curl -O https://devnet.aptoslabs.com/waypoint.txt
       ```
+  
+    :::tip
+    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+    :::
 
 8. Edit the `fullnode.yaml` file in your current working directory as follows.
 
@@ -165,13 +169,17 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
    ```bash
    mkdir aptos-fullnode && cd aptos-fullnode
    ```
-3. Run the following script to prepare your local config and data dir for DevNet:
+3. Run the following script to prepare your local config and data dir for Devnet:
     ```bash
     mkdir data && \
     curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/config/src/config/test_data/public_full_node.yaml && \
     curl -O https://devnet.aptoslabs.com/waypoint.txt && \
     curl -O https://devnet.aptoslabs.com/genesis.blob
     ```
+
+    :::tip
+    To connect to other networks, you can find genesis and waypoint here -> https://github.com/aptos-labs/aptos-genesis-waypoint
+    :::
 
 4. Finally, start the fullnode via docker:
    ```bash
