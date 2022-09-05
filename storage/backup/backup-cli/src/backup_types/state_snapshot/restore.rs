@@ -132,22 +132,42 @@ impl StateSnapshotRestoreController {
             )
         };
 
-        // FIXME update counters
         ver_gauge.set(self.version as i64);
         tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
         let total_chunks = manifest.chunks.len();
+
+        let resume_point_opt = receiver.previous_key_hash();
+        let chunks = if let Some(resume_point) = resume_point_opt {
+            manifest
+                .chunks
+                .into_iter()
+                .skip_while(|chunk| chunk.last_key <= resume_point)
+                .collect()
+        } else {
+            manifest.chunks
+        };
+        if chunks.len() < total_chunks {
+            info!(
+                chunks_to_add = chunks.len(),
+                total_chunks = total_chunks,
+                "Resumed state snapshot restore."
+            )
+        };
+        let chunks_to_add = chunks.len();
+
         let start = Instant::now();
-        for (i, chunk) in manifest.chunks.into_iter().enumerate() {
+        let start_idx = chunks.first().map_or(0, |chunk| chunk.first_idx);
+        for (i, chunk) in chunks.into_iter().enumerate() {
             let blobs = self.read_state_value(chunk.blobs).await?;
             let proof = self.storage.load_bcs_file(&chunk.proof).await?;
             info!("State chunk loaded.");
             receiver.add_chunk(blobs, proof)?;
             info!(
                 chunk = i,
-                chunks_total = total_chunks,
+                chunks_to_add = chunks_to_add,
                 last_idx = chunk.last_idx,
-                values_per_second =
-                    ((chunk.last_idx + 1) as f64 / start.elapsed().as_secs_f64()) as u64,
+                values_per_second = ((chunk.last_idx + 1 - start_idx) as f64
+                    / start.elapsed().as_secs_f64()) as u64,
                 "State chunk added.",
             );
 
