@@ -24,7 +24,7 @@ Dependes on the Fullnode upstream, a Fullnode can be called as a Validator Fulln
 * **Validator Fullnode** state sync from a Validator node directly.
 * **Public Fullnode** state sync from other Fullnodes.
 
-There's no difference in their functionality, just where the node is downloading their data from. Read more details about network topology [here](basics-node-networks-sync.md)
+There's no difference in their functionality, only whether their upstream node is a validator or another fullnode. Read more details about network topology [here](basics-node-networks-sync.md)
 
 Third-party blockchain explorers, wallets, exchanges, and DApps may run a local FullNode to:
 * Leverage the REST interface for blockchain interactions.
