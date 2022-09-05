@@ -140,6 +140,10 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
         })
     }
+
+    pub fn previous_key_hash(&self) -> Option<HashValue> {
+        self.tree_restore.previous_key_hash()
+    }
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
