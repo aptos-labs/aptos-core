@@ -48,12 +48,10 @@ on:
       FORGE_ENABLE_FAILPOINTS:
         required: false
         type: string
-        default: false
         description: Whether to use failpoints images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
       FORGE_ENABLE_PERFORMANCE:
         required: false
         type: string
-        default: false
         description: Whether to use performance images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
 
 env:

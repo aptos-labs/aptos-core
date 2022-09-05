@@ -492,6 +492,8 @@ class ForgeContext:
     reuse_args: Sequence[str]
     keep_args: Sequence[str]
     haproxy_args: Sequence[str]
+    num_validators_args: Sequence[str]
+    num_validator_fullnodes_args: Sequence[str]
 
     # aws related options
     aws_account_num: str
@@ -823,6 +825,8 @@ class LocalForgeRunner(ForgeRunner):
                     "--",
                     "--suite",
                     context.forge_test_suite,
+                    *context.num_validators_args,
+                    *context.num_validator_fullnodes_args,
                     "--duration-secs",
                     context.forge_runner_duration_secs,
                     "test",
@@ -901,9 +905,17 @@ class K8sForgeRunner(ForgeRunner):
             AWS_ACCOUNT_NUM=context.aws_account_num,
             AWS_REGION=context.aws_region,
             FORGE_NAMESPACE=context.forge_namespace,
-            REUSE_ARGS=context.reuse_args if context.reuse_args else "",
-            KEEP_ARGS=context.keep_args if context.keep_args else "",
-            ENABLE_HAPROXY_ARGS=context.haproxy_args if context.haproxy_args else "",
+            REUSE_ARGS=" ".join(context.reuse_args) if context.reuse_args else "",
+            KEEP_ARGS=" ".join(context.keep_args) if context.keep_args else "",
+            ENABLE_HAPROXY_ARGS=" ".join(context.haproxy_args)
+            if context.haproxy_args
+            else "",
+            NUM_VALIDATORS_ARGS=" ".join(context.num_validators_args)
+            if context.num_validators_args
+            else "",
+            NUM_VALIDATOR_FULLNODES_ARGS=" ".join(context.num_validator_fullnodes_args)
+            if context.num_validator_fullnodes_args
+            else "",
             FORGE_TRIGGERED_BY=forge_triggered_by,
         )
 
@@ -1177,6 +1189,9 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
+# these override the args in forge-cli
+@envoption("FORGE_NUM_VALIDATORS")
+@envoption("FORGE_NUM_VALIDATOR_FULLNODES")
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
@@ -1211,6 +1226,8 @@ def test(
     aws_auth_script: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
+    forge_num_validators: int,
+    forge_num_validator_fullnodes: int,
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
     forge_enable_failpoints: Optional[str],
@@ -1292,6 +1309,10 @@ def test(
 
     assert forge_namespace is not None, "Forge namespace is required"
 
+    # These features and profile flags are set as strings
+    forge_enable_failpoints = forge_enable_failpoints == "true"
+    forge_enable_performance = forge_enable_performance == "true"
+
     if forge_test_suite == "compat":
         # Compat uses 2 image tags
         default_latest_image, second_latest_image = list(
@@ -1342,6 +1363,15 @@ def test(
         reuse_args=["--reuse"] if forge_namespace_reuse else [],
         keep_args=["--keep"] if forge_namespace_keep else [],
         haproxy_args=["--enable-haproxy"] if forge_enable_haproxy else [],
+        num_validators_args=["--num-validators", forge_num_validators]
+        if forge_num_validators
+        else [],
+        num_validator_fullnodes_args=[
+            "--num-validator-fullnodes",
+            forge_num_validator_fullnodes,
+        ]
+        if forge_num_validator_fullnodes
+        else [],
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         forge_image_tag=forge_image_tag,
