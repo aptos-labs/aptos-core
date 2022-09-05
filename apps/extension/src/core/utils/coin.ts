@@ -109,16 +109,7 @@ export const aptToOcta = (octa: number) => octa * OCTA_POSITIVE_EXPONENT;
  * @param {Number} value The value that a coin has
  * @param {FormatCoinParams} opts Specify custom properties for formatting the coin
  */
-export const formatCoin = (value?: number, opts: FormatCoinOptions = {
-  decimals: 4,
-  includeUnit: true,
-  isLowercase: false,
-  isNonNegative: true,
-  multiplier: OCTA_NEGATIVE_EXPONENT,
-  paramUnitType: 'OCTA',
-  returnUnitType: 'APT',
-  usePlural: true,
-}) => {
+export const formatCoin = (value?: number, opts: FormatCoinOptions = {}) => {
   if (opts.isNonNegative && value && value < 0) {
     throw new Error('Value cannot be negative');
   }
@@ -139,18 +130,18 @@ export const formatCoin = (value?: number, opts: FormatCoinOptions = {
     transformedNumeral = numeralTransformer({
       format: numeralFormat,
       multiplier: 1,
-      value: value || 0,
+      value: value ?? 0,
     });
   } else {
     transformedNumeral = numeralTransformer({
       format: numeralFormat,
       multiplier,
-      value: value || 0,
+      value: value ?? 0,
     });
   }
 
   // add units
-  let units: null | string = null;
+  let units: string | null = null;
   if (includeUnit) {
     units = generateUnitString({
       isLowercase,

@@ -51,7 +51,7 @@ function StakeBodyContent({
     value: stakeAmount,
   } = stakeInfo;
 
-  const stakeAmountString = formatCoin(stakeAmount);
+  const stakeAmountString = formatCoin(stakeAmount, { includeUnit: false });
 
   const lockedUntilDateString = useMemo(() => {
     const lockedUntilDate = new Date(Number(lockedUntilSecs) * 1000);

@@ -10,7 +10,6 @@ import { useNetworks } from 'core/hooks/useNetworks';
  * QUERY KEYS
  */
 export const accountQueryKeys = Object.freeze({
-  getAccountAptCoinBalance: 'getAccountAptCoinBalance',
   getAccountExists: 'getAccountExists',
   getAccountOctaCoinBalance: 'getAccountOctaCoinBalance',
   getAccountStakeBalance: 'getAccountStakeBalance',

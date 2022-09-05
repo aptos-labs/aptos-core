@@ -6,10 +6,9 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { useAccountStakeBalance } from 'core/queries/account';
-import numeral from 'numeral';
 import { secondaryAddressFontColor } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
-import { APTOS_UNIT } from 'core/utils/coin';
+import { APTOS_UNIT, formatCoin } from 'core/utils/coin';
 
 function WalletAccountStake() {
   const { colorMode } = useColorMode();
@@ -20,7 +19,7 @@ function WalletAccountStake() {
   } = useAccountStakeBalance(activeAccountAddress, {
     refetchInterval: 5000,
   });
-  const stakeBalanceString = numeral(stakeBalance).format('0,0');
+  const stakeBalanceString = formatCoin(stakeBalance, { includeUnit: false });
 
   return (
     <VStack alignItems="flex-start">
