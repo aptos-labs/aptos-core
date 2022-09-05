@@ -259,27 +259,11 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
 }
 ```
 
-### Querying events
+### Querying transactions
 
-Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+In Aptos, each transaction is committed as a distinct version to the Blockchain. This allows for the convenience of sharing committed transactions by their version number, to do so query `https://{rest_server_api}/transactions/by_version/{version}`. Transactions submitted by an account can also be queried via `https://{rest_server_api}/account/{address}/transactions?start={sequence_number}&limit=1`, where the `sequence_number` matches the sequence number of the transaction.
 
-Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
-
-```
-[
-  {
-    "version":"13629679",
-    "key": "0x0200000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-    "sequence_number": "0",
-    "type": "0x1::coin::WithdrawEvent",
-    "data": {
-      "amount": "1000"
-    }
-  }
-]
-```
-
-More information can be gathered from the transaction that generated the event. To do so, query: `https://{rest_server_api}/transactions/by_version/{version}`, where `{version}` is the same value as the `{version}` in the event query.
+A transfer transaction would appear as follows:
 
 ```
 {
@@ -288,6 +272,26 @@ More information can be gathered from the transaction that generated the event. 
   "success": true,
   "vm_status": "Executed successfully",
   "changes": [
+    {
+      "address": "0xb258b91eee04111039320a85b0c24a2dd433909e14a6b5c32ee722e0fdecfddc",
+      "data": {
+        "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        "data": {
+          "coin": {
+            "value": "1000"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+              }
+            }
+          },
+          ...
+        }
+      },
+      "type": "write_resource"
+    },
     ...
   ],
   "sender": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
@@ -308,7 +312,7 @@ More information can be gathered from the transaction that generated the event. 
   },
   "events": [
     {
-      "key": "0x0200000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+      "key": "0x0300000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
       "sequence_number": "0",
       "type": "0x1::coin::WithdrawEvent",
       "data": {
@@ -316,7 +320,7 @@ More information can be gathered from the transaction that generated the event. 
       }
     },
     {
-      "key": "0x01000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      "key": "0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "sequence_number": "0",
       "type": "0x1::coin::DepositEvent",
       "data": {
@@ -329,11 +333,46 @@ More information can be gathered from the transaction that generated the event. 
 }
 ```
 
-The transaction in turn provides other important information for generating a complete perspective on what caused the event. For example, this gives the `timestamp` for when the transaction was executed, other related events, and the `gas_used`. Transactions contain all relevant information to present to the user including the events, time executed, and changes made.
+There's a lot of information in a transaction:
+* `version` indicates the globally unique identifier for this transaction, its ordered position in all the committed transactions on the Blockchain
+* `sender` is the account address of the entity that submitted the transaction
+* `gas_used` is the units paid for executing the transaction
+* `success` and `vm_status` indicate whether or not the transaction successfully executed and any reasons why it might not have
+* `changes` include the final values for any state resources that have been modified during the execution of the transaction
+* `events` contain all the events emitted during the transaction execution
+* `timetstamp` is the near real time timestamp of the transactions execution
+
+If `success` is false, then `vm_status` will contain an error code or message that resultd in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
+
+Each event in `events` is differentiated by an `key`. The `key` is derived from the `guid` from `changes`. Specifically, the `key` is a 40-byte hex string where the first 8-bytes (or 16 characters) are the little endian representation of the `creation_num` in the `guid` of the `changes` event and the remaining characters are the account address. As events do not dictate what emitted them, it is imperative to track the path in `changes` to determine the source of an event. In particular, each `CoinStore<T>` has both a `WithdrawEvent` and a `DepositEvent`, based upon the type of coin. In order to determine which coin based upon a transaction, an indexer can compare the `guid::creation_num` in a `changes` event combined with the address to the `key` for events in `events`.
+
+Using the above example, `events[1].key` is `0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`. This is equivalent to `changes[0].data.data.deposit_events.guid`, which is `{"addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e", "creation_num": "2"}`.
+
+### Querying events
+
+Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+
+Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
+
+```
+[
+  {
+    "version":"13629679",
+    "key": "0x0300000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+    "sequence_number": "0",
+    "type": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "1000"
+    }
+  }
+]
+```
+
+More information can be gathered from the transaction that generated the event. To do so, query: `https://{rest_server_api}/transactions/by_version/{version}`, where `{version}` is the same value as the `{version}` in the event query.
 
 :::tip
 
-When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires also look at the `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
+When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires considering `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
 
 :::
 
