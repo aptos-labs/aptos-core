@@ -46,6 +46,7 @@ class NftOffersController < ApplicationController
   private
 
   def sign_in_step
+    @login_dialog = DialogComponent.new(id: 'login_dialog')
     completed = user_signed_in?
     {
       name: :sign_in,
