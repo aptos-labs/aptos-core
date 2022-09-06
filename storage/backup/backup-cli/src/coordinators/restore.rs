@@ -32,11 +32,11 @@ pub struct RestoreCoordinatorOpt {
     pub replay_all: bool,
     #[structopt(
         long,
-        default_value = "0",
-        help = "Ignore restoring the ledger history (transactions and events) before this version \
-                if possible"
+        help = "[default to only start ledger history after selected state snapshot] \
+        Ignore restoring the ledger history (transactions and events) before this version \
+        if possible, set 0 for full ledger history."
     )]
-    pub ledger_history_start_version: Version,
+    pub ledger_history_start_version: Option<Version>,
     #[structopt(long, help = "Skip restoring epoch ending info, used for debugging.")]
     pub skip_epoch_endings: bool,
 }
@@ -46,7 +46,7 @@ pub struct RestoreCoordinator {
     global_opt: GlobalRestoreOptions,
     metadata_cache_opt: MetadataCacheOpt,
     replay_all: bool,
-    ledger_history_start_version: Version,
+    ledger_history_start_version: Option<Version>,
     skip_epoch_endings: bool,
 }
 
@@ -114,10 +114,12 @@ impl RestoreCoordinator {
             .global_opt
             .run_mode
             .get_next_expected_transaction_version()?;
-        let start_version = std::cmp::min(
-            self.ledger_history_start_version,
-            state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0),
-        );
+        let mut start_version = state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0);
+        if let Some(v) = self.ledger_history_start_version {
+            if v < start_version {
+                start_version = v;
+            }
+        }
         transactions = transactions
             .into_iter()
             .skip_while(|p| p.last_version < start_version)
@@ -126,7 +128,7 @@ impl RestoreCoordinator {
             if txn_resume_point > 0 {
                 if actual_start_version > txn_resume_point {
                     panic!(
-                        "DB has transactions till {}, requesting to add transactions from {}, might \
+                        "DB has transactions till {}, requesting to add transactions from {:?}, might \
                     result in non-continuous ledger history, aborting. Try to adjust the \
                     --ledger_history_start_version flag.",
                         txn_resume_point,
