@@ -129,6 +129,9 @@ pub struct GlobalRestoreOpt {
 
     #[structopt(flatten)]
     pub concurernt_downloads: ConcurrentDownloadsOpt,
+
+    #[structopt(flatten)]
+    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
 }
 
 pub enum RestoreRunMode {
@@ -227,6 +230,7 @@ pub struct GlobalRestoreOptions {
     pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
     pub run_mode: Arc<RestoreRunMode>,
     pub concurrent_downloads: usize,
+    pub replay_concurrency_level: usize,
 }
 
 impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
@@ -235,6 +239,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
     fn try_from(opt: GlobalRestoreOpt) -> Result<Self> {
         let target_version = opt.target_version.unwrap_or(Version::max_value());
         let concurrent_downloads = opt.concurernt_downloads.get();
+        let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             let restore_handler = Arc::new(AptosDB::open(
                 db_dir,
@@ -255,6 +260,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             trusted_waypoints: Arc::new(opt.trusted_waypoints.verify()?),
             run_mode: Arc::new(run_mode),
             concurrent_downloads,
+            replay_concurrency_level,
         })
     }
 }
@@ -302,7 +308,34 @@ pub struct ConcurrentDownloadsOpt {
 
 impl ConcurrentDownloadsOpt {
     pub fn get(&self) -> usize {
-        self.concurrent_downloads.unwrap_or_else(num_cpus::get)
+        let ret = self.concurrent_downloads.unwrap_or_else(num_cpus::get);
+        info!(
+            concurrent_downloads = ret,
+            "Determined concurrency level for downloading."
+        );
+        ret
+    }
+}
+
+#[derive(Clone, Copy, Default, StructOpt)]
+pub struct ReplayConcurrencyLevelOpt {
+    #[structopt(
+        long,
+        help = "[Defaults to number of CPUs] \
+        concurrency_level used by the transaction executor, applicable when replaying transactions \
+        after a state snapshot."
+    )]
+    replay_concurrency_level: Option<usize>,
+}
+
+impl ReplayConcurrencyLevelOpt {
+    pub fn get(&self) -> usize {
+        let ret = self.replay_concurrency_level.unwrap_or_else(num_cpus::get);
+        info!(
+            concurrency = ret,
+            "Determined concurrency level for transaction replaying."
+        );
+        ret
     }
 }
 
