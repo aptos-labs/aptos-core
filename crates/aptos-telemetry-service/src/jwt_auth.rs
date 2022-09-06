@@ -66,10 +66,13 @@ pub async fn authorize_jwt(
         }
     };
 
-    if allow_roles.contains(&claims.peer_role)
-        && claims.epoch == current_epoch
-        && claims.exp > Utc::now().timestamp() as usize
-    {
+    if !allow_roles.contains(&claims.peer_role) {
+        return Err(reject::custom(ServiceError::forbidden(
+            "the peer does not have access to this resource",
+        )));
+    }
+
+    if claims.epoch == current_epoch && claims.exp > Utc::now().timestamp() as usize {
         Ok(claims)
     } else {
         Err(reject::custom(ServiceError::unauthorized(
@@ -110,6 +113,9 @@ pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
+    use super::super::tests::test_context;
     use super::*;
 
     #[tokio::test]
@@ -152,5 +158,46 @@ mod tests {
         headers.insert(AUTHORIZATION, "BEARER: token".parse().unwrap());
         let jwt = jwt_from_header(headers).await;
         assert!(jwt.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_authoize_jwt() {
+        let test_context = test_context::new_test_context().await;
+        {
+            test_context
+                .inner
+                .validator_cache()
+                .write()
+                .insert(ChainId::new(25), (10, HashMap::new()));
+        }
+        let token = create_jwt_token(
+            test_context.inner.clone(),
+            ChainId::new(25),
+            PeerId::random(),
+            PeerRole::Validator,
+            10,
+        )
+        .unwrap();
+        let result = authorize_jwt(
+            token,
+            (test_context.inner.clone(), vec![PeerRole::Validator]),
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let token = create_jwt_token(
+            test_context.inner.clone(),
+            ChainId::new(25),
+            PeerId::random(),
+            PeerRole::ValidatorFullNode,
+            10,
+        )
+        .unwrap();
+        let result = authorize_jwt(token, (test_context.inner, vec![PeerRole::Validator])).await;
+        assert!(result.is_err());
+        assert_eq!(
+            *result.err().unwrap().find::<ServiceError>().unwrap(),
+            ServiceError::forbidden("the peer does not have access to this resource",)
+        )
     }
 }
