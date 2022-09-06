@@ -13,7 +13,6 @@ from unittest.mock import patch
 from . import forge
 from .forge import (
     FakeTime,
-    Filesystem,
     ForgeCluster,
     ForgeFormatter,
     ForgeJob,
@@ -27,6 +26,7 @@ from .forge import (
     K8sForgeRunner,
     ListClusterResult,
     SystemContext,
+    create_forge_command,
     find_recent_images,
     find_recent_images_by_profile_or_features,
     assert_provided_image_tags_has_profile_or_features,
@@ -179,22 +179,30 @@ class SpyProcesses(FakeProcesses):
 
 
 def fake_context(
-    shell=None, filesystem=None, processes=None, time=None
+    shell=None, filesystem=None, processes=None, time=None, mode=None,
 ) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
         filesystem=filesystem if filesystem else FakeFilesystem(),
         processes=processes if processes else FakeProcesses(),
         time=time if time else FakeTime(),
-        forge_args=[
-            "--suite", "banana",
-            "--duration-secs", "123",
-            "test", "k8s-swarm",
-            "--image-tag", "asdf",
-            "--upgrade-image-tag", "upgrade_asdf",
-            "--namespace", "potato",
-            "--fake-args"
-        ],
+        forge_args=create_forge_command(
+            forge_runner_mode=mode,
+            enable_failpoints_feature=False,
+            forge_test_suite="banana",
+            forge_runner_duration_secs="123",
+            forge_num_validators="10",
+            forge_num_validator_fullnodes="20",
+            image_tag="asdf",
+            upgrade_image_tag="upgrade_asdf",
+            forge_namespace="potato",
+            forge_namespace_reuse="false",
+            forge_namespace_keep="false",
+            forge_enable_haproxy="false",
+            cargo_args=["--cargo-arg"],
+            forge_cli_args=["--forge-cli-arg"],
+            test_args=["--test-arg"],
+        ),
         aws_account_num="123",
         aws_region="banana-east-1",
         forge_image_tag="forge_asdf",
@@ -210,22 +218,36 @@ def fake_context(
 
 
 class ForgeRunnerTests(unittest.TestCase):
+    maxDiff = None
+
     def testLocalRunner(self) -> None:
+        cargo_run = " ".join([
+            "cargo", "run",
+            "--cargo-arg",
+            "-p", "forge-cli",
+            "--",
+            "--suite", "banana",
+            "--duration-secs", "123",
+            "--num-validators", "10",
+            "--num-validator-fullnodes", "20",
+            "--forge-cli-arg",
+            "test", "k8s-swarm",
+            "--image-tag", "asdf",
+            "--upgrade-image-tag", "upgrade_asdf",
+            "--namespace", "potato",
+            "--port-forward",
+            "--test-arg"
+        ])
         shell = SpyShell(
             OrderedDict(
                 [
-                    (
-                        "cargo run -p forge-cli -- --suite banana --duration-se"
-                        "cs 123 test k8s-swarm --image-tag asdf --upgrade-image"
-                        "-tag upgrade_asdf --namespace potato --fake-args",
-                        RunResult(0, b"orange"),
-                    ),
+                    (cargo_run, RunResult(0, b"orange"),),
                     ("kubectl get pods -n potato", RunResult(0, b"Pods")),
                 ]
             )
         )
         filesystem = SpyFilesystem({}, {})
-        context = fake_context(shell, filesystem)
+        context = fake_context(shell, filesystem, mode="local")
         runner = LocalForgeRunner()
         result = runner.run(context)
         self.assertEqual(result.state, ForgeState.PASS, result.output)
@@ -273,7 +295,7 @@ class ForgeRunnerTests(unittest.TestCase):
                 "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
             },
         )
-        context = fake_context(shell, filesystem)
+        context = fake_context(shell, filesystem, mode="k8s")
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)

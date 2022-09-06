@@ -18,7 +18,7 @@ spec:
     - -c
     - |
       ulimit -n 1048576
-      forge {FORGE_ARGS}
+      {FORGE_ARGS}
 
     env:
     - name: FORGE_TRIGGERED_BY
