@@ -137,29 +137,46 @@ pub async fn test_consensus_fault_tolerance(
     let transactions: Vec<_> =
         join_all(validator_clients.iter().cloned().map(move |v| async move {
             let mut txns =
-                v.1.get_transactions(None, Some(1000))
-                    .await
-                    .map_err(|e| anyhow::anyhow!("{:?}", e))?
-                    .into_inner();
+                v.1.get_transactions(
+                    Some(if target_v < 1000 { 0 } else { target_v - 1000 }),
+                    Some(1000),
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?
+                .into_inner();
             txns.retain(|t| t.version().unwrap() <= target_v);
             <anyhow::Result<Vec<_>>>::Ok(txns)
         }))
         .await;
 
+    let txns_a = transactions
+        .first()
+        .unwrap()
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+
     for i in 1..transactions.len() {
-        let txns_a = transactions
-            .first()
-            .unwrap()
-            .as_ref()
-            .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
         let txns_b = transactions
             .get(i)
             .unwrap()
             .as_ref()
             .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
-        assert_eq!(txns_a.len(), txns_b.len());
+        assert_eq!(
+            txns_a.len(),
+            txns_b.len(),
+            "Fetched length of transactions for target_v {} doesn't match: from {} to {} vs from {} to {}",
+            target_v,
+            txns_a.first().and_then(|t| t.version()).unwrap_or(0),
+            txns_a.last().and_then(|t| t.version()).unwrap_or(0),
+            txns_b.first().and_then(|t| t.version()).unwrap_or(0),
+            txns_b.last().and_then(|t| t.version()).unwrap_or(0),
+        );
         for i in 0..txns_a.len() {
-            assert_eq!(txns_a[i], txns_b[i]);
+            assert_eq!(
+                txns_a[i], txns_b[i],
+                "Transaction at index {} after target version {}, doesn't match",
+                i, target_v
+            );
         }
     }
 
