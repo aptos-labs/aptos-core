@@ -164,6 +164,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "async-trait",
+ "backup-cli",
  "base64 0.13.0",
  "bcs",
  "cached-packages",
