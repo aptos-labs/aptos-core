@@ -106,20 +106,63 @@ Follow the below detailed steps:
   
   **Using Aptos-core source code**
 
-  ```
-  aptos key extract-peer  --private-key-file private-key.txt  \
+  :::tip Required: host information
+  Use the `--host` flag to provide the host information to output a network address for the fullnode. 
+  :::
+
+  ```bash
+  aptos key extract-peer --host example.com:6180 \
+      --public-network-key-file private-key.txt.pub \
       --output-file peer-info.yaml
   ```
+  which will produce the following output:
+  ```
+  {
+    "Result": {
+      "B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813": {
+        "addresses": [
+          "/dns/example.com/tcp/6180/noise-ik/0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
+        ],
+        "keys": [
+          "0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
+        ],
+        "role": "Upstream"
+      }
+    }
+  }
+  ```
+  or
+  ```
+  aptos key extract-peer --host 1.1.1.1:6180 \
+      --public-network-key-file private-key.txt.pub \
+      --output-file peer-info.yaml
+  ```
+  which will produce the following output:
+  ```
+  {
+    "Result": {
+      "B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813": {
+        "addresses": [
+          "/ip4/1.1.1.1/tcp/6180/noise-ik/0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
+        ],
+        "keys": [
+          "0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
+        ],
+        "role": "Upstream"
+      }
+    }
+  }
+  ```
 
-   **Using Docker**
+  **Using Docker**
 
-   From inside the `aptoslabs/tools` Docker container:
+  Run the same above commands to extract the peer from inside the `aptoslabs/tools` Docker container. For example:
 
-   ```
-   $ aptos key extract-peer \
-       --private-key-file /path/to/private-key.txt \
-       --output-file /path/to/peer-info.yaml
-   ```
+  ```
+  aptos key extract-peer --host 1.1.1.1:6180 \
+      --public-network-key-file /path/to/private-key.txt.pub \
+      --output-file /path/to/peer-info.yaml
+  ```
 
   This will create a YAML file that will have your `peer_id` corresponding to the `private-key.txt` you provided.
 
