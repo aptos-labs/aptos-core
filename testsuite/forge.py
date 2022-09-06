@@ -3,6 +3,7 @@ import atexit
 
 import json
 import multiprocessing
+from optparse import Option
 
 
 # Using fork can crash the subprocess, use spawn instead
@@ -825,14 +826,7 @@ class LocalForgeRunner(ForgeRunner):
 
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
-                [
-                    "cargo",
-                    "run",
-                    "-p",
-                    "forge-cli",
-                    "--",
-                    *context.forge_args,
-                ],
+                context.forge_args,
                 stream_output=True,
             )
             forge_result.set_output(result.output.decode())
@@ -1148,6 +1142,91 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     return sanitized_namespace
 
 
+def create_forge_command(
+    forge_runner_mode: Optional[str],
+    enable_failpoints_feature: bool,
+    forge_test_suite: Optional[str],
+    forge_runner_duration_secs: Optional[str],
+    forge_num_validators: Optional[str],
+    forge_num_validator_fullnodes: Optional[str],
+    image_tag: str,
+    upgrade_image_tag: str,
+    forge_namespace: str,
+    forge_namespace_reuse: Optional[str],
+    forge_namespace_keep: Optional[str],
+    forge_enable_haproxy: Optional[str],
+    cargo_args: Optional[Sequence[str]],
+    forge_cli_args: Optional[Sequence[str]],
+    test_args: Optional[Sequence[str]],
+) -> List[str]:
+    """
+    Cargo args get passed before forge directly to cargo (i.e. features)
+    Forge Cli args get passed to forge before the test command (i.e. test suite)
+    Test args get passed to the test subcommand (i.e. image tag)
+    """
+    if forge_runner_mode == "local":
+        forge_args = [
+            "cargo",
+            "run",
+        ]
+        if enable_failpoints_feature:
+            forge_args.extend(["--features", "failpoints"])
+        if cargo_args:
+            forge_args.extend(cargo_args)
+        forge_args.extend([
+            "-p",
+            "forge-cli",
+            "--",
+        ])
+    elif forge_runner_mode == "k8s":
+        forge_args = ["forge"]
+    else:
+        return []
+    if forge_test_suite:
+        forge_args.extend([
+            "--suite", forge_test_suite
+        ])
+    if forge_runner_duration_secs:
+        forge_args.extend([
+            "--duration-secs", forge_runner_duration_secs
+        ])
+
+    if forge_num_validators:
+        forge_args.extend(["--num-validators", forge_num_validators])
+    if forge_num_validator_fullnodes:
+        forge_args.extend([
+            "--num-validator-fullnodes",
+            forge_num_validator_fullnodes,
+        ])
+
+    if forge_cli_args:
+        forge_args.extend(forge_cli_args)
+
+    # TODO: add support for other backend
+    backend = "k8s-swarm"
+    forge_args.extend([
+        "test", backend,
+        "--image-tag", image_tag,
+        "--upgrade-image-tag", upgrade_image_tag,
+        "--namespace", forge_namespace,
+    ])
+
+    if forge_runner_mode == "local":
+        forge_args.append("--port-forward")
+
+    if forge_namespace_reuse == "true":
+        forge_args.append("--reuse")
+    if forge_namespace_keep == "true":
+        forge_args.append("--keep")
+    if forge_enable_haproxy == "true":
+        forge_args.append("--enable-haproxy")
+
+    if test_args:
+        forge_args.extend(test_args)
+
+    return forge_args
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1182,7 +1261,9 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
 @envoption("GITHUB_STEP_SUMMARY")
-@click.option("--extra-args", multiple=True)
+@click.option("--cargo-args", multiple=True, help="Cargo args to pass to forge local runner")
+@click.option("--forge-cli-args", multiple=True, help="Forge cli args to pass to forge cli")
+@click.option("--test-args", multiple=True, help="Test args to pass to forge test subcommand")
 def test(
     forge_output: Optional[str],
     forge_report: Optional[str],
@@ -1213,7 +1294,9 @@ def test(
     github_repository: Optional[str],
     github_run_id: Optional[str],
     github_step_summary: Optional[str],
-    extra_args: Optional[List[str]],
+    cargo_args: Optional[List[str]],
+    forge_cli_args: Optional[List[str]],
+    test_args: Optional[List[str]],
 ) -> None:
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
@@ -1255,8 +1338,8 @@ def test(
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
         forge_image_tag,
-        enable_failpoints_feature=forge_enable_failpoints,
-        enable_performance_profile=forge_enable_performance,
+        enable_failpoints_feature=enable_failpoints_feature,
+        enable_performance_profile=enable_performance_profile,
     )
 
     if forge_test_suite == "compat":
@@ -1299,45 +1382,23 @@ def test(
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
 
-    forge_args = []
-    if forge_test_suite:
-        forge_args.extend([
-            "--suite", forge_test_suite
-        ])
-    if forge_runner_duration_secs:
-        forge_args.extend([
-            "--duration-secs", "forge_runner_duration_secs"
-        ])
-
-    # TODO: add support for other backend
-    backend = "k8s-swarm"
-    forge_args.extend([
-        "test", backend,
-        "--image-tag", image_tag,
-        "--upgrade-image-tag", upgrade_image_tag,
-        "--namespace", forge_namespace,
-    ])
-
-    if forge_runner_mode == "local":
-        forge_args.append("--port-forward")
-
-    if forge_namespace_reuse == "true":
-        forge_args.append("--reuse")
-    if forge_namespace_keep == "true":
-        forge_args.append("--keep")
-    if forge_enable_haproxy == "true":
-        forge_args.append("--enable-haproxy")
-    if forge_num_validators:
-        forge_args.extend(["--num-validators", forge_num_validators])
-    if forge_num_validator_fullnodes:
-        forge_args.extend([
-            "--num-validator-fullnodes",
-            forge_num_validator_fullnodes,
-        ])
-    if enable_failpoints_feature:
-        forge_args.extend(["--features", "failpoints"])
-    if extra_args:
-        forge_args.extend(extra_args)
+    forge_args = create_forge_command(
+        forge_runner_mode=forge_runner_mode,
+        enable_failpoints_feature=enable_failpoints_feature,
+        forge_test_suite=forge_test_suite,
+        forge_runner_duration_secs=forge_runner_duration_secs,
+        forge_num_validators=forge_num_validators,
+        forge_num_validator_fullnodes=forge_num_validator_fullnodes,
+        image_tag=image_tag,
+        upgrade_image_tag=upgrade_image_tag,
+        forge_namespace=forge_namespace,
+        forge_namespace_reuse=forge_namespace_reuse,
+        forge_namespace_keep=forge_namespace_keep,
+        forge_enable_haproxy=forge_enable_haproxy,
+        cargo_args=cargo_args,
+        forge_cli_args=forge_cli_args,
+        test_args=test_args,
+    )
 
     context = ForgeContext(
         shell=shell,
