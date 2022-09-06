@@ -1,8 +1,8 @@
 ## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
 ## If you are trying to change how this CI works, you MUST go read the important
-## note at the top of build-images. In short, to test this, you must temporarily
-## change build-images to use the pull_request trigger instead of pull_request_target.
+## note at the top of docker-build-test.yaml. In short, to test this, you must temporarily
+## change docker-build-test to use the pull_request trigger instead of pull_request_target.
 
 ## Make sure to add the CICD:CICD:build-images and CICD:run-e2e-tests labels to test
 ## this within an in-review PR.
@@ -28,7 +28,7 @@ on:
 jobs:
   # Confirm that the generated client within the TS SDK has been re-generated
   # if there are any changes that would affect it within the PR / commit. If
-  # everything is checked in, run tests, build the SDK, and upload it to npm.js.
+  # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   test-sdk-confirm-client-generated-publish:
     runs-on: high-perf-docker
     permissions:
@@ -135,3 +135,44 @@ jobs:
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs local-testnet
+
+  # Run the TS SDK examples. Note: There are small windows where these examples
+  # might be able to fail. For example, if we released a new devnet and SDK with
+  # an incompatible change, but haven't updated the examples to use the new SDK.
+  # That's why this is a separate job, because there are times when it could fail,
+  # whereas there is no reason why the test-sdk-confirm-client-generated-publish
+  # job should fail. These could also fail because we run them against devnet,
+  # whereas we run the test-sdk-confirm-client-generated-publish against a node
+  # built from the same commit and run as part of that CI job.
+  run-examples:
+    runs-on: ubuntu-latest
+    env:
+      APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com/v1
+      APTOS_FAUCET_URL: https://faucet.devnet.aptoslabs.com
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm install -g yarn
+
+      # Run example code in typescript.
+      - uses: nick-fields/retry@v2
+        name: ts-example-test
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+
+      # Run example code in javascript.
+      - uses: nick-fields/retry@v2
+        name: js-example-test
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
