@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::clients::humio;
 use crate::GCPBigQueryConfig;
@@ -38,6 +39,7 @@ pub async fn new_test_context() -> TestContext {
         victoria_metrics_token: "".into(),
         humio_url: "".into(),
         humio_auth_token: "".into(),
+        pfn_allowlist: HashMap::new(),
     };
     let humio_client = humio::IngestClient::new(
         Url::parse("http://localhost/").unwrap(),
@@ -48,11 +50,13 @@ pub async fn new_test_context() -> TestContext {
         .unwrap();
     let validator_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
     let vfn_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+    let pfn_cache = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
 
     TestContext::new(Context::new(
         config,
         validator_cache,
         vfn_cache,
+        pfn_cache,
         Some(gcp_bigquery_client),
         None,
         humio_client,

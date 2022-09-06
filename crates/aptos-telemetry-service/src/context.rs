@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::{convert::Infallible, sync::Arc};
 
 use crate::validator_cache::PeerSetCache;
@@ -9,8 +9,10 @@ use crate::{
     clients::humio, clients::victoria_metrics_api::Client as MetricsClient, GCPBigQueryConfig,
     TelemetryServiceConfig,
 };
-use aptos_crypto::noise;
+use aptos_crypto::{noise, x25519};
+use aptos_infallible::RwLock;
 use aptos_types::chain_id::ChainId;
+use aptos_types::PeerId;
 use gcp_bigquery_client::Client as BQClient;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use warp::Filter;
@@ -20,6 +22,7 @@ pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     validator_cache: PeerSetCache,
     vfn_cache: PeerSetCache,
+    pfn_cache: Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>>,
     configured_chains: HashSet<ChainId>,
 
     pub gcp_bq_client: Option<BQClient>,
@@ -38,6 +41,7 @@ impl Context {
         config: &TelemetryServiceConfig,
         validator_cache: PeerSetCache,
         vfn_cache: PeerSetCache,
+        pfn_cache: Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>>,
         gcp_bigquery_client: Option<BQClient>,
         victoria_metrics_client: Option<MetricsClient>,
         humio_client: humio::IngestClient,
@@ -52,6 +56,7 @@ impl Context {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
             validator_cache,
             vfn_cache,
+            pfn_cache,
             configured_chains,
 
             gcp_bq_client: gcp_bigquery_client,
@@ -76,6 +81,10 @@ impl Context {
 
     pub fn vfn_cache(&self) -> PeerSetCache {
         self.vfn_cache.clone()
+    }
+
+    pub fn pfn_cache(&self) -> Arc<RwLock<HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>>> {
+        self.pfn_cache.clone()
     }
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {

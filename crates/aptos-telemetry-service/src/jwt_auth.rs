@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::PeerRole;
 use aptos_logger::error;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
@@ -11,8 +10,8 @@ use warp::{
     reject, Rejection,
 };
 
-use crate::error::ServiceError;
 use crate::{context::Context, types::auth::Claims};
+use crate::{error::ServiceError, types::common::NodeType};
 
 const BEARER: &str = "BEARER ";
 
@@ -20,7 +19,7 @@ pub fn create_jwt_token(
     context: Context,
     chain_id: ChainId,
     peer_id: PeerId,
-    peer_role: PeerRole,
+    node_type: NodeType,
     epoch: u64,
 ) -> Result<String, Error> {
     let issued = Utc::now().timestamp();
@@ -32,7 +31,7 @@ pub fn create_jwt_token(
     let claims = Claims {
         chain_id,
         peer_id,
-        peer_role,
+        node_type,
         epoch,
         exp: expiration as usize,
         iat: issued as usize,
@@ -43,7 +42,7 @@ pub fn create_jwt_token(
 
 pub async fn authorize_jwt(
     token: String,
-    (context, allow_roles): (Context, Vec<PeerRole>),
+    (context, allow_roles): (Context, Vec<NodeType>),
 ) -> anyhow::Result<Claims, Rejection> {
     let decoded = decode::<Claims>(
         &token,
@@ -66,7 +65,7 @@ pub async fn authorize_jwt(
         }
     };
 
-    if !allow_roles.contains(&claims.peer_role) {
+    if !allow_roles.contains(&claims.node_type) {
         return Err(reject::custom(ServiceError::forbidden(
             "the peer does not have access to this resource",
         )));
@@ -174,13 +173,13 @@ mod tests {
             test_context.inner.clone(),
             ChainId::new(25),
             PeerId::random(),
-            PeerRole::Validator,
+            NodeType::Validator,
             10,
         )
         .unwrap();
         let result = authorize_jwt(
             token,
-            (test_context.inner.clone(), vec![PeerRole::Validator]),
+            (test_context.inner.clone(), vec![NodeType::Validator]),
         )
         .await;
         assert!(result.is_ok());
@@ -189,11 +188,11 @@ mod tests {
             test_context.inner.clone(),
             ChainId::new(25),
             PeerId::random(),
-            PeerRole::ValidatorFullNode,
+            NodeType::ValidatorFullNode,
             10,
         )
         .unwrap();
-        let result = authorize_jwt(token, (test_context.inner, vec![PeerRole::Validator])).await;
+        let result = authorize_jwt(token, (test_context.inner, vec![NodeType::Validator])).await;
         assert!(result.is_err());
         assert_eq!(
             *result.err().unwrap().find::<ServiceError>().unwrap(),
