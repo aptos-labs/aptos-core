@@ -497,18 +497,10 @@ class ForgeContext:
     processes: Processes
     time: Time
 
-    # forge criteria
-    forge_enable_failpoints: bool
-    forge_test_suite: str
-    forge_runner_duration_secs: str
-
     # forge cluster options
     forge_namespace: str
-    reuse_args: Sequence[str]
-    keep_args: Sequence[str]
-    haproxy_args: Sequence[str]
-    num_validators_args: Sequence[str]
-    num_validator_fullnodes_args: Sequence[str]
+    keep_port_forwards: bool
+    forge_args: Sequence[str]
 
     # aws related options
     aws_account_num: Optional[str]
@@ -517,7 +509,6 @@ class ForgeContext:
     forge_image_tag: str
     image_tag: str
     upgrade_image_tag: str
-    forge_namespace: str
     forge_cluster_name: str
     forge_blocking: bool
 
@@ -832,42 +823,16 @@ class LocalForgeRunner(ForgeRunner):
         )
         port_forward_process = context.processes.spawn(prometheus_port_forward)
 
-        # Build features list
-        if context.forge_enable_failpoints:
-            features_args = ["--features", "failpoints"]
-        else:
-            features_args = []
-
-        cmd = [
-            "cargo",
-            "run",
-            *features_args,
-            "-p",
-            "forge-cli",
-            "--",
-            "--suite",
-            context.forge_test_suite,
-            *context.num_validators_args,
-            *context.num_validator_fullnodes_args,
-            "--duration-secs",
-            context.forge_runner_duration_secs,
-            "test",
-            "k8s-swarm",
-            "--image-tag",
-            context.image_tag,
-            "--upgrade-image-tag",
-            context.upgrade_image_tag,
-            "--namespace",
-            context.forge_namespace,
-            "--port-forward",
-            *context.reuse_args,
-            *context.keep_args,
-            *context.haproxy_args,
-        ]
-
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
-                cmd,
+                [
+                    "cargo",
+                    "run",
+                    "-p",
+                    "forge-cli",
+                    "--",
+                    *context.forge_args,
+                ],
                 stream_output=True,
             )
             forge_result.set_output(result.output.decode())
@@ -876,7 +841,7 @@ class LocalForgeRunner(ForgeRunner):
             )
 
         # Kill port forward unless we're keeping them
-        if not context.keep_args:
+        if not context.keep_port_forwards:
             # Kill all processess with kubectl in the name
             for process in context.processes.processes():
                 if (
@@ -926,25 +891,13 @@ class K8sForgeRunner(ForgeRunner):
 
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
-            FORGE_TEST_SUITE=context.forge_test_suite,
-            FORGE_RUNNER_DURATION_SECS=context.forge_runner_duration_secs,
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
             AWS_ACCOUNT_NUM=context.aws_account_num,
             AWS_REGION=context.aws_region,
             FORGE_NAMESPACE=context.forge_namespace,
-            REUSE_ARGS=" ".join(context.reuse_args) if context.reuse_args else "",
-            KEEP_ARGS=" ".join(context.keep_args) if context.keep_args else "",
-            ENABLE_HAPROXY_ARGS=" ".join(context.haproxy_args)
-            if context.haproxy_args
-            else "",
-            NUM_VALIDATORS_ARGS=" ".join(context.num_validators_args)
-            if context.num_validators_args
-            else "",
-            NUM_VALIDATOR_FULLNODES_ARGS=" ".join(context.num_validator_fullnodes_args)
-            if context.num_validator_fullnodes_args
-            else "",
+            FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
         )
 
@@ -1223,16 +1176,13 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 @envoption("VERBOSE")
 @envoption("GITHUB_ACTIONS", "false")
 @click.option("--dry-run", is_flag=True)
-@click.option("--ignore-cluster-warning", is_flag=True)
-@click.option(
-    "--interactive/--no-interactive", is_flag=True, default=sys.stdin.isatty()
-)
 @click.option("--balance-clusters", is_flag=True)
 @envoption("FORGE_BLOCKING", "true")
 @envoption("GITHUB_SERVER_URL")
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
 @envoption("GITHUB_STEP_SUMMARY")
+@click.option("--extra-args", multiple=True)
 def test(
     forge_output: Optional[str],
     forge_report: Optional[str],
@@ -1241,8 +1191,8 @@ def test(
     aws_region: str,
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
-    forge_num_validators: int,
-    forge_num_validator_fullnodes: int,
+    forge_num_validators: Optional[str],
+    forge_num_validator_fullnodes: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
     forge_enable_failpoints: Optional[str],
@@ -1257,14 +1207,13 @@ def test(
     verbose: Optional[str],
     github_actions: str,
     dry_run: Optional[bool],
-    ignore_cluster_warning: Optional[bool],
-    interactive: bool,
     balance_clusters: bool,
     forge_blocking: Optional[str],
     github_server_url: Optional[str],
     github_repository: Optional[str],
     github_run_id: Optional[str],
     github_step_summary: Optional[str],
+    extra_args: Optional[List[str]],
 ) -> None:
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
@@ -1300,8 +1249,8 @@ def test(
     assert forge_namespace is not None, "Forge namespace is required"
 
     # These features and profile flags are set as strings
-    forge_enable_failpoints = forge_enable_failpoints == "true"
-    forge_enable_performance = forge_enable_performance == "true"
+    enable_failpoints_feature = forge_enable_failpoints == "true"
+    enable_performance_profile = forge_enable_performance == "true"
 
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
@@ -1317,8 +1266,8 @@ def test(
                 shell,
                 git,
                 2,
-                enable_failpoints_feature=forge_enable_failpoints == "true",
-                enable_performance_profile=forge_enable_performance == "true",
+                enable_failpoints_feature=enable_failpoints_feature,
+                enable_performance_profile=enable_performance_profile,
             )
         )
         # This might not work as intended because we dont know if that revision passed forge
@@ -1333,8 +1282,8 @@ def test(
                 shell,
                 git,
                 1,
-                enable_failpoints_feature=forge_enable_failpoints == "true",
-                enable_performance_profile=forge_enable_performance == "true",
+                enable_failpoints_feature=enable_performance_profile,
+                enable_performance_profile=enable_performance_profile,
             )
         )
         image_tag = image_tag or default_latest_image
@@ -1350,36 +1299,63 @@ def test(
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
 
+    forge_args = []
+    if forge_test_suite:
+        forge_args.extend([
+            "--suite", forge_test_suite
+        ])
+    if forge_runner_duration_secs:
+        forge_args.extend([
+            "--duration-secs", "forge_runner_duration_secs"
+        ])
+
+    # TODO: add support for other backend
+    backend = "k8s-swarm"
+    forge_args.extend([
+        "test", backend,
+        "--image-tag", image_tag,
+        "--upgrade-image-tag", upgrade_image_tag,
+        "--namespace", forge_namespace,
+    ])
+
+    if forge_runner_mode == "local":
+        forge_args.append("--port-forward")
+
+    if forge_namespace_reuse == "true":
+        forge_args.append("--reuse")
+    if forge_namespace_keep == "true":
+        forge_args.append("--keep")
+    if forge_enable_haproxy == "true":
+        forge_args.append("--enable-haproxy")
+    if forge_num_validators:
+        forge_args.extend(["--num-validators", forge_num_validators])
+    if forge_num_validator_fullnodes:
+        forge_args.extend([
+            "--num-validator-fullnodes",
+            forge_num_validator_fullnodes,
+        ])
+    if enable_failpoints_feature:
+        forge_args.extend(["--features", "failpoints"])
+    if extra_args:
+        forge_args.extend(extra_args)
+
     context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
         processes=processes,
         time=time,
-        forge_enable_failpoints=forge_enable_failpoints,
-        forge_test_suite=forge_test_suite,
-        forge_runner_duration_secs=forge_runner_duration_secs,
-        reuse_args=["--reuse"] if forge_namespace_reuse else [],
-        keep_args=["--keep"] if forge_namespace_keep else [],
-        haproxy_args=["--enable-haproxy"] if forge_enable_haproxy else [],
-        num_validators_args=["--num-validators", forge_num_validators]
-        if forge_num_validators
-        else [],
-        num_validator_fullnodes_args=[
-            "--num-validator-fullnodes",
-            forge_num_validator_fullnodes,
-        ]
-        if forge_num_validator_fullnodes
-        else [],
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
         forge_namespace=forge_namespace,
+        keep_port_forwards=forge_namespace_keep == "true",
         forge_cluster_name=forge_cluster_name,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}",
+        forge_args=forge_args,
     )
     forge_runner_mapping = {
         "local": LocalForgeRunner,
