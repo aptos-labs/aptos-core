@@ -55,7 +55,6 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-  FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
@@ -71,7 +70,6 @@ env:
 
 jobs:
   forge:
-    if: env.FORGE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     permissions:
