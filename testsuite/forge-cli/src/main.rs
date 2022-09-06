@@ -179,6 +179,9 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(1800);
+    let suite_name = "changing_working_quorum_test";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
