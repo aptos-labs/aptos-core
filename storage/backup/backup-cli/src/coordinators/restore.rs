@@ -13,7 +13,7 @@ use crate::{
         COORDINATOR_FAIL_TS, COORDINATOR_START_TS, COORDINATOR_SUCC_TS, COORDINATOR_TARGET_VERSION,
     },
     storage::BackupStorage,
-    utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode},
+    utils::{unix_timestamp_sec, GlobalRestoreOptions},
 };
 use anyhow::{bail, Result};
 use aptos_logger::prelude::*;
@@ -110,15 +110,10 @@ impl RestoreCoordinator {
         COORDINATOR_TARGET_VERSION.set(actual_target_version as i64);
         info!("Planned to restore to version {}.", actual_target_version);
 
-        let txn_resume_point = match self.global_opt.run_mode.as_ref() {
-            RestoreRunMode::Restore { restore_handler } => {
-                restore_handler.get_next_expected_transaction_version()?
-            }
-            RestoreRunMode::Verify => {
-                info!("This is a dry run.");
-                0
-            }
-        };
+        let txn_resume_point = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
         let start_version = std::cmp::min(
             self.ledger_history_start_version,
             state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0),
