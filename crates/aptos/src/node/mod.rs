@@ -27,6 +27,12 @@ use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
+use backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
+use backup_cli::metadata::cache::MetadataCacheOpt;
+use backup_cli::storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter};
+use backup_cli::utils::{
+    ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
+};
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use hex::FromHex;
@@ -34,6 +40,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
@@ -55,6 +62,7 @@ pub enum NodeTool {
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
     AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
+    BootstrapDbFromBackup(BootstrapDbFromBackup),
 }
 
 impl NodeTool {
@@ -71,6 +79,7 @@ impl NodeTool {
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
             AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
+            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -840,6 +849,73 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             );
             AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
         }
+        Ok(())
+    }
+}
+
+/// Tool to bootstrap DB from backup
+#[derive(Parser)]
+pub struct BootstrapDbFromBackup {
+    #[clap(flatten)]
+    pub metadata_cache_opt: MetadataCacheOpt,
+
+    #[clap(long, help = "Config file for the source backup.", parse(from_os_str))]
+    config_path: PathBuf,
+
+    #[clap(
+        long = "target-db-dir",
+        help = "e.g. /opt/aptos/data/db",
+        parse(from_os_str)
+    )]
+    pub db_dir: PathBuf,
+
+    #[clap(flatten)]
+    pub rocksdb_opt: RocksdbOpt,
+
+    #[clap(flatten)]
+    pub concurernt_downloads: ConcurrentDownloadsOpt,
+
+    #[clap(flatten)]
+    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+}
+
+#[async_trait]
+impl CliCommand<()> for BootstrapDbFromBackup {
+    fn command_name(&self) -> &'static str {
+        "BootstrapDbFromBackup"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let opt = RestoreCoordinatorOpt {
+            metadata_cache_opt: self.metadata_cache_opt,
+            replay_all: false,
+            ledger_history_start_version: None,
+            skip_epoch_endings: false,
+        };
+        let global_opt = GlobalRestoreOpt {
+            dry_run: false,
+            db_dir: Some(self.db_dir),
+            target_version: None,
+            trusted_waypoints: Default::default(),
+            rocksdb_opt: self.rocksdb_opt,
+            concurernt_downloads: self.concurernt_downloads,
+            replay_concurrency_level: self.replay_concurrency_level,
+        }
+        .try_into()?;
+        let storage = Arc::new(CommandAdapter::new(
+            CommandAdapterConfig::load_from_file(&self.config_path).await?,
+        ));
+
+        // hack: get around this error, related to use of `async_trait`:
+        //   error: higher-ranked lifetime error
+        //   ...
+        //   = note: could not prove for<'r, 's> Pin<Box<impl futures::Future<Output = std::result::Result<(), CliError>>>>: CoerceUnsized<Pin<Box<(dyn futures::Future<Output = std::result::Result<(), CliError>> + std::marker::Send + 's)>>>
+        tokio::task::spawn_blocking(|| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(RestoreCoordinator::new(opt, global_opt, storage).run())
+        })
+        .await
+        .unwrap()?;
         Ok(())
     }
 }
