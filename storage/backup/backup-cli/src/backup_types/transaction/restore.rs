@@ -39,7 +39,12 @@ use futures::{
     StreamExt,
 };
 use itertools::zip_eq;
-use std::{cmp::min, pin::Pin, sync::Arc, time::Instant};
+use std::{
+    cmp::{max, min},
+    pin::Pin,
+    sync::Arc,
+    time::Instant,
+};
 use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 use tokio::io::BufReader;
@@ -317,10 +322,21 @@ impl TransactionRestoreBatchController {
         loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>> + Unpin,
         restore_handler: &RestoreHandler,
     ) -> Result<Option<impl Stream<Item = Result<(Transaction, TransactionInfo)>>>> {
+        let next_expected_version = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
         let start = Instant::now();
 
         let restore_handler_clone = restore_handler.clone();
-        let first_to_replay = self.replay_from_version.unwrap_or(Version::MAX);
+        // DB doesn't allow replaying anything before what's in DB already.
+        //
+        // TODO: notice that we don't deal with overwrites before "first_to_replay", because the
+        //       DB  allows it. Need to follow up further.
+        let first_to_replay = max(
+            self.replay_from_version.unwrap_or(Version::MAX),
+            next_expected_version,
+        );
         let target_version = self.global_opt.target_version;
 
         let mut txns_to_execute_stream = loaded_chunk_stream

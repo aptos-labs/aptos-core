@@ -18,6 +18,7 @@ use aptos_config::config::{
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
+use aptos_logger::info;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -204,6 +205,18 @@ impl RestoreRunMode {
                 restore_handler.reset_state_store();
             }
             Self::Verify => (),
+        }
+    }
+
+    pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.get_next_expected_transaction_version()
+            }
+            RestoreRunMode::Verify => {
+                info!("This is a dry run. Assuming resuming point at version 0.");
+                Ok(0)
+            }
         }
     }
 }
