@@ -1,4 +1,8 @@
-env_vars: []
+env_vars:
+  - key: "BUCKET"
+    value: "aptos-ait3-data/backups"
+  - key: "SUB_DIR"
+    value: "e4"
 commands:
   create_backup: echo "$BACKUP_NAME"
   create_for_write: |
