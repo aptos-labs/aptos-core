@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Context;
 use aptos_rest_client::Client as RestClient;
 use async_trait::async_trait;
 use core::time;
@@ -54,10 +55,12 @@ pub async fn test_consensus_fault_tolerance(
     parts_in_cycle: usize,
     mut failure_injection: Box<dyn FailureInjection>,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
-    mut check_cycle: Box<dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>)>,
+    mut check_cycle: Box<
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+    >,
     new_epoch_on_cycle: bool,
 ) -> anyhow::Result<()> {
-    let validator_clients = swarm.get_clients_with_names();
+    let validator_clients = swarm.get_validator_clients_with_names();
 
     async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
         join_all(
@@ -114,7 +117,7 @@ pub async fn test_consensus_fault_tolerance(
             cur.iter().map(|s| s.round).collect::<Vec<_>>()
         );
 
-        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous);
+        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous)?;
         if new_epoch_on_cycle {
             swarm.aptos_public_info().reconfig().await;
         }
@@ -246,6 +249,7 @@ impl FailureInjection for FailPointFailureInjection {
                     .1
                     .set_failpoint(name.clone(), "off".to_string())
                     .await
+                    .context(validator_clients[*validator_idx].0.clone())
                     .unwrap();
             }
             self.modified_failpoints = HashSet::new();
@@ -255,6 +259,7 @@ impl FailureInjection for FailPointFailureInjection {
                 .1
                 .set_failpoint(name.clone(), actions.clone())
                 .await
+                .context(validator_clients[validator_idx].0.clone())
                 .unwrap();
             self.modified_failpoints.insert((validator_idx, name));
         }
@@ -265,6 +270,7 @@ impl FailureInjection for FailPointFailureInjection {
                 .1
                 .set_failpoint(name.clone(), "off".to_string())
                 .await
+                .context(validator_clients[*validator_idx].0.clone())
                 .unwrap();
         }
     }

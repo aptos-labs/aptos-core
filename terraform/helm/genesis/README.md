@@ -40,6 +40,8 @@ Aptos blockchain automated genesis ceremony for testnets
 | genesis.validator.enable_onchain_discovery | bool | `false` | Use External DNS as created by aptos-node helm chart for validator host in genesis |
 | genesis.validator.internal_host_suffix | string | `"validator-lb"` | If `enable_onchain_discovery` is false, use this host suffix for internal kubernetes service name |
 | genesis.validator.stake_amount | string | `"100000000000000"` | Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals |
+| genesis.validator.num_validators_with_larger_stake | string | `"0"` | Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals |
+| genesis.validator.larger_stake_amount | string | `"1000000000000000"` | Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals |
 | imageTag | string | `"testnet"` | Default image tag to use for all tools images |
 | labels | string | `nil` |  |
 | podSecurityPolicy | bool | `true` | LEGACY: create PodSecurityPolicy, which exists at the cluster-level |
