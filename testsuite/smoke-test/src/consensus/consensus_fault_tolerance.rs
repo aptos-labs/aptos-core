@@ -135,6 +135,7 @@ async fn run_fail_point_test(
         Box::new(FailPointFailureInjection::new(get_fail_points_to_set)),
         check_cycle,
         false,
+        false,
     )
     .await
     .unwrap();
@@ -166,6 +167,7 @@ async fn test_no_failures() {
             Ok(())
         }),
         true,
+        false,
     )
     .await
     .unwrap();

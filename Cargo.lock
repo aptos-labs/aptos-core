@@ -3885,6 +3885,7 @@ dependencies = [
  "aptosdb",
  "async-trait",
  "cached-packages",
+ "chrono",
  "either",
  "framework",
  "futures",
@@ -3892,6 +3893,7 @@ dependencies = [
  "hyper",
  "hyper-tls",
  "inspection-service",
+ "itertools",
  "k8s-openapi",
  "kube",
  "num_cpus",
@@ -9316,11 +9318,14 @@ name = "testcases"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
  "forge",
  "rand 0.7.3",
+ "reqwest",
+ "serde_json",
  "tokio",
 ]
 
