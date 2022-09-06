@@ -27,6 +27,7 @@ from .forge import (
     SystemContext,
     assert_aws_token_expiration,
     find_recent_images_by_profile_or_features,
+    assert_provided_image_tags_has_profile_or_features,
     format_comment,
     format_pre_comment,
     format_report,
@@ -375,6 +376,14 @@ class TestFindRecentImage(unittest.TestCase):
                 find_recent_images_by_profile_or_features(
                     shell, git, 1, commit_threshold=1
                 )
+            )
+
+    def testFailpointsProvidedImageTag(self) -> None:
+        with self.assertRaises(AssertionError):
+            assert_provided_image_tags_has_profile_or_features(
+                "potato_tomato",
+                "failpoints_performance_potato",
+                enable_failpoints_feature=True,
             )
 
 
