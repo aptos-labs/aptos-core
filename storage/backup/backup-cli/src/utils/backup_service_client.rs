@@ -6,14 +6,14 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::transaction::Version;
 use aptosdb::backup::backup_handler::DbState;
+use clap::Parser;
 use futures::TryStreamExt;
-use structopt::StructOpt;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct BackupServiceClientOpt {
-    #[structopt(
+    #[clap(
         long = "backup-service-address",
         default_value = "http://localhost:6186",
         help = "Backup service address."

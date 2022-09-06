@@ -31,6 +31,7 @@ use aptosdb::{
     state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
     AptosDB, GetRestoreHandler,
 };
+use clap::Parser;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -38,13 +39,12 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use structopt::StructOpt;
 use tokio::fs::metadata;
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct GlobalBackupOpt {
     // Defaults to 128MB, so concurrent chunk downloads won't take up too much memory.
-    #[structopt(
+    #[clap(
         long = "max-chunk-size",
         default_value = "134217728",
         help = "Maximum chunk file size in bytes."
@@ -52,21 +52,21 @@ pub struct GlobalBackupOpt {
     pub max_chunk_size: usize,
 }
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct RocksdbOpt {
-    #[structopt(long, default_value = "5000")]
+    #[clap(long, default_value = "5000")]
     ledger_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     ledger_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "5000")]
+    #[clap(long, default_value = "5000")]
     state_merkle_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "1000")]
+    #[clap(long, default_value = "1000")]
     index_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     index_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "16")]
+    #[clap(long, default_value = "16")]
     max_background_jobs: i32,
 }
 
@@ -101,12 +101,12 @@ impl Default for RocksdbOpt {
     }
 }
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct GlobalRestoreOpt {
-    #[structopt(long, help = "Dry run without writing data to DB.")]
+    #[clap(long, help = "Dry run without writing data to DB.")]
     pub dry_run: bool,
 
-    #[structopt(
+    #[clap(
         long = "target-db-dir",
         parse(from_os_str),
         conflicts_with = "dry-run",
@@ -114,23 +114,23 @@ pub struct GlobalRestoreOpt {
     )]
     pub db_dir: Option<PathBuf>,
 
-    #[structopt(
+    #[clap(
         long,
         help = "Content newer than this version will not be recovered to DB, \
         defaulting to the largest version possible, meaning recover everything in the backups."
     )]
     pub target_version: Option<Version>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub trusted_waypoints: TrustedWaypointOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub rocksdb_opt: RocksdbOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub concurernt_downloads: ConcurrentDownloadsOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
 }
 
@@ -274,9 +274,9 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
     }
 }
 
-#[derive(Clone, Default, StructOpt)]
+#[derive(Clone, Default, Parser)]
 pub struct TrustedWaypointOpt {
-    #[structopt(
+    #[clap(
         long,
         help = "(multiple) When provided, an epoch ending LedgerInfo at the waypoint version will be \
         checked against the hash in the waypoint, but signatures on it are NOT checked. \
@@ -305,9 +305,9 @@ impl TrustedWaypointOpt {
     }
 }
 
-#[derive(Clone, Copy, Default, StructOpt)]
+#[derive(Clone, Copy, Default, Parser)]
 pub struct ConcurrentDownloadsOpt {
-    #[structopt(
+    #[clap(
         long,
         help = "[Defaults to number of CPUs] \
         number of concurrent downloads including metadata files from the backup storage."
@@ -326,9 +326,9 @@ impl ConcurrentDownloadsOpt {
     }
 }
 
-#[derive(Clone, Copy, Default, StructOpt)]
+#[derive(Clone, Copy, Default, Parser)]
 pub struct ReplayConcurrencyLevelOpt {
-    #[structopt(
+    #[clap(
         long,
         help = "[Defaults to number of CPUs] \
         concurrency_level used by the transaction executor, applicable when replaying transactions \

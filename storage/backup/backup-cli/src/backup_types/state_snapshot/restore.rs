@@ -28,16 +28,16 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
+use clap::Parser;
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
-use structopt::StructOpt;
 use tokio::time::Instant;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct StateSnapshotRestoreOpt {
-    #[structopt(long = "state-manifest")]
+    #[clap(long = "state-manifest")]
     pub manifest_handle: FileHandle,
-    #[structopt(long = "state-into-version")]
+    #[clap(long = "state-into-version")]
     pub version: Version,
 }
 
