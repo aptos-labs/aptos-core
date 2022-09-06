@@ -98,22 +98,25 @@ impl RestoreCoordinator {
             metadata_view.select_transaction_backups(0, self.target_version())?;
         let actual_target_version = self.get_actual_target_version(&transactions)?;
         let epoch_endings = metadata_view.select_epoch_ending_backups(actual_target_version)?;
-        let state_snapshot = if self.replay_all {
+        let txn_resume_point = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
+
+        let state_snapshot = if self.replay_all || txn_resume_point != 0 {
             None
+        } else if let Some(version) = self.global_opt.run_mode.get_in_progress_state_snapshot()? {
+            info!("Found in progress state snapshot restore, at version {}, looking for matching backup.", version);
+            Some(metadata_view.expect_state_snapshot(version)?)
         } else {
             metadata_view.select_state_snapshot(actual_target_version)?
         };
         let replay_transactions_from_version = match &state_snapshot {
             Some(b) => b.version + 1,
-            None => 0,
+            None => txn_resume_point,
         };
         COORDINATOR_TARGET_VERSION.set(actual_target_version as i64);
         info!("Planned to restore to version {}.", actual_target_version);
-
-        let txn_resume_point = self
-            .global_opt
-            .run_mode
-            .get_next_expected_transaction_version()?;
         let mut start_version = state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0);
         if let Some(v) = self.ledger_history_start_version {
             if v < start_version {
