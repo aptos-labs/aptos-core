@@ -178,6 +178,8 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .args(&[
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
+            "--ledger-history-start-version",
+            "0",
             "local-fs",
             "--dir",
             backup_path.to_str().unwrap(),
