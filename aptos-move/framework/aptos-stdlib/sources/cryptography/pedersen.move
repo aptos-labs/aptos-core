@@ -53,10 +53,47 @@ module aptos_std::pedersen {
         }
     }
 
-    /// Updates the commitment c to c' = c + point. Useful for re-randomizing the commitment or updating the committed
-    /// value.
-    public fun commitment_add(c: &mut Commitment, point: &RistrettoPoint) {
-        ristretto255::point_add_assign(&mut c.point, point);
+    /// Returns a non-hiding commitment val * basepoint where `basepoint` is the Ristretto255 basepoint.
+    public fun new_non_hiding_commitment_for_bulletproof(val: &Scalar): Commitment {
+        Commitment {
+            point: ristretto255::basepoint_mul(val)
+        }
+    }
+
+    /// Returns lhs + rhs. Useful for re-randomizing the commitment or updating the committed value.
+    public fun commitment_add(lhs: &Commitment, rhs: &Commitment): Commitment {
+        Commitment {
+            point: ristretto255::point_add(&lhs.point, &rhs.point)
+        }
+    }
+
+    /// Sets lhs = lhs + rhs. Useful for re-randomizing the commitment or updating the committed value.
+    public fun commitment_add_assign(lhs: &mut Commitment, rhs: &Commitment) {
+        ristretto255::point_add_assign(&mut lhs.point, &rhs.point);
+    }
+
+    /// Returns lhs - rhs. Useful for re-randomizing the commitment or updating the committed value.
+    public fun commitment_sub(lhs: &Commitment, rhs: &Commitment): Commitment {
+        Commitment {
+            point: ristretto255::point_sub(&lhs.point, &rhs.point)
+        }
+    }
+
+    /// Sets lhs = lhs - rhs. Useful for re-randomizing the commitment or updating the committed value.
+    public fun commitment_sub_assign(lhs: &mut Commitment, rhs: &Commitment) {
+        ristretto255::point_sub_assign(&mut lhs.point, &rhs.point);
+    }
+
+    /// Creates a copy of this commitment.
+    public fun commitment_clone(c: &Commitment): Commitment {
+        Commitment {
+            point: ristretto255::point_clone(&c.point)
+        }
+    }
+
+    /// Returns true if the two commitments are identical: i.e., same value and same randomness.
+    public fun commitment_equals(lhs: &Commitment, rhs: &Commitment): bool {
+        ristretto255::point_equals(&lhs.point, &rhs.point)
     }
 
     /// Returns the underlying elliptic curve point representing the commitment as an in-memory RistrettoPoint.
@@ -64,8 +101,24 @@ module aptos_std::pedersen {
         &c.point
     }
 
-    /// Returns the underlying elliptic curve point representing the commitment as a CompressedRistretto.
-    public fun commitment_to_compressed_point(c: &Commitment): CompressedRistretto {
+    /// Returns the Pedersen commitment as a CompressedRistretto point.
+    public fun commitment_as_compressed_point(c: &Commitment): CompressedRistretto {
         point_compress(&c.point)
+    }
+
+    /// Moves the Commitment into a CompressedRistretto point.
+    public fun commitment_into_point(c: Commitment): RistrettoPoint {
+        let Commitment { point } = c;
+        point
+    }
+
+    /// Moves the Commitment into a CompressedRistretto point.
+    public fun commitment_into_compressed_point(c: Commitment): CompressedRistretto {
+        point_compress(&c.point)
+    }
+
+    /// Returns the randomness base compatible with the Bulletproofs module.
+    public fun randomness_base_for_bulletproof(): RistrettoPoint {
+        std::option::extract(&mut ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE))
     }
 }

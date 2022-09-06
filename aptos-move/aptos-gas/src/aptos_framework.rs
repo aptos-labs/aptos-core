@@ -40,7 +40,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 1],
 
     [.ristretto255.point_add, "ristretto255.point_add", 1],
-    [.ristretto255.point_clone, "ristretto255.point_clone", 1],
+    [.ristretto255.point_clone, optional "ristretto255.point_clone", 1],
     [.ristretto255.point_compress, "ristretto255.point_compress", 1],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 1],
     [.ristretto255.point_equals, "ristretto255.point_equals", 1],
@@ -51,14 +51,16 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.point_sub, "ristretto255.point_sub", 1],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 1],
 
-
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case
-    [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 1],  // DEPRECATED
-    [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 1],  // DEPRECATED
 
-    [.ristretto255.sha2_512_per_byte, "ristretto255.sha2_512_per_byte", 1],
-    [.ristretto255.sha2_512_per_hash, "ristretto255.sha2_512_per_hash", 1],
+    // DEPRECATED
+    [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 1],
+    // DEPRECATED
+    [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 1],
+
+    [.ristretto255.sha2_512_per_byte, optional "ristretto255.sha2_512_per_byte", 1],
+    [.ristretto255.sha2_512_per_hash, optional "ristretto255.sha2_512_per_hash", 1],
 
     [.ristretto255.scalar_add, "ristretto255.scalar_add", 1],
     [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 1],
@@ -72,8 +74,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.scalar_sub, "ristretto255.scalar_sub", 1],
     [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
 
-    [.bulletproofs.per_rangeproof_deserialize, ".bulletproofs.per_rangeproof_deserialize", 1],
-    [.bulletproofs.per_bit_rangeproof_verify, "bulletproofs.per_bit_rangeproof_verify", 1],
+    [.bulletproofs.base, optional "bulletproofs.base", 1],
+    [.bulletproofs.per_byte_rangeproof_deserialize, optional "bulletproofs.per_byte_rangeproof_deserialize", 1],
+    [.bulletproofs.per_bit_rangeproof_verify, optional "bulletproofs.per_bit_rangeproof_verify", 1],
 
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],

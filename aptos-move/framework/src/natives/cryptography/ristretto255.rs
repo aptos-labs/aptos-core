@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::cryptography::{ristretto255_point, ristretto255_scalar};
-use crate::natives::util::make_native_from_func;
+use crate::natives::make_native_from_func;
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_deps::move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -30,8 +30,10 @@ pub struct GasParameters {
     pub point_sub: InternalGasPerArg,
     pub point_parse_arg: InternalGasPerArg,
 
-    pub sha512_per_byte: InternalGasPerByte, // DEPRECATED
-    pub sha512_per_hash: InternalGasPerArg,  // DEPRECATED
+    // DEPRECATED
+    pub sha512_per_byte: InternalGasPerByte,
+    // DEPRECATED
+    pub sha512_per_hash: InternalGasPerArg,
     pub sha2_512_per_byte: InternalGasPerByte,
     pub sha2_512_per_hash: InternalGasPerArg,
 

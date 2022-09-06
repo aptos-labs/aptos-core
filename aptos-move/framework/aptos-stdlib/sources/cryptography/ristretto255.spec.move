@@ -3,7 +3,7 @@ spec aptos_std::ristretto255 {
         pragma opaque;
     }
 
-    spec new_point_from_sha2_512_internal { // TODO: temporary mockup.
+    spec new_point_from_sha512_internal { // TODO: temporary mockup.
         pragma opaque;
     }
 
@@ -39,6 +39,10 @@ spec aptos_std::ristretto255 {
         pragma opaque;
     }
 
+    spec double_scalar_mul_internal { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     spec point_add_internal { // TODO: temporary mockup.
         pragma opaque;
     }
@@ -71,6 +75,10 @@ spec aptos_std::ristretto255 {
         pragma opaque;
     }
 
+    spec scalar_from_sha512_internal { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     spec scalar_reduced_from_32_bytes_internal { // TODO: temporary mockup.
         pragma opaque;
     }
@@ -80,10 +88,6 @@ spec aptos_std::ristretto255 {
     }
 
     spec scalar_invert_internal { // TODO: temporary mockup.
-        pragma opaque;
-    }
-
-    spec scalar_from_sha2_512_internal { // TODO: temporary mockup.
         pragma opaque;
     }
 

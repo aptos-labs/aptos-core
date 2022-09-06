@@ -3948,7 +3948,7 @@ dependencies = [
  "bcs",
  "better_any",
  "bulletproofs",
- "claim",
+ "byteorder",
  "claims",
  "clap 3.2.17",
  "curve25519-dalek-ng",

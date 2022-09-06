@@ -22,8 +22,9 @@ static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 pub fn aptos_natives(
     gas_params: NativeGasParameters,
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
+    include_test_natives: bool,
 ) -> NativeFunctionTable {
-    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
+    let iter_chain = move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
         .chain(framework::natives::all_natives(
             CORE_CODE_ADDRESS,
@@ -44,8 +45,15 @@ pub fn aptos_natives(
             .filter(|(addr, module_name, _, _)| {
                 !(*addr == CORE_CODE_ADDRESS && module_name.as_str() == "event")
             }),
-        )
-        .collect()
+        );
+
+    if include_test_natives {
+        iter_chain
+            .chain(framework::natives::all_test_natives(CORE_CODE_ADDRESS))
+            .collect()
+    } else {
+        iter_chain.collect()
+    }
 }
 
 pub fn configure_for_unit_test() {
