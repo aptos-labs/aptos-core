@@ -16,10 +16,12 @@ use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
+use testcases::state_sync_performance::StateSyncValidatorPerformance;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
-    reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
+    reconfiguration_test::ReconfigurationTest,
+    state_sync_performance::StateSyncFullnodePerformance,
 };
 use tokio::runtime::Runtime;
 use url::Url;
@@ -424,11 +426,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             })),
-        "state_sync" => config
-            .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
-            .with_initial_fullnode_count(4)
-            .with_network_tests(&[&StateSyncPerformance])
-            .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None)),
+        "state_sync_perf_fullnodes_apply_outputs" => {
+            state_sync_perf_fullnodes_apply_outputs(config)
+        }
+        "state_sync_perf_fullnodes_execute_transactions" => {
+            state_sync_perf_fullnodes_execute_transactions(config)
+        }
+        "state_sync_perf_validators" => state_sync_perf_validators(config),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(&[&SimpleValidatorUpgrade])
@@ -501,6 +505,62 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
+}
+
+/// A default config for running various state sync performance tests
+fn state_sync_perf_fullnodes_config(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    forge_config
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .with_initial_fullnode_count(4)
+        .with_network_tests(&[&StateSyncFullnodePerformance])
+}
+
+/// The config for running a state sync performance test when applying
+/// transaction outputs in fullnodes.
+fn state_sync_perf_fullnodes_apply_outputs(
+    forge_config: ForgeConfig<'static>,
+) -> ForgeConfig<'static> {
+    state_sync_perf_fullnodes_config(forge_config)
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 600.into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
+        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None))
+}
+
+/// The config for running a state sync performance test when executing
+/// transactions in fullnodes.
+fn state_sync_perf_fullnodes_execute_transactions(
+    forge_config: ForgeConfig<'static>,
+) -> ForgeConfig<'static> {
+    state_sync_perf_fullnodes_config(forge_config)
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 600.into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        }))
+        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None))
+}
+
+/// The config for running a state sync performance test when applying
+/// transaction outputs in failed validators.
+fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    forge_config
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 600.into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+        }))
+        .with_network_tests(&[&StateSyncValidatorPerformance])
+        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None))
 }
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
