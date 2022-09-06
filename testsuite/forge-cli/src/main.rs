@@ -176,7 +176,8 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
     let duration = Duration::from_secs(args.duration_secs as u64);
-    let suite_name: &str = args.suite.as_ref();
+    // let suite_name: &str = args.suite.as_ref();
+    let suite_name = "failpoints_check";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -413,10 +414,44 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         ])
 }
 
+pub struct FailpointsCheck {}
+
+impl Test for FailpointsCheck {
+    fn name(&self) -> &'static str {
+        "check failpoints work test"
+    }
+}
+
+impl NetworkTest for FailpointsCheck {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let clients: Vec<_> = ctx
+            .swarm()
+            .validators()
+            .map(|node| node.rest_client())
+            .collect();
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(async {
+            for client in &clients {
+                client
+                    .set_failpoint("consensus::send::any".to_string(), "return".to_string())
+                    .await
+                    .unwrap();
+            }
+        });
+        Ok(())
+    }
+}
+
 fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
+        "failpoints_check" => config
+            .with_network_tests(&[&FailpointsCheck {}])
+            .with_initial_validator_count(NonZeroUsize::new(3).unwrap())
+            .with_node_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+            })),
         "epoch_changer_performance" => config
             .with_network_tests(&[&PerformanceBenchmark])
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
