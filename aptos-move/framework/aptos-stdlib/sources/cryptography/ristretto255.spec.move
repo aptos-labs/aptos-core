@@ -39,6 +39,10 @@ spec aptos_std::ristretto255 {
         pragma opaque;
     }
 
+    spec double_scalar_mul_internal { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     spec point_add_internal { // TODO: temporary mockup.
         pragma opaque;
     }

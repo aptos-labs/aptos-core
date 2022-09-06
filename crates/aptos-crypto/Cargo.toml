@@ -67,3 +67,7 @@ harness = false
 [[bench]]
 name = "bls12381"
 harness = false
+
+[[bench]]
+name = "bulletproofs"
+harness = false

@@ -2456,6 +2456,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clear_on_drop"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38508a63f4979f0048febc9966fadbd48e5dab31fd0ec6a3f151bbf4a74f7423"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "codespan"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3911,6 +3920,7 @@ dependencies = [
  "bcs",
  "better_any",
  "bulletproofs",
+ "byteorder",
  "claims",
  "clap 3.2.17",
  "curve25519-dalek-ng",
