@@ -25,7 +25,7 @@ use crate::node::{
     ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
-use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
+use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
     AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
     WithdrawStake,
@@ -569,17 +569,20 @@ impl CliTestFramework {
 
     pub async fn extract_peer(
         &self,
+        host: HostAndPort,
         private_key_file: PathBuf,
         output_file: PathBuf,
     ) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
         ExtractPeer {
-            private_key_input_options: PrivateKeyInputOptions::from_file(private_key_file),
+            host,
+            network_key_input_options: NetworkKeyInputOptions::from_private_key_file(
+                private_key_file,
+            ),
             output_file_options: SaveFile {
                 output_file,
                 prompt_options: PromptOptions::yes(),
             },
             encoding_options: Default::default(),
-            profile_options: Default::default(),
         }
         .execute()
         .await
