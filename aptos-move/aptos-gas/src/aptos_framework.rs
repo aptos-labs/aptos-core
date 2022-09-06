@@ -72,7 +72,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.scalar_sub, "ristretto255.scalar_sub", 1],
     [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
 
-    [.bulletproofs.per_rangeproof_deserialize, ".bulletproofs.per_rangeproof_deserialize", 1],
+    [.bulletproofs.base, "bulletproofs.base", 1],
+    [.bulletproofs.per_byte_rangeproof_deserialize, "bulletproofs.per_byte_rangeproof_deserialize", 1],
     [.bulletproofs.per_bit_rangeproof_verify, "bulletproofs.per_bit_rangeproof_verify", 1],
 
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
