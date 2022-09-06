@@ -18,7 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::requests::StorageServiceRequest;
+use storage_service_types::requests::{DataRequest, StorageServiceRequest};
 use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
@@ -144,6 +144,17 @@ impl PeerStates {
         if request.data_request.is_storage_summary_request()
             || request.data_request.is_protocol_version_request()
         {
+            return true;
+        }
+
+        // Let's ignore invalid data advertisements for now
+        if matches!(
+            request.data_request,
+            DataRequest::GetNumberOfStatesAtVersion(_)
+        ) || matches!(
+            request.data_request,
+            DataRequest::GetStateValuesWithProof(_)
+        ) {
             return true;
         }
 

@@ -35,8 +35,8 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-) -> Runtime {
-    let runtime = runtime::Builder::new_multi_thread()
+) -> (Runtime, Runtime) {
+    let consensus_runtime = runtime::Builder::new_multi_thread()
         .thread_name("consensus")
         .enable_all()
         .build()
@@ -55,10 +55,10 @@ pub fn start_consensus(
         txn_notifier,
         state_sync_notifier,
         commit_notifier.clone(),
-        runtime.handle(),
+        consensus_runtime.handle(),
     ));
 
-    let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
+    let time_service = Arc::new(ClockTimeService::new(consensus_runtime.handle().clone()));
 
     let (timeout_sender, timeout_receiver) = channel::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) = channel::new(1_024, &counters::PENDING_SELF_MESSAGES);
@@ -79,9 +79,14 @@ pub fn start_consensus(
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 
-    runtime.spawn(network_task.start());
-    runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
+    let network_runtime = runtime::Builder::new_multi_thread()
+        .thread_name("consensus-network")
+        .enable_all()
+        .build()
+        .expect("Failed to create Tokio runtime!");
+    network_runtime.spawn(network_task.start());
+    consensus_runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
-    runtime
+    (consensus_runtime, network_runtime)
 }

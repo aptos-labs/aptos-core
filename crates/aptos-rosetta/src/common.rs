@@ -29,7 +29,7 @@ pub fn check_network(
     server_context: &RosettaContext,
 ) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || ChainId::from_str(network_identifier.network.trim())
+        && ChainId::from_str(network_identifier.network.trim())
             .map_err(|_| ApiError::NetworkIdentifierMismatch)?
             == server_context.chain_id
     {

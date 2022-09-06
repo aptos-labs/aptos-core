@@ -59,7 +59,7 @@ fn generate_executed_item_from_ordered(
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
 ) -> BufferItem {
-    debug!("{} advance to executed from ordered", commit_info);
+    debug!("Advance to executed from ordered: {}", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
         verified_signatures,
@@ -241,7 +241,7 @@ impl BufferItem {
                     partial_commit_proof.ledger_info().clone(),
                     signature,
                 );
-                debug!("{} advance to signed", partial_commit_proof.commit_info());
+                debug!("Advance to signed: {} ", partial_commit_proof.commit_info());
 
                 Self::Signed(Box::new(SignedItem {
                     executed_blocks,

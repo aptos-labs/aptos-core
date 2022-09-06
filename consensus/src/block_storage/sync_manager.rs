@@ -4,6 +4,7 @@
 use crate::{
     block_storage::{BlockReader, BlockStore},
     logging::{LogEvent, LogSchema},
+    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -355,7 +356,9 @@ impl BlockStore {
         let mut status = BlockRetrievalStatus::Succeeded;
         let mut id = request.req.block_id();
         while (blocks.len() as u64) < request.req.num_blocks() {
-            if let Some(executed_block) = self.get_block(id) {
+            let result = monitor!("block_retreival_get_block", self.get_block(id));
+
+            if let Some(executed_block) = result {
                 blocks.push(executed_block.block().clone());
                 if request.req.match_target_id(id) {
                     status = BlockRetrievalStatus::SucceededWithTarget;
@@ -379,7 +382,7 @@ impl BlockStore {
         request
             .response_sender
             .send(Ok(response_bytes.into()))
-            .map_err(|e| anyhow::anyhow!("{:?}", e))
+            .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
     }
 }
 
@@ -486,12 +489,8 @@ impl BlockRetriever {
                         e,
                     );
                     // select next peer to try
-                    if peers.is_empty() {
-                        bail!(
-                            "Failed to fetch block {} in {} attempts: no more peers available",
-                            block_id,
-                            attempt
-                        );
+                    if peers.is_empty() || attempt >= 10 {
+                        bail!("Failed to fetch block {} in {} attempts", block_id, attempt);
                     }
                     peer = self.pick_peer(attempt, peers);
                 }

@@ -23,7 +23,6 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
-    reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
 
@@ -99,6 +98,20 @@ pub async fn bootstrap_async(
     rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
+
+    if let Some(ref client) = rest_client {
+        assert_eq!(
+            chain_id.id(),
+            client
+                .get_ledger_information()
+                .await
+                .expect("Should successfully get ledger information from Rest API")
+                .into_inner()
+                .chain_id,
+            "Failed to match Rosetta chain Id to upstream server"
+        );
+    }
+
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
@@ -149,37 +162,12 @@ pub fn routes(
 
 /// Handle error codes from warp
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    let code;
-    let body;
-
     debug!("Failed with: {:?}", err);
-
-    if err.is_not_found() {
-        code = StatusCode::NOT_FOUND;
-        body = reply::json(&Error::new(code, "Not Found".to_owned()));
-    } else if let Some(cause) = err.find::<warp::cors::CorsForbidden>() {
-        code = StatusCode::FORBIDDEN;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<warp::body::BodyDeserializeError>() {
-        code = StatusCode::BAD_REQUEST;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<warp::reject::LengthRequired>() {
-        code = StatusCode::LENGTH_REQUIRED;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<PayloadTooLarge>() {
-        code = StatusCode::PAYLOAD_TOO_LARGE;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
-        code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<MethodNotAllowed>() {
-        code = StatusCode::METHOD_NOT_ALLOWED;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else {
-        code = StatusCode::INTERNAL_SERVER_ERROR;
-        body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
-    }
-    let mut rep = reply::with_status(body, code).into_response();
+    let body = reply::json(&Error::new(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("unexpected error: {:?}", err),
+    ));
+    let mut rep = reply::with_status(body, StatusCode::INTERNAL_SERVER_ERROR).into_response();
     rep.headers_mut()
         .insert("access-control-allow-origin", HeaderValue::from_static("*"));
     Ok(rep)

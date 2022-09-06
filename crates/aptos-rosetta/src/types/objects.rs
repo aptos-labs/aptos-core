@@ -282,7 +282,7 @@ impl Operation {
         operator: AccountAddress,
     ) -> Operation {
         Operation::new(
-            OperationType::Withdraw,
+            OperationType::SetOperator,
             operation_index,
             status,
             address,
@@ -319,9 +319,9 @@ impl std::cmp::Ord for Operation {
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    sender: Option<AccountIdentifier>,
+    pub sender: Option<AccountIdentifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    operator: Option<AccountIdentifier>,
+    pub operator: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -412,7 +412,7 @@ pub struct SigningPayload {
     /// Hex encoded string of payload bytes to be signed
     pub hex_bytes: String,
     /// Signature type to sign with
-    pub signature_type: SignatureType,
+    pub signature_type: Option<SignatureType>,
 }
 
 /// A representation of a transaction by it's underlying operations (write set changes)
@@ -427,10 +427,12 @@ pub struct Transaction {
     pub metadata: TransactionMetadata,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionMetadata {
     pub transaction_type: TransactionType,
     pub version: U64,
+    pub failed: bool,
+    pub vm_status: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -526,6 +528,8 @@ impl Transaction {
             metadata: TransactionMetadata {
                 transaction_type: txn_type,
                 version: txn_info.version,
+                failed: !txn_info.success,
+                vm_status: txn_info.vm_status,
             },
         })
     }
@@ -665,8 +669,7 @@ fn parse_operations_from_write_set(
                 }
             }
         } else if data.typ == stake_pool_tag {
-            // Account sequence number increase (possibly creation)
-            // Find out if it's the 0th sequence number (creation)
+            // Find set operator events
             for (id, value) in data.data.0.iter() {
                 if id.0 == set_operator_events_field_identifier() {
                     serde_json::from_value::<EventId>(value.clone()).unwrap();
@@ -986,8 +989,6 @@ pub struct CoinEvent {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetOperatorEvent {
-    _pool_address: Address,
-    _old_operator: Address,
     new_operator: Address,
 }
 

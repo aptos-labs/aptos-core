@@ -62,6 +62,15 @@ pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counts the total number of progress checks called
+pub static PROGRESS_CHECK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_progress_check",
+        "Total number of progress checks in main loop"
+    )
+    .unwrap()
+});
+
 //////////////////////
 // PROPOSAL ELECTION
 //////////////////////
@@ -329,6 +338,16 @@ pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_block_retrieval_channel_msgs_count",
         "Counters(queued,dequeued,dropped) related to block retrieval channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to block retrieval task
+pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_block_retrieval_task_msgs_count",
+        "Counters(queued,dequeued,dropped) related to block retrieval task",
         &["state"]
     )
     .unwrap()
