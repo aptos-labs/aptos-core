@@ -143,7 +143,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                         "We were able to pull the same transaction (version: {}) \
                                     from both your node and the baseline node. Great! This \
                                     implies that your node is keeping up with other nodes \
-                                    in the network.",
+                                    in the network and returning valid transaction data.",
                                         latest_shared_version,
                                     ),
                                 )

@@ -1,16 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::evaluator::EvaluationResult;
 use crate::{
     evaluators::{
         direct::{
             get_node_identity, HandshakeEvaluatorArgs, LatencyEvaluatorArgs,
-            NodeIdentityEvaluatorArgs, TpsEvaluatorArgs, TransactionAvailabilityEvaluatorArgs,
+            NodeIdentityEvaluatorArgs, StateSyncVersionEvaluatorArgs, TpsEvaluatorArgs,
+            TransactionAvailabilityEvaluatorArgs,
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
             ConsensusTimeoutsEvaluatorArgs, NetworkMinimumPeersEvaluatorArgs,
-            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionEvaluatorArgs,
+            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionMetricsEvaluatorArgs,
         },
         system_information::{BuildVersionEvaluatorArgs, HardwareEvaluatorArgs},
     },
@@ -19,7 +21,7 @@ use crate::{
 use anyhow::{bail, format_err, Context, Result};
 use aptos_config::config::RoleType;
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
-use aptos_rest_client::Client as AptosRestClient;
+use aptos_rest_client::{Client as AptosRestClient, IndexResponse};
 use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use clap::Parser;
 use once_cell::sync::Lazy;
@@ -166,6 +168,9 @@ pub struct EvaluatorArgs {
     pub state_sync_version_args: StateSyncVersionEvaluatorArgs,
 
     #[clap(flatten)]
+    pub state_sync_version_metrics_args: StateSyncVersionMetricsEvaluatorArgs,
+
+    #[clap(flatten)]
     #[oai(skip)]
     pub tps_args: TpsEvaluatorArgs,
 
@@ -279,6 +284,31 @@ impl NodeAddress {
 
         // Build a network address, including the public key and protocol.
         Ok(NetworkAddress::from(socket_addr).append_prod_protos(public_key, 0))
+    }
+
+    pub async fn get_index_response(&self, timeout: Duration) -> Result<IndexResponse> {
+        Ok(self.get_api_client(timeout).get_index().await?.into_inner())
+    }
+
+    pub async fn get_index_response_or_evaluation_result(
+        &self,
+        timeout: Duration,
+    ) -> Result<IndexResponse, EvaluationResult> {
+        match self.get_index_response(timeout).await {
+            Ok(index_response) => Ok(index_response),
+            Err(error) => Err(EvaluationResult {
+                headline: "Failed to read response from / on API".to_string(),
+                score: 0,
+                explanation: format!(
+                    "We received an error response hitting / (the index) of the API of \
+                    your node, make sure your API port ({}) is publicly accessible: {}.",
+                    self.api_port, error
+                ),
+                category: "api".to_string(),
+                evaluator_name: "index_response".to_string(),
+                links: vec![],
+            }),
+        }
     }
 }
 
