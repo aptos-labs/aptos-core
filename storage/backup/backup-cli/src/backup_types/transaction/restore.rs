@@ -222,6 +222,7 @@ impl TransactionRestoreBatchController {
             .await?;
 
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+            AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;
