@@ -474,13 +474,13 @@ class SystemTime(Time):
 
 
 class FakeTime(Time):
-    _now: datetime = datetime.fromtimestamp(1659078000, timezone.utc)
+    _now: int = 1659078000
 
     def now(self) -> datetime:
-        return self._now
+        return datetime.fromtimestamp(self._now, timezone.utc)
 
     def epoch(self) -> str:
-        return "1659078000"
+        return str(self._now)
 
 
 @dataclass
