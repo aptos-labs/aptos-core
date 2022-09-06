@@ -184,7 +184,7 @@ fn main() -> Result<()> {
     }
 
     let duration = Duration::from_secs(1800);
-    let suite_name = "changing_working_quorum_test";
+    let suite_name = "different_node_speed_and_reliability_test";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
