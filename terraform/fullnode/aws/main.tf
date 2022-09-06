@@ -95,13 +95,6 @@ resource "helm_release" "pfn" {
           }
         }
       }
-      aws = {
-        region       = var.region
-        cluster_name = data.aws_eks_cluster.aptos.name
-        vpc_id       = module.eks.vpc_id
-        role_arn     = aws_iam_role.k8s-aws-integrations.arn
-        zone_name    = var.zone_id != "" ? data.aws_route53_zone.pfn[0].name : null
-      }
     }),
     jsonencode(var.pfn_helm_values),
   ]
