@@ -17,17 +17,19 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
-use aptos_jellyfish_merkle::{
-    restore::StateSnapshotRestore, NodeBatch, StateSnapshotProgress, StateValueBatch,
-    StateValueWriter, TreeWriter,
-};
+use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
     waypoint::Waypoint,
 };
-use aptosdb::{backup::restore_handler::RestoreHandler, AptosDB, GetRestoreHandler};
+use aptosdb::state_restore::StateSnapshotProgress;
+use aptosdb::{
+    backup::restore_handler::RestoreHandler,
+    state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
+    AptosDB, GetRestoreHandler,
+};
 use std::{
     collections::HashMap,
     convert::TryFrom,

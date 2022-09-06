@@ -25,10 +25,11 @@ use aptos_data_client::{
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
-use aptos_types::proof::SparseMerkleRangeProof;
-use aptos_types::state_store::state_value::StateValueChunkWithProof;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
-use claim::{assert_err, assert_ge, assert_matches, assert_none, assert_ok};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, proof::SparseMerkleRangeProof,
+    state_store::state_value::StateValueChunkWithProof, transaction::Version,
+};
+use claims::{assert_err, assert_ge, assert_matches, assert_none, assert_ok};
 use futures::{FutureExt, StreamExt};
 use std::{sync::Arc, time::Duration};
 use storage_service_types::responses::CompleteDataRange;

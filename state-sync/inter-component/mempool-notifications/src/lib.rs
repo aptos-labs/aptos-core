@@ -224,7 +224,7 @@ mod tests {
         },
         write_set::WriteSetMut,
     };
-    use claim::{assert_matches, assert_ok};
+    use claims::{assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use tokio::runtime::{Builder, Runtime};
 
@@ -391,6 +391,10 @@ mod tests {
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread().enable_all().build().unwrap()
+        Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .enable_all()
+            .build()
+            .unwrap()
     }
 }

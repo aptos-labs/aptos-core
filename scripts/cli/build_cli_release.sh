@@ -4,7 +4,6 @@
 
 ###########################################
 # Build and package a release for the CLI #
-#                                         #
 ###########################################
 
 # Note: This must be run from the root of the aptos-core repository

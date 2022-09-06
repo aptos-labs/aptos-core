@@ -58,5 +58,5 @@ variable "chain_id" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode"
-  default     = "s-8vcpu-16gb"
+  default     = "s-16vcpu-32gb"
 }

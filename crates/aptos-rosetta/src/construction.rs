@@ -623,7 +623,7 @@ async fn construction_payloads(
     let payload = SigningPayload {
         account_identifier: AccountIdentifier::from(sender),
         hex_bytes: signing_message,
-        signature_type: SignatureType::Ed25519,
+        signature_type: Some(SignatureType::Ed25519),
     };
 
     // Transaction is both the unsigned transaction and the payload

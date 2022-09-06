@@ -92,7 +92,7 @@ spec:
         imagePullPolicy: {{ .Values.genesis.image.pullPolicy }}
         workingDir: /tmp
         command:
-        - sh
+        - bash
         - -c
         - |-
           set -e

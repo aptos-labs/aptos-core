@@ -48,12 +48,10 @@ on:
       FORGE_ENABLE_FAILPOINTS:
         required: false
         type: string
-        default: false
         description: Whether to use failpoints images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
       FORGE_ENABLE_PERFORMANCE:
         required: false
         type: string
-        default: false
         description: Whether to use performance images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
 
 env:
@@ -61,7 +59,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
-  IMAGE_TAG: ${{ inputs.IMAGE_TAG || inputs.GIT_SHA }}
+  IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
   FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}

@@ -92,9 +92,13 @@ provider "kubernetes" {
   token                  = module.validator.aws_eks_cluster_auth_token
 }
 
+locals {
+  genesis_helm_chart_path = "${path.module}/../helm/genesis"
+}
+
 resource "helm_release" "genesis" {
   name        = "genesis"
-  chart       = "${path.module}/../helm/genesis"
+  chart       = local.genesis_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -122,4 +126,9 @@ resource "helm_release" "genesis" {
     }),
     jsonencode(var.genesis_helm_values)
   ]
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.genesis_helm_chart_path, "**") : filesha1("${local.genesis_helm_chart_path}/${f}")]))
+  }
 }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
+ActiveRecord::Schema[7.0].define(version: 2022_09_03_154019) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -298,25 +298,6 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
     t.datetime "notified_at", comment: "The time at which a notification was sent for this network operation."
   end
 
-  create_table "nft_offers", force: :cascade do |t|
-    t.string "name", null: false
-    t.datetime "valid_from"
-    t.datetime "valid_until"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["name"], name: "index_nft_offers_on_name", unique: true
-  end
-
-  create_table "nfts", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.bigint "nft_offer_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "explorer_url"
-    t.index ["nft_offer_id"], name: "index_nfts_on_nft_offer_id"
-    t.index ["user_id"], name: "index_nfts_on_user_id"
-  end
-
   create_table "notification_preferences", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.integer "delivery_method", default: 0, null: false
@@ -418,6 +399,19 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  create_table "wallets", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "network", null: false, comment: "The network that the account exists on (e.g. 'ait3')."
+    t.string "wallet_name", null: false, comment: "The name of the wallet (e.g. 'petra')."
+    t.string "public_key", null: false, comment: "The public key of the account."
+    t.string "address", null: false, comment: "The account address."
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["public_key", "network"], name: "index_wallets_on_public_key_and_network", unique: true
+    t.index ["user_id"], name: "index_wallets_on_user_id"
+    t.check_constraint "public_key::text ~ '^0x[0-9a-f]{64}$'::text"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "it1_profiles", "users"
@@ -425,12 +419,11 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_31_174120) do
   add_foreign_key "it2_surveys", "users"
   add_foreign_key "it3_profiles", "users"
   add_foreign_key "it3_surveys", "users"
-  add_foreign_key "nfts", "nft_offers"
-  add_foreign_key "nfts", "users"
   add_foreign_key "notification_preferences", "users"
   add_foreign_key "project_categories", "categories"
   add_foreign_key "project_categories", "projects"
   add_foreign_key "project_members", "projects"
   add_foreign_key "project_members", "users"
   add_foreign_key "projects", "users"
+  add_foreign_key "wallets", "users"
 end

@@ -10,6 +10,8 @@ declare global {
     Stimulus: Application;
     aptos?: {
       connect: () => Promise<{address: string, publicKey: string}>;
+      signAndSubmitTransaction: (transaction: {}) => Promise<Record<string, unknown>>;
+      signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
     }
   }
 }

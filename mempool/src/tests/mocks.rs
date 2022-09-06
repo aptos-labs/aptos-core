@@ -50,6 +50,7 @@ impl MockSharedMempool {
     pub fn new() -> Self {
         let runtime = Builder::new_multi_thread()
             .thread_name("mock-shared-mem")
+            .disable_lifo_slot()
             .enable_all()
             .build()
             .expect("[mock shared mempool] failed to create runtime");

@@ -29,7 +29,7 @@ rand = { version = "0.7.3", default-features = false }
 serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
 thiserror = "1.0.31"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.21.0", features = ["full"] }
 
 aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
@@ -58,7 +58,7 @@ short-hex-str = { path = "../crates/short-hex-str" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
-claim = "0.5.0"
+claims = "0.7"
 proptest = "1.0.0"
 tempfile = "3.3.0"
 

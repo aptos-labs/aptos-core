@@ -45,6 +45,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
+use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
@@ -54,7 +55,6 @@ use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
         ident_str,
-        language_storage::ModuleId,
         transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
     },
@@ -409,10 +409,15 @@ impl AptosVM {
         session: &mut SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
         modules: &[CompiledModule],
+        exists: BTreeSet<ModuleId>,
         senders: &[AccountAddress],
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
         for module in modules {
+            if exists.contains(&module.self_id()) {
+                // Call initializer only on first publish.
+                continue;
+            }
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
@@ -490,6 +495,7 @@ impl AptosVM {
             &mut session,
             gas_meter,
             &self.deserialize_module_bundle(modules)?,
+            BTreeSet::new(),
             &[txn_data.sender()],
         )?;
 
@@ -525,6 +531,15 @@ impl AptosVM {
             // Validate the module bundle
             self.validate_publish_request(&modules, expected_modules)?;
 
+            // Check what modules exist before publishing.
+            let mut exists = BTreeSet::new();
+            for m in &modules {
+                let id = m.self_id();
+                if session.get_data_store().exists_module(&id)? {
+                    exists.insert(id);
+                }
+            }
+
             // Publish the bundle
             if check_compat {
                 session.publish_module_bundle(bundle.into_inner(), destination, gas_meter)?
@@ -537,7 +552,7 @@ impl AptosVM {
             }
 
             // Execute initializers
-            self.execute_module_initialization(session, gas_meter, &modules, &[destination])
+            self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
         } else {
             Ok(())
         }

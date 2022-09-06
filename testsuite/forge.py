@@ -484,6 +484,7 @@ class ForgeContext:
     time: Time
 
     # forge criteria
+    forge_enable_failpoints: bool
     forge_test_suite: str
     forge_runner_duration_secs: str
 
@@ -492,6 +493,8 @@ class ForgeContext:
     reuse_args: Sequence[str]
     keep_args: Sequence[str]
     haproxy_args: Sequence[str]
+    num_validators_args: Sequence[str]
+    num_validator_fullnodes_args: Sequence[str]
 
     # aws related options
     aws_account_num: str
@@ -813,33 +816,43 @@ class LocalForgeRunner(ForgeRunner):
             resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
         )
         port_forward_process = context.processes.spawn(prometheus_port_forward)
+
+        # Build features list
+        if context.forge_enable_failpoints:
+            features_args = ["--features", "failpoints"]
+        else:
+            features_args = []
+
+        cmd = [
+            "cargo",
+            "run",
+            *features_args,
+            "-p",
+            "forge-cli",
+            "--",
+            "--suite",
+            context.forge_test_suite,
+            *context.num_validators_args,
+            *context.num_validator_fullnodes_args,
+            "--duration-secs",
+            context.forge_runner_duration_secs,
+            "test",
+            "k8s-swarm",
+            "--image-tag",
+            context.image_tag,
+            "--upgrade-image-tag",
+            context.upgrade_image_tag,
+            "--namespace",
+            context.forge_namespace,
+            "--port-forward",
+            *context.reuse_args,
+            *context.keep_args,
+            *context.haproxy_args,
+        ]
+
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
-                [
-                    "cargo",
-                    "run",
-                    "-p",
-                    "forge-cli",
-                    "--",
-                    "--suite",
-                    context.forge_test_suite,
-                    "--mempool-backlog",
-                    "5000",
-                    "--duration-secs",
-                    context.forge_runner_duration_secs,
-                    "test",
-                    "k8s-swarm",
-                    "--image-tag",
-                    context.image_tag,
-                    "--upgrade-image-tag",
-                    context.upgrade_image_tag,
-                    "--namespace",
-                    context.forge_namespace,
-                    "--port-forward",
-                    *context.reuse_args,
-                    *context.keep_args,
-                    *context.haproxy_args,
-                ],
+                cmd,
                 stream_output=True,
             )
             forge_result.set_output(result.output.decode())
@@ -903,9 +916,17 @@ class K8sForgeRunner(ForgeRunner):
             AWS_ACCOUNT_NUM=context.aws_account_num,
             AWS_REGION=context.aws_region,
             FORGE_NAMESPACE=context.forge_namespace,
-            REUSE_ARGS=context.reuse_args if context.reuse_args else "",
-            KEEP_ARGS=context.keep_args if context.keep_args else "",
-            ENABLE_HAPROXY_ARGS=context.haproxy_args if context.haproxy_args else "",
+            REUSE_ARGS=" ".join(context.reuse_args) if context.reuse_args else "",
+            KEEP_ARGS=" ".join(context.keep_args) if context.keep_args else "",
+            ENABLE_HAPROXY_ARGS=" ".join(context.haproxy_args)
+            if context.haproxy_args
+            else "",
+            NUM_VALIDATORS_ARGS=" ".join(context.num_validators_args)
+            if context.num_validators_args
+            else "",
+            NUM_VALIDATOR_FULLNODES_ARGS=" ".join(context.num_validator_fullnodes_args)
+            if context.num_validator_fullnodes_args
+            else "",
             FORGE_TRIGGERED_BY=forge_triggered_by,
         )
 
@@ -1080,6 +1101,23 @@ class Git:
             yield self.run(["rev-parse", f"HEAD~{i}"]).unwrap().decode().strip()
 
 
+def assert_provided_image_tags_has_profile_or_features(
+    forge_image_tag,
+    image_tag,
+    enable_failpoints_feature: bool = False,
+    enable_performance_profile: bool = False,
+):
+    for tag in [forge_image_tag, image_tag]:
+        if enable_failpoints_feature:
+            assert tag.startswith(
+                "failpoints"
+            ), f"Missing failpoints_ feature prefix in {tag}"
+        if enable_performance_profile:
+            assert tag.startswith(
+                "performance"
+            ), f"Missing performance_ profile prefix in {tag}"
+
+
 def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
@@ -1179,6 +1217,9 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
+# these override the args in forge-cli
+@envoption("FORGE_NUM_VALIDATORS")
+@envoption("FORGE_NUM_VALIDATOR_FULLNODES")
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
@@ -1213,6 +1254,8 @@ def test(
     aws_auth_script: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
+    forge_num_validators: int,
+    forge_num_validator_fullnodes: int,
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
     forge_enable_failpoints: Optional[str],
@@ -1294,6 +1337,17 @@ def test(
 
     assert forge_namespace is not None, "Forge namespace is required"
 
+    # These features and profile flags are set as strings
+    forge_enable_failpoints = forge_enable_failpoints == "true"
+    forge_enable_performance = forge_enable_performance == "true"
+
+    assert_provided_image_tags_has_profile_or_features(
+        image_tag,
+        forge_image_tag,
+        enable_failpoints_feature=forge_enable_failpoints,
+        enable_performance_profile=forge_enable_performance,
+    )
+
     if forge_test_suite == "compat":
         # Compat uses 2 image tags
         default_latest_image, second_latest_image = list(
@@ -1339,11 +1393,21 @@ def test(
         filesystem=filesystem,
         processes=processes,
         time=time,
+        forge_enable_failpoints=forge_enable_failpoints,
         forge_test_suite=forge_test_suite,
         forge_runner_duration_secs=forge_runner_duration_secs,
         reuse_args=["--reuse"] if forge_namespace_reuse else [],
         keep_args=["--keep"] if forge_namespace_keep else [],
         haproxy_args=["--enable-haproxy"] if forge_enable_haproxy else [],
+        num_validators_args=["--num-validators", forge_num_validators]
+        if forge_num_validators
+        else [],
+        num_validator_fullnodes_args=[
+            "--num-validator-fullnodes",
+            forge_num_validator_fullnodes,
+        ]
+        if forge_num_validator_fullnodes
+        else [],
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         forge_image_tag=forge_image_tag,

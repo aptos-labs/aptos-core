@@ -10,8 +10,8 @@
 //!
 
 use crate::schema::DB_METADATA_CF_NAME;
+use crate::state_restore::StateSnapshotProgress;
 use anyhow::Result;
-use aptos_jellyfish_merkle::StateSnapshotProgress;
 use aptos_types::transaction::Version;
 use schemadb::{
     define_schema,

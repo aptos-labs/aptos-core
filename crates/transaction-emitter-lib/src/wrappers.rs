@@ -37,8 +37,6 @@ pub async fn emit_transactions_with_cluster(
     let client = cluster.random_instance().rest_client();
     let mut root_account = cluster.load_aptos_root_account(&client).await?;
     let mut emitter = TxnEmitter::new(
-        &mut root_account,
-        client,
         TransactionFactory::new(cluster.chain_id)
             .with_gas_unit_price(1)
             .with_transaction_expiration_time(args.txn_expiration_time_secs),
@@ -72,6 +70,7 @@ pub async fn emit_transactions_with_cluster(
     }
     let stats = emitter
         .emit_txn_for_with_stats(
+            &mut root_account,
             emit_job_request,
             duration,
             min(10, max(args.duration / 5, 1)),

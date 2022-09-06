@@ -27,6 +27,7 @@ from .forge import (
     SystemContext,
     assert_aws_token_expiration,
     find_recent_images_by_profile_or_features,
+    assert_provided_image_tags_has_profile_or_features,
     format_comment,
     format_pre_comment,
     format_report,
@@ -178,11 +179,14 @@ def fake_context(
         filesystem=filesystem if filesystem else FakeFilesystem(),
         processes=processes if processes else FakeProcesses(),
         time=time if time else FakeTime(),
+        forge_enable_failpoints=False,
         forge_test_suite="banana",
         forge_runner_duration_secs="123",
         reuse_args=[],
         keep_args=[],
         haproxy_args=[],
+        num_validators_args=[],
+        num_validator_fullnodes_args=[],
         aws_account_num="123",
         aws_region="banana-east-1",
         forge_image_tag="forge_asdf",
@@ -202,7 +206,7 @@ class ForgeRunnerTests(unittest.TestCase):
             OrderedDict(
                 [
                     (
-                        "cargo run -p forge-cli -- --suite banana --mempool-backlog 5000 --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward",
+                        "cargo run -p forge-cli -- --suite banana --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward",
                         RunResult(0, b"orange"),
                     ),
                     ("kubectl get pods -n potato", RunResult(0, b"Pods")),
@@ -373,6 +377,14 @@ class TestFindRecentImage(unittest.TestCase):
                 find_recent_images_by_profile_or_features(
                     shell, git, 1, commit_threshold=1
                 )
+            )
+
+    def testFailpointsProvidedImageTag(self) -> None:
+        with self.assertRaises(AssertionError):
+            assert_provided_image_tags_has_profile_or_features(
+                "potato_tomato",
+                "failpoints_performance_potato",
+                enable_failpoints_feature=True,
             )
 
 

@@ -103,8 +103,6 @@ module aptos_framework::block {
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
     ) acquires BlockResource {
-        timestamp::assert_operating();
-
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
 

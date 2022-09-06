@@ -9,15 +9,15 @@ use aptos_config::{
 };
 use aptos_crypto::HashValue;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{TransactionListWithProof, Version},
     PeerId,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
-use claim::{assert_err, assert_matches, assert_none};
+use claims::{assert_err, assert_matches, assert_none};
 use futures::StreamExt;
 use maplit::hashmap;
 use netcore::transport::ConnectionOrigin;
@@ -30,15 +30,17 @@ use network::{
 use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
-use storage_service_types::requests::{
-    DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StorageServiceRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+use storage_service_types::{
+    requests::{
+        DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StorageServiceRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, StorageServerSummary,
+        StorageServiceResponse, OPTIMISTIC_FETCH_VERSION_DELTA,
+    },
+    StorageServiceError, StorageServiceMessage,
 };
-use storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, StorageServerSummary,
-    StorageServiceResponse, OPTIMISTIC_FETCH_VERSION_DELTA,
-};
-use storage_service_types::{StorageServiceError, StorageServiceMessage};
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
     LedgerInfoWithSignatures::new(

@@ -4,8 +4,7 @@
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
-            PrivateKeyInputOptions, ProfileOptions, RngArgs, SaveFile,
+            CliError, CliTypedResult, EncodingOptions, EncodingType, KeyType, RngArgs, SaveFile,
         },
         utils::{append_file_extension, check_if_file_exists, write_to_file},
     },
@@ -13,6 +12,7 @@ use crate::{
 };
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{ed25519, x25519, PrivateKey, ValidCryptoMaterial};
+use aptos_genesis::config::HostAndPort;
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -44,19 +44,27 @@ impl KeyTool {
 
 /// CLI tool for extracting full peer information for an upstream peer
 ///
-/// A `private-key` or `public-key` can be given encoded on the command line, or
-/// a `private-key-file` or a `public-key-file` can be given to read from.
-/// The `output_file` will be a YAML serialized peer information for use in network config.
+/// This command builds a YAML blob that can be copied into a user's network configuration.
+/// A host is required to build the network address used for the connection, and the
+/// network key is required to identify the peer.
+///
+/// A `private-network-key` or `public-network-key` can be given encoded on the command line, or
+/// a `private-network-key-file` or a `public-network-key-file` can be given to read from.
+/// The `output-file` will be a YAML serialized peer information for use in network config.
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
+    /// Host and port of the full node
+    ///
+    /// e.g. 127.0.0.1:6180 or my-awesome-dns.com:6180
+    #[clap(long)]
+    pub(crate) host: HostAndPort,
+
     #[clap(flatten)]
-    pub(crate) private_key_input_options: PrivateKeyInputOptions,
+    pub(crate) network_key_input_options: NetworkKeyInputOptions,
     #[clap(flatten)]
     pub(crate) output_file_options: SaveFile,
     #[clap(flatten)]
     pub(crate) encoding_options: EncodingOptions,
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -66,21 +74,24 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
     }
 
     async fn execute(self) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
+        // Load key based on public or private
+        let public_key = self
+            .network_key_input_options
+            .extract_public_network_key(self.encoding_options.encoding)?;
+
         // Check output file exists
         self.output_file_options.check_file()?;
-
-        // Load key based on public or private
-        let public_key = self.private_key_input_options.extract_x25519_public_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
 
         // Build peer info
         let peer_id = from_identity_public_key(public_key);
         let mut public_keys = HashSet::new();
         public_keys.insert(public_key);
 
-        let peer = Peer::new(Vec::new(), public_keys, PeerRole::Upstream);
+        let address = self.host.as_network_address(public_key).map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to build network address: {}", err))
+        })?;
+
+        let peer = Peer::new(vec![address], public_keys, PeerRole::Upstream);
 
         let mut map = HashMap::new();
         map.insert(peer_id, peer);
@@ -91,6 +102,56 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
         self.output_file_options
             .save_to_file("Extracted peer", yaml.as_bytes())?;
         Ok(map)
+    }
+}
+
+#[derive(Debug, Default, Parser)]
+pub struct NetworkKeyInputOptions {
+    /// x25519 Private key input file name
+    #[clap(long, group = "network_key_input", parse(from_os_str))]
+    private_network_key_file: Option<PathBuf>,
+
+    /// x25519 Private key encoded in a type as shown in `encoding`
+    #[clap(long, group = "network_key_input")]
+    private_network_key: Option<String>,
+
+    /// x25519 Public key input file name
+    #[clap(long, group = "network_key_input", parse(from_os_str))]
+    public_network_key_file: Option<PathBuf>,
+
+    /// x25519 Public key encoded in a type as shown in `encoding`
+    #[clap(long, group = "network_key_input")]
+    public_network_key: Option<String>,
+}
+
+impl NetworkKeyInputOptions {
+    pub fn from_private_key_file(file: PathBuf) -> Self {
+        Self {
+            private_network_key_file: Some(file),
+            private_network_key: None,
+            public_network_key_file: None,
+            public_network_key: None,
+        }
+    }
+
+    pub fn extract_public_network_key(
+        self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<x25519::PublicKey> {
+        // The grouping above prevents there from being more than one, but just in case
+        match (self.public_network_key,  self.public_network_key_file, self.private_network_key, self.private_network_key_file){
+            (Some(public_network_key), None, None, None) => encoding.decode_key("--public-network-key", public_network_key.as_bytes().to_vec()),
+            (None, Some(public_network_key_file),None,  None) => encoding.load_key("--public-network-key-file", public_network_key_file.as_path()),
+            (None, None, Some(private_network_key),  None) => {
+                let private_network_key: x25519::PrivateKey = encoding.decode_key("--private-network-key", private_network_key.as_bytes().to_vec())?;
+                Ok(private_network_key.public_key())
+            },
+            (None, None, None, Some(private_network_key_file)) => {
+                let private_network_key: x25519::PrivateKey = encoding.load_key("--private-network-key-file", private_network_key_file.as_path())?;
+                Ok(private_network_key.public_key())
+            },
+            _ => Err(CliError::CommandArgumentError("Must provide exactly one of [--public-network-key, --public-network-key-file, --private-network-key, --private-network-key-file]".to_string()))
+        }
     }
 }
 

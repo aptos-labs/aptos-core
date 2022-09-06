@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::state_restore::StateSnapshotRestore;
 use crate::{
     backup::restore_utils, event_store::EventStore, ledger_store::LedgerStore,
     state_store::StateStore, transaction_store::TransactionStore, AptosDB,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
