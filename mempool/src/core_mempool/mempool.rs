@@ -92,9 +92,6 @@ impl Mempool {
                     .sequence_info
                     .account_sequence_number_type
                 {
-                    // In the CRSN case, we can only clear out transactions based on the LHS of the
-                    // window (i.e., min_nonce).
-                    x @ AccountSequenceInfo::CRSN { .. } => x,
                     AccountSequenceInfo::Sequential(_) => {
                         AccountSequenceInfo::Sequential(new_seq_number)
                     }
@@ -140,7 +137,6 @@ impl Mempool {
         );
         let cached_value = self.sequence_number_cache.get(&txn.sender());
         let sequence_number = match crsn_or_seqno {
-            AccountSequenceInfo::CRSN { .. } => crsn_or_seqno,
             AccountSequenceInfo::Sequential(_) => AccountSequenceInfo::Sequential(
                 cached_value.map_or(db_sequence_number, |value| max(*value, db_sequence_number)),
             ),
@@ -203,17 +199,13 @@ impl Mempool {
             if seen.contains(&TxnPointer::from(txn)) {
                 continue;
             }
-            let account_seqtype = txn.sequence_number.account_sequence_number_type;
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.sequence_number_cache.get(&txn.address);
             let seen_previous = tx_seq > 0 && seen.contains(&(txn.address, tx_seq - 1));
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus. In the case of CRSNs, we can safely
             // assume that it can be included.
-            if seen_previous
-                || account_sequence_number == Some(&tx_seq)
-                || matches!(account_seqtype, AccountSequenceInfo::CRSN { .. })
-            {
+            if seen_previous || account_sequence_number == Some(&tx_seq) {
                 let ptr = TxnPointer::from(txn);
                 seen.insert(ptr);
                 result.push(ptr);

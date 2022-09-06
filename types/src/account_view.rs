@@ -3,7 +3,7 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, CRSNResource, ChainIdResource, CoinStoreResource},
+    account_config::{AccountResource, ChainIdResource, CoinStoreResource},
     on_chain_config::{
         access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet, Version,
     },
@@ -55,10 +55,6 @@ pub trait AccountView {
 
     fn get_chain_id_resource(&self) -> anyhow::Result<Option<ChainIdResource>> {
         self.get_resource::<ChainIdResource>()
-    }
-
-    fn get_crsn_resource(&self) -> anyhow::Result<Option<CRSNResource>> {
-        self.get_resource::<CRSNResource>()
     }
 
     fn get_coin_store_resource(&self) -> anyhow::Result<Option<CoinStoreResource>> {

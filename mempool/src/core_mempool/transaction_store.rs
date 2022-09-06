@@ -333,22 +333,6 @@ impl TransactionStore {
             let mut min_seq = crsn_or_seqno.min_seq();
 
             match crsn_or_seqno {
-                AccountSequenceInfo::CRSN { min_nonce, size } => {
-                    for i in min_nonce..size {
-                        if let Some(txn) = txns.get_mut(&i) {
-                            self.priority_index.insert(txn);
-
-                            if txn.timeline_state == TimelineState::NotReady {
-                                self.timeline_index.insert(txn);
-                            }
-
-                            // Remove txn from parking lot after it has been promoted to
-                            // priority_index / timeline_index, i.e., txn status is ready.
-                            self.parking_lot_index.remove(txn);
-                            min_seq = i;
-                        }
-                    }
-                }
                 AccountSequenceInfo::Sequential(_) => {
                     while let Some(txn) = txns.get_mut(&min_seq) {
                         self.priority_index.insert(txn);
