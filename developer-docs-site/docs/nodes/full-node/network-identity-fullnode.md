@@ -47,11 +47,11 @@ Follow the below detailed steps:
     
     Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
 
-    ```
-    $ git clone https://github.com/aptos-labs/aptos-core.git
-    $ cd aptos-core
-    $ ./scripts/dev_setup.sh
-    $ source ~/.cargo/env
+    ```bash
+    git clone https://github.com/aptos-labs/aptos-core.git
+    cd aptos-core
+    ./scripts/dev_setup.sh
+    source ~/.cargo/env
     ```
 
     **Using Docker**
@@ -60,9 +60,9 @@ Follow the below detailed steps:
 
     `cd` into the directory for your local public FullNode and start a Docker container with the latest tools, for example:
 
-    ```
-    $ cd ~/my-full-node
-    $ docker run -it aptoslabs/tools:devnet /bin/bash
+    ```bash
+    cd ~/my-full-node
+    docker run -it aptoslabs/tools:devnet /bin/bash
     ```
 
 2. Generate the private key
@@ -71,24 +71,24 @@ Follow the below detailed steps:
   
   Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
 
-  :::note
+  :::tip
 
   The below command will also create a corresponding `private-key.txt.pub` file with the public identity key in it.
 
   :::
 
-  ```
+  ```bash
   aptos key generate --key-type x25519 --output-file /path/to/private-key.txt
 
   ```
 
   Example `private-key.txt` and the associated `private-key.txt.pub` files are shown below:
 
-  ```
-  $ cat ~/private-key.txt
+  ```bash
+  cat ~/private-key.txt
   C83110913CBE4583F820FABEB7514293624E46862FAE1FD339B923F0CACC647D%           
 
-  $ cat ~/private-key.txt.pub
+  cat ~/private-key.txt.pub
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813%
   ```
 
@@ -96,7 +96,7 @@ Follow the below detailed steps:
 
   Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
 
-  ```
+  ```bash
   aptos key generate \
       --key-type x25519 \
       --output-file /path/to/private-key.txt
@@ -106,29 +106,72 @@ Follow the below detailed steps:
   
   **Using Aptos-core source code**
 
-  ```
-  aptos key extract-peer  --private-key-file private-key.txt  \
+  :::tip Required: host information
+  Use the `--host` flag to provide the host information to output a network address for the fullnode. 
+  :::
+
+  ```bash
+  aptos key extract-peer --host example.com:6180 \
+      --public-network-key-file private-key.txt.pub \
       --output-file peer-info.yaml
   ```
+  which will produce the following output:
+  ```json
+  {
+    "Result": {
+      "B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813": {
+        "addresses": [
+          "/dns/example.com/tcp/6180/noise-ik/0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
+        ],
+        "keys": [
+          "0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
+        ],
+        "role": "Upstream"
+      }
+    }
+  }
+  ```
+  or
+  ```bash
+  aptos key extract-peer --host 1.1.1.1:6180 \
+      --public-network-key-file private-key.txt.pub \
+      --output-file peer-info.yaml
+  ```
+  which will produce the following output:
+  ```json
+  {
+    "Result": {
+      "B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813": {
+        "addresses": [
+          "/ip4/1.1.1.1/tcp/6180/noise-ik/0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
+        ],
+        "keys": [
+          "0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
+        ],
+        "role": "Upstream"
+      }
+    }
+  }
+  ```
 
-   **Using Docker**
+  **Using Docker**
 
-   From inside the `aptoslabs/tools` Docker container:
+  Run the same above commands to extract the peer from inside the `aptoslabs/tools` Docker container. For example:
 
-   ```
-   $ aptos key extract-peer \
-       --private-key-file /path/to/private-key.txt \
-       --output-file /path/to/peer-info.yaml
-   ```
+  ```bash
+  aptos key extract-peer --host 1.1.1.1:6180 \
+      --public-network-key-file /path/to/private-key.txt.pub \
+      --output-file /path/to/peer-info.yaml
+  ```
 
   This will create a YAML file that will have your `peer_id` corresponding to the `private-key.txt` you provided.
 
-  Example output `peer-info.yaml`:
+  Example output `peer-info.yaml` for the `--host example.com:6180` option:
 
-   ```
+   ```yaml
    ---
    B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
-     addresses: []
+     addresses: ["/dns/example.com/tcp/6180/noise-ik/0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"]
      keys:
        - "0xB881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813"
    role: Upstream
@@ -141,7 +184,7 @@ Follow the below detailed steps:
 
 After you generated the public identity key you can startup the FullNode with a static network identity by using the public key in the `peer_id` field of the configuration file `fullnode.yaml`:
 
-```
+```yaml
 full_node_networks:
 - network_id: "public"
   discovery_method: "onchain"
@@ -153,7 +196,7 @@ full_node_networks:
 
 In our example, you would specify the above-generated `peer_id` in place of the `<PEER_ID>`:
 
-```
+```yaml
 full_node_networks:
 - network_id: "public"
   discovery_method: "onchain"
@@ -172,7 +215,7 @@ See [Ports and port settings](/nodes/ait/node-requirements#networking-requiremen
 
 Once you start your FullNode with a static identity you can allow others to connect to devnet through your node.
 
-:::note
+:::tip
 
 In the below steps, the port numbers used are for illustration only. You can use your choice of port numbers.
 
@@ -185,7 +228,7 @@ In the below steps, the port numbers used are for illustration only. You can use
 
 Share your FullNode static network identity in the following format in the Discord channel `advertise-full-nodes`:
 
-  ```
+  ```yaml
   <Peer_ID>:
     addresses:
     # with DNS
@@ -200,7 +243,7 @@ Share your FullNode static network identity in the following format in the Disco
 
  For example:
 
-  ```
+  ```yaml
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
     addresses:
     - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
@@ -211,7 +254,7 @@ Share your FullNode static network identity in the following format in the Disco
     role: "Upstream"
   ```
 
-:::note
+:::tip
 
 Peer ID is synonymous with `AccountAddress`. See [NetworkAddress](https://github.com/aptos-labs/aptos-core/blob/main/documentation/specifications/network/network-address.md) to see how `addresses` key value is constructed.
 

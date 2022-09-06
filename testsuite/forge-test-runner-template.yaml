@@ -18,13 +18,7 @@ spec:
     - -c
     - |
       ulimit -n 1048576
-      forge \
-        --suite {FORGE_TEST_SUITE} \
-        --duration-secs {FORGE_RUNNER_DURATION_SECS} {NUM_VALIDATORS_ARGS} {NUM_VALIDATOR_FULLNODES_ARGS} \
-        test k8s-swarm \
-          --image-tag {IMAGE_TAG} \
-          --upgrade-image-tag {UPGRADE_IMAGE_TAG} \
-          --namespace {FORGE_NAMESPACE} {REUSE_ARGS} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
+      {FORGE_ARGS}
 
     env:
     - name: FORGE_TRIGGERED_BY
