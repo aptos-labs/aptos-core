@@ -20,6 +20,7 @@ locals {
     : "latest"
   )
   aws_tags = "Terraform=pfn,Workspace=${terraform.workspace}"
+  workspace_name = "${terraform.workspace}"
 }
 
 module "eks" {
@@ -34,6 +35,7 @@ module "eks" {
   utility_instance_type       = var.utility_instance_type
   fullnode_instance_type      = var.fullnode_instance_type
   num_fullnodes               = var.num_fullnodes
+  num_extra_instance          = var.num_extra_instance
 }
 
 data "aws_eks_cluster" "aptos" {
@@ -129,6 +131,28 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = "gp2"
+      }
+      backup = {
+        enable = count.index == 0 ? var.enable_backup : false
+        config = {
+          location = "s3"
+          s3 = {
+            bucket = aws_s3_bucket.backup.bucket
+          }
+        }
+        serviceAccount = {
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.backup.arn
+          }
+        }
+      }
+      restore = {
+        config = {
+          location = "s3"
+          s3 = {
+            bucket = aws_s3_bucket.backup.bucket
+          }
+        }
       }
     }),
     jsonencode(var.fullnode_helm_values),
