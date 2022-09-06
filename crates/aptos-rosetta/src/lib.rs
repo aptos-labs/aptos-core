@@ -15,7 +15,14 @@ use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{collections::BTreeMap, convert::Infallible, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    convert::Infallible,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use tokio::{sync::Mutex, task::JoinHandle};
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -76,7 +83,11 @@ pub fn bootstrap(
     rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name("rosetta")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("rosetta-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()

@@ -56,7 +56,7 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     thread,
@@ -155,7 +155,7 @@ impl AptosNodeArgs {
 
             // Start the node
             println!("Using node config {:?}", &config);
-            start(config, None).expect("Node should start correctly");
+            start(config, None, true).expect("Node should start correctly");
         };
     }
 }
@@ -173,8 +173,19 @@ pub struct AptosHandle {
 }
 
 /// Start an aptos node
-pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()> {
+pub fn start(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
     crash_handler::setup_panic_handler();
+
+    if create_global_rayon_pool {
+        rayon::ThreadPoolBuilder::new()
+            .thread_name(|index| format!("rayon-global-{}", index))
+            .build_global()
+            .expect("Failed to build rayon global thread _pool.");
+    }
 
     let mut logger = aptos_logger::Logger::new();
     logger
@@ -331,7 +342,7 @@ where
 
     println!("\nAptos is running, press ctrl-c to exit\n");
 
-    start(config, Some(log_file))
+    start(config, Some(log_file), false)
 }
 
 // Fetch chain ID from on-chain resource
@@ -424,7 +435,11 @@ fn setup_data_streaming_service(
 
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()
-        .thread_name("data-streaming-service")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stream-serv-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -449,7 +464,11 @@ fn setup_aptos_data_client(
 
     // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
-        .thread_name("aptos-data-client")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("data-client-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -476,7 +495,11 @@ fn setup_state_sync_storage_service(
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
     let storage_service_runtime = Builder::new_multi_thread()
-        .thread_name("storage-service-server")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stor-server-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -590,11 +613,20 @@ pub fn setup_environment(
 
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
     for network_config in network_configs.into_iter() {
-        debug!("Creating runtime for {}", network_config.network_id);
+        let network_id = network_config.network_id;
+        debug!("Creating runtime for {}", network_id);
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder
             .disable_lifo_slot()
-            .thread_name(format!("network-{}", network_config.network_id))
+            .thread_name_fn(move || {
+                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                format!(
+                    "network-{}-{}",
+                    network_id.as_str().chars().take(3).collect::<String>(),
+                    id
+                )
+            })
             .enable_all();
         if let Some(runtime_threads) = network_config.runtime_threads {
             runtime_builder.worker_threads(runtime_threads);

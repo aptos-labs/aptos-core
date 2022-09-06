@@ -6,7 +6,13 @@ mod handlers;
 use crate::handlers::get_routes;
 use aptos_logger::prelude::*;
 use aptosdb::AptosDB;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use tokio::runtime::{Builder, Runtime};
 
 pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
@@ -14,7 +20,11 @@ pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
     let routes = get_routes(backup_handler);
 
     let runtime = Builder::new_multi_thread()
-        .thread_name("backup")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("backup-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
