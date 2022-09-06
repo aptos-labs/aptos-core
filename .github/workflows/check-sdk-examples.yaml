@@ -1,0 +1,48 @@
+name: "Check SDK examples"
+on:
+  pull_request:
+  push:
+    branches:
+      - devnet
+
+jobs:
+  # Run the TS SDK examples. Note: There are small windows where these examples
+  # might be able to fail. For example, if we released a new devnet and SDK with
+  # an incompatible change, but haven't updated the examples to use the new SDK.
+  # That's why this is a separate job, because there are times when it could fail,
+  # whereas there is no reason why the test-sdk-confirm-client-generated-publish
+  # job should fail. These could also fail because we run them against devnet,
+  # whereas we run the test-sdk-confirm-client-generated-publish against a node
+  # built from the same commit and run as part of that CI job.
+  run-examples:
+    runs-on: ubuntu-latest
+    env:
+      APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com
+      APTOS_FAUCET_URL: https://faucet.devnet.aptoslabs.com
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm install -g yarn@1.22.19
+
+      # Run example code in typescript.
+      - uses: nick-fields/retry@v2
+        name: ts-example-test
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+
+      # Run example code in javascript.
+      - uses: nick-fields/retry@v2
+        name: js-example-test
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
