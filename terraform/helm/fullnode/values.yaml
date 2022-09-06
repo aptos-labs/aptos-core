@@ -5,8 +5,11 @@ chain:
 
 aptos_chains:
   devnet:
-    id: 25
-    waypoint: 0:b9ef40d9846bb0a2f0a56517f50392b8eaddeb5a607e6635d280c96d8e23ae2c
+    waypoint_txt_url: https://devnet.aptoslabs.com/waypoint.txt
+    genesis_blob_url: https://devnet.aptoslabs.com/genesis.blob
+  ait3:
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-ait3/main/genesis.blob
 
 # fullnode network config
 fullnode_identity:

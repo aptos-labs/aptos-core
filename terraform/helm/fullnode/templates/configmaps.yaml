@@ -6,18 +6,3 @@ metadata:
     {{- include "aptos-fullnode.labels" . | nindent 4 }}
 data:
 {{ (tpl (.Files.Glob "files/*.yaml").AsConfig .) | indent 2 }}
-
----
-
-{{- if not .Values.chain.genesisConfigmap }}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "aptos-fullnode.fullname" . }}-genesis
-  labels:
-    {{- include "aptos-fullnode.labels" . | nindent 4 }}
-data:
-  waypoint.txt: {{ (get .Values.aptos_chains .Values.chain.name).waypoint }}
-binaryData:
-  genesis.blob: {{ .Files.Get (print "files/genesis/" .Values.chain.name ".blob") | b64enc }}
-{{- end }}
