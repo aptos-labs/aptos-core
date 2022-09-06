@@ -42,7 +42,7 @@ enum OneShotCommand {
         about = "Query the backup service builtin in the local node."
     )]
     Query(OneShotQueryType),
-    #[clap(about = "Do a one shot backup.")]
+    #[clap(about = "Do a one shot backup of either of the backup types.")]
     Backup(OneShotBackupOpt),
 }
 
