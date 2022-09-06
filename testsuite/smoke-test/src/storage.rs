@@ -181,6 +181,8 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
             "local-fs",
             "--dir",
             backup_path.to_str().unwrap(),
+            "--ledger-history-start-version",
+            "0",
         ])
         .current_dir(workspace_root())
         .output()
