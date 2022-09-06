@@ -118,9 +118,9 @@ pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 
 pub struct ForgeConfig<'cfg> {
-    aptos_tests: &'cfg [&'cfg dyn AptosTest],
-    admin_tests: &'cfg [&'cfg dyn AdminTest],
-    network_tests: &'cfg [&'cfg dyn NetworkTest],
+    aptos_tests: Vec<&'cfg dyn AptosTest>,
+    admin_tests: Vec<&'cfg dyn AdminTest>,
+    network_tests: Vec<&'cfg dyn NetworkTest>,
 
     /// The initial number of validators to spawn when the test harness creates a swarm
     initial_validator_count: NonZeroUsize,
@@ -152,17 +152,17 @@ impl<'cfg> ForgeConfig<'cfg> {
         Self::default()
     }
 
-    pub fn with_aptos_tests(mut self, aptos_tests: &'cfg [&'cfg dyn AptosTest]) -> Self {
+    pub fn with_aptos_tests(mut self, aptos_tests: Vec<&'cfg dyn AptosTest>) -> Self {
         self.aptos_tests = aptos_tests;
         self
     }
 
-    pub fn with_admin_tests(mut self, admin_tests: &'cfg [&'cfg dyn AdminTest]) -> Self {
+    pub fn with_admin_tests(mut self, admin_tests: Vec<&'cfg dyn AdminTest>) -> Self {
         self.admin_tests = admin_tests;
         self
     }
 
-    pub fn with_network_tests(mut self, network_tests: &'cfg [&'cfg dyn NetworkTest]) -> Self {
+    pub fn with_network_tests(mut self, network_tests: Vec<&'cfg dyn NetworkTest>) -> Self {
         self.network_tests = network_tests;
         self
     }
@@ -224,7 +224,7 @@ impl<'cfg> ForgeConfig<'cfg> {
         self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
 
-    pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {
+    pub fn all_tests(&self) -> impl Iterator<Item = &'_ dyn Test> {
         self.admin_tests
             .iter()
             .map(|t| t as &dyn Test)
@@ -236,9 +236,9 @@ impl<'cfg> ForgeConfig<'cfg> {
 impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
         Self {
-            aptos_tests: &[],
-            admin_tests: &[],
-            network_tests: &[],
+            aptos_tests: vec![],
+            admin_tests: vec![],
+            network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
