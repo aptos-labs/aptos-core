@@ -35,6 +35,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::aptos_natives(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        true,
     )
 }
 
