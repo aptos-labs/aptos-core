@@ -128,7 +128,7 @@ pub struct GlobalRestoreOpt {
     pub rocksdb_opt: RocksdbOpt,
 
     #[clap(flatten)]
-    pub concurernt_downloads: ConcurrentDownloadsOpt,
+    pub concurrent_downloads: ConcurrentDownloadsOpt,
 
     #[clap(flatten)]
     pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
@@ -247,7 +247,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
 
     fn try_from(opt: GlobalRestoreOpt) -> Result<Self> {
         let target_version = opt.target_version.unwrap_or(Version::max_value());
-        let concurrent_downloads = opt.concurernt_downloads.get();
+        let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             let restore_handler = Arc::new(AptosDB::open(
@@ -310,7 +310,8 @@ pub struct ConcurrentDownloadsOpt {
     #[clap(
         long,
         help = "[Defaults to number of CPUs] \
-        number of concurrent downloads including metadata files from the backup storage."
+        number of concurrent downloads including metadata files from the backup storage. \
+        Speeds up accessing remote backup access."
     )]
     concurrent_downloads: Option<usize>,
 }
@@ -328,6 +329,7 @@ impl ConcurrentDownloadsOpt {
 
 #[derive(Clone, Copy, Default, Parser)]
 pub struct ReplayConcurrencyLevelOpt {
+    /// AptosVM::set_concurrency_level_once() is called with this
     #[clap(
         long,
         help = "[Defaults to number of CPUs] \
