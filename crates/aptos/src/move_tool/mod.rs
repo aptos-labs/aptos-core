@@ -800,7 +800,8 @@ impl FunctionArgType {
                     .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
             ),
             FunctionArgType::Raw => {
-                let raw = hex::decode(arg).map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
+                let raw = hex::decode(arg)
+                    .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
                 Ok(raw)
             }
         }
