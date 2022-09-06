@@ -855,6 +855,7 @@ impl Client {
                     serde_json::from_value::<NewBlockEventResponse>(event.data)
                         .map_err(|e| anyhow!(e))
                         .and_then(|e| {
+                            assert_eq!(e.height, sequence_number);
                             Ok(VersionedNewBlockEvent {
                                 event: NewBlockEvent::new(
                                     AccountAddress::from_hex_literal(&e.hash)
