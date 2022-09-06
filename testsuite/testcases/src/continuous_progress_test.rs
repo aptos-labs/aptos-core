@@ -65,6 +65,7 @@ impl NetworkLoadTest for ContinuousProgressTest {
                 Ok(())
             }),
             false,
+            true,
         ))?;
 
         Ok(())

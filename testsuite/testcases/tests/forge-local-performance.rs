@@ -11,7 +11,7 @@ fn main() -> Result<()> {
     let tests = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .with_initial_version(InitialVersion::Newest)
-        .with_network_tests(&[&PerformanceBenchmark, &NonZeroGasPrice]);
+        .with_network_tests(vec![&PerformanceBenchmark, &NonZeroGasPrice]);
 
     let options = Options::from_args();
     forge_main(tests, LocalFactory::from_workspace()?, &options)
