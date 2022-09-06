@@ -222,6 +222,15 @@ impl RestoreRunMode {
             }
         }
     }
+
+    pub fn get_in_progress_state_snapshot(&self) -> Result<Option<Version>> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.get_in_progress_state_snapshot_version()
+            }
+            RestoreRunMode::Verify => Ok(None),
+        }
+    }
 }
 
 #[derive(Clone)]
