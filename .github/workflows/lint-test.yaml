@@ -212,6 +212,8 @@ jobs:
             [[ $file =~ .*testsuite/.*.py ]] && echo "::set-output name=SHOULD_RUN::true" && echo "Running unittests"
           done
 
+          exit 0
+
         id: should-run-tests
 
       - uses: actions/setup-python@v4
