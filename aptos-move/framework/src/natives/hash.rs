@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::util::make_native_from_func;
+use crate::natives::make_native_from_func;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
