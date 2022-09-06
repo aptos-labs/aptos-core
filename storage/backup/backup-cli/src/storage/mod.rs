@@ -15,6 +15,7 @@ use crate::storage::{
 };
 use anyhow::{ensure, Result};
 use async_trait::async_trait;
+use clap::Parser;
 use once_cell::sync::Lazy;
 #[cfg(test)]
 use proptest::prelude::*;
@@ -22,7 +23,6 @@ use regex::Regex;
 #[cfg(test)]
 use std::convert::TryInto;
 use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// String returned by a specific storage implementation to identify a backup, probably a folder name
@@ -169,11 +169,11 @@ pub trait BackupStorage: Send + Sync {
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>>;
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub enum StorageOpt {
-    #[structopt(about = "Select the LocalFs backup store.")]
+    #[clap(about = "Select the LocalFs backup store.")]
     LocalFs(LocalFsOpt),
-    #[structopt(about = "Select the CommandAdapter backup store.")]
+    #[clap(about = "Select the CommandAdapter backup store.")]
     CommandAdapter(CommandAdapterOpt),
 }
 

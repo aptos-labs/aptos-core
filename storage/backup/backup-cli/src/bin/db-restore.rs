@@ -14,42 +14,42 @@ use backup_cli::{
     storage::StorageOpt,
     utils::{GlobalRestoreOpt, GlobalRestoreOptions},
 };
+use clap::Parser;
 use std::convert::TryInto;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     global: GlobalRestoreOpt,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     restore_type: RestoreType,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum RestoreType {
     EpochEnding {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: EpochEndingRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     StateSnapshot {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: StateSnapshotRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     Transaction {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: TransactionRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     Auto {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: RestoreCoordinatorOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
 }
