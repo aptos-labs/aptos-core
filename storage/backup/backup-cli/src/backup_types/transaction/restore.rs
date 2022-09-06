@@ -29,6 +29,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
+use clap::Parser;
 use executor::chunk_executor::ChunkExecutor;
 use executor_types::TransactionReplayer;
 use futures::{
@@ -46,16 +47,15 @@ use std::{
     time::Instant,
 };
 use storage_interface::DbReaderWriter;
-use structopt::StructOpt;
 use tokio::io::BufReader;
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct TransactionRestoreOpt {
-    #[structopt(long = "transaction-manifest")]
+    #[clap(long = "transaction-manifest")]
     pub manifest_handle: FileHandle,
-    #[structopt(
+    #[clap(
         long = "replay-transactions-from-version",
         help = "Transactions with this version and above will be replayed so state and events are \
         gonna pop up. Requires state at the version right before this to exist, either by \

@@ -13,17 +13,17 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct TransactionBackupOpt {
-    #[structopt(long = "start-version", help = "First transaction to backup.")]
+    #[clap(long = "start-version", help = "First transaction to backup.")]
     pub start_version: u64,
 
-    #[structopt(long = "num_transactions", help = "Number of transactions to backup")]
+    #[clap(long = "num_transactions", help = "Number of transactions to backup")]
     pub num_transactions: usize,
 }
 

@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use async_trait::async_trait;
+use clap::Parser;
 use futures::stream::poll_fn;
 use once_cell::sync::Lazy;
 use std::{
@@ -19,7 +20,6 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, read_dir, remove_file, OpenOptions},
     io::{AsyncRead, AsyncReadExt},
@@ -33,9 +33,9 @@ static TEMP_METADATA_CACHE_DIR: Lazy<TempPath> = Lazy::new(|| {
     dir
 });
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct MetadataCacheOpt {
-    #[structopt(
+    #[clap(
         long = "metadata-cache-dir",
         parse(from_os_str),
         help = "[Defaults to temporary dir] Metadata cache dir."
