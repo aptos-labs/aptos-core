@@ -20,13 +20,13 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use clap::Parser;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct CommandAdapterOpt {
-    #[structopt(
+    #[clap(
         long = "config",
         help = "Config file for the command adapter backup store."
     )]

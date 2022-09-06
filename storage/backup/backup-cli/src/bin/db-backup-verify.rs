@@ -10,17 +10,17 @@ use backup_cli::{
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, TrustedWaypointOpt},
 };
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     metadata_cache_opt: MetadataCacheOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     trusted_waypoints_opt: TrustedWaypointOpt,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     storage: StorageOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
 }
 
