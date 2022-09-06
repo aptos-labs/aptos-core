@@ -675,6 +675,13 @@ fn test_gc_ready_transaction() {
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline[0].sequence_number(), 0);
+
+    // Resubmit txn 1
+    add_txn(&mut pool, TestTransaction::new(1, 1, 1)).unwrap();
+
+    // Make sure txns 2 and 3 can be broadcast after txn 1 is resubmitted
+    let (timeline, _) = pool.read_timeline(0, 10);
+    assert_eq!(timeline.len(), 4);
 }
 
 #[test]

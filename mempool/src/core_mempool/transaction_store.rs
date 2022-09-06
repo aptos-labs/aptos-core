@@ -558,10 +558,11 @@ impl TransactionStore {
                         Bound::Excluded(next_key.sequence_number)
                     });
                 // mark all following txns as non-ready, i.e. park them
-                for (_, t) in txns.range((park_range_start, park_range_end)) {
+                for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
+                    t.timeline_state = TimelineState::NotReady;
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
                     let is_active = self.priority_index.contains(&txn);
