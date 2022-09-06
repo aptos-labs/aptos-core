@@ -97,8 +97,15 @@ jobs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
 
+  check-minimum-revision:
+    needs: [permission-check, determine-build-docker-metadata]
+    uses: ./.github/workflows/docker-rust-build.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+
   rust-images:
-    needs: [permission-check, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata, check-minimum-revision]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
@@ -107,7 +114,7 @@ jobs:
       PROFILE: release
 
   rust-images-testing:
-    needs: [permission-check, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata, check-minimum-revision]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
@@ -118,7 +125,7 @@ jobs:
       BUILD_TEST_IMAGES: true
 
   rust-images-performance:
-    needs: [permission-check, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata, check-minimum-revision]
     uses: ./.github/workflows/docker-rust-build.yaml
     secrets: inherit
     with:
@@ -141,7 +148,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
   forge-e2e-test:
-    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata]
+    needs: [rust-images, rust-images-testing, rust-images-performance, determine-docker-build-metadata, check-minimum-revision]
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -160,7 +167,7 @@ jobs:
       FORGE_NAMESPACE: forge-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
   community-platform:
-    needs: [permission-check]
+    needs: [permission-check, check-minimum-revision]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -187,7 +194,7 @@ jobs:
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl
 
   indexer-server:
-    needs: [permission-check]
+    needs: [permission-check, check-minimum-revision]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
