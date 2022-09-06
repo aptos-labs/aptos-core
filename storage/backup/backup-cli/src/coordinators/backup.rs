@@ -45,7 +45,7 @@ pub struct BackupCoordinatorOpt {
     #[clap(long, default_value = "100000")]
     pub transaction_batch_size: usize,
     #[clap(flatten)]
-    pub concurernt_downloads: ConcurrentDownloadsOpt,
+    pub concurrent_downloads: ConcurrentDownloadsOpt,
 }
 
 impl BackupCoordinatorOpt {
@@ -83,7 +83,7 @@ impl BackupCoordinator {
             metadata_cache_opt: opt.metadata_cache_opt,
             state_snapshot_interval_epochs: opt.state_snapshot_interval_epochs,
             transaction_batch_size: opt.transaction_batch_size,
-            concurrent_downloads: opt.concurernt_downloads.get(),
+            concurrent_downloads: opt.concurrent_downloads.get(),
         }
     }
 

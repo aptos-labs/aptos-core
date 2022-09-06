@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod command;
-mod config;
+pub mod config;
 
 #[cfg(test)]
 mod tests;
