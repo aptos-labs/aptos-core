@@ -168,6 +168,18 @@ module aptos_framework::staking_config {
         staking_config.voting_power_increase_limit = new_voting_power_increase_limit;
     }
 
+    /// Update whether validators are allowed to join/leave post genesis.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_allow_validator_set_change(
+        aptos_framework: &signer,
+        allow_validator_set_change: bool,
+    ) acquires StakingConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        staking_config.allow_validator_set_change = allow_validator_set_change;
+    }
+
     fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
         assert!(minimum_stake <= maximum_stake && maximum_stake > 0, error::invalid_argument(EINVALID_STAKE_RANGE));
     }

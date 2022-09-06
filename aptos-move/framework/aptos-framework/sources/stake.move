@@ -341,6 +341,28 @@ module aptos_framework::stake {
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
     }
 
+    public fun remove_validators(
+        aptos_framework: &signer,
+        validators: &vector<address>,
+    ) acquires ValidatorSet {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        let len = vector::length(validators);
+        let i = 0;
+
+        // Remove each validator from the validator set.
+        while (i < len) {
+            let validator = *vector::borrow(validators, i);
+            let validator_index = find_validator(&validator_set.active_validators, validator);
+            if (option::is_some(&validator_index)) {
+                vector::remove(&mut validator_set.active_validators, *option::borrow(&validator_index));
+            };
+
+            i = i + 1;
+        };
+    }
+
     /// Initialize validator set to the core resource account.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -2194,6 +2216,22 @@ module aptos_framework::stake {
             rewards_rate_denominator
         );
         assert!(rewards_amount == 31412778408000000, 0);
+    }
+
+    #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
+    public entry fun test_removing_validator_from_active_set(
+        aptos_framework: &signer,
+        validator_1: &signer,
+        validator_2: &signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator_1, 100, true, false);
+        initialize_test_validator(validator_2, 100, true, true);
+        assert!(vector::length(&borrow_global<ValidatorSet>(@aptos_framework).active_validators) == 2, 0);
+
+        // Remove validator 1 from the active validator set. Only validator 2 remains.
+        remove_validators(aptos_framework, &vector[signer::address_of(validator_1)]);
+        assert!(vector::length(&borrow_global<ValidatorSet>(@aptos_framework).active_validators) == 1, 0);
     }
 
     #[test_only]
