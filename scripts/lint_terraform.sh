@@ -48,11 +48,9 @@ done
 
 # Run tflint
 echo "##### tflint #####"
-tflint --init
 base_dir=$(pwd)
+tflint --init --config="${base_dir}/terraform/.tflint.hcl"
 for dir in ${tf_dirs[@]}; do
-    echo "Lintint $dir"
-    cd $dir
-    tflint --config "${base_dir}/.tflint.hcl"
-    cd $base_dir
+    echo "Linting $dir"
+    tflint --config="${base_dir}/terraform/.tflint.hcl" --var-file="${base_dir}/terraform/tflint.tfvars" $dir
 done
