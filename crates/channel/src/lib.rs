@@ -105,6 +105,7 @@ impl<T> Stream for Receiver<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let next = Pin::new(&mut self.inner).poll_next(cx);
         if let Poll::Ready(Some(_)) = next {
+            tokio::task::consume_budget().await;
             self.gauge.dec();
         }
         next

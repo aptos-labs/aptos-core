@@ -173,6 +173,7 @@ impl<K: Eq + Hash + Clone, M> Stream for Receiver<K, M> {
             if let Some(status_ch) = status_ch {
                 let _err = status_ch.send(ElementStatus::Dequeued);
             }
+            tokio::task::consume_budget().await;
             Poll::Ready(Some(val))
         // all senders have been dropped (and so the stream is terminated)
         } else if shared_state.num_senders == 0 {
