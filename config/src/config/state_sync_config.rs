@@ -106,7 +106,7 @@ impl Default for StorageServiceConfig {
         Self {
             max_concurrent_requests: 4000,
             max_epoch_chunk_size: 100,
-            max_lru_cache_size: 100,
+            max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
             max_state_chunk_size: 2000,
