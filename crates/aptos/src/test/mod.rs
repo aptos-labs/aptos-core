@@ -51,6 +51,9 @@ use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
+#[cfg(test)]
+mod tests;
+
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
 pub const FIRST_MOVE_FILE: &str = "
