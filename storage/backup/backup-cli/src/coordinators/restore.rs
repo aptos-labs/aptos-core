@@ -18,26 +18,26 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use clap::Parser;
 use std::sync::Arc;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct RestoreCoordinatorOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
-    #[structopt(
+    #[clap(
         long,
         help = "Replay all transactions, don't try to use a state snapshot."
     )]
     pub replay_all: bool,
-    #[structopt(
+    #[clap(
         long,
         help = "[default to only start ledger history after selected state snapshot] \
         Ignore restoring the ledger history (transactions and events) before this version \
         if possible, set 0 for full ledger history."
     )]
     pub ledger_history_start_version: Option<Version>,
-    #[structopt(long, help = "Skip restoring epoch ending info, used for debugging.")]
+    #[clap(long, help = "Skip restoring epoch ending info, used for debugging.")]
     pub skip_epoch_endings: bool,
 }
 

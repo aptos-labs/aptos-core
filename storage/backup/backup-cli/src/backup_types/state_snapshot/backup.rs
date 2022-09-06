@@ -20,15 +20,15 @@ use aptos_types::{
     transaction::Version,
 };
 use bytes::Bytes;
+use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Instant;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct StateSnapshotBackupOpt {
-    #[structopt(
+    #[clap(
         long = "state-snapshot-epoch",
         help = "Epoch at the end of which a state snapshot is to be taken."
     )]

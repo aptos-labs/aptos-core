@@ -14,29 +14,29 @@ use backup_cli::{
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, RocksdbOpt, TrustedWaypointOpt},
 };
+use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     metadata_cache_opt: MetadataCacheOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     trusted_waypoints_opt: TrustedWaypointOpt,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     storage: StorageOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
-    #[structopt(long = "target-db-dir", parse(from_os_str))]
+    #[clap(long = "target-db-dir", parse(from_os_str))]
     pub db_dir: PathBuf,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub rocksdb_opt: RocksdbOpt,
-    #[structopt(
+    #[clap(
         long,
         help = "[Defaults to 0] The first transaction version required to be replayed and verified."
     )]
     start_version: Option<Version>,
-    #[structopt(
+    #[clap(
         long,
         help = "[Defaults to the latest version available] The last transaction version required \
                 to be replayed and verified (if present in the backup)."

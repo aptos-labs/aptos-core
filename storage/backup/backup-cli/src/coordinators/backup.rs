@@ -22,29 +22,29 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use aptosdb::backup::backup_handler::DbState;
+use clap::Parser;
 use futures::{stream, Future, StreamExt};
 use std::{fmt::Debug, sync::Arc};
-use structopt::StructOpt;
 use tokio::{
     sync::watch,
     time::{interval, Duration},
 };
 use tokio_stream::wrappers::IntervalStream;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct BackupCoordinatorOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
     // Taking a state snapshot involves going through the entire state tree, should be taken
     // infrequently.
-    #[structopt(long, default_value = "24")]
+    #[clap(long, default_value = "24")]
     pub state_snapshot_interval_epochs: usize,
     // Assuming the network runs at 100 tps, it's 100 * 3600 = 360k transactions per hour, we don't
     // want the backups to lag behind too much. Defaulting to 100k here in case the network is way
     // slower than expected.
-    #[structopt(long, default_value = "100000")]
+    #[clap(long, default_value = "100000")]
     pub transaction_batch_size: usize,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub concurernt_downloads: ConcurrentDownloadsOpt,
 }
 
