@@ -7,7 +7,7 @@
 class NftOffer
   include ActiveModel::Model
 
-  attr_accessor :slug, :network, :module_address, :private_key
+  attr_accessor :slug, :network, :module_address, :private_key, :distinct_images
 
   # Constants for slugs
   APTOS_ZERO = 'aptos-zero'
@@ -19,7 +19,8 @@ class NftOffer
         slug: APTOS_ZERO,
         network: 'devnet',
         module_address: ENV.fetch('APTOS_ZERO_NFT_MODULE_ADDRESS'),
-        private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY')
+        private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY'),
+        distinct_images: true
       )
     else
       raise ActiveRecord::RecordNotFound

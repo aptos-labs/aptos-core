@@ -98,7 +98,8 @@ gem 'MailchimpTransactional'
 gem 'recaptcha', '~> 5.10'
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem 'image_processing'
+gem 'google-cloud-storage', require: false
+# gem 'image_processing'
 
 # UI components
 gem 'better_html'
