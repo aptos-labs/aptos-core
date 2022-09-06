@@ -484,6 +484,7 @@ class ForgeContext:
     time: Time
 
     # forge criteria
+    forge_enable_failpoints: bool
     forge_test_suite: str
     forge_runner_duration_secs: str
 
@@ -815,33 +816,43 @@ class LocalForgeRunner(ForgeRunner):
             resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
         )
         port_forward_process = context.processes.spawn(prometheus_port_forward)
+
+        # Build features list
+        if context.forge_enable_failpoints:
+            features_args = ["--features", "failpoints"]
+        else:
+            features_args = []
+
+        cmd = [
+            "cargo",
+            "run",
+            *features_args,
+            "-p",
+            "forge-cli",
+            "--",
+            "--suite",
+            context.forge_test_suite,
+            *context.num_validators_args,
+            *context.num_validator_fullnodes_args,
+            "--duration-secs",
+            context.forge_runner_duration_secs,
+            "test",
+            "k8s-swarm",
+            "--image-tag",
+            context.image_tag,
+            "--upgrade-image-tag",
+            context.upgrade_image_tag,
+            "--namespace",
+            context.forge_namespace,
+            "--port-forward",
+            *context.reuse_args,
+            *context.keep_args,
+            *context.haproxy_args,
+        ]
+
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
-                [
-                    "cargo",
-                    "run",
-                    "-p",
-                    "forge-cli",
-                    "--",
-                    "--suite",
-                    context.forge_test_suite,
-                    *context.num_validators_args,
-                    *context.num_validator_fullnodes_args,
-                    "--duration-secs",
-                    context.forge_runner_duration_secs,
-                    "test",
-                    "k8s-swarm",
-                    "--image-tag",
-                    context.image_tag,
-                    "--upgrade-image-tag",
-                    context.upgrade_image_tag,
-                    "--namespace",
-                    context.forge_namespace,
-                    "--port-forward",
-                    *context.reuse_args,
-                    *context.keep_args,
-                    *context.haproxy_args,
-                ],
+                cmd,
                 stream_output=True,
             )
             forge_result.set_output(result.output.decode())
@@ -1090,6 +1101,23 @@ class Git:
             yield self.run(["rev-parse", f"HEAD~{i}"]).unwrap().decode().strip()
 
 
+def assert_provided_image_tags_has_profile_or_features(
+    forge_image_tag,
+    image_tag,
+    enable_failpoints_feature: bool = False,
+    enable_performance_profile: bool = False,
+):
+    for tag in [forge_image_tag, image_tag]:
+        if enable_failpoints_feature:
+            assert tag.startswith(
+                "failpoints"
+            ), f"Missing failpoints_ feature prefix in {tag}"
+        if enable_performance_profile:
+            assert tag.startswith(
+                "performance"
+            ), f"Missing performance_ profile prefix in {tag}"
+
+
 def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
@@ -1313,6 +1341,13 @@ def test(
     forge_enable_failpoints = forge_enable_failpoints == "true"
     forge_enable_performance = forge_enable_performance == "true"
 
+    assert_provided_image_tags_has_profile_or_features(
+        image_tag,
+        forge_image_tag,
+        enable_failpoints_feature=forge_enable_failpoints,
+        enable_performance_profile=forge_enable_performance,
+    )
+
     if forge_test_suite == "compat":
         # Compat uses 2 image tags
         default_latest_image, second_latest_image = list(
@@ -1358,6 +1393,7 @@ def test(
         filesystem=filesystem,
         processes=processes,
         time=time,
+        forge_enable_failpoints=forge_enable_failpoints,
         forge_test_suite=forge_test_suite,
         forge_runner_duration_secs=forge_runner_duration_secs,
         reuse_args=["--reuse"] if forge_namespace_reuse else [],
