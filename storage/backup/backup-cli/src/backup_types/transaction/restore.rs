@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::OTHER_TIMERS_SECONDS;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
@@ -434,6 +435,9 @@ impl TransactionRestoreBatchController {
                 let (txns, txn_infos): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["replay_txn_chunk"])
+                        .start_timer();
                     tokio::task::spawn_blocking(move || chunk_replayer.replay(txns, txn_infos))
                         .err_into::<anyhow::Error>()
                         .await
@@ -446,6 +450,9 @@ impl TransactionRestoreBatchController {
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["commit_txn_chunk"])
+                        .start_timer();
                     tokio::task::spawn_blocking(move || {
                         let committed_chunk = chunk_replayer.commit()?;
                         let v = committed_chunk.result_view.version().unwrap_or(0);
