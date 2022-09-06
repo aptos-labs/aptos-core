@@ -131,6 +131,10 @@ module aptos_framework::aptos_coin {
         move_to(account, MintCapStore { mint_cap });
     }
 
+    public fun has_mint_capability(account: &signer): bool {
+        exists<MintCapStore>(signer::address_of(account))
+    }
+
     fun find_delegation(addr: address): Option<u64> acquires Delegations {
         let delegations = &borrow_global<Delegations>(@core_resources).inner;
         let i = 0;
