@@ -562,7 +562,9 @@ impl TransactionStore {
                     self.parking_lot_index.insert(t);
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
-                    t.timeline_state = TimelineState::NotReady;
+                    if let TimelineState::Ready(_) = t.timeline_state {
+                        t.timeline_state = TimelineState::NotReady;
+                    }
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
                     let is_active = self.priority_index.contains(&txn);
