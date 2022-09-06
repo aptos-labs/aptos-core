@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
+use anyhow::{anyhow, bail, Context, Result};
 use aptos_rest_client::Client as RestClient;
 use async_trait::async_trait;
+use chrono::Utc;
 use core::time;
 use futures::future::join_all;
+use itertools::Itertools;
 use std::time::Duration;
 use std::{collections::HashSet, time::Instant};
 
@@ -56,10 +58,14 @@ pub async fn test_consensus_fault_tolerance(
     mut failure_injection: Box<dyn FailureInjection>,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
     mut check_cycle: Box<
-        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> Result<()>,
     >,
     new_epoch_on_cycle: bool,
-) -> anyhow::Result<()> {
+    // Instead of failing on first check, we check the full run,
+    // and then fail if any checks failed during the run.
+    // Can allow us to better see if state would've gotten resolved by itself, etc.
+    raise_check_error_at_the_end: bool,
+) -> Result<()> {
     let validator_clients = swarm.get_validator_clients_with_names();
 
     async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
@@ -71,6 +77,8 @@ pub async fn test_consensus_fault_tolerance(
         )
         .await
     }
+
+    let mut errors = Vec::new();
 
     for cycle in 0..cycles {
         let previous = get_all_states(&validator_clients).await;
@@ -109,15 +117,31 @@ pub async fn test_consensus_fault_tolerance(
             transactions,
         );
         println!(
-            "All at versions: {:?}",
-            cur.iter().map(|s| s.version).collect::<Vec<_>>()
+            "All at epochs: {:?}, from {:?}",
+            cur.iter().map(|s| s.epoch).collect::<Vec<_>>(),
+            previous.iter().map(|s| s.epoch).collect::<Vec<_>>(),
         );
         println!(
-            "All at rounds: {:?}",
-            cur.iter().map(|s| s.round).collect::<Vec<_>>()
+            "All at rounds: {:?}, from {:?}",
+            cur.iter().map(|s| s.round).collect::<Vec<_>>(),
+            previous.iter().map(|s| s.round).collect::<Vec<_>>(),
+        );
+        println!(
+            "All at versions: {:?}, from {:?}",
+            cur.iter().map(|s| s.version).collect::<Vec<_>>(),
+            previous.iter().map(|s| s.version).collect::<Vec<_>>(),
         );
 
-        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous)?;
+        let check_result = check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous);
+        if raise_check_error_at_the_end {
+            if let Err(error) = check_result {
+                println!("Failed check {}", error);
+                errors.push((error, cycle, Utc::now()));
+            }
+        } else {
+            check_result?;
+        }
+
         if new_epoch_on_cycle {
             swarm.aptos_public_info().reconfig().await;
         }
@@ -142,7 +166,7 @@ pub async fn test_consensus_fault_tolerance(
             let mut txns =
                 v.1.get_transactions_bcs(Some(target_v.saturating_sub(1000)), Some(1000))
                     .await
-                    .map_err(|e| anyhow::anyhow!("{:?}", e))?
+                    .map_err(|e| anyhow!("{:?}", e))?
                     .into_inner();
             txns.retain(|t| t.version <= target_v);
             <anyhow::Result<Vec<_>>>::Ok(txns)
@@ -153,14 +177,14 @@ pub async fn test_consensus_fault_tolerance(
         .first()
         .unwrap()
         .as_ref()
-        .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+        .map_err(|e| anyhow!("{:?}", &e))?;
 
     for i in 1..transactions.len() {
         let txns_b = transactions
             .get(i)
             .unwrap()
             .as_ref()
-            .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+            .map_err(|e| anyhow!("{:?}", &e))?;
         assert_eq!(
             txns_a.len(),
             txns_b.len(),
@@ -180,6 +204,21 @@ pub async fn test_consensus_fault_tolerance(
         }
     }
 
+    if !errors.is_empty() {
+        bail!(
+            "There were {} check failures during the run: {}",
+            errors.len(),
+            errors
+                .iter()
+                .map(|(err, cycle, ts)| format!(
+                    "cycle {} at {}: {:?} ",
+                    cycle,
+                    ts.to_rfc3339(),
+                    err
+                ))
+                .join("\n")
+        );
+    }
     Ok(())
 }
 

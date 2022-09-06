@@ -13,11 +13,13 @@ edition = "2018"
 again = "0.1.2"
 anyhow = { version = "1.0.57", features = ["backtrace"] }
 async-trait = "0.1.53"
+chrono = "0.4.19"
 either = "1.6.1"
 futures = "0.3.21"
 hex = "0.4.3"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+itertools = "0.10.0"
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
 kube = "0.51.0"
 num_cpus = "1.13.1"
