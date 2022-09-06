@@ -33,7 +33,8 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::fmt::{Display, Formatter};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -62,6 +63,23 @@ pub enum ConsensusMsg {
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
+}
+
+impl Display for ConsensusMsg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
+            ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
+            ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::SyncInfo(_) => "SyncInfo",
+            ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
+            ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
+            ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
+        };
+        write!(f, "{}", str)
+    }
 }
 
 /// The interface from Network to Consensus layer.

@@ -314,6 +314,16 @@ pub static CONSENSUS_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters for received consensus messages broken down by type
+pub static CONSENSUS_RECEIVED_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_received_msgs_count",
+        "Counters for received consensus messages broken down by type",
+        &["type"]
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to consensus channel
 pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

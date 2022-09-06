@@ -282,6 +282,9 @@ impl NetworkTask {
         while let Some(message) = self.all_events.next().await {
             match message {
                 Event::Message(peer_id, msg) => {
+                    counters::CONSENSUS_RECEIVED_MSGS
+                        .with_label_values(&[&msg.to_string()])
+                        .inc();
                     if let Err(e) = self
                         .consensus_messages_tx
                         .push((peer_id, discriminant(&msg)), (peer_id, msg))
