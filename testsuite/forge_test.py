@@ -179,6 +179,7 @@ def fake_context(
         filesystem=filesystem if filesystem else FakeFilesystem(),
         processes=processes if processes else FakeProcesses(),
         time=time if time else FakeTime(),
+        forge_enable_failpoints=False,
         forge_test_suite="banana",
         forge_runner_duration_secs="123",
         reuse_args=[],
