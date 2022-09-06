@@ -1090,6 +1090,23 @@ class Git:
             yield self.run(["rev-parse", f"HEAD~{i}"]).unwrap().decode().strip()
 
 
+def assert_provided_image_tags_has_profile_or_features(
+    forge_image_tag,
+    image_tag,
+    enable_failpoints_feature: bool = False,
+    enable_performance_profile: bool = False,
+):
+    for tag in [forge_image_tag, image_tag]:
+        if enable_failpoints_feature:
+            assert tag.startswith(
+                "failpoints"
+            ), f"Missing failpoints_ feature prefix in {tag}"
+        if enable_performance_profile:
+            assert tag.startswith(
+                "performance"
+            ), f"Missing performance_ profile prefix in {tag}"
+
+
 def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
@@ -1312,6 +1329,13 @@ def test(
     # These features and profile flags are set as strings
     forge_enable_failpoints = forge_enable_failpoints == "true"
     forge_enable_performance = forge_enable_performance == "true"
+
+    assert_provided_image_tags_has_profile_or_features(
+        image_tag,
+        forge_image_tag,
+        enable_failpoints_feature=forge_enable_failpoints,
+        enable_performance_profile=forge_enable_performance,
+    )
 
     if forge_test_suite == "compat":
         # Compat uses 2 image tags
