@@ -265,6 +265,22 @@ resource "helm_release" "monitoring" {
   }
 }
 
+resource "helm_release" "node_exporter" {
+  count       = var.enable_node_exporter ? 1 : 0
+  name        = "prometheus-node-exporter"
+  repository  = "https://prometheus-community.github.io/helm-charts"
+  chart       = "prometheus-node-exporter"
+  version     = "4.0.0"
+  namespace   = "kube-system"
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({}),
+    jsonencode(var.node_exporter_helm_values),
+  ]
+}
+
 resource "kubernetes_cluster_role" "debug" {
   metadata {
     name = "debug"

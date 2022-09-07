@@ -131,3 +131,14 @@ variable "monitoring_helm_values" {
   type        = any
   default     = {}
 }
+
+variable "enable_node_exporter" {
+  description = "Enable Prometheus node exporter helm chart"
+  default     = false
+}
+
+variable "node_exporter_helm_values" {
+  description = "Map of values to pass to node exporter Helm"
+  type        = any
+  default     = {}
+}
