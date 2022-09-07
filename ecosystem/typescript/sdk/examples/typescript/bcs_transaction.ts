@@ -75,9 +75,9 @@ const {
     BigInt(sequenceNumber),
     entryFunctionPayload,
     // Max gas unit to spend
-    2000n,
+    BigInt(2000),
     // Gas price per unit
-    1n,
+    BigInt(1),
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
     BigInt(Math.floor(Date.now() / 1000) + 10),
     new ChainId(chainId),

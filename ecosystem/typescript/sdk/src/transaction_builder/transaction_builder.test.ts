@@ -71,10 +71,10 @@ test("serialize entry function payload with no type args", () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(new HexString(ADDRESS_3)),
-    0n,
+    BigInt(0),
     entryFunctionPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -100,10 +100,10 @@ test("serialize entry function payload with type args", () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     entryFunctionPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -124,10 +124,10 @@ test("serialize entry function payload with type args but no function args", () 
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     entryFunctionPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -146,10 +146,10 @@ test("serialize script payload with no type args and no function args", () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     scriptPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -170,10 +170,10 @@ test("serialize script payload with type args but no function args", () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     scriptPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -195,10 +195,10 @@ test("serialize script payload with type arg and function arg", () => {
   const scriptPayload = new TransactionPayloadScript(new Script(script, [token], [argU8]));
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     scriptPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -222,10 +222,10 @@ test("serialize script payload with one type arg and two function args", () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
-    0n,
+    BigInt(0),
     scriptPayload,
-    2000n,
-    0n,
+    BigInt(2000),
+    BigInt(0),
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
