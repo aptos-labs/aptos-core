@@ -33,8 +33,7 @@ import * as Gen from "../generated/index";
 
 export { TypeTagParser } from "./builder_utils.js";
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const { sha3_256 } = sha3;
+const { sha3_256: sha3Hash } = sha3;
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -70,7 +69,7 @@ export class TransactionBuilder<F extends SigningFn> {
 
   /** Generates a Signing Message out of a raw transaction. */
   static getSigningMessage(rawTxn: AnyRawTransaction): SigningMessage {
-    const hash = sha3_256.create();
+    const hash = sha3Hash.create();
     if (rawTxn instanceof RawTransaction) {
       hash.update(RAW_TRANSACTION_SALT);
     } else if (rawTxn instanceof MultiAgentRawTransaction) {

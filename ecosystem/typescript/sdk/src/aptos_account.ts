@@ -10,8 +10,7 @@ import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const { sha3_256 } = sha3;
+const { sha3_256: sha3Hash } = sha3;
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;

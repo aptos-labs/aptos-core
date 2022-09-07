@@ -24,8 +24,7 @@ import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const { sha3_256 } = sha3;
+const { sha3_256: sha3Hash } = sha3;
 
 export class RawTransaction {
   /**
@@ -531,7 +530,7 @@ export abstract class Transaction {
   abstract hash(): Bytes;
 
   getHashSalt(): Bytes {
-    const hash = sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update("APTOS::Transaction");
     return new Uint8Array(hash.arrayBuffer());
   }
@@ -553,7 +552,7 @@ export class UserTransaction extends Transaction {
   }
 
   hash(): Bytes {
-    const hash = sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update(this.getHashSalt());
     hash.update(bcsToBytes(this));
     return new Uint8Array(hash.arrayBuffer());
