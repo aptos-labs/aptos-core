@@ -5,11 +5,17 @@ module aptos_token::token_transfers {
     use std::error;
     use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, Token, TokenId};
+    use aptos_framework::account;
+    use aptos_framework::event::{Self, EventHandle};
+
 
     const ETOKEN_OFFER_NOT_EXIST: u64 = 1;
 
     struct TokenTransfers has key {
         pending_claims: Table<TokenOfferId, Token>,
+        offer_event: EventHandle<TokenOfferEvent>,
+        cancel_offer_event: EventHandle<TokenCancelOfferEvent>,
+        claim_event: EventHandle<TokenClaimEvent>,
     }
 
     struct TokenOfferId has copy, drop, store {
@@ -17,11 +23,30 @@ module aptos_token::token_transfers {
         token_id: TokenId,
     }
 
+    struct TokenOfferEvent has drop, store {
+        sender: address,
+        token_offer_id: TokenOfferId,
+        amount: u64,
+    }
+
+    struct TokenCancelOfferEvent has drop, store {
+        sender: address,
+        token_offer_id: TokenOfferId,
+    }
+
+    struct TokenClaimEvent has drop, store {
+        claimer: address,
+        token_offer_id: TokenOfferId,
+    }
+
     fun initialize_token_transfers(account: &signer) {
         move_to(
             account,
             TokenTransfers {
                 pending_claims: table::new<TokenOfferId, Token>(),
+                offer_event: account::new_event_handle<TokenOfferEvent>(account),
+                cancel_offer_event: account::new_event_handle<TokenCancelOfferEvent>(account),
+                claim_event: account::new_event_handle<TokenClaimEvent>(account),
             }
         )
     }
@@ -67,6 +92,15 @@ module aptos_token::token_transfers {
             let dst_token = table::borrow_mut(pending_claims, token_offer_id);
             token::merge(dst_token, token);
         };
+
+        event::emit_event<TokenOfferEvent>(
+            &mut borrow_global_mut<TokenTransfers>(sender_addr).offer_event,
+            TokenOfferEvent {
+                sender: sender_addr,
+                token_offer_id,
+                amount,
+            },
+        );
     }
 
     public entry fun claim_script(
@@ -92,6 +126,14 @@ module aptos_token::token_transfers {
         assert!(table::contains(pending_claims, token_offer_id), error::not_found(ETOKEN_OFFER_NOT_EXIST));
         let tokens = table::remove(pending_claims, token_offer_id);
         token::deposit_token(receiver, tokens);
+
+        event::emit_event<TokenClaimEvent>(
+            &mut borrow_global_mut<TokenTransfers>(sender).claim_event,
+            TokenClaimEvent {
+                claimer: signer::address_of(receiver),
+                token_offer_id,
+            },
+        );
     }
 
     public entry fun cancel_offer_script(
@@ -117,7 +159,15 @@ module aptos_token::token_transfers {
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
         let token = table::remove(pending_claims, token_offer_id);
-        token::deposit_token(sender, token)
+        token::deposit_token(sender, token);
+
+        event::emit_event<TokenCancelOfferEvent>(
+            &mut borrow_global_mut<TokenTransfers>(sender_addr).cancel_offer_event,
+            TokenCancelOfferEvent {
+                sender: sender_addr,
+                token_offer_id,
+            },
+        );
     }
 
     #[test(creator = @0x1, owner = @0x2)]
