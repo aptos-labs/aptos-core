@@ -18,7 +18,6 @@ proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 serde = "1.0.137"
 
-accumulator = { path = "../accumulator" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }

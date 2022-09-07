@@ -35,7 +35,6 @@ aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }
-aptos-keygen = { path = "../crates/aptos-keygen" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
 aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
