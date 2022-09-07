@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Controller } from "./controller";
+import type { Types } from "aptos";
 
 interface ClaimDetails {
   wallet_name: string;
@@ -16,6 +17,53 @@ const fromHexString = (hexString: string) =>
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
+  static values = {
+    address: String,
+    network: String,
+    apiUrl: String,
+    moduleAddress: String,
+  };
+
+  declare readonly addressValue: string;
+  declare readonly networkValue: string;
+  declare readonly apiUrlValue: string;
+  declare readonly moduleAddressValue: string;
+
+  get mintFunctionName() {
+    return this.moduleAddressValue.replace(/0x0+/, '0x') + '::claim_mint';
+  }
+
+  connect() {
+    this.redirectIfMinted();
+  }
+
+  async redirectIfMinted() {
+    const accountTransactionsUrl = [
+      this.apiUrlValue,
+      'accounts',
+      this.addressValue,
+      'transactions'
+    ].join('/');
+    const response = await fetch(accountTransactionsUrl);
+    const transactions: Types.OnChainTransaction[] = await response.json();
+    const mintTransaction = transactions.find((transaction) =>
+      transaction.success &&
+      'payload' in transaction &&
+      'function' in transaction.payload &&
+      transaction.payload.function === this.mintFunctionName);
+    if (mintTransaction) {
+      this.redirectToTransaction(mintTransaction);
+    }
+  }
+
+  redirectToTransaction(transaction: Types.Transaction) {
+    const url = new URL(location.href);
+    url.search = `?txn=${transaction.hash}`;
+
+    // @ts-ignore
+    Turbo.visit(url.toString());
+  }
+
   async handleClick(event: Event) {
     event.preventDefault();
 
@@ -47,7 +95,7 @@ export default class extends Controller<HTMLAnchorElement> {
     const signature = fromHexString(claimDetails.signature.substring(2));
     const transaction = {
       type: 'entry_function_payload',
-      function: claimDetails.module_address + '::claim_mint',
+      function: this.mintFunctionName,
       arguments: [
         claimDetails.message,
         signature,
@@ -58,9 +106,7 @@ export default class extends Controller<HTMLAnchorElement> {
     if (claimDetails.wallet_name === 'petra') {
       const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
       if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
-        // TODO: Do something more intelligent with the transaction.
-        window.open(`https://explorer.devnet.aptos.dev/txn/${pendingTransaction.hash}?network=testnet`);
-        return;
+        return this.redirectToTransaction(pendingTransaction);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.

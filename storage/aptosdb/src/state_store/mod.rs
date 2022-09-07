@@ -741,6 +741,8 @@ impl StateStore {
             if index.stale_since_version > end {
                 break;
             }
+            // Prune the stale state value index itself first.
+            db_batch.delete::<StaleStateValueIndexSchema>(&index)?;
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         for version in begin..end {
@@ -780,6 +782,9 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         node_batch: &StateValueBatch,
         progress: StateSnapshotProgress,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["state_value_writer_write_chunk"])
+            .start_timer();
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;
         batch.put::<DbMetadataSchema>(

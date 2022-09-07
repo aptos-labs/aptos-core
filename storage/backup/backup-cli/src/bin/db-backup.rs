@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use structopt::StructOpt;
+use clap::Parser;
 
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
@@ -23,104 +23,110 @@ use backup_cli::{
     },
 };
 
-#[derive(StructOpt)]
-#[structopt(about = "Ledger backup tool.")]
+#[derive(Parser)]
+#[clap(about = "Ledger backup tool.")]
 enum Command {
-    #[structopt(about = "Manually run one shot commands.")]
+    #[clap(subcommand, about = "Manually run one shot commands.")]
     OneShot(OneShotCommand),
-    #[structopt(about = "Long running process backing up the chain continuously.")]
+    #[clap(
+        subcommand,
+        about = "Long running process backing up the chain continuously."
+    )]
     Coordinator(CoordinatorCommand),
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum OneShotCommand {
-    #[structopt(about = "Query the backup service builtin in the local node.")]
+    #[clap(
+        subcommand,
+        about = "Query the backup service builtin in the local node."
+    )]
     Query(OneShotQueryType),
-    #[structopt(about = "Do a one shot backup.")]
+    #[clap(about = "Do a one shot backup of either of the backup types.")]
     Backup(OneShotBackupOpt),
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum OneShotQueryType {
-    #[structopt(
+    #[clap(
         about = "Queries the latest epoch, committed version and synced version of the local \
         node, via the backup service within it."
     )]
     NodeState(OneShotQueryNodeStateOpt),
-    #[structopt(
+    #[clap(
         about = "Queries the latest epoch and versions of the existing backups in the storage."
     )]
     BackupStorageState(OneShotQueryBackupStorageStateOpt),
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct OneShotQueryNodeStateOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     client: BackupServiceClientOpt,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct OneShotQueryBackupStorageStateOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     metadata_cache: MetadataCacheOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     storage: StorageOpt,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct OneShotBackupOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     global: GlobalBackupOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     client: BackupServiceClientOpt,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     backup_type: BackupType,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum BackupType {
     EpochEnding {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: EpochEndingBackupOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     StateSnapshot {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: StateSnapshotBackupOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     Transaction {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: TransactionBackupOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum CoordinatorCommand {
-    #[structopt(about = "Run the coordinator.")]
+    #[clap(about = "Run the coordinator.")]
     Run(CoordinatorRunOpt),
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct CoordinatorRunOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     global: GlobalBackupOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     client: BackupServiceClientOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     coordinator: BackupCoordinatorOpt,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     storage: StorageOpt,
 }
 

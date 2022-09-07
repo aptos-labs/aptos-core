@@ -14,6 +14,10 @@ class ClaimNftButtonComponent < ViewComponent::Base
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'claim-nft'
     @rest[:data][:action] = 'claim-nft#handleClick'
+    @rest[:data][:claim_nft_address_value] = @wallet.address
+    @rest[:data][:claim_nft_network_value] = @wallet.network
+    @rest[:data][:claim_nft_api_url_value] = @wallet.api_url
+    @rest[:data][:claim_nft_module_address_value] = @nft_offer.module_address
   end
 
   private

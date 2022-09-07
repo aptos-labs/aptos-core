@@ -5,6 +5,7 @@ import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
+import { Memoize } from "typescript-memoize";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
@@ -28,8 +29,6 @@ export class AptosAccount {
    * Address associated with the given account
    */
   private readonly accountAddress: HexString;
-
-  private authKeyCached?: HexString;
 
   static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
@@ -101,14 +100,12 @@ export class AptosAccount {
    * See here for more info: {@link https://aptos.dev/basics/basics-accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
+  @Memoize()
   authKey(): HexString {
-    if (!this.authKeyCached) {
-      const hash = SHA3.sha3_256.create();
-      hash.update(this.signingKey.publicKey);
-      hash.update("\x00");
-      this.authKeyCached = new HexString(hash.hex());
-    }
-    return this.authKeyCached;
+    const hash = SHA3.sha3_256.create();
+    hash.update(this.signingKey.publicKey);
+    hash.update("\x00");
+    return new HexString(hash.hex());
   }
 
   /**

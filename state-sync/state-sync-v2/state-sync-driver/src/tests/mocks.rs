@@ -139,20 +139,6 @@ mock! {
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> anyhow::Result<()>;
 
-        fn execute_and_commit_chunk<'a>(
-            &self,
-            txn_list_with_proof: TransactionListWithProof,
-            verified_target_li: &LedgerInfoWithSignatures,
-            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<ChunkCommitNotification>;
-
-        fn apply_and_commit_chunk<'a>(
-            &self,
-            txn_output_list_with_proof: TransactionOutputListWithProof,
-            verified_target_li: &LedgerInfoWithSignatures,
-            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<ChunkCommitNotification>;
-
         fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
         fn reset(&self) -> Result<()>;

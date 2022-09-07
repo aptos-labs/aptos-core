@@ -58,20 +58,6 @@ pub trait ChunkExecutorTrait: Send + Sync {
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
-    fn execute_and_commit_chunk(
-        &self,
-        txn_list_with_proof: TransactionListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification>;
-
-    fn apply_and_commit_chunk(
-        &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification>;
-
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
 
