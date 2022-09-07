@@ -1512,7 +1512,6 @@ dependencies = [
  "dashmap",
  "fail 0.5.0",
  "framework",
- "mirai-annotations",
  "move-deps",
  "mvhashmap",
  "num_cpus",
