@@ -90,10 +90,9 @@ jobs:
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
-        run: |
-          set +e
-
-          source testsuite/run_forge.sh
+        run: >
+          testsuite/run_forge.sh
+            --verbose
       - name: Post pre-Forge comment
         if: github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
