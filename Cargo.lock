@@ -4145,6 +4145,7 @@ dependencies = [
 name = "generate-format"
 version = "0.1.0"
 dependencies = [
+ "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
  "aptos-crypto-derive",
