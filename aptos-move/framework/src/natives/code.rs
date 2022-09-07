@@ -20,7 +20,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -155,6 +155,9 @@ pub struct PublishRequest {
     pub destination: AccountAddress,
     pub bundle: ModuleBundle,
     pub expected_modules: BTreeSet<String>,
+    /// Allowed module dependencies. Empty for no restrictions. An empty string in the set
+    /// allows all modules from that address.
+    pub allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     pub check_compat: bool,
 }
 
@@ -169,6 +172,17 @@ fn get_move_string(v: Value) -> PartialVMResult<String> {
     String::from_utf8(bytes).map_err(|_| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
 }
 
+/// Gets the fields of the `code::AllowedDep` helper structure.
+fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
+    let mut fields = v.value_as::<Struct>()?.unpack()?.collect::<Vec<_>>();
+    if fields.len() != 2 {
+        return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+    }
+    let module_name = get_move_string(fields.pop().unwrap())?;
+    let account = fields.pop().unwrap().value_as::<AccountAddress>()?;
+    Ok((account, module_name))
+}
+
 /***************************************************************************************************
  * native fun request_publish(
  *     destination: address,
@@ -177,6 +191,15 @@ fn get_move_string(v: Value) -> PartialVMResult<String> {
  *     policy: u8
  * )
  *
+ * _and_
+ *
+ *  native fun request_publish_with_allowed_deps(
+ *      owner: address,
+ *      expected_modules: vector<String>,
+ *      allowed_deps: vector<AllowedDep>,
+ *      bundle: vector<vector<u8>>,
+ *      policy: u8
+ *  );
  *   gas cost: base_cost + unit_cost * bytes_len
  *
  **************************************************************************************************/
@@ -192,13 +215,25 @@ fn native_request_publish(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    debug_assert_eq!(args.len(), 4);
+    debug_assert!(matches!(args.len(), 4 | 5));
+    let with_allowed_deps = args.len() == 5;
 
     let policy = pop_arg!(args, u8);
     let mut code = vec![];
     for module in pop_arg!(args, Vec<Value>) {
         code.push(module.value_as::<Vec<u8>>()?);
     }
+
+    let allowed_deps = if with_allowed_deps {
+        let mut allowed_deps: BTreeMap<AccountAddress, BTreeSet<String>> = BTreeMap::new();
+        for dep in pop_arg!(args, Vec<Value>) {
+            let (account, module_name) = unpack_allowed_dep(dep)?;
+            allowed_deps.entry(account).or_default().insert(module_name);
+        }
+        Some(allowed_deps)
+    } else {
+        None
+    };
 
     let mut expected_modules = BTreeSet::new();
     for name in pop_arg!(args, Vec<Value>) {
@@ -214,9 +249,29 @@ fn native_request_publish(
         + gas_params.per_byte
             * expected_modules.iter().fold(NumBytes::new(0), |acc, name| {
                 acc + NumBytes::new(name.len() as u64)
-            });
+            })
+        + gas_params.per_byte
+            * allowed_deps.clone().unwrap_or_default().iter().fold(
+                NumBytes::new(0),
+                |acc, (_, deps)| {
+                    acc + NumBytes::new(32)
+                        + deps.iter().fold(NumBytes::zero(), |inner_acc, name| {
+                            inner_acc + NumBytes::new(name.len() as u64)
+                        })
+                },
+            );
 
     let destination = pop_arg!(args, AccountAddress);
+
+    // Add own modules to allowed deps
+    let allowed_deps = allowed_deps.map(|mut allowed| {
+        allowed
+            .entry(destination)
+            .or_default()
+            .extend(expected_modules.clone().into_iter());
+        allowed
+    });
+
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();
     if code_context.requested_module_bundle.is_some() {
         // Can't request second time.
@@ -226,6 +281,7 @@ fn native_request_publish(
         destination,
         bundle: ModuleBundle::new(code),
         expected_modules,
+        allowed_deps,
         check_compat: policy == CHECK_COMPAT_POLICY,
     });
     // TODO(Gas): charge gas for requesting code load (charge for actual code loading done elsewhere)
@@ -248,10 +304,16 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "request_publish",
-        make_native_request_publish(gas_params.request_publish),
-    )];
+    let natives = [
+        (
+            "request_publish",
+            make_native_request_publish(gas_params.request_publish.clone()),
+        ),
+        (
+            "request_publish_with_allowed_deps",
+            make_native_request_publish(gas_params.request_publish),
+        ),
+    ];
 
     crate::natives::helpers::make_module_natives(natives)
 }
