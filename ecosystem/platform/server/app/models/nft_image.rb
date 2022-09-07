@@ -3,6 +3,30 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+class NftImageQueryHelper
+  def self._find_or_create(nft_offer, image_num)
+    loop do
+      if nft_offer.distinct_images
+        query = NftImage.where(slug: nft_offer.slug, image_number: image_num)
+      else
+        image_num = 1
+        query = NftImage.where(slug: nft_offer.slug)
+      end
+
+      is_new = false
+      img = query.first_or_create! do |image|
+        is_new = true
+        image.slug = nft_offer.slug
+        image.image_number = image_num
+      end
+
+      return img, is_new
+    rescue PG::UniqueViolation
+      # We retry on conflict!
+    end
+  end
+end
+
 class NftImage < ApplicationRecord
   has_one_attached :image
   default_scope { with_attached_image }
@@ -11,21 +35,10 @@ class NftImage < ApplicationRecord
     # Verify this is a valid slug
     nft_offer = NftOffer.find(slug)
     # Find or create the nft_image
-    if nft_offer.distinct_images
-      query = NftImage.where(slug:, image_number: image_num)
-    else
-      image_num = 1
-      query = NftImage.where(slug:)
-    end
+    img, is_new = NftImageQueryHelper._find_or_create(nft_offer, image_num)
 
-    is_new = false
-    img = query.first_or_create! do |image|
-      is_new = true
-      image.slug = slug
-      image.image_number = image_num
-    end
-
-    if is_new
+    image_file = nil
+    if (is_new || !img.image&.attached?) && !img.image&.reload&.attached?
       filename = if nft_offer.distinct_images
                    "#{nft_offer.network}__#{nft_offer.slug.underscore}__#{image_num}.png"
                  else
@@ -37,6 +50,16 @@ class NftImage < ApplicationRecord
     end
 
     img
+  ensure
+    # Clean up image_file if it exists
+    begin
+      if image_file.present?
+        image_file.close
+        image_file.unlink
+      end
+    rescue StandardError
+      # Ignored
+    end
   end
 
   # Returns a `TempFile` with the image contents
