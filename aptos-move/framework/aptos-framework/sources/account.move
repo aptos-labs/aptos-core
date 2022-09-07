@@ -223,11 +223,13 @@ module aptos_framework::account {
             let sig = ed25519::new_signature_from_bytes(signature);
             assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
             ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else {
+        } else if (scheme == MULTI_ED25519_SCHEME) {
             let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
             let sig = multi_ed25519::new_signature_from_bytes(signature);
             assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
             multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
         }
     }
 
@@ -249,8 +251,6 @@ module aptos_framework::account {
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        assert!((from_scheme == ED25519_SCHEME || from_scheme == MULTI_ED25519_SCHEME), EINVALID_SCHEME);
-        assert!((to_scheme == ED25519_SCHEME || to_scheme == MULTI_ED25519_SCHEME), EINVALID_SCHEME);
 
         let account_resource = borrow_global_mut<Account>(addr);
 
@@ -259,10 +259,12 @@ module aptos_framework::account {
             let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
             let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
             assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
-        } else {
+        } else if (from_scheme == MULTI_ED25519_SCHEME) {
             let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
             let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
             assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
         };
 
         let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
@@ -287,7 +289,7 @@ module aptos_framework::account {
             // assert that we're calling from the same account of the originating address
             // for example, if we have already rotated from keypair_a to keypair_b, and are trying to rotate from
             // keypair_b to keypair_c, we expect the call to come from the signer of address_a
-            assert!(addr == table::remove(address_map, curr_address), EINVALID_ORIGINATING_ADDRESS);
+            assert!(addr == table::remove(address_map, curr_address), error::not_found(EINVALID_ORIGINATING_ADDRESS));
         };
         table::add(address_map, new_address, addr);
 
