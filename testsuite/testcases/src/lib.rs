@@ -23,7 +23,7 @@ use forge::{
     TxnStats, Version,
 };
 use rand::SeedableRng;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Builder;
 
 async fn batch_update(
@@ -124,13 +124,17 @@ pub trait NetworkLoadTest: Test {
         std::thread::sleep(duration);
         Ok(())
     }
-    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
+    fn finish(&self, _swarm: &mut dyn Swarm, _start_time: u64, _end_time: u64) -> Result<()> {
         Ok(())
     }
 }
 
 impl NetworkTest for dyn NetworkLoadTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
         let duration = ctx.global_duration;
 
         let all_validators = ctx
@@ -177,9 +181,14 @@ impl NetworkTest for dyn NetworkLoadTest {
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
 
+        let end_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
         ctx.check_for_success(&txn_stat, &duration)?;
 
-        self.finish(ctx.swarm())?;
+        self.finish(ctx.swarm(), start_timestamp, end_timestamp)?;
 
         Ok(())
     }
