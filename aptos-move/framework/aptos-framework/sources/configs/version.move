@@ -1,4 +1,4 @@
-/// Maintains the version number for the blockchain.
+/// Maintains version numbers of the Aptos  blockchain.
 module aptos_framework::version {
     use std::error;
     use std::signer;
@@ -43,6 +43,21 @@ module aptos_framework::version {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
+    }
+
+    /// Gets the current version.
+    public fun current(): u64 acquires Version {
+        *&borrow_global<Version>(@aptos_framework).major
+    }
+
+    /// Returns the value of a currently rolled out version of the Aptos validator code. This
+    /// is used during native code rollout scenarios as follows: if
+    /// `version::current() < version::next()` then a rollout is in progress and has
+    /// not yet finished. In this case the Move code should behave downwards compatible to
+    /// `version::current()`. If `current() == next()` the rollout can be considered as finished.
+    public fun next(): u64 {
+        // TODO: determine the correct value before merging
+        5
     }
 
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,

@@ -16,6 +16,7 @@ itertools = "0.10.0"
 project-root = "0.2.2"
 proptest = "1.0.0"
 rand = "0.7.3"
+rstest = "0.15.0"
 serde = { version = "1.0.137", default-features = false }
 tempfile = "3.3.0"
 

@@ -1,10 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::assert_success;
 use crate::AptosPackageHooks;
+use anyhow::anyhow;
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
+use aptos_types::on_chain_config::Version;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -12,12 +15,14 @@ use aptos_types::{
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_packages::aptos_stdlib;
+use framework::natives::code::PackageMetadata;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_core_types::parser::parse_struct_tag;
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
@@ -58,6 +63,14 @@ impl MoveHarness {
             executor: FakeExecutor::from_fresh_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
+    }
+
+    pub fn new_at_version(major: u64) -> Self {
+        let mut h = Self::new();
+        if h.get_version().unwrap() != major {
+            h.set_version(major)
+        }
+        h
     }
 
     pub fn new_mainnet() -> Self {
@@ -192,18 +205,22 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
     pub fn create_publish_package(
         &mut self,
         account: &Account,
         path: &Path,
         options: Option<BuildOptions>,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
-        let metadata = package
+        let mut metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -215,7 +232,7 @@ impl MoveHarness {
 
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, None);
+        let txn = self.create_publish_package(account, path, None, |_| {});
         self.run(txn)
     }
 
@@ -226,7 +243,18 @@ impl MoveHarness {
         path: &Path,
         options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, Some(options));
+        let txn = self.create_publish_package(account, path, Some(options), |_| {});
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package, and alllows to patch the metadata
+    pub fn publish_package_with_patcher(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        metadata_patcher: impl FnMut(&mut PackageMetadata),
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None, metadata_patcher);
         self.run(txn)
     }
 
@@ -287,6 +315,27 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    /// Returns the version of the chain.
+    pub fn get_version(&self) -> anyhow::Result<u64> {
+        self.read_resource::<Version>(
+            &AccountAddress::ONE,
+            parse_struct_tag("0x1::version::Version")?,
+        )
+        .map(|v| v.major)
+        .ok_or_else(|| anyhow!("no version"))
+    }
+
+    /// Sets the version of the chain.
+    pub fn set_version(&mut self, major: u64) {
+        let acc = self.aptos_framework_account();
+        assert_success!(self.run_entry_function(
+            &acc,
+            str::parse("0x1::version::set_version").unwrap(),
+            vec![],
+            vec![bcs::to_bytes(&major).unwrap()],
+        ));
     }
 }
 
