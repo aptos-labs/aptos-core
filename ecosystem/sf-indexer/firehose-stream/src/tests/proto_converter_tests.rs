@@ -14,12 +14,13 @@ use aptos_protos::extractor::v1::{
     Transaction as TransactionPB,
 };
 
-use aptos_sdk::types::{account_config::aptos_test_root_address, LocalAccount};
+use aptos_sdk::types::LocalAccount;
 use move_deps::{
     move_core_types::{account_address::AccountAddress, value::MoveValue},
     move_package::BuildConfig,
 };
 use serde_json::{json, Value};
+use std::str::FromStr;
 use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -36,10 +37,8 @@ async fn test_genesis_works() {
     assert_eq!(txn.r#type(), TransactionType::Genesis);
     assert_eq!(txn.block_height, 0);
     if let TxnData::Genesis(txn) = txn.txn_data.unwrap() {
-        assert_eq!(
-            txn.events[0].key.clone().unwrap().account_address,
-            aptos_test_root_address().to_string()
-        );
+        AccountAddress::from_str(&txn.events[0].key.clone().unwrap().account_address)
+            .expect("Valid account address in event");
     }
 }
 
