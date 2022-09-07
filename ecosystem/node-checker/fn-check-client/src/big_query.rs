@@ -4,13 +4,14 @@
 use anyhow::{bail, Context, Result};
 use aptos_sdk::types::account_address::AccountAddress;
 use clap::Parser;
-use gcp_bigquery_client::error::BQError;
-use gcp_bigquery_client::model::dataset::Dataset;
-use gcp_bigquery_client::model::table::Table;
-use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
-use gcp_bigquery_client::model::table_field_schema::TableFieldSchema;
-use gcp_bigquery_client::model::table_schema::TableSchema;
-use gcp_bigquery_client::Client as BigQueryClient;
+use gcp_bigquery_client::{
+    error::BQError,
+    model::{
+        dataset::Dataset, table::Table, table_data_insert_all_request::TableDataInsertAllRequest,
+        table_field_schema::TableFieldSchema, table_schema::TableSchema,
+    },
+    Client as BigQueryClient,
+};
 use log::info;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -30,12 +31,16 @@ pub struct BigQueryArgs {
     pub gcp_project_id: String,
 
     /// BigQuery dataset ID.
-    #[clap(long, default_value = "ait3_vfn_nhc")]
+    #[clap(long, default_value = "ait3_vfn_pfn_nhc")]
     pub big_query_dataset_id: String,
 
     /// BigQuery table ID.
     #[clap(long, default_value = "nhc_response_data")]
     pub big_query_table_id: String,
+
+    /// If set, do not output to BigQuery.
+    #[clap(long)]
+    pub big_query_dry_run: bool,
 }
 
 // This struct formats the data into a format that BigQuery expects.
@@ -44,19 +49,21 @@ pub struct MyBigQueryRow {
     pub account_address: String,
     pub nhc_response_json: String,
     pub time_response_received: u64,
+    pub node_type: String,
 }
 
-impl TryFrom<(AccountAddress, SingleCheck)> for MyBigQueryRow {
+impl TryFrom<(AccountAddress, SingleCheck, &str)> for MyBigQueryRow {
     type Error = anyhow::Error;
 
     fn try_from(
-        (account_address, single_check): (AccountAddress, SingleCheck),
+        (account_address, single_check, node_type): (AccountAddress, SingleCheck, &str),
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             account_address: account_address.to_string(),
             nhc_response_json: serde_json::to_string(&single_check.result)
                 .context("Failed to encode result data as JSON")?,
             time_response_received: single_check.timestamp.as_secs(),
+            node_type: node_type.to_string(),
         })
     }
 }
@@ -93,6 +100,7 @@ fn make_required(mut table_field_schema: TableFieldSchema) -> TableFieldSchema {
 pub async fn write_to_big_query(
     big_query_args: &BigQueryArgs,
     nhc_responses: HashMap<AccountAddress, Vec<SingleCheck>>,
+    node_type: &str,
 ) -> Result<()> {
     let client = BigQueryClient::from_service_account_key_file(
         big_query_args
@@ -144,10 +152,11 @@ pub async fn write_to_big_query(
                         // TODO: Consider using a record instead to give it more structure.
                         make_required(TableFieldSchema::string("nhc_response_json")),
                         make_required(TableFieldSchema::timestamp("time_response_received")),
+                        make_required(TableFieldSchema::string("node_type")),
                     ]),
                 )
                 .friendly_name("NHC response data")
-                .description("NHC check responses from vfn-check-client for AIT3 VFN checks"),
+                .description("NHC check responses from fn-check-client for AIT3 FN checks"),
             )
             .await,
     )
@@ -161,7 +170,7 @@ pub async fn write_to_big_query(
         for single_check_result in check_results {
             insert_request.add_row(
                 None,
-                MyBigQueryRow::try_from((account_address, single_check_result))?,
+                MyBigQueryRow::try_from((account_address, single_check_result, node_type))?,
             )?;
         }
     }

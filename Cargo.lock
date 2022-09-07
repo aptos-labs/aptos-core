@@ -594,6 +594,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-fn-check-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-node-checker",
+ "aptos-sdk",
+ "clap 3.2.17",
+ "env_logger 0.9.0",
+ "futures",
+ "gcp-bigquery-client",
+ "log",
+ "reqwest",
+ "serde 1.0.144",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
@@ -1473,24 +1491,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "ureq",
-]
-
-[[package]]
-name = "aptos-vfn-check-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-node-checker",
- "aptos-sdk",
- "clap 3.2.17",
- "env_logger 0.9.0",
- "futures",
- "gcp-bigquery-client",
- "log",
- "reqwest",
- "serde 1.0.144",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
