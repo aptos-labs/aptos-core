@@ -164,10 +164,6 @@ impl AptosVMImpl {
             return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
         }
 
-        // Check is performed on `txn.raw_txn_bytes_len()` which is the same as
-        // `raw_bytes_len`
-        assume!(raw_bytes_len <= txn_gas_params.max_transaction_size_in_bytes);
-
         // The submitted max gas units that the transaction can consume is greater than the
         // maximum number of gas units bound that we have set for any
         // transaction.

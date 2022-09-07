@@ -100,8 +100,6 @@
 //!             +-----------------------------+
 //! ```
 
-#[macro_use]
-extern crate mirai_annotations;
 mod access_path_cache;
 #[macro_use]
 mod counters;

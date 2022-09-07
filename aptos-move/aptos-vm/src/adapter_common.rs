@@ -190,9 +190,6 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             should_restart = true;
         }
 
-        // `result` is initially empty, a single element is pushed per loop iteration and
-        // the number of iterations is bound to the max size of `signature_verified_block`
-        assume!(result.len() < usize::max_value());
         result.push((vm_status, output))
     }
     Ok(result)
