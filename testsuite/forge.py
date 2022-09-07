@@ -448,14 +448,22 @@ class ForgeResult:
     def set_debugging_output(self, output: str) -> None:
         self.debugging_output = output
 
-    def format(self) -> str:
-        output = "\n".join([
+    def format(self, context: ForgeContext) -> str:
+        dashboard_link = get_dashboard_link(
+            context.forge_cluster_name,
+            context.forge_namespace,
+            context.forge_chain_name,
+            (self.start_time, self.end_time),
+        )
+        output_lines = []
+        if not self.succeeded():
+            output_lines.append(self.debugging_output)
+        output_lines.extend([
             f"Forge output: {self.output}",
             f"Forge {self.state.value.lower()}ed",
+            f"Dashboard Link: {dashboard_link}",
         ])
-        if not self.succeeded():
-            output += "\n" + self.debugging_output
-        return output
+        return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
         return self.state == ForgeState.PASS
@@ -986,9 +994,10 @@ class ListClusterResult(TypedDict):
 
 def list_eks_clusters(shell: Shell) -> List[str]:
     cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
+    print("CLUSTER JSON", cluster_json)
     # This type annotation is not enforced, just helpful
     try:
-        cluster_result: ListClusterResult = json.loads(cluster_json)
+        cluster_result: ListClusterResult = json.loads(cluster_json.decode())
         return [
             cluster_name
             for cluster_name in cluster_result["clusters"]
@@ -1316,7 +1325,7 @@ def test(
     try:
         current_cluster = get_current_cluster_name(shell)
     except Exception as e:
-        print("Warning: failed to get current cluster name: {e}")
+        print(f"Warning: failed to get current cluster name: {e}")
 
     if not forge_cluster_name or balance_clusters:
         cluster_names = list_eks_clusters(shell)
@@ -1441,7 +1450,7 @@ def test(
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(context)
 
-        print(result.format())
+        print(result.format(context))
 
         outputs = []
         if forge_output:
@@ -1462,7 +1471,7 @@ def test(
             try:
                 set_current_cluster(shell, current_cluster)
             except Exception as ee:
-                print("Warning: failed to restore current cluster: {ee}")
+                print(f"Warning: failed to restore current cluster: {ee}")
                 print("Set cluster manually with aws eks update-kubeconfig --name {current_cluster}")
         raise Exception(
             "Forge state:\n" + dump_forge_state(shell, forge_namespace)
