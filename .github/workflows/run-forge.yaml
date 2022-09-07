@@ -69,6 +69,7 @@ env:
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
+  VERBOSE: true
 
 jobs:
   forge:
@@ -90,9 +91,7 @@ jobs:
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
-        run: >
-          testsuite/run_forge.sh
-            --verbose
+        run: testsuite/run_forge.sh
       - name: Post pre-Forge comment
         if: github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
@@ -106,11 +105,7 @@ jobs:
           PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
           PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
           PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
-        run: |
-          set +e
-
-          # source this script to run and get environment variables
-          source testsuite/run_forge.sh
+        run: testsuite/run_forge.sh
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
         if: github.event.number != null && !cancelled()
