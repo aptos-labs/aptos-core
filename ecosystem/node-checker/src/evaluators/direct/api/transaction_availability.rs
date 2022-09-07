@@ -34,6 +34,7 @@ impl TransactionAvailabilityEvaluator {
     async fn get_transaction_by_version(
         client: &AptosRestClient,
         version: u64,
+        node_name: &str,
     ) -> Result<TransactionData, ApiEvaluatorError> {
         Ok(client
             .get_transaction_by_version_bcs(version)
@@ -42,8 +43,8 @@ impl TransactionAvailabilityEvaluator {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
                     anyhow::Error::from(e).context(format!(
-                        "The node API failed to return the requested transaction at version: {}",
-                        version
+                        "The {} node API failed to return the requested transaction at version: {}",
+                        node_name, version
                     )),
                 )
             })?
@@ -123,13 +124,17 @@ impl Evaluator for TransactionAvailabilityEvaluator {
             .get_api_client(std::time::Duration::from_secs(4));
 
         let latest_baseline_transaction =
-            Self::get_transaction_by_version(&baseline_client, latest_shared_version).await?;
+            Self::get_transaction_by_version(&baseline_client, latest_shared_version, "baseline")
+                .await?;
+
         let latest_baseline_accumulator_root_hash =
             Self::unwrap_accumulator_root_hash(&latest_baseline_transaction)?;
 
         let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
         let evaluation =
-            match Self::get_transaction_by_version(&target_client, latest_shared_version).await {
+            match Self::get_transaction_by_version(&target_client, latest_shared_version, "target")
+                .await
+            {
                 Ok(latest_target_transaction) => {
                     match Self::unwrap_accumulator_root_hash(&latest_target_transaction) {
                         Ok(latest_target_accumulator_root_hash) => {
