@@ -392,8 +392,7 @@ class Test(unittest.TestCase):
         signature = raw_transaction.sign(private_key)
         self.assertTrue(raw_transaction.verify(public_key, signature))
 
-        authenticator = Authenticator(
-            Ed25519Authenticator(public_key, signature))
+        authenticator = Authenticator(Ed25519Authenticator(public_key, signature))
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
@@ -446,8 +445,7 @@ class Test(unittest.TestCase):
         )
 
         signature = raw_transaction_generated.sign(sender_private_key)
-        self.assertTrue(raw_transaction_generated.verify(
-            sender_public_key, signature))
+        self.assertTrue(raw_transaction_generated.verify(sender_public_key, signature))
 
         authenticator = Authenticator(
             Ed25519Authenticator(sender_public_key, signature)
@@ -522,15 +520,12 @@ class Test(unittest.TestCase):
         )
 
         sender_signature = raw_transaction_generated.sign(sender_private_key)
-        receiver_signature = raw_transaction_generated.sign(
-            receiver_private_key)
+        receiver_signature = raw_transaction_generated.sign(receiver_private_key)
         self.assertTrue(
-            raw_transaction_generated.verify(
-                sender_public_key, sender_signature)
+            raw_transaction_generated.verify(sender_public_key, sender_signature)
         )
         self.assertTrue(
-            raw_transaction_generated.verify(
-                receiver_public_key, receiver_signature)
+            raw_transaction_generated.verify(receiver_public_key, receiver_signature)
         )
 
         authenticator = Authenticator(
@@ -585,16 +580,14 @@ class Test(unittest.TestCase):
         signed_transaction_generated_bytes = ser.output().hex()
 
         # Verify the RawTransaction
-        self.assertEqual(raw_transaction_input,
-                         raw_transaction_generated_bytes)
+        self.assertEqual(raw_transaction_input, raw_transaction_generated_bytes)
         raw_transaction = RawTransaction.deserialize(
             Deserializer(bytes.fromhex(raw_transaction_input))
         )
         self.assertEqual(raw_transaction_generated, raw_transaction)
 
         # Verify the SignedTransaction
-        self.assertEqual(signed_transaction_input,
-                         signed_transaction_generated_bytes)
+        self.assertEqual(signed_transaction_input, signed_transaction_generated_bytes)
         signed_transaction = SignedTransaction.deserialize(
             Deserializer(bytes.fromhex(signed_transaction_input))
         )
