@@ -131,7 +131,7 @@ These configurations are not quite ready to be used as they are. You will need t
 To generate your own baseline configuration, you must first run the NHC service with `create` option. The below command shows how to create a baseline configuration YAML by running the NHC service using Docker:
 
 ```
-docker run -it aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker configuration create --url 'http://baseline-fullnode.aptoslabs.com' --configuration-name devnet_fullnode --configuration-name-pretty "Devnet Fullnode" --evaluators network_minimum_peers api_latency --api-port 80 > /etc/nhc/devnet_fullnode.yaml
+docker run -it aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker configuration create --url 'http://baseline-fullnode.aptoslabs.com' --configuration-name devnet_fullnode --configuration-name-pretty "Devnet fullnode" --evaluators network_minimum_peers api_latency --api-port 80 > /etc/nhc/devnet_fullnode.yaml
 ```
 
 The above command specifies the bare minimum for a baseline configuration. You can tune each evaluator as you see fit. See the fields `evaluators` and `evaluator_args` in the YAML. For more guidance on this, pass the `-h` flag to the above command to see all the flags you can work with.

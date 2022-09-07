@@ -11,7 +11,7 @@ slug: "glossary"
 
 ## Account
 
-- An **account** in the Aptos Blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
+- An **account** in the Aptos blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
 - The account is identified by an [account address](#account-address).
 
 ## Account Address
@@ -23,22 +23,22 @@ slug: "glossary"
 - AptosBFT is the Aptos protocol's BFT consensus algorithm.
 - AptosBFT is based on HotStuff.
 
-## Aptos Blockchain
+## Aptos blockchain
 
-- The **Aptos Blockchain** is a ledger of immutable transactions agreed upon by the validators on the Aptos network (the network of validators).
+- The **Aptos blockchain** is a ledger of immutable transactions agreed upon by the validators on the Aptos network (the network of validators).
 
 ## Aptos-core
 
 Aptos-core is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
 
-* the Aptos Blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
-* the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos Blockchain immutable ledger.
+* the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
+* the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
 
 ## Aptos Framework
 The Aptos Framework defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
 
 ## Aptos node
-An Aptos node is a peer entity of the Aptos network that tracks the state of the Aptos Blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
+An Aptos node is a peer entity of the Aptos network that tracks the state of the Aptos blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
 
 ## Aptos Protocol
 
@@ -68,7 +68,7 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 ## Byzantine Fault Tolerance (BFT)
 
 - **Byzantine Fault Tolerance** (BFT) is the ability of a distributed system to provide safety and liveness guarantees in the presence of faulty, or “[Byzantine](#byzantine-validator),” validators below a certain threshold.
-- The Aptos Blockchain uses AptosBFT, a consensus protocol based on [HotStuff.](#hotstuff)
+- The Aptos blockchain uses AptosBFT, a consensus protocol based on [HotStuff.](#hotstuff)
 - BFT algorithms typically operate with a number of entities, collectively holding N votes (which are called “validators” in the Aptos network’s application of the system).
 - N is chosen to withstand some number of validators holding f votes, which might be malicious.
 - In this configuration, N is typically set to 3f+1. Validators holding up to f votes will be allowed to be faulty &mdash; offline, malicious, slow, etc. As long as 2f+1 votes are held by [honest](#honest-validator) validators, they will be able to reach consensus on consistent decisions.
@@ -78,7 +78,7 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 
 - **Consensus** is a component of a validator.
 - The consensus component is responsible for coordination and agreement amongst all validators on the block of transactions to be executed, their order, and the execution results.
-- The Aptos Blockchain is formed with these agreed-upon transactions and their corresponding execution results.
+- The Aptos blockchain is formed with these agreed-upon transactions and their corresponding execution results.
 
 ## Consensus Protocol
 
@@ -183,13 +183,13 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Merkle Accumulator
 
-- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos Blockchain uses to store the ledger.
+- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
 - They are also called ["history trees"](http://people.cs.vt.edu/danfeng/courses/cs6204/sp10-papers/crosby.pdf) in literature.
 
 ## Move
 
-- **Move** is a new programming language that implements all the transactions on the Aptos Blockchain.
+- **Move** is a new programming language that implements all the transactions on the Aptos blockchain.
 - It has two different kinds of code &mdash; [transaction scripts](#transaction-script) and [Move modules](#move-module).
 
 ## Move Bytecode
@@ -199,7 +199,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Move Module
 
-- A **Move module** defines the rules for updating the global state of the Aptos Blockchain.
+- A **Move module** defines the rules for updating the global state of the Aptos blockchain.
 - In the Aptos protocol, a Move module is a **smart contract**.
 - Each user-submitted transaction includes a transaction script. The transaction script invokes procedures of one or more Move modules to update the global state of the blockchain according to the rules.
 
@@ -217,7 +217,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Node
 
-- A **node** is a peer entity of the Aptos network that tracks the state of the Aptos Blockchain.
+- A **node** is a peer entity of the Aptos network that tracks the state of the Aptos blockchain.
 - An Aptos node consists of logical components. [Mempool](#mempool), [consensus](#consensus), and the [virtual machine](#virtual-machine) are examples of node components.
 
 # O
@@ -231,7 +231,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ## Proof
 
 - A **proof** is a way to verify the accuracy of data in the blockchain.
-- Every operation in the Aptos Blockchain can be verified cryptographically that it is indeed correct and that data has not been omitted.
+- Every operation in the Aptos blockchain can be verified cryptographically that it is indeed correct and that data has not been omitted.
 - For example, if a user queries the information within a particular executed transaction, they will be provided with a cryptographic proof that the data returned to them is correct.
 
 # R
@@ -275,7 +275,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## State Root Hash
 
-- **State root hash** is a [Merkle hash](https://en.wikipedia.org/wiki/Merkle_tree) over all keys and values the state of the Aptos Blockchain at a given version.
+- **State root hash** is a [Merkle hash](https://en.wikipedia.org/wiki/Merkle_tree) over all keys and values the state of the Aptos blockchain at a given version.
 
 # T
 
@@ -289,14 +289,14 @@ then there is a guarantee that T_N will never be included in the blockchain.
   - [Sequence number](#sequence-number)
   - [Expiration time](#expiration-time)
 - A signed transaction is a raw transaction with the digital signature.
-- An executed transaction changes the state of the Aptos Blockchain.
+- An executed transaction changes the state of the Aptos blockchain.
 
 ## Transaction Script
 
 - Each transaction submitted by a user includes a **transaction script**.
 - It represents the operation a client submits to a validator.
 - The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-modules)/smart contracts.
-- The transaction script is an arbitrary program that interacts with resources published in the global storage of the Aptos Blockchain by calling the procedures of a module. It encodes the logic for a transaction.
+- The transaction script is an arbitrary program that interacts with resources published in the global storage of the Aptos blockchain by calling the procedures of a module. It encodes the logic for a transaction.
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
 
@@ -305,14 +305,14 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ## Validator
 
 - _Alternate name_: Validators.
-- A **validator** is an entity of the Aptos ecosystem that validates on the Aptos Blockchain. It receives requests from clients and runs consensus, execution, and storage.
+- A **validator** is an entity of the Aptos ecosystem that validates on the Aptos blockchain. It receives requests from clients and runs consensus, execution, and storage.
 - A validator maintains the history of all the transactions on the blockchain.
 - Internally, a validator needs to keep the current state, to execute transactions, and to calculate the next state.
 
 ## Version
 
 - A **version** is also called “height” in blockchain literature.
-- The Aptos Blockchain doesn't have an explicit notion of a block &mdash; it only uses blocks for batching and executing transactions.
+- The Aptos blockchain doesn't have an explicit notion of a block &mdash; it only uses blocks for batching and executing transactions.
 - A transaction at height 0 is the first transaction (genesis transaction), and a transaction at height 100 is the 101st transaction in the transaction store.
 
 # W

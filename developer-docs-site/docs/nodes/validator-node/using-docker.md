@@ -65,7 +65,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
         --local-repository-dir ~/$WORKSPACE \
         --username $USERNAME \
         --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
-        --validator-host <Validator node IP / DNS address>:<Port> \
+        --validator-host <validator node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port> \
         --stake-amount 100000000000000
 
@@ -97,7 +97,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-  Edit the `layout.yaml`, add the `root_key`, the Validator node username, and `chain_id`:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
   root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
@@ -159,7 +159,7 @@ Now you have completed setting up your validator node in test mode. You can cont
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
     ```
 
-12.  Edit `fullnode.yaml` file to update the IP address for Validator node.
+12.  Edit `fullnode.yaml` file to update the IP address for validator node.
 
 13.  [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on fullnode machine.
 

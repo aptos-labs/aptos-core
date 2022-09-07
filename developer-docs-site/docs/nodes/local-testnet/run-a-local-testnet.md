@@ -11,17 +11,17 @@ sidebar_position: 9
 If you want to use CLI to start and run a local testnet, see [Using CLI to Run a Local Testnet](./using-cli-to-run-a-local-testnet).
 :::
 
-You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes.
+You can run a local testnet of the Aptos blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes.
 
 You can run a local testnet in two ways:
 
 1. Using the Aptos-core source code. This approach is useful for testing modifications to the Aptos-core codebase or to the Aptos Framework.
 
-2. Using Docker. This is particularly useful for building services on top of the Aptos Blockchain or the Aptos Framework, as there is no build overhead and the ledger persists across network restarts (by default).
+2. Using Docker. This is particularly useful for building services on top of the Aptos blockchain or the Aptos Framework, as there is no build overhead and the ledger persists across network restarts (by default).
 
 The rest of this document describes:
 
-- How to start your local testnet with a single Validator node, and
+- How to start your local testnet with a single validator node, and
 - How to start a Faucet service and attach it to your local testnet.
 
 ## Using the Aptos-core source code
@@ -134,7 +134,7 @@ wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose
 docker-compose up
 ```
 
-This will start both a Validator node and Faucet service.
+This will start both a validator node and Faucet service.
 
 - The Validator's REST endpoint will be available at `http://127.0.0.1:8080`, and
 - The Faucet is available at `http://127.0.0.1:8000`.
