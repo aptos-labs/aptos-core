@@ -53,6 +53,9 @@ pub struct Layout {
     pub voting_duration_secs: u64,
     /// % of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Has initial balances
+    #[serde(default)]
+    pub has_initial_balances: bool,
 }
 
 impl Layout {
@@ -87,6 +90,7 @@ impl Default for Layout {
             rewards_apy_percentage: 10,
             voting_duration_secs: 43_200,
             voting_power_increase_limit: 20,
+            has_initial_balances: false,
         }
     }
 }
