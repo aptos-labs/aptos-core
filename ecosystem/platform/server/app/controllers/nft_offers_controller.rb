@@ -11,6 +11,13 @@ class NftOffersController < ApplicationController
     @nft_offer = NftOffer.find(params[:slug])
     @wallet = current_user&.wallets&.where(network: @nft_offer.network)&.first ||
               Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
+
+    @transaction_hash = params[:txn]
+
+    return render :minted if @transaction_hash.is_a?(String) && @transaction_hash.match?(/^0x[0-9a-f]{64}$/)
+
+    @transaction_hash = nil
+
     @steps = [
       sign_in_step,
       connect_wallet_step,
