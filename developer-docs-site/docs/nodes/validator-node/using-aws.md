@@ -5,7 +5,7 @@ slug: "run-validator-node-using-aws"
 
 # On AWS
 
-This is a step-by-step guide to install an Aptos node on AWS. These steps will configure a Validator node and a fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on AWS. These steps will configure a validator node and a fullnode on separate machines. 
 
 ## Before you proceed
 
@@ -164,7 +164,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-  Edit the `layout.yaml`, add the `root_key`, the Validator node username, and `chain_id`:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
   root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"

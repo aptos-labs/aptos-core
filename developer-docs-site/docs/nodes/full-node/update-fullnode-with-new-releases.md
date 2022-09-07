@@ -6,11 +6,11 @@ sidebar_position: 11
 
 # Update Fullnode With New Releases
 
-When `devnet` is wiped and updated with newer versions, you will need to update your fullnode as well. If you do not, your fullnode will not continue to synchronize with the network. To update your Fullnode, follow these steps:
+When `devnet` is wiped and updated with newer versions, you will need to update your fullnode as well. If you do not, your fullnode will not continue to synchronize with the network. To update your fullnode, follow these steps:
 
-## If you built the Fullnode from aptos-core source code
+## If you built the fullnode from aptos-core source code
 
-1. Shutdown your Fullnode.
+1. Shutdown your fullnode.
 
 2. Delete the data folder (the directory path is what you specified in the configuration file, e.g., `fullnode.yaml`).
 
@@ -24,13 +24,13 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 6. Update the configuration file (e.g., `fullnode.yaml`) with the new waypoint (if you configure the waypoint directly there).
 
-7. Restart the Fullnode.
+7. Restart the fullnode.
 
 8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-or-docker#verify-initial-synchronization) section for checking if the fullnode is syncing again.
 
-## If you run a Fullnode via Docker
+## If you run a fullnode via Docker
 
-1. Shutdown your Fullnode
+1. Shutdown your fullnode
 2. Delete the entire directory which holds your fullnode config and data directory.
 3. Rerun the instructions on [Approach #2: Using Docker](fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
 

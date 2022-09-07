@@ -193,7 +193,7 @@ Once your validator node joined the validator set, you can verify the correctnes
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_connections{.*\"Validator\".*}"
     ```
 
-    The command will output the number of inbound and outbound connections of your Validator node. For example:
+    The command will output the number of inbound and outbound connections of your validator node. For example:
 
     ```bash
     aptos_connections{direction="inbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 5

@@ -6,9 +6,9 @@ sidebar_position: 10
 
 # Fullnode Using Aptos Source or Docker
 
-You can run your own [Fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos Blockchain and stay up-to-date. Fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes or validators.
+You can run your own [Fullnode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos blockchain and stay up-to-date. Fullnodes replicate the entire state of the blockchain by querying other Aptos fullnodes or validators.
 
-Alternatively, you can use the fullnodes provided by Aptos Labs. However, such Aptos Labs-provided fullnodes have rate limits, which can impede your development. By running your own fullnode you can directly synchronize with the Aptos Blockchain and avoid such rate limits.
+Alternatively, you can use the fullnodes provided by Aptos Labs. However, such Aptos Labs-provided fullnodes have rate limits, which can impede your development. By running your own fullnode you can directly synchronize with the Aptos blockchain and avoid such rate limits.
 
 Fullnodes can be run by anyone. This tutorial explains how to configure a public fullnode to connect to the Aptos devnet.
 
@@ -31,7 +31,7 @@ Before you get started with this tutorial, read the following sections:
 
 We recommend the following hardware resources:
 
-- For running a production grade Fullnode:
+- For running a production grade fullnode:
 
   - **CPU**: 8 cores, 16 threads (Intel Xeon Skylake or newer).
   - **Memory**: 32GB RAM.
@@ -53,7 +53,7 @@ Given that devnet is currently being reset on a weekly basis, we estimate that A
 
 :::
 
-## Configuring a Fullnode
+## Configuring a fullnode
 
 You can configure a public fullnode in one of two ways:
 
@@ -88,12 +88,12 @@ This document describes how to configure your public fullnode using both methods
     source ~/.cargo/env
     ```
 
-With your development environment ready, now you can start to setup your Fullnode.
+With your development environment ready, now you can start to setup your fullnode.
 
 5. Checkout the `devnet` branch using `git checkout --track origin/devnet`.
 
 6. Make sure your current working directory is `aptos-core`.
-   Run `cp config/src/config/test_data/public_full_node.yaml fullnode.yaml` to create a copy of the fullnode config template. You will edit this file to ensure that your Fullnode:
+   Run `cp config/src/config/test_data/public_full_node.yaml fullnode.yaml` to create a copy of the fullnode config template. You will edit this file to ensure that your fullnode:
 
     - Contains the correct genesis blob that is published by the Aptos devnet.
     - Synchronizes correctly with the devnet, by using the checkpoint file `waypoint.txt` published by the devnet, and
@@ -164,7 +164,7 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
 :::
 
 1. Install [Docker](https://docs.docker.com/get-docker/).
-2. Create a directory for your local public Fullnode, and `cd` into it.
+2. Create a directory for your local public fullnode, and `cd` into it.
    For example:
    ```bash
    mkdir aptos-fullnode && cd aptos-fullnode
@@ -187,11 +187,11 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
    ```
 Ensure you have opened the relevant ports - 8080, 9101 and 6180 and you may also need to update the 127.0.0.1 with 0.0.0.0 in the public_full_node.yaml - listen_address and api\address
 
-## Verify the correctness of your Fullnode
+## Verify the correctness of your fullnode
 
 ### Verify initial synchronization
 
-During the initial synchronization of your Fullnode, there may be a lot of data to transfer. You can monitor the progress by querying the metrics port to see what version your node is currently synced to. Run the following command to see the current synced version of your node:
+During the initial synchronization of your fullnode, there may be a lot of data to transfer. You can monitor the progress by querying the metrics port to see what version your node is currently synced to. Run the following command to see the current synced version of your node:
 
 ```
 curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{.*\"synced\"}" | awk '{print $2}'

@@ -17,13 +17,13 @@ Follow the requirements specified in this document to make your AIT-3 Validator 
 
 ## Validator node in test mode
 
-You must run a Validator node in the test mode to be eligible for AIT-3. This is a method Aptos Labs uses to verify that a node operator can successfully start a Validator node and configure it properly with the Aptos network identity. 
+You must run a validator node in the test mode to be eligible for AIT-3. This is a method Aptos Labs uses to verify that a node operator can successfully start a validator node and configure it properly with the Aptos network identity. 
 
 In test mode, you will be running a local network with one single node, and it should be functioning like a normal blockchain.
 
 ## Hardware requirements
 
-For running an Aptos **Validator and Fullnode** we recommend the following hardware resources:
+For running an Aptos **validator and fullnode** we recommend the following hardware resources:
 
   - **CPU**:
       - 8 cores, 16 threads
@@ -69,7 +69,7 @@ For the Validator:
 - Open the TCP port 6180, for the Validators to talk to each other.
 - Open the TCP port 9101, for getting the Validator metrics to validate the health stats (only needed during registration stage).
 
-For the Fullnode:
+For the fullnode:
 
 - Open the TCP port 6182, for fullnodes to talk to each other.
 - Open the TCP port 9101, for getting the fullnode metrics to validate the health stats (only needed during registration stage).

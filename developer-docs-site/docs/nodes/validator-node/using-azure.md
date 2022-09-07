@@ -148,7 +148,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-  Edit the `layout.yaml`, add the `root_key`, the Validator node username, and `chain_id`:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
   root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"

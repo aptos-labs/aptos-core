@@ -7,23 +7,23 @@ slug: "network-identity-fullnode"
 
 Fullnodes will automatically start up with a randomly generated network identity. This works well for regular fullnodes. However:
 
-- You may want your fullnode to be added to a specific upstream Fullnode's allowlist (i.e., another fullnode participant in the Aptos network), because:
+- You may want your fullnode to be added to a specific upstream fullnode's allowlist (i.e., another fullnode participant in the Aptos network), because:
 
-  - You might require specific permissions for your fullnode on this specific upstream Fullnode, or
+  - You might require specific permissions for your fullnode on this specific upstream fullnode, or
   - This upstream fullnode only allows known identities to connect to it, or
   - You may wish to advertise your fullnode for other Aptos fullnodes to connect to (to help support the Aptos network).
 
-In such cases, it helps if you run your fullnode with a static network identity, instead of a randomly generated network identity that keeps changing every time you start up your Fullnode.
+In such cases, it helps if you run your fullnode with a static network identity, instead of a randomly generated network identity that keeps changing every time you start up your fullnode.
 
 This guide will show you how to:
 
-- Create a static network identity for your Fullnode.
+- Create a static network identity for your fullnode.
 - Start a node with a static network identity.
-- Allow other fullnodes to connect to your Fullnode.
+- Allow other fullnodes to connect to your fullnode.
 
 ## Before you proceed
 
-Before you proceed, make sure that you already know how to start your local Fullnode. See [Run a Fullnode](/nodes/full-node/index.md) for detailed documentation.
+Before you proceed, make sure that you already know how to start your local fullnode. See [Run a Fullnode](/nodes/full-node/index.md) for detailed documentation.
 
 :::caution Docker support only on Linux
 
@@ -31,13 +31,13 @@ Docker container is currently supported only on Linux x86-64 platform. If you ar
 
 :::
 
-## Creating a static identity for a Fullnode
+## Creating a static identity for a fullnode
 
-To create a static identity for your Fullnode:
+To create a static identity for your fullnode:
 
-1. You first create a private key, public key pair for your Fullnode.
+1. You first create a private key, public key pair for your fullnode.
 2. Next you derive the `peer_id` from the public key.
-3. Finally, you use the `peer_id` in your `fullnode.yaml` to create a static network identity for your Fullnode.
+3. Finally, you use the `peer_id` in your `fullnode.yaml` to create a static network identity for your fullnode.
 
 Follow the below detailed steps:
 
@@ -94,7 +94,7 @@ Follow the below detailed steps:
 
   **Using Docker**
 
-  Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your Fullnode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
+  Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your fullnode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
 
   ```bash
   aptos key generate \
@@ -177,7 +177,7 @@ Follow the below detailed steps:
    role: Upstream
     ```
 
-  In this example, `B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813` is the `peer_id`. Use this in the `peer_id` field of your `fullnode.yaml` to create a static identity for your Fullnode.
+  In this example, `B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813` is the `peer_id`. Use this in the `peer_id` field of your `fullnode.yaml` to create a static identity for your fullnode.
 
 
 ## Start a node with a static network identity
@@ -223,7 +223,7 @@ In the below steps, the port numbers used are for illustration only. You can use
 
 - Make sure you open port `6180` (or `6182`, for example, depending on which port your node is listening to) and that you open your firewall.
 - If you are using Docker, simply add `- "6180:6180"` or `- "6182:6182"` under ports in your ``docker-compose.yaml`` file.
-- Share your fullnode static network identity with others. They can then use it in the `seeds` key of their `fullnode.yaml` file to connect to your Fullnode.
+- Share your fullnode static network identity with others. They can then use it in the `seeds` key of their `fullnode.yaml` file to connect to your fullnode.
 - Make sure the port number you put in the `addresses` matches the one you have in the fullnode configuration file `fullnode.yaml` (for example, `6180` or `6182`).
 
 Share your fullnode static network identity in the following format in the Discord channel `advertise-full-nodes`:

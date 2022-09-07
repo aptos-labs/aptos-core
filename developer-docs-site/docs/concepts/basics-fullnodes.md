@@ -2,7 +2,7 @@
 title: "Fullnodes"
 slug: "basics-fullnodes"
 ---
-An Aptos node is an entity of the Aptos ecosystem that tracks the [state](/reference/glossary#state) of the Aptos Blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
+An Aptos node is an entity of the Aptos ecosystem that tracks the [state](/reference/glossary#state) of the Aptos blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
 * [Validator nodes](basics-validator-nodes.md)
 * Fullnodes
 
@@ -14,15 +14,15 @@ Each Aptos node comprises several logical components:
 * [Storage](basics-validator-nodes.md#storage)
 * [State synchronizer](basics-validator-nodes.md#state-synchronizer)
 
-The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a Fullnode.
+The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
 
 ## Overview
 
-Fullnodes can be run by anyone. Fullnodes re-execute all transactions in the history of the Aptos Blockchain. Fullnodes replicate the entire state of the blockchain by synchronizing with upstream participants, e.g., other fullnodes or validator nodes. To verify blockchain state, fullnodes receive the set of transactions and the [accumulator hash root](/reference/glossary#accumulator-root-hash) of the ledger signed by the validators. In addition, fullnodes accept transactions submitted by Aptos clients and forward them directly (or indirecly) to validator nodes. While fullnodes and validators share the same code, fullnodes do not participate in consensus.
+Fullnodes can be run by anyone. Fullnodes re-execute all transactions in the history of the Aptos blockchain. Fullnodes replicate the entire state of the blockchain by synchronizing with upstream participants, e.g., other fullnodes or validator nodes. To verify blockchain state, fullnodes receive the set of transactions and the [accumulator hash root](/reference/glossary#accumulator-root-hash) of the ledger signed by the validators. In addition, fullnodes accept transactions submitted by Aptos clients and forward them directly (or indirecly) to validator nodes. While fullnodes and validators share the same code, fullnodes do not participate in consensus.
 
-Depending on the fullnode upstream, a fullnode can be called as a Validator Fullnode, or a Public Fullnode:
-* **Validator Fullnode** state sync from a Validator node directly.
-* **Public Fullnode** state sync from other fullnodes.
+Depending on the fullnode upstream, a fullnode can be called as a validator fullnode, or a public fullnode:
+* **Validator fullnode** state sync from a validator node directly.
+* **Public fullnode** state sync from other fullnodes.
 
 There's no difference in their functionality, only whether their upstream node is a validator or another fullnode. Read more details about network topology [here](basics-node-networks-sync.md)
 
