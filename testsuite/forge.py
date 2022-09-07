@@ -1048,12 +1048,12 @@ class Git:
 
 
 def assert_provided_image_tags_has_profile_or_features(
-    forge_image_tag: Optional[str],
     image_tag: Optional[str],
+    upgrade_image_tag: Optional[str],
     enable_failpoints_feature: bool = False,
     enable_performance_profile: bool = False,
 ):
-    for tag in [forge_image_tag, image_tag]:
+    for tag in [image_tag, upgrade_image_tag]:
         if not tag:
             continue
         if enable_failpoints_feature:
@@ -1345,7 +1345,7 @@ def test(
 
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
-        forge_image_tag,
+        upgrade_image_tag,
         enable_failpoints_feature=enable_failpoints_feature,
         enable_performance_profile=enable_performance_profile,
     )
