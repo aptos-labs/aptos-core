@@ -46,7 +46,7 @@ async fn test_move_compile_flow() {
     // The manifest should work to compile
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
-    match cli.compile_package(named_addresses.clone()).await {
+    match cli.compile_package(named_addresses.clone(), None).await {
         Ok(modules) => assert!(modules.is_empty()),
         Err(err) => panic!("Error compiling: {:?}", err),
     }
@@ -74,7 +74,7 @@ async fn test_move_compile_flow() {
     // Now try to compile real code
     cli.add_move_files();
 
-    match cli.compile_package(named_addresses.clone()).await {
+    match cli.compile_package(named_addresses.clone(), None).await {
         Ok(modules) => assert!(!modules.is_empty()),
         Err(err) => panic!("Error compiling: {:?}", err),
     }
@@ -115,7 +115,10 @@ async fn test_move_publish_flow() {
     // Let's publish it
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
-    let _ = match cli.publish_package(0, None, named_addresses, false).await {
+    let _ = match cli
+        .publish_package(0, None, named_addresses, false, None)
+        .await
+    {
         Ok(response) => response,
         Err(err) => panic!("Should not have failed to publish package {:?}", err),
     };

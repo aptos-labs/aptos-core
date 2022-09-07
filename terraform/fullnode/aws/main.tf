@@ -19,7 +19,8 @@ locals {
     ? [for t in data.aws_ecr_image.stable[0].image_tags : t if substr(t, 0, 5) == "main_"][0]
     : "latest"
   )
-  aws_tags = "Terraform=pfn,Workspace=${terraform.workspace}"
+  aws_tags       = "Terraform=pfn,Workspace=${terraform.workspace}"
+  workspace_name = terraform.workspace
 }
 
 module "eks" {
@@ -34,6 +35,7 @@ module "eks" {
   utility_instance_type       = var.utility_instance_type
   fullnode_instance_type      = var.fullnode_instance_type
   num_fullnodes               = var.num_fullnodes
+  num_extra_instance          = var.num_extra_instance
 }
 
 data "aws_eks_cluster" "aptos" {
@@ -95,13 +97,6 @@ resource "helm_release" "pfn" {
           }
         }
       }
-      aws = {
-        region       = var.region
-        cluster_name = data.aws_eks_cluster.aptos.name
-        vpc_id       = module.eks.vpc_id
-        role_arn     = aws_iam_role.k8s-aws-integrations.arn
-        zone_name    = var.zone_id != "" ? data.aws_route53_zone.pfn[0].name : null
-      }
     }),
     jsonencode(var.pfn_helm_values),
   ]
@@ -136,6 +131,28 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = "gp2"
+      }
+      backup = {
+        enable = count.index == 0 ? var.enable_backup : false
+        config = {
+          location = "s3"
+          s3 = {
+            bucket = aws_s3_bucket.backup.bucket
+          }
+        }
+        serviceAccount = {
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.backup.arn
+          }
+        }
+      }
+      restore = {
+        config = {
+          location = "s3"
+          s3 = {
+            bucket = aws_s3_bucket.backup.bucket
+          }
+        }
       }
     }),
     jsonencode(var.fullnode_helm_values),

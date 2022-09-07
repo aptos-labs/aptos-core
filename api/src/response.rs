@@ -40,15 +40,16 @@ use serde_json::Value;
 
 use super::bcs_payload::Bcs;
 
+/// An enum representing the different types of outputs for APIs
 #[derive(ResponseContent)]
 pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
-    // When returning data as JSON, we take in T and then serialize to JSON as
-    // part of the response.
+    /// When returning data as JSON, we take in T and then serialize to JSON as
+    /// part of the response.
     Json(Json<T>),
 
-    // Return the data as BCS, which is just Vec<u8>. This data could have come
-    // from either an internal Rust type being serialized into bytes, or just
-    // the bytes directly from storage.
+    /// Return the data as BCS, which is just Vec<u8>. This data could have come
+    /// from either an internal Rust type being serialized into bytes, or just
+    /// the bytes directly from storage.
     Bcs(Bcs),
 }
 
@@ -127,14 +128,21 @@ macro_rules! generate_error_response {
             $(
             #[oai(status = $status)]
             $name(poem_openapi::payload::Json<aptos_api_types::AptosError>,
-                #[oai(header = "X-Aptos-Chain-Id")] Option<u8>,
                 // We use just regular u64 here instead of U64 since all header
                 // values are implicitly strings anyway.
+                /// Chain ID of the current chain
+                #[oai(header = "X-Aptos-Chain-Id")] Option<u8>,
+                /// Current ledger version of the chain
                 #[oai(header = "X-Aptos-Ledger-Version")] Option<u64>,
+                /// Oldest non-pruned ledger version of the chain
                 #[oai(header = "X-Aptos-Ledger-Oldest-Version")] Option<u64>,
+                /// Current timestamp of the chain
                 #[oai(header = "X-Aptos-Ledger-TimestampUsec")] Option<u64>,
+                /// Current epoch of the chain
                 #[oai(header = "X-Aptos-Epoch")] Option<u64>,
+                /// Current block height of the chain
                 #[oai(header = "X-Aptos-Block-Height")] Option<u64>,
+                /// Oldest non-pruned block height of the chain
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] Option<u64>,
             ),
             )*
@@ -273,15 +281,22 @@ macro_rules! generate_success_response {
             $(
             #[oai(status = $status)]
             $name(
-                $crate::response::AptosResponseContent<T>,
-                #[oai(header = "X-Aptos-Chain-Id")] u8,
                 // We use just regular u64 here instead of U64 since all header
                 // values are implicitly strings anyway.
+                $crate::response::AptosResponseContent<T>,
+                /// Chain ID of the current chain
+                #[oai(header = "X-Aptos-Chain-Id")] u8,
+                /// Current ledger version of the chain
                 #[oai(header = "X-Aptos-Ledger-Version")] u64,
+                /// Oldest non-pruned ledger version of the chain
                 #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
+                /// Current timestamp of the chain
                 #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
+                /// Current epoch of the chain
                 #[oai(header = "X-Aptos-Epoch")] u64,
+                /// Current block height of the chain
                 #[oai(header = "X-Aptos-Block-Height")] u64,
+                /// Oldest non-pruned block height of the chain
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] u64,
             ),
             )*

@@ -82,7 +82,9 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
-        let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
+        let (_bytecode, script_hash) = self
+            .compile_proposal_args
+            .compile(self.txn_options.prompt_options)?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -93,17 +95,20 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         );
         prompt_yes_with_override(
             "Do you want to submit this proposal?",
-            self.compile_proposal_args.prompt_options,
+            self.txn_options.prompt_options,
         )?;
 
         let txn = self
             .txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                self.pool_address_args.pool_address,
-                script_hash.to_vec(),
-                self.metadata_url.to_string().as_bytes().to_vec(),
-                metadata_hash.to_hex().as_bytes().to_vec(),
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_create_proposal(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                ),
+                None,
+            )
             .await?;
         let txn_summary = TransactionSummary::from(&txn);
         if let Transaction::UserTransaction(inner) = txn {
@@ -223,8 +228,6 @@ pub struct SubmitVote {
     pub(crate) no: bool,
 
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
-    #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
@@ -251,15 +254,18 @@ impl CliCommand<TransactionSummary> for SubmitVote {
 
         prompt_yes_with_override(
             &format!("Are you sure you want to vote {}", vote_str),
-            self.prompt_options,
+            self.txn_options.prompt_options,
         )?;
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                self.pool_address_args.pool_address,
-                self.proposal_id,
-                vote,
-            ))
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_vote(
+                    self.pool_address_args.pool_address,
+                    self.proposal_id,
+                    vote,
+                ),
+                None,
+            )
             .await
             .map(TransactionSummary::from)
     }
@@ -374,14 +380,16 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile(self.txn_options.prompt_options)?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
         let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
 
         self.txn_options
-            .submit_transaction(txn)
+            .submit_transaction(txn, None)
             .await
             .map(TransactionSummary::from)
     }
@@ -401,13 +409,10 @@ pub struct CompileProposalArgs {
     /// framework upgrade
     #[clap(long)]
     pub(crate) framework_git_rev: Option<String>,
-
-    #[clap(flatten)]
-    pub prompt_options: PromptOptions,
 }
 
 impl CompileProposalArgs {
-    fn compile(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    fn compile(&self, prompt_options: PromptOptions) -> CliTypedResult<(Vec<u8>, HashValue)> {
         // Check script file
         let script_path = self.script_path.as_path();
         if !self.script_path.exists() {
@@ -423,11 +428,7 @@ impl CompileProposalArgs {
         }
 
         // Compile script
-        compile_in_temp_dir(
-            script_path,
-            self.framework_git_rev.clone(),
-            self.prompt_options,
-        )
+        compile_in_temp_dir(script_path, self.framework_git_rev.clone(), prompt_options)
     }
 }
 

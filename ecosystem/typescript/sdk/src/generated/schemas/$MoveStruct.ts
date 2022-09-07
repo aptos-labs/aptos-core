@@ -2,13 +2,18 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveStruct = {
+    description: `A move struct`,
     properties: {
         name: {
-            type: 'IdentifierWrapper',
+            type: 'all-of',
+            contains: [{
+                type: 'IdentifierWrapper',
+            }],
             isRequired: true,
         },
         is_native: {
             type: 'boolean',
+            description: `Whether the struct is a native struct of Move`,
             isRequired: true,
         },
         abilities: {

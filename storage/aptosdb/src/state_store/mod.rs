@@ -4,12 +4,14 @@
 //! This file defines state store APIs that are related account state Merkle tree.
 
 use crate::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue};
+use crate::state_restore::StateSnapshotProgress;
 use crate::{
     epoch_by_version::EpochByVersionSchema,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
     state_merkle_db::StateMerkleDb,
+    state_restore::{StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
@@ -21,10 +23,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::{
-    iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateSnapshotProgress,
-    StateValueWriter,
-};
+use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -57,7 +56,7 @@ mod state_snapshot_committer;
 #[cfg(test)]
 mod state_store_test;
 
-type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, Option<StateValue>>;
+type StateValueBatch = crate::state_restore::StateValueBatch<StateKey, Option<StateValue>>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.

@@ -14,8 +14,12 @@ export class BlocksService {
      * Get blocks by height
      * This endpoint allows you to get the transactions in a block
      * and the corresponding block information.
-     * @param blockHeight
-     * @param withTransactions
+     *
+     * If the block is pruned, it will return a 410
+     * @param blockHeight Block height to lookup.  Starts at 0
+     * @param withTransactions If set to true, include all transactions in the block
+     *
+     * If not provided, no transactions will be retrieved
      * @returns Block
      * @throws ApiError
      */
@@ -39,8 +43,12 @@ export class BlocksService {
      * Get blocks by version
      * This endpoint allows you to get the transactions in a block
      * and the corresponding block information given a version in the block.
-     * @param version
-     * @param withTransactions
+     *
+     * If the block has been pruned, it will return a 410
+     * @param version Ledger version to lookup block information for.
+     * @param withTransactions If set to true, include all transactions in the block
+     *
+     * If not provided, no transactions will be retrieved
      * @returns Block
      * @throws ApiError
      */

@@ -42,7 +42,7 @@ class CoinClient(RestClient):
             [
                 TransactionArgument("Moon Coin", Serializer.str),
                 TransactionArgument("MOON", Serializer.str),
-                TransactionArgument(6, Serializer.u64),
+                TransactionArgument(6, Serializer.u8),
                 TransactionArgument(False, Serializer.bool),
             ],
         )

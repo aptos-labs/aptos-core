@@ -11,16 +11,12 @@ use std::{
     cmp::min,
     time::{Duration, Instant},
 };
-use termion::color;
 use transaction_emitter_lib::{query_sequence_numbers, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
-    let mut root_account = cluster.load_aptos_root_account(&client).await?;
     let mut faucet_account = cluster.load_aptos_root_account(&client).await?;
     let emitter = TxnEmitter::new(
-        &mut root_account,
-        client,
         TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
         StdRng::from_seed(OsRng.gen()),
     );
@@ -58,19 +54,13 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
                     format_err!("Failed to query sequence number from {}: {}", instance, e)
                 })?[0];
                 let host = instance.api_url().host().unwrap().to_string();
-                let color = if seq != faucet_account.sequence_number() {
+                let status = if seq != faucet_account.sequence_number() {
                     all_good = false;
-                    color::Fg(color::Red).to_string()
+                    "good"
                 } else {
-                    color::Fg(color::Green).to_string()
+                    "bad"
                 };
-                print!(
-                    "[{}{}:{}{}]  ",
-                    color,
-                    &host[..min(host.len(), 10)],
-                    seq,
-                    color::Fg(color::Reset)
-                );
+                print!("[{}:{}:{}]  ", &host[..min(host.len(), 10)], seq, status);
             }
             println!();
             if all_good {

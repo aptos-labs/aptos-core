@@ -1,4 +1,5 @@
-from distutils.ccompiler import get_default_compiler
+from contextlib import ExitStack
+from importlib.metadata import files
 import json
 import os
 import unittest
@@ -7,15 +8,47 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Union
+from unittest.mock import patch
+
+from . import forge
+from .forge import (
+    FakeTime,
+    ForgeCluster,
+    ForgeFormatter,
+    ForgeJob,
+    ForgeResult,
+    ForgeState,
+    GetPodsItem,
+    GetPodsItemMetadata,
+    GetPodsItemStatus,
+    GetPodsResult,
+    Git,
+    K8sForgeRunner,
+    ListClusterResult,
+    SystemContext,
+    create_forge_command,
+    find_recent_images,
+    find_recent_images_by_profile_or_features,
+    assert_provided_image_tags_has_profile_or_features,
+    format_comment,
+    format_pre_comment,
+    format_report,
+    get_all_forge_jobs,
+    get_dashboard_link,
+    get_humio_logs_link,
+    get_validator_logs_link,
+    list_eks_clusters,
+    main,
+    ForgeContext,
+    LocalForgeRunner,
+    FakeShell,
+    FakeFilesystem,
+    RunResult,
+    FakeProcesses,
+    sanitize_forge_resource_name,
+)
 
 from click.testing import CliRunner
-from .forge import (
-    AwsError, FakeTime, ForgeCluster, ForgeFormatter, ForgeJob, ForgeResult, ForgeState, GetPodsItem, GetPodsItemMetadata, GetPodsItemStatus, GetPodsResult,
-    Git, K8sForgeRunner, ListClusterResult, SystemContext, assert_aws_token_expiration, find_recent_images, format_comment,
-    format_pre_comment, format_report, get_all_forge_jobs, get_dashboard_link, get_humio_logs_link,
-    get_validator_logs_link, list_eks_clusters, list_jobs, main, ForgeContext, LocalForgeRunner, FakeShell,
-    FakeFilesystem, RunResult, FakeProcesses, sanitize_forge_namespace
-)
 
 
 class HasAssertMultiLineEqual(Protocol):
@@ -32,7 +65,9 @@ def get_fixture_path(fixture_name: str) -> Path:
 
 
 class AssertFixtureMixin:
-    def assertFixture(self: HasAssertMultiLineEqual, test_str: str, fixture_name: str) -> None:
+    def assertFixture(
+        self: HasAssertMultiLineEqual, test_str: str, fixture_name: str
+    ) -> None:
         fixture_path = get_fixture_path(fixture_name)
         if os.getenv("FORGE_WRITE_FIXTURES") == "true":
             print(f"Writing fixture to {str(fixture_path)}")
@@ -48,7 +83,7 @@ class AssertFixtureMixin:
             f"Fixture {fixture_name} does not match"
             "\n"
             f"Wrote to {str(temp)} for comparison"
-            "\nRerun with FORGE_WRITE_FIXTURES=true to update the fixtures"
+            "\nRerun with FORGE_WRITE_FIXTURES=true to update the fixtures",
         )
 
 
@@ -64,14 +99,20 @@ class SpyShell(FakeShell):
 
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
         rendered_command = " ".join(command)
-        default = Exception(f"Command not mocked: {rendered_command}") if self.strict else super().run(command)
+        default = (
+            Exception(f"Command not mocked: {rendered_command}")
+            if self.strict
+            else super().run(command)
+        )
         result = self.command_map.get(rendered_command, default)
         self.commands.append(rendered_command)
         if isinstance(result, Exception):
             raise result
         return result
 
-    async def gen_run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+    async def gen_run(
+        self, command: Sequence[str], stream_output: bool = False
+    ) -> RunResult:
         return self.run(command, stream_output)
 
     def assert_commands(self, testcase) -> None:
@@ -96,14 +137,23 @@ class SpyFilesystem(FakeFilesystem):
     def write(self, filename: str, contents: bytes) -> None:
         self.writes[filename] = contents
 
+    def get_write(self, filename: str) -> bytes:
+        return self.writes[filename]
+
     def read(self, filename: str) -> bytes:
         self.reads.append(filename)
         return self.expected_reads.get(filename, b"")
 
     def assert_writes(self, testcase) -> None:
         for filename, contents in self.expected_writes.items():
-            testcase.assertIn(filename, self.writes, f"{filename} was not written: {self.writes}")
-            testcase.assertMultiLineEqual(self.writes[filename].decode(), contents.decode(), f"{filename} did not match expected contents")
+            testcase.assertIn(
+                filename, self.writes, f"{filename} was not written: {self.writes}"
+            )
+            testcase.assertMultiLineEqual(
+                self.writes[filename].decode(),
+                contents.decode(),
+                f"{filename} did not match expected contents",
+            )
 
     def assert_reads(self, testcase) -> None:
         for filename in self.expected_reads.keys():
@@ -117,11 +167,9 @@ class SpyFilesystem(FakeFilesystem):
     def unlink(self, filename: str) -> None:
         self.unlinks.append(filename)
 
-
     def assert_unlinks(self, testcase) -> None:
         for filename in self.expected_unlinks:
             testcase.assertIn(filename, self.unlinks, f"{filename} was not unlinked")
-
 
 
 class SpyProcesses(FakeProcesses):
@@ -130,46 +178,76 @@ class SpyProcesses(FakeProcesses):
             callback()
 
 
-def fake_context(shell=None, filesystem=None, processes=None, time=None) -> ForgeContext:
+def fake_context(
+    shell=None, filesystem=None, processes=None, time=None, mode=None,
+) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
         filesystem=filesystem if filesystem else FakeFilesystem(),
         processes=processes if processes else FakeProcesses(),
         time=time if time else FakeTime(),
-
-        forge_test_suite="banana",
-        forge_runner_duration_secs="123",
-
-        reuse_args=[],
-        keep_args=[],
-        haproxy_args=[],
-
+        forge_args=create_forge_command(
+            forge_runner_mode=mode,
+            enable_failpoints_feature=False,
+            forge_test_suite="banana",
+            forge_runner_duration_secs="123",
+            forge_num_validators="10",
+            forge_num_validator_fullnodes="20",
+            image_tag="asdf",
+            upgrade_image_tag="upgrade_asdf",
+            forge_namespace="potato",
+            forge_namespace_reuse="false",
+            forge_namespace_keep="false",
+            forge_enable_haproxy="false",
+            cargo_args=["--cargo-arg"],
+            forge_cli_args=["--forge-cli-arg"],
+            test_args=["--test-arg"],
+        ),
         aws_account_num="123",
         aws_region="banana-east-1",
-
         forge_image_tag="forge_asdf",
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="potato",
+        keep_port_forwards=False,
         forge_cluster_name="tomato",
         forge_blocking=True,
-
         github_actions="false",
         github_job_url="https://banana",
     )
 
 
 class ForgeRunnerTests(unittest.TestCase):
+    maxDiff = None
+
     def testLocalRunner(self) -> None:
-        shell = SpyShell(OrderedDict([
-            (
-                'cargo run -p forge-cli -- --suite banana --mempool-backlog 5000 --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --port-forward',
-                RunResult(0, b"orange"),
-            ),
-            ("kubectl get pods -n potato", RunResult(0, b"Pods")),
-        ]))
+        cargo_run = " ".join([
+            "cargo", "run",
+            "--cargo-arg",
+            "-p", "forge-cli",
+            "--",
+            "--suite", "banana",
+            "--duration-secs", "123",
+            "--num-validators", "10",
+            "--num-validator-fullnodes", "20",
+            "--forge-cli-arg",
+            "test", "k8s-swarm",
+            "--image-tag", "asdf",
+            "--upgrade-image-tag", "upgrade_asdf",
+            "--namespace", "potato",
+            "--port-forward",
+            "--test-arg"
+        ])
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    (cargo_run, RunResult(0, b"orange"),),
+                    ("kubectl get pods -n potato", RunResult(0, b"Pods")),
+                ]
+            )
+        )
         filesystem = SpyFilesystem({}, {})
-        context = fake_context(shell, filesystem)
+        context = fake_context(shell, filesystem, mode="local")
         runner = LocalForgeRunner()
         result = runner.run(context)
         self.assertEqual(result.state, ForgeState.PASS, result.output)
@@ -179,23 +257,45 @@ class ForgeRunnerTests(unittest.TestCase):
 
     def testK8sRunner(self) -> None:
         self.maxDiff = None
-        shell = SpyShell(OrderedDict([
-            ("kubectl delete pod -n default -l forge-namespace=potato --force", RunResult(0, b"")),
-            ("kubectl wait -n default --for=delete pod -l forge-namespace=potato", RunResult(0, b"")),
-            ("kubectl apply -n default -f temp1", RunResult(0, b"")),
-            ("kubectl wait -n default --timeout=5m --for=condition=Ready pod/potato-1659078000-asdf", RunResult(0, b"")),
-            ("kubectl logs -n default -f potato-1659078000-asdf", RunResult(0, b"")),
-            ("kubectl get pod -n default potato-1659078000-asdf -o jsonpath='{.status.phase}'", RunResult(0, b"Succeeded")),
-            ("kubectl get pods -n potato", RunResult(0, b"Pods")),
-        ]))
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    (
+                        "kubectl delete pod -n default -l forge-namespace=potato --force",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl wait -n default --for=delete pod -l forge-namespace=potato",
+                        RunResult(0, b""),
+                    ),
+                    ("kubectl apply -n default -f temp1", RunResult(0, b"")),
+                    (
+                        "kubectl wait -n default --timeout=1m --for=condition=Ready pod/potato-1659078000-asdf",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl logs -n default -f potato-1659078000-asdf",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl get pod -n default potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                        RunResult(0, b"Succeeded"),
+                    ),
+                    ("kubectl get pods -n potato", RunResult(0, b"Pods")),
+                ]
+            )
+        )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
         template_fixture = get_fixture_path("forge-test-runner-template.fixture")
-        filesystem = SpyFilesystem({
-            "temp1": template_fixture.read_bytes(),
-        }, {
-            "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
-        })
-        context = fake_context(shell, filesystem)
+        filesystem = SpyFilesystem(
+            {
+                "temp1": template_fixture.read_bytes(),
+            },
+            {
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
+            },
+        )
+        context = fake_context(shell, filesystem, mode="k8s")
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)
@@ -204,42 +304,114 @@ class ForgeRunnerTests(unittest.TestCase):
         self.assertEqual(result.state, ForgeState.PASS, result.output)
 
 
-class TestAWSTokenExpiration(unittest.TestCase):
-    def testNoAwsToken(self) -> None:
-        with self.assertRaisesRegex(AwsError, "AWS token is required"): 
-            assert_aws_token_expiration(None)
-
-    def testAwsTokenExpired(self) -> None:
-        expiration = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
-        with self.assertRaisesRegex(AwsError, "AWS token has expired"):
-            assert_aws_token_expiration(expiration)
-    
-    def testAwsTokenMalformed(self) -> None:
-        with self.assertRaisesRegex(AwsError, "Invalid date format:.*"):
-            assert_aws_token_expiration("asdlkfjasdlkjf")
-
-
 class TestFindRecentImage(unittest.TestCase):
     def testFindRecentImage(self) -> None:
-        shell = SpyShell(OrderedDict([
-            ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
-            ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=potato", RunResult(1, b"")),
-            ("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
-            ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=lychee", RunResult(0, b"")),
-        ]))
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=potato",
+                        RunResult(1, b""),
+                    ),
+                    ("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=lychee",
+                        RunResult(0, b""),
+                    ),
+                ]
+            )
+        )
         git = Git(shell)
-        image_tags = find_recent_images(shell, git, 1)
+        image_tags = find_recent_images(shell, git, 1, "aptos/validator")
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
-    def testDidntFindRecentImage(self) -> None:
-        shell = SpyShell(OrderedDict([
-            ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
-            ("aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab", RunResult(1, b"")),
-        ]))
+    def testFindRecentFailpointsImage(self) -> None:
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=failpoints_tomato",
+                        RunResult(0, b""),
+                    ),
+                ]
+            )
+        )
+        git = Git(shell)
+        image_tags = find_recent_images_by_profile_or_features(
+            shell,
+            git,
+            1,
+            enable_performance_profile=False,
+            enable_failpoints_feature=True
+        )
+        self.assertEqual(list(image_tags), ["failpoints_tomato"])
+        shell.assert_commands(self)
+
+    def testFindRecentPerformanceImage(self) -> None:
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=performance_potato",
+                        RunResult(0, b""),
+                    ),
+                ]
+            )
+        )
+        git = Git(shell)
+        image_tags = find_recent_images_by_profile_or_features(
+            shell,
+            git,
+            1,
+            enable_performance_profile=True,
+            enable_failpoints_feature=False,
+        )
+        self.assertEqual(list(image_tags), ["performance_potato"])
+        shell.assert_commands(self)
+
+    def testFailBothFailpointsPerformance(self) -> None:
+        shell = SpyShell(OrderedDict())
         git = Git(shell)
         with self.assertRaises(Exception):
-            list(find_recent_images(shell, git, 1, commit_threshold=1))
+            find_recent_images_by_profile_or_features(
+                shell,
+                git,
+                1,
+                enable_performance_profile=True,
+                enable_failpoints_feature=True,
+            )
+
+    def testDidntFindRecentImage(self) -> None:
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
+                        RunResult(1, b""),
+                    ),
+                ]
+            )
+        )
+        git = Git(shell)
+        with self.assertRaises(Exception):
+            list(
+                find_recent_images(
+                    shell, git, 1, "aptos/validator", commit_threshold=1
+                )
+            )
+
+    def testFailpointsProvidedImageTag(self) -> None:
+        with self.assertRaises(AssertionError):
+            assert_provided_image_tags_has_profile_or_features(
+                "potato_tomato",
+                "failpoints_performance_potato",
+                enable_failpoints_feature=True,
+            )
 
 
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
@@ -249,17 +421,14 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem = SpyFilesystem({"test": b"banana"}, {})
         context = fake_context(filesystem=filesystem)
         result = ForgeResult.from_args(ForgeState.PASS, "test")
-        context.report(result, [
-            ForgeFormatter("test", lambda c, r: "banana")
-        ])
+        context.report(result, [ForgeFormatter("test", lambda c, r: "banana")])
         filesystem.assert_reads(self)
         filesystem.assert_writes(self)
 
     def testHumioLogLink(self) -> None:
-        self.assertFixture(
-            get_humio_logs_link("forge-pr-2983"),
-            "testHumioLogLink.fixture"
-        )
+        link = get_humio_logs_link("forge-pr-2983")
+        self.assertFixture(link, "testHumioLogLink.fixture")
+        self.assertIn("forge-pr-2983", link)
 
     def testValidatorLogsLink(self) -> None:
         self.assertFixture(
@@ -285,9 +454,9 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
                 "forge-pr-2983",
                 "forge-big-1",
                 (
-                    datetime.fromtimestamp(100000),
-                    datetime.fromtimestamp(100001),
-                )
+                    datetime.fromtimestamp(100000, timezone.utc),
+                    datetime.fromtimestamp(100001, timezone.utc),
+                ),
             ),
             "testDashboardLinkTimeInterval.fixture",
         )
@@ -323,89 +492,151 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
 
     def testSanitizeForgeNamespaceSlashes(self) -> None:
         namespace_with_slash = "banana/apple"
-        namespace = sanitize_forge_namespace(namespace_with_slash)
+        namespace = sanitize_forge_resource_name(namespace_with_slash)
         self.assertEqual(namespace, "banana-apple")
 
     def testSanitizeForgeNamespaceTooLong(self) -> None:
         namespace_too_long = "a" * 10000
-        namespace = sanitize_forge_namespace(namespace_too_long)
-        self.assertEqual(namespace, "a"*64)
+        namespace = sanitize_forge_resource_name(namespace_too_long)
+        self.assertEqual(namespace, "a" * 64)
+
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
 
     def testMain(self) -> None:
         runner = CliRunner()
-        with runner.isolated_filesystem():
+        shell = SpyShell(OrderedDict([
+            ('aws sts get-caller-identity', RunResult(0, b'{"Account": "123456789012"}')),
+            ('kubectl config current-context', RunResult(0, b'aptos-banana')),
+            ('git rev-parse HEAD~0', RunResult(0, b'banana')),
+            (
+                'aws ecr describe-images --repository-name aptos/validator --im'
+                'age-ids imageTag=banana',
+                RunResult(0, b''),
+            ),
+            ('aws eks update-kubeconfig --name forge-big-1', RunResult(0, b'')),
+            (
+                'kubectl delete pod -n default -l forge-namespace=forge-perry-1659078000 '
+                '--force',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl wait -n default --for=delete pod -l '
+                'forge-namespace=forge-perry-1659078000',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl apply -n default -f temp1',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl wait -n default --timeout=1m --for=condition=Ready '
+                'pod/forge-perry-1659078000-1659078000-banana',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl logs -n default -f forge-perry-1659078000-1659078000-banana',
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl get pod -n default forge-perry-1659078000-1659078000-banana -o '
+                "jsonpath='{.status.phase}'",
+                RunResult(0, b''),
+            ),
+            (
+                'kubectl get pods -n forge-perry-1659078000',
+                RunResult(0, b''),
+            )
+        ]))
+        filesystem = SpyFilesystem({
+            "temp-comment": get_fixture_path("testMainComment.fixture").read_bytes(),
+            "temp-step-summary": get_fixture_path("testMainComment.fixture").read_bytes(),
+            "temp-pre-comment": get_fixture_path("testMainPreComment.fixture").read_bytes(),
+            "temp-report": get_fixture_path("testMainReport.fixture").read_bytes(),
+        }, {})
+        with ExitStack() as stack:
+            stack.enter_context(runner.isolated_filesystem())
+            stack.enter_context(patch.object(forge, "FakeFilesystem", lambda: filesystem))
+            stack.enter_context(patch.object(forge, "FakeShell", lambda: shell))
+
             os.mkdir(".git")
             os.mkdir("testsuite")
-            template_name =  "forge-test-runner-template.yaml"
+            template_name = "forge-test-runner-template.yaml"
             Path(f"testsuite/{template_name}").write_text(
                 (Path(__file__).parent / template_name).read_text()
             )
-            result = runner.invoke(main, [
-                "test", "--dry-run",
-                "--forge-cluster-name", "forge-big-1",
-                "--forge-report", "temp-report",
-                "--forge-pre-comment", "temp-pre-comment",
-                "--forge-comment", "temp-comment",
-                "--github-step-summary", "temp-step-summary",
-            ], catch_exceptions=False)
-            self.assertEqual(
-                sorted(os.listdir(".")),
-                sorted(['temp-report', 'testsuite', 'temp-pre-comment', '.git', 'temp-comment', 'temp-step-summary']),
+            result = runner.invoke(
+                main,
+                [
+                    "test",
+                    "--dry-run",
+                    "--forge-cluster-name", "forge-big-1",
+                    "--forge-report", "temp-report",
+                    "--forge-pre-comment", "temp-pre-comment",
+                    "--forge-comment", "temp-comment",
+                    "--github-step-summary", "temp-step-summary",
+                    "--github-server-url", "None",
+                    "--github-repository", "None",
+                    "--github-run-id", "None",
+                ],
+                catch_exceptions=False,
             )
-            report = Path("temp-report").read_text()
-            pre_comment = Path("temp-pre-comment").read_text()
-            comment = Path("temp-comment").read_text()
-            step_summary = Path("temp-comment").read_text()
-        self.assertFixture(result.output, "testMain.fixture")
-        self.assertFixture(pre_comment, "testMainPreComment.fixture")
-        self.assertFixture(report, "testMainReport.fixture")
-        self.assertFixture(comment, "testMainComment.fixture")
-        self.assertFixture(step_summary, "testMainComment.fixture")
+            shell.assert_commands(self)
+            self.assertFixture(filesystem.get_write("temp-comment").decode(), "testMainComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-step-summary").decode(), "testMainComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-pre-comment").decode(), "testMainPreComment.fixture")
+            self.assertFixture(filesystem.get_write("temp-report").decode(), "testMainReport.fixture")
+            self.assertFixture(result.output, "testMain.fixture")
 
 
 class TestListClusters(unittest.TestCase):
     def testListClusters(self) -> None:
-        fake_clusters = (
-            json.dumps(
-                ListClusterResult(
-                    clusters=[
-                        "banana-fake-1",
-                        "aptos-forge-banana-1",
-                        "aptos-forge-potato-2",
-                    ]
-                ),
+        fake_clusters = json.dumps(
+            ListClusterResult(
+                clusters=[
+                    "banana-fake-1",
+                    "aptos-forge-banana-1",
+                    "aptos-forge-potato-2",
+                ]
+            ),
+        )
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("aws eks list-clusters", RunResult(0, fake_clusters.encode())),
+                ]
             )
         )
-        shell = SpyShell(OrderedDict([
-            ("aws eks list-clusters", RunResult(0, fake_clusters.encode())),
-        ]))
         clusters = list_eks_clusters(shell)
         self.assertEqual(clusters, ["aptos-forge-banana-1", "aptos-forge-potato-2"])
         shell.assert_commands(self)
 
     def testListClustersFails(self) -> None:
         with self.assertRaises(Exception):
-            shell = SpyShell(OrderedDict([
-                ("Blah", RunResult(0, b"")),
-            ]))
+            shell = SpyShell(
+                OrderedDict(
+                    [
+                        ("Blah", RunResult(0, b"")),
+                    ]
+                )
+            )
             list_eks_clusters(shell)
             shell.assert_commands(self)
 
 
 def fake_pod_item(name: str, phase: str) -> GetPodsItem:
     return GetPodsItem(
-        metadata=GetPodsItemMetadata(name=name),
-        status=GetPodsItemStatus(phase=phase)
+        metadata=GetPodsItemMetadata(name=name), status=GetPodsItemStatus(phase=phase)
     )
 
 
 class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
     async def testGetAllForgeJobs(self) -> None:
         fake_clusters = json.dumps(
-            ListClusterResult(clusters=["aptos-forge-banana", "banana-1", "aptos-forge-apple-2"])
+            ListClusterResult(
+                clusters=["aptos-forge-banana", "banana-1", "aptos-forge-apple-2"]
+            )
         ).encode()
         fake_first_pods = GetPodsResult(
             items=[
@@ -421,25 +652,30 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 fake_pod_item("me-too", "Failed"),
             ]
         )
-        shell = SpyShell(OrderedDict([
-            ("aws eks list-clusters", RunResult(0, fake_clusters)),
-            (
-                "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
-                RunResult(0, b""),
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("aws eks list-clusters", RunResult(0, fake_clusters)),
+                    (
+                        "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl get pods -n default --kubeconfig temp1 -o json",
+                        RunResult(0, json.dumps(fake_first_pods).encode()),
+                    ),
+                    (
+                        "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "kubectl get pods -n default --kubeconfig temp2 -o json",
+                        RunResult(0, json.dumps(fake_second_pods).encode()),
+                    ),
+                ]
             ),
-            (
-                "kubectl get pods -n default --kubeconfig temp1 -o json",
-                RunResult(0, json.dumps(fake_first_pods).encode()),
-            ),
-            (
-                "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
-                RunResult(0, b""),
-            ),
-            (
-                "kubectl get pods -n default --kubeconfig temp2 -o json",
-                RunResult(0, json.dumps(fake_second_pods).encode()),
-            ),
-        ]), strict=True)
+            strict=True,
+        )
         filesystem = SpyFilesystem({}, {}, ["temp1", "temp2"])
         processes = SpyProcesses()
         context = SystemContext(shell, filesystem, processes)
@@ -451,7 +687,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 cluster=ForgeCluster(
                     name="aptos-forge-banana",
                     kubeconf="temp1",
-                )
+                ),
             ),
             ForgeJob(
                 name="forge-failed",
@@ -459,7 +695,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 cluster=ForgeCluster(
                     name="aptos-forge-banana",
                     kubeconf="temp1",
-                )
+                ),
             ),
             ForgeJob(
                 name="forge-second",
@@ -467,7 +703,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 cluster=ForgeCluster(
                     name="aptos-forge-apple-2",
                     kubeconf="temp2",
-                )
+                ),
             ),
             ForgeJob(
                 name="forge-succeeded",
@@ -475,8 +711,8 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                 cluster=ForgeCluster(
                     name="aptos-forge-apple-2",
                     kubeconf="temp2",
-                )
-            )
+                ),
+            ),
         ]
         self.assertEqual(jobs, expected_jobs)
         processes.run_atexit()

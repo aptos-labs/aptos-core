@@ -4,15 +4,12 @@
 //! This module implements the functionality to restore a `JellyfishMerkleTree` from small chunks
 //! of accounts.
 
-#[cfg(test)]
-mod restore_test;
-
 use crate::{
     node_type::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    NibbleExt, StateSnapshotProgress, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{
@@ -20,7 +17,6 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -30,8 +26,7 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use std::{cmp::Eq, collections::HashMap, hash::Hash, sync::Arc};
-use storage_interface::StateSnapshotReceiver;
+use std::{cmp::Eq, collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<K> {
@@ -109,7 +104,7 @@ where
     }
 }
 
-struct JellyfishMerkleRestore<K> {
+pub struct JellyfishMerkleRestore<K> {
     /// The underlying storage.
     store: Arc<dyn TreeWriter<K>>,
 
@@ -292,7 +287,7 @@ where
     /// Restores a chunk of accounts. This function will verify that the given chunk is correct
     /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
     /// error will be returned and nothing will be written to storage.
-    fn add_chunk_impl(
+    pub fn add_chunk_impl(
         &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
@@ -676,7 +671,7 @@ where
 
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
-    fn finish_impl(mut self) -> Result<()> {
+    pub fn finish_impl(mut self) -> Result<()> {
         // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
@@ -714,122 +709,5 @@ where
         self.freeze(0);
         self.store.write_node_batch(&self.frozen_nodes)?;
         Ok(())
-    }
-}
-
-struct StateValueRestore<K, V> {
-    version: Version,
-    db: Arc<dyn StateValueWriter<K, V>>,
-}
-
-impl<K: crate::Key + CryptoHash + Eq + Hash, V: crate::Value> StateValueRestore<K, V> {
-    pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self { version, db }
-    }
-
-    pub fn add_chunk(&mut self, mut chunk: Vec<(K, V)>) -> Result<()> {
-        // load progress
-        let progress_opt = self.db.get_progress(self.version)?;
-
-        // skip overlaps
-        if let Some(progress) = progress_opt {
-            let idx = chunk
-                .iter()
-                .position(|(k, _v)| CryptoHash::hash(k) > progress.key_hash)
-                .unwrap_or(chunk.len());
-            chunk = chunk.split_off(idx);
-        }
-
-        // quit if all skipped
-        if chunk.is_empty() {
-            return Ok(());
-        }
-
-        // save
-        let mut usage = progress_opt.map_or(StateStorageUsage::zero(), |p| p.usage);
-        let (last_key, _last_value) = chunk.last().unwrap();
-        let last_key_hash = CryptoHash::hash(last_key);
-        let kv_batch = chunk
-            .into_iter()
-            .map(|(k, v)| {
-                usage.add_item(k.key_size() + v.value_size());
-                ((k, self.version), Some(v))
-            })
-            .collect();
-        self.db.write_kv_batch(
-            self.version,
-            &kv_batch,
-            StateSnapshotProgress::new(last_key_hash, usage),
-        )
-    }
-
-    pub fn finish(self) -> Result<()> {
-        let progress = self.db.get_progress(self.version)?;
-        self.db.write_usage(
-            self.version,
-            progress.map_or(StateStorageUsage::zero(), |p| p.usage),
-        )
-    }
-}
-
-pub struct StateSnapshotRestore<K, V> {
-    tree_restore: JellyfishMerkleRestore<K>,
-    kv_restore: StateValueRestore<K, V>,
-}
-
-impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRestore<K, V> {
-    pub fn new<T: 'static + TreeReader<K> + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Self> {
-        Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new(
-                Arc::clone(tree_store),
-                version,
-                expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
-        })
-    }
-
-    pub fn new_overwrite<T: 'static + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Self> {
-        Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new_overwrite(
-                Arc::clone(tree_store),
-                version,
-                expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
-        })
-    }
-}
-
-impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotReceiver<K, V>
-    for StateSnapshotRestore<K, V>
-{
-    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
-        // Write KV out first because we are likely to resume according to the rightmost key in the
-        // tree after crashing.
-        self.kv_restore.add_chunk(chunk.clone())?;
-        self.tree_restore
-            .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
-        Ok(())
-    }
-
-    fn finish(self) -> Result<()> {
-        self.kv_restore.finish()?;
-        self.tree_restore.finish_impl()
-    }
-
-    fn finish_box(self: Box<Self>) -> Result<()> {
-        self.kv_restore.finish()?;
-        self.tree_restore.finish_impl()
     }
 }

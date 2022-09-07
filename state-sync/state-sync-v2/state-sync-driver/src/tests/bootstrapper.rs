@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::bootstrapper::GENESIS_TRANSACTION_VERSION;
 use crate::{
-    bootstrapper::Bootstrapper,
+    bootstrapper::{Bootstrapper, GENESIS_TRANSACTION_VERSION},
     driver::DriverConfiguration,
     error::Error,
     tests::{
@@ -25,11 +24,10 @@ use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
-use claim::{assert_matches, assert_none, assert_ok};
-use data_streaming_service::streaming_client::NotificationAndFeedback;
+use claims::{assert_matches, assert_none, assert_ok};
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
-    streaming_client::NotificationFeedback,
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
 use futures::{channel::oneshot, FutureExt, SinkExt};
 use mockall::{predicate::eq, Sequence};

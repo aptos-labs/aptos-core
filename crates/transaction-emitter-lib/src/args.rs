@@ -8,7 +8,7 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::{ArgEnum, Parser};
+use clap::{ArgEnum, ArgGroup, Parser};
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -68,17 +68,22 @@ impl Default for TransactionType {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+#[clap(group(
+    ArgGroup::new("mode")
+        .required(true)
+        .args(&["mempool-backlog", "target-tps"]),
+))]
 pub struct EmitArgs {
-    #[clap(long, default_value = "0")]
+    #[clap(long)]
     /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
     /// is producing enough load to get the highest TPS in the system. Typically this should be
     /// configured to be ~4x of the max achievable TPS.
     /// 0 if target_tps used.
-    pub mempool_backlog: usize,
+    pub mempool_backlog: Option<usize>,
 
     /// Target constant TPS, 0 if mempool_backlog used
-    #[clap(long, default_value = "0")]
-    pub target_tps: usize,
+    #[clap(long)]
+    pub target_tps: Option<usize>,
 
     #[clap(long, default_value = "30")]
     pub txn_expiration_time_secs: u64,

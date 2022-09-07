@@ -20,12 +20,11 @@ use crate::{
 use aptos_config::config::ContinuousSyncingMode;
 use aptos_infallible::Mutex;
 use aptos_types::transaction::{TransactionOutputListWithProof, Version};
-use claim::assert_matches;
+use claims::assert_matches;
 use consensus_notifications::ConsensusSyncNotification;
-use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
-    streaming_client::NotificationFeedback,
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
 use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};

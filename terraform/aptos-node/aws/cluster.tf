@@ -43,14 +43,14 @@ locals {
       min_size      = var.utility_instance_min_num
       desired_size  = var.utility_instance_num
       max_size      = var.utility_instance_max_num > 0 ? var.utility_instance_max_num : 2 * var.utility_instance_num
-      taint         = false
+      taint         = var.utility_instance_enable_taint
     }
     validators = {
       instance_type = var.validator_instance_type
       min_size      = var.validator_instance_min_num
       desired_size  = var.validator_instance_num
       max_size      = var.validator_instance_max_num > 0 ? var.validator_instance_max_num : 2 * var.validator_instance_num
-      taint         = true
+      taint         = var.validator_instance_enable_taint
     }
   }
 }

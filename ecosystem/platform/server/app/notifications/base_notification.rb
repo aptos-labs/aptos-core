@@ -6,10 +6,15 @@
 class BaseNotification < Noticed::Base
   def self.deliver_by(delivery_method, options = {})
     notification_name = name.underscore
-    guard_method_name = "deliver_#{delivery_method}_#{notification_name}?".to_sym
+    delivery_method_guard_name = "deliver_#{delivery_method}?".to_sym
+    preference_guard_name = "deliver_#{delivery_method}_#{notification_name}?".to_sym
 
-    unless respond_to?(guard_method_name)
-      define_method guard_method_name do
+    unless respond_to?(preference_guard_name)
+      define_method preference_guard_name do
+        # First, check generic delivery_method logic.
+        return false if respond_to?(delivery_method_guard_name) && !send(delivery_method_guard_name)
+
+        # Next, check for the delivery_method/notification_name preference.
         prefs = recipient.notification_preferences.where(delivery_method:).first
         return false if prefs.nil?
 
@@ -17,7 +22,11 @@ class BaseNotification < Noticed::Base
       end
     end
 
-    options[:if] = guard_method_name
+    options[:if] = preference_guard_name
     super(delivery_method, options)
+  end
+
+  def deliver_email?
+    !recipient.email.nil?
   end
 end

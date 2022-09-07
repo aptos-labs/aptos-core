@@ -2,31 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    configuration::EvaluatorArgs,
+    configuration::{EvaluatorArgs, NodeAddress},
     evaluator::Evaluator,
     evaluators::{
         direct::{
-            ApiEvaluatorError, DirectEvaluatorInput, LatencyEvaluator, TpsEvaluator,
-            TpsEvaluatorError, TransactionAvailabilityEvaluator,
+            ApiEvaluatorError, DirectEvaluatorInput, HandshakeEvaluator, LatencyEvaluator,
+            NoiseEvaluatorError, StateSyncVersionEvaluator, TpsEvaluator, TpsEvaluatorError,
+            TransactionAvailabilityEvaluator,
         },
         metrics::{
             ConsensusProposalsEvaluator, ConsensusRoundEvaluator, ConsensusTimeoutsEvaluator,
             MetricsEvaluatorError, MetricsEvaluatorInput, NetworkMinimumPeersEvaluator,
-            NetworkPeersWithinToleranceEvaluator, StateSyncVersionEvaluator,
+            NetworkPeersWithinToleranceEvaluator, StateSyncVersionMetricsEvaluator,
         },
         system_information::{
-            BuildVersionEvaluator, SystemInformationEvaluatorError, SystemInformationEvaluatorInput,
+            BuildVersionEvaluator, HardwareEvaluator, SystemInformationEvaluatorError,
+            SystemInformationEvaluatorInput,
         },
     },
 };
 use anyhow::{bail, Result};
 use std::collections::HashSet;
 
-use super::system_information::HardwareEvaluator;
-
 type ApiEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
 type MetricsEvaluatorType =
     Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
+type NoiseEvaluatorType =
+    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = NoiseEvaluatorError>>;
 type SystemInformationEvaluatorType = Box<
     dyn Evaluator<Input = SystemInformationEvaluatorInput, Error = SystemInformationEvaluatorError>,
 >;
@@ -46,8 +48,38 @@ type TpsEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = 
 pub enum EvaluatorType {
     Api(ApiEvaluatorType),
     Metrics(MetricsEvaluatorType),
+    Noise(NoiseEvaluatorType),
     SystemInformation(SystemInformationEvaluatorType),
     Tps(TpsEvaluatorType),
+}
+
+// Consider using something like ambassador for this. But if you do, consider
+// a wholesale re-evaluation of the trait structure instead. For example, this
+// struct should itself implement the trait with the common functions and there
+// should be another way to build up the dependency tree of evaluators.
+impl EvaluatorType {
+    pub fn validate_check_node_call(
+        &self,
+        target_node_address: &NodeAddress,
+    ) -> anyhow::Result<()> {
+        match self {
+            EvaluatorType::Api(evaluator) => {
+                evaluator.validate_check_node_call(target_node_address)
+            }
+            EvaluatorType::Metrics(evaluator) => {
+                evaluator.validate_check_node_call(target_node_address)
+            }
+            EvaluatorType::Noise(evaluator) => {
+                evaluator.validate_check_node_call(target_node_address)
+            }
+            EvaluatorType::SystemInformation(evaluator) => {
+                evaluator.validate_check_node_call(target_node_address)
+            }
+            EvaluatorType::Tps(evaluator) => {
+                evaluator.validate_check_node_call(target_node_address)
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -87,7 +119,12 @@ impl EvaluatorSet {
     pub fn get_direct_evaluators(&self) -> Vec<&EvaluatorType> {
         self.evaluators
             .iter()
-            .filter(|evaluator| matches!(evaluator, EvaluatorType::Api(_) | EvaluatorType::Tps(_)))
+            .filter(|evaluator| {
+                matches!(
+                    evaluator,
+                    EvaluatorType::Api(_) | EvaluatorType::Noise(_) | EvaluatorType::Tps(_)
+                )
+            })
             .collect()
     }
 }
@@ -120,6 +157,11 @@ pub fn build_evaluators(
         &mut evaluator_identifiers,
         evaluator_args,
     )?;
+    HandshakeEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
     HardwareEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
@@ -141,6 +183,11 @@ pub fn build_evaluators(
         evaluator_args,
     )?;
     StateSyncVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    StateSyncVersionMetricsEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,

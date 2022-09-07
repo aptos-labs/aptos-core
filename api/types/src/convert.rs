@@ -46,6 +46,10 @@ use std::{
 };
 use storage_interface::DbReader;
 
+/// The Move converter for converting Move types to JSON
+///
+/// This reads the underlying BCS types and ABIs to convert them into
+/// JSON outputs
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
     db: Arc<dyn DbReader>,

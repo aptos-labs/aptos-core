@@ -31,6 +31,12 @@ fn native_public_key_validate(
 
     let num_sub_pks = pks_bytes.len() / ED25519_PUBLIC_KEY_LENGTH;
 
+    let mut cost = gas_params.base;
+
+    if num_sub_pks > multi_ed25519::MAX_NUM_OF_KEYS {
+        return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+    };
+
     let num_valid = pks_bytes
         .chunks_exact(ED25519_PUBLIC_KEY_LENGTH)
         .filter(|&pk_bytes| {
@@ -48,8 +54,7 @@ fn native_public_key_validate(
     }
 
     let num_checked = NumArgs::new(num_checked as u64);
-    let cost = gas_params.base
-        + gas_params.per_pubkey_deserialize * num_checked
+    cost += gas_params.per_pubkey_deserialize * num_checked
         + gas_params.per_pubkey_small_order_check * num_checked;
 
     Ok(NativeResult::ok(cost, smallvec![Value::bool(all_valid)]))

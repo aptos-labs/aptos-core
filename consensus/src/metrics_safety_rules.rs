@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::persistent_liveness_storage::PersistentLivenessStorage;
+use crate::{monitor, persistent_liveness_storage::PersistentLivenessStorage};
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::info;
 use aptos_types::{
@@ -141,7 +140,7 @@ mod tests {
         epoch_change::EpochChangeProof,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
-    use claim::{assert_matches, assert_ok};
+    use claims::{assert_matches, assert_ok};
     use consensus_types::{
         block_data::BlockData,
         timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},

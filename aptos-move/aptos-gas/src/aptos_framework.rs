@@ -71,6 +71,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],
 
+    [.hash.keccak256.base, optional "hash.keccak256.base", 1],
+    [.hash.keccak256.per_byte, optional "hash.keccak256.per_byte", 1],
+
     [.type_info.type_of.base, "type_info.type_of.base", 1],
     [.type_info.type_of.per_byte_in_str, "type_info.type_of.per_abstract_memory_unit", 1],
     [.type_info.type_name.base, "type_info.type_name.base", 1],
@@ -93,8 +96,5 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.aggregator.read.base, "aggregator.read.base", 1],
     [.aggregator.sub.base, "aggregator.sub.base", 1],
     [.aggregator.destroy.base, "aggregator.destroy.base", 1],
-    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 1],
-
-    [.network_address.validate_network_addresses.base, "network_address.validate_network_addresses.base", 1],
-    [.network_address.validate_network_addresses.per_byte, "network_address.validate_network_addresses.per_byte", 1],
+    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 1]
 ]);

@@ -84,10 +84,13 @@ impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
             vec![]
         };
         self.txn_options
-            .submit_transaction(resource_account_create_resource_account(
-                bcs::to_bytes(&self.seed)?,
-                authentication_key,
-            ))
+            .submit_transaction(
+                resource_account_create_resource_account(
+                    bcs::to_bytes(&self.seed)?,
+                    authentication_key,
+                ),
+                None,
+            )
             .await
             .map(CreateResourceAccountSummary::from)
     }

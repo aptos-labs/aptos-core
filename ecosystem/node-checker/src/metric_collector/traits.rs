@@ -6,8 +6,6 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use thiserror::Error as ThisError;
 
-// TODO: Consider using thiserror.
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SystemInformation(pub HashMap<String, String>);
 

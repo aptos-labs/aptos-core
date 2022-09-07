@@ -108,11 +108,11 @@ impl FetchMetadata {
         start_epoch: Option<i64>,
         end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
-        let mut start_seq_num = 0;
         let (last_events, state) = client
             .get_new_block_events(None, Some(1))
             .await?
             .into_parts();
+        let mut start_seq_num = state.oldest_block_height;
         assert_eq!(last_events.len(), 1, "{:?}", last_events);
         let last_event = last_events.first().unwrap();
         let last_seq_num = last_event.sequence_number;
@@ -122,7 +122,24 @@ impl FetchMetadata {
             if wanted_start_epoch < 0 {
                 wanted_start_epoch = last_event.event.epoch() as i64 + wanted_start_epoch + 1;
             }
-            std::cmp::max(2, wanted_start_epoch) as u64
+
+            let oldest_event = client
+                .get_new_block_events(Some(start_seq_num), Some(1))
+                .await?
+                .into_inner()
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("No blocks at oldest_block_height {}", start_seq_num))?;
+            let oldest_fetchable_epoch = std::cmp::max(oldest_event.event.epoch() + 1, 2);
+            if oldest_fetchable_epoch > wanted_start_epoch as u64 {
+                println!(
+                    "Oldest full epoch that can be retreived is {} ",
+                    oldest_fetchable_epoch
+                );
+                oldest_fetchable_epoch
+            } else {
+                wanted_start_epoch as u64
+            }
         };
         let wanted_end_epoch = {
             let mut wanted_end_epoch = end_epoch.unwrap_or(i64::MAX);
@@ -169,12 +186,14 @@ impl FetchMetadata {
             "Fetching {} to {} sequence number, wanting epochs [{}, {}), last version: {} and epoch: {}",
             start_seq_num, last_seq_num, wanted_start_epoch, wanted_end_epoch, state.version, state.epoch,
         );
+        let mut result: Vec<EpochInfo> = vec![];
+        if wanted_start_epoch >= wanted_end_epoch {
+            return Ok(result);
+        }
 
         let mut validators: Vec<ValidatorInfo> = vec![];
-        let mut epoch = 0;
-
         let mut current: Vec<VersionedNewBlockEvent> = vec![];
-        let mut result: Vec<EpochInfo> = vec![];
+        let mut epoch = 0;
 
         let mut cursor = start_seq_num;
         loop {

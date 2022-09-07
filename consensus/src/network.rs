@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     counters,
     logging::LogEvent,
+    monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
 };
 use anyhow::{anyhow, ensure};
@@ -54,7 +54,8 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub block_retrieval: aptos_channel::Receiver<AccountAddress, IncomingBlockRetrievalRequest>,
+    pub block_retrieval:
+        aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -245,7 +246,8 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    block_retrieval_tx: aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>,
+    block_retrieval_tx:
+        aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -311,7 +313,10 @@ impl NetworkTask {
                             protocol,
                             response_sender: callback,
                         };
-                        if let Err(e) = self.block_retrieval_tx.push(peer_id, req_with_callback) {
+                        if let Err(e) = self
+                            .block_retrieval_tx
+                            .push(peer_id, (peer_id, req_with_callback))
+                        {
                             warn!(error = ?e, "aptos channel closed");
                         }
                     }

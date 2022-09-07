@@ -11,8 +11,9 @@ use aptos_sf_indexer::indexer::substream_processor::{
 use aptos_sf_indexer::proto;
 
 use anyhow::{format_err, Context, Error};
-use aptos_sf_indexer::database::new_db_pool;
 use aptos_sf_indexer::{
+    counters::start_inspection_service,
+    database::new_db_pool,
     substream_processors::block_output_processor::BlockOutputSubstreamProcessor,
     substreams::SubstreamsEndpoint,
     substreams_stream::{BlockResponse, SubstreamsStream},
@@ -58,6 +59,11 @@ async fn main() -> Result<(), Error> {
     let substream_module_name = &args.module_name;
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let inspection_url = env::var("INSPECTION_URL").unwrap_or_else(|_| "localhost".to_string());
+    let inspection_port = env::var("INSPECTION_PORT")
+        .map(|v| v.parse::<u16>().unwrap_or(9105))
+        .unwrap_or(9105);
+    start_inspection_service(inspection_url.as_str(), inspection_port);
     let conn_pool = new_db_pool(&database_url).unwrap();
     info!("Created the connection pool");
 

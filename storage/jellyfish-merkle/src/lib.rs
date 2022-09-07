@@ -73,7 +73,7 @@ pub mod iterator;
 mod jellyfish_merkle_test;
 pub mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
-mod mock_tree_store;
+pub mod mock_tree_store;
 pub mod node_type;
 pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -84,7 +84,6 @@ use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::proof::SparseMerkleProofExt;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -98,7 +97,7 @@ use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -145,33 +144,6 @@ pub trait TreeWriter<K>: Send + Sync {
     fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<K>>) -> Result<()>;
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateSnapshotProgress {
-    pub key_hash: HashValue,
-    pub usage: StateStorageUsage,
-}
-
-impl StateSnapshotProgress {
-    pub fn new(key_hash: HashValue, usage: StateStorageUsage) -> Self {
-        Self { key_hash, usage }
-    }
-}
-
-pub trait StateValueWriter<K, V>: Send + Sync {
-    /// Writes a kv batch into storage.
-    fn write_kv_batch(
-        &self,
-        version: Version,
-        kv_batch: &StateValueBatch<K, Option<V>>,
-        progress: StateSnapshotProgress,
-    ) -> Result<()>;
-
-    fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()>;
-
-    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>>;
-}
-
 pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
     fn key_size(&self) -> usize;
 }
@@ -211,8 +183,6 @@ impl TestKey for StateKey {}
 
 /// Node batch that will be written into db atomically with other batches.
 pub type NodeBatch<K> = HashMap<NodeKey, Node<K>>;
-/// Key-Value batch that will be written into db atomically with other batches.
-pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NodeStats {

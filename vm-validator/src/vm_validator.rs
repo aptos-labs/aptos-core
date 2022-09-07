@@ -105,13 +105,6 @@ pub fn get_account_sequence_number(
 
     let account_state_view = state_view.as_account_with_state_view(&address);
 
-    if let Ok(Some(crsn)) = account_state_view.get_crsn_resource() {
-        return Ok(AccountSequenceInfo::CRSN {
-            min_nonce: crsn.min_nonce(),
-            size: crsn.size(),
-        });
-    }
-
     match account_state_view.get_account_resource()? {
         Some(account_resource) => Ok(AccountSequenceInfo::Sequential(
             account_resource.sequence_number(),

@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::streaming_client::NotificationAndFeedback;
 use crate::{
     data_notification::DataPayload,
     error::Error,
     streaming_client::{
-        new_streaming_service_client_listener_pair, DataStreamingClient, NotificationFeedback,
-        StreamingServiceClient,
+        new_streaming_service_client_listener_pair, DataStreamingClient, NotificationAndFeedback,
+        NotificationFeedback, StreamingServiceClient,
     },
     streaming_service::DataStreamingService,
     tests::utils::{
@@ -19,7 +18,7 @@ use crate::{
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
-use claim::{assert_le, assert_matches, assert_ok, assert_some};
+use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
 macro_rules! unexpected_payload_type {
     ($received:expr) => {

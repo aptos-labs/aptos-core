@@ -7,7 +7,7 @@ slug: "run-a-fullnode-on-gcp"
 
 This tutorial explains how to configure and deploy a public FullNode to connect to the Aptos devnet using Google Cloud (GCP). Running a FullNode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking for deploying a production grade FullNode, we recommend you to deploy it on the cloud.
 
-> **Note:** Please read [Run a Fullnode](/nodes/full-node/fullnode-for-devnet) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
+> **Note:** Please read [Run a Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
 >
 
 ## Prerequisites
@@ -92,7 +92,13 @@ You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform mo
     zone          = "c"            # Specify the zone suffix
     project       = "gcp-fullnode" # Specify your GCP project name
     era           = 1              # bump era number to wipe the chain
-    image_tag     = "dev_5b525691" # Specify the docker image tag to use
+    image_tag     = "devnet"       # Specify the docker image tag to use, replace to `testnet` or other tag if needed
+
+    fullnode_helm_values = {
+      chain = {
+      name = "devnet"              # replace with `ait3` or other values if connecting to different networks.
+      }
+    }
   }
   ```
 
@@ -182,7 +188,7 @@ There could be two types of releasees, one comes with a data wipe to startover t
 
 ### Upgrade without data wipe
 
-1. Update `image_tag` in `main.tf` (if you use `devnet` tag you can skip this step)
+1. Update `image_tag` in `main.tf`
 
 2. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file
   ```
@@ -213,9 +219,12 @@ If you want to configure your node with a static identity, check the [fullnode a
     zone          = "c"            # Specify the zone suffix
     project       = "gcp-fullnode" # Specify your GCP project name
     era           = 1              # bump era number to wipe the chain
-    image_tag     = "dev_5b525691" # Specify the docker image tag to use
+    image_tag     = "devnet"       # Specify the docker image tag to use
 
     fullnode_helm_values = {
+      chain = {
+        name = "devnet"
+      }
       # create fullnode from this identity config, so it will always have same peer id and address
       fullnode_identity = {
         type = "from_config"
@@ -271,6 +280,8 @@ module "fullnode" {
     }
   }
 ```
+
+Make sure to update `aptos_chains.devnet` to corresponding networks if you're connecting to other networks.
 
 3. Apply Terraform changes
   ```

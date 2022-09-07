@@ -122,7 +122,26 @@ impl ReleaseTarget {
                 PathBuf::from(self.file_name())
             },
         };
-        options.create_release()
+
+        #[cfg(unix)]
+        {
+            options.create_release()
+        }
+        #[cfg(windows)]
+        {
+            // Windows requires to set the stack because the package compiler puts too much on the
+            // stack for the default size.  A quick internet search has shown the new thread with
+            // a custom stack size is the easiest course of action.
+            const STACK_SIZE: usize = 4 * 1024 * 1024;
+            let child_thread = std::thread::Builder::new()
+                .name("Framework-release".to_string())
+                .stack_size(STACK_SIZE)
+                .spawn(|| options.create_release())
+                .expect("Expected to spawn release thread");
+            child_thread
+                .join()
+                .expect("Expected to join release thread")
+        }
     }
 }
 

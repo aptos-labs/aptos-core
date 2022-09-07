@@ -4,42 +4,42 @@ slug: "additional-doc"
 sidebar_position: 15
 ---
 
-## Shutdown Nodes for Incentivized Testnet
+## Shutdown nodes for Incentivized Testnet
 
-Follow this instruction when you need to take down the validator node and cleanup the resources used by the node.
+Follow these instructions when you need to take down the validator node and cleanup the resources used by the node.
 
+Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch).
 
-Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch)
-
-    ```
-    aptos node leave-validator-set --profile ait3-operator
-    ```
+```bash
+aptos node leave-validator-set --profile ait3-operator
+```
 
 ### Using source code
 
 - Stop your node.
-- Remove the data directory: `rm -rf <your-data-directory>`
-- Remove the genesis blob file and waypoint
+- Remove the data directory: `rm -r <your-data-directory>`.
+- Remove the genesis blob file and waypoint.
 - Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
 
 ### Using Docker
 
-- Stop your node and remove the data volumes, `docker compose down --volumes`
-- Remove the genesis blob file and waypoint
+- Stop your node and remove the data volumes, `docker compose down --volumes`.
+- Remove the genesis blob file and waypoint.
 - Depends on if you want to reuse your node identity, you can choose to keep or delete the `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` files.
 
 ### Using Terraform
 
-- Stop your node and delete all the resources: `terraform destroy`
+- Stop your node and delete all the resources: `terraform destroy`.
 
+## Add monitoring components
 
-## Add Monitoring Components
-
-Note: This is currently only supported using Terraform.
+:::tip Supported only using Terraform
+This is currently only supported using Terraform.
+:::
 
 1. Set the `enable_monitoring` variable in your terraform module. For example:
 
-    ```
+    ```rust
     module "aptos-node" {
       ...
       enable_monitoring           = true
@@ -47,27 +47,29 @@ Note: This is currently only supported using Terraform.
     }
     ```
 
-2. Apply the changes: `terraform apply`
+2. Apply the changes: `terraform apply`.
 
-3. You should see a new pod getting created. Run `kubectl get pods` to check.
+3. You will see a new pod getting created. Run `kubectl get pods` to check.
 
-4. Access the dashboard
+4. Access the dashboard.
 
     First, find the IP/DNS for the monitoring load balancer.
 
-    ```
+    ```bash
     kubectl get svc ${WORKSPACE}-mon-aptos-monitoring --output jsonpath='{.status.loadBalancer.ingress[0]}'
     ```
 
-    You can access the dashboard on `http://<ip/DNS>`
+    You can access the dashboard on `http://<ip/DNS>`.
 
 ## Staking with CLI
 
-We now have a UI to support some staking operation, but in any case if you need to do operations not supported in UI, you can use CLI for it.
+:::tip Stake with UI
+You can also use UI to perform a few staking operations. See the [**Initialize staking pool** section](/nodes/ait/steps-in-ait3#initialize-staking-pool). Proceed below to use the CLI to perform staking operations. 
+:::
 
 - Initialize CLI with your wallet private key or create new wallet
 
-  ```
+  ```bash
   aptos init --profile ait3-owner \
     --rest-url http://ait3.aptosdev.com
   ```
@@ -76,7 +78,7 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Initialize staking pool using CLI
 
-  ```
+  ```bash
   aptos stake initialize-stake-owner \
     --initial-stake-amount 100000000000000 \
     --operator-address <operator-address> \
@@ -86,7 +88,7 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Transfer coin between accounts
 
-  ```
+  ```bash
   aptos account transfer \
     --account <operator-address> \
     --amount <amount> \
@@ -95,7 +97,7 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Switch operator
 
-  ```
+  ```bash
   aptos stake set-operator \
     --operator-address <new-operator-address> \ 
     --profile ait3-owner
@@ -103,7 +105,7 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Switch voter
 
-  ```
+  ```bash
   aptos stake set-delegated-voter \
     --voter-address <new-voter-address> \ 
     --profile ait3-owner
@@ -111,21 +113,26 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Add stake
 
-  ```
+  ```bash
   aptos stake add-stake \
     --amount <amount> \
-    --profile ait3-owner
+    --profile ait3-owner \
+    --max-gas 10000
   ```
+
+  :::tip Max gas
+    You can adjust the above `max-gas` number. Ensure that you sent your operator enough tokens to pay for the gas fee.
+    :::
 
 - Increase stake lockup
 
-  ```
+  ```bash
   aptos stake increase-lockup --profile ait3-owner
   ```
 
 - Unlock stake
 
-  ```
+  ```bash
   aptos stake unlock-stake \
     --amount <amount> \
     --profile ait3-owner
@@ -133,7 +140,7 @@ We now have a UI to support some staking operation, but in any case if you need 
 
 - Withdraw stake
 
-  ```
+  ```bash
   aptos stake withdraw-stake \
     --amount <amount> \
     --profile ait3-owner
