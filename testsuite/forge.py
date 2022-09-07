@@ -911,7 +911,7 @@ class K8sForgeRunner(ForgeRunner):
                     "wait",
                     "-n",
                     "default",
-                    "--timeout=1m",
+                    "--timeout=5m",
                     "--for=condition=Ready",
                     f"pod/{forge_pod_name}",
                 ]
