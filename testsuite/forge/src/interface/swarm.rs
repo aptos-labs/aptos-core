@@ -267,6 +267,21 @@ pub trait SwarmExt: Swarm {
             )
             .collect()
     }
+
+    fn get_clients_for_peers(&self, peers: &[PeerId], client_timeout: Duration) -> Vec<RestClient> {
+        peers
+            .iter()
+            .map(|peer| {
+                self.validator(*peer)
+                    .map(|n| n.rest_client_with_timeout(client_timeout))
+                    .unwrap_or_else(|| {
+                        self.full_node(*peer)
+                            .unwrap()
+                            .rest_client_with_timeout(client_timeout)
+                    })
+            })
+            .collect()
+    }
 }
 
 /// Waits for all nodes to have caught up to the specified `verison`.
