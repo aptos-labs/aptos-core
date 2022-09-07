@@ -824,43 +824,6 @@ impl EpochManager {
 
         let progress_counter = Arc::new(AtomicU64::new(0));
         let counter_copy = progress_counter.clone();
-        let panic_duration_s = self.config.panic_on_stuck_epoch_manager_duration_s;
-
-        let _handle = if panic_duration_s > 0 {
-            Some(
-                thread::Builder::new()
-                    .name("panic_thread".to_string())
-                    .spawn(move || {
-                        let mut last_change = Instant::now();
-                        let mut prev_value = 0;
-                        loop {
-                            let cur_value = counter_copy.load(std::sync::atomic::Ordering::Relaxed);
-                            if prev_value != cur_value {
-                                debug!("Progress check passed {} < {}", prev_value, cur_value);
-                                last_change = Instant::now();
-                                prev_value = cur_value;
-                            } else {
-                                error!(
-                                    "No progress in {}s, at {}",
-                                    last_change.elapsed().as_secs(),
-                                    cur_value,
-                                );
-                                if last_change.elapsed().as_secs() > panic_duration_s {
-                                    panic!(
-                                        "Crashing after {}s no progress",
-                                        last_change.elapsed().as_secs()
-                                    );
-                                }
-                            }
-
-                            thread::sleep(Duration::from_secs(30));
-                        }
-                    })
-                    .unwrap(),
-            )
-        } else {
-            None
-        };
         loop {
             ::futures::select! {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
