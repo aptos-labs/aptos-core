@@ -92,3 +92,12 @@ fn test_shared_account() {
     )]);
     run_tests_for_pkg("shared_account", named_address);
 }
+
+#[test]
+fn test_resource_account() {
+    let named_address = BTreeMap::from([(
+        String::from("resource_account"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("resource_account", named_address);
+}

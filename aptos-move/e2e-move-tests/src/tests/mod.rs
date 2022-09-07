@@ -13,3 +13,4 @@ mod max_loop_depth;
 mod rotate_auth_key;
 mod stake;
 mod string_args;
+mod resource_account;
