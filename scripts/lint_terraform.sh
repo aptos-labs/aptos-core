@@ -12,11 +12,11 @@ if ! command -v tflint &>/dev/null; then
     if [[ "$(uname)" == "Darwin" ]]; then
         brew install tflint
     else # Assume Linux
-        wget https://raw.githubusercontent.com/terraform-linters/tflint/21a0c1c86c5aa0e3e95916e6e25ded69efcf13f3/install_linux.sh
-        sha=$(shasum -a 256 install_linux.sh | awk '{ print $1 }')
-        [ "$sha" != "54e1b264b0f4b3e183d873273d5ee2053c80222a4422eea0b35d2e88114fbff9" ] && echo "shasum mismatch" && exit 1
-        chmod +x install_linux.sh
-        ./install_linux.sh
+        wget https://github.com/terraform-linters/tflint/releases/download/v0.39.3/tflint_linux_amd64.zip
+        sha=$(shasum -a 256 tflint_linux_amd64.zip | awk '{ print $1 }')
+        [ "$sha" != "53ab21354c3dedc8ae4296b236330b8b0e76a777d2013a6549107822c60631ef" ] && echo "shasum mismatch" && exit 1
+        unzip tflint_linux_amd64.zip
+        chmod +x tflint
     fi
 else
     echo "tflint already installed"
@@ -49,8 +49,8 @@ done
 # Run tflint
 echo "##### tflint #####"
 base_dir=$(pwd)
-tflint --init --config="${base_dir}/terraform/.tflint.hcl"
+./tflint --init --config="${base_dir}/terraform/.tflint.hcl"
 for dir in ${tf_dirs[@]}; do
     echo "Linting $dir"
-    tflint --config="${base_dir}/terraform/.tflint.hcl" --var-file="${base_dir}/terraform/tflint.tfvars" $dir
+    ./tflint --config="${base_dir}/terraform/.tflint.hcl" --var-file="${base_dir}/terraform/tflint.tfvars" $dir
 done
