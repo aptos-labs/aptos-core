@@ -194,8 +194,8 @@ export class TransactionBuilderABI {
     });
 
     this.builderConfig = {
-      gasUnitPrice: 1n,
-      maxGasAmount: 2000n,
+      gasUnitPrice: BigInt(1),
+      maxGasAmount: BigInt(2000),
       expSecFromNow: 20,
       ...builderConfig,
     };

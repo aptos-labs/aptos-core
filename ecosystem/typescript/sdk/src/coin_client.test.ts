@@ -21,7 +21,7 @@ test(
 
     await client.waitForTransaction(await coinClient.transfer(alice, bob, 42), { checkSuccess: true });
 
-    expect(await coinClient.checkBalance(bob)).toBe(42n);
+    expect(await coinClient.checkBalance(bob)).toBe(BigInt(42));
   },
   30 * 1000,
 );

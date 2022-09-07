@@ -170,7 +170,7 @@ describe("BuilderUtils", () => {
 
   it("serializes a u64 arg", async () => {
     let serializer = new Serializer();
-    serializeArg(18446744073709551615n, new TypeTagU64(), serializer);
+    serializeArg(BigInt("18446744073709551615"), new TypeTagU64(), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
 
     serializer = new Serializer();
@@ -181,7 +181,7 @@ describe("BuilderUtils", () => {
 
   it("serializes a u128 arg", async () => {
     let serializer = new Serializer();
-    serializeArg(340282366920938463463374607431768211455n, new TypeTagU128(), serializer);
+    serializeArg(BigInt("340282366920938463463374607431768211455"), new TypeTagU128(), serializer);
     expect(serializer.getBytes()).toEqual(
       new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
     );
@@ -275,7 +275,7 @@ describe("BuilderUtils", () => {
 
   it("converts a u64 TransactionArgument", async () => {
     const res = argToTransactionArgument(123, new TypeTagU64());
-    expect((res as TransactionArgumentU64).value).toEqual(123n);
+    expect((res as TransactionArgumentU64).value).toEqual(BigInt(123));
     expect(() => {
       argToTransactionArgument("u64", new TypeTagU64());
     }).toThrow(/Cannot convert/);
@@ -283,7 +283,7 @@ describe("BuilderUtils", () => {
 
   it("converts a u128 TransactionArgument", async () => {
     const res = argToTransactionArgument(123, new TypeTagU128());
-    expect((res as TransactionArgumentU128).value).toEqual(123n);
+    expect((res as TransactionArgumentU128).value).toEqual(BigInt(123));
     expect(() => {
       argToTransactionArgument("u128", new TypeTagU128());
     }).toThrow(/Cannot convert/);
@@ -335,8 +335,8 @@ describe("BuilderUtils", () => {
   });
 
   it("ensures a bigint", async () => {
-    expect(ensureBigInt(10)).toBe(10n);
-    expect(ensureBigInt("123")).toBe(123n);
+    expect(ensureBigInt(10)).toBe(BigInt(10));
+    expect(ensureBigInt("123")).toBe(BigInt(123));
     expect(() => ensureBigInt("True")).toThrow(/^Cannot convert/);
   });
 });

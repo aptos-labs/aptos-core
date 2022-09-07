@@ -74,20 +74,20 @@ describe("BCS Deserializer", () => {
 
   it("deserializes a uint64", () => {
     let deserializer = new Deserializer(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
-    expect(deserializer.deserializeU64()).toEqual(18446744073709551615n);
+    expect(deserializer.deserializeU64()).toEqual(BigInt("18446744073709551615"));
     deserializer = new Deserializer(new Uint8Array([0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12]));
-    expect(deserializer.deserializeU64()).toEqual(1311768467750121216n);
+    expect(deserializer.deserializeU64()).toEqual(BigInt("1311768467750121216"));
   });
 
   it("deserializes a uint128", () => {
     let deserializer = new Deserializer(
       new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
     );
-    expect(deserializer.deserializeU128()).toEqual(340282366920938463463374607431768211455n);
+    expect(deserializer.deserializeU128()).toEqual(BigInt("340282366920938463463374607431768211455"));
     deserializer = new Deserializer(
       new Uint8Array([0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
     );
-    expect(deserializer.deserializeU128()).toEqual(1311768467750121216n);
+    expect(deserializer.deserializeU128()).toEqual(BigInt("1311768467750121216"));
   });
 
   it("deserializes a uleb128", () => {
