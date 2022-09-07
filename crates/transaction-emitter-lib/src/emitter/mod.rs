@@ -577,9 +577,9 @@ async fn wait_for_single_account_sequence(
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
         time::sleep(Duration::from_millis(1000)).await;
-        match query_sequence_numbers(client, [account.address()].iter()).await {
-            Ok(sequence_numbers) => {
-                if sequence_numbers[0] >= account.sequence_number() {
+        match query_sequence_number(client, account.address()).await {
+            Ok(sequence_number) => {
+                if sequence_number >= account.sequence_number() {
                     return Ok(());
                 }
             }
@@ -622,7 +622,6 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
-
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok(sequence_numbers) => {
@@ -701,6 +700,10 @@ fn update_seq_num_and_get_num_expired(
             },
         )
         .sum()
+}
+
+pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
+    Ok(query_sequence_numbers(client, [address].iter()).await?[0])
 }
 
 pub async fn query_sequence_numbers<'a, I>(client: &RestClient, addresses: I) -> Result<Vec<u64>>
