@@ -33,7 +33,11 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 
 use crate::{
     args::TransactionType,
-    emitter::{account_minter::AccountMinter, submission_worker::SubmissionWorker},
+    emitter::{
+        account_minter::AccountMinter,
+        stats::{DynamicStatsTracking, TxnStats},
+        submission_worker::SubmissionWorker,
+    },
     transaction_generator::{
         account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
@@ -42,7 +46,6 @@ use crate::{
 };
 use aptos_sdk::transaction_builder::aptos_stdlib;
 use rand::rngs::StdRng;
-use stats::{StatsAccumulator, TxnStats};
 
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 100_000_000_000;
@@ -310,7 +313,17 @@ struct Worker {
 pub struct EmitJob {
     workers: Vec<Worker>,
     stop: Arc<AtomicBool>,
-    stats: Arc<StatsAccumulator>,
+    stats: Arc<DynamicStatsTracking>,
+}
+
+impl EmitJob {
+    pub fn start_next_phase(&self) {
+        self.stats.start_next_phase();
+    }
+
+    pub fn get_cur_phase(&self) -> usize {
+        self.stats.get_cur_phase()
+    }
 }
 
 #[derive(Debug)]
@@ -349,6 +362,7 @@ impl TxnEmitter {
         &mut self,
         root_account: &mut LocalAccount,
         req: EmitJobRequest,
+        stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
         let mode_params = req.calculate_mode_params();
         let workers_per_endpoint = mode_params.workers_per_endpoint;
@@ -369,7 +383,7 @@ impl TxnEmitter {
         let all_addresses = Arc::new(RwLock::new(all_addresses));
         let mut all_accounts = all_accounts.into_iter();
         let stop = Arc::new(AtomicBool::new(false));
-        let stats = Arc::new(StatsAccumulator::default());
+        let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
         let txn_factory = self
             .txn_factory
@@ -463,7 +477,7 @@ impl TxnEmitter {
         })
     }
 
-    pub async fn stop_job(&mut self, job: EmitJob) -> TxnStats {
+    pub async fn stop_job(&mut self, job: EmitJob) -> Vec<TxnStats> {
         job.stop.store(true, Ordering::Relaxed);
         for worker in job.workers {
             let mut accounts = worker
@@ -472,23 +486,30 @@ impl TxnEmitter {
                 .expect("TxnEmitter worker thread failed");
             self.accounts.append(&mut accounts);
         }
+
         job.stats.accumulate()
     }
 
-    pub fn peek_job_stats(&self, job: &EmitJob) -> TxnStats {
+    pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
         job.stats.accumulate()
     }
 
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
-        let mut prev_stats: Option<TxnStats> = None;
+        let mut prev_stats: Option<Vec<TxnStats>> = None;
+        let default_stats = TxnStats::default();
         let window = Duration::from_secs(max(interval_secs, 1));
         while Instant::now() < deadline {
             tokio::time::sleep(window).await;
+            let cur_phase = job.stats.get_cur_phase();
             let stats = self.peek_job_stats(job);
-            let delta = &stats - &prev_stats.unwrap_or_default();
+            let delta = &stats[cur_phase]
+                - prev_stats
+                    .as_ref()
+                    .map(|p| &p[cur_phase])
+                    .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("{}", delta.rate(window));
+            info!("phase {}: {}", cur_phase, delta.rate(window));
         }
     }
 
@@ -498,13 +519,13 @@ impl TxnEmitter {
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
-        let job = self.start_job(root_account, emit_job_request).await?;
+        let job = self.start_job(root_account, emit_job_request, 1).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
         info!("Stopped job");
-        Ok(stats)
+        Ok(stats.into_iter().next().unwrap())
     }
 
     pub async fn emit_txn_for_with_stats(
@@ -515,12 +536,12 @@ impl TxnEmitter {
         interval_secs: u64,
     ) -> Result<TxnStats> {
         info!("Starting emitting txns for {} secs", duration.as_secs());
-        let job = self.start_job(root_account, emit_job_request).await?;
+        let job = self.start_job(root_account, emit_job_request, 1).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
         info!("Stopped job");
-        Ok(stats)
+        Ok(stats.into_iter().next().unwrap())
     }
 
     pub async fn submit_single_transaction(
