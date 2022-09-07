@@ -318,37 +318,19 @@ impl TransactionStore {
     }
 
     /// Maintains the following invariants:
-    /// - All transactions of a given non-CRSN account that are sequential to the current sequence number
+    /// - All transactions of a given account that are sequential to the current sequence number
     ///   should be included in both the PriorityIndex (ordering for Consensus) and
     ///   TimelineIndex (txns for SharedMempool).
-    /// - All transactions of a given CRSN account that are greater than the account's min_nonce
-    ///   should be included in both the PriorityIndex and TimelineIndex.
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(
         &mut self,
         address: &AccountAddress,
-        crsn_or_seqno: AccountSequenceInfo,
+        sequence_info: AccountSequenceInfo,
     ) {
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut min_seq = crsn_or_seqno.min_seq();
+            let mut min_seq = sequence_info.min_seq();
 
-            match crsn_or_seqno {
-                AccountSequenceInfo::CRSN { min_nonce, size } => {
-                    for i in min_nonce..size {
-                        if let Some(txn) = txns.get_mut(&i) {
-                            self.priority_index.insert(txn);
-
-                            if txn.timeline_state == TimelineState::NotReady {
-                                self.timeline_index.insert(txn);
-                            }
-
-                            // Remove txn from parking lot after it has been promoted to
-                            // priority_index / timeline_index, i.e., txn status is ready.
-                            self.parking_lot_index.remove(txn);
-                            min_seq = i;
-                        }
-                    }
-                }
+            match sequence_info {
                 AccountSequenceInfo::Sequential(_) => {
                     while let Some(txn) = txns.get_mut(&min_seq) {
                         self.priority_index.insert(txn);
@@ -377,7 +359,7 @@ impl TransactionStore {
             }
             trace!(
                 LogSchema::new(LogEntry::ProcessReadyTxns).account(*address),
-                first_ready_seq_num = crsn_or_seqno.min_seq(),
+                first_ready_seq_num = sequence_info.min_seq(),
                 last_ready_seq_num = min_seq,
                 num_parked_txns = parking_lot_txns,
             );
