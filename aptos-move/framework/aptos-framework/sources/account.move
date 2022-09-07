@@ -102,7 +102,7 @@ module aptos_framework::account {
     const EINVALID_CAPABILITY_TYPE: u64 = 14;
     const EINVALID_ACCEPT_SIGNER_CAPABILITY: u64 = 15;
 
-    native fun create_signer(addr: address): signer;
+    native public(friend) fun create_signer(addr: address): signer;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(aptos_framework: &signer) {

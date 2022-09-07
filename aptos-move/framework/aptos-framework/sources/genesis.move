@@ -19,6 +19,7 @@ module aptos_framework::genesis {
     use aptos_framework::state_storage;
     use aptos_framework::version;
     use aptos_framework::chain_status;
+    use aptos_framework::aptos_account;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -29,6 +30,11 @@ module aptos_framework::genesis {
         proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         full_node_network_addresses: vector<u8>,
+    }
+
+    struct InitialBalance has copy, drop {
+        address: address,
+        amount: u64,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -101,14 +107,32 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
-    /// Genesis step 2: Initialize Aptos coin.
-    fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
+    /// Genesis step 2: Initialize Aptos coin and mint initial balances
+    fun initialize_aptos_coin(
+        aptos_framework: &signer,
+        initial_balances: vector<InitialBalance>,
+    ): MintCapability<AptosCoin> {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
+        // Mint initial balances
+        let i = 0;
+        let len = vector::length(&initial_balances);
+        while (i < len) {
+            let initial_balance = vector::borrow(&initial_balances, i);
+            // We have to create the account before minting
+            aptos_account::create_account(initial_balance.address);
+
+            // Only mint if there will be a balance
+            if (initial_balance.amount > 0) {
+                aptos_coin::mint(aptos_framework, initial_balance.address, initial_balance.amount);
+            };
+            i = i + 1;
+        };
 
         mint_cap
     }
@@ -117,10 +141,11 @@ module aptos_framework::genesis {
     fun initialize_core_resources_and_aptos_coin(
         aptos_framework: &signer,
         core_resources_auth_key: vector<u8>,
+        initial_balances: vector<InitialBalance>,
     ) {
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
-        let mint_cap = initialize_aptos_coin(aptos_framework);
+        let mint_cap = initialize_aptos_coin(aptos_framework, initial_balances);
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
@@ -139,21 +164,12 @@ module aptos_framework::genesis {
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-            let owner = &account::create_account(validator.owner_address);
+            let owner = &account::create_signer(validator.owner_address);
             let operator = owner;
             // Create the operator account if it's different from owner.
             if (validator.operator_address != validator.owner_address) {
-                operator = &account::create_account(validator.operator_address);
+                operator = &account::create_signer(validator.operator_address);
             };
-            // Create the voter account if it's different from owner and operator.
-            if (validator.voter_address != validator.owner_address &&
-                validator.voter_address != validator.operator_address) {
-                account::create_account(validator.voter_address);
-            };
-
-            // Mint the initial staking amount to the validator.
-            coin::register<AptosCoin>(owner);
-            aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
 
             // Initialize the stake pool and join the validator set.
             stake::initialize_stake_owner(

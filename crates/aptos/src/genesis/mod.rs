@@ -17,7 +17,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_genesis::builder::GenesisConfiguration;
+use aptos_genesis::builder::{parse_initial_balances_from_staking_amounts, GenesisConfiguration};
 use aptos_genesis::config::{StringOperatorConfiguration, StringOwnerConfiguration};
 use aptos_genesis::{
     config::{Layout, ValidatorConfiguration},
@@ -26,11 +26,14 @@ use aptos_genesis::{
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use std::collections::HashMap;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
+use vm_genesis::InitialBalance;
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
+const BALANCES_FILE: &str = "balances.yaml";
 
 /// Tool for setting up an Aptos chain Genesis transaction
 ///
@@ -144,6 +147,19 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
+    // If there is an initial balances, load them from a file, otherwise do the old way
+    // of building the balances from the staking amounts
+    let initial_balances: Vec<InitialBalance> = if layout.has_initial_balances {
+        parse_initial_balances_from_file(&client, validators.as_slice())?
+    } else {
+        parse_initial_balances_from_staking_amounts(validators.as_slice()).map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to parse initial balances from validator configurations {}",
+                err
+            ))
+        })?
+    };
+
     let framework = client.get_framework()?;
 
     Ok(GenesisInfo::new(
@@ -164,7 +180,60 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             voting_duration_secs: layout.voting_duration_secs,
             voting_power_increase_limit: layout.voting_power_increase_limit,
         },
+        initial_balances.as_slice(),
     )?)
+}
+
+/// Parses initial balances from a file.  This includes erroring out if a known address is supposed
+/// to have exist at genesis.
+fn parse_initial_balances_from_file(
+    client: &Client,
+    validators: &[ValidatorConfiguration],
+) -> CliTypedResult<Vec<InitialBalance>> {
+    let initial_balances: Vec<InitialBalance> = client.get(Path::new(BALANCES_FILE))?;
+
+    // Check for duplicate accounts in balances
+    let mut accounts = HashMap::new();
+    for balance in initial_balances.iter() {
+        if accounts.contains_key(&balance.address) {
+            return Err(CliError::CommandArgumentError(format!(
+                "Duplicate initial balance for {}",
+                balance.address
+            )));
+        }
+        accounts.insert(balance.address, balance.balance);
+    }
+
+    // Ensure that at least all of the known addresses are present and follow the basic requirements
+    for validator in validators {
+        // All accounts must be present
+        if !accounts.contains_key(&validator.owner_account_address) {
+            return Err(CliError::CommandArgumentError(format!(
+                "Missing initial balance for owner {}",
+                validator.owner_account_address
+            )));
+        } else if !accounts.contains_key(&validator.operator_account_address) {
+            return Err(CliError::CommandArgumentError(format!(
+                "Missing initial balance for operator {}",
+                validator.operator_account_address
+            )));
+        } else if !accounts.contains_key(&validator.voter_account_address) {
+            return Err(CliError::CommandArgumentError(format!(
+                "Missing initial balance for voter {}",
+                validator.voter_account_address
+            )));
+        }
+
+        // Owner must at least have it's stake amount
+        if *accounts.get(&validator.owner_account_address).unwrap() < validator.stake_amount {
+            return Err(CliError::CommandArgumentError(format!(
+                "Initial balance for {} is below stake amount {}",
+                validator.owner_account_address, validator.stake_amount
+            )));
+        }
+    }
+
+    Ok(initial_balances)
 }
 
 /// Do proper parsing so more information is known about failures

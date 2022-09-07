@@ -6,6 +6,7 @@
 mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
+use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -41,6 +42,7 @@ use move_deps::{
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -82,6 +84,7 @@ pub fn encode_genesis_transaction(
     framework: &ReleaseBundle,
     chain_id: ChainId,
     genesis_config: GenesisConfiguration,
+    initial_balances: &[InitialBalance],
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
@@ -92,6 +95,7 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
+        initial_balances,
     )))
 }
 
@@ -102,6 +106,7 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
+    initial_balances: &[InitialBalance],
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -122,9 +127,13 @@ pub fn encode_genesis_change_set(
     // On-chain genesis process.
     initialize(&mut session, consensus_config, chain_id, genesis_config);
     if genesis_config.is_test {
-        initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
+        initialize_core_resources_and_aptos_coin(
+            &mut session,
+            core_resources_key,
+            initial_balances,
+        );
     } else {
-        initialize_aptos_coin(&mut session);
+        initialize_aptos_coin(&mut session, initial_balances);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
@@ -286,13 +295,19 @@ fn initialize(
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_aptos_coin(
+    session: &mut SessionExt<impl MoveResolver>,
+    initial_balances: &[InitialBalance],
+) {
+    let balance_bytes = bcs::to_bytes(initial_balances).expect("Validators can be serialized");
+    let mut args = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    args.push(balance_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        args,
     );
 }
 
@@ -309,17 +324,22 @@ fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
 fn initialize_core_resources_and_aptos_coin(
     session: &mut SessionExt<impl MoveResolver>,
     core_resources_key: &Ed25519PublicKey,
+    initial_balances: &[InitialBalance],
 ) {
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
+    let balance_bytes = bcs::to_bytes(initial_balances).expect("Validators can be serialized");
+    let mut args = serialize_values(&vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS),
+        MoveValue::vector_u8(core_resources_auth_key.to_vec()),
+    ]);
+    args.push(balance_bytes);
+
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "initialize_core_resources_and_aptos_coin",
         vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::vector_u8(core_resources_auth_key.to_vec()),
-        ]),
+        args,
     );
 }
 
@@ -506,6 +526,12 @@ pub struct Validator {
     pub full_node_network_addresses: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct InitialBalance {
+    pub address: AccountAddress,
+    pub balance: u64,
+}
+
 pub struct TestValidator {
     pub key: Ed25519PrivateKey,
     pub consensus_key: bls12381::PrivateKey,
@@ -562,6 +588,8 @@ pub fn generate_test_genesis(
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
+    let initial_balances =
+        parse_initial_balances_from_staking_amounts(validators.as_slice()).unwrap();
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
@@ -583,6 +611,7 @@ pub fn generate_test_genesis(
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
         },
+        initial_balances.as_slice(),
     );
     (genesis, test_validators)
 }
@@ -595,6 +624,8 @@ pub fn generate_mainnet_genesis(
     let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
+    let initial_balances =
+        parse_initial_balances_from_staking_amounts(validators.as_slice()).unwrap();
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
@@ -617,8 +648,44 @@ pub fn generate_mainnet_genesis(
             voting_duration_secs: 7 * 24 * 3600, // 7 days
             voting_power_increase_limit: 30,
         },
+        initial_balances.as_slice(),
     );
     (genesis, test_validators)
+}
+
+/// Uses the staking amounts to determine what the correct initial balances
+/// if there are no other accounts that are initialized with coins
+pub fn parse_initial_balances_from_staking_amounts(
+    validators: &[Validator],
+) -> anyhow::Result<Vec<InitialBalance>> {
+    let mut owners = HashSet::new();
+    let mut initial_balances: HashMap<AccountAddress, u64> = HashMap::new();
+    for validator in validators {
+        // Ensure that the owner isn't duplicated
+        if owners.contains(&validator.owner_address) {
+            bail!(
+                "Owner showed up twice in validator set {}",
+                validator.owner_address
+            )
+        }
+        owners.insert(validator.owner_address);
+
+        // Add the initial balance for the owner
+        {
+            let entry = initial_balances.entry(validator.owner_address).or_default();
+            *entry = validator.stake_amount;
+        }
+        // Ensure the operator and the voters are present
+        initial_balances
+            .entry(validator.operator_address)
+            .or_default();
+        initial_balances.entry(validator.voter_address).or_default();
+    }
+
+    Ok(initial_balances
+        .into_iter()
+        .map(|(address, balance)| InitialBalance { address, balance })
+        .collect())
 }
 
 #[test]
