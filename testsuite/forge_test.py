@@ -36,6 +36,7 @@ from .forge import (
     get_all_forge_jobs,
     get_dashboard_link,
     get_humio_logs_link,
+    get_testsuite_images,
     get_validator_logs_link,
     list_eks_clusters,
     main,
@@ -211,6 +212,7 @@ def fake_context(
         forge_namespace="potato",
         keep_port_forwards=False,
         forge_cluster_name="tomato",
+        forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",
@@ -423,6 +425,20 @@ class TestFindRecentImage(unittest.TestCase):
 
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
+
+    def testTestsuiteImages(self) -> None:
+        context = fake_context()
+        # set the image tag and upgrade image tag to the same value
+        upgrade_img = context.upgrade_image_tag
+        context.upgrade_image_tag = context.image_tag
+        # do not expect an upgrade
+        txt = get_testsuite_images(context)
+        self.assertEqual(txt, f"`{context.image_tag}`")
+
+        # upgrade
+        context.upgrade_image_tag = upgrade_img
+        txt = get_testsuite_images(context)
+        self.assertEqual(txt, f"`{context.image_tag}` ==> `{context.upgrade_image_tag}`")
 
     def testReport(self) -> None:
         filesystem = SpyFilesystem({"test": b"banana"}, {})
