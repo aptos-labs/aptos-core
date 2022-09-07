@@ -30,7 +30,6 @@ import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArg
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
-import { IAptosClient } from "../common";
 
 export { TypeTagParser } from "./builder_utils.js";
 
@@ -308,13 +307,22 @@ export type RemoteABIBuilderConfig = Partial<Omit<ABIBuilderConfig, "sender">> &
   sender: MaybeHexString | AccountAddress;
 };
 
+interface AptosClientInterface {
+  getAccountModules: (accountAddress: MaybeHexString) => Promise<Gen.MoveModuleBytecode[]>;
+  getAccount: (accountAddress: MaybeHexString) => Promise<Gen.AccountData>;
+  getChainId: () => Promise<number>;
+}
+
 /**
  * This transaction builder downloads JSON ABIs from the fullnodes.
  * It then translates the JSON ABIs to the format that is accepted by TransactionBuilderABI
  */
 export class TransactionBuilderRemoteABI {
   // We don't want the builder to depend on the actual AptosClient. There might be circular dependencies.
-  constructor(private readonly aptosClient: IAptosClient, private readonly builderConfig: RemoteABIBuilderConfig) {}
+  constructor(
+    private readonly aptosClient: AptosClientInterface,
+    private readonly builderConfig: RemoteABIBuilderConfig,
+  ) {}
 
   // Cache for 10 minutes
   @MemoizeExpiring(10 * 60 * 1000)

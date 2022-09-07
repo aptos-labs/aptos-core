@@ -12,8 +12,7 @@
     "outDir": "./dist",
     "sourceMap": true,
     "target": "es2020",
-    "pretty": true,
-    "stripInternal":true
+    "pretty": true
   },
   "include": ["src"]
 }

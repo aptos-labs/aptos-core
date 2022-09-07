@@ -13,13 +13,12 @@ import {
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
 } from "./transaction_builder";
-import { IAptosClient } from "./common";
 
 /**
  * Provides methods for retrieving data from Aptos node.
  * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
  */
-export class AptosClient extends IAptosClient {
+export class AptosClient {
   client: Gen.AptosGeneratedClient;
 
   /**
@@ -33,7 +32,6 @@ export class AptosClient extends IAptosClient {
    * @param config Additional configuration options for the generated Axios client.
    */
   constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
-    super();
     if (!nodeUrl) {
       throw new Error("Node URL cannot be empty.");
     }

@@ -9,7 +9,6 @@ import { Memoize } from "typescript-memoize";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
-import { IAptosClient } from "./common.js";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -24,23 +23,12 @@ export class AptosAccount {
   /**
    * A private key and public key, associated with the given account
    */
-  private signingKeyInternal: Nacl.SignKeyPair;
+  readonly signingKey: Nacl.SignKeyPair;
 
   /**
    * Address associated with the given account
    */
   private readonly accountAddress: HexString;
-
-  private client?: IAptosClient;
-
-  get signingKey() {
-    return this.signingKeyInternal;
-  }
-
-  /** @internal */
-  set signingKey(keyPair: Nacl.SignKeyPair) {
-    this.signingKeyInternal = keyPair;
-  }
 
   static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
@@ -85,17 +73,15 @@ export class AptosAccount {
    * @param privateKeyBytes  Private key from which account key pair will be generated.
    * If not specified, new key pair is going to be created.
    * @param address Account address (e.g. 0xe8012714cd17606cee7188a2a365eef3fe760be598750678c8c5954eb548a591).
-   * @param client
    * If not specified, a new one will be generated from public key
    */
-  constructor(privateKeyBytes?: Uint8Array | undefined, address?: MaybeHexString, client?: IAptosClient) {
+  constructor(privateKeyBytes?: Uint8Array | undefined, address?: MaybeHexString) {
     if (privateKeyBytes) {
       this.signingKey = Nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
     } else {
       this.signingKey = Nacl.sign.keyPair();
     }
     this.accountAddress = HexString.ensure(address || this.authKey().hex());
-    this.client = client;
   }
 
   /**
@@ -106,14 +92,6 @@ export class AptosAccount {
    */
   address(): HexString {
     return this.accountAddress;
-  }
-
-  /**
-   * Lookup the original address by current account's auth key
-   * @returns
-   */
-  async originalAddress(): Promise<HexString> {
-    return this.client.lookupOriginalAddress(this.authKey());
   }
 
   /**
