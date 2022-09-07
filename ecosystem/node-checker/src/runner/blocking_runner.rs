@@ -63,7 +63,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
         EvaluationResult {
             headline: "Failed to collect metrics from target node".to_string(),
             score: 0,
-            explanation: format!("Failed to collect metrics from your node, make sure your metrics port ({}) is publicly accessible: {}", address.metrics_port, error),
+            explanation: format!("Failed to collect metrics from your node, make sure your metrics port ({}) is publicly accessible: {}", address.get_metrics_port(), error),
             category: "metrics".to_string(),
             evaluator_name: "metrics_port".to_string(),
             links: vec![],
@@ -216,7 +216,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
             .await
             .context(format!(
             "Failed to read index response from baseline node. Make sure its API is open (port {})",
-            self.baseline_node_information.node_address.api_port
+            self.baseline_node_information.node_address.get_api_port()
         ))
             .map_err(RunnerError::BaselineMissingDataError)?;
 

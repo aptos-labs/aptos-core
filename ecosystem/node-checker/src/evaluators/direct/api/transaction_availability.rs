@@ -133,7 +133,9 @@ impl Evaluator for TransactionAvailabilityEvaluator {
         let middle_baseline_accumulator_root_hash =
             Self::unwrap_accumulator_root_hash(&middle_baseline_transaction)?;
 
-        let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
+        let target_client = input
+            .target_node_address
+            .get_api_client(std::time::Duration::from_secs(5));
         let evaluation =
             match Self::get_transaction_by_version(&target_client, middle_shared_version, "latest")
                 .await
@@ -150,8 +152,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     format!(
                                         "We were able to pull the same transaction (version: {}) \
                                     from both your node and the baseline node. Great! This \
-                                    implies that your node is keeping up with other nodes \
-                                    in the network and returning valid transaction data.",
+                                    implies that your node is returning valid transaction data.",
                                         middle_shared_version,
                                     ),
                                 )
