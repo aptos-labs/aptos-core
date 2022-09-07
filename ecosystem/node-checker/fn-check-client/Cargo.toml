@@ -1,8 +1,8 @@
 [package]
-name = "aptos-vfn-check-client"
+name = "aptos-fn-check-client"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Tool to check the health of all VFNs registed in the validator set of an Aptos network"
+description = "Tool to check the health of all VFNs registered in the validator set of an Aptos network or PFNs from a config file"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
