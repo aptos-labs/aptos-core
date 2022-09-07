@@ -6,8 +6,7 @@ import { HexString } from "../../hex_string";
 import { Bytes } from "../bcs";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const { sha3_256 } = sha3;
+const { sha3_256: sha3Hash } = sha3;
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -42,7 +41,7 @@ export class AuthenticationKey {
     bytes.set(pubKeyBytes);
     bytes.set([AuthenticationKey.MULTI_ED25519_SCHEME], pubKeyBytes.length);
 
-    const hash = sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update(bytes);
 
     return new AuthenticationKey(new Uint8Array(hash.arrayBuffer()));

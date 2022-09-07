@@ -15,8 +15,8 @@
     }
   },
   "scripts": {
-    "prepack": "yarn build",
-    "build": "rm -rf dist && tsup ./src/index.ts --format esm,cjs,iife --sourcemap --dts",
+    "prepack": "tsup",
+    "build": "tsup",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
