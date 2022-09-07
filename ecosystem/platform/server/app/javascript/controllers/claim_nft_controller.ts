@@ -59,7 +59,7 @@ export default class extends Controller<HTMLAnchorElement> {
       const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
       if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
         // TODO: Do something more intelligent with the transaction.
-        window.open(`https://explorer.devnet.aptos.dev/txn/${pendingTransaction.hash}`);
+        window.open(`https://explorer.devnet.aptos.dev/txn/${pendingTransaction.hash}?network=testnet`);
         return;
       }
     } else if (false) {
