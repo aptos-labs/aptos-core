@@ -275,9 +275,9 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, t)| {
-            if let Ok(crsn_or_seqno) = seq_numbers[idx] {
-                if t.sequence_number() >= crsn_or_seqno.min_seq() {
-                    return Some((t, crsn_or_seqno));
+            if let Ok(sequence_info) = seq_numbers[idx] {
+                if t.sequence_number() >= sequence_info.min_seq() {
+                    return Some((t, sequence_info));
                 } else {
                     statuses.push((
                         t,
@@ -312,7 +312,7 @@ where
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, crsn_or_seqno)) in transactions.into_iter().enumerate() {
+        for (idx, (transaction, sequence_info)) in transactions.into_iter().enumerate() {
             if let Ok(validation_result) = &validation_results[idx] {
                 match validation_result.status() {
                     None => {
@@ -320,7 +320,7 @@ where
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
-                            crsn_or_seqno,
+                            sequence_info,
                             timeline_state,
                         );
                         statuses.push((transaction, (mempool_status, None)));
