@@ -114,6 +114,10 @@ impl Evaluator for TransactionAvailabilityEvaluator {
             )]);
         }
 
+        // Select a version in the middle of shared oldest and latest version.
+        let middle_shared_version =
+            (oldest_shared_version.saturating_add(latest_shared_version)) / 2;
+
         // We've asserted that both nodes are sufficiently up to date relative
         // to each other, we should be able to pull the same transaction from
         // both nodes.
@@ -123,23 +127,22 @@ impl Evaluator for TransactionAvailabilityEvaluator {
             .node_address
             .get_api_client(std::time::Duration::from_secs(4));
 
-        let latest_baseline_transaction =
-            Self::get_transaction_by_version(&baseline_client, latest_shared_version, "baseline")
+        let middle_baseline_transaction =
+            Self::get_transaction_by_version(&baseline_client, middle_shared_version, "baseline")
                 .await?;
-
-        let latest_baseline_accumulator_root_hash =
-            Self::unwrap_accumulator_root_hash(&latest_baseline_transaction)?;
+        let middle_baseline_accumulator_root_hash =
+            Self::unwrap_accumulator_root_hash(&middle_baseline_transaction)?;
 
         let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
         let evaluation =
-            match Self::get_transaction_by_version(&target_client, latest_shared_version, "target")
+            match Self::get_transaction_by_version(&target_client, middle_shared_version, "latest")
                 .await
             {
-                Ok(latest_target_transaction) => {
-                    match Self::unwrap_accumulator_root_hash(&latest_target_transaction) {
-                        Ok(latest_target_accumulator_root_hash) => {
-                            if latest_baseline_accumulator_root_hash
-                                == latest_target_accumulator_root_hash
+                Ok(middle_target_transaction) => {
+                    match Self::unwrap_accumulator_root_hash(&middle_target_transaction) {
+                        Ok(middle_target_accumulator_root_hash) => {
+                            if middle_baseline_accumulator_root_hash
+                                == middle_target_accumulator_root_hash
                             {
                                 self.build_evaluation_result(
                                     "Target node produced valid recent transaction".to_string(),
@@ -149,7 +152,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     from both your node and the baseline node. Great! This \
                                     implies that your node is keeping up with other nodes \
                                     in the network and returning valid transaction data.",
-                                        latest_shared_version,
+                                        middle_shared_version,
                                     ),
                                 )
                             } else {
@@ -163,9 +166,9 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     transaction was invalid compared to the baseline as the \
                                     accumulator root hash of the transaction ({}) was different \
                                     compared to the baseline ({}).",
-                                        latest_shared_version,
-                                        latest_target_accumulator_root_hash,
-                                        latest_baseline_accumulator_root_hash,
+                                        middle_shared_version,
+                                        middle_target_accumulator_root_hash,
+                                        middle_baseline_accumulator_root_hash,
                                     ),
                                 )
                             }
@@ -179,7 +182,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                             from both your node and the baseline node. However, the \
                             the transaction was missing metadata such as the version, \
                             accumulator root hash, etc. Error: {}",
-                                latest_shared_version, error,
+                                middle_shared_version, error,
                             ),
                         ),
                     }
@@ -191,7 +194,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                         "The target node claims it has transactions between versions {} and {}, \
                     but it was unable to return the transaction with version {}. This implies \
                     something is wrong with your node's API. Error: {}",
-                        oldest_target_version, latest_target_version, latest_shared_version, error,
+                        oldest_target_version, latest_target_version, middle_shared_version, error,
                     ),
                 ),
             };
