@@ -1,3 +1,4 @@
+from cgitb import enable
 from contextlib import ExitStack
 from importlib.metadata import files
 import json
@@ -411,6 +412,7 @@ class TestFindRecentImage(unittest.TestCase):
                 "potato_tomato",
                 "failpoints_performance_potato",
                 enable_failpoints_feature=True,
+                enable_performance_profile=False,
             )
 
     def testFailpointsNoProvidedImageTag(self) -> None:
@@ -418,6 +420,7 @@ class TestFindRecentImage(unittest.TestCase):
             None,
             None,
             enable_failpoints_feature=True,
+            enable_performance_profile=False,
         )
 
 
