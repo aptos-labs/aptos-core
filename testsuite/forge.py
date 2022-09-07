@@ -448,14 +448,15 @@ class ForgeResult:
     def set_debugging_output(self, output: str) -> None:
         self.debugging_output = output
 
-    def format(self) -> str:
-        output = "\n".join([
+    def format(self, context: ForgeContext) -> str:
+        output_lines = []
+        if not self.succeeded():
+            output_lines.append(self.debugging_output)
+        output_lines.extend([
             f"Forge output: {self.output}",
             f"Forge {self.state.value.lower()}ed",
         ])
-        if not self.succeeded():
-            output += "\n" + self.debugging_output
-        return output
+        return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
         return self.state == ForgeState.PASS
@@ -690,16 +691,19 @@ def get_humio_logs_link(forge_namespace: str) -> str:
 
 
 def format_github_info(context: ForgeContext) -> str:
-    return (
-        textwrap.dedent(
-            f"""
-          * [Test runner output]({context.github_job_url})
-          * Test run is {'' if context.forge_blocking else 'not '}land-blocking
-        """
+    if not context.github_job_url:
+        return ""
+    else:
+        return (
+            textwrap.dedent(
+                f"""
+            * [Test runner output]({context.github_job_url})
+            * Test run is {'' if context.forge_blocking else 'not '}land-blocking
+            """
+            )
+            .lstrip()
+            .strip()
         )
-        .lstrip()
-        .strip()
-    )
 
 
 def format_pre_comment(context: ForgeContext) -> str:
@@ -988,12 +992,12 @@ def list_eks_clusters(shell: Shell) -> List[str]:
     cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
     # This type annotation is not enforced, just helpful
     try:
-        cluster_result: ListClusterResult = json.loads(cluster_json)
-        return [
-            cluster_name
-            for cluster_name in cluster_result["clusters"]
-            if cluster_name.startswith("aptos-forge-big-")
-        ]
+        cluster_result: ListClusterResult = json.loads(cluster_json.decode())
+        clusters = []
+        for cluster_name in cluster_result["clusters"]:
+            if cluster_name.startswith("aptos-forge-"):
+                clusters.append(cluster_name)
+        return clusters
     except Exception as e:
         raise AwsError("Failed to list eks clusters") from e
 
@@ -1318,7 +1322,7 @@ def test(
     try:
         current_cluster = get_current_cluster_name(shell)
     except Exception as e:
-        print("Warning: failed to get current cluster name: {e}")
+        print(f"Warning: failed to get current cluster name: {e}")
 
     if not forge_cluster_name or balance_clusters:
         cluster_names = list_eks_clusters(shell)
@@ -1417,7 +1421,7 @@ def test(
         forge_cluster_name=forge_cluster_name,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
-        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}",
+        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}" if github_run_id else None,
         forge_args=forge_args,
     )
     forge_runner_mapping = {
@@ -1432,6 +1436,8 @@ def test(
             ForgeResult.empty(),
             [ForgeFormatter(forge_pre_comment, lambda *_: pre_comment)],
         )
+    else:
+        print(pre_comment)
 
     if forge_runner_mode == "pre-forge":
         return
@@ -1443,18 +1449,22 @@ def test(
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(context)
 
-        print(result.format())
-
         outputs = []
         if forge_output:
             outputs.append(ForgeFormatter(forge_output, lambda *_: result.output))
         if forge_report:
             outputs.append(ForgeFormatter(forge_report, format_report))
+        else:
+            print(format_report(context, result))
         if forge_comment:
             outputs.append(ForgeFormatter(forge_comment, format_comment))
+        else:
+            print(format_comment(context, result))
         if github_step_summary:
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
         context.report(result, outputs)
+
+        print(result.format(context))
 
         if not result.succeeded() and forge_blocking == "true":
             raise SystemExit(1)
@@ -1464,7 +1474,7 @@ def test(
             try:
                 set_current_cluster(shell, current_cluster)
             except Exception as ee:
-                print("Warning: failed to restore current cluster: {ee}")
+                print(f"Warning: failed to restore current cluster: {ee}")
                 print("Set cluster manually with aws eks update-kubeconfig --name {current_cluster}")
         raise Exception(
             "Forge state:\n" + dump_forge_state(shell, forge_namespace)
