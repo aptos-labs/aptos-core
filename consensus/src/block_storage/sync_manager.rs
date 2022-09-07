@@ -19,7 +19,8 @@ use aptos_types::{
 use consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, MAX_BLOCKS_PER_REQUEST,
+        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
+        MAX_BLOCKS_PER_REQUEST, MAX_FAILED_ATTEMPTS,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -423,31 +424,25 @@ impl BlockRetriever {
             "Retrieving {} blocks starting from {}",
             num_blocks, block_id
         );
-        let mut attempt = 0_u32;
         let mut progress = 0;
         let mut last_block_id = block_id;
         let mut result_blocks: Vec<Block> = vec![];
         let mut retrieve_batch_size = MAX_BLOCKS_PER_REQUEST;
         if peers.is_empty() {
-            bail!(
-                "Failed to fetch block {} in {} attempts: no more peers available",
-                block_id,
-                attempt
-            );
+            bail!("Failed to fetch block {}: no peers available", block_id);
         }
-        let mut peer = self.pick_peer(attempt, peers);
+        let mut failed_attempt = 0_u32;
+        let mut peer = self.pick_peer(failed_attempt, peers);
         while progress < num_blocks {
             // in case this is the last retrieval
             retrieve_batch_size = min(retrieve_batch_size, num_blocks - progress);
 
-            attempt += 1;
-
             debug!(
                 LogSchema::new(LogEvent::RetrieveBlock).remote_peer(peer),
                 block_id = block_id,
-                "Fetching {} blocks, attempt {}",
+                "Fetching {} blocks, failed attempt {}",
                 retrieve_batch_size,
-                attempt
+                failed_attempt
             );
             let response = self
                 .network
@@ -458,7 +453,7 @@ impl BlockRetriever {
                         target_block_id,
                     ),
                     peer,
-                    retrieval_timeout(attempt),
+                    retrieval_timeout(failed_attempt + 1),
                 )
                 .await;
 
@@ -486,14 +481,15 @@ impl BlockRetriever {
                         e,
                     );
                     // select next peer to try
-                    if peers.is_empty() {
+                    if peers.is_empty() || failed_attempt >= MAX_FAILED_ATTEMPTS {
                         bail!(
-                            "Failed to fetch block {} in {} attempts: no more peers available",
+                            "Failed to fetch block {} in {} attempts",
                             block_id,
-                            attempt
+                            failed_attempt + 1,
                         );
                     }
-                    peer = self.pick_peer(attempt, peers);
+                    failed_attempt += 1;
+                    peer = self.pick_peer(failed_attempt, peers);
                 }
             }
         }
