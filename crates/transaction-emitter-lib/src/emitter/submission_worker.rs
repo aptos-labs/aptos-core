@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{stats::StatsAccumulator, wait_for_accounts_sequence},
+    emitter::{
+        stats::{DynamicStatsTracking, StatsAccumulator},
+        wait_for_accounts_sequence,
+    },
     transaction_generator::TransactionGenerator,
     EmitModeParams,
 };
@@ -28,7 +31,7 @@ pub struct SubmissionWorker {
     client: RestClient,
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
-    stats: Arc<StatsAccumulator>,
+    stats: Arc<DynamicStatsTracking>,
     txn_generator: Box<dyn TransactionGenerator>,
     worker_index: usize,
     check_account_sequence_only_once: bool,
@@ -41,7 +44,7 @@ impl SubmissionWorker {
         client: RestClient,
         stop: Arc<AtomicBool>,
         params: EmitModeParams,
-        stats: Arc<StatsAccumulator>,
+        stats: Arc<DynamicStatsTracking>,
         txn_generator: Box<dyn TransactionGenerator>,
         worker_index: usize,
         check_account_sequence_only_once: bool,
@@ -76,6 +79,9 @@ impl SubmissionWorker {
         let mut wait_until = start_time;
 
         while !self.stop.load(Ordering::Relaxed) {
+            let stats_clone = self.stats.clone();
+            let loop_stats = stats_clone.get_cur();
+
             let loop_start_time = Arc::new(Instant::now());
             if wait_duration.as_secs() > 0
                 && loop_start_time.duration_since(wait_until) > wait_duration
@@ -103,7 +109,7 @@ impl SubmissionWorker {
                         reqs,
                         loop_start_time.clone(),
                         txn_offset_time.clone(),
-                        self.stats.clone(),
+                        loop_stats,
                     )
                 },
             ))
@@ -132,6 +138,7 @@ impl SubmissionWorker {
                 self.check_account_sequence_only_once,
                 wait_for_accounts_sequence_timeout,
                 self.check_account_sequence_only_once,
+                loop_stats,
             )
             .await;
 
@@ -184,6 +191,7 @@ impl SubmissionWorker {
         skip_latency_stats: bool,
         wait_for_accounts_sequence_timeout: Duration,
         check_account_sequence_only_once: bool,
+        loop_stats: &StatsAccumulator,
     ) {
         assert_eq!(
             num_requests,
@@ -202,7 +210,7 @@ impl SubmissionWorker {
         let num_committed = num_requests - num_expired;
 
         if num_expired > 0 {
-            self.stats
+            loop_stats
                 .expired
                 .fetch_add(num_expired as u64, Ordering::Relaxed);
             sample!(
@@ -219,18 +227,18 @@ impl SubmissionWorker {
             let sum_latency = sum_of_completion_timestamps_millis
                 - (txn_offset_time as u128 * num_committed as u128) / num_requests as u128;
             let avg_latency = (sum_latency / num_committed as u128) as u64;
-            self.stats
+            loop_stats
                 .committed
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
-                self.stats
+                loop_stats
                     .latency
                     .fetch_add(sum_latency as u64, Ordering::Relaxed);
-                self.stats
+                loop_stats
                     .latency_samples
                     .fetch_add(num_committed as u64, Ordering::Relaxed);
-                self.stats
+                loop_stats
                     .latencies
                     .record_data_point(avg_latency, num_committed as u64);
             }
@@ -259,7 +267,7 @@ pub async fn submit_transactions(
     txns: &[SignedTransaction],
     loop_start_time: Arc<Instant>,
     txn_offset_time: Arc<AtomicU64>,
-    stats: Arc<StatsAccumulator>,
+    stats: &StatsAccumulator,
 ) -> anyhow::Result<()> {
     let cur_time = Instant::now();
     let offset = cur_time - *loop_start_time;
