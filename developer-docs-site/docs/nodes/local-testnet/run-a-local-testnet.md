@@ -77,7 +77,7 @@ The rest of this document describes:
         Waypoint: 0:47e676b5fe38ebe2aec6053db7b3daa0b805693d6422e3475e46e89499464ecf
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/7180
+        Fullnode network: /ip4/0.0.0.0/tcp/7180
     Aptos is running, press ctrl-c to exit
     ```
 
@@ -169,7 +169,7 @@ Completed generating configuration:
         Waypoint: 0:197bc8b76761622c2d2054d8bf93c1802fa0eb4bc55f0f3d4442878fdecc297f
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/7180
+        Fullnode network: /ip4/0.0.0.0/tcp/7180
 
 Aptos is running, press ctrl-c to exit
 ```

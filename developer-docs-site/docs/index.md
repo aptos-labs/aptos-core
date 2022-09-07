@@ -65,8 +65,8 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 <div class="row row-cols-1 row-cols-md-3a g-4">
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
-    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a Validator or a FullNode</h2></a>
-    <p class="card-text">Install and run a Validator or a FullNode.</p>
+    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a Validator or a Fullnode</h2></a>
+    <p class="card-text">Install and run a Validator or a Fullnode.</p>
 </div>
 </div>
   <div class="col">

@@ -6,18 +6,18 @@ import BlockQuote from "@site/src/components/BlockQuote";
 
 An Aptos node is an entity of the Aptos ecosystem that tracks the state of the Aptos Blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
 * Validator nodes
-* [FullNodes](basics-fullnodes.md)
+* [Fullnodes](basics-fullnodes.md)
 
 Each Aptos node comprises several logical components:
 * [REST service](/reference/glossary#rest-service)
 * [Mempool](#mempool)
-* [Consensus (disabled in FullNodes)](#consensus)
+* [Consensus (disabled in fullnodes)](#consensus)
 * [Execution](#execution)
 * [Virtual Machine](#virtual-machine)
 * [Storage](#storage)
 * [State synchronizer](#state-synchronizer)
 
-The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a FullNode.
+The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a Fullnode.
 
 # Overview
 
@@ -25,7 +25,7 @@ When a transaction is submitted to the Aptos Blockchain, validator nodes run a d
 
 The Aptos Blockchain uses a Byzantine Fault Tolerance (BFT) consensus protocol for validator nodes to agree on the ledger of finalized transactions and their execution results. Validator nodes process these transactions and include them in their local copy of the blockchain database. This means that up-to-date validator nodes always maintain a copy of the current [state](/reference/glossary#state) of the blockchain, locally.
 
-Validator nodes communicate directly with other validator nodes over a private network. [FullNodes](basics-fullnodes.md) are an external validation and/or dissemination resource for the finalized transaction history. They receive transactions from peers and may re-execute them locally (the same way a validator executes transactions). FullNodes store the results of re-executed transactions to local storage. In doing so, they can challenge any foul-play by validators and provide evidence if there is any attempt to re-write or modify the blockchain history. This helps to mitigate against validator corruption and/or collusion.
+Validator nodes communicate directly with other validator nodes over a private network. [Fullnodes](basics-fullnodes.md) are an external validation and/or dissemination resource for the finalized transaction history. They receive transactions from peers and may re-execute them locally (the same way a validator executes transactions). Fullnodes store the results of re-executed transactions to local storage. In doing so, they can challenge any foul-play by validators and provide evidence if there is any attempt to re-write or modify the blockchain history. This helps to mitigate against validator corruption and/or collusion.
 
 <BlockQuote type="info">
 The AptosBFT consensus protocol provides fault tolerance of up to one-third of malicious validator nodes.
@@ -36,9 +36,9 @@ The AptosBFT consensus protocol provides fault tolerance of up to one-third of m
 ![validator.svg](/img/docs/validator.svg)
 ### Mempool
 
-Mempool is a component within each node that holds an in-memory buffer of transactions that have been submitted to the blockchain, but not yet agreed upon or executed. This buffer is replicated between validator nodes and FullNodes.
+Mempool is a component within each node that holds an in-memory buffer of transactions that have been submitted to the blockchain, but not yet agreed upon or executed. This buffer is replicated between validator nodes and Fullnodes.
 
-The JSON-RPC service of a FullNode sends transactions to a validator node's mempool. Mempool performs various checks on the transactions to ensure transaction validity and protect against DOS attacks. When a new transaction passes initial verification and is added to mempool, it is then distributed to the mempools of other validator nodes in the network.
+The JSON-RPC service of a fullnode sends transactions to a validator node's mempool. Mempool performs various checks on the transactions to ensure transaction validity and protect against DOS attacks. When a new transaction passes initial verification and is added to mempool, it is then distributed to the mempools of other validator nodes in the network.
 
 When a validator node temporarily becomes a leader in the consensus protocol, consensus pulls the transactions from mempool and proposes a new transaction block. This block is broadcasted to other validators and contains a total ordering over all transactions in the block. Each validator then executes the block and submits votes on whether or not to accept the new block proposal.
 

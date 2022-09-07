@@ -84,7 +84,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
         --local-repository-dir ~/$WORKSPACE \
         --username $USERNAME \
         --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
-        --validator-host <Validator Node IP / DNS address>:<Port> \
+        --validator-host <Validator node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port> \
         --stake-amount 100000000000000
 
@@ -175,7 +175,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 7).
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 8).
-      - `operator.yaml`: Node information that will be used for both the Validator and the FullNode (from step 8). 
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 8). 
     - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 9).
     - `framework.mrb`: The AptosFramework Move package (from step 10).
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 11).

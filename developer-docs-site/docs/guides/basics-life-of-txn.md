@@ -4,7 +4,7 @@ slug: "basics-life-of-txn"
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-To get a deeper understanding of the lifecycle of an Aptos transaction (from an operational perspective), we will follow a transaction on its journey, from being submitted to an Aptos FullNode, to being committed to the Aptos Blockchain. We will then *zoom-in* on the logical components of Aptos nodes and take a look how the transaction interacts with these components.
+To get a deeper understanding of the lifecycle of an Aptos transaction (from an operational perspective), we will follow a transaction on its journey, from being submitted to an Aptos Fullnode, to being committed to the Aptos Blockchain. We will then *zoom-in* on the logical components of Aptos nodes and take a look how the transaction interacts with these components.
 
 # Assumptions
 
@@ -15,7 +15,7 @@ For the purpose of this doc, we will assume that:
 * Alice is sending 10 Aptos Coins to Bob.
 * The current [sequence number](/reference/glossary#sequence-number) of Alice's account is 5 (which indicates that 5 transactions have already been sent from Alice's account).
 * There are a total of 100 validator nodes &mdash; V<sub>1</sub> to V<sub>100</sub> on the network.
-* An Aptos client submits Alice's transaction to a REST service on an Aptos FullNode. The FullNode forwards this transaction to a validator FullNode which in turn forwards it to validator V<sub>1</sub>.
+* An Aptos client submits Alice's transaction to a REST service on an Aptos Fullnode. The fullnode forwards this transaction to a validator fullnode which in turn forwards it to validator V<sub>1</sub>.
 * Validator V<sub>1</sub> is a proposer/leader for the current round.
 
 # Client submits a transaction
@@ -64,8 +64,8 @@ We've described what happens in each stage below, along with links to the corres
 
 | Description                                                  | Aptos Node Component Interactions                           |
 | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos FullNode. The FullNode uses the REST service to forward the transaction to its own mempool, which then forwards the transaction to mempools running on other nodes in the network. The transaction will eventually be forwarded to a mempool running on a validator FullNode, which will send it to a validator node (V<sub>1</sub> in this case). | [1. REST Service](#1-client--rest-service)                  |
-| 2. **REST service → Mempool**: The FullNode's REST service transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service--mempool), [1. Mempool](#1-rest-service--mempool) |
+| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos Fullnode. The fullnode uses the REST service to forward the transaction to its own mempool, which then forwards the transaction to mempools running on other nodes in the network. The transaction will eventually be forwarded to a mempool running on a validator Fullnode, which will send it to a validator node (V<sub>1</sub> in this case). | [1. REST Service](#1-client--rest-service)                  |
+| 2. **REST service → Mempool**: The Fullnode's REST service transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service--mempool), [1. Mempool](#1-rest-service--mempool) |
 | 3. **Mempool → Virtual Machine (VM)**: Mempool will use the virtual machine (VM) component to perform transaction validation, such as signature verification, account balance verification and replay resistance using the sequence number. | [4. Mempool](#4-mempool--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
 
 
@@ -109,13 +109,13 @@ In the [previous section](#lifecycle-of-the-transaction), we described the typic
 
 You can learn more about the different types of Aptos nodes here:
 * [Validator nodes](/concepts/basics-validator-nodes)
-* [FullNodes](/concepts/basics-fullnodes)
+* [Fullnodes](/concepts/basics-fullnodes)
 
 For our narrative, we will assume that a client submits a transaction T<sub>N</sub> to a validator V<sub>X</sub>. For each validator component, we will describe each of its inter-component interactions in subsections under the respective component's section. Note that subsections describing the inter-component interactions are not listed strictly in the order in which they are performed. Most of the interactions are relevant to the processing of a transaction, and some are relevant to clients querying the blockchain (queries for existing information on the blockchain).
 
 The following are the core components of an Aptos node used in the lifecycle of a transaction:
 
-**FullNode**
+**Fullnode**
 
 * [REST Service](#rest-service)
 
@@ -131,15 +131,15 @@ The following are the core components of an Aptos node used in the lifecycle of 
 ![Figure 1.1 REST Service](/img/rest-service.svg)
 <small className="figure">Figure 1.1 REST Service</small>
 
-Any request made by a client goes to the REST Service of a FullNode first. Then, the submitted transaction is forwarded to the validator FullNode, which then sends it to the validator node V<sub>X</sub>.
+Any request made by a client goes to the REST Service of a fullnode first. Then, the submitted transaction is forwarded to the validator Fullnode, which then sends it to the validator node V<sub>X</sub>.
 
 ### 1. Client → REST Service
 
-A client submits a transaction to the REST service of an Aptos FullNode.
+A client submits a transaction to the REST service of an Aptos Fullnode.
 
 ### 2. REST Service → Mempool
 
-The REST service forwards the transaction to a validator FullNode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
+The REST service forwards the transaction to a validator Fullnode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
 
 ### 3. REST Service → Storage
 
@@ -184,7 +184,7 @@ Mempool is a shared buffer that holds the transactions that are “waiting” to
 
 ### 1. REST Service → Mempool
 
-* After receiving a transaction from the client, the REST service proxies the transaction to a validator FullNode. The transaction is then sent to the validator node’s mempool.
+* After receiving a transaction from the client, the REST service proxies the transaction to a validator Fullnode. The transaction is then sent to the validator node’s mempool.
 * The mempool for validator node V<sub>X</sub> accepts transaction T<sub>N</sub> for the sender's account only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account.
 
 ### 2. Mempool → Other validator nodes

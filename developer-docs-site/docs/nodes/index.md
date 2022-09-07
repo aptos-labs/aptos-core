@@ -37,13 +37,13 @@ This section contains the guides for the Aptos nodes. Topics covered include how
   <div class="col">
   <div class="card h-100" >
     <div class="card-body d-flex flex-column">
-    <h2 class="card-title">FullNode for the Aptos networks </h2>
-    <p class="card-text">You can connect a fullnode to any of the Aptos networks. Pick your preferred FullNode installation method from below:</p>
+    <h2 class="card-title">Fullnode for the Aptos networks </h2>
+    <p class="card-text">You can connect a fullnode to any of the Aptos networks. Pick your preferred Fullnode installation method from below:</p>
         <ul class="list-group list-group-flush">
           <li class="list-group-item"><a href="https://aptos.dev/nodes/full-node/fullnode-source-code-or-docker" class="card-link" target="_self">Using Aptos source or Docker</a></li>
           <li class="list-group-item"><a href="https://aptos.dev/nodes/full-node/run-a-fullnode-on-gcp" class="card-link" target="_self">Using GCP</a></li>
         </ul>
-    <p class="card-text"><a href="https://aptos.dev/nodes/full-node/public-fullnode" class="card-link" target="_self">Go to FullNode home ></a></p>
+    <p class="card-text"><a href="https://aptos.dev/nodes/full-node/public-fullnode" class="card-link" target="_self">Go to Fullnode home ></a></p>
 </div>
 </div>
 </div>
