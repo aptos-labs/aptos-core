@@ -130,15 +130,23 @@ impl Swarm for K8sSwarm {
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {
-        Box::new(self.validators.values().map(|v| v as &'a dyn Validator))
+        let mut validators: Vec<_> = self
+            .validators
+            .values()
+            .map(|v| v as &'a dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        Box::new(
-            self.validators
-                .values_mut()
-                .map(|v| v as &'a mut dyn Validator),
-        )
+        let mut validators: Vec<_> = self
+            .validators
+            .values_mut()
+            .map(|v| v as &'a mut dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {

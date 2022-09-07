@@ -50,11 +50,6 @@ impl K8sNode {
         self.service_name.clone()
     }
 
-    #[allow(dead_code)]
-    fn index(&self) -> usize {
-        self.index
-    }
-
     pub(crate) fn rest_client(&self) -> RestClient {
         RestClient::new(self.rest_api_endpoint())
     }
@@ -128,6 +123,10 @@ impl K8sNode {
 impl Node for K8sNode {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn index(&self) -> usize {
+        self.index
     }
 
     fn peer_id(&self) -> PeerId {

@@ -56,6 +56,10 @@ genesis:
     internal_host_suffix: validator-lb
     # -- Stake amount for each validator in this testnet. Defaults to 1M APTOS coins with 8 decimals
     stake_amount: "100000000000000"
+    # -- Number of validators to give larger stake in genesis to.
+    num_validators_with_larger_stake: 0
+    # -- Stake amount for nodes we are giving larger state to. Defaults to 10M APTOS coins with 8 decimals
+    larger_stake_amount: "1000000000000000"
   fullnode:
     # -- Use External DNS as created by aptos-node helm chart for fullnode host in genesis
     enable_onchain_discovery: true
