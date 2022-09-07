@@ -25,7 +25,7 @@ use std::{
 use tokio::sync::Semaphore;
 
 // Unfortunately we don't have any way, on chain or not, to know what the API
-// port is, so we just assume it is one of these. If their node is inaccessible at,
+// port is, so we just assume it is one of these. If their node is inaccessible at
 // any of these ports, e.g. because it runs on 7777 and they have an LB not registered
 // on chain in front of it that listens at 80 just for the API, we're just out of luck.
 // If we get this kind of information from elsewhere at some point, we could look at
@@ -53,7 +53,9 @@ pub struct NodeHealthCheckerArgs {
 }
 
 impl NodeHealthCheckerArgs {
-    /// Check all FullNodes from the validator set.
+    /// Per account address, check all nodes. This may result in multiple calls
+    /// to NHC even for a single node in the case that we don't know the API
+    /// port and we're just guessing.
     pub async fn check_nodes(
         &self,
         address_to_nodes: HashMap<AccountAddress, Vec<NodeInfo>>,
@@ -309,7 +311,7 @@ impl SingleCheck {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SingleCheckResult {
     /// The node was successfully checked. Note: The evaulation itself could
-    /// still indicat, a problem with the node, this just states that we were
+    /// still indicate a problem with the node, this just states that we were
     /// able to check the node sucessfully with NHC.
     Success(SingleCheckSuccess),
 
@@ -380,7 +382,9 @@ pub enum NodeCheckFailureCode {
     ApiPortClosed,
 }
 
-// These are necessary because we can't just use a unit type for this enum variant.
+// These are necessary because we can't just use a unit type for this enum variant
+// because we serialize SingleCheckResult using internal tagging, in which case
+// serde requires that all variants have values.
 
 #[derive(Debug, Serialize)]
 pub struct NoVfnRegistered;
