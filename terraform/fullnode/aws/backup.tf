@@ -28,7 +28,7 @@ data "aws_iam_policy_document" "backup-assume-role" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_provider}:sub"
-      values   = ["system:serviceaccount:default:${local.workspace_name}0-aptos-fullnode"]
+      values   = ["system:serviceaccount:default:pfn0-aptos-fullnode"]
     }
 
     condition {
