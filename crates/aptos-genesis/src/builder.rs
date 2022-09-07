@@ -7,7 +7,7 @@ use crate::{
     keys::{generate_key_objects, PrivateIdentity},
     GenesisInfo,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_config::config::RocksDbStorageConfig;
 use aptos_config::keys::ConfigKey;
 use aptos_config::{
@@ -25,10 +25,12 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
+use aptos_types::account_address::AccountAddress;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::{BTreeMap, HashSet};
 use std::{
     convert::{TryFrom, TryInto},
     fs::File,
@@ -37,6 +39,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use vm_genesis::InitialBalance;
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
@@ -592,6 +595,8 @@ impl Builder {
             (init_genesis_config)(&mut genesis_config);
         }
 
+        let initial_balances = parse_initial_balances_from_staking_amounts(configs.as_slice())?;
+
         // Build genesis & waypoint
         let mut genesis_info = GenesisInfo::new(
             ChainId::test(),
@@ -599,6 +604,7 @@ impl Builder {
             configs,
             self.framework.clone(),
             &genesis_config,
+            initial_balances.as_slice(),
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();
@@ -612,4 +618,44 @@ impl Builder {
 
         Ok((genesis.clone(), waypoint))
     }
+}
+
+/// Uses the staking amounts to determine what the correct initial balances
+/// if there are no other accounts that are initialized with coins
+/// TODO: Combine with version in vm genesis
+pub fn parse_initial_balances_from_staking_amounts(
+    validators: &[ValidatorConfiguration],
+) -> anyhow::Result<Vec<InitialBalance>> {
+    let mut owners = HashSet::new();
+    let mut initial_balances: BTreeMap<AccountAddress, u64> = BTreeMap::new();
+    for validator in validators {
+        // Ensure that the owner isn't duplicated
+        if owners.contains(&validator.owner_account_address) {
+            bail!(
+                "Owner showed up twice in validator set {}",
+                validator.owner_account_address
+            )
+        }
+        owners.insert(validator.owner_account_address);
+
+        // Add the initial balance for the owner
+        {
+            let entry = initial_balances
+                .entry(validator.owner_account_address)
+                .or_default();
+            *entry = validator.stake_amount;
+        }
+        // Ensure the operator and the voters are present
+        initial_balances
+            .entry(validator.operator_account_address)
+            .or_default();
+        initial_balances
+            .entry(validator.voter_account_address)
+            .or_default();
+    }
+
+    Ok(initial_balances
+        .into_iter()
+        .map(|(address, balance)| InitialBalance { address, balance })
+        .collect())
 }

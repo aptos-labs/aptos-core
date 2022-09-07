@@ -11,6 +11,7 @@ pub mod keys;
 pub mod test_utils;
 
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
+use anyhow::bail;
 use aptos_config::config::{
     RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     TARGET_SNAPSHOT_SIZE,
@@ -23,7 +24,7 @@ use aptosdb::AptosDB;
 use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
-use vm_genesis::Validator;
+use vm_genesis::{InitialBalance, Validator};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -43,6 +44,7 @@ pub struct GenesisInfo {
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    /// Is a test network
     pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
@@ -60,6 +62,8 @@ pub struct GenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+    /// Initial balances at genesis
+    pub initial_balances: Vec<InitialBalance>,
 }
 
 impl GenesisInfo {
@@ -69,10 +73,27 @@ impl GenesisInfo {
         configs: Vec<ValidatorConfiguration>,
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
+        initial_balances: &[InitialBalance],
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
         for config in configs {
+            // Validate stake amounts
+            if config.stake_amount < genesis_config.min_stake {
+                bail!(
+                    "Stake amount {} for {} is below min stake {}",
+                    config.stake_amount,
+                    config.owner_account_address,
+                    genesis_config.min_stake
+                )
+            } else if config.stake_amount > genesis_config.max_stake {
+                bail!(
+                    "Stake amount {} for {} is above max stake {}",
+                    config.stake_amount,
+                    config.owner_account_address,
+                    genesis_config.max_stake
+                )
+            }
             validators.push(config.try_into()?)
         }
 
@@ -93,6 +114,7 @@ impl GenesisInfo {
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
+            initial_balances: initial_balances.to_vec(),
         })
     }
 
@@ -124,6 +146,7 @@ impl GenesisInfo {
                 voting_duration_secs: self.voting_duration_secs,
                 voting_power_increase_limit: self.voting_power_increase_limit,
             },
+            self.initial_balances.as_slice(),
         )
     }
 

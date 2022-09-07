@@ -101,7 +101,7 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
-    /// Genesis step 2: Initialize Aptos coin.
+    /// Genesis step 2: Initialize Aptos coin
     fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
@@ -134,27 +134,38 @@ module aptos_framework::genesis {
     ///
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
-    fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
+    ///
+    /// Also mint initial balances
+    fun create_initialize_validators(
+        aptos_framework: &signer,
+        initial_balance_accounts: vector<address>,
+        initial_balances: vector<u64>,
+        validators: vector<ValidatorConfiguration>,
+    ) {
+        // Create validators and mint associated coins / initialize accounts
         let i = 0;
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-            let owner = &account::create_account(validator.owner_address);
+
+            // Find owner's balance
+            let owner_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.owner_address);
+
+            // Initialize the owner
+            let owner = &create_account(aptos_framework, validator.owner_address, owner_balance);
+
             let operator = owner;
             // Create the operator account if it's different from owner.
             if (validator.operator_address != validator.owner_address) {
-                operator = &account::create_account(validator.operator_address);
+                let operator_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.operator_address);
+                operator = &create_account(aptos_framework, validator.operator_address, operator_balance);
             };
             // Create the voter account if it's different from owner and operator.
             if (validator.voter_address != validator.owner_address &&
                 validator.voter_address != validator.operator_address) {
-                account::create_account(validator.voter_address);
+                let voter_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.voter_address);
+                create_account(aptos_framework, validator.voter_address, voter_balance);
             };
-
-            // Mint the initial staking amount to the validator.
-            coin::register<AptosCoin>(owner);
-            aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
-
             // Initialize the stake pool and join the validator set.
             stake::initialize_stake_owner(
                 owner,
@@ -179,11 +190,45 @@ module aptos_framework::genesis {
             i = i + 1;
         };
 
+        // Mint initial balances that were not handled by validators
+        let i = 0;
+        let len = vector::length(&initial_balances);
+        while (i < len) {
+            let account = *vector::borrow(&initial_balance_accounts, i);
+            let initial_balance = *vector::borrow(&initial_balances, i);
+            // We have to create the account before minting
+            create_account(aptos_framework, account, initial_balance);
+            i = i + 1;
+        };
+
         // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
 
         stake::on_new_epoch();
+    }
+
+    /// Creates an account allowing for the signer to be used elsewhere in genesis
+    fun create_account(aptos_framework: &signer, account: address, balance: u64): signer {
+        let signer = account::create_account(account);
+        coin::register<AptosCoin>(&signer);
+
+        if (balance > 0) {
+            aptos_coin::mint(aptos_framework, account, balance);
+        };
+        signer
+    }
+
+    /// Finds the balance of the account and removes it from the list
+    fun find_initial_balance(accounts: &mut vector<address>, balances: &mut vector<u64>, account: &address): u64 {
+        // Lookup account
+        let (found, index) = vector::index_of(accounts, account);
+        assert!(found, 404);
+        let found_address = vector::remove(accounts, index);
+
+        // Ensure it's the right one and remove it from the list
+        assert!(found_address == *account, 404);
+        vector::remove(balances, index)
     }
 
     /// The last step of genesis.
