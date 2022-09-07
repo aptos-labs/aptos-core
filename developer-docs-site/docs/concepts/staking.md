@@ -153,7 +153,7 @@ At the start of each epoch, the following key events are triggered:
 
 Rewards for staking are calculated by using:
 
-1. The `rewards_rate`, an annual percentage yield (APY).
+1. The `rewards_rate`, an annual percentage yield (APY), i.e., rewards accrue as a compound interest on your current staked amount.
 2. Your staked amount, and 
 3. Your voting performance.
 
