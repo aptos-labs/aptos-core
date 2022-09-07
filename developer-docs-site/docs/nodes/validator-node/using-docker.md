@@ -49,7 +49,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
        Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
-5. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. See [Network Identity For FullNode](../full-node/network-identity-fullnode.md) for how to do this. 
+5. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. See [Network Identity For Fullnode](../full-node/network-identity-fullnode.md) for how to do this. 
 
     You will need this information to register on Aptos community website later.
 
@@ -65,7 +65,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
         --local-repository-dir ~/$WORKSPACE \
         --username $USERNAME \
         --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
-        --validator-host <Validator Node IP / DNS address>:<Port> \
+        --validator-host <Validator node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port> \
         --stake-amount 100000000000000
 
@@ -142,7 +142,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 4).
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 5).
-      - `operator.yaml`: Node information that will be used for both the Validator and the FullNode (from step 5). 
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 5). 
     - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 6).
     - `framework.mrb`: The AptosFramework Move package (from step 7).
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 8).
@@ -152,7 +152,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
 Now you have completed setting up your validator node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
 
-11.  [Optional] <span id="docker-vfn">Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.</span>
+11.  [Optional] <span id="docker-vfn">Now let's setup fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span>
 
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
@@ -161,7 +161,7 @@ Now you have completed setting up your validator node in test mode. You can cont
 
 12.  Edit `fullnode.yaml` file to update the IP address for Validator node.
 
-13.  [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
+13.  [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on fullnode machine.
 
 14.  [Optional] Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.
