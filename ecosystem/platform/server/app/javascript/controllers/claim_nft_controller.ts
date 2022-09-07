@@ -30,7 +30,7 @@ export default class extends Controller<HTMLAnchorElement> {
   declare readonly moduleAddressValue: string;
 
   get mintFunctionName() {
-    return this.moduleAddressValue + '::claim_mint';
+    return this.moduleAddressValue.replace(/0x0+/, '0x') + '::claim_mint';
   }
 
   connect() {
