@@ -741,6 +741,8 @@ impl StateStore {
             if index.stale_since_version > end {
                 break;
             }
+            // Prune the stale state value index itself first.
+            db_batch.delete::<StaleStateValueIndexSchema>(&index)?;
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         for version in begin..end {
