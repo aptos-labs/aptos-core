@@ -125,7 +125,9 @@ module aptos_token::marketplace_utils {
 
         let total_amount = listing.min_price * listing.amount;
         let token_amount = listing.amount;
-        assert!(timestamp::now_seconds() <= listing.expiration_sec, EEXPIRED_LISTING);
+        if (listing.expiration_sec != 0) {
+            assert!(timestamp::now_seconds() <= listing.expiration_sec, EEXPIRED_LISTING);
+        };
         assert!(coin::balance<CoinType>(coin_owner_address) >= total_amount, EBUYER_NOT_HAVING_ENOUGH_COINS);
 
         let token = token::withdraw_with_event_internal(listing.owner, listing.token_id, listing.amount);
