@@ -8,6 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_value::StaleStateValueIndex;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -15,6 +16,7 @@ use aptos_types::{
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
+use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use crate::{
     pruner::{state_pruner_worker::StatePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
@@ -395,12 +397,19 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
     for batch in inputs {
         update_store(store, batch.clone().into_iter(), version);
         for (k, v) in batch.iter() {
-            if let Some(old_v_opt) = current_state_values.insert(k.clone(), v.clone()) {
+            if let Some((old_version, old_v_opt)) =
+                current_state_values.insert(k.clone(), (version, v.clone()))
+            {
                 pruner
                     .wake_and_wait_pruner(version as u64 /* latest_version */)
                     .unwrap();
                 if version > 0 {
-                    verify_state_value(vec![(k, &old_v_opt)].into_iter(), version - 1, store, true);
+                    verify_state_value(
+                        vec![(k, &(old_version, old_v_opt))].into_iter(),
+                        version - 1,
+                        store,
+                        true,
+                    );
                 }
             }
             verify_state_value(current_state_values.iter(), version, store, false);
@@ -409,15 +418,26 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
     }
 }
 
-fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValue>)>>(
+fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option<StateValue>))>>(
     kvs: I,
     version: Version,
     state_store: &Arc<StateStore>,
     pruned: bool,
 ) {
-    for (k, v) in kvs {
+    for (k, (old_version, v)) in kvs {
         let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
         assert_eq!(&v_from_db, if pruned { &None } else { v });
+        if pruned {
+            assert!(state_store
+                .ledger_db
+                .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
+                    stale_since_version: version,
+                    version: *old_version,
+                    state_key: k.clone()
+                })
+                .unwrap()
+                .is_none());
+        }
     }
 
     if pruned {
