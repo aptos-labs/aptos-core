@@ -1,19 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{collection::hash_map, prelude::*};
-
-use aptos_jellyfish_merkle::{restore::StateSnapshotRestore, TreeReader};
+use crate::{
+    state_restore::StateSnapshotRestore,
+    test_helper::{arb_state_kv_sets, update_store},
+    AptosDB,
+};
+use aptos_jellyfish_merkle::TreeReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
+use proptest::{collection::hash_map, prelude::*};
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
-
-use crate::{
-    test_helper::{arb_state_kv_sets, update_store},
-    AptosDB,
-};
 
 use super::*;
 

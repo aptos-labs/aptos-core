@@ -53,15 +53,6 @@ impl TestTransaction {
         }
     }
 
-    pub(crate) fn crsn(mut self, min_nonce: u64) -> Self {
-        // Default CRSN size to 128
-        self.account_seqno_type = AccountSequenceInfo::CRSN {
-            min_nonce,
-            size: 128,
-        };
-        self
-    }
-
     pub(crate) fn make_signed_transaction_with_expiration_time(
         &self,
         exp_timestamp_secs: u64,

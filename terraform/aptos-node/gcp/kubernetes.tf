@@ -53,21 +53,21 @@ resource "helm_release" "validator" {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
-          key    = google_container_node_pool.validators.node_config[0].taint[0].key
-          value  = google_container_node_pool.validators.node_config[0].taint[0].value
+          key    = "aptos.org/nodepool"
+          value  = "validators"
           effect = "NoExecute"
         }]
       }
       fullnode = {
         storage = {
-          class = "standard"
+          class = kubernetes_storage_class.ssd.metadata[0].name
         }
         nodeSelector = {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
-          key    = google_container_node_pool.validators.node_config[0].taint[0].key
-          value  = google_container_node_pool.validators.node_config[0].taint[0].value
+          key    = "aptos.org/nodepool"
+          value  = "validators"
           effect = "NoExecute"
         }]
       }

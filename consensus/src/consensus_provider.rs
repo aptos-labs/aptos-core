@@ -38,6 +38,7 @@ pub fn start_consensus(
 ) -> Runtime {
     let runtime = runtime::Builder::new_multi_thread()
         .thread_name("consensus")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");

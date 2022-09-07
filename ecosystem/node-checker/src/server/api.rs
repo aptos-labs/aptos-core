@@ -14,6 +14,8 @@ use crate::{
     runner::Runner,
 };
 use anyhow::anyhow;
+use aptos_crypto::x25519;
+use aptos_crypto::ValidCryptoMaterialStringExt;
 use poem::{http::StatusCode, Error as PoemError, Result as PoemResult};
 use poem_openapi::{
     param::Query, payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService,
@@ -87,13 +89,49 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         #[oai(default = "NodeAddress::default_metrics_port")] metrics_port: Query<u16>,
         #[oai(default = "NodeAddress::default_api_port")] api_port: Query<u16>,
         #[oai(default = "NodeAddress::default_noise_port")] noise_port: Query<u16>,
+        /// A public key for the node, e.g. 0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f.
+        /// This is only necessary for certain evaluators, e.g. HandshakeEvaluator.
+        public_key: Query<Option<String>>,
     ) -> PoemResult<Json<EvaluationSummary>> {
+        // Ensure the public key, if given, is in a valid format.
+        let public_key = match public_key.0 {
+            Some(public_key) => match x25519::PublicKey::from_encoded_string(&public_key) {
+                Ok(public_key) => Some(public_key),
+                Err(e) => {
+                    return Err(PoemError::from((
+                        StatusCode::BAD_REQUEST,
+                        anyhow!("Invalid public key \"{}\": {:#}", public_key, e),
+                    )))
+                }
+            },
+            None => None,
+        };
+
         let target_node_address = NodeAddress {
             url: node_url.0,
             metrics_port: metrics_port.0,
             api_port: api_port.0,
             noise_port: noise_port.0,
+            public_key,
         };
+
+        let baseline_node_configuration =
+            self.get_baseline_node_configuration(&baseline_configuration_name.0)?;
+
+        // Ensure the given arguments are valid for the configured evaluators.
+        for evaluator in &baseline_node_configuration
+            .runner
+            .get_evaluator_set()
+            .evaluators
+        {
+            if let Err(e) = evaluator.validate_check_node_call(&target_node_address) {
+                return Err(PoemError::from((
+                    StatusCode::BAD_REQUEST,
+                    anyhow!("Invalid request: {}", e),
+                )));
+            }
+        }
+
         let request = CheckNodeRequest {
             baseline_configuration_name: baseline_configuration_name.0,
             target_node: target_node_address.clone(),
@@ -105,9 +143,6 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
                 "This node health checker is configured to only check its preconfigured test node"),
             )));
         }
-
-        let baseline_node_configuration =
-            self.get_baseline_node_configuration(&request.baseline_configuration_name)?;
 
         let target_metric_collector = ReqwestMetricCollector::new(
             request.target_node.url.clone(),

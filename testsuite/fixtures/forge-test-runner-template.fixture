@@ -18,7 +18,8 @@ spec:
     - -c
     - |
       ulimit -n 1048576
-      forge --suite banana --duration-secs 123 test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato   
+      forge --suite banana --duration-secs 123 --num-validators 10 --num-validator-fullnodes 20 --forge-cli-arg test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace potato --test-arg
+
     env:
     - name: FORGE_TRIGGERED_BY
       value: github-actions

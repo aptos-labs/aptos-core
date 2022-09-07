@@ -170,6 +170,11 @@ variable "utility_instance_max_num" {
   default     = 0
 }
 
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint the instances in the utility nodegroup"
+  default     = false
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   default     = "c6i.4xlarge"
@@ -188,6 +193,11 @@ variable "validator_instance_min_num" {
 variable "validator_instance_max_num" {
   description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.validator_instance_num"
   default     = 0
+}
+
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  default     = false
 }
 
 variable "workspace_name_override" {

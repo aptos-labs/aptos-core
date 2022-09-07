@@ -3,6 +3,7 @@ import atexit
 
 import json
 import multiprocessing
+from optparse import Option
 
 
 # Using fork can crash the subprocess, use spawn instead
@@ -156,10 +157,6 @@ def get_current_user() -> str:
     return pwd.getpwuid(os.getuid())[0]
 
 
-def get_utc_timestamp(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-
 @click.group()
 def main() -> None:
     # Check that the current directory is the root of the repository.
@@ -244,23 +241,23 @@ DEVINFRA_GRAFANA_BASE_URL = (
 )
 HUMIO_LOGS_LINK = (
     "https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_insta"
-    "nce%3D%2A%29%20%7C%20forge-compat%20&live=false&start=1661893461000&end=16"
-    "61894266000&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C"
-    "%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%2"
-    "2width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22le"
-    "vel%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3"
-    "A%22link%22%2C%22openInNewBrowserTab%22%3A***%2C%22style%22%3A%22button%22"
-    "%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-c"
-    "ore%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTem"
-    "plate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header"
-    "%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22"
-    "%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22"
-    "width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s"
-    ".pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22ty"
-    "pe%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22form"
-    "at%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%"
-    "22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtB"
-    "ottom=***&showOnlyFirstLine=false"
+    "nce%3D%2A%29%20%7C%20$FORGE_NAMESPACE%20&live=false&start=1661893461000&en"
+    "d=1661894266000&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%2"
+    "2%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%"
+    "2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%"
+    "22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%"
+    "22%3A%22link%22%2C%22openInNewBrowserTab%22%3A***%2C%22style%22%3A%22butto"
+    "n%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Fapt"
+    "os-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22tex"
+    "tTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22he"
+    "ader%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22fiel"
+    "d%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2"
+    "C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%2"
+    "2k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%"
+    "22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22"
+    "format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22"
+    "%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newes"
+    "tAtBottom=***&showOnlyFirstLine=false"
 )
 
 
@@ -305,6 +302,9 @@ class Processes:
         raise NotImplementedError()
 
     def atexit(self, callback: Callable[[], None]) -> None:
+        raise NotImplementedError()
+
+    def user(self) -> str:
         raise NotImplementedError()
 
 
@@ -352,6 +352,9 @@ class SystemProcesses(Processes):
     def atexit(self, callback: Callable[[], None]) -> None:
         atexit.register(callback)
 
+    def user(self) -> str:
+        return get_current_user()
+
 
 class FakeProcesses(Processes):
     def __init__(self) -> None:
@@ -368,6 +371,9 @@ class FakeProcesses(Processes):
 
     def atexit(self, callback: Callable[[], None]) -> None:
         return self.exit_callbacks.append(callback)
+
+    def user(self) -> str:
+        return "perry"
 
 
 class ForgeState(Enum):
@@ -443,7 +449,13 @@ class ForgeResult:
         self.debugging_output = output
 
     def format(self) -> str:
-        return f"Forge {self.state.value.lower()}ed"
+        output = "\n".join([
+            f"Forge output: {self.output}",
+            f"Forge {self.state.value.lower()}ed",
+        ])
+        if not self.succeeded():
+            output += "\n" + self.debugging_output
+        return output
 
     def succeeded(self) -> bool:
         return self.state == ForgeState.PASS
@@ -463,10 +475,13 @@ class SystemTime(Time):
 
 
 class FakeTime(Time):
-    _now: datetime = datetime.fromisoformat("2022-07-29T00:00:00+00:00")
+    _now: int = 1659078000
 
     def now(self) -> datetime:
-        return self._now
+        return datetime.fromtimestamp(self._now, timezone.utc)
+
+    def epoch(self) -> str:
+        return str(self._now)
 
 
 @dataclass
@@ -483,24 +498,18 @@ class ForgeContext:
     processes: Processes
     time: Time
 
-    # forge criteria
-    forge_test_suite: str
-    forge_runner_duration_secs: str
-
     # forge cluster options
     forge_namespace: str
-    reuse_args: Sequence[str]
-    keep_args: Sequence[str]
-    haproxy_args: Sequence[str]
+    keep_port_forwards: bool
+    forge_args: Sequence[str]
 
     # aws related options
-    aws_account_num: str
+    aws_account_num: Optional[str]
     aws_region: str
 
     forge_image_tag: str
     image_tag: str
     upgrade_image_tag: str
-    forge_namespace: str
     forge_cluster_name: str
     forge_blocking: bool
 
@@ -774,7 +783,7 @@ class ForgeRunner:
 
 def dump_forge_state(shell: Shell, forge_namespace: str) -> str:
     try:
-        return (
+        output = (
             shell.run(
                 [
                     "kubectl",
@@ -787,6 +796,7 @@ def dump_forge_state(shell: Shell, forge_namespace: str) -> str:
             .unwrap()
             .decode()
         )
+        return "" if "No resources found" in output else output
     except Exception as e:
         return f"Failed to get debugging output: {e}"
 
@@ -813,33 +823,10 @@ class LocalForgeRunner(ForgeRunner):
             resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
         )
         port_forward_process = context.processes.spawn(prometheus_port_forward)
+
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
-                [
-                    "cargo",
-                    "run",
-                    "-p",
-                    "forge-cli",
-                    "--",
-                    "--suite",
-                    context.forge_test_suite,
-                    "--mempool-backlog",
-                    "5000",
-                    "--duration-secs",
-                    context.forge_runner_duration_secs,
-                    "test",
-                    "k8s-swarm",
-                    "--image-tag",
-                    context.image_tag,
-                    "--upgrade-image-tag",
-                    context.upgrade_image_tag,
-                    "--namespace",
-                    context.forge_namespace,
-                    "--port-forward",
-                    *context.reuse_args,
-                    *context.keep_args,
-                    *context.haproxy_args,
-                ],
+                context.forge_args,
                 stream_output=True,
             )
             forge_result.set_output(result.output.decode())
@@ -848,7 +835,7 @@ class LocalForgeRunner(ForgeRunner):
             )
 
         # Kill port forward unless we're keeping them
-        if not context.keep_args:
+        if not context.keep_port_forwards:
             # Kill all processess with kubectl in the name
             for process in context.processes.processes():
                 if (
@@ -893,19 +880,18 @@ class K8sForgeRunner(ForgeRunner):
         )
         template = context.filesystem.read("testsuite/forge-test-runner-template.yaml")
         forge_triggered_by = "github-actions" if context.github_actions else "other"
+
+        assert context.aws_account_num is not None, "AWS account number is required"
+
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
-            FORGE_TEST_SUITE=context.forge_test_suite,
-            FORGE_RUNNER_DURATION_SECS=context.forge_runner_duration_secs,
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
             AWS_ACCOUNT_NUM=context.aws_account_num,
             AWS_REGION=context.aws_region,
             FORGE_NAMESPACE=context.forge_namespace,
-            REUSE_ARGS=context.reuse_args if context.reuse_args else "",
-            KEEP_ARGS=context.keep_args if context.keep_args else "",
-            ENABLE_HAPROXY_ARGS=context.haproxy_args if context.haproxy_args else "",
+            FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
         )
 
@@ -921,11 +907,11 @@ class K8sForgeRunner(ForgeRunner):
                     "wait",
                     "-n",
                     "default",
-                    "--timeout=5m",
+                    "--timeout=1m",
                     "--for=condition=Ready",
                     f"pod/{forge_pod_name}",
                 ]
-            ).unwrap()
+            )
             state = None
             attempts = 100
             streaming = True
@@ -939,8 +925,7 @@ class K8sForgeRunner(ForgeRunner):
                 if streaming:
                     streaming = False
 
-                if forge_logs.succeeded():
-                    forge_result.set_output(forge_logs.output.decode())
+                forge_result.set_output(forge_logs.output.decode())
 
                 # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
                 forge_status = (
@@ -983,17 +968,6 @@ class K8sForgeRunner(ForgeRunner):
 
 class AwsError(Exception):
     pass
-
-
-def assert_aws_token_expiration(aws_token_expiration: Optional[str]) -> None:
-    if aws_token_expiration is None:
-        raise AwsError("AWS token is required")
-    try:
-        expiration = datetime.strptime(aws_token_expiration, "%Y-%m-%dT%H:%M:%S%z")
-    except Exception as e:
-        raise AwsError(f"Invalid date format: {aws_token_expiration}") from e
-    if datetime.now(timezone.utc) > expiration:
-        raise AwsError("AWS token has expired")
 
 
 def get_aws_account_num(shell: Shell) -> str:
@@ -1048,17 +1022,6 @@ async def write_cluster_config(
     ).unwrap()
 
 
-def update_aws_auth(shell: Shell, aws_auth_script: Optional[str] = None) -> None:
-    if aws_auth_script is None:
-        raise AwsError("Please authenticate with AWS and rerun")
-    result = shell.run(["bash", "-c", f"source {aws_auth_script} && env | grep AWS_"])
-    for line in result.unwrap().decode().splitlines():
-        if line.startswith("AWS_"):
-            key, val = line.split("=", 1)
-            os.environ[key] = val
-    assert_aws_auth(shell)
-
-
 def get_current_cluster_name(shell: Shell) -> str:
     result = shell.run(["kubectl", "config", "current-context"])
     current_context = result.unwrap().decode()
@@ -1080,15 +1043,30 @@ class Git:
             yield self.run(["rev-parse", f"HEAD~{i}"]).unwrap().decode().strip()
 
 
+def assert_provided_image_tags_has_profile_or_features(
+    forge_image_tag,
+    image_tag,
+    enable_failpoints_feature: bool = False,
+    enable_performance_profile: bool = False,
+):
+    for tag in [forge_image_tag, image_tag]:
+        if enable_failpoints_feature:
+            assert tag.startswith(
+                "failpoints"
+            ), f"Missing failpoints_ feature prefix in {tag}"
+        if enable_performance_profile:
+            assert tag.startswith(
+                "performance"
+            ), f"Missing performance_ profile prefix in {tag}"
+
+
 def find_recent_images_by_profile_or_features(
     shell: Shell,
     git: Git,
     num_images: int,
-    # Set a generoush threshold in case of failures
-    commit_threshold: int = 100,
-    enable_failpoints_feature: bool = False,
-    enable_performance_profile: bool = False,
-) -> List[str]:
+    enable_failpoints_feature: Optional[bool],
+    enable_performance_profile: Optional[bool],
+) -> Generator[str, None, None]:
     image_name = "aptos/validator"
     image_tag_prefix = ""
     if enable_failpoints_feature and enable_performance_profile:
@@ -1103,7 +1081,6 @@ def find_recent_images_by_profile_or_features(
         shell,
         git,
         num_images,
-        commit_threshold,
         image_name=image_name,
         image_tag_prefix=image_tag_prefix,
     )
@@ -1113,10 +1090,9 @@ def find_recent_images(
     shell: Shell,
     git: Git,
     num_images: int,
-    # Set a generoush threshold in case of failures
-    commit_threshold: int = 100,
-    image_name: str = "aptos/validator",
+    image_name: str,
     image_tag_prefix: str = "",
+    commit_threshold: int = 100,
 ) -> Generator[str, None, None]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
@@ -1166,6 +1142,91 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     return sanitized_namespace
 
 
+def create_forge_command(
+    forge_runner_mode: Optional[str],
+    enable_failpoints_feature: bool,
+    forge_test_suite: Optional[str],
+    forge_runner_duration_secs: Optional[str],
+    forge_num_validators: Optional[str],
+    forge_num_validator_fullnodes: Optional[str],
+    image_tag: str,
+    upgrade_image_tag: str,
+    forge_namespace: str,
+    forge_namespace_reuse: Optional[str],
+    forge_namespace_keep: Optional[str],
+    forge_enable_haproxy: Optional[str],
+    cargo_args: Optional[Sequence[str]],
+    forge_cli_args: Optional[Sequence[str]],
+    test_args: Optional[Sequence[str]],
+) -> List[str]:
+    """
+    Cargo args get passed before forge directly to cargo (i.e. features)
+    Forge Cli args get passed to forge before the test command (i.e. test suite)
+    Test args get passed to the test subcommand (i.e. image tag)
+    """
+    if forge_runner_mode == "local":
+        forge_args = [
+            "cargo",
+            "run",
+        ]
+        if enable_failpoints_feature:
+            forge_args.extend(["--features", "failpoints"])
+        if cargo_args:
+            forge_args.extend(cargo_args)
+        forge_args.extend([
+            "-p",
+            "forge-cli",
+            "--",
+        ])
+    elif forge_runner_mode == "k8s":
+        forge_args = ["forge"]
+    else:
+        return []
+    if forge_test_suite:
+        forge_args.extend([
+            "--suite", forge_test_suite
+        ])
+    if forge_runner_duration_secs:
+        forge_args.extend([
+            "--duration-secs", forge_runner_duration_secs
+        ])
+
+    if forge_num_validators:
+        forge_args.extend(["--num-validators", forge_num_validators])
+    if forge_num_validator_fullnodes:
+        forge_args.extend([
+            "--num-validator-fullnodes",
+            forge_num_validator_fullnodes,
+        ])
+
+    if forge_cli_args:
+        forge_args.extend(forge_cli_args)
+
+    # TODO: add support for other backend
+    backend = "k8s-swarm"
+    forge_args.extend([
+        "test", backend,
+        "--image-tag", image_tag,
+        "--upgrade-image-tag", upgrade_image_tag,
+        "--namespace", forge_namespace,
+    ])
+
+    if forge_runner_mode == "local":
+        forge_args.append("--port-forward")
+
+    if forge_namespace_reuse == "true":
+        forge_args.append("--reuse")
+    if forge_namespace_keep == "true":
+        forge_args.append("--keep")
+    if forge_enable_haproxy == "true":
+        forge_args.append("--enable-haproxy")
+
+    if test_args:
+        forge_args.extend(test_args)
+
+    return forge_args
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1174,11 +1235,12 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 @envoption("FORGE_COMMENT")
 # cluster auth
 @envoption("AWS_REGION", "us-west-2")
-@envoption("AWS_TOKEN_EXPIRATION")
-@envoption("AWS_AUTH_SCRIPT")
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 @envoption("FORGE_CLUSTER_NAME")
+# these override the args in forge-cli
+@envoption("FORGE_NUM_VALIDATORS")
+@envoption("FORGE_NUM_VALIDATOR_FULLNODES")
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
@@ -1193,26 +1255,25 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 @envoption("VERBOSE")
 @envoption("GITHUB_ACTIONS", "false")
 @click.option("--dry-run", is_flag=True)
-@click.option("--ignore-cluster-warning", is_flag=True)
-@click.option(
-    "--interactive/--no-interactive", is_flag=True, default=sys.stdin.isatty()
-)
 @click.option("--balance-clusters", is_flag=True)
 @envoption("FORGE_BLOCKING", "true")
 @envoption("GITHUB_SERVER_URL")
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
 @envoption("GITHUB_STEP_SUMMARY")
+@click.option("--cargo-args", multiple=True, help="Cargo args to pass to forge local runner")
+@click.option("--forge-cli-args", multiple=True, help="Forge cli args to pass to forge cli")
+@click.option("--test-args", multiple=True, help="Test args to pass to forge test subcommand")
 def test(
     forge_output: Optional[str],
     forge_report: Optional[str],
     forge_pre_comment: Optional[str],
     forge_comment: Optional[str],
     aws_region: str,
-    aws_token_expiration: Optional[str],
-    aws_auth_script: Optional[str],
     forge_runner_mode: str,
     forge_cluster_name: Optional[str],
+    forge_num_validators: Optional[str],
+    forge_num_validator_fullnodes: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_namespace_reuse: Optional[str],
     forge_enable_failpoints: Optional[str],
@@ -1227,47 +1288,35 @@ def test(
     verbose: Optional[str],
     github_actions: str,
     dry_run: Optional[bool],
-    ignore_cluster_warning: Optional[bool],
-    interactive: bool,
     balance_clusters: bool,
     forge_blocking: Optional[str],
     github_server_url: Optional[str],
     github_repository: Optional[str],
     github_run_id: Optional[str],
     github_step_summary: Optional[str],
+    cargo_args: Optional[List[str]],
+    forge_cli_args: Optional[List[str]],
+    test_args: Optional[List[str]],
 ) -> None:
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)
-    filesystem = LocalFilesystem()
+    filesystem = FakeFilesystem() if dry_run else LocalFilesystem() 
     processes = FakeProcesses() if dry_run else SystemProcesses()
     time = FakeTime() if dry_run else SystemTime()
 
-    if dry_run:
-        aws_account_num = "1234"
-    # Pre flight checks
-    else:
-        try:
-            assert_aws_auth(shell)
-            aws_account_num = get_aws_account_num(shell)
-        except Exception:
-            update_aws_auth(shell, aws_auth_script)
-            aws_account_num = get_aws_account_num(shell)
-
-    if aws_auth_script and aws_token_expiration and not dry_run:
-        assert_aws_token_expiration(
-            os.getenv("AWS_TOKEN_EXPIRATION", aws_token_expiration)
-        )
-
-    assert aws_account_num is not None, "AWS account number is required"
+    aws_account_num = None
+    try:
+        aws_account_num = get_aws_account_num(shell)
+    except Exception as e:
+        print(f"Warning: failed to get AWS account number: {e}")
 
     # Perform cluster selection
     current_cluster = None
-    if not forge_cluster_name:
-        if interactive:
-            current_cluster = get_current_cluster_name(shell)
-            if click.confirm(f"Automatically using current cluster {current_cluster}"):
-                forge_cluster_name = current_cluster
+    try:
+        current_cluster = get_current_cluster_name(shell)
+    except Exception as e:
+        print("Warning: failed to get current cluster name: {e}")
 
     if not forge_cluster_name or balance_clusters:
         cluster_names = list_eks_clusters(shell)
@@ -1275,24 +1324,23 @@ def test(
 
     assert forge_cluster_name, "Forge cluster name is required"
 
-    click.echo(f"Using forge cluster: {forge_cluster_name}")
-    if "forge" not in forge_cluster_name and not ignore_cluster_warning:
-        click.echo(
-            "Forge cluster usually contains forge, to ignore this warning set --ignore-cluster-warning"
-        )
-        if interactive:
-            click.confirm("Continue?", abort=True)
-        else:
-            return
-
-    set_current_cluster(shell, forge_cluster_name)
-
     if forge_namespace is None:
-        forge_namespace = f"forge-{get_current_user()}-{time.epoch()}"
+        forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
 
     forge_namespace = sanitize_forge_resource_name(forge_namespace)
 
     assert forge_namespace is not None, "Forge namespace is required"
+
+    # These features and profile flags are set as strings
+    enable_failpoints_feature = forge_enable_failpoints == "true"
+    enable_performance_profile = forge_enable_performance == "true"
+
+    assert_provided_image_tags_has_profile_or_features(
+        image_tag,
+        forge_image_tag,
+        enable_failpoints_feature=enable_failpoints_feature,
+        enable_performance_profile=enable_performance_profile,
+    )
 
     if forge_test_suite == "compat":
         # Compat uses 2 image tags
@@ -1301,8 +1349,8 @@ def test(
                 shell,
                 git,
                 2,
-                enable_failpoints_feature=forge_enable_failpoints,
-                enable_performance_profile=forge_enable_performance,
+                enable_failpoints_feature=enable_failpoints_feature,
+                enable_performance_profile=enable_performance_profile,
             )
         )
         # This might not work as intended because we dont know if that revision passed forge
@@ -1312,15 +1360,15 @@ def test(
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
-        default_latest_image = list(
+        default_latest_image = next(
             find_recent_images_by_profile_or_features(
                 shell,
                 git,
                 1,
-                enable_failpoints_feature=forge_enable_failpoints,
-                enable_performance_profile=forge_enable_performance,
+                enable_failpoints_feature=enable_performance_profile,
+                enable_performance_profile=enable_performance_profile,
             )
-        )[0]
+        )
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
@@ -1334,26 +1382,41 @@ def test(
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
 
+    forge_args = create_forge_command(
+        forge_runner_mode=forge_runner_mode,
+        enable_failpoints_feature=enable_failpoints_feature,
+        forge_test_suite=forge_test_suite,
+        forge_runner_duration_secs=forge_runner_duration_secs,
+        forge_num_validators=forge_num_validators,
+        forge_num_validator_fullnodes=forge_num_validator_fullnodes,
+        image_tag=image_tag,
+        upgrade_image_tag=upgrade_image_tag,
+        forge_namespace=forge_namespace,
+        forge_namespace_reuse=forge_namespace_reuse,
+        forge_namespace_keep=forge_namespace_keep,
+        forge_enable_haproxy=forge_enable_haproxy,
+        cargo_args=cargo_args,
+        forge_cli_args=forge_cli_args,
+        test_args=test_args,
+    )
+
     context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
         processes=processes,
         time=time,
-        forge_test_suite=forge_test_suite,
-        forge_runner_duration_secs=forge_runner_duration_secs,
-        reuse_args=["--reuse"] if forge_namespace_reuse else [],
-        keep_args=["--keep"] if forge_namespace_keep else [],
-        haproxy_args=["--enable-haproxy"] if forge_enable_haproxy else [],
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         forge_image_tag=forge_image_tag,
         image_tag=image_tag,
         upgrade_image_tag=upgrade_image_tag,
         forge_namespace=forge_namespace,
+        keep_port_forwards=forge_namespace_keep == "true",
         forge_cluster_name=forge_cluster_name,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}",
+        forge_args=forge_args,
     )
     forge_runner_mapping = {
         "local": LocalForgeRunner,
@@ -1372,12 +1435,13 @@ def test(
         return
 
     try:
+        print(f"Using cluster: {forge_cluster_name}")
+        set_current_cluster(shell, forge_cluster_name)
+
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(context)
 
         print(result.format())
-        if not result.succeeded():
-            print(result.debugging_output)
 
         outputs = []
         if forge_output:
@@ -1394,6 +1458,12 @@ def test(
             raise SystemExit(1)
 
     except Exception as e:
+        if current_cluster:
+            try:
+                set_current_cluster(shell, current_cluster)
+            except Exception as ee:
+                print("Warning: failed to restore current cluster: {ee}")
+                print("Set cluster manually with aws eks update-kubeconfig --name {current_cluster}")
         raise Exception(
             "Forge state:\n" + dump_forge_state(shell, forge_namespace)
         ) from e

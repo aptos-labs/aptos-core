@@ -10,6 +10,9 @@ import type { U64 } from './U64';
  * index endpoint (i.e., GET "/").
  */
 export type IndexResponse = {
+    /**
+     * Chain ID of the current chain
+     */
     chain_id: number;
     epoch: U64;
     ledger_version: U64;

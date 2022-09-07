@@ -1,8 +1,6 @@
-  provider "azuread" {
-      use_microsoft_graph = true
-  }
+provider "azuread" {}
 
-  terraform {
+terraform {
   required_version = "~> 1.2.0"
   required_providers {
     azuread = {
@@ -10,28 +8,28 @@
       version = "~> 2.27.0"
     }
     azurerm = {
-      source  = "hashicorp/azurerm"
+      source = "hashicorp/azurerm"
     }
     helm = {
-      source  = "hashicorp/helm"
+      source = "hashicorp/helm"
     }
     kubernetes = {
-      source  = "hashicorp/kubernetes"
+      source = "hashicorp/kubernetes"
     }
     local = {
-      source  = "hashicorp/local"
+      source = "hashicorp/local"
     }
     null = {
-      source  = "hashicorp/null"
+      source = "hashicorp/null"
     }
     random = {
-      source  = "hashicorp/random"
+      source = "hashicorp/random"
     }
     time = {
-      source  = "hashicorp/time"
+      source = "hashicorp/time"
     }
     tls = {
-      source  = "hashicorp/tls"
+      source = "hashicorp/tls"
     }
   }
 }

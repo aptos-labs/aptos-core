@@ -122,6 +122,7 @@ impl SMRNode {
                 twin_id.id,
                 std::thread::current().name().unwrap_or("")
             ))
+            .disable_lifo_slot()
             .enable_all()
             .build()
             .unwrap();

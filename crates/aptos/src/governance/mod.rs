@@ -82,7 +82,9 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
-        let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
+        let (_bytecode, script_hash) = self
+            .compile_proposal_args
+            .compile(self.txn_options.prompt_options)?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -378,7 +380,9 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile(self.txn_options.prompt_options)?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
@@ -405,13 +409,10 @@ pub struct CompileProposalArgs {
     /// framework upgrade
     #[clap(long)]
     pub(crate) framework_git_rev: Option<String>,
-
-    #[clap(flatten)]
-    pub prompt_options: PromptOptions,
 }
 
 impl CompileProposalArgs {
-    fn compile(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    fn compile(&self, prompt_options: PromptOptions) -> CliTypedResult<(Vec<u8>, HashValue)> {
         // Check script file
         let script_path = self.script_path.as_path();
         if !self.script_path.exists() {
@@ -427,11 +428,7 @@ impl CompileProposalArgs {
         }
 
         // Compile script
-        compile_in_temp_dir(
-            script_path,
-            self.framework_git_rev.clone(),
-            self.prompt_options,
-        )
+        compile_in_temp_dir(script_path, self.framework_git_rev.clone(), prompt_options)
     }
 }
 

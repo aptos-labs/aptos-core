@@ -101,6 +101,7 @@ pub fn bootstrap(
 ) -> Runtime {
     let runtime = Builder::new_multi_thread()
         .thread_name("shared-mem")
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[shared mempool] failed to create runtime");

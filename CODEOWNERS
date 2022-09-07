@@ -1,5 +1,8 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
+# Owners for the `.github` directory and all its subdirectories.
+/.github/ @aptos-labs/prod-eng
+
 # Owners for the `/api` directory and all its subdirectories. 
 /api/ @banool @gregnazario
 
@@ -40,6 +43,9 @@
 # Owners for the `/aptos-rosetta` directory and related crates.
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
+
+# Owners for the `/dashboards` directory and all its subdirectories.
+/dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
 /developer-docs-site/ @davidiw @rajkaramchedu

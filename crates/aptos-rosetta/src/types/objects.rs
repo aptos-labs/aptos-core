@@ -412,7 +412,7 @@ pub struct SigningPayload {
     /// Hex encoded string of payload bytes to be signed
     pub hex_bytes: String,
     /// Signature type to sign with
-    pub signature_type: SignatureType,
+    pub signature_type: Option<SignatureType>,
 }
 
 /// A representation of a transaction by it's underlying operations (write set changes)

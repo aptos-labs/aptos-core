@@ -6,6 +6,7 @@ import type { BuildVersionEvaluatorArgs } from './BuildVersionEvaluatorArgs';
 import type { ConsensusProposalsEvaluatorArgs } from './ConsensusProposalsEvaluatorArgs';
 import type { ConsensusRoundEvaluatorArgs } from './ConsensusRoundEvaluatorArgs';
 import type { ConsensusTimeoutsEvaluatorArgs } from './ConsensusTimeoutsEvaluatorArgs';
+import type { HandshakeEvaluatorArgs } from './HandshakeEvaluatorArgs';
 import type { HardwareEvaluatorArgs } from './HardwareEvaluatorArgs';
 import type { LatencyEvaluatorArgs } from './LatencyEvaluatorArgs';
 import type { NetworkMinimumPeersEvaluatorArgs } from './NetworkMinimumPeersEvaluatorArgs';
@@ -19,6 +20,7 @@ export type EvaluatorArgs = {
     consensus_proposals_args: ConsensusProposalsEvaluatorArgs;
     consensus_round_args: ConsensusRoundEvaluatorArgs;
     consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs;
+    handshake_args: HandshakeEvaluatorArgs;
     hardware_args: HardwareEvaluatorArgs;
     latency_args: LatencyEvaluatorArgs;
     network_minimum_peers_args: NetworkMinimumPeersEvaluatorArgs;

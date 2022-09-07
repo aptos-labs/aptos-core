@@ -4,7 +4,9 @@
  * @returns
  */
 export const bytesToHex = (buffer: Uint8Array): string =>
-  [...buffer].map((x) => x.toString(16).padStart(2, "0")).join("");
+  Array.from(buffer)
+    .map((x) => x.toString(16).padStart(2, "0"))
+    .join("");
 
 /**
  * Checks if a string is a valid string of hex characters.

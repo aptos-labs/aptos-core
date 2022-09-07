@@ -10,10 +10,9 @@ use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::write_set::WriteSet;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::EventWithVersion,
@@ -35,10 +34,11 @@ use aptos_types::{
         TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
         TransactionWithProof, Version,
     },
+    write_set::WriteSet,
     PeerId,
 };
 use channel::aptos_channel;
-use claim::{assert_matches, assert_none};
+use claims::{assert_matches, assert_none};
 use futures::channel::{oneshot, oneshot::Receiver};
 use mockall::{
     mock,
@@ -54,16 +54,18 @@ use network::{
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, ExecutedTrees, Order};
-use storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+use storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
+        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+        StorageServerSummary, StorageServiceResponse,
+    },
+    Epoch, StorageServiceError, StorageServiceMessage,
 };
-use storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceResponse,
-};
-use storage_service_types::{Epoch, StorageServiceError, StorageServiceMessage};
 use tokio::time::timeout;
 
 /// Various test constants for storage

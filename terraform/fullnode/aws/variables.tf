@@ -34,10 +34,6 @@ variable "k8s_admins" {
   default     = []
 }
 
-variable "ssh_pub_key" {
-  description = "SSH public key to configure for bastion and vault access"
-}
-
 variable "num_fullnodes" {
   default = 1
 }
@@ -119,5 +115,15 @@ variable "utility_instance_type" {
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.2xlarge"
+  default     = "c6i.4xlarge"
+}
+
+variable "num_extra_instance" {
+  default     = 0
+  description = "Number of extra instances to add into node pool"
+}
+
+variable "enable_backup" {
+  description = "enable data backup from fullnode"
+  default     = false
 }

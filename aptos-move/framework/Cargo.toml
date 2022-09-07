@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 base64 = "0.13.0"
 bcs = "0.1.3"
 better_any = "0.1.1"
-claim = "0.5.0"
+claims = "0.7"
 clap = "3.1.8"
 curve25519-dalek = { version = "3", default-features = false }
 flate2 = "1.0.24"
@@ -35,6 +35,7 @@ siphasher = "0.3.10"
 smallvec = "1.8.0"
 structopt = "0.3.21"
 tempfile = "3.3.0"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
 aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }

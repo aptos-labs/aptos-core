@@ -25,7 +25,7 @@ use crate::node::{
     ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
-use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
+use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
     AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
     WithdrawStake,
@@ -50,6 +50,9 @@ use std::collections::HashMap;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
+
+#[cfg(test)]
+mod tests;
 
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
@@ -569,17 +572,20 @@ impl CliTestFramework {
 
     pub async fn extract_peer(
         &self,
+        host: HostAndPort,
         private_key_file: PathBuf,
         output_file: PathBuf,
     ) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
         ExtractPeer {
-            private_key_input_options: PrivateKeyInputOptions::from_file(private_key_file),
+            host,
+            network_key_input_options: NetworkKeyInputOptions::from_private_key_file(
+                private_key_file,
+            ),
             output_file_options: SaveFile {
                 output_file,
                 prompt_options: PromptOptions::yes(),
             },
             encoding_options: Default::default(),
-            profile_options: Default::default(),
         }
         .execute()
         .await
@@ -646,11 +652,12 @@ impl CliTestFramework {
     pub async fn compile_package(
         &self,
         account_strs: BTreeMap<&str, &str>,
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
-            included_artifacts: IncludedArtifacts::Sparse,
+            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
         }
         .execute()
         .await
@@ -676,13 +683,14 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
             legacy_flow,
             override_size_check: false,
-            included_artifacts: IncludedArtifacts::All,
+            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All),
         }
         .execute()
         .await

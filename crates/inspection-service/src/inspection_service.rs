@@ -24,7 +24,7 @@ use tokio::runtime;
 const DISABLED_ENDPOINT_MESSAGE: &str =
     "This endpoint is disabled! Enable it in the InspectionServiceConfig.";
 
-fn encode_metrics(encoder: impl Encoder) -> Vec<u8> {
+pub fn encode_metrics(encoder: impl Encoder) -> Vec<u8> {
     let metric_families = gather_metrics();
     let mut buffer = vec![];
     encoder.encode(&metric_families, &mut buffer).unwrap();
@@ -169,6 +169,7 @@ pub fn start_inspection_service(node_config: NodeConfig) {
 
         let runtime = runtime::Builder::new_current_thread()
             .enable_io()
+            .disable_lifo_slot()
             .build()
             .unwrap();
         runtime

@@ -1,0 +1,26 @@
+[package]
+name = "aptos-network-checker"
+version = "0.0.1"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos network checker"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.57"
+aptos-api-types = { path = "../../api/types" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-logger = { path = "../aptos-logger" }
+aptos-types = { path = "../../types" }
+clap = "3.2.17"
+fallible = { path = "../fallible" }
+futures = "0.3.21"
+hex = "0.4.3"
+network = { path = "../../network" }
+serde = { version = "1.0.137", features = ["derive"] }
+tokio = { version = "1.21.0" }
+

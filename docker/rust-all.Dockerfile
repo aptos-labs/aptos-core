@@ -37,7 +37,7 @@ ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
 
-RUN docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
+RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y \
     sudo \
     procps \
     gdb \
+    curl \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Because build machine perf might not match run machine perf, we have to symlink

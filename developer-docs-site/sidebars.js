@@ -121,7 +121,7 @@ const sidebars = {
         },
         {
           type: "category",
-          label: "FullNode for Devnet",
+          label: "Public Fullnode",
           link: { type: "doc", id: "nodes/full-node/index" },
           collapsible: true,
           collapsed: true,

@@ -180,7 +180,6 @@ module aptos_token::token_coin_swap {
                 listings: table::new<TokenId, TokenCoinSwap<CoinType>>(),
                 listing_events: account::new_event_handle<TokenListingEvent>(token_owner),
                 swap_events: account::new_event_handle<TokenSwapEvent>(token_owner),
-
             };
             move_to(token_owner, token_listing);
         }
@@ -246,7 +245,8 @@ module aptos_token::token_coin_swap {
         token_id: TokenId,
         token_amount: u64
     ) acquires TokenListings, TokenStoreEscrow {
-        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listings;
+        let token_owner_addr = signer::address_of(token_owner);
+        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(token_owner_addr).listings;
         // remove the listing entry
         assert!(table::contains(listing, token_id), ETOKEN_LISTING_NOT_EXIST);
         table::remove(listing, token_id);

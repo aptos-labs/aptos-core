@@ -134,7 +134,8 @@ async fn run_fail_point_test(
         check_cycle,
         false,
     )
-    .await;
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -163,7 +164,8 @@ async fn test_no_failures() {
         }),
         true,
     )
-    .await;
+    .await
+    .unwrap();
 }
 
 #[tokio::test]

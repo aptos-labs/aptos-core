@@ -48,7 +48,7 @@ variable "chain_id" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode. All configurations can be obtained at https://www.vultr.com/api/#tag/plans"
-  default     = "vc2-8c-16gb"
+  default     = "vc2-16c-32gb"
 }
 
 variable "api_key" {
@@ -64,5 +64,5 @@ variable "fullnode_region" {
 
 variable "block_storage_class" {
   description = "Either vultr-block-storage for high_perf/ssd, vultr-block-storage-hdd for storage_opt/hdd. high_perf is not available in all regions!"
-  default = "vultr-block-storage"
+  default     = "vultr-block-storage"
 }

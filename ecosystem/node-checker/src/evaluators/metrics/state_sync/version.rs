@@ -32,18 +32,18 @@ pub static SYNC_VERSION_METRIC_LABEL: Lazy<Label> = Lazy::new(|| Label {
 });
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct StateSyncVersionEvaluatorArgs {
-    #[clap(long, default_value = "5000")]
-    pub version_delta_tolerance: u64,
+pub struct StateSyncVersionMetricsEvaluatorArgs {
+    #[clap(long, default_value_t = 10000)]
+    pub metrics_version_delta_tolerance: u64,
 }
 
 #[derive(Debug)]
-pub struct StateSyncVersionEvaluator {
-    args: StateSyncVersionEvaluatorArgs,
+pub struct StateSyncVersionMetricsEvaluator {
+    args: StateSyncVersionMetricsEvaluatorArgs,
 }
 
-impl StateSyncVersionEvaluator {
-    pub fn new(args: StateSyncVersionEvaluatorArgs) -> Self {
+impl StateSyncVersionMetricsEvaluator {
+    pub fn new(args: StateSyncVersionMetricsEvaluatorArgs) -> Self {
         Self { args }
     }
 
@@ -92,7 +92,7 @@ impl StateSyncVersionEvaluator {
             _wildcard => {
                 // We convert to i64 to avoid potential overflow if the target is ahead of the baseline.
                 let delta_from_baseline = latest_baseline_version as i64 - latest_target_version as i64;
-                if delta_from_baseline > self.args.version_delta_tolerance as i64 {
+                if delta_from_baseline > self.args.metrics_version_delta_tolerance as i64 {
                     self.build_evaluation_result(
                         "State sync version is lagging".to_string(),
                         70,
@@ -100,7 +100,7 @@ impl StateSyncVersionEvaluator {
                             "Successfully pulled metrics from target node twice and saw the \
                             version was progressing, but it is lagging {} versions behind the baseline node. \
                             Target version: {}. Baseline version: {}. Tolerance: {}.",
-                            delta_from_baseline, latest_target_version, latest_baseline_version, self.args.version_delta_tolerance
+                            delta_from_baseline, latest_target_version, latest_baseline_version, self.args.metrics_version_delta_tolerance
                         )
                     )
                 } else {
@@ -114,7 +114,7 @@ impl StateSyncVersionEvaluator {
                             Target version: {}. Baseline version: {}. Tolerance: {}.",
                             latest_target_version,
                             latest_baseline_version,
-                            self.args.version_delta_tolerance
+                            self.args.metrics_version_delta_tolerance
                         )
                     )
                 }
@@ -124,7 +124,7 @@ impl StateSyncVersionEvaluator {
 }
 
 #[async_trait::async_trait]
-impl Evaluator for StateSyncVersionEvaluator {
+impl Evaluator for StateSyncVersionMetricsEvaluator {
     type Input = MetricsEvaluatorInput;
     type Error = MetricsEvaluatorError;
 
@@ -181,11 +181,13 @@ impl Evaluator for StateSyncVersionEvaluator {
     }
 
     fn get_evaluator_name() -> String {
-        "version".to_string()
+        "version_metrics".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
-        Ok(Self::new(evaluator_args.state_sync_version_args.clone()))
+        Ok(Self::new(
+            evaluator_args.state_sync_version_metrics_args.clone(),
+        ))
     }
 
     fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
@@ -227,8 +229,8 @@ mod test {
         };
 
         let state_sync_metrics_evaluator =
-            StateSyncVersionEvaluator::new(StateSyncVersionEvaluatorArgs {
-                version_delta_tolerance: 1000,
+            StateSyncVersionMetricsEvaluator::new(StateSyncVersionMetricsEvaluatorArgs {
+                metrics_version_delta_tolerance: 1000,
             });
 
         let metrics_evaluator_input = MetricsEvaluatorInput {

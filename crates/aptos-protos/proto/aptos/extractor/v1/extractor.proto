@@ -96,6 +96,7 @@ message Event {
   EventKey key = 1;
   uint64 sequence_number = 2;
   MoveType type = 3;
+  string type_str = 5;
   string data = 4;
 }
 
@@ -182,7 +183,8 @@ message DeleteModule {
 message DeleteResource {
   string address = 1;
   bytes state_key_hash = 2;
-  MoveStructTag resource = 3;
+  MoveStructTag type = 3;
+  string type_str = 4;
 }
 
 message DeleteTableItem {
@@ -206,7 +208,9 @@ message WriteModule {
 message WriteResource {
   string address = 1;
   bytes state_key_hash = 2;
-  MoveResource data = 3;
+  MoveStructTag type = 3;
+  string type_str = 4;
+  string data = 5;
 }
 
 message WriteTableData {
@@ -354,11 +358,6 @@ message WriteSetPayload {
 message EntryFunctionId {
   MoveModuleId module = 1;
   string name = 2;
-}
-
-message MoveResource {
-  MoveStructTag type = 1;
-  string data = 2;
 }
 
 message MoveModuleId {
