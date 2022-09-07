@@ -992,7 +992,7 @@ def list_eks_clusters(shell: Shell) -> List[str]:
         return [
             cluster_name
             for cluster_name in cluster_result["clusters"]
-            if cluster_name.startswith("aptos-forge-")
+            if cluster_name.startswith("aptos-forge-big-")
         ]
     except Exception as e:
         raise AwsError("Failed to list eks clusters") from e
