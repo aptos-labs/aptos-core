@@ -561,8 +561,8 @@ export class AptosClient {
     extraArgs?: { maxGasAmount?: BCS.Uint64; gasUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
-      maxGasAmount: 2000n,
-      gasUnitPrice: 1n,
+      maxGasAmount: BigInt(2000),
+      gasUnitPrice: BigInt(1),
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
       ...extraArgs,
     };
