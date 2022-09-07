@@ -106,10 +106,12 @@ pub async fn sync_and_load(
         let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
     }
+    info!("Deleted stale metadata files in cache.");
 
-    NUM_META_MISS.set(new_remote_hashes.len() as i64);
+    let num_new_files = new_remote_hashes.len();
+    NUM_META_MISS.set(num_new_files as i64);
     NUM_META_DOWNLOAD.set(0);
-    let futs = new_remote_hashes.iter().map(|h| {
+    let futs = new_remote_hashes.iter().enumerate().map(|(i, h)| {
         let fh_by_h_ref = &remote_file_handle_by_hash;
         let storage_ref = &storage;
         let cache_dir_ref = &cache_dir;
@@ -135,6 +137,12 @@ pub async fn sync_and_load(
             // rename to target file only if successful; stale tmp file caused by failure will be
             // reclaimed on next run
             tokio::fs::rename(local_tmp_file, local_file).await?;
+            info!(
+                file_handle = file_handle,
+                processed = i + 1,
+                total = num_new_files,
+                "Metadata file downloaded."
+            );
             NUM_META_DOWNLOAD.inc();
             Ok(())
         }
@@ -147,6 +155,7 @@ pub async fn sync_and_load(
         .collect::<Result<Vec<_>>>()
         .await?;
 
+    info!("Loading all metadata files to memory.");
     // Load metadata from synced cache files.
     let mut metadata_vec = Vec::new();
     for h in new_remote_hashes.into_iter().chain(up_to_date_local_hashes) {
@@ -164,8 +173,8 @@ pub async fn sync_and_load(
         )
     }
     info!(
-        "Metadata cache loaded in {:.2} seconds.",
-        timer.elapsed().as_secs_f64()
+        total_time = timer.elapsed().as_secs(),
+        "Metadata cache loaded.",
     );
     Ok(metadata_vec.into())
 }
