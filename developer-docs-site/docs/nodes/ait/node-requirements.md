@@ -7,7 +7,7 @@ slug: "node-requirements"
 
 Follow the requirements specified in this document to make your AIT-3 Validator and fullnode deployment hassle-free.
 
-## Validator and Fullnode
+## Validator and fullnode
 
 - For the AIT-3, we require that you run the Validator. We recommend that optionally you run a fullnode also. However, a fullnode is not required. 
 - If you run fullnode also, then we strongly recommend that you run the Validator and the fullnode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the fullnode will help ensure smooth deployment of these nodes.
