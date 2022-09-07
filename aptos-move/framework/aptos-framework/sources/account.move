@@ -101,6 +101,7 @@ module aptos_framework::account {
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
     const EINVALID_CAPABILITY_TYPE: u64 = 14;
     const EINVALID_ACCEPT_SIGNER_CAPABILITY: u64 = 15;
+    const EABORT_DEPRECATED_FUNCTION: u64 = 16;
 
     native fun create_signer(addr: address): signer;
 
@@ -307,48 +308,19 @@ module aptos_framework::account {
         rotation_capability_sig_bytes: vector<u8>,
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
-    ) acquires Account {
-        let addr = signer::address_of(account);
-        assert!(exists_at(addr) && exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-
-        let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-        let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
-
-        // Get the current authentication key of the account and verify that it matches with `account_public_key_bytes`
-        let account_resource = borrow_global_mut<Account>(addr);
-        let auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-        assert!(account_resource.authentication_key == auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-        //  Construct a RotationCapabilityOfferProofChallenge struct
-        let rotation_capability_offer_proof_challenge = RotationCapabilityOfferProofChallenge {
-            sequence_number: account_resource.sequence_number,
-            recipient_address,
-        };
-
-        // Verify a digital-signature-based capability that assures us this rotation capability offer was intended by the account owner
-        assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, rotation_capability_offer_proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-
-        // Add the recipient's address in account owner's rotation capability offer once we verify that this action is intended by the account owner
-        option::fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
+    ) {
+        let _account = account;
+        let _rotation_capability_sig_bytes = rotation_capability_sig_bytes;
+        let _account_public_key_bytes = account_public_key_bytes;
+        let _recipient_address = recipient_address;
+        abort error::aborted(EABORT_DEPRECATED_FUNCTION)
     }
 
     /// Accept rotation capability from `offerer_address` if there's an existing rotation capability offer to the account owner in the offerer's account
-    public fun accept_rotation_capability_ed25519(account: &signer, offerer_address: address) : RotationCapability acquires Account {
-        assert!(exists_at(offerer_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-
-        // Check if there's an existing rotation capability offer from the offerer
-        let account_resource = borrow_global_mut<Account>(offerer_address);
-        let addr = signer::address_of(account);
-        assert!(option::contains(&account_resource.rotation_capability_offer.for, &addr), error::not_found(EINVALID_ACCEPT_ROTATION_CAPABILITY));
-
-        // If there's an existing rotation capability offer for this account in the offerer's account,
-        // we create a RotationCapability of offerer and return the RotationCapability
-        let rotation_capability = RotationCapability {
-            account: offerer_address,
-        };
-        option::extract(&mut account_resource.rotation_capability_offer.for);
-
-        rotation_capability
+    public fun accept_rotation_capability_ed25519(account: &signer, offerer_address: address) : RotationCapability {
+        let _account = account;
+        let _offerer_address = offerer_address;
+        abort error::aborted(EABORT_DEPRECATED_FUNCTION)
     }
 
     /// Offers the capability to sign on behalf of account to the account at address recipient_address.
@@ -588,51 +560,6 @@ module aptos_framework::account {
         let alice_address = from_bcs::to_address(curr_auth_key);
         let alice = create_account_unchecked(alice_address);
         alice
-    }
-
-    #[test(bob = @0x345)]
-    #[expected_failure(abort_code = 65544)]
-    public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-        let alice = create_account_from_ed25519_public_key(pk);
-        create_account(signer::address_of(&bob));
-
-        let invalid_signature = x"78f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-        offer_rotation_capability_ed25519(&alice, invalid_signature, pk, signer::address_of(&bob));
-    }
-
-    #[test(bob = @0x345)]
-    public entry fun test_valid_accept_rotation_capability(bob: signer) acquires Account {
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-        let alice = create_account_from_ed25519_public_key(pk);
-        create_account(signer::address_of(&bob));
-
-        let valid_signature = x"68f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-        offer_rotation_capability_ed25519(&alice, valid_signature, pk, signer::address_of(&bob));
-
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
-
-        let rotation_cap = accept_rotation_capability_ed25519(&bob, signer::address_of(&alice));
-        assert!(rotation_cap.account == signer::address_of(&alice), 0);
-    }
-
-    #[test(bob = @0x345, charlie=@0x567)]
-    #[expected_failure(abort_code = 393226)]
-    public entry fun test_invalid_accept_rotation_capability(bob: signer, charlie: signer) acquires Account {
-        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
-        let alice = create_account_from_ed25519_public_key(pk);
-        create_account(signer::address_of(&bob));
-
-        create_account(signer::address_of(&charlie));
-
-        let valid_signature = x"68f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-        offer_rotation_capability_ed25519(&alice, valid_signature, pk, signer::address_of(&bob));
-
-        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
-
-        accept_rotation_capability_ed25519(&bob, signer::address_of(&charlie));
     }
 
     #[test(bob = @0x345)]
