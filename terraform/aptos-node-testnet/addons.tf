@@ -1,14 +1,14 @@
 locals {
-  metrics_server_helm_chart_path      = "${path.module}/../helm/k8s-metrics"
+  autoscaling_helm_chart_path      = "${path.module}/../helm/autoscaling"
   chaos_mesh_helm_chart_path          = "${path.module}/../helm/chaos"
   testnet_addons_helm_chart_path      = "${path.module}/../helm/testnet-addons"
   node_health_checker_helm_chart_path = "${path.module}/../helm/node-health-checker"
 }
 
-resource "helm_release" "metrics-server" {
-  name        = "metrics-server"
+resource "helm_release" "autoscaling" {
+  name        = "autoscaling"
   namespace   = "kube-system"
-  chart       = local.metrics_server_helm_chart_path
+  chart       = local.autoscaling_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -47,7 +47,7 @@ resource "helm_release" "metrics-server" {
   # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
     name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.metrics_server_helm_chart_path, "**") : filesha1("${local.metrics_server_helm_chart_path}/${f}")]))
+    value = sha1(join("", [for f in fileset(local.autoscaling_helm_chart_path, "**") : filesha1("${local.autoscaling_helm_chart_path}/${f}")]))
   }
 }
 
