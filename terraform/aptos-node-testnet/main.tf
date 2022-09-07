@@ -1,7 +1,3 @@
-terraform {
-  backend "s3" {}
-}
-
 provider "aws" {
   region = var.region
 }
@@ -66,12 +62,12 @@ module "validator" {
   validator_instance_type = var.validator_instance_type
 
   # addons
-  enable_monitoring              = true
-  enable_logger                  = true
-  monitoring_helm_values         = var.monitoring_helm_values
-  logger_helm_values             = var.logger_helm_values
-  enable_vector_daemonset_logger = var.enable_vector_daemonset_logger
-  vector_daemonset_helm_values   = var.vector_daemonset_helm_values
+  enable_monitoring            = true
+  enable_logger                = true
+  monitoring_helm_values       = var.monitoring_helm_values
+  logger_helm_values           = var.logger_helm_values
+  enable_vector_log_agent      = var.enable_vector_log_agent
+  vector_log_agent_helm_values = var.vector_log_agent_helm_values
 }
 
 locals {

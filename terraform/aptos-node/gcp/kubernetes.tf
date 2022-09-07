@@ -113,6 +113,24 @@ resource "helm_release" "logger" {
   }
 }
 
+resource "helm_release" "vector_log_agent" {
+  count            = var.enable_vector_log_agent ? 1 : 0
+  name             = "${local.helm_release_name}-vector-logs"
+  chart            = local.vector_log_agent_helm_chart_path
+  max_history      = 5
+  namespace        = "vector"
+  create_namespace = true
+  wait             = false
+
+  values = var.vector_log_agent_helm_values
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.vector_log_agent_helm_chart_path, "**") : filesha1("${local.vector_log_agent_helm_chart_path}/${f}")]))
+  }
+}
+
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
   name        = "${terraform.workspace}-mon"

@@ -1,75 +1,4 @@
 # These templates originate / are inspired from https://github.com/vectordotdev/vector/tree/master/distribution/kubernetes/vector-agent
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: vector
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: vector
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
-automountServiceAccountToken: true
----
-# Permissions to use Kubernetes API.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: vector
-  namespace: {{ .Release.Namespace }}  
-  labels:
-    app.kubernetes.io/name: vector
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - namespaces
-      - nodes
-      - pods
-    verbs:
-      - list
-      - watch
-  - apiGroups: ["policy"]
-    resources: ["podsecuritypolicies"]
-    verbs: ["use"]
-    resourceNames:
-    - vector
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: vector
-  labels:
-    app.kubernetes.io/name: vector
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: vector
-subjects:
-  - kind: ServiceAccount
-    name: vector
-    namespace: {{ .Release.Namespace }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: vector
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: vector
-    app.kubernetes.io/instance: vector
-    app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
-data:
-  vector-config.yaml: |-
-{{ (tpl (.Files.Get "files/vector-config.yaml") .) | indent 4 }}
----
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -78,7 +7,6 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -86,11 +14,11 @@ spec:
   requiredDropCapabilities:
     - ALL
   volumes:
-    - 'hostPath'
-    - 'configMap'
-    - 'emptyDir'
-    - 'secret'
-    - 'projected'
+    - "hostPath"
+    - "configMap"
+    - "emptyDir"
+    - "secret"
+    - "projected"
   allowedHostPaths:
     - pathPrefix: "/var/log"
       readOnly: true
@@ -106,19 +34,94 @@ spec:
   hostIPC: false
   hostPID: false
   runAsUser:
-    rule: 'RunAsAny'
+    rule: "RunAsAny"
   seLinux:
-    rule: 'RunAsAny'
+    rule: "RunAsAny"
   supplementalGroups:
-    rule: 'MustRunAs'
+    rule: "MustRunAs"
     ranges:
       - min: 1
         max: 65535
   fsGroup:
-    rule: 'MustRunAs'
+    rule: "MustRunAs"
     ranges:
       - min: 1
         max: 65535
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+data:
+  vector-config.yaml: |-
+{{ (tpl (.Files.Get "files/vector-config.yaml") .) | indent 4 }}
+  vector-transforms.yaml: |-
+{{ (tpl (.Files.Get "files/vector-transforms.yaml") .) | indent 4 }}
+{{- range $sinkName, $sinkConfig := .Values.loggingSinks }}
+  "{{ $sinkName }}-sink.yaml": |- 
+    sinks:
+      {{ $sinkName }}: {{ toYaml $sinkConfig | nindent 8 }}
+{{- end }}
+
+---
+# Permissions to use Kubernetes API.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - nodes
+      - pods
+    verbs:
+      - list
+      - watch
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs: ["use"]
+    resourceNames:
+      - vector
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vector
+subjects:
+  - kind: ServiceAccount
+    name: vector
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -129,7 +132,6 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.23.0-distroless-libc"
 spec:
   selector:
     matchLabels:
@@ -147,28 +149,34 @@ spec:
         app.kubernetes.io/name: vector
         app.kubernetes.io/instance: vector
         app.kubernetes.io/component: Agent
-        vector.dev/exclude: "true"
       annotations:
-        checksum/vector.yaml: {{ tpl (.Files.Get "files/vector-config.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
     spec:
       serviceAccountName: vector
       dnsPolicy: ClusterFirst
       tolerations:
-      - effect: NoExecute
-        operator: Exists
-      - effect: NoSchedule
-        operator: Exists
+        - effect: NoExecute
+          operator: Exists
+        - effect: NoSchedule
+          operator: Exists
       containers:
         - name: vector
-          image: "timberio/vector:0.23.0-distroless-libc"
+          image: "{{ .Values.image }}"
           imagePullPolicy: IfNotPresent
           args:
             - --watch-config
-            - --config-dir
-            - /etc/vector/
+            - --config
+            - /etc/vector/vector-config.yaml
+            - --config
+            - /etc/vector/vector-transforms.yaml
+            {{- range $sinkName, $sinkConfig := .Values.loggingSinks }}
+            - --config
+            - "/etc/vector/{{ $sinkName }}-sink.yaml"
+            {{- end }}
           env:
             - name: K8S_CLUSTER
-              value: "{{ .Values.k8s_cluster }}"
+              value: "{{ .Values.k8sCluster }}"
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -181,13 +189,21 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: VECTOR_LOG_FORMAT
+              value: json
             - name: PROCFS_ROOT
               value: "/host/proc"
             - name: SYSFS_ROOT
               value: "/host/sys"
-            {{- range $k, $v := .Values.env }}
-              {{- toYaml $v | nindent 12 }}
-            {{ end }}
+            {{- range $secretName, $secretKeyValuePairs := .Values.secretVars }}
+            {{- range $key, $value := $secretKeyValuePairs }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: prom-exporter
               containerPort: 9090

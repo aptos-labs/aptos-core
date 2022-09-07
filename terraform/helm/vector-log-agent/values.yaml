@@ -1,0 +1,17 @@
+image: timberio/vector:0.24.0-distroless-libc
+
+# logging_sinks:
+# Choose any (you can choose multiple) logging sinks supported by vector as found here https://vector.dev/docs/reference/configuration/sinks/
+# E.g.:
+# loggingSinks:
+#   stdout:
+#     type: console
+#     inputs: [kubernetes_logs]
+#     encoding:
+#       codec: json
+
+# secretVars:
+#   my-custom-secret:
+#     MY_SECRET_ENV_VAR: <some_secret_value>
+
+# k8sCluster: my_blockchain_cluster

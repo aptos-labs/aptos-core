@@ -1,19 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "required": ["k8s_cluster", "logging_sinks", "env"],
+  "required": ["k8sCluster", "loggingSinks", "secretVars"],
   "properties": {
-    "k8s_cluster": {
+    "image": {
+      "type": "string",
+      "description": "The image to use for the container"
+    },
+    "k8sCluster": {
       "description": "A human readable name for the k8s cluster. This will be added as field 'k8s_cluster' to each log event.",
       "type": "string"
     },
-    "logging_sinks": {
+    "loggingSinks": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": { "type": "object" }
     },
-    "env": {
+    "secretVars": {
       "type": "object",
-      "additionalProperties": { "type": "array" }
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
     }
   }
 }

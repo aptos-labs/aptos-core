@@ -221,13 +221,13 @@ variable "logger_helm_values" {
   default     = {}
 }
 
-variable "enable_vector_daemonset_logger" {
-  description = "Enable vector daemonset logger helm chart"
+variable "enable_vector_log_agent" {
+  description = "Enable vector log agent helm chart"
   default     = false
 }
 
-variable "vector_daemonset_helm_values" {
-  description = "Map of helm values to pass to vector-daemonset chart"
+variable "vector_log_agent_helm_values" {
+  description = "List of strings which contain yaml encoded helm values. These are passed to the vector-daemonset chart."
   type        = list(string)
   default     = []
 }
