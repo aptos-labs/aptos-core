@@ -60,7 +60,7 @@ resource "helm_release" "validator" {
       }
       fullnode = {
         storage = {
-          class = "standard"
+          class = kubernetes_storage_class.ssd.metadata[0].name
         }
         nodeSelector = {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
