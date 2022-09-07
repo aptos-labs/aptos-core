@@ -122,6 +122,12 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Entry function to enable and disable features. Can only be called by @aptos_framework.
+    FeaturesChangeFeatureFlags {
+        enable: Vec<u64>,
+        disable: Vec<u64>,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -327,6 +333,9 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            FeaturesChangeFeatureFlags { enable, disable } => {
+                features_change_feature_flags(enable, disable)
+            }
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -679,6 +688,25 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Entry function to enable and disable features. Can only be called by @aptos_framework.
+pub fn features_change_feature_flags(enable: Vec<u64>, disable: Vec<u64>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("features").to_owned(),
+        ),
+        ident_str!("change_feature_flags").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&enable).unwrap(),
+            bcs::to_bytes(&disable).unwrap(),
+        ],
     ))
 }
 
@@ -1257,6 +1285,19 @@ mod decoder {
         }
     }
 
+    pub fn features_change_feature_flags(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::FeaturesChangeFeatureFlags {
+                enable: bcs::from_bytes(script.args().get(0)?).ok()?,
+                disable: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -1558,6 +1599,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "features_change_feature_flags".to_string(),
+            Box::new(decoder::features_change_feature_flags),
         );
         map.insert(
             "managed_coin_burn".to_string(),

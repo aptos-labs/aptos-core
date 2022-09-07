@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::assert_success;
 use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -12,6 +13,7 @@ use aptos_types::{
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_packages::aptos_stdlib;
+use framework::natives::code::PackageMetadata;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
@@ -58,6 +60,14 @@ impl MoveHarness {
             executor: FakeExecutor::from_fresh_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
+    }
+
+    pub fn new_with_features(features: Vec<u64>) -> Self {
+        let mut h = Self::new();
+        if !features.is_empty() {
+            h.enable_features(features);
+        }
+        h
     }
 
     pub fn new_mainnet() -> Self {
@@ -192,18 +202,22 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
     pub fn create_publish_package(
         &mut self,
         account: &Account,
         path: &Path,
         options: Option<BuildOptions>,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
-        let metadata = package
+        let mut metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -215,7 +229,7 @@ impl MoveHarness {
 
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, None);
+        let txn = self.create_publish_package(account, path, None, |_| {});
         self.run(txn)
     }
 
@@ -226,7 +240,18 @@ impl MoveHarness {
         path: &Path,
         options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, Some(options));
+        let txn = self.create_publish_package(account, path, Some(options), |_| {});
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package, and alllows to patch the metadata
+    pub fn publish_package_with_patcher(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        metadata_patcher: impl FnMut(&mut PackageMetadata),
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None, metadata_patcher);
         self.run(txn)
     }
 
@@ -287,6 +312,20 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    /// Enables features
+    pub fn enable_features(&mut self, features: Vec<u64>) {
+        let acc = self.aptos_framework_account();
+        assert_success!(self.run_entry_function(
+            &acc,
+            str::parse("0x1::features::change_feature_flags").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&features).unwrap(),
+                bcs::to_bytes(&Vec::<u64>::new()).unwrap()
+            ],
+        ));
     }
 }
 
