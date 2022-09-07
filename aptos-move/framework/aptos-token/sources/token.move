@@ -889,6 +889,10 @@ module aptos_token::token {
         royalty.payee_address
     }
 
+    public fun get_token_amount(token: &Token): u64 {
+        token.amount
+    }
+
     // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test_only]
