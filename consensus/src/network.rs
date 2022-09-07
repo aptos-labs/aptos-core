@@ -102,6 +102,9 @@ impl NetworkSender {
 
         ensure!(from != self.author, "Retrieve block from self");
         let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[&msg.to_string()])
+            .inc();
         let response_msg = monitor!(
             "block_retrieval",
             self.network_sender.send_rpc(from, msg, timeout).await
@@ -307,6 +310,9 @@ impl NetworkTask {
                 }
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
+                        counters::CONSENSUS_RECEIVED_MSGS
+                            .with_label_values(&["BlockRetrievalRequest"])
+                            .inc();
                         debug!(
                             remote_peer = peer_id,
                             event = LogEvent::ReceiveBlockRetrieval,
