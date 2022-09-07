@@ -141,13 +141,20 @@ impl NetworkSender {
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
         let self_author = self.author;
-        let other_validators = self
+        let other_validators: Vec<_> = self
             .validators
             .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author);
+            .filter(|author| author != &self_author)
+            .collect();
 
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[&msg.to_string()])
+            .inc_by(other_validators.len() as u64);
         // Broadcast message over direct-send to all other validators.
-        if let Err(err) = self.network_sender.send_to_many(other_validators, msg) {
+        if let Err(err) = self
+            .network_sender
+            .send_to_many(other_validators.into_iter(), msg)
+        {
             error!(error = ?err, "Error broadcasting message");
         }
     }
@@ -165,6 +172,9 @@ impl NetworkSender {
                 }
                 continue;
             }
+            counters::CONSENSUS_SENT_MSGS
+                .with_label_values(&[&msg.to_string()])
+                .inc();
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
                 error!(
                     remote_peer = peer,
