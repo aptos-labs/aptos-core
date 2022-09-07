@@ -26,7 +26,9 @@ use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use clap::Parser;
 use once_cell::sync::Lazy;
 use poem_openapi::{types::Example, Object as PoemObject};
+use reqwest::cookie::Jar;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
@@ -196,28 +198,84 @@ pub struct NodeAddress {
     #[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
     #[oai(default = "Self::default_metrics_port")]
     #[serde(default = "NodeAddress::default_metrics_port")]
-    pub metrics_port: u16,
+    metrics_port: u16,
 
     /// API port.
     #[clap(long, default_value = &DEFAULT_API_PORT_STR)]
     #[oai(default = "Self::default_api_port")]
     #[serde(default = "NodeAddress::default_api_port")]
-    pub api_port: u16,
+    api_port: u16,
 
     /// Validator communication port.
     #[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
     #[oai(default = "Self::default_noise_port")]
     #[serde(default = "NodeAddress::default_noise_port")]
-    pub noise_port: u16,
+    noise_port: u16,
 
     /// Public key for the node. This is used for the HandshakeEvaluator.
     /// If that evaluator is not enabled, this is not necessary.
     #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
     #[oai(skip)]
-    pub public_key: Option<x25519::PublicKey>,
+    public_key: Option<x25519::PublicKey>,
+
+    // Cookie store. We don't include this in anything external (clap, the
+    // OpenAPI spec, serde, etc.), this is just for internal use.
+    #[oai(skip)]
+    #[clap(skip)]
+    #[serde(skip)]
+    cookie_store: Arc<Jar>,
 }
 
 impl NodeAddress {
+    pub fn new(url: Url) -> Self {
+        Self {
+            url,
+            metrics_port: Self::default_metrics_port(),
+            api_port: Self::default_api_port(),
+            noise_port: Self::default_noise_port(),
+            public_key: None,
+            cookie_store: Arc::new(Jar::default()),
+        }
+    }
+
+    pub fn metrics_port(mut self, port: u16) -> Self {
+        self.metrics_port = port;
+        self
+    }
+
+    pub fn api_port(mut self, port: u16) -> Self {
+        self.api_port = port;
+        self
+    }
+
+    pub fn noise_port(mut self, port: u16) -> Self {
+        self.noise_port = port;
+        self
+    }
+
+    pub fn public_key(mut self, public_key: Option<x25519::PublicKey>) -> Self {
+        self.public_key = public_key;
+        self
+    }
+
+    /// Do not use this to build a client, use get_metrics_client.
+    pub fn get_metrics_port(&self) -> u16 {
+        self.metrics_port
+    }
+
+    /// Do not use this to build a client, use get_api_client.
+    pub fn get_api_port(&self) -> u16 {
+        self.api_port
+    }
+
+    pub fn get_noise_port(&self) -> u16 {
+        self.noise_port
+    }
+
+    pub fn get_public_key(&self) -> Option<x25519::PublicKey> {
+        self.public_key
+    }
+
     pub fn default_metrics_port() -> u16 {
         DEFAULT_METRICS_PORT
     }
@@ -236,9 +294,24 @@ impl NodeAddress {
         url
     }
 
+    pub fn get_metrics_url(&self) -> Url {
+        let mut url = self.url.clone();
+        url.set_port(Some(self.metrics_port)).unwrap();
+        url
+    }
+
+    pub fn get_metrics_client(&self, timeout: Duration) -> reqwest::Client {
+        reqwest::ClientBuilder::new()
+            .timeout(timeout)
+            .cookie_provider(self.cookie_store.clone())
+            .build()
+            .unwrap()
+    }
+
     pub fn get_api_client(&self, timeout: Duration) -> AptosRestClient {
         let client = reqwest::ClientBuilder::new()
             .timeout(timeout)
+            .cookie_provider(self.cookie_store.clone())
             .build()
             .unwrap();
 
@@ -325,6 +398,7 @@ impl Example for NodeAddress {
                 )
                 .unwrap(),
             ),
+            cookie_store: Arc::new(Jar::default()),
         }
     }
 }

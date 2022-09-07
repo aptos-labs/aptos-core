@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{configuration::NodeAddress, server::NodeInformation};
 use aptos_rest_client::IndexResponse;
 use aptos_sdk::types::chain_id::ChainId;
-
-use crate::{configuration::NodeAddress, server::NodeInformation};
 
 /// This type of evaluator just takes in the target node address and then
 /// directly fetches whatever information it needs to perform the evaluation.

@@ -40,10 +40,8 @@ fn build_node_configuration_wrapper_with_blocking_runner(
         role_type: node_configuration.get_role_type(),
     };
 
-    let baseline_metric_collector = ReqwestMetricCollector::new(
-        node_configuration.node_address.url.clone(),
-        node_configuration.node_address.metrics_port,
-    );
+    let baseline_metric_collector =
+        ReqwestMetricCollector::new(node_configuration.node_address.clone());
 
     let evaluator_set = build_evaluators(
         &node_configuration.evaluators,

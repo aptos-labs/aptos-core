@@ -81,15 +81,12 @@ pub async fn run(args: Run) -> Result<()> {
 
     let preconfigured_test_node = match args.target_node_url {
         Some(ref url) => {
-            let node_address = NodeAddress {
-                url: url.clone(),
-                api_port: args.target_api_port,
-                metrics_port: args.target_metrics_port,
-                noise_port: args.target_noise_port,
-                public_key: args.target_public_key,
-            };
-            let metric_collector =
-                ReqwestMetricCollector::new(node_address.url.clone(), node_address.metrics_port);
+            let node_address = NodeAddress::new(url.clone())
+                .api_port(args.target_api_port)
+                .metrics_port(args.target_metrics_port)
+                .noise_port(args.target_noise_port)
+                .public_key(args.target_public_key);
+            let metric_collector = ReqwestMetricCollector::new(node_address.clone());
             Some(PreconfiguredNode {
                 node_address,
                 metric_collector,
