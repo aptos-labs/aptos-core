@@ -511,6 +511,7 @@ class ForgeContext:
     image_tag: str
     upgrade_image_tag: str
     forge_cluster_name: str
+    forge_test_suite: str
     forge_blocking: bool
 
     github_actions: str
@@ -701,6 +702,11 @@ def format_github_info(context: ForgeContext) -> str:
         .strip()
     )
 
+def get_testsuite_images(context: ForgeContext) -> str:
+    if context.forge_test_suite == "compat":
+        return f"`{context.image_tag}` ==> `{context.upgrade_image_tag}`"
+    else:
+        return f"`{context.image_tag}`"
 
 def format_pre_comment(context: ForgeContext) -> str:
     dashboard_link = get_dashboard_link(
@@ -717,7 +723,7 @@ def format_pre_comment(context: ForgeContext) -> str:
     return (
         textwrap.dedent(
             f"""
-        ### Forge is running with `{context.image_tag}`
+        ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
         * [Grafana dashboard (auto-refresh)]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
         * [(Deprecated) OpenSearch Logs]({validator_logs_link})
@@ -743,15 +749,15 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
 
     if result.state == ForgeState.PASS:
         forge_comment_header = (
-            f"### :white_check_mark: Forge test success on `{context.image_tag}`"
+            f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
         )
     elif result.state == ForgeState.FAIL:
         forge_comment_header = (
-            f"### :x: Forge test perf regression on `{context.image_tag}`"
+            f"### :x: Forge suite `{context.forge_test_suite}` failure on {get_testsuite_images(context)}"
         )
     elif result.state == ForgeState.SKIP:
         forge_comment_header = (
-            f"### :thought_balloon: Forge test preempted on `{context.image_tag}`"
+            f"### :thought_balloon: Forge suite `{context.forge_test_suite}` preempted on {get_testsuite_images(context)}"
         )
     else:
         raise Exception(f"Invalid forge state: {result.state}")
@@ -1415,6 +1421,7 @@ def test(
         forge_namespace=forge_namespace,
         keep_port_forwards=forge_namespace_keep == "true",
         forge_cluster_name=forge_cluster_name,
+        forge_test_suite=forge_test_suite,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}",

@@ -1,4 +1,4 @@
-### :white_check_mark: Forge test success on `asdf`
+### :white_check_mark: Forge suite `banana` success on `asdf`
 ```
 performance benchmark with full nodes : 6795 TPS, 4370 ms latency, 6000 ms p99 latency,no expired txns
 Test Ok
