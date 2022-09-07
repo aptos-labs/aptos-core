@@ -11,9 +11,6 @@ Using the following image tags:
 * Test run is land-blocking
 === End temp-pre-comment ===
 Using cluster: forge-big-1
-Forge output: 
-Forge failed
-
 === Start temp-report ===
 Forge test runner terminated:
 Trailing Log Lines:
@@ -51,3 +48,6 @@ Debugging output:
 * [Test runner output](None/None/actions/runs/None)
 * Test run is land-blocking
 === End temp-step-summary ===
+
+Forge output: 
+Forge failed
