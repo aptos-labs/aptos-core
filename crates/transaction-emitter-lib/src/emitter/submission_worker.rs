@@ -271,6 +271,37 @@ pub async fn submit_transactions(
         .submitted
         .fetch_add(txns.len() as u64, Ordering::Relaxed);
 
+    for txn in txns {
+        if let Err(e) = client.submit_bcs(txn).await {
+            stats
+                .failed_submission
+                .fetch_add(1 as u64, Ordering::Relaxed);
+            sample!(
+                SampleRate::Duration(Duration::from_secs(120)),
+                warn!("[{:?}] Failed to txn: {:?}", client.path_prefix_string(), e)
+            );
+        }
+    }
+    Ok(())
+}
+
+pub async fn batch_submit_transactions(
+    client: &RestClient,
+    txns: &[SignedTransaction],
+    loop_start_time: Arc<Instant>,
+    txn_offset_time: Arc<AtomicU64>,
+    stats: Arc<StatsAccumulator>,
+) -> anyhow::Result<()> {
+    let cur_time = Instant::now();
+    let offset = cur_time - *loop_start_time;
+    txn_offset_time.fetch_add(
+        txns.len() as u64 * offset.as_millis() as u64,
+        Ordering::Relaxed,
+    );
+    stats
+        .submitted
+        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+
     match client.submit_batch_bcs(txns).await {
         Err(e) => {
             stats

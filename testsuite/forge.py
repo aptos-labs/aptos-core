@@ -1385,7 +1385,7 @@ def test(
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
         enable_failpoints_feature=enable_failpoints_feature,
-        forge_test_suite=forge_test_suite,
+        forge_test_suite="network_latency",
         forge_runner_duration_secs=forge_runner_duration_secs,
         forge_num_validators=forge_num_validators,
         forge_num_validator_fullnodes=forge_num_validator_fullnodes,
