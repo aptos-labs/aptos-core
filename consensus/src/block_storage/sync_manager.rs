@@ -423,24 +423,18 @@ impl BlockRetriever {
             "Retrieving {} blocks starting from {}",
             num_blocks, block_id
         );
-        let mut attempt = 0_u32;
         let mut progress = 0;
         let mut last_block_id = block_id;
         let mut result_blocks: Vec<Block> = vec![];
         let mut retrieve_batch_size = MAX_BLOCKS_PER_REQUEST;
         if peers.is_empty() {
-            bail!(
-                "Failed to fetch block {} in {} attempts: no more peers available",
-                block_id,
-                attempt
-            );
+            bail!("Failed to fetch block {}: no peers available", block_id);
         }
-        let mut peer = self.pick_peer(attempt, peers);
+        let mut peer = self.pick_peer(0, peers);
+        let mut attempt = 1_u32;
         while progress < num_blocks {
             // in case this is the last retrieval
             retrieve_batch_size = min(retrieve_batch_size, num_blocks - progress);
-
-            attempt += 1;
 
             debug!(
                 LogSchema::new(LogEvent::RetrieveBlock).remote_peer(peer),
@@ -486,13 +480,10 @@ impl BlockRetriever {
                         e,
                     );
                     // select next peer to try
-                    if peers.is_empty() {
-                        bail!(
-                            "Failed to fetch block {} in {} attempts: no more peers available",
-                            block_id,
-                            attempt
-                        );
+                    if peers.is_empty() || attempt >= 5 {
+                        bail!("Failed to fetch block {} in {} attempts", block_id, attempt);
                     }
+                    attempt += 1;
                     peer = self.pick_peer(attempt, peers);
                 }
             }
