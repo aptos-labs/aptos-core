@@ -20,7 +20,7 @@ interface GetTokenIdStringFromDictProps {
 export const getTokenIdDictFromString = ({
   tokenId,
 }: GetTokenIdStringFromDictProps): TokenId => {
-  const [collection, creator, name] = tokenId.split('::');
+  const [collection, creator, name] = decodeURIComponent(tokenId).split('::');
   return {
     collection,
     creator,

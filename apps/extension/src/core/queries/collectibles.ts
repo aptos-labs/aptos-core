@@ -45,7 +45,7 @@ export function useDepositTokens(
   const { aptosClient } = useNetworks();
 
   async function getDepositTokens() {
-    const depositEvents = await getTransactionEvents(
+    const events = await getTransactionEvents(
       aptosClient,
       activeAccountAddress,
       ['0x3::token::DepositEvent', '0x3::token::WithdrawEvent'],
@@ -53,14 +53,12 @@ export function useDepositTokens(
     const collectionDict: CollectionDict = {};
     const tokenClient = new TokenClient(aptosClient);
     const tokenCounterDict: Record<string, number> = {};
-    await Promise.all(depositEvents.map(async (event) => {
+    const eventsToBeLoaded: TokenId[] = [];
+
+    // Determine if the events have more deposits than withdrawals
+    events.forEach((event) => {
       const { collection, creator, name } = event.data.id.token_data_id;
       const tokenString = getTokenIdStringFromDict({ collection, creator, name });
-      const result = await tokenClient.getTokenData(creator, collection, name);
-
-      if (!(collection in collectionDict)) {
-        collectionDict[collection] = [];
-      }
       if (!(tokenString in tokenCounterDict)) {
         tokenCounterDict[tokenString] = 0;
       }
@@ -70,41 +68,61 @@ export function useDepositTokens(
       } else if (event.type === '0x3::token::WithdrawEvent') {
         tokenCounterDict[tokenString] -= 1;
       }
-      const currentCollection = collectionDict[collection];
-      if (currentCollection.find((token) => token.name === name) === undefined) {
-        const { uri } = result;
-        const metadata = (await axios.get<MetadataJson>(uri)).data;
-        collectionDict[collection].push({
-          id: {
-            collection,
-            creator,
-            name,
-          },
-          imageUri: result.uri,
-          metadata: {
-            animation_url: metadata?.animation_url,
-            attributes: metadata?.attributes,
-            collection: metadata?.collection ?? collection,
-            description: metadata?.description ?? result.description,
-            external_url: metadata?.external_url,
-            image: metadata?.image ?? uri,
-            name: metadata?.name ?? name,
-            properties: metadata?.properties,
-            seller_fee_basis_points: metadata?.seller_fee_basis_points,
-            symbol: metadata?.symbol,
-          },
-          name,
-          uri: result.uri,
-        });
+    });
+    Object.keys(tokenCounterDict).forEach((key) => {
+      if (tokenCounterDict[key] > 0) {
+        eventsToBeLoaded.push(getTokenIdDictFromString({ tokenId: key }));
       }
+    });
+
+    // Load metadata and image data for each event
+    await Promise.all(eventsToBeLoaded.map(async (tokenId) => {
+      const { collection, creator, name } = tokenId;
+      if (!(collection in collectionDict)) {
+        collectionDict[collection] = [];
+      }
+
+      let result;
+      let uri = '';
+      let metadata;
+      try {
+        result = await tokenClient.getTokenData(creator, collection, name);
+        uri = result.uri;
+        metadata = (await axios.get<MetadataJson>(uri)).data;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(error);
+      }
+
+      collectionDict[collection].push({
+        id: {
+          collection,
+          creator,
+          name,
+        },
+        imageUri: uri,
+        metadata: {
+          animation_url: metadata?.animation_url,
+          attributes: metadata?.attributes,
+          collection: metadata?.collection,
+          description: metadata?.description ?? result?.description ?? '',
+          external_url: metadata?.external_url,
+          image: metadata?.image ?? uri,
+          name: metadata?.name ?? name,
+          properties: metadata?.properties,
+          seller_fee_basis_points: metadata?.seller_fee_basis_points,
+          symbol: metadata?.symbol,
+        },
+        name,
+        uri,
+      });
     }));
 
-    return Array.from(Object.values(collectionDict)).flat(1).filter((token) => {
-      if (!token.id) {
-        return false;
+    return Array.from(Object.values(collectionDict)).flat(1).sort((a, b) => {
+      if (a.name && b.name) {
+        return a.name.localeCompare(b.name);
       }
-      const tokenString = getTokenIdStringFromDict(token.id);
-      return tokenCounterDict[tokenString] > 0;
+      return 0;
     });
   }
 
