@@ -19,6 +19,7 @@ on:
       FORGE_CLUSTER_NAME:
         required: false
         type: string
+        default: aptos-forge-big-0
         description: The Forge k8s cluster to be used for test
       FORGE_RUNNER_DURATION_SECS:
         required: false

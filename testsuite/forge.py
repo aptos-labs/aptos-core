@@ -992,7 +992,7 @@ def list_eks_clusters(shell: Shell) -> List[str]:
         return [
             cluster_name
             for cluster_name in cluster_result["clusters"]
-            if cluster_name.startswith("aptos-forge-")
+            if cluster_name.startswith("aptos-forge-big-")
         ]
     except Exception as e:
         raise AwsError("Failed to list eks clusters") from e
@@ -1044,12 +1044,14 @@ class Git:
 
 
 def assert_provided_image_tags_has_profile_or_features(
-    forge_image_tag,
-    image_tag,
+    forge_image_tag: Optional[str],
+    image_tag: Optional[str],
     enable_failpoints_feature: bool = False,
     enable_performance_profile: bool = False,
 ):
     for tag in [forge_image_tag, image_tag]:
+        if not tag:
+            continue
         if enable_failpoints_feature:
             assert tag.startswith(
                 "failpoints"
