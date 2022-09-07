@@ -1,14 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import * as Nacl from "tweetnacl";
-import * as SHA3 from "js-sha3";
+import nacl from "tweetnacl";
+import sha3 from "js-sha3";
 import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
 import { Memoize } from "typescript-memoize";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const { sha3_256 } = sha3;
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -23,7 +26,7 @@ export class AptosAccount {
   /**
    * A private key and public key, associated with the given account
    */
-  readonly signingKey: Nacl.SignKeyPair;
+  readonly signingKey: nacl.SignKeyPair;
 
   /**
    * Address associated with the given account
@@ -77,9 +80,9 @@ export class AptosAccount {
    */
   constructor(privateKeyBytes?: Uint8Array | undefined, address?: MaybeHexString) {
     if (privateKeyBytes) {
-      this.signingKey = Nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
+      this.signingKey = nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
     } else {
-      this.signingKey = Nacl.sign.keyPair();
+      this.signingKey = nacl.sign.keyPair();
     }
     this.accountAddress = HexString.ensure(address || this.authKey().hex());
   }
@@ -102,7 +105,7 @@ export class AptosAccount {
    */
   @Memoize()
   authKey(): HexString {
-    const hash = SHA3.sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update(this.signingKey.publicKey);
     hash.update("\x00");
     return new HexString(hash.hex());
@@ -123,7 +126,7 @@ export class AptosAccount {
    * @returns A signature HexString
    */
   signBuffer(buffer: Uint8Array): HexString {
-    const signature = Nacl.sign(buffer, this.signingKey.secretKey);
+    const signature = nacl.sign(buffer, this.signingKey.secretKey);
     return HexString.fromUint8Array(signature.slice(0, 64));
   }
 
