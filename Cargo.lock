@@ -590,7 +590,6 @@ dependencies = [
  "storage-interface",
  "tokio",
  "vm-validator",
- "warp",
 ]
 
 [[package]]
@@ -696,7 +695,6 @@ dependencies = [
  "serde 1.0.144",
  "serde_yaml 0.8.26",
  "storage-interface",
- "structopt 0.3.26",
  "toml",
  "vm-genesis",
 ]
@@ -816,7 +814,6 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "tokio",
  "tracing",
  "tracing-subscriber",
 ]
@@ -881,13 +878,11 @@ name = "aptos-network-checker"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
  "aptos-types",
  "clap 3.2.17",
- "fallible",
  "futures",
  "hex",
  "network",
@@ -1318,7 +1313,6 @@ dependencies = [
  "aptos-types",
  "aptosdb",
  "consensus",
- "const_format",
  "flate2",
  "futures",
  "httpmock",
@@ -1363,11 +1357,9 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "serde_repr",
- "serde_with",
  "serde_yaml 0.8.26",
  "thiserror",
  "tokio",
- "tokio_schedule",
  "url",
  "warp",
 ]
@@ -1605,12 +1597,10 @@ dependencies = [
 name = "aptosdb-indexer"
 version = "0.1.0"
 dependencies = [
- "accumulator",
  "anyhow",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
- "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
@@ -1621,7 +1611,6 @@ dependencies = [
  "aptos-vm",
  "bcs",
  "byteorder",
- "executor-types",
  "move-deps",
  "num-derive",
  "proptest",
@@ -3985,7 +3974,6 @@ dependencies = [
  "sha2 0.9.9",
  "siphasher",
  "smallvec",
- "structopt 0.3.26",
  "tempfile",
  "tiny-keccak",
 ]
@@ -4749,7 +4737,6 @@ checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
 dependencies = [
  "autocfg",
  "hashbrown",
- "serde 1.0.144",
 ]
 
 [[package]]
@@ -5049,7 +5036,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
- "aptos-config",
  "aptos-crypto",
  "aptos-gas",
  "aptos-keygen",
@@ -5057,7 +5043,6 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
- "aptos-writeset-generator",
  "bcs",
  "cached-packages",
  "framework",
@@ -5066,7 +5051,6 @@ dependencies = [
  "move-deps",
  "num_cpus",
  "once_cell",
- "project-root",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -6660,12 +6644,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
 
 [[package]]
-name = "numtoa"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
-
-[[package]]
 name = "object"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7827,15 +7805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "redox_termios"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8440d8acb4fd3d277125b4bd01a6f38aee8d814b3b5fc09b3f2b825d37d3fe8f"
-dependencies = [
- "redox_syscall 0.2.16",
-]
-
-[[package]]
 name = "redox_users"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8194,7 +8163,6 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "consensus-types",
- "crash-handler",
  "criterion",
  "once_cell",
  "proptest",
@@ -8268,7 +8236,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-metrics-core",
- "aptos-state-view",
  "aptos-types",
  "bitvec",
  "criterion",
@@ -8492,34 +8459,6 @@ dependencies = [
  "itoa 1.0.3",
  "ryu",
  "serde 1.0.144",
-]
-
-[[package]]
-name = "serde_with"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89df7a26519371a3cce44fbb914c2819c84d9b897890987fa3ab096491cc0ea8"
-dependencies = [
- "base64 0.13.0",
- "chrono",
- "hex",
- "indexmap",
- "serde 1.0.144",
- "serde_json",
- "serde_with_macros",
- "time 0.3.13",
-]
-
-[[package]]
-name = "serde_with_macros"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de337f322382fcdfbb21a014f7c224ee041a23785651db67b9827403178f698f"
-dependencies = [
- "darling",
- "proc-macro2 1.0.43",
- "quote 1.0.21",
- "syn 1.0.99",
 ]
 
 [[package]]
@@ -9246,18 +9185,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "termion"
-version = "1.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "077185e2eac69c3f8379a4298e1e07cd36beb962290d4a51199acf0fdc10607e"
-dependencies = [
- "libc",
- "numtoa",
- "redox_syscall 0.2.16",
- "redox_termios",
-]
-
-[[package]]
 name = "termtree"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9570,16 +9497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio_schedule"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b91f371e5032da918342685fde2ca040710d38aaec985378e121055fbf031e9"
-dependencies = [
- "chrono",
- "tokio",
-]
-
-[[package]]
 name = "toml"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9829,7 +9746,6 @@ dependencies = [
  "rand_core 0.5.1",
  "reqwest",
  "serde 1.0.144",
- "termion",
  "tokio",
  "url",
 ]
@@ -10204,7 +10120,6 @@ name = "vm-genesis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-config",
  "aptos-crypto",
  "aptos-gas",
  "aptos-proptest-helpers",
@@ -10235,9 +10150,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "cached-packages",
- "executor",
  "executor-test-helpers",
- "executor-types",
  "fail 0.5.0",
  "move-deps",
  "rand 0.7.3",
