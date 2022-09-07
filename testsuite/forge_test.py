@@ -413,6 +413,13 @@ class TestFindRecentImage(unittest.TestCase):
                 enable_failpoints_feature=True,
             )
 
+    def testFailpointsNoProvidedImageTag(self) -> None:
+        assert_provided_image_tags_has_profile_or_features(
+            None,
+            None,
+            enable_failpoints_feature=True,
+        )
+
 
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
