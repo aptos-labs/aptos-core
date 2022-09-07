@@ -41,5 +41,6 @@
 /config/master.key
 /config/credentials.yml.enc
 
-# Never commit this dangerous file :-)
+# Never commit these dangerous files :-)
 .env
+aptos-*.json

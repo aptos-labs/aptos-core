@@ -75,6 +75,7 @@ Rails.application.routes.draw do
 
   # NFTs
   resources :nft_offers, param: :slug, only: %i[show update]
+  get 'nft_images/:nft_offer_slug/:image_num', { to: 'nft_images#show', constraints: { image_num: /\d+/ } }
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')

@@ -19,8 +19,8 @@ locals {
     ? [for t in data.aws_ecr_image.stable[0].image_tags : t if substr(t, 0, 5) == "main_"][0]
     : "latest"
   )
-  aws_tags = "Terraform=pfn,Workspace=${terraform.workspace}"
-  workspace_name = "${terraform.workspace}"
+  aws_tags       = "Terraform=pfn,Workspace=${terraform.workspace}"
+  workspace_name = terraform.workspace
 }
 
 module "eks" {

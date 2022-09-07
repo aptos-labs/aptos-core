@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class Wallet < ApplicationRecord
-  VALID_NETWORKS = %w[devnet ait3].freeze
+  VALID_NETWORKS = %w[devnet testnet ait3].freeze
   VALID_WALLET_NAMES = %w[petra].freeze
 
   attr_accessor :challenge, :signed_challenge
@@ -32,6 +32,8 @@ class Wallet < ApplicationRecord
     case network
     when 'devnet'
       'https://fullnode.devnet.aptoslabs.com/v1'
+    when 'testnet'
+      'https://testnet.aptoslabs.com/v1'
     when 'ait3'
       'https://ait3.aptosdev.com/v1'
     else
