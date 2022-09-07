@@ -13,6 +13,7 @@ use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
 use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
 use testcases::continuous_progress_test::ContinuousProgressTest;
+use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
@@ -476,6 +477,26 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(240)),
+            )),
+        // not scheduled on continuous
+        "load_vs_perf_benchmark" => config
+            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_fullnode_count(10)
+            .with_network_tests(vec![&LoadVsPerfBenchmark {
+                test: &PerformanceBenchmarkWithFN,
+                tps: &[
+                    200, 1000, 3000, 5000, 6000, 6300, 6600, 7000, 7500, 8000, 10000, 12000,
+                ],
+            }])
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                // no epoch change.
+                helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                0,
+                10000,
+                true,
+                Some(Duration::from_secs(60)),
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
