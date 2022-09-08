@@ -675,6 +675,19 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resources_at_version_bcs(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resources?ledger_version={}",
+            address, version
+        ))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,

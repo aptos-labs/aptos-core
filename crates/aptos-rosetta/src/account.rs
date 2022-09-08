@@ -26,6 +26,7 @@ use aptos_rest_client::{
 };
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::account_config::{AccountResource, CoinStoreResource};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -107,7 +108,7 @@ async fn convert_balances_to_amounts(
     rest_client: &aptos_rest_client::Client,
     coin_cache: Arc<CoinCache>,
     maybe_filter_currencies: Option<Vec<Currency>>,
-    balances: HashMap<TypeTag, Balance>,
+    balances: HashMap<TypeTag, u64>,
     balance_version: u64,
 ) -> ApiResult<Vec<Amount>> {
     let mut amounts = Vec::new();
@@ -119,7 +120,7 @@ async fn convert_balances_to_amounts(
             .await?
         {
             amounts.push(Amount {
-                value: balance.coin.value.0.to_string(),
+                value: balance.to_string(),
                 currency,
             });
         }
@@ -154,35 +155,29 @@ async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
     version: u64,
-) -> ApiResult<(u64, HashMap<TypeTag, Balance>)> {
+) -> ApiResult<(u64, HashMap<TypeTag, u64>)> {
     if let Ok(response) = rest_client
-        .get_account_resources_at_version(address, version)
+        .get_account_resources_at_version_bcs(address, version)
         .await
     {
         let resources = response.into_inner();
         let mut maybe_sequence_number = None;
         let mut balances = HashMap::new();
 
-        for resource in resources {
+        for (struct_tag, bytes) in resources {
             match (
-                resource.resource_type.address,
-                resource.resource_type.module.as_str(),
-                resource.resource_type.name.as_str(),
+                struct_tag.address,
+                struct_tag.module.as_str(),
+                struct_tag.name.as_str(),
             ) {
                 (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE) => {
-                    if let Ok(resource) =
-                        serde_json::from_value::<AccountData>(resource.data.clone())
-                    {
-                        maybe_sequence_number = Some(resource.sequence_number.0)
-                    }
+                    let account: AccountResource = bcs::from_bytes(&bytes)?;
+                    maybe_sequence_number = Some(account.sequence_number())
                 }
                 (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
-                    if let Some(coin_type) = resource.resource_type.type_params.first() {
-                        if let Ok(resource) =
-                            serde_json::from_value::<Balance>(resource.data.clone())
-                        {
-                            balances.insert(coin_type.clone(), resource);
-                        }
+                    let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
+                    if let Some(coin_type) = struct_tag.type_params.first() {
+                        balances.insert(coin_type.clone(), coin_store.coin());
                     }
                 }
                 _ => {}
@@ -201,12 +196,7 @@ async fn get_balances(
         Ok((sequence_number, balances))
     } else {
         let mut currency_map = HashMap::new();
-        currency_map.insert(
-            native_coin_tag(),
-            Balance {
-                coin: AptosCoin { value: U64(0) },
-            },
-        );
+        currency_map.insert(native_coin_tag(), 0);
         Ok((0, currency_map))
     }
 }
