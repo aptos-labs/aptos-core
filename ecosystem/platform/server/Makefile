@@ -96,6 +96,7 @@ db-rollback:
 
 
 lint-ruby:
+	yarn run prettier --write .
 	bundle exec rubocop -A
 
 lint-security:
