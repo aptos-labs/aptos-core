@@ -9,7 +9,7 @@ use again::RetryPolicy;
 use anyhow::{anyhow, format_err, Result};
 use aptos_infallible::RwLock;
 use aptos_logger::sample::Sampling;
-use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -613,7 +613,7 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     transactions_per_account: usize,
-    wait_timeout: Duration,
+    txn_expiration_ts_secs: u64,
     fetch_only_once: bool,
     sleep_between_cycles: Duration,
 ) -> (usize, u128) {
@@ -623,7 +623,7 @@ async fn wait_for_accounts_sequence(
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
-            Ok(sequence_numbers) => {
+            Ok((sequence_numbers, chain_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();
                 for (account, sequence_number) in zip(accounts.iter_mut(), &sequence_numbers) {
                     let prev_sequence_number = latest_fetched_counts
@@ -641,19 +641,29 @@ async fn wait_for_accounts_sequence(
                 if pending_addresses.is_empty() {
                     break;
                 }
+
+                if chain_timestamp_secs > txn_expiration_ts_secs {
+                    break;
+                }
             }
             Err(e) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(60)),
                     warn!(
                         "Failed to query ledger info on accounts {:?} for instance {:?} : {:?}",
-                        pending_addresses, client, e
+                        pending_addresses,
+                        client.path_prefix_string(),
+                        e
                     )
                 );
             }
         }
 
-        if start_time.elapsed() >= wait_timeout {
+        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 180 {
+            error!(
+                "Client {:?} cannot catch up to needed timestamp, after additional 240s",
+                client.path_prefix_string()
+            );
             break;
         }
 
@@ -702,21 +712,32 @@ fn update_seq_num_and_get_num_expired(
 }
 
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
-    Ok(query_sequence_numbers(client, [address].iter()).await?[0])
+    Ok(query_sequence_numbers(client, [address].iter()).await?.0[0])
 }
 
-pub async fn query_sequence_numbers<'a, I>(client: &RestClient, addresses: I) -> Result<Vec<u64>>
+pub async fn query_sequence_numbers<'a, I>(
+    client: &RestClient,
+    addresses: I,
+) -> Result<(Vec<u64>, u64)>
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
-    Ok(try_join_all(
+    let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(
         addresses.map(|address| RETRY_POLICY.retry(move || client.get_account_bcs(*address))),
     )
     .await
     .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
     .into_iter()
-    .map(|resp| resp.into_inner().sequence_number())
-    .collect())
+    .map(|resp| {
+        let (account, state) = resp.into_parts();
+        (
+            account.sequence_number(),
+            Duration::from_micros(state.timestamp_usecs).as_secs(),
+        )
+    })
+    .unzip();
+
+    Ok((seq_nums, timestamps.into_iter().max().unwrap()))
 }
 
 pub fn gen_transfer_txn_request(

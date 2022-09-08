@@ -12,14 +12,15 @@ use crate::{
 use aptos_logger::sample::Sampling;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use futures::future::try_join_all;
+use futures::future::join_all;
+use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 use std::sync::atomic::AtomicU64;
@@ -74,8 +75,6 @@ impl SubmissionWorker {
         self.sleep_check_done(start_sleep_duration).await;
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-        let wait_for_accounts_sequence_timeout =
-            Duration::from_secs(self.params.txn_expiration_time_secs + 30);
         let mut wait_until = start_time;
 
         while !self.stop.load(Ordering::Relaxed) {
@@ -99,31 +98,30 @@ impl SubmissionWorker {
             wait_until += wait_duration;
 
             let requests = self.gen_requests();
+
+            let txn_expiration_time = requests
+                .iter()
+                .map(|txn| txn.expiration_timestamp_secs())
+                .max()
+                .unwrap_or(0);
+
             let num_requests = requests.len();
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
-            if let Err(e) = try_join_all(requests.chunks(self.params.max_submit_batch_size).map(
-                |reqs| {
-                    submit_transactions(
-                        &self.client,
-                        reqs,
-                        loop_start_time.clone(),
-                        txn_offset_time.clone(),
-                        loop_stats,
-                    )
-                },
-            ))
-            .await
-            {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
-                    warn!(
-                        "[{:?}] Failed to submit request: {:?}",
-                        self.client.path_prefix_string(),
-                        e
-                    )
-                );
-            }
+            join_all(
+                requests
+                    .chunks(self.params.max_submit_batch_size)
+                    .map(|reqs| {
+                        submit_transactions(
+                            &self.client,
+                            reqs,
+                            loop_start_time.clone(),
+                            txn_offset_time.clone(),
+                            loop_stats,
+                        )
+                    }),
+            )
+            .await;
 
             let early_return_due_to_stop = if self.check_account_sequence_only_once {
                 // we also don't want to be stuck waiting for txn_expiration_time_secs
@@ -141,7 +139,7 @@ impl SubmissionWorker {
                 // skip latency if asked to check seq_num only once
                 // even if we check more often due to stop (to not affect sampling)
                 self.check_account_sequence_only_once,
-                wait_for_accounts_sequence_timeout,
+                txn_expiration_time,
                 // if we needed to stop sleep early, we should check until complete
                 // as not enough time might have passed otherwise for txn to be committed.
                 self.check_account_sequence_only_once && !early_return_due_to_stop,
@@ -197,7 +195,7 @@ impl SubmissionWorker {
         txn_offset_time: u64,
         num_requests: usize,
         skip_latency_stats: bool,
-        wait_for_accounts_sequence_timeout: Duration,
+        txn_expiration_ts_secs: u64,
         check_account_sequence_only_once: bool,
         loop_stats: &StatsAccumulator,
     ) {
@@ -210,7 +208,7 @@ impl SubmissionWorker {
             &self.client,
             &mut self.accounts,
             self.params.transactions_per_account,
-            wait_for_accounts_sequence_timeout,
+            txn_expiration_ts_secs,
             check_account_sequence_only_once,
             Duration::from_millis(self.params.check_account_sequence_sleep_millis),
         )
@@ -277,7 +275,7 @@ pub async fn submit_transactions(
     loop_start_time: Arc<Instant>,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
-) -> anyhow::Result<()> {
+) {
     let cur_time = Instant::now();
     let offset = cur_time - *loop_start_time;
     txn_offset_time.fetch_add(
@@ -304,12 +302,34 @@ pub async fn submit_transactions(
         }
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
+
+            sample!(SampleRate::Duration(Duration::from_secs(15)), {
+                let by_error = failures
+                    .iter()
+                    .map(|f| {
+                        f.error
+                            .vm_error_code
+                            .and_then(|c| StatusCode::try_from(c).ok())
+                    })
+                    .counts();
+                if let Some(f) = failures.first() {
+                    warn!(
+                            "[{:?}] Failed to submit due to {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}",
+                            client.path_prefix_string(),
+                            f,
+                            txns[0].sequence_number(),
+                            failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
+                            by_error,
+                        );
+                }
+            });
+
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
             for f in failures {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
+                    SampleRate::Duration(Duration::from_secs(15)),
                     warn!(
                         "[{:?}] Failed to submit a request within a batch: {:?}",
                         client.path_prefix_string(),
@@ -319,5 +339,4 @@ pub async fn submit_transactions(
             }
         }
     };
-    Ok(())
 }
