@@ -28,7 +28,7 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_types::account_config::AccountResource;
+use aptos_types::account_config::{AccountResource, CoinStoreResource};
 use aptos_types::contract_event::EventWithVersion;
 use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
@@ -188,6 +188,20 @@ impl Client {
                 Err(anyhow!("No data returned").into())
             }
         })
+    }
+
+    pub async fn get_account_balance_bcs(
+        &self,
+        address: AccountAddress,
+        coin_type: &str,
+    ) -> AptosResult<Response<u64>> {
+        let resp = self
+            .get_account_resource_bcs::<CoinStoreResource>(
+                address,
+                &format!("0x1::coin::CoinStore<{}>", coin_type),
+            )
+            .await?;
+        resp.and_then(|resource| Ok(resource.coin()))
     }
 
     pub async fn get_account_balance_at_version(
