@@ -495,7 +495,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
-                helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+                helm_values["chain"]["epoch_duration_secs"] = 90.into();
             }))
             .with_success_criteria(SuccessCriteria::new(
                 0,
