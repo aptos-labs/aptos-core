@@ -60,11 +60,11 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 /// Build up the transaction, which should contain the `operations` as the change set
 async fn build_block(
     parent_block_identifier: BlockIdentifier,
-    block: aptos_rest_client::aptos_api_types::Block,
+    block: aptos_rest_client::aptos_api_types::BcsBlock,
     chain_id: ChainId,
 ) -> ApiResult<Block> {
     // note: timestamps are in microseconds, so we convert to milliseconds
-    let timestamp = get_timestamp(block.block_timestamp.0);
+    let timestamp = get_timestamp(block.block_timestamp);
     let block_identifier = BlockIdentifier::from_block(&block, chain_id);
 
     // Convert the transactions and build the block
@@ -88,7 +88,10 @@ async fn get_block_by_index(
     block_cache: &BlockRetriever,
     block_height: u64,
     chain_id: ChainId,
-) -> ApiResult<(BlockIdentifier, aptos_rest_client::aptos_api_types::Block)> {
+) -> ApiResult<(
+    BlockIdentifier,
+    aptos_rest_client::aptos_api_types::BcsBlock,
+)> {
     let block = block_cache.get_block_by_height(block_height, true).await?;
 
     // For the genesis block, we populate parent_block_identifier with the
@@ -120,13 +123,13 @@ pub struct BlockInfo {
 
 impl BlockInfo {
     pub fn from_block(
-        block: &aptos_rest_client::aptos_api_types::Block,
+        block: &aptos_rest_client::aptos_api_types::BcsBlock,
         chain_id: ChainId,
     ) -> BlockInfo {
         BlockInfo {
             block_id: BlockIdentifier::from_block(block, chain_id),
-            timestamp: get_timestamp(block.block_timestamp.0),
-            last_version: block.last_version.0,
+            timestamp: get_timestamp(block.block_timestamp),
+            last_version: block.last_version,
         }
     }
 }
@@ -167,10 +170,10 @@ impl BlockRetriever {
         &self,
         height: u64,
         with_transactions: bool,
-    ) -> ApiResult<aptos_rest_client::aptos_api_types::Block> {
+    ) -> ApiResult<aptos_rest_client::aptos_api_types::BcsBlock> {
         let block = self
             .rest_client
-            .get_block_by_height(height, with_transactions)
+            .get_block_by_height_bcs(height, with_transactions)
             .await?
             .into_inner();
 
