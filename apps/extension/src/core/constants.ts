@@ -11,6 +11,8 @@ export const aptosStakePoolStructTag = `${stakeNamespace}::StakePool` as const;
 
 export const latestVersion = 1;
 
+export const passwordStrength = 2;
+
 export const validStorageUris = [
   'amazonaws.com',
   'ipfs.io',

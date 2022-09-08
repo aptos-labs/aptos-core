@@ -20,6 +20,7 @@ import {
 } from 'core/components/Toast';
 import { useAccounts } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
+import { passwordStrength } from 'core/constants';
 import { MnemonicFormValues } from './AddAccountLayout';
 
 zxcvbnOptions.setOptions(passwordOptions);
@@ -214,7 +215,9 @@ function NextButton() {
 
     switch (activeStep) {
       case ImportOnboardingPage.CreatePassword: {
-        if (termsOfService && initialPassword === confirmPassword && passwordScore > 2) {
+        if (termsOfService
+          && initialPassword === confirmPassword
+          && passwordScore >= passwordStrength) {
           return baseNextButton;
         }
         if (initialPassword !== confirmPassword) {
@@ -226,7 +229,7 @@ function NextButton() {
             </Tooltip>
           );
         }
-        if (passwordScore <= 2) {
+        if (passwordScore < passwordStrength) {
           return (
             <Tooltip
               label={'Password strength must be at least "strong"'}

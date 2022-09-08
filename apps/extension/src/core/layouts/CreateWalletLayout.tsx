@@ -17,6 +17,7 @@ import { AptosAccount } from 'aptos';
 import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
 import { useAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
+import { passwordStrength } from 'core/constants';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
@@ -111,7 +112,9 @@ function NextButton({
 
     switch (activeStep) {
       case OnboardingPage.CreatePassword: {
-        if (termsOfService && initialPassword === confirmPassword && passwordScore > 2) {
+        if (termsOfService
+          && initialPassword === confirmPassword
+           && passwordScore >= passwordStrength) {
           return baseNextButton;
         }
         if (initialPassword !== confirmPassword) {
@@ -123,7 +126,7 @@ function NextButton({
             </Tooltip>
           );
         }
-        if (passwordScore <= 2) {
+        if (passwordScore < passwordStrength) {
           return (
             <Tooltip
               label={'Password strength must be at least "strong"'}
