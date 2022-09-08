@@ -13,6 +13,7 @@ declare global {
       connect: () => Promise<{address: string, publicKey: string}>;
       signAndSubmitTransaction: (transaction: {}) => Promise<Types.Transaction>;
       signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
+      network: () => Promise<string>;
     }
   }
 }
