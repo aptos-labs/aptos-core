@@ -333,6 +333,10 @@ module aptos_framework::aptos_governance {
         }
     }
 
+    public entry fun add_approved_script_hash_script(proposal_id: u64) acquires ApprovedExecutionHashes {
+        add_approved_script_hash(proposal_id)
+    }
+
     /// Add the execution script hash of a successful governance proposal to the approved list.
     /// This is needed to bypass the mempool transaction size limit for approved governance proposal transactions that
     /// are too large (e.g. module upgrades).
