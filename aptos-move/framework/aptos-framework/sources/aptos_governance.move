@@ -354,7 +354,7 @@ module aptos_framework::aptos_governance {
     public fun resolve(proposal_id: u64, signer_address: address): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         let proposal = voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
         remove_approved_hash(proposal_id);
-        get_signer(proposal, signer_address)
+        get_signer(signer_address)
     }
 
     /// Remove an approved proposal's execution script hash.
@@ -376,6 +376,13 @@ module aptos_framework::aptos_governance {
         reconfiguration::reconfigure();
     }
 
+    /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.
+    public fun get_signer_testnet_only(
+        core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
+        system_addresses::assert_core_resource(core_resources);
+        get_signer(signer_address)
+    }
+
     /// Return the voting power a stake pool has with respect to governance proposals.
     fun get_voting_power(pool_address: address): u64 {
         let allow_validator_set_change = staking_config::get_allow_validator_set_change(&staking_config::get());
@@ -391,7 +398,7 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
+    fun get_signer(signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
         let signer_cap = simple_map::borrow(&governance_responsibility.signer_caps, &signer_address);
         create_signer_with_capability(signer_cap)

@@ -420,6 +420,9 @@ module aptos_framework::stake {
     }
 
     fun initialize_owner(owner: &signer) {
+        // TODO: Undo when ready
+        abort 0;
+
         let owner_address = signer::address_of(owner);
         assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
 
