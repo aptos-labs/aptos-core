@@ -44,8 +44,6 @@ module aptos_framework::aptos_governance {
     const ENO_VOTING_POWER: u64 = 5;
     /// Proposal is not ready to be resolved. Waiting on time or votes
     const EPROPOSAL_NOT_RESOLVABLE_YET: u64 = 6;
-    /// Proposal's script hash has already been added to the approved list
-    const ESCRIPT_HASH_ALREADY_ADDED: u64 = 7;
     /// The proposal has not been resolved yet
     const EPROPOSAL_NOT_RESOLVED_YET: u64 = 8;
     /// Metadata location cannot be longer than 256 chars
@@ -280,7 +278,7 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64,
         should_pass: bool,
-    ) acquires GovernanceEvents, VotingRecords {
+    ) acquires ApprovedExecutionHashes, GovernanceEvents, VotingRecords {
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
@@ -328,6 +326,11 @@ module aptos_framework::aptos_governance {
                 should_pass,
             },
         );
+
+        let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
+        if (proposal_state == PROPOSAL_STATE_SUCCEEDED) {
+            add_approved_script_hash(proposal_id);
+        }
     }
 
     /// Add the execution script hash of a successful governance proposal to the approved list.
@@ -336,10 +339,9 @@ module aptos_framework::aptos_governance {
     public fun add_approved_script_hash(proposal_id: u64) acquires ApprovedExecutionHashes {
         let approved_hashes = borrow_global_mut<ApprovedExecutionHashes>(@aptos_framework);
         // Prevent adding the same script hash to the list multiple times.
-        assert!(
-            !simple_map::contains_key(&approved_hashes.hashes, &proposal_id),
-            error::invalid_argument(ESCRIPT_HASH_ALREADY_ADDED),
-        );
+        if (simple_map::contains_key(&approved_hashes.hashes, &proposal_id)) {
+            return
+        };
 
         // Ensure the proposal can be resolved.
         let proposal_state = voting::get_proposal_state<GovernanceProposal>(@aptos_framework, proposal_id);
@@ -490,7 +492,7 @@ module aptos_framework::aptos_governance {
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
-    ) acquires GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
         setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
 
         create_proposal(
@@ -513,7 +515,7 @@ module aptos_framework::aptos_governance {
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
-    ) acquires GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceEvents, GovernanceResponsbility, VotingRecords {
         setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
 
         create_proposal(
