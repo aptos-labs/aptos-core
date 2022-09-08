@@ -243,15 +243,14 @@ variable "monitoring_helm_values" {
   default     = {}
 }
 
-variable "enable_node_exporter" {
-  description = "Enable Prometheus node exporter helm chart"
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
   default     = false
 }
 
-variable "node_exporter_helm_values" {
-  description = "Map of values to pass to node exporter Helm"
-  type        = any
-  default     = {}
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
 }
 
 variable "helm_release_name_override" {

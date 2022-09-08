@@ -1,5 +1,5 @@
 locals {
-  autoscaling_helm_chart_path      = "${path.module}/../helm/autoscaling"
+  autoscaling_helm_chart_path         = "${path.module}/../helm/autoscaling"
   chaos_mesh_helm_chart_path          = "${path.module}/../helm/chaos"
   testnet_addons_helm_chart_path      = "${path.module}/../helm/testnet-addons"
   node_health_checker_helm_chart_path = "${path.module}/../helm/node-health-checker"
