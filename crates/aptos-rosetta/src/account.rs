@@ -159,24 +159,35 @@ async fn get_balances(
         .get_account_resources_at_version(address, version)
         .await
     {
-        let response = response.into_inner();
+        let resources = response.into_inner();
+        let mut maybe_sequence_number = None;
+        let mut balances = HashMap::new();
 
-        let maybe_sequence_number = if let Some(account_resource) =
-            response.iter().find(|resource| {
-                resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module.as_str() == ACCOUNT_MODULE
-                    && resource.resource_type.name.as_str() == ACCOUNT_RESOURCE
-            }) {
-            if let Ok(resource) =
-                serde_json::from_value::<AccountData>(account_resource.data.clone())
-            {
-                Some(resource.sequence_number.0)
-            } else {
-                None
+        for resource in resources {
+            match (
+                resource.resource_type.address,
+                resource.resource_type.module.as_str(),
+                resource.resource_type.name.as_str(),
+            ) {
+                (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE) => {
+                    if let Ok(resource) =
+                        serde_json::from_value::<AccountData>(resource.data.clone())
+                    {
+                        maybe_sequence_number = Some(resource.sequence_number.0)
+                    }
+                }
+                (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
+                    if let Some(coin_type) = resource.resource_type.type_params.first() {
+                        if let Ok(resource) =
+                            serde_json::from_value::<Balance>(resource.data.clone())
+                        {
+                            balances.insert(coin_type.clone(), resource);
+                        }
+                    }
+                }
+                _ => {}
             }
-        } else {
-            None
-        };
+        }
 
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
@@ -185,27 +196,6 @@ async fn get_balances(
                 "Failed to retrieve account sequence number".to_string(),
             )));
         };
-
-        let balances = response
-            .iter()
-            .filter(|resource| {
-                resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module.as_str() == COIN_MODULE
-                    && resource.resource_type.name.as_str() == COIN_STORE_RESOURCE
-            })
-            .filter_map(|resource| {
-                // Currency must have a type
-                if let Some(coin_type) = resource.resource_type.type_params.first() {
-                    match serde_json::from_value::<Balance>(resource.data.clone()) {
-                        Ok(resource) => Some((coin_type.clone(), resource)),
-                        Err(_) => None,
-                    }
-                } else {
-                    // Skip currencies that don't match
-                    None
-                }
-            })
-            .collect();
 
         // Retrieve balances
         Ok((sequence_number, balances))
