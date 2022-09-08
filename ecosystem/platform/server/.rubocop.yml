@@ -1,7 +1,11 @@
+inherit_from:
+  - node_modules/@prettier/plugin-ruby/rubocop.yml
+
 AllCops:
   Exclude:
     - db/schema.rb
     - vendor/**/*
+    - node_modules/**/*
   NewCops: enable
 
 Metrics/MethodLength:
