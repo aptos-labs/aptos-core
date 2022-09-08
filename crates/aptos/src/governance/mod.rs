@@ -59,12 +59,12 @@ impl GovernanceTool {
 #[derive(Parser)]
 pub struct SubmitProposal {
     /// Location of the JSON metadata of the proposal
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[cfg(feature = "no-upload-proposal")]
     /// A JSON file to be uploaded later at the metadata URL
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
     #[clap(flatten)]
