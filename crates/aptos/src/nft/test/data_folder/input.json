@@ -1,0 +1,82 @@
+{
+  "collections": [
+    {
+      "name": "demo collection 1",
+      "description": "this is a demonstration collection",
+      "collection_file_path": "./collection_1.png",
+      "maximum": 10000000,
+      "mutability_config": [false, false, false],
+      "tokens": [
+        {
+          "name": "nft1",
+          "description": "this is a description for nft1",
+          "token_file_path": "./token_1.png",
+          "amount": 2,
+          "royalty_creator_weights": {
+            "0xd": 4,
+            "0xe": 5,
+            "0xa": 9,
+            "0xd": 10
+          },
+          "royalty_points_denominator": 100,
+          "royalty_points_numerator": 1,
+          "token_mutate_setting": [false, false, false, false, false],
+          "property_map": {
+            "age": 10,
+            "owner_name": "alice",
+            "male": false
+          }
+        },
+        {
+          "name": "nft2",
+          "description": "this is a description for nft2",
+          "token_file_path": "./token_2.png",
+          "amount": 1,
+          "royalty_creator_weights": {
+            "0xa": 4,
+            "0xb": 5,
+            "0xe": 9,
+            "0xd": 10
+          },
+          "royalty_points_denominator": 100,
+          "royalty_points_numerator": 1,
+          "token_mutate_setting": [false, false, false, false, true],
+          "property_map": {
+            "age": 10,
+            "owner_name": "Bob",
+            "male": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "demo collection 2",
+      "description": "this is a demonstration collection",
+      "collection_file_path": "./collection_2.png",
+      "maximum": 10000000,
+      "mutability_config": [false, false, false],
+      "tokens": [
+        {
+          "name": "nft1",
+          "description": "this is a description for nft1",
+          "token_file_path": "./token_1.png",
+          "amount": 2,
+          "royalty_creator_weights": {
+            "0xa": 4,
+            "0xb": 5,
+            "0xe": 9,
+            "0xd": 10
+          },
+          "royalty_points_denominator": 100,
+          "royalty_points_numerator": 1,
+          "token_mutate_setting": [false, false, false, false, false],
+          "property_map": {
+            "age": 10,
+            "owner_name": "alice",
+            "male": false
+          }
+        }
+      ]
+    }
+  ]
+}

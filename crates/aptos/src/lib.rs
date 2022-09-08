@@ -14,6 +14,7 @@ pub mod op;
 pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
+pub mod nft;
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult};
 use crate::common::utils::cli_build_information;
