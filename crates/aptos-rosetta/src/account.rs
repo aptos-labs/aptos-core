@@ -19,11 +19,6 @@ use crate::{
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_rest_client::aptos_api_types::AccountData;
-use aptos_rest_client::{
-    aptos::{AptosCoin, Balance},
-    aptos_api_types::U64,
-};
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CoinStoreResource};

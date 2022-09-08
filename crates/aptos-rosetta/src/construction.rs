@@ -24,7 +24,7 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::parse_currency;
+use crate::common::{native_coin_tag, parse_currency};
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
@@ -264,7 +264,7 @@ async fn construction_metadata(
         max_gas.0
     } else {
         let account_balance = rest_client
-            .get_account_balance(address)
+            .get_account_balance_bcs(address, &native_coin_tag().to_string())
             .await
             .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
             .into_inner();
@@ -272,17 +272,12 @@ async fn construction_metadata(
         let maximum_possible_gas =
             if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
                 std::cmp::min(
-                    (account_balance
-                        .coin
-                        .value
-                        .0
-                        .saturating_sub(transfer.amount.0))
-                        / gas_price_per_unit,
+                    (account_balance.saturating_sub(transfer.amount.0)) / gas_price_per_unit,
                     MAX_GAS_UNITS_PER_REQUEST,
                 )
             } else {
                 std::cmp::min(
-                    account_balance.coin.value.0 / gas_price_per_unit,
+                    account_balance / gas_price_per_unit,
                     MAX_GAS_UNITS_PER_REQUEST,
                 )
             };
