@@ -280,6 +280,15 @@ module aptos_framework::account {
 
         // update the authentication key of the current account
         let account_resource = borrow_global_mut<Account>(addr);
+
+        event::emit_event<KeyRotationEvent>(
+            &mut account_resource.key_rotation_events,
+            KeyRotationEvent {
+                old_authentication_key: account_resource.authentication_key,
+                new_authentication_key: new_auth_key,
+            }
+        );
+
         account_resource.authentication_key = new_auth_key;
     }
 
