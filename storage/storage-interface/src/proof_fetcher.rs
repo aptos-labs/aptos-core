@@ -11,11 +11,13 @@ use std::collections::HashMap;
 
 /// Defines the trait for fetching proof from the DB
 pub trait ProofFetcher: Sync + Send {
-    /// API to fetch the state value along with proof
+    /// Fetches the state value along with its proof. If root_hash is provided, will also verify
+    /// its proof.
     fn fetch_state_value_and_proof(
         &self,
         state_key: &StateKey,
         version: Version,
+        root_hash: Option<HashValue>,
     ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProofExt>)>;
 
     /// API to return all the proofs fetched by the proof fetcher so far.
