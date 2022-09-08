@@ -182,6 +182,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    if suite_name == "compat" {
+        panic!("{}", suite_name);
+    }
+
+    let duration = Duration::from_secs(6 * 15 * 60);
+    let suite_name = "load_vs_perf_benchmark";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -488,9 +495,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(10)
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
-                tps: &[
-                    200, 1000, 3000, 5000, 6000, 6300, 6600, 7000, 7500, 8000, 10000, 12000,
-                ],
+                tps: &[6600, 7000, 7500, 8000, 10000, 12000],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
