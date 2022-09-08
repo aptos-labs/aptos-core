@@ -345,7 +345,7 @@ module aptos_token::token {
                 };
                 // update the token largest property_version
                 direct_deposit(token_owner, new_token);
-                update_token_property_internal(token_owner, new_token_id, keys, values, types);
+                update_token_property_internal(token_owner, token_id, new_token_id, keys, values, types);
                 i = i + 1;
             };
             token_data.largest_property_version = largest_property_version + token.amount;
@@ -353,27 +353,28 @@ module aptos_token::token {
             let Token {id: _, amount: _, token_properties: _} = token;
         } else {
             assert!(amount == 1, ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE);
-            update_token_property_internal(token_owner, token_id, keys, values, types);
+            update_token_property_internal(token_owner, token_id, token_id, keys, values, types);
         };
     }
 
     fun update_token_property_internal(
         token_owner: address,
-        token_id: TokenId,
+        old_token_id: TokenId,
+        new_token_id: TokenId,
         keys: vector<String>,
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires TokenStore {
         let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
-        assert!(table::contains(tokens, token_id), ENO_TOKEN_IN_TOKEN_STORE);
-        let value = &mut table::borrow_mut(tokens, token_id).token_properties;
+        assert!(table::contains(tokens, new_token_id), ENO_TOKEN_IN_TOKEN_STORE);
+        let value = &mut table::borrow_mut(tokens, new_token_id).token_properties;
 
         property_map::update_property_map(value, keys, values, types);
         event::emit_event<MutateTokenPropertyMapEvent>(
             &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
             MutateTokenPropertyMapEvent {
-                old_id: token_id,
-                new_id: token_id,
+                old_id: old_token_id,
+                new_id: new_token_id,
                 keys,
                 values,
                 types
