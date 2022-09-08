@@ -37,6 +37,5 @@ pub struct BcsBlock {
     /// The last ledger version of the block inclusive
     pub last_version: u64,
     /// The transactions in the block in sequential order
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub transactions: Option<Vec<TransactionOnChainData>>,
 }
