@@ -44,7 +44,9 @@
                 <% if step.name == :sign_in %>
                   To begin, sign in to Aptos.
                 <% elsif step.name == :connect_wallet %>
-                  Connect your wallet. You will need an <%= render(LinkComponent.new(href: 'https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci')) { 'Aptos Wallet' } %> with a funded account and the network set to <%= @nft_offer.network.capitalize %>.
+                  Connect your wallet. You will need
+                  an Aptos Wallet, such as <%= render(LinkComponent.new(href: 'https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci')) { 'Petra Wallet' } %>,
+                  with a funded account and the network set to <%= @nft_offer.network.capitalize %>.
                 <% elsif step.name == :claim_nft %>
                   Your NFT is ready to mint!
                 <% end %>

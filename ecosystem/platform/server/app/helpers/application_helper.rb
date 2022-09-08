@@ -16,10 +16,4 @@ module ApplicationHelper
       [attr, SORT_ORDER[sort_sign]]
     end
   end
-
-  def truncate_address(string, separator: '…')
-    string.truncate(
-      (4 * 2) + separator.size, omission: "#{separator}#{string.last(4)}"
-    )
-  end
 end
