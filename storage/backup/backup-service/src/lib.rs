@@ -98,11 +98,8 @@ mod tests {
         let resp = get(&format!("http://127.0.0.1:{}/state_root_proof/0", port,)).unwrap();
         assert_eq!(resp.status(), 500);
 
-        // an endpoint handled by `reply_with_async_channel_writer' always returns 200,
-        // connection terminates prematurely when the channel writer errors.
-        let resp = get(&format!("http://127.0.0.1:{}/state_snapshot/1", port,)).unwrap();
-        assert_eq!(resp.status(), 200);
-        assert_eq!(resp.content_length(), None);
-        assert!(resp.bytes().is_err());
+        // In an endpoint handled by `reply_with_async_channel_writer', connection terminates
+        // prematurely when the channel writer errors.
+        assert!(get(&format!("http://127.0.0.1:{}/state_snapshot/1", port,)).is_err());
     }
 }
