@@ -11,20 +11,24 @@ export default class extends Controller {
     apiUrl: String,
   };
 
-  static targets = ["dateMinted", "mintNumber", "image"];
+  static targets = ["transactionFailedError", "dateMinted", "mintNumber", "image", "address"];
 
+  declare readonly transactionFailedErrorTarget: HTMLElement;
   declare readonly dateMintedTarget: HTMLElement;
   declare readonly mintNumberTarget: HTMLElement;
+  declare readonly addressTarget: HTMLElement;
   declare readonly imageTarget: HTMLImageElement;
 
   declare readonly transactionHashValue: string;
   declare readonly apiUrlValue: string;
 
+  retries = 0;
+
   connect() {
     this.fetchNftInfo();
   }
 
-  async fetchNftInfo() {
+  fetchNftInfo = async () => {
     const transactionUrl = [
       this.apiUrlValue,
       'transactions',
@@ -32,9 +36,18 @@ export default class extends Controller {
       this.transactionHashValue,
     ].join('/');
     const response = await fetch(transactionUrl);
+    if (!response.ok && ++this.retries <= 1) {
+      return setTimeout(this.fetchNftInfo, 1000);
+    }
+
     const transaction: Types.OnChainTransaction = await response.json();
 
     if (!('timestamp' in transaction && 'events' in transaction)) return;
+
+    if (!transaction.success) {
+      this.transactionFailedErrorTarget.classList.remove('hidden');
+      return;
+    }
 
     const createEvent = transaction.events.find(event =>
       event.type === '0x3::token::CreateTokenDataEvent');
@@ -47,6 +60,8 @@ export default class extends Controller {
 
     this.dateMintedTarget.textContent = dateMinted.toDateString();
     this.mintNumberTarget.textContent = `#${mintNumber}`;
+    this.addressTarget.textContent = transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
+    this.addressTarget.title = transaction.sender;
     this.imageTarget.src = imageUrl;
   }
 }

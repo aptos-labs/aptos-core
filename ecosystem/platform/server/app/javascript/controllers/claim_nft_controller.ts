@@ -17,6 +17,10 @@ const fromHexString = (hexString: string) =>
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
+  static targets = ["transactionFailedError"];
+
+  declare readonly transactionFailedErrorTarget: HTMLElement;
+
   static values = {
     address: String,
     network: String,
@@ -60,15 +64,16 @@ export default class extends Controller<HTMLAnchorElement> {
     const url = new URL(location.href);
     url.search = `?txn=${transaction.hash}`;
 
-    // @ts-ignore
-    Turbo.visit(url.toString());
+    // Full page load instead of Turbo.visit due to bug with controller not
+    // being mounted.
+    location.href = url.toString();
   }
 
   async handleClick(event: Event) {
     event.preventDefault();
 
     const csrfToken = (document.getElementsByName("csrf-token")[0] as HTMLMetaElement).content;
-    const response = await fetch(this.element.href, {
+    const response = await fetch(this.element.querySelector('a')!.href, {
       method: "PUT",
       headers: {
         "X-CSRF-Token": csrfToken,
@@ -102,16 +107,21 @@ export default class extends Controller<HTMLAnchorElement> {
       ],
       type_arguments: [],
     };
+    this.transactionFailedErrorTarget.classList.add('hidden');
 
     if (claimDetails.wallet_name === 'petra') {
-      const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
-      if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
-        return this.redirectToTransaction(pendingTransaction);
+      try {
+        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
+        if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
+          return this.redirectToTransaction(pendingTransaction);
+        }
+      } catch (error) {
+        console.error(error);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.
     }
 
-    throw 'Unable to submit transaction.'
+    this.transactionFailedErrorTarget.classList.remove('hidden');
   }
 }
