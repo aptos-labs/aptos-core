@@ -706,13 +706,15 @@ export class AptosClient {
     const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
         "0x1::account",
-        "rotate_authentication_key_ed25519",
+        "rotate_authentication_key",
         [],
         [
+          BCS.bcsSerializeU8(0), // ed25519 scheme
+          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
+          BCS.bcsSerializeU8(0), // ed25519 scheme
+          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
           BCS.bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
           BCS.bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
-          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
         ],
       ),
     );
