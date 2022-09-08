@@ -12,10 +12,7 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
-use std::{
-    collections::HashSet,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashSet, time::Duration};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
@@ -188,6 +185,9 @@ fn test_system_ttl() {
     mempool.gc();
     let batch = mempool.get_batch(1, 1024, HashSet::new());
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
+
+    // TTL cache sizes should match the size of transaction store.
+    assert_eq!(mempool.metrics_cache.size(), 1);
 }
 
 #[test]
@@ -203,20 +203,6 @@ fn test_commit_callback() {
     pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
     // Verify that we can execute transaction 6.
     assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
-}
-
-#[test]
-fn test_sequence_number_cache() {
-    // Checks potential race where StateDB is lagging.
-    let mut pool = setup_mempool().0;
-    // Callback from consensus should set current sequence number for account.
-    pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
-
-    // Try to add transaction with sequence number 6 to pool (while last known executed transaction
-    // for AC is 0).
-    add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
-    // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, 1024, HashSet::new()).len(), 1);
 }
 
 #[test]
@@ -491,25 +477,23 @@ fn test_clean_stuck_transactions() {
 
 #[test]
 fn test_ttl_cache() {
-    let mut cache = TtlCache::new(2, Duration::from_secs(1));
+    let mut cache = TtlCache::new(2);
     // Test basic insertion.
-    cache.insert(1, 1);
-    cache.insert(1, 2);
-    cache.insert(2, 2);
-    cache.insert(1, 3);
+    cache.insert(1, 1, Duration::from_millis(1));
+    cache.insert(1, 2, Duration::from_millis(2));
+    cache.insert(2, 2, Duration::from_millis(3));
+    cache.insert(1, 3, Duration::from_millis(4));
     assert_eq!(cache.get(&1), Some(&3));
     assert_eq!(cache.get(&2), Some(&2));
     assert_eq!(cache.size(), 2);
     // Test reaching max capacity.
-    cache.insert(3, 3);
+    cache.insert(3, 3, Duration::from_millis(5));
     assert_eq!(cache.size(), 2);
     assert_eq!(cache.get(&1), Some(&3));
     assert_eq!(cache.get(&3), Some(&3));
     assert_eq!(cache.get(&2), None);
     // Test ttl functionality.
-    cache.gc(SystemTime::now()
-        .checked_add(Duration::from_secs(10))
-        .unwrap());
+    cache.gc(Duration::from_secs(1));
     assert_eq!(cache.size(), 0);
 }
 
@@ -580,7 +564,7 @@ fn test_bytes_limit() {
 }
 
 #[test]
-fn test_transaction_store_account_remove() {
+fn test_transaction_store_remove_account_if_empty() {
     let mut config = NodeConfig::random();
     config.mempool.capacity = 100;
     let mut pool = CoreMempool::new(&config);
@@ -602,4 +586,20 @@ fn test_transaction_store_account_remove() {
 
     pool.remove_transaction(&TestTransaction::get_address(2), 2, true);
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
+}
+
+#[test]
+fn test_sequence_number_behavior_at_capacity() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+
+    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+    add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(2), 0, false);
+
+    let batch = pool.get_batch(10, 10240, HashSet::new());
+    assert_eq!(batch.len(), 1);
 }
