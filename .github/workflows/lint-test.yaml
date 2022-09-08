@@ -71,13 +71,13 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
+      - run: yarn install --frozen-lockfile
+      - run: yarn run prettier --check .
+      - run: yarn run tsc
       - run: bundle exec bundler-audit --update
       - run: bundle exec brakeman -q -w2
       - run: bundle exec rubocop
       - run: bundle exec erblint --lint-all
-      - run: yarn install --frozen-lockfile
-      - run: yarn run prettier --check .
-      - run: yarn run tsc
 
   community-platform-test:
     runs-on: ubuntu-latest
