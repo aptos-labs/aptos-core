@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.3.12 (2022-09-08)
+
 - Feature to rotate auth key for single signature account
 
 ## 1.3.11 (2022-08-31)
