@@ -10,7 +10,7 @@ use anyhow::{format_err, Result};
 use move_deps::move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::{StructTag, TypeTag},
+    language_storage::StructTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -146,11 +146,19 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage,
     {
-        let access_path = access_path_for_config(Self::CONFIG_ID);
+        let access_path = Self::access_path();
         match storage.fetch_config(access_path) {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
+    }
+
+    fn access_path() -> AccessPath {
+        access_path_for_config(Self::CONFIG_ID)
+    }
+
+    fn struct_tag() -> StructTag {
+        struct_tag_for_config(Self::CONFIG_ID)
     }
 }
 
@@ -158,31 +166,21 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
-pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {
-    StructTag {
-        address: CORE_CODE_ADDRESS,
-        module: ConfigurationResource::MODULE_NAME.to_owned(),
-        name: ident_str!("Reconfiguration").to_owned(),
-        type_params: vec![TypeTag::Struct(StructTag {
-            address: CORE_CODE_ADDRESS,
-            module: config_name.clone(),
-            name: config_name,
-            type_params: vec![],
-        })],
-    }
-}
-
 pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
-    let struct_tag = StructTag {
-        address: CORE_CODE_ADDRESS,
-        module: Identifier::new(config_id.1).expect("fail to make identifier"),
-        name: Identifier::new(config_id.2).expect("fail to make identifier"),
-        type_params: vec![],
-    };
+    let struct_tag = struct_tag_for_config(config_id);
     AccessPath::new(
         CORE_CODE_ADDRESS,
         AccessPath::resource_access_vec(struct_tag),
     )
+}
+
+pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
+    StructTag {
+        address: CORE_CODE_ADDRESS,
+        module: Identifier::new(config_id.1).expect("fail to make identifier"),
+        name: Identifier::new(config_id.2).expect("fail to make identifier"),
+        type_params: vec![],
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
