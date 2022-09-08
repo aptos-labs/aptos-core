@@ -276,6 +276,7 @@ impl CoinCache {
             name: String,
             symbol: String,
             decimals: u8,
+            _supply: Option<Vec<u8>>,
         }
 
         let struct_tag = match coin {
@@ -297,35 +298,28 @@ impl CoinCache {
 
         let response = if let Some(version) = version {
             rest_client
-                .get_account_resource_at_version(address, &encoded_resource_tag, version)
+                .get_account_resource_at_version_bcs::<CoinInfo>(
+                    address,
+                    &encoded_resource_tag,
+                    version,
+                )
                 .await?
         } else {
             rest_client
-                .get_account_resource(address, &encoded_resource_tag)
+                .get_account_resource_bcs::<CoinInfo>(address, &encoded_resource_tag)
                 .await?
         };
 
         // At this point if we've retrieved it and it's bad, we error out
-        if let Some(resource) = response.into_inner() {
-            let coin_info = serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| {
-                ApiError::DeserializationFailed(Some(format!(
-                    "CoinInfo failed to deserialize for {}",
-                    coin
-                )))
-            })?;
+        let coin_info = response.into_inner();
 
-            Ok(Some(Currency {
-                symbol: coin_info.symbol,
-                decimals: coin_info.decimals,
-                metadata: Some(CurrencyMetadata {
-                    move_type: struct_tag.to_string(),
-                }),
-            }))
-        } else {
-            Err(ApiError::DeserializationFailed(Some(format!(
-                "Currency {} not found",
-                coin
-            ))))
-        }
+        // TODO: The symbol has to come from a trusted list, as the move type is the real indicator
+        Ok(Some(Currency {
+            symbol: coin_info.symbol,
+            decimals: coin_info.decimals,
+            metadata: Some(CurrencyMetadata {
+                move_type: struct_tag.to_string(),
+            }),
+        }))
     }
 }

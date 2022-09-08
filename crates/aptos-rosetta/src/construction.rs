@@ -735,8 +735,9 @@ async fn construction_submit(
     let rest_client = server_context.rest_client()?;
 
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let response = rest_client.submit(&txn).await?;
+    let hash = txn.clone().committed_hash();
+    rest_client.submit_bcs(&txn).await?;
     Ok(ConstructionSubmitResponse {
-        transaction_identifier: response.inner().hash.into(),
+        transaction_identifier: hash.into(),
     })
 }

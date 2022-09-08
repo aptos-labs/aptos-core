@@ -215,8 +215,14 @@ impl Client {
         self.get(self.build_path("")?).await
     }
 
+    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponse>> {
+        let url = self.build_path("")?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
-        let response = self.get_index().await?.map(|r| State {
+        let response = self.get_index_bcs().await?.map(|r| State {
             chain_id: r.chain_id,
             epoch: r.epoch.into(),
             version: r.ledger_version.into(),
@@ -712,6 +718,21 @@ impl Client {
         resource_type: &str,
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_resource_at_version_bcs<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}?ledger_version={}",
+            address, resource_type, version
+        ))?;
+
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
