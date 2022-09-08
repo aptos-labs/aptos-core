@@ -5,7 +5,7 @@
 
 class Wallet < ApplicationRecord
   VALID_NETWORKS = %w[devnet testnet ait3].freeze
-  VALID_WALLET_NAMES = %w[petra].freeze
+  VALID_WALLET_NAMES = %w[petra martian].freeze
 
   attr_accessor :challenge, :signed_challenge
 
