@@ -100,3 +100,12 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
   annotations:
+
+kube-state-metrics:
+  enabled: false
+  namespaceOverride: kube-system
+
+prometheus-node-exporter:
+  enabled: false
+  namespaceOverride: kube-system
+
