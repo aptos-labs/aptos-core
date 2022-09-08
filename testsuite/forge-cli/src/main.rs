@@ -184,7 +184,7 @@ fn main() -> Result<()> {
         panic!("{}", suite_name);
     }
 
-    let duration = Duration::from_secs(9 * 10 * 60);
+    let duration = Duration::from_secs(2 * 10 * 60);
     let suite_name = "load_vs_perf_benchmark";
 
     let runtime = Runtime::new()?;
@@ -490,7 +490,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(10)
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
-                tps: &[200, 1000, 3000, 5000, 6000, 7000, 8000, 10000, 12000],
+                tps: &[6300, 6600],
+                // tps: &[200, 1000, 3000, 5000, 6000, 7000, 8000, 10000, 12000],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // no epoch change.
