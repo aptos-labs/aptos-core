@@ -113,8 +113,8 @@ impl GetValidatorFullNodes {
             }
 
             for vfn_address in vfn_addresses.into_iter() {
-                let node_url = match extract_network_address(&vfn_address) {
-                    Ok(node_url) => node_url,
+                let (node_url, noise_port) = match extract_network_address(&vfn_address) {
+                    Ok(result) => result,
                     Err(e) => {
                         invalid_node_address_results
                             .entry(*account_address)
@@ -136,6 +136,7 @@ impl GetValidatorFullNodes {
                     .push(NodeInfo {
                         node_url,
                         api_port: None,
+                        noise_port,
                         public_key: vfn_address.find_noise_proto(),
                     });
             }

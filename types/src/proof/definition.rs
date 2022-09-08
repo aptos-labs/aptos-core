@@ -20,8 +20,7 @@ use aptos_crypto::{
     HashValue,
 };
 use serde::{Deserialize, Serialize};
-use std::any::type_name;
-use std::marker::PhantomData;
+use std::{any::type_name, marker::PhantomData};
 
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_crypto::hash::TestOnlyHasher;
@@ -211,6 +210,19 @@ impl SparseMerkleProofExt {
         element_value: Option<&V>,
     ) -> Result<()> {
         SparseMerkleProof::from(self.clone()).verify(expected_root_hash, element_key, element_value)
+    }
+
+    pub fn verify_by_hash(
+        &self,
+        expected_root_hash: HashValue,
+        element_key: HashValue,
+        element_hash: Option<HashValue>,
+    ) -> Result<()> {
+        SparseMerkleProof::from(self.clone()).verify_by_hash(
+            expected_root_hash,
+            element_key,
+            element_hash,
+        )
     }
 }
 

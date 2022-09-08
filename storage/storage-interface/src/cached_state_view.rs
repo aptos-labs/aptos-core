@@ -150,9 +150,11 @@ impl CachedStateView {
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
                 match self.snapshot {
                     Some((version, root_hash)) => {
-                        let (value, proof) = self
-                            .proof_fetcher
-                            .fetch_state_value_and_proof(state_key, version)?;
+                        let (value, proof) = self.proof_fetcher.fetch_state_value_and_proof(
+                            state_key,
+                            version,
+                            Some(root_hash),
+                        )?;
                         // TODO: proof verification can be opted out, for performance
                         if let Some(proof) = proof {
                             proof
