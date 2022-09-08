@@ -5,8 +5,9 @@ use crate::{
     counters::LATEST_PROCESSED_VERSION,
     database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{
-        errors::BlockProcessingError, processing_result::ProcessingResult,
-        substream_processor::SubstreamProcessor,
+        errors::BlockProcessingError,
+        processing_result::ProcessingResult,
+        substream_processor::{get_conn, SubstreamProcessor},
     },
     models::{
         events::EventModel,
@@ -57,7 +58,7 @@ impl Debug for BlockOutputSubstreamProcessor {
 }
 
 /// This will insert all events within all transactions within a certain block
-fn insert_block(
+fn handle_block(
     conn: &PgPoolConnection,
     substream_name: &'static str,
     block_height: u64,
@@ -145,6 +146,7 @@ fn insert_user_transactions_w_sigs(conn: &PgPoolConnection, txn_details: &[Trans
                     ut_schema::gas_unit_price.eq(excluded(ut_schema::gas_unit_price)),
                     ut_schema::timestamp.eq(excluded(ut_schema::timestamp)),
                     ut_schema::inserted_at.eq(excluded(ut_schema::inserted_at)),
+                    ut_schema::entry_function_id_str.eq(excluded(ut_schema::entry_function_id_str)),
                 )),
         )
         .expect("Error inserting user transactions into database");
@@ -446,8 +448,8 @@ impl SubstreamProcessor for BlockOutputSubstreamProcessor {
             TransactionModel::from_transactions(&block_output.transactions);
         let last_version = txns.last().unwrap().version;
 
-        let conn = Self::get_conn(self.connection_pool());
-        let tx_result = insert_block(
+        let conn = get_conn(self.connection_pool());
+        let tx_result = handle_block(
             &conn,
             self.substream_module_name(),
             block_height,
