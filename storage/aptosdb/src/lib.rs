@@ -291,7 +291,7 @@ impl AptosDB {
                             &StaleStateValueIndex {
                                 stale_since_version: min_readable_version + 1,
                                 version: 0,
-                                state_key: state_key.clone(),
+                                state_key,
                             },
                         )
                         .unwrap();
