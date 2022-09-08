@@ -597,6 +597,7 @@ impl AptosVM {
         if let Err(err) = validate_signature_checked_transaction::<S, Self>(
             self,
             &mut session,
+            storage,
             txn,
             false,
             log_context,
@@ -844,22 +845,23 @@ impl AptosVM {
     fn run_prologue_with_payload<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
-                self.0.check_gas(txn_data, log_context)?;
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
-                self.0.check_gas(txn_data, log_context)?;
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::ModuleBundle(_module) => {
-                self.0.check_gas(txn_data, log_context)?;
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
             }
         }
@@ -948,12 +950,19 @@ impl VMAdapter for AptosVM {
     fn run_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let txn_data = TransactionMetadata::new(transaction);
         //let account_blob = session.data_cache.get_resource
-        self.run_prologue_with_payload(session, transaction.payload(), &txn_data, log_context)
+        self.run_prologue_with_payload(
+            session,
+            storage,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+        )
     }
 
     fn should_restart_execution(vm_output: &TransactionOutput) -> bool {
@@ -1039,13 +1048,19 @@ impl AptosSimulationVM {
     fn validate_simulated_transaction<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         transaction: &SignedTransaction,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         self.0.check_transaction_format(transaction)?;
-        self.0
-            .run_prologue_with_payload(session, transaction.payload(), txn_data, log_context)
+        self.0.run_prologue_with_payload(
+            session,
+            storage,
+            transaction.payload(),
+            txn_data,
+            log_context,
+        )
     }
 
     /*
@@ -1066,9 +1081,13 @@ impl AptosSimulationVM {
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
         let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
-        if let Err(err) =
-            self.validate_simulated_transaction::<S>(&mut session, txn, &txn_data, log_context)
-        {
+        if let Err(err) = self.validate_simulated_transaction::<S>(
+            &mut session,
+            storage,
+            txn,
+            &txn_data,
+            log_context,
+        ) {
             return discard_error_vm_status(err);
         };
 

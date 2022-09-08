@@ -20,7 +20,7 @@ use aptos_state_view::StateView;
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
-    on_chain_config::{GasSchedule, OnChainConfig, Version},
+    on_chain_config::{ApprovedExecutionHashes, GasSchedule, OnChainConfig, Version},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
@@ -146,8 +146,9 @@ impl AptosVMImpl {
         })
     }
 
-    pub fn check_gas(
+    pub fn check_gas<S: MoveResolverExt>(
         &self,
+        storage: &S,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -155,13 +156,32 @@ impl AptosVMImpl {
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
-            warn!(
-                *log_context,
-                "[VM] Transaction size too big {} (max {})",
-                raw_bytes_len,
-                txn_gas_params.max_transaction_size_in_bytes,
-            );
-            return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
+            let data =
+                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+
+            let valid = if let Ok(Some(data)) = data {
+                let approved_execution_hashes =
+                    bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
+                approved_execution_hashes
+                    .map(|aeh| {
+                        aeh.entries
+                            .into_iter()
+                            .any(|value| value.1 == txn_data.script_hash)
+                    })
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if !valid {
+                warn!(
+                    *log_context,
+                    "[VM] Transaction size too big {} (max {})",
+                    raw_bytes_len,
+                    txn_gas_params.max_transaction_size_in_bytes,
+                );
+                return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
+            }
         }
 
         // The submitted max gas units that the transaction can consume is greater than the
