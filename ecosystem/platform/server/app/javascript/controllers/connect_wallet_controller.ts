@@ -33,8 +33,7 @@ export default class extends Controller<HTMLFormElement> {
       return "martian";
     } else if (false) {
       // TODO: Add more wallet detection logic here.
-    }
-    {
+    } else {
       throw "Aptos wallet not detected.";
     }
   }
