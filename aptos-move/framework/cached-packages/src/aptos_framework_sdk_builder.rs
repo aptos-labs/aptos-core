@@ -34,16 +34,6 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// Offer rotation capability of this account to another address
-    /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
-    /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
-    /// The recipient address refers to the address that the account owner wants to give the rotation capability to.
-    AccountOfferRotationCapabilityEd25519 {
-        rotation_capability_sig_bytes: Vec<u8>,
-        account_public_key_bytes: Vec<u8>,
-        recipient_address: AccountAddress,
-    },
-
     /// Offers the capability to sign on behalf of account to the account at address recipient_address.
     AccountOfferSignerCapability {
         signer_capability_sig_bytes: Vec<u8>,
@@ -292,15 +282,6 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
-            AccountOfferRotationCapabilityEd25519 {
-                rotation_capability_sig_bytes,
-                account_public_key_bytes,
-                recipient_address,
-            } => account_offer_rotation_capability_ed25519(
-                rotation_capability_sig_bytes,
-                account_public_key_bytes,
-                recipient_address,
-            ),
             AccountOfferSignerCapability {
                 signer_capability_sig_bytes,
                 account_scheme,
@@ -467,33 +448,6 @@ impl EntryFunctionCall {
             None
         }
     }
-}
-
-/// Offer rotation capability of this account to another address
-/// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
-/// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
-/// The recipient address refers to the address that the account owner wants to give the rotation capability to.
-pub fn account_offer_rotation_capability_ed25519(
-    rotation_capability_sig_bytes: Vec<u8>,
-    account_public_key_bytes: Vec<u8>,
-    recipient_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("offer_rotation_capability_ed25519").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
-            bcs::to_bytes(&account_public_key_bytes).unwrap(),
-            bcs::to_bytes(&recipient_address).unwrap(),
-        ],
-    ))
 }
 
 /// Offers the capability to sign on behalf of account to the account at address recipient_address.
@@ -1210,20 +1164,6 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
-    pub fn account_offer_rotation_capability_ed25519(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountOfferRotationCapabilityEd25519 {
-                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
-                account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
-                recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn account_offer_signer_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1639,10 +1579,6 @@ type EntryFunctionDecoderMap = std::collections::HashMap<
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
-        map.insert(
-            "account_offer_rotation_capability_ed25519".to_string(),
-            Box::new(decoder::account_offer_rotation_capability_ed25519),
-        );
         map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
