@@ -10,8 +10,54 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use move_deps::move_core_types::abi::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
+
+/// How to call a particular Move script (aka. an "ABI"). This is a clone of
+/// move_core_types::abi::ScriptABI but with a tweak on EntryFunction -> EntryFunction
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EntryABI {
+    TransactionScript(TransactionScriptABI),
+    EntryFunction(EntryFunctionABI),
+}
+
+impl EntryABI {
+    pub fn is_entry_fun_abi(&self) -> bool {
+        matches!(self, Self::EntryFunction(_))
+    }
+
+    pub fn is_transaction_script_abi(&self) -> bool {
+        matches!(self, Self::TransactionScript(_))
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::TransactionScript(abi) => abi.name(),
+            Self::EntryFunction(abi) => abi.name(),
+        }
+    }
+
+    pub fn doc(&self) -> &str {
+        match self {
+            Self::TransactionScript(abi) => abi.doc(),
+            Self::EntryFunction(abi) => abi.doc(),
+        }
+    }
+
+    pub fn ty_args(&self) -> &[TypeArgumentABI] {
+        match self {
+            Self::TransactionScript(abi) => abi.ty_args(),
+            Self::EntryFunction(abi) => abi.ty_args(),
+        }
+    }
+
+    pub fn args(&self) -> &[ArgumentABI] {
+        match self {
+            Self::TransactionScript(abi) => abi.args(),
+            Self::EntryFunction(abi) => abi.args(),
+        }
+    }
+}
 
 /// Call a Move script.
 #[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -58,9 +104,9 @@ impl fmt::Debug for Script {
     }
 }
 
-/// Call a Move script function.
+/// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ScriptFunction {
+pub struct EntryFunction {
     module: ModuleId,
     function: Identifier,
     ty_args: Vec<TypeTag>,
@@ -68,14 +114,14 @@ pub struct ScriptFunction {
     args: Vec<Vec<u8>>,
 }
 
-impl ScriptFunction {
+impl EntryFunction {
     pub fn new(
         module: ModuleId,
         function: Identifier,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Self {
-        ScriptFunction {
+        EntryFunction {
             module,
             function,
             ty_args,

@@ -10,8 +10,3 @@
 #
 #   movies = Movie.create([{ name: "Star Wars" }, { name: "Lord of the Rings" }])
 #   Character.create(name: "Luke", movie: movies.first)
-
-if Rails.env.development?
-  User.create!(username: 'aptos', password: 'aptos1', password_confirmation: 'aptos1', is_root: true,
-               confirmed_at: Time.now)
-end

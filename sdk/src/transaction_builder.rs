@@ -10,11 +10,10 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 
-pub use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{
-    authenticator::AuthenticationKeyPreimage, ChangeSet, ModuleBundle, Script, ScriptFunction,
-    WriteSetPayload,
+    authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
+pub use cached_packages::aptos_stdlib;
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -27,6 +26,22 @@ pub struct TransactionBuilder {
 }
 
 impl TransactionBuilder {
+    pub fn new(
+        payload: TransactionPayload,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        Self {
+            payload,
+            chain_id,
+            expiration_timestamp_secs,
+            max_gas_amount: 4000,
+            gas_unit_price: 1,
+            sender: None,
+            sequence_number: None,
+        }
+    }
+
     pub fn sender(mut self, sender: AccountAddress) -> Self {
         self.sender = Some(sender);
         self
@@ -120,19 +135,13 @@ impl TransactionFactory {
         )))
     }
 
-    pub fn change_set(&self, change_set: ChangeSet) -> TransactionBuilder {
-        self.payload(TransactionPayload::WriteSet(WriteSetPayload::Direct(
-            change_set,
-        )))
-    }
-
-    pub fn script_function(&self, func: ScriptFunction) -> TransactionBuilder {
-        self.payload(TransactionPayload::ScriptFunction(func))
+    pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
+        self.payload(TransactionPayload::EntryFunction(func))
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_create_account(
+        self.payload(aptos_stdlib::aptos_account_create_account(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
         ))
     }
@@ -143,7 +152,7 @@ impl TransactionFactory {
         amount: u64,
     ) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_transfer(
+        self.payload(aptos_stdlib::aptos_account_transfer(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
             amount,
         ))

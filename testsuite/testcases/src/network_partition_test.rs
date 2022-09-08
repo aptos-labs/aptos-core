@@ -17,7 +17,7 @@ impl Test for NetworkPartitionTest {
 
 impl NetworkTest for NetworkPartitionTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
 
         let partition = SwarmChaos::Partition(SwarmNetworkPartition {
             partition_percentage: PARTITION_PERCENTAGE,
@@ -44,8 +44,7 @@ impl NetworkTest for NetworkPartitionTest {
         ctx.swarm().remove_chaos(partition)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

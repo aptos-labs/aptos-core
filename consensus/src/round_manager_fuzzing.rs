@@ -17,11 +17,11 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_infallible::Mutex;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    multi_signature::MultiSignature,
     on_chain_config::{OnChainConsensusConfig, ValidatorSet},
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -82,7 +82,7 @@ fn make_initial_epoch_change_proof(signer: &ValidatorSigner) -> EpochChangeProof
         ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1, 0);
     let validator_set = ValidatorSet::new(vec![validator_info]);
     let li = LedgerInfo::mock_genesis(Some(validator_set));
-    let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
+    let lis = LedgerInfoWithSignatures::new(li, AggregateSignature::empty());
     EpochChangeProof::new(vec![lis], false)
 }
 
@@ -146,6 +146,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         Arc::new(MockPayloadManager::new(None)),
         time_service,
         1,
+        1024,
         10,
     );
 

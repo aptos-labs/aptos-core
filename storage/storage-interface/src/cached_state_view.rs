@@ -1,23 +1,32 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_view::DbStateView;
-use crate::{proof_fetcher::ProofFetcher, DbReader};
+use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{StateView, StateViewId};
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
     write_set::WriteSet,
 };
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("kv_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -102,14 +111,24 @@ impl CachedStateView {
         })
     }
 
-    pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
-        write_sets
-            .iter()
-            .flat_map(|write_set| write_set.iter())
-            .map(|(key, _)| key)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .try_for_each(|key| self.get_state_value(key).map(|_| ()))
+    pub fn prime_cache_by_write_set<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
+        &self,
+        write_sets: T,
+    ) -> Result<()> {
+        IO_POOL.scope(|s| {
+            write_sets
+                .into_iter()
+                .flat_map(|write_set| write_set.iter())
+                .map(|(key, _)| key)
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .for_each(|key| {
+                    s.spawn(move |_| {
+                        self.get_state_value(key).expect("Must succeed.");
+                    })
+                });
+        });
+        Ok(())
     }
 
     pub fn into_state_cache(self) -> StateCache {
@@ -173,17 +192,21 @@ impl StateView for CachedStateView {
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
-            return Ok(contents.as_ref().map(|v| v.maybe_bytes.clone()));
+            return Ok(contents.as_ref().map(|v| v.bytes().to_vec()));
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache.entry(state_key.clone()).or_insert(state_value_option);
-        Ok(new_value.as_ref().map(|v| v.maybe_bytes.clone()))
+        Ok(new_value.as_ref().map(|v| v.bytes().to_vec()))
     }
 
     fn is_genesis(&self) -> bool {
         self.snapshot.is_none()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        Ok(self.speculative_state.usage())
     }
 }
 
@@ -223,5 +246,9 @@ impl StateView for CachedDbStateView {
 
     fn is_genesis(&self) -> bool {
         self.db_state_view.is_genesis()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.db_state_view.get_usage()
     }
 }

@@ -1,29 +1,34 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::evaluator::EvaluationResult;
 use crate::{
     evaluators::{
         direct::{
-            get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
+            get_node_identity, HandshakeEvaluatorArgs, LatencyEvaluatorArgs,
+            NodeIdentityEvaluatorArgs, StateSyncVersionEvaluatorArgs, TpsEvaluatorArgs,
             TransactionAvailabilityEvaluatorArgs,
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
             ConsensusTimeoutsEvaluatorArgs, NetworkMinimumPeersEvaluatorArgs,
-            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionEvaluatorArgs,
+            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionMetricsEvaluatorArgs,
         },
-        system_information::BuildVersionEvaluatorArgs,
+        system_information::{BuildVersionEvaluatorArgs, HardwareEvaluatorArgs},
     },
     runner::BlockingRunnerArgs,
 };
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, format_err, Context, Result};
 use aptos_config::config::RoleType;
-use aptos_rest_client::Client as AptosRestClient;
-use aptos_sdk::types::chain_id::ChainId;
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
+use aptos_rest_client::{Client as AptosRestClient, IndexResponse};
+use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use clap::Parser;
 use once_cell::sync::Lazy;
 use poem_openapi::{types::Example, Object as PoemObject};
+use reqwest::cookie::Jar;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
@@ -144,6 +149,12 @@ pub struct EvaluatorArgs {
     pub consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs,
 
     #[clap(flatten)]
+    pub handshake_args: HandshakeEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub hardware_args: HardwareEvaluatorArgs,
+
+    #[clap(flatten)]
     pub latency_args: LatencyEvaluatorArgs,
 
     #[clap(flatten)]
@@ -157,6 +168,9 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub state_sync_version_args: StateSyncVersionEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub state_sync_version_metrics_args: StateSyncVersionMetricsEvaluatorArgs,
 
     #[clap(flatten)]
     #[oai(skip)]
@@ -184,22 +198,84 @@ pub struct NodeAddress {
     #[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
     #[oai(default = "Self::default_metrics_port")]
     #[serde(default = "NodeAddress::default_metrics_port")]
-    pub metrics_port: u16,
+    metrics_port: u16,
 
     /// API port.
     #[clap(long, default_value = &DEFAULT_API_PORT_STR)]
     #[oai(default = "Self::default_api_port")]
     #[serde(default = "NodeAddress::default_api_port")]
-    pub api_port: u16,
+    api_port: u16,
 
     /// Validator communication port.
     #[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
     #[oai(default = "Self::default_noise_port")]
     #[serde(default = "NodeAddress::default_noise_port")]
-    pub noise_port: u16,
+    noise_port: u16,
+
+    /// Public key for the node. This is used for the HandshakeEvaluator.
+    /// If that evaluator is not enabled, this is not necessary.
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
+    #[oai(skip)]
+    public_key: Option<x25519::PublicKey>,
+
+    // Cookie store. We don't include this in anything external (clap, the
+    // OpenAPI spec, serde, etc.), this is just for internal use.
+    #[oai(skip)]
+    #[clap(skip)]
+    #[serde(skip)]
+    cookie_store: Arc<Jar>,
 }
 
 impl NodeAddress {
+    pub fn new(url: Url) -> Self {
+        Self {
+            url,
+            metrics_port: Self::default_metrics_port(),
+            api_port: Self::default_api_port(),
+            noise_port: Self::default_noise_port(),
+            public_key: None,
+            cookie_store: Arc::new(Jar::default()),
+        }
+    }
+
+    pub fn metrics_port(mut self, port: u16) -> Self {
+        self.metrics_port = port;
+        self
+    }
+
+    pub fn api_port(mut self, port: u16) -> Self {
+        self.api_port = port;
+        self
+    }
+
+    pub fn noise_port(mut self, port: u16) -> Self {
+        self.noise_port = port;
+        self
+    }
+
+    pub fn public_key(mut self, public_key: Option<x25519::PublicKey>) -> Self {
+        self.public_key = public_key;
+        self
+    }
+
+    /// Do not use this to build a client, use get_metrics_client.
+    pub fn get_metrics_port(&self) -> u16 {
+        self.metrics_port
+    }
+
+    /// Do not use this to build a client, use get_api_client.
+    pub fn get_api_port(&self) -> u16 {
+        self.api_port
+    }
+
+    pub fn get_noise_port(&self) -> u16 {
+        self.noise_port
+    }
+
+    pub fn get_public_key(&self) -> Option<x25519::PublicKey> {
+        self.public_key
+    }
+
     pub fn default_metrics_port() -> u16 {
         DEFAULT_METRICS_PORT
     }
@@ -218,13 +294,94 @@ impl NodeAddress {
         url
     }
 
+    pub fn get_metrics_url(&self) -> Url {
+        let mut url = self.url.clone();
+        url.set_port(Some(self.metrics_port)).unwrap();
+        url
+    }
+
+    pub fn get_metrics_client(&self, timeout: Duration) -> reqwest::Client {
+        reqwest::ClientBuilder::new()
+            .timeout(timeout)
+            .cookie_provider(self.cookie_store.clone())
+            .build()
+            .unwrap()
+    }
+
     pub fn get_api_client(&self, timeout: Duration) -> AptosRestClient {
         let client = reqwest::ClientBuilder::new()
             .timeout(timeout)
+            .cookie_provider(self.cookie_store.clone())
             .build()
             .unwrap();
 
         AptosRestClient::from((client, self.get_api_url()))
+    }
+
+    /// Gets the NodeAddress as a NetworkAddress. If the URL is a domain name,
+    /// it will automatically perform DNS resolution. This method returns an
+    /// error if `public_key` is None.
+    pub fn as_noise_network_address(&self) -> Result<NetworkAddress> {
+        // Confirm we have a public key. Technically we can build a NetworkAddress
+        // without one, but it's not useful for any of our needs without one.
+        let public_key = match self.public_key {
+            Some(public_key) => public_key,
+            None => bail!("Cannot convert NodeAddress to NetworkAddress without a public key"),
+        };
+
+        // Ensure we can get socket addrs from the URL. If the URL is a domain
+        // name, it will automatically perform DNS resolution.
+        let socket_addrs = self
+            .url
+            .socket_addrs(|| None)
+            .with_context(|| format!("Failed to get SocketAddrs from address {}", self.url))?;
+
+        // Ensure this results in exactly one SocketAddr.
+        if socket_addrs.is_empty() {
+            bail!(
+                "NodeAddress {} did not resolve to any SocketAddrs. If DNS, ensure domain name is valid",
+                self.url
+            );
+        }
+        if socket_addrs.len() > 1 {
+            aptos_logger::warn!(
+                "NodeAddress {} resolved to multiple SocketAddrs, but we're only checking the first one: {:?}",
+                self.url,
+                socket_addrs,
+            );
+        }
+
+        // Configure the SocketAddr with the provided noise port.
+        let mut socket_addr = socket_addrs[0];
+        socket_addr.set_port(self.noise_port);
+
+        // Build a network address, including the public key and protocol.
+        Ok(NetworkAddress::from(socket_addr).append_prod_protos(public_key, 0))
+    }
+
+    pub async fn get_index_response(&self, timeout: Duration) -> Result<IndexResponse> {
+        Ok(self.get_api_client(timeout).get_index().await?.into_inner())
+    }
+
+    pub async fn get_index_response_or_evaluation_result(
+        &self,
+        timeout: Duration,
+    ) -> Result<IndexResponse, EvaluationResult> {
+        match self.get_index_response(timeout).await {
+            Ok(index_response) => Ok(index_response),
+            Err(error) => Err(EvaluationResult {
+                headline: "Failed to read response from / on API".to_string(),
+                score: 0,
+                explanation: format!(
+                    "We received an error response hitting / (the index) of the API of \
+                    your node, make sure your API port ({}) is publicly accessible: {}.",
+                    self.api_port, error
+                ),
+                category: "api".to_string(),
+                evaluator_name: "index_response".to_string(),
+                links: vec![],
+            }),
+        }
     }
 }
 
@@ -235,6 +392,13 @@ impl Example for NodeAddress {
             metrics_port: Self::default_metrics_port(),
             api_port: Self::default_api_port(),
             noise_port: Self::default_noise_port(),
+            public_key: Some(
+                x25519::PublicKey::from_encoded_string(
+                    "0x44fd1324c66371b4788af0b901c9eb8088781acb29e6b8b9c791d5d9838fbe1f",
+                )
+                .unwrap(),
+            ),
+            cookie_store: Arc::new(Jar::default()),
         }
     }
 }

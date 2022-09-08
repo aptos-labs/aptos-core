@@ -16,15 +16,16 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
+    PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-    UpdateConsensusKey, UpdateValidatorNetworkAddresses, ValidatorConfigFileArgs,
+    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
+    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
-use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
+use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
     AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
     WithdrawStake,
@@ -42,13 +43,16 @@ use aptos_types::{
     on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
-use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
+
+#[cfg(test)]
+mod tests;
 
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
@@ -118,7 +122,7 @@ impl CliTestFramework {
         // Create account if it doesn't exist (and there's a faucet)
         let client = aptos_rest_client::Client::new(self.endpoint.clone());
         let address = self.account_id(index);
-        return client.get_account(address).await.is_ok();
+        client.get_account(address).await.is_ok()
     }
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
@@ -169,7 +173,7 @@ impl CliTestFramework {
             profile_options: Default::default(),
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
-            num_coins: amount.unwrap_or(DEFAULT_FUNDED_COINS),
+            amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
         }
         .execute()
@@ -259,11 +263,11 @@ impl CliTestFramework {
         proof_of_possession: bls12381::ProofOfPossession,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         InitializeValidator {
             txn_options: self.transaction_options(index, None),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
@@ -280,7 +284,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
         AddStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -289,7 +293,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn unlock_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn unlock_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<TransactionSummary> {
         UnlockStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -298,7 +306,11 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+    pub async fn withdraw_stake(
+        &self,
+        index: usize,
+        amount: u64,
+    ) -> CliTypedResult<TransactionSummary> {
         WithdrawStake {
             node_op_options: self.transaction_options(index, None),
             amount,
@@ -307,7 +319,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
         IncreaseLockup {
             txn_options: self.transaction_options(index, None),
         }
@@ -319,7 +331,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         JoinValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -332,7 +344,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         LeaveValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -347,12 +359,12 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
@@ -367,11 +379,11 @@ impl CliTestFramework {
 
     pub async fn analyze_validator_performance(
         &self,
-        start_epoch: Option<u64>,
-        end_epoch: Option<u64>,
+        start_epoch: Option<i64>,
+        end_epoch: Option<i64>,
     ) -> CliTypedResult<()> {
         AnalyzeValidatorPerformance {
-            start_epoch,
+            start_epoch: start_epoch.unwrap_or(-2),
             end_epoch,
             rest_options: self.rest_options(),
             profile_options: Default::default(),
@@ -387,12 +399,12 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
@@ -424,7 +436,7 @@ impl CliTestFramework {
         initial_stake_amount: u64,
         voter_index: Option<usize>,
         operator_index: Option<usize>,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         InitializeStakeOwner {
             txn_options: self.transaction_options(owner_index, None),
             initial_stake_amount,
@@ -439,7 +451,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         operator_index: usize,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
@@ -452,7 +464,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         voter_index: usize,
-    ) -> CliTypedResult<Transaction> {
+    ) -> CliTypedResult<TransactionSummary> {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),
@@ -480,7 +492,7 @@ impl CliTestFramework {
 
     pub async fn account_balance_now(&self, index: usize) -> CliTypedResult<u64> {
         let result = self.list_account(index, ListQuery::Balance).await?;
-        Ok(json_account_to_balance(result.get(0).unwrap()))
+        Ok(json_account_to_balance(result.first().unwrap()))
     }
 
     pub async fn assert_account_balance_now(&self, index: usize, expected: u64) {
@@ -493,7 +505,7 @@ impl CliTestFramework {
             self.last_n_transactions_details(10).await
         );
         let accounts = result.unwrap();
-        let account = accounts.get(0).unwrap();
+        let account = accounts.first().unwrap();
         let coin = json_account_to_balance(account);
         assert_eq!(
             coin,
@@ -560,17 +572,20 @@ impl CliTestFramework {
 
     pub async fn extract_peer(
         &self,
+        host: HostAndPort,
         private_key_file: PathBuf,
         output_file: PathBuf,
     ) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
         ExtractPeer {
-            private_key_input_options: PrivateKeyInputOptions::from_file(private_key_file),
+            host,
+            network_key_input_options: NetworkKeyInputOptions::from_private_key_file(
+                private_key_file,
+            ),
             output_file_options: SaveFile {
                 output_file,
                 prompt_options: PromptOptions::yes(),
             },
             encoding_options: Default::default(),
-            profile_options: Default::default(),
         }
         .execute()
         .await
@@ -589,9 +604,9 @@ impl CliTestFramework {
         let sources_dir = move_dir.join("sources");
 
         let hello_blockchain_contents = include_str!(
-            "../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchain.move"
+            "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
         );
-        let source_path = sources_dir.join("HelloBlockchain.move");
+        let source_path = sources_dir.join("hello_blockchain.move");
         write_to_file(
             source_path.as_path(),
             &source_path.as_display().to_string(),
@@ -599,8 +614,8 @@ impl CliTestFramework {
         )
         .unwrap();
 
-        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchainTest.move");
-        let test_path = sources_dir.join("HelloBlockchainTest.move");
+        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
+        let test_path = sources_dir.join("hello_blockchain_test.move");
         write_to_file(
             test_path.as_path(),
             &test_path.as_display().to_string(),
@@ -618,6 +633,7 @@ impl CliTestFramework {
         &self,
         name: String,
         account_strs: BTreeMap<&str, &str>,
+        framework_dir: Option<PathBuf>,
     ) -> CliTypedResult<()> {
         InitPackage {
             name,
@@ -627,6 +643,7 @@ impl CliTestFramework {
                 assume_yes: false,
                 assume_no: true,
             },
+            for_test_framework: framework_dir,
         }
         .execute()
         .await
@@ -635,9 +652,12 @@ impl CliTestFramework {
     pub async fn compile_package(
         &self,
         account_strs: BTreeMap<&str, &str>,
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
+            save_metadata: false,
+            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
         }
         .execute()
         .await
@@ -649,6 +669,7 @@ impl CliTestFramework {
         filter: Option<&str>,
     ) -> CliTypedResult<&'static str> {
         TestPackage {
+            instruction_execution_bound: 100_000,
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
         }
@@ -662,13 +683,31 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
-        upgrade_policy: Option<UpgradePolicy>,
+        included_artifacts: Option<IncludedArtifacts>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
             legacy_flow,
-            upgrade_policy,
+            override_size_check: false,
+            included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::All),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn download_package(
+        &self,
+        index: usize,
+        package: String,
+        output_dir: PathBuf,
+    ) -> CliTypedResult<&'static str> {
+        DownloadPackage {
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+            account: self.account_id(index),
+            package,
+            output_dir: Some(output_dir),
         }
         .execute()
         .await
@@ -762,6 +801,8 @@ impl CliTestFramework {
                 .unwrap(),
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
+            prompt_options: PromptOptions::yes(),
+            estimate_max_gas: true,
             ..Default::default()
         }
     }
@@ -769,9 +810,7 @@ impl CliTestFramework {
     fn operator_args(&self, pool_index: Option<usize>) -> OperatorArgs {
         OperatorArgs {
             pool_address_args: OptionalPoolAddressArgs {
-                pool_address: pool_index.map(|idx| AccountAddressWrapper {
-                    account_address: self.account_id(idx),
-                }),
+                pool_address: pool_index.map(|idx| self.account_id(idx)),
             },
         }
     }
@@ -835,7 +874,7 @@ pub struct ValidatorSet {
     pub pending_active: Vec<ValidatorInfo>,
 }
 
-fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
+pub fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
     ValidatorSet {
         consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
             0u64 => ConsensusScheme::BLS12381,
@@ -862,4 +901,25 @@ fn json_account_to_balance(value: &Value) -> u64 {
             .unwrap(),
     )
     .unwrap()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IndividualValidatorPerformance {
+    successful_proposals: String,
+    failed_proposals: String,
+}
+
+impl IndividualValidatorPerformance {
+    pub fn successful_proposals(&self) -> u32 {
+        self.successful_proposals.parse().unwrap()
+    }
+
+    pub fn failed_proposals(&self) -> u32 {
+        self.failed_proposals.parse().unwrap()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorPerformance {
+    pub validators: Vec<IndividualValidatorPerformance>,
 }

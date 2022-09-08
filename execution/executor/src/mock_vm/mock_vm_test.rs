@@ -1,9 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
+
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
 use aptos_state_view::StateView;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -23,6 +26,10 @@ impl StateView for MockStateView {
     fn is_genesis(&self) -> bool {
         false
     }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        Ok(StateStorageUsage::new_untracked())
+    }
 }
 
 #[test]
@@ -39,17 +46,23 @@ fn test_mock_vm_different_senders() {
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
         let sender = txn.as_signed_user_txn().unwrap().sender();
         assert_eq!(
-            output.write_set().iter().cloned().collect::<Vec<_>>(),
-            vec![
+            output
+                .write_set()
+                .iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            [
                 (
                     StateKey::AccessPath(balance_ap(sender)),
-                    WriteOp::Value(amount.to_le_bytes().to_vec())
+                    WriteOp::Modification(amount.to_le_bytes().to_vec())
                 ),
                 (
                     StateKey::AccessPath(seqnum_ap(sender)),
-                    WriteOp::Value(1u64.to_le_bytes().to_vec())
+                    WriteOp::Modification(1u64.to_le_bytes().to_vec())
                 ),
             ]
+            .into_iter()
+            .collect()
         );
     }
 }
@@ -68,17 +81,23 @@ fn test_mock_vm_same_sender() {
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
-            output.write_set().iter().cloned().collect::<Vec<_>>(),
-            vec![
+            output
+                .write_set()
+                .iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            [
                 (
                     StateKey::AccessPath(balance_ap(sender)),
-                    WriteOp::Value((amount * (i as u64 + 1)).to_le_bytes().to_vec())
+                    WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
                 ),
                 (
                     StateKey::AccessPath(seqnum_ap(sender)),
-                    WriteOp::Value((i as u64 + 1).to_le_bytes().to_vec())
+                    WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
                 ),
             ]
+            .into_iter()
+            .collect()
         );
     }
 }
@@ -103,21 +122,23 @@ fn test_mock_vm_payment() {
             .unwrap()
             .write_set()
             .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-        vec![
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect::<BTreeMap<_, _>>(),
+        [
             (
                 StateKey::AccessPath(balance_ap(gen_address(0))),
-                WriteOp::Value(50u64.to_le_bytes().to_vec())
+                WriteOp::Modification(50u64.to_le_bytes().to_vec())
             ),
             (
                 StateKey::AccessPath(seqnum_ap(gen_address(0))),
-                WriteOp::Value(2u64.to_le_bytes().to_vec())
+                WriteOp::Modification(2u64.to_le_bytes().to_vec())
             ),
             (
                 StateKey::AccessPath(balance_ap(gen_address(1))),
-                WriteOp::Value(150u64.to_le_bytes().to_vec())
+                WriteOp::Modification(150u64.to_le_bytes().to_vec())
             ),
         ]
+        .into_iter()
+        .collect()
     );
 }

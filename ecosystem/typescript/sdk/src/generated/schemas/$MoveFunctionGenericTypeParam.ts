@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveFunctionGenericTypeParam = {
+    description: `Move function generic type param`,
     properties: {
         constraints: {
             type: 'array',

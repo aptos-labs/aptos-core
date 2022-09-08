@@ -7,23 +7,25 @@
 
 use crate::{
     account::CoinCache,
-    block::BlockCache,
+    block::BlockRetriever,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::chain_id::ChainId;
-use aptos_warp_webserver::WebServer;
-use aptos_warp_webserver::{logger, Error};
-use std::collections::BTreeMap;
-use std::{convert::Infallible, sync::Arc};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_warp_webserver::{logger, Error, WebServer};
+use std::{
+    collections::BTreeMap,
+    convert::Infallible,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
+use tokio::{sync::Mutex, task::JoinHandle};
 use warp::{
     http::{HeaderValue, Method, StatusCode},
-    reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
 
@@ -52,7 +54,7 @@ pub struct RosettaContext {
     /// Coin cache for looking up Currency details
     pub coin_cache: Arc<CoinCache>,
     /// Block index cache
-    pub block_cache: Option<Arc<BlockCache>>,
+    pub block_cache: Option<Arc<BlockRetriever>>,
     pub accounts: Arc<Mutex<BTreeMap<AccountAddress, SequenceNumber>>>,
 }
 
@@ -65,7 +67,7 @@ impl RosettaContext {
         }
     }
 
-    fn block_cache(&self) -> ApiResult<Arc<BlockCache>> {
+    fn block_cache(&self) -> ApiResult<Arc<BlockRetriever>> {
         if let Some(ref block_cache) = self.block_cache {
             Ok(block_cache.clone())
         } else {
@@ -81,7 +83,12 @@ pub fn bootstrap(
     rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name("rosetta")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("rosetta-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[rosetta] failed to create runtime");
@@ -99,13 +106,27 @@ pub async fn bootstrap_async(
     rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
+
+    if let Some(ref client) = rest_client {
+        assert_eq!(
+            chain_id.id(),
+            client
+                .get_ledger_information()
+                .await
+                .expect("Should successfully get ledger information from Rest API")
+                .into_inner()
+                .chain_id,
+            "Failed to match Rosetta chain Id to upstream server"
+        );
+    }
+
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
         let block_cache = rest_client
             .as_ref()
-            .map(|rest_client| Arc::new(BlockCache::new(rest_client.clone())));
+            .map(|rest_client| Arc::new(BlockRetriever::new(rest_client.clone())));
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),
@@ -149,37 +170,12 @@ pub fn routes(
 
 /// Handle error codes from warp
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    let code;
-    let body;
-
     debug!("Failed with: {:?}", err);
-
-    if err.is_not_found() {
-        code = StatusCode::NOT_FOUND;
-        body = reply::json(&Error::new(code, "Not Found".to_owned()));
-    } else if let Some(cause) = err.find::<warp::cors::CorsForbidden>() {
-        code = StatusCode::FORBIDDEN;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<warp::body::BodyDeserializeError>() {
-        code = StatusCode::BAD_REQUEST;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<warp::reject::LengthRequired>() {
-        code = StatusCode::LENGTH_REQUIRED;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<PayloadTooLarge>() {
-        code = StatusCode::PAYLOAD_TOO_LARGE;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
-        code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else if let Some(cause) = err.find::<MethodNotAllowed>() {
-        code = StatusCode::METHOD_NOT_ALLOWED;
-        body = reply::json(&Error::new(code, cause.to_string()));
-    } else {
-        code = StatusCode::INTERNAL_SERVER_ERROR;
-        body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
-    }
-    let mut rep = reply::with_status(body, code).into_response();
+    let body = reply::json(&Error::new(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("unexpected error: {:?}", err),
+    ));
+    let mut rep = reply::with_status(body, StatusCode::INTERNAL_SERVER_ERROR).into_response();
     rep.headers_mut()
         .insert("access-control-allow-origin", HeaderValue::from_static("*"));
     Ok(rep)

@@ -84,13 +84,3 @@ monitoring:
         memory: 128Mi
     googleAuth:
     config:
-
-
-
-aws:
-  region:
-  cluster_name:
-  vpc_id:
-  role_arn:
-  zone_name:
-

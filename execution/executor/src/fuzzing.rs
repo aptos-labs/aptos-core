@@ -1,19 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_executor::BlockExecutor, chunk_executor::ChunkExecutor};
+use crate::block_executor::BlockExecutor;
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_state_view::StateView;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionToCommit, Version,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use executor_types::BlockExecutorTrait;
 use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
@@ -21,16 +19,6 @@ fn create_test_executor() -> BlockExecutor<FakeVM> {
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
     BlockExecutor::<FakeVM>::new(db_reader_writer)
-}
-
-pub fn fuzz_execute_and_commit_chunk(
-    txn_list_with_proof: TransactionListWithProof,
-    verified_target_li: LedgerInfoWithSignatures,
-) {
-    let db = DbReaderWriter::new(FakeDb {});
-    let executor = ChunkExecutor::<FakeVM>::new(db);
-
-    let _events = executor.execute_and_commit_chunk(txn_list_with_proof, &verified_target_li, None);
 }
 
 pub fn fuzz_execute_and_commit_blocks(

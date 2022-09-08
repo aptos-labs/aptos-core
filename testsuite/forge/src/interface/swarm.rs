@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
@@ -79,8 +80,15 @@ pub trait Swarm: Sync {
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
 
-    async fn ensure_no_validator_restart(&mut self) -> Result<()>;
-    async fn ensure_no_fullnode_restart(&mut self) -> Result<()>;
+    async fn ensure_no_validator_restart(&self) -> Result<()>;
+    async fn ensure_no_fullnode_restart(&self) -> Result<()>;
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> Result<()>;
 
     // Get prometheus metrics from the swarm
     async fn query_metrics(
@@ -211,10 +219,9 @@ pub trait SwarmExt: Swarm {
             return Err(anyhow!("Fork check failed"));
         }
 
-        runtime.block_on(self.wait_for_all_nodes_to_catchup_to_version(
-            max_version,
-            Instant::now() + Duration::from_secs(10),
-        ))?;
+        runtime.block_on(
+            self.wait_for_all_nodes_to_catchup_to_version(max_version, Duration::from_secs(10)),
+        )?;
 
         if !runtime.block_on(are_root_hashes_equal_at_version(&clients, max_version))? {
             return Err(anyhow!("Fork check failed"));
@@ -227,67 +234,108 @@ pub trait SwarmExt: Swarm {
     async fn wait_for_all_nodes_to_catchup_to_version(
         &self,
         version: u64,
-        deadline: Instant,
+        timeout: Duration,
     ) -> Result<()> {
-        let clients = self
-            .validators()
-            .map(|node| node.rest_client())
-            .chain(self.full_nodes().map(|node| node.rest_client()))
-            .collect::<Vec<_>>();
-
-        loop {
-            let results =
-                try_join_all(clients.iter().map(|node| node.get_ledger_information())).await;
-            let all_catchup = results
-                .map(|resps| {
-                    resps
-                        .into_iter()
-                        .map(|r| r.into_inner().version)
-                        .all(|v| v >= version)
-                })
-                .unwrap_or(false);
-            if all_catchup {
-                break;
-            }
-
-            if Instant::now() > deadline {
-                return Err(anyhow!(
-                    "waiting for nodes to catch up to version {} timed out",
-                    version
-                ));
-            }
-
-            tokio::time::sleep(Duration::from_millis(500)).await;
-        }
-
-        Ok(())
+        wait_for_all_nodes_to_catchup_to_version(
+            &self.get_all_nodes_clients_with_names(),
+            version,
+            timeout,
+        )
+        .await
     }
 
     /// Wait for all nodes in the network to be caught up. This is done by first querying each node
     /// for its current version, selects the max version, then waits for all nodes to catch up to
     /// that version. Once done, we can guarantee that all transactions committed before invocation
     /// of this function are available at all the nodes in the swarm
-    async fn wait_for_all_nodes_to_catchup(&self, deadline: Instant) -> Result<()> {
-        let clients = self
-            .validators()
-            .map(|node| node.rest_client())
-            .chain(self.full_nodes().map(|node| node.rest_client()))
-            .collect::<Vec<_>>();
-
-        if clients.is_empty() {
-            bail!("no nodes available")
-        }
-        let mut latest_version = 0u64;
-        for c in clients {
-            latest_version = latest_version.max(
-                c.get_ledger_information()
-                    .await
-                    .map(|r| r.into_inner().version)
-                    .unwrap_or(0),
-            );
-        }
-
-        self.wait_for_all_nodes_to_catchup_to_version(latest_version, deadline)
-            .await
+    async fn wait_for_all_nodes_to_catchup(&self, timeout: Duration) -> Result<()> {
+        wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
     }
+
+    fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {
+        self.validators()
+            .map(|node| (node.name().to_string(), node.rest_client()))
+            .collect()
+    }
+
+    fn get_all_nodes_clients_with_names(&self) -> Vec<(String, RestClient)> {
+        self.validators()
+            .map(|node| (node.name().to_string(), node.rest_client()))
+            .chain(
+                self.full_nodes()
+                    .map(|node| (node.name().to_string(), node.rest_client())),
+            )
+            .collect()
+    }
+}
+
+/// Waits for all nodes to have caught up to the specified `verison`.
+pub async fn wait_for_all_nodes_to_catchup_to_version(
+    clients: &[(String, RestClient)],
+    version: u64,
+    timeout: Duration,
+) -> Result<()> {
+    let start_time = Instant::now();
+    loop {
+        let results: Result<Vec<_>> = try_join_all(clients.iter().map(|(name, node)| async move {
+            Ok((
+                name,
+                node.get_ledger_information().await?.into_inner().version,
+            ))
+        }))
+        .await;
+        let versions = results
+            .map(|resps| resps.into_iter().collect::<Vec<_>>())
+            .ok();
+        let all_caught_up = versions
+            .clone()
+            .map(|resps| resps.iter().all(|(_, v)| *v >= version))
+            .unwrap_or(false);
+        if all_caught_up {
+            info!(
+                "All nodes caught up successfully in {}s",
+                start_time.elapsed().as_secs()
+            );
+            return Ok(());
+        }
+
+        if start_time.elapsed() > timeout {
+            return Err(anyhow!(
+                "Waiting for nodes to catch up to version {} timed out, current status: {:?}",
+                version,
+                versions.unwrap_or_default()
+            ));
+        }
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+/// Wait for all nodes in the network to be caught up. This is done by first querying each node
+/// for its current version, selects the max version, then waits for all nodes to catch up to
+/// that version. Once done, we can guarantee that all transactions committed before invocation
+/// of this function are available at all the nodes in the swarm
+pub async fn wait_for_all_nodes_to_catchup(
+    clients: &[(String, RestClient)],
+    timeout: Duration,
+) -> Result<()> {
+    if clients.is_empty() {
+        bail!("no nodes available")
+    }
+    let highest_synced_version = get_highest_synced_version(clients).await?;
+    wait_for_all_nodes_to_catchup_to_version(clients, highest_synced_version, timeout).await
+}
+
+/// Returns the highest synced version of the given clients
+pub async fn get_highest_synced_version(clients: &[(String, RestClient)]) -> Result<u64> {
+    let mut latest_version = 0u64;
+    for (_, c) in clients {
+        latest_version = latest_version.max(
+            c.get_ledger_information()
+                .await
+                .map(|r| r.into_inner().version)
+                .unwrap_or(0),
+        );
+    }
+    Ok(latest_version)
 }

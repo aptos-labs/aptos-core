@@ -5,7 +5,6 @@
 
 use crate::transaction_accumulator::TransactionAccumulatorSchema;
 use crate::{
-    change_set::ChangeSet,
     errors::AptosDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
@@ -193,17 +192,16 @@ impl TransactionStore {
         &self,
         version: Version,
         transaction: &Transaction,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         if let Transaction::UserTransaction(txn) = transaction {
-            cs.batch.put::<TransactionByAccountSchema>(
+            batch.put::<TransactionByAccountSchema>(
                 &(txn.sender(), txn.sequence_number()),
                 &version,
             )?;
         }
-        cs.batch
-            .put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
-        cs.batch.put::<TransactionSchema>(&version, transaction)?;
+        batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
+        batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
     }
@@ -259,9 +257,9 @@ impl TransactionStore {
         &self,
         version: Version,
         write_set: &WriteSet,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
-        cs.batch.put::<WriteSetSchema>(&version, write_set)
+        batch.put::<WriteSetSchema>(&version, write_set)
     }
 
     /// Prune the transaction by hash store given a list of transaction
@@ -425,21 +423,6 @@ impl<'a> Iterator for TransactionIter<'a> {
         self.next_impl().transpose()
     }
 }
-
-// TODO(philiphayes): this will need to change to support CRSNs
-// (Conflict-Resistant Sequence Numbers)[https://github.com/diem/dip/blob/main/dips/dip-168.md].
-//
-// It depends on the implementation details, but we'll probably index by _requested_
-// transaction sequence number rather than committed account sequence number.
-// This would mean the property: `seq_num_{i+1} == seq_num_{i} + 1` would no longer
-// be guaranteed and the check should be removed.
-//
-// This index would also no longer iterate over an account's transactions in
-// committed order, meaning the outer method would need to overread by
-// `CRSN_WINDOW_SIZE`, sort by version, and take only `limit` entries to get
-// at most `limit` transactions in committed order. Alternatively, add another
-// index for scanning an accounts transactions in committed order, e.g.,
-// `(AccountAddress, Version) -> SeqNum`.
 
 pub struct AccountTransactionVersionIter<'a> {
     inner: SchemaIterator<'a, TransactionByAccountSchema>,

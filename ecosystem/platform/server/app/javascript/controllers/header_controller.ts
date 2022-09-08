@@ -5,11 +5,12 @@ import { Controller } from "./controller";
 
 // Connects to data-controller="header"
 export default class extends Controller {
-  static targets = ["nav", "navButton", "user"];
+  static targets = ["nav", "navButton", "user", "userButton"];
 
   declare readonly navTarget: HTMLElement;
   declare readonly navButtonTarget: HTMLElement;
   declare readonly userTarget: HTMLElement;
+  declare readonly userButtonTarget: HTMLElement;
   declare readonly hasUserTarget: boolean;
 
   toggleNav() {
@@ -52,6 +53,20 @@ export default class extends Controller {
     if (this.navTarget.hasAttribute('open')) {
       this.toggleNav();
     }
+  }
+
+  windowClick(event: Event) {
+    // Hide the user dropdown if the user clicks outside.
+    if (!(event.target instanceof Element)) return;
+    if (!this.hasUserTarget) return;
+    if (!this.userTarget.hasAttribute('open')) return;
+    if (event.target === this.userTarget ||
+        this.userTarget.contains(event.target) ||
+        event.target === this.userButtonTarget ||
+        this.userButtonTarget.contains(event.target)) {
+      return;
+    }
+    this.toggleUser();
   }
 
   preventDefault(event: Event) {

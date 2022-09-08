@@ -314,6 +314,26 @@ pub static CONSENSUS_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters for received consensus messages broken down by type
+pub static CONSENSUS_RECEIVED_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_received_msgs_count",
+        "Counters for received consensus messages broken down by type",
+        &["type"]
+    )
+    .unwrap()
+});
+
+/// Counters for sent consensus messages broken down by type
+pub static CONSENSUS_SENT_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_sent_msgs_count",
+        "Counters for received consensus messages broken down by type",
+        &["type"]
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to consensus channel
 pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -339,6 +359,16 @@ pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_block_retrieval_channel_msgs_count",
         "Counters(queued,dequeued,dropped) related to block retrieval channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to block retrieval task
+pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_block_retrieval_task_msgs_count",
+        "Counters(queued,dequeued,dropped) related to block retrieval task",
         &["state"]
     )
     .unwrap()

@@ -3,8 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+mod log_build_information;
+
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_build_info::build_information;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
@@ -14,9 +17,9 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
 use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, Level};
-use aptos_sf_stream::runtime::bootstrap as bootstrap_sf_stream;
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -35,22 +38,25 @@ use data_streaming_service::{
 };
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
-use futures::channel::mpsc::channel;
+use framework::ReleaseBundle;
+use futures::channel::mpsc;
 use hex::FromHex;
+use log_build_information::log_build_information;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync_driver::driver_factory::DriverFactory;
-use state_sync_driver::driver_factory::StateSyncRuntimes;
-use state_sync_driver::metadata_storage::PersistentMetadataStorage;
+use state_sync_driver::{
+    driver_factory::{DriverFactory, StateSyncRuntimes},
+    metadata_storage::PersistentMetadataStorage,
+};
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     thread,
@@ -66,6 +72,7 @@ use tokio::runtime::{Builder, Runtime};
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
+const TELEMETRY_LOG_INGEST_BUFFER_SIZE: usize = 128;
 
 /// Runs an aptos fullnode or validator
 #[derive(Clone, Debug, Parser)]
@@ -93,11 +100,9 @@ pub struct AptosNodeArgs {
     #[clap(long, requires("test"))]
     random_ports: bool,
 
-    /// Paths to Aptos framework module blobs to be included in genesis.
-    ///
-    /// Can be both files and directories
+    /// Paths to the Aptos framework release package to be used for genesis.
     #[clap(long, requires("test"))]
-    genesis_modules: Option<Vec<PathBuf>>,
+    genesis_framework: Option<PathBuf>,
 
     /// Enable lazy mode
     ///
@@ -115,33 +120,42 @@ impl AptosNodeArgs {
                 .seed
                 .map(StdRng::from_seed)
                 .unwrap_or_else(StdRng::from_entropy);
-            let genesis_modules = if let Some(module_paths) = self.genesis_modules {
-                framework::load_modules_from_paths(&module_paths)
+            let genesis_framework = if let Some(path) = self.genesis_framework {
+                ReleaseBundle::read(path).unwrap()
             } else {
-                cached_framework_packages::module_blobs().to_vec()
+                cached_packages::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
-                genesis_modules,
+                &genesis_framework,
                 rng,
             )
             .expect("Test mode should start correctly");
         } else {
-            // Load the config file
+            // Get the config file path
             let config_path = self.config.expect("Config is required to launch node");
+            if !config_path.exists() {
+                panic!(
+                    "The node config file could not be found! Ensure the given path is correct: {:?}",
+                    config_path.display()
+                )
+            }
+
+            // A config file exists, attempt to parse the config
             let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
                 panic!(
-                    "Failed to load node config file! Given file path: {:?}. Error: {:?}",
-                    config_path, error
+                    "Failed to parse node config file! Given file path: {:?}. Error: {:?}",
+                    config_path.display(),
+                    error
                 )
             });
-            println!("Using node config {:?}", &config);
 
             // Start the node
-            start(config, None).expect("Node should start correctly");
+            println!("Using node config {:?}", &config);
+            start(config, None, true).expect("Node should start correctly");
         };
     }
 }
@@ -153,20 +167,33 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _sf_stream: Option<Runtime>,
+    _fh_stream: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
 
 /// Start an aptos node
-pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()> {
+pub fn start(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
     crash_handler::setup_panic_handler();
+
+    if create_global_rayon_pool {
+        rayon::ThreadPoolBuilder::new()
+            .thread_name(|index| format!("rayon-global-{}", index))
+            .build_global()
+            .expect("Failed to build rayon global thread _pool.");
+    }
 
     let mut logger = aptos_logger::Logger::new();
     logger
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
+        .telemetry_level(config.logger.telemetry_level)
+        .enable_telemetry_flush(config.logger.enable_telemetry_flush)
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
@@ -175,7 +202,16 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
     if let Some(log_file) = log_file {
         logger.printer(Box::new(FileWriter::new(log_file)));
     }
-    let _logger = Some(logger.build());
+    let mut remote_log_rx = None;
+    if config.logger.enable_telemetry_remote_log {
+        let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
+        logger.remote_log_tx(tx);
+        remote_log_rx = Some(rx);
+    }
+    let _logger = logger.build();
+
+    // Print out build information.
+    log_build_information();
 
     // Let's now log some important information, since the logger is set up
     info!(config = config, "Loaded AptosNode config");
@@ -191,7 +227,8 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config)?;
+    let _node_handle = setup_environment(config, remote_log_rx)?;
+
     let term = Arc::new(AtomicBool::new(false));
 
     while !term.load(Ordering::Acquire) {
@@ -207,7 +244,7 @@ pub fn load_test_environment<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
-    genesis_modules: Vec<Vec<u8>>,
+    framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
 where
@@ -253,7 +290,7 @@ where
         }
 
         // Build genesis and validator node
-        let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)?
+        let builder = aptos_genesis::builder::Builder::new(&test_dir, framework.clone())?
             .with_init_config(Some(Arc::new(move |_, config, _| {
                 *config = template.clone();
             })))
@@ -290,9 +327,13 @@ where
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());
-    println!("\tREST API endpoint: {}", &config.api.address);
+    println!("\tREST API endpoint: http://{}", &config.api.address);
     println!(
-        "\tFullNode network: {}",
+        "\tMetrics endpoint: http://{}:{}/metrics",
+        &config.inspection_service.address, &config.inspection_service.port
+    );
+    println!(
+        "\tAptosnet Fullnode network endpoint: {}",
         &config.full_node_networks[0].listen_address
     );
     if lazy {
@@ -301,7 +342,7 @@ where
 
     println!("\nAptos is running, press ctrl-c to exit\n");
 
-    start(config, Some(log_file))
+    start(config, Some(log_file), false)
 }
 
 // Fetch chain ID from on-chain resource
@@ -394,7 +435,12 @@ fn setup_data_streaming_service(
 
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()
-        .thread_name("data-streaming-service")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stream-serv-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
@@ -418,7 +464,12 @@ fn setup_aptos_data_client(
 
     // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
-        .thread_name("aptos-data-client")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("data-client-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create aptos data client {}", err))?;
@@ -444,7 +495,12 @@ fn setup_state_sync_storage_service(
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
     let storage_service_runtime = Builder::new_multi_thread()
-        .thread_name("storage-service-server")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stor-server-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to start state sync storage service {}", err))?;
@@ -465,7 +521,10 @@ fn setup_state_sync_storage_service(
     Ok(storage_service_runtime)
 }
 
-pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle> {
+pub fn setup_environment(
+    node_config: NodeConfig,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+) -> anyhow::Result<AptosHandle> {
     // Start the node inspection service
     let node_config_clone = node_config.clone();
     thread::spawn(move || {
@@ -482,6 +541,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
             node_config.storage.rocksdb_configs,
             node_config.storage.enable_indexer,
             node_config.storage.target_snapshot_size,
+            node_config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
     );
@@ -553,10 +613,20 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
     for network_config in network_configs.into_iter() {
-        debug!("Creating runtime for {}", network_config.network_id);
+        let network_id = network_config.network_id;
+        debug!("Creating runtime for {}", network_id);
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder
-            .thread_name(format!("network-{}", network_config.network_id))
+            .disable_lifo_slot()
+            .thread_name_fn(move || {
+                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                format!(
+                    "network-{}-{}",
+                    network_id.as_str().chars().take(3).collect::<String>(),
+                    id
+                )
+            })
             .enable_all();
         if let Some(runtime_threads) = network_config.runtime_threads {
             runtime_builder.worker_threads(runtime_threads);
@@ -652,7 +722,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         db_rw.clone(),
     )?;
 
-    let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
+    let (mp_client_sender, mp_client_events) = mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
     let api_runtime = bootstrap_api(
         &node_config,
@@ -660,7 +730,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         aptos_db.clone(),
         mp_client_sender.clone(),
     )?;
-    let sf_runtime = match bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+    let sf_runtime = match bootstrap_fh_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
         None => None,
         Some(res) => Some(res?),
     };
@@ -716,9 +786,14 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
 
+    let build_info = build_information!();
     // Create the telemetry service
-    let telemetry_runtime =
-        aptos_telemetry::service::start_telemetry_service(node_config.clone(), chain_id);
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id,
+        build_info,
+        remote_log_rx,
+    );
 
     Ok(AptosHandle {
         _api: api_runtime,
@@ -726,7 +801,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
-        _sf_stream: sf_runtime,
+        _fh_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

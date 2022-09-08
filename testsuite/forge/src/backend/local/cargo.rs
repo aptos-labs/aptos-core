@@ -3,6 +3,7 @@
 
 use crate::Result;
 use anyhow::{bail, Context};
+use aptos_logger::info;
 use serde::Deserialize;
 use std::{
     env, fs,
@@ -16,6 +17,10 @@ use tempfile::NamedTempFile;
 pub struct Metadata {
     pub target_directory: PathBuf,
     pub workspace_root: PathBuf,
+}
+
+pub fn use_release() -> bool {
+    option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
 }
 
 pub fn metadata() -> Result<Metadata> {
@@ -152,8 +157,16 @@ where
     D: AsRef<Path>,
     T: AsRef<Path>,
 {
+    let use_release = use_release();
+
     let target_directory = target_directory.as_ref();
     let directory = directory.as_ref();
+
+    let mut args = vec!["build", "--bin=aptos-node", "--features=failpoints"];
+    if use_release {
+        args.push("--release");
+    }
+    info!("Compiling with cargo args: {:?}", args);
     let output = Command::new("cargo")
         .current_dir(directory)
         .env("CARGO_TARGET_DIR", target_directory)
@@ -167,15 +180,19 @@ where
         .context("Failed to build aptos-node")?;
 
     if output.status.success() {
-        let bin_path =
-            target_directory.join(format!("debug/{}{}", "aptos-node", env::consts::EXE_SUFFIX));
+        let bin_path = target_directory.join(format!(
+            "{}/{}{}",
+            if use_release { "release" } else { "debug" },
+            "aptos-node",
+            env::consts::EXE_SUFFIX
+        ));
         if !bin_path.exists() {
             bail!(
                 "Can't find binary aptos-node at expected path {:?}",
                 bin_path
             );
         }
-
+        info!("Local swarm node binary path: {:?}", bin_path);
         Ok(bin_path)
     } else {
         io::stderr().write_all(&output.stderr)?;

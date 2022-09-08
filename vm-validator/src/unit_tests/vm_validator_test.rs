@@ -4,7 +4,6 @@
 use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -14,6 +13,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use move_deps::move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
 use storage_interface::state_view::LatestDbStateCheckpointView;
@@ -175,14 +175,16 @@ fn test_validate_max_gas_units_below_min() {
     // external gas units.
     let txn_gas_params = TransactionGasParameters::initial();
     let txn_bytes = txn_gas_params.large_transaction_cutoff
-        + (txn_gas_params.gas_unit_scaling_factor / txn_gas_params.intrinsic_gas_per_byte);
+        + (u64::from(txn_gas_params.gas_unit_scaling_factor)
+            / u64::from(txn_gas_params.intrinsic_gas_per_byte))
+        .into();
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(TransactionPayload::Script(Script::new(
-            vec![42; txn_bytes as usize],
+            vec![42; u64::from(txn_bytes) as usize],
             vec![],
             vec![],
         ))),
@@ -385,36 +387,6 @@ fn test_validate_invalid_arguments() {
     let _ret = vm_validator.validate_transaction(transaction).unwrap();
     // TODO: Script arguement types are now checked at execution time. Is this an idea behavior?
     // assert_eq!(ret.status().unwrap().major_status, StatusCode::TYPE_MISMATCH);
-}
-
-#[test]
-fn test_validate_non_genesis_write_set() {
-    let vm_validator = TestValidator::new();
-
-    // Confirm that a correct transaction is validated successfully.
-    let address = account_config::aptos_test_root_address();
-    let transaction = transaction_test_helpers::get_write_set_txn(
-        address,
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,
-    )
-    .into_inner();
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::REJECTED_WRITE_SET);
-
-    // A WriteSet txn is only valid when sent from the root account.
-    let bad_transaction = transaction_test_helpers::get_write_set_txn(
-        account_config::aptos_test_root_address(),
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,
-    )
-    .into_inner();
-    let ret = vm_validator.validate_transaction(bad_transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::REJECTED_WRITE_SET);
 }
 
 #[test]

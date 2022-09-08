@@ -14,12 +14,10 @@
 mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
-mod rotate_key;
 mod universe;
 pub use bad_transaction::*;
 pub use create_account::*;
 pub use peer_to_peer::*;
-pub use rotate_key::*;
 pub use universe::*;
 
 use crate::{
@@ -27,7 +25,6 @@ use crate::{
     executor::FakeExecutor,
     gas_costs, transaction_status_eq,
 };
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_types::{
     transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
     vm_status::{known_locations, StatusCode},
@@ -148,11 +145,6 @@ impl AccountCurrent {
         self.initial_data.account()
     }
 
-    /// Rotates the key in this account.
-    pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) {
-        self.initial_data.rotate_key(privkey, pubkey);
-    }
-
     /// Returns the current balance for this account, assuming all transactions seen so far are
     /// applied.
     pub fn balance(&self) -> u64 {
@@ -232,11 +224,6 @@ impl AccountCurrent {
             *gas_costs::PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_FIRST
         }
     }
-
-    /// Returns the gas cost of a peer-to-peer transaction with an insufficient balance.
-    pub fn rotate_key_gas_cost(&self) -> u64 {
-        *gas_costs::ROTATE_KEY
-    }
 }
 
 /// Computes the result for running a transfer out of one account. Also updates the account to
@@ -277,6 +264,7 @@ pub fn txn_one_account_result(
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: known_locations::core_account_module_abort(),
                     code: 6,
+                    info: None,
                 }),
                 false,
             )
@@ -291,6 +279,7 @@ pub fn txn_one_account_result(
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: known_locations::core_account_module_abort(),
                     code: 10,
+                    info: None,
                 }),
                 false,
             )
@@ -337,7 +326,7 @@ pub fn all_transactions_strategy(
         8 => p2p_strategy(min, max),
         // TODO: resurrecte once we have unhosted wallets
         //1 => create_account_strategy(min, max),
-        1 => any::<RotateKeyGen>().prop_map(RotateKeyGen::arced),
+        // 1 => any::<RotateKeyGen>().prop_map(RotateKeyGen::arced),
         1 => bad_txn_strategy(),
     ]
 }

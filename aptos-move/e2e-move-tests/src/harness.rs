@@ -1,24 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::{
-    common::types::MovePackageDir,
-    move_tool::{BuiltPackage, MemberId},
-};
+use crate::AptosPackageHooks;
+use aptos::move_tool::MemberId;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{PrivateKey, Uniform};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
-    transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+    transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use cached_framework_packages::aptos_stdlib;
-use framework::natives::code::UpgradePolicy;
+use cached_packages::aptos_stdlib;
+use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
+use rand::{
+    rngs::{OsRng, StdRng},
+    Rng, SeedableRng,
+};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -48,6 +53,7 @@ pub struct MoveHarness {
 impl MoveHarness {
     /// Creates a new harness.
     pub fn new() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_fresh_genesis(),
             txn_seq_no: BTreeMap::default(),
@@ -75,9 +81,27 @@ impl MoveHarness {
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
         let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
-        self.txn_seq_no.insert(addr, 10);
         self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(addr, 10);
         data.account().clone()
+    }
+
+    // Creates an account with a randomly generated address and key pair
+    pub fn new_account_with_key_pair(&mut self) -> Account {
+        let mut rng = StdRng::from_seed(OsRng.gen());
+
+        let privkey = Ed25519PrivateKey::generate(&mut rng);
+        let pubkey = privkey.public_key();
+        let acc = Account::with_keypair(privkey, pubkey);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), 10);
+        data.account().clone()
+    }
+
+    /// Gets the account where the Aptos framework is installed (0x1).
+    pub fn aptos_framework_account(&mut self) -> Account {
+        self.new_account_at(AccountAddress::ONE)
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -107,13 +131,13 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> SignedTransaction {
-        // We initialize for some reason with 10, so use 10 as the first value here too
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = *seq_no_ref;
         *seq_no_ref += 1;
         account
             .transaction()
             .sequence_number(seq_no)
+            .max_gas_amount(1_000_000)
             .gas_unit_price(1)
             .payload(payload)
             .sign()
@@ -145,7 +169,7 @@ impl MoveHarness {
         } = fun;
         self.create_transaction_payload(
             account,
-            TransactionPayload::ScriptFunction(ScriptFunction::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
                 module_id,
                 function_id,
                 ty_args,
@@ -172,13 +196,13 @@ impl MoveHarness {
         &mut self,
         account: &Account,
         path: &Path,
-        upgrade_policy: UpgradePolicy,
+        options: Option<BuildOptions>,
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(MovePackageDir::new(path.to_owned()), true, false)
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
-            .extract_metadata(upgrade_policy)
+            .extract_metadata()
             .expect("extracting package metadata must succeed");
         self.create_transaction_payload(
             account,
@@ -190,13 +214,19 @@ impl MoveHarness {
     }
 
     /// Runs transaction which publishes the Move Package.
-    pub fn publish_package(
+    pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None);
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package_with_options(
         &mut self,
         account: &Account,
         path: &Path,
-        upgrade_policy: UpgradePolicy,
+        options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, upgrade_policy);
+        let txn = self.create_publish_package(account, path, Some(options));
         self.run(txn)
     }
 
@@ -213,12 +243,12 @@ impl MoveHarness {
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         self.fast_forward(1);
         self.executor
-            .new_block_with_metadata(proposer_index, failed_proposer_indices);
+            .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
@@ -297,10 +327,11 @@ macro_rules! assert_success {
 #[macro_export]
 macro_rules! assert_abort {
     ($s:expr, $c:pat) => {{
-        use aptos_types::transaction::*;
         assert!(matches!(
             $s,
-            TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: $c, .. })
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+            ),
         ));
     }};
 }

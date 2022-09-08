@@ -1175,14 +1175,14 @@ components:
     TransactionPayload:
       title: Transaction Payload
       oneOf:
-        - $ref: '#/components/schemas/ScriptFunctionPayload'
+        - $ref: '#/components/schemas/EntryFunctionPayload'
         - $ref: '#/components/schemas/ScriptPayload'
         - $ref: '#/components/schemas/ModuleBundlePayload'
         - $ref: '#/components/schemas/WriteSetPayload'
       discriminator:
         propertyName: type
-    ScriptFunctionPayload:
-      title: Script Function Payload
+    EntryFunctionPayload:
+      title: Entry Function Payload
       type: object
       required:
         - type
@@ -1193,19 +1193,19 @@ components:
         type:
           type: string
         function:
-          $ref: '#/components/schemas/ScriptFunctionId'
+          $ref: '#/components/schemas/EntryFunctionId'
         type_arguments:
           type: array
-          description: Generic type arguments required by the script function.
+          description: Generic type arguments required by the entry function.
           items:
             $ref: '#/components/schemas/MoveTypeTagId'
         arguments:
           type: array
-          description: The script function arguments.
+          description: The entry function arguments.
           items:
             $ref: '#/components/schemas/MoveValue'
       example:
-        type: "script_function_payload"
+        type: "entry_function_payload"
         function: "0x1::PaymentScripts::peer_to_peer_with_metadata"
         type_arguments:
           - "0x1::XDX::XDX"
@@ -1214,11 +1214,11 @@ components:
           - "2021000000"
           - "0x"
           - "0x"
-    ScriptFunctionId:
-      title: Script Function ID
+    EntryFunctionId:
+      title: Entry Function ID
       type: string
       description: |
-        Script function id is string representation of a script function defined on-chain.
+        Entry function id is string representation of a entry function defined on-chain.
 
         Format: `{address}::{module name}::{function name}`
 

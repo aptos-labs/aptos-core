@@ -248,8 +248,9 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         sender.address(),
     );
 
+    let framework_modules = cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules().iter().collect(),
+        deps: framework_modules.iter().collect(),
     };
     let module = compiler
         .into_compiled_module(module_code.as_str())

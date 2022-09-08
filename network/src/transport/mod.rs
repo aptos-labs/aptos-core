@@ -32,6 +32,9 @@ use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
+// Re-exposed for aptos-network-checker
+pub use netcore::transport::tcp::{resolve_and_connect, TcpSocket};
+
 #[cfg(test)]
 mod test;
 

@@ -3,24 +3,24 @@
 
 use anyhow::Result;
 use aptos_logger::{prelude::*, Level, Logger};
-use aptos_secure_push_metrics::MetricsPusher;
+use aptos_push_metrics::MetricsPusher;
 use backup_cli::{
     coordinators::verify::VerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, TrustedWaypointOpt},
 };
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     metadata_cache_opt: MetadataCacheOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     trusted_waypoints_opt: TrustedWaypointOpt,
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     storage: StorageOpt,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
 }
 
@@ -34,6 +34,8 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).read_env().init();
+
+    #[allow(deprecated)]
     let _mp = MetricsPusher::start();
 
     let opt = Opt::from_args();

@@ -4,7 +4,6 @@
 mod bad_transaction;
 mod create_account;
 mod peer_to_peer;
-mod rotate_key;
 
 use language_e2e_tests::{
     account_universe::{
@@ -49,6 +48,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn all_transactions(
         universe in AccountUniverseGen::strategy(
             2..default_num_accounts(),
@@ -60,6 +60,7 @@ proptest! {
     }
 
     #[test]
+    #[ignore]
     fn all_transactions_limited(
         mut universe in AccountUniverseGen::strategy(
             4..default_num_accounts(),

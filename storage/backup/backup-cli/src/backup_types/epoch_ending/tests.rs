@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::epoch_ending::{
         backup::{EpochEndingBackupController, EpochEndingBackupOpt},
@@ -16,7 +17,7 @@ use crate::{
 };
 use aptos_config::utils::get_available_port;
 use aptos_temppath::TempPath;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
@@ -83,7 +84,8 @@ fn end_to_end() {
                 target_version: Some(target_version),
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
-                concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                concurrent_downloads: ConcurrentDownloadsOpt::default(),
+                replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
             }
             .try_into()
             .unwrap(),
@@ -139,7 +141,7 @@ prop_compose! {
                 if overwrite && li.ledger_info().epoch() != 0 {
                     li = LedgerInfoWithSignatures::new(
                         li.ledger_info().clone(),
-                        MultiSignature::empty(),
+                        AggregateSignature::empty(),
                     );
                     should_fail_without_waypoints = true;
                 }
@@ -214,7 +216,8 @@ async fn test_trusted_waypoints_impl(
             target_version: None,
             trusted_waypoints: TrustedWaypointOpt::default(),
             rocksdb_opt: RocksdbOpt::default(),
-            concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            concurrent_downloads: ConcurrentDownloadsOpt::default(),
+            replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
         }
         .try_into()
         .unwrap(),
@@ -234,7 +237,8 @@ async fn test_trusted_waypoints_impl(
                 trust_waypoint: trusted_waypoints,
             },
             rocksdb_opt: RocksdbOpt::default(),
-            concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            concurrent_downloads: ConcurrentDownloadsOpt::default(),
+            replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
         }
         .try_into()
         .unwrap(),

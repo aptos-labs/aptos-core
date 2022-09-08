@@ -99,3 +99,8 @@ variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""
 }
+
+variable "num_extra_instance" {
+  default     = 0
+  description = "Number of extra instances to add into node pool"
+}

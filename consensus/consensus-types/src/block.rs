@@ -349,20 +349,6 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            self.author().map(|proposer| {
-                u32::try_from(
-                    validators
-                        .iter()
-                        .position(|&v| v == proposer)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Proposer {} not in validator list {:?}",
-                                proposer, validators
-                            )
-                        }),
-                )
-                .unwrap()
-            }),
             // A bitvec of voters
             self.quorum_cert()
                 .ledger_info()

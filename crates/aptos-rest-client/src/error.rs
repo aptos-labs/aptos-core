@@ -1,10 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-pub type Result<T, E = Error> = ::std::result::Result<T, E>;
+use crate::State;
+use aptos_api_types::AptosError;
+use reqwest::StatusCode;
+use thiserror::Error;
 
 #[derive(Debug)]
-pub struct Error {
+pub struct FaucetClientError {
     inner: Box<Inner>,
 }
 
@@ -32,7 +35,7 @@ enum Kind {
     Unknown,
 }
 
-impl Error {
+impl FaucetClientError {
     pub fn is_retriable(&self) -> bool {
         match self.inner.kind {
             // internal server errors are retriable
@@ -67,7 +70,7 @@ impl Error {
     }
 
     pub fn status(status: u16) -> Self {
-        Self::new(Kind::HttpStatus(status), None::<Error>)
+        Self::new(Kind::HttpStatus(status), None::<FaucetClientError>)
     }
 
     pub fn timeout<E: Into<BoxError>>(e: E) -> Self {
@@ -122,20 +125,95 @@ impl Error {
     }
 }
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for FaucetClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl std::error::Error for Error {
+impl std::error::Error for FaucetClientError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source.as_ref().map(|e| &**e as _)
     }
 }
 
-impl From<serde_json::Error> for Error {
+impl From<serde_json::Error> for FaucetClientError {
     fn from(e: serde_json::Error) -> Self {
         Self::decode(e)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum RestError {
+    #[error("API error {0}")]
+    Api(AptosErrorResponse),
+    #[error("BCS ser/de error {0}")]
+    Bcs(bcs::Error),
+    #[error("JSON er/de error {0}")]
+    Json(serde_json::Error),
+    #[error("URL Parse error {0}")]
+    UrlParse(url::ParseError),
+    #[error("Timeout waiting for transaction {0}")]
+    Timeout(&'static str),
+    #[error("Unknown error {0}")]
+    Unknown(anyhow::Error),
+    #[error("Http error {0}")]
+    Http(StatusCode),
+}
+
+impl From<(AptosError, Option<State>, StatusCode)> for RestError {
+    fn from((error, state, status_code): (AptosError, Option<State>, StatusCode)) -> Self {
+        Self::Api(AptosErrorResponse {
+            error,
+            state,
+            status_code,
+        })
+    }
+}
+
+impl From<bcs::Error> for RestError {
+    fn from(err: bcs::Error) -> Self {
+        Self::Bcs(err)
+    }
+}
+
+impl From<url::ParseError> for RestError {
+    fn from(err: url::ParseError) -> Self {
+        Self::UrlParse(err)
+    }
+}
+
+impl From<serde_json::Error> for RestError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Json(err)
+    }
+}
+
+impl From<anyhow::Error> for RestError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::Unknown(err)
+    }
+}
+
+impl From<reqwest::Error> for RestError {
+    fn from(err: reqwest::Error) -> Self {
+        if let Some(status) = err.status() {
+            RestError::Http(status)
+        } else {
+            RestError::Unknown(err.into())
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct AptosErrorResponse {
+    pub error: AptosError,
+    pub state: Option<State>,
+    pub status_code: StatusCode,
+}
+
+impl std::fmt::Display for AptosErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error)
     }
 }

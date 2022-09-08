@@ -3,20 +3,24 @@
 
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
-use crate::state_merkle_db::StateMerkleDb;
-use crate::state_store::buffered_state::CommitMessage;
-use crate::state_store::state_merkle_batch_committer::{
-    StateMerkleBatch, StateMerkleBatchCommitter,
+use crate::state_store::{
+    buffered_state::CommitMessage,
+    state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
+    StateDb,
 };
 use aptos_logger::trace;
-use std::sync::mpsc::{Receiver, SyncSender};
-use std::sync::{mpsc, Arc};
-use std::thread::JoinHandle;
-use storage_interface::state_delta::StateDelta;
-use storage_interface::{jmt_update_refs, jmt_updates};
+use std::{
+    sync::{
+        mpsc,
+        mpsc::{Receiver, SyncSender},
+        Arc,
+    },
+    thread::JoinHandle,
+};
+use storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
 
 pub(crate) struct StateSnapshotCommitter {
-    state_merkle_db: Arc<StateMerkleDb>,
+    state_db: Arc<StateDb>,
     state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
     state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleBatch>>,
     join_handle: Option<JoinHandle<()>>,
@@ -24,25 +28,25 @@ pub(crate) struct StateSnapshotCommitter {
 
 impl StateSnapshotCommitter {
     pub fn new(
-        state_merkle_db: Arc<StateMerkleDb>,
+        state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
     ) -> Self {
         // Rendezvous channel
         let (state_merkle_batch_commit_sender, state_merkle_batch_commit_receiver) =
             mpsc::sync_channel(0);
-        let arc_state_merkle_db = Arc::clone(&state_merkle_db);
+        let arc_state_db = Arc::clone(&state_db);
         let join_handle = std::thread::Builder::new()
-            .name("state_merkle_batch_committer".to_string())
+            .name("state_batch_committer".to_string())
             .spawn(move || {
                 let committer = StateMerkleBatchCommitter::new(
-                    arc_state_merkle_db,
+                    arc_state_db,
                     state_merkle_batch_commit_receiver,
                 );
                 committer.run();
             })
             .expect("Failed to spawn state merkle batch committer thread.");
         Self {
-            state_merkle_db,
+            state_db,
             state_snapshot_commit_receiver,
             state_merkle_batch_commit_sender,
             join_handle: Some(join_handle),
@@ -72,12 +76,17 @@ impl StateSnapshotCommitter {
                         .unwrap();
 
                     let (batch, root_hash) = self
+                        .state_db
                         .state_merkle_db
                         .merklize_value_set(
                             jmt_update_refs(&jmt_updates(&delta_to_commit.updates_since_base)),
                             Some(&node_hashes),
                             version,
                             base_version,
+                            self.state_db
+                                .get_previous_epoch_ending(version)
+                                .unwrap()
+                                .map(|(v, _e)| v),
                         )
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender

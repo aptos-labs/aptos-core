@@ -36,6 +36,9 @@ gem 'stimulus-rails'
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem 'jbuilder'
 
+# Image generation! ImageMagick
+gem 'rmagick'
+
 gem 'activeadmin'
 gem 'cancancan'
 gem 'devise'
@@ -76,6 +79,9 @@ gem 'httparty'
 # Address deriviation (sha_256)
 gem 'sha3'
 
+# Cryptography
+gem 'ed25519', '~> 1.3'
+
 # Zip files
 gem 'rubyzip'
 
@@ -92,7 +98,8 @@ gem 'MailchimpTransactional'
 gem 'recaptcha', '~> 5.10'
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-# gem "image_processing", "~> 1.2"
+gem 'google-cloud-storage', require: false
+# gem 'image_processing'
 
 # UI components
 gem 'better_html'
@@ -107,8 +114,9 @@ gem 'sentry-ruby'
 gem 'statesman', '~> 10.0'
 
 # Feature flags
-gem 'flipper', '~> 0.24.1'
-gem 'flipper-active_record', '~> 0.24.1'
+gem 'flipper', '~> 0.25.1'
+gem 'flipper-active_record', '~> 0.25.1'
+gem 'flipper-ui', '~> 0.25.1'
 
 # Redis
 gem 'hiredis', '~> 0.6.3'

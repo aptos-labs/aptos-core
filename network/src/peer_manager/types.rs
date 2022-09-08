@@ -46,7 +46,7 @@ pub enum ConnectionRequest {
     ),
 }
 
-#[derive(Clone, PartialEq, Serialize)]
+#[derive(Clone, PartialEq, Eq, Serialize)]
 pub enum ConnectionNotification {
     /// Connection with a new peer has been established.
     NewPeer(ConnectionMetadata, NetworkContext),

@@ -8,7 +8,8 @@ use aptos_api_types::{
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    NodeConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -39,7 +40,7 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
@@ -90,7 +91,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        cached_framework_packages::module_blobs().to_vec(),
+        cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -99,7 +100,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
-    let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
+    let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
 
     let (db, db_rw) = if use_db_with_indexer {
@@ -113,6 +114,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
                 RocksdbConfigs::default(),
                 false, /* indexer */
                 TARGET_SNAPSHOT_SIZE,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
             .unwrap(),
         )
@@ -204,11 +206,61 @@ impl TestContext {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
         }
 
-        let msg = pretty(&msg);
+        let msg = pretty(&Self::prune_golden(msg));
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 
         self.golden_output.as_ref().unwrap().log(&msg);
+    }
+
+    /// Prune well-known excessively large entries from a resource array response.
+    /// TODO: we can't dump all resources of an account as golden output. As functionality
+    /// grows this becomes too much. Need a way to filter only the resources which folks want.
+    fn prune_golden(val: Value) -> Value {
+        if !val.is_array() {
+            return val;
+        }
+
+        val.as_array()
+            .unwrap()
+            .iter()
+            .map(|field| {
+                if let Some(changes) = field.as_object().unwrap().get("changes") {
+                    let mut nfield = field.clone();
+                    nfield["changes"] = changes
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|change| {
+                            let mut nchange = change.clone();
+                            nchange["data"] = Self::resource_replacer(&change["data"]);
+                            nchange
+                        })
+                        .collect();
+                    nfield
+                } else {
+                    field.clone()
+                }
+            })
+            .collect()
+    }
+
+    // Resource may appear in many different places, so make a convenient stripper
+    fn resource_replacer(val: &Value) -> Value {
+        let mut nval = val.clone();
+        nval["data"] = match val["type"].as_str().unwrap() {
+            "0x1::code::PackageRegistry" => Value::String("package registry omitted".to_string()),
+            // Ideally this wouldn't be stripped, but it changes by minor changes to the
+            // Move modules, which leads to a bad devx.
+            "0x1::state_storage::StateStorageUsage" => {
+                Value::String("state storage omitted".to_string())
+            }
+            "0x1::state_storage::GasParameter" => {
+                Value::String("state storage gas parameter omitted".to_string())
+            }
+            _ => val["data"].clone(),
+        };
+        nval
     }
 
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -357,7 +409,7 @@ impl TestContext {
             .unwrap()
     }
 
-    pub async fn api_execute_script_function(
+    pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,
         module: &str,
@@ -368,7 +420,7 @@ impl TestContext {
         self.api_execute_txn(
             account,
             json!({
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),
@@ -479,11 +531,10 @@ impl TestContext {
         &self,
         poem_address: SocketAddr,
     ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-        let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
+        warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),
-        ));
-        proxy
+        ))
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
@@ -527,7 +578,6 @@ impl TestContext {
             0,
             round,
             self.validator_owner,
-            Some(0),
             vec![0],
             vec![],
             self.fake_time_usecs,
@@ -558,6 +608,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
+        LedgerInfoWithSignatures::new(info, AggregateSignature::empty())
     }
 }

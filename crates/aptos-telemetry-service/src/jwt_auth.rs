@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::PeerRole;
+use aptos_logger::error;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
@@ -10,7 +11,7 @@ use warp::{
     reject, Rejection,
 };
 
-use crate::error::Error::JWTTokenError;
+use crate::error::ServiceError;
 use crate::{context::Context, types::auth::Claims};
 
 const BEARER: &str = "BEARER ";
@@ -49,16 +50,21 @@ pub async fn authorize_jwt(
         &context.jwt_decoding_key,
         &Validation::new(Algorithm::HS512),
     )
-    .map_err(|_| reject::reject())?;
+    .map_err(|e| {
+        error!("unable to authorize jwt token: {}", e);
+        reject::custom(ServiceError::unauthorized("invalid authorization token"))
+    })?;
 
     let claims = decoded.claims;
 
-    let current_epoch = context
-        .validator_cache()
-        .read()
-        .get(&claims.chain_id)
-        .unwrap()
-        .0;
+    let current_epoch = match context.validator_cache().read().get(&claims.chain_id) {
+        Some(info) => info.0,
+        None => {
+            return Err(reject::custom(ServiceError::unauthorized(
+                "expired authorization token",
+            )));
+        }
+    };
 
     if allow_roles.contains(&claims.peer_role)
         && claims.epoch == current_epoch
@@ -66,25 +72,34 @@ pub async fn authorize_jwt(
     {
         Ok(claims)
     } else {
-        Err(reject::custom(JWTTokenError))
+        Err(reject::custom(ServiceError::unauthorized(
+            "expired authorization token",
+        )))
     }
 }
 
 pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<String, Rejection> {
     let header = match headers.get(AUTHORIZATION) {
         Some(v) => v,
-        None => return Err(reject::reject()),
+        None => {
+            return Err(reject::custom(ServiceError::unauthorized(
+                "no authorization header present",
+            )))
+        }
     };
     let auth_header = match std::str::from_utf8(header.as_bytes()) {
         Ok(v) => v,
         Err(_) => return Err(reject::reject()),
     };
+    let auth_header = auth_header.split(',').next().unwrap_or_default();
     if !auth_header
         .get(..BEARER.len())
         .unwrap_or_default()
         .eq_ignore_ascii_case(BEARER)
     {
-        return Err(reject::reject());
+        return Err(reject::custom(ServiceError::unauthorized(
+            "invalid authorization header",
+        )));
     }
     Ok(auth_header
         .get(BEARER.len()..)

@@ -223,6 +223,9 @@ impl serde::Serialize for Block {
         if !self.transactions.is_empty() {
             len += 1;
         }
+        if self.chain_id != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.extractor.v1.Block", len)?;
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -233,6 +236,9 @@ impl serde::Serialize for Block {
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
+        if self.chain_id != 0 {
+            struct_ser.serialize_field("chainId", &self.chain_id)?;
+        }
         struct_ser.end()
     }
 }
@@ -242,13 +248,14 @@ impl<'de> serde::Deserialize<'de> for Block {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["timestamp", "height", "transactions"];
+        const FIELDS: &[&str] = &["timestamp", "height", "transactions", "chainId"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Timestamp,
             Height,
             Transactions,
+            ChainId,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -276,6 +283,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             "height" => Ok(GeneratedField::Height),
                             "transactions" => Ok(GeneratedField::Transactions),
+                            "chainId" => Ok(GeneratedField::ChainId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -298,6 +306,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 let mut timestamp__ = None;
                 let mut height__ = None;
                 let mut transactions__ = None;
+                let mut chain_id__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Timestamp => {
@@ -321,12 +330,22 @@ impl<'de> serde::Deserialize<'de> for Block {
                             }
                             transactions__ = Some(map.next_value()?);
                         }
+                        GeneratedField::ChainId => {
+                            if chain_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("chainId"));
+                            }
+                            chain_id__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(Block {
                     timestamp: timestamp__,
                     height: height__.unwrap_or_default(),
                     transactions: transactions__.unwrap_or_default(),
+                    chain_id: chain_id__.unwrap_or_default(),
                 })
             }
         }
@@ -684,7 +703,10 @@ impl serde::Serialize for DeleteResource {
         if !self.state_key_hash.is_empty() {
             len += 1;
         }
-        if self.resource.is_some() {
+        if self.r#type.is_some() {
+            len += 1;
+        }
+        if !self.type_str.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -698,8 +720,11 @@ impl serde::Serialize for DeleteResource {
                 pbjson::private::base64::encode(&self.state_key_hash).as_str(),
             )?;
         }
-        if let Some(v) = self.resource.as_ref() {
-            struct_ser.serialize_field("resource", v)?;
+        if let Some(v) = self.r#type.as_ref() {
+            struct_ser.serialize_field("type", v)?;
+        }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
         }
         struct_ser.end()
     }
@@ -710,13 +735,14 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["address", "stateKeyHash", "resource"];
+        const FIELDS: &[&str] = &["address", "stateKeyHash", "type", "typeStr"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Address,
             StateKeyHash,
-            Resource,
+            Type,
+            TypeStr,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -743,7 +769,8 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                         match value {
                             "address" => Ok(GeneratedField::Address),
                             "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
-                            "resource" => Ok(GeneratedField::Resource),
+                            "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -765,7 +792,8 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
             {
                 let mut address__ = None;
                 let mut state_key_hash__ = None;
-                let mut resource__ = None;
+                let mut r#type__ = None;
+                let mut type_str__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Address => {
@@ -783,18 +811,25 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                                     .0,
                             );
                         }
-                        GeneratedField::Resource => {
-                            if resource__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("resource"));
+                        GeneratedField::Type => {
+                            if r#type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            resource__ = Some(map.next_value()?);
+                            r#type__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
                         }
                     }
                 }
                 Ok(DeleteResource {
                     address: address__.unwrap_or_default(),
                     state_key_hash: state_key_hash__.unwrap_or_default(),
-                    resource: resource__,
+                    r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
                 })
             }
         }
@@ -1307,6 +1342,248 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
         )
     }
 }
+impl serde::Serialize for EntryFunctionId {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.module.is_some() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.extractor.v1.EntryFunctionId", len)?;
+        if let Some(v) = self.module.as_ref() {
+            struct_ser.serialize_field("module", v)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for EntryFunctionId {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["module", "name"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Module,
+            Name,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "module" => Ok(GeneratedField::Module),
+                            "name" => Ok(GeneratedField::Name),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = EntryFunctionId;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.extractor.v1.EntryFunctionId")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<EntryFunctionId, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut module__ = None;
+                let mut name__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Module => {
+                            if module__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("module"));
+                            }
+                            module__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(EntryFunctionId {
+                    module: module__,
+                    name: name__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "aptos.extractor.v1.EntryFunctionId",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
+impl serde::Serialize for EntryFunctionPayload {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.function.is_some() {
+            len += 1;
+        }
+        if !self.type_arguments.is_empty() {
+            len += 1;
+        }
+        if !self.arguments.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.extractor.v1.EntryFunctionPayload", len)?;
+        if let Some(v) = self.function.as_ref() {
+            struct_ser.serialize_field("function", v)?;
+        }
+        if !self.type_arguments.is_empty() {
+            struct_ser.serialize_field("typeArguments", &self.type_arguments)?;
+        }
+        if !self.arguments.is_empty() {
+            struct_ser.serialize_field("arguments", &self.arguments)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["function", "typeArguments", "arguments"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Function,
+            TypeArguments,
+            Arguments,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "function" => Ok(GeneratedField::Function),
+                            "typeArguments" => Ok(GeneratedField::TypeArguments),
+                            "arguments" => Ok(GeneratedField::Arguments),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = EntryFunctionPayload;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.extractor.v1.EntryFunctionPayload")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<EntryFunctionPayload, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut function__ = None;
+                let mut type_arguments__ = None;
+                let mut arguments__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Function => {
+                            if function__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("function"));
+                            }
+                            function__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::TypeArguments => {
+                            if type_arguments__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeArguments"));
+                            }
+                            type_arguments__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::Arguments => {
+                            if arguments__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("arguments"));
+                            }
+                            arguments__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(EntryFunctionPayload {
+                    function: function__,
+                    type_arguments: type_arguments__.unwrap_or_default(),
+                    arguments: arguments__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "aptos.extractor.v1.EntryFunctionPayload",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
 impl serde::Serialize for Event {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -1322,6 +1599,9 @@ impl serde::Serialize for Event {
             len += 1;
         }
         if self.r#type.is_some() {
+            len += 1;
+        }
+        if !self.type_str.is_empty() {
             len += 1;
         }
         if !self.data.is_empty() {
@@ -1340,6 +1620,9 @@ impl serde::Serialize for Event {
         if let Some(v) = self.r#type.as_ref() {
             struct_ser.serialize_field("type", v)?;
         }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
+        }
         if !self.data.is_empty() {
             struct_ser.serialize_field("data", &self.data)?;
         }
@@ -1352,13 +1635,14 @@ impl<'de> serde::Deserialize<'de> for Event {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["key", "sequenceNumber", "type", "data"];
+        const FIELDS: &[&str] = &["key", "sequenceNumber", "type", "typeStr", "data"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Key,
             SequenceNumber,
             Type,
+            TypeStr,
             Data,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -1387,6 +1671,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                             "key" => Ok(GeneratedField::Key),
                             "sequenceNumber" => Ok(GeneratedField::SequenceNumber),
                             "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -1410,6 +1695,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                 let mut key__ = None;
                 let mut sequence_number__ = None;
                 let mut r#type__ = None;
+                let mut type_str__ = None;
                 let mut data__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
@@ -1434,6 +1720,12 @@ impl<'de> serde::Deserialize<'de> for Event {
                             }
                             r#type__ = Some(map.next_value()?);
                         }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
+                        }
                         GeneratedField::Data => {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
@@ -1446,6 +1738,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                     key: key__,
                     sequence_number: sequence_number__.unwrap_or_default(),
                     r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
                     data: data__.unwrap_or_default(),
                 })
             }
@@ -2601,114 +2894,6 @@ impl<'de> serde::Deserialize<'de> for MoveModuleId {
             }
         }
         deserializer.deserialize_struct("aptos.extractor.v1.MoveModuleId", FIELDS, GeneratedVisitor)
-    }
-}
-impl serde::Serialize for MoveResource {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.r#type.is_some() {
-            len += 1;
-        }
-        if !self.data.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("aptos.extractor.v1.MoveResource", len)?;
-        if let Some(v) = self.r#type.as_ref() {
-            struct_ser.serialize_field("type", v)?;
-        }
-        if !self.data.is_empty() {
-            struct_ser.serialize_field("data", &self.data)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for MoveResource {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &["type", "data"];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            Type,
-            Data,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "type" => Ok(GeneratedField::Type),
-                            "data" => Ok(GeneratedField::Data),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = MoveResource;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.extractor.v1.MoveResource")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveResource, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut r#type__ = None;
-                let mut data__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::Type => {
-                            if r#type__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("type"));
-                            }
-                            r#type__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::Data => {
-                            if data__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("data"));
-                            }
-                            data__ = Some(map.next_value()?);
-                        }
-                    }
-                }
-                Ok(MoveResource {
-                    r#type: r#type__,
-                    data: data__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("aptos.extractor.v1.MoveResource", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveScriptBytecode {
@@ -3932,7 +4117,7 @@ impl serde::Serialize for MultiEd25519Signature {
         if self.threshold != 0 {
             len += 1;
         }
-        if !self.bitmap.is_empty() {
+        if !self.public_key_indices.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -3960,11 +4145,8 @@ impl serde::Serialize for MultiEd25519Signature {
         if self.threshold != 0 {
             struct_ser.serialize_field("threshold", &self.threshold)?;
         }
-        if !self.bitmap.is_empty() {
-            struct_ser.serialize_field(
-                "bitmap",
-                pbjson::private::base64::encode(&self.bitmap).as_str(),
-            )?;
+        if !self.public_key_indices.is_empty() {
+            struct_ser.serialize_field("publicKeyIndices", &self.public_key_indices)?;
         }
         struct_ser.end()
     }
@@ -3975,14 +4157,14 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["publicKeys", "signatures", "threshold", "bitmap"];
+        const FIELDS: &[&str] = &["publicKeys", "signatures", "threshold", "publicKeyIndices"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             PublicKeys,
             Signatures,
             Threshold,
-            Bitmap,
+            PublicKeyIndices,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4010,7 +4192,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             "publicKeys" => Ok(GeneratedField::PublicKeys),
                             "signatures" => Ok(GeneratedField::Signatures),
                             "threshold" => Ok(GeneratedField::Threshold),
-                            "bitmap" => Ok(GeneratedField::Bitmap),
+                            "publicKeyIndices" => Ok(GeneratedField::PublicKeyIndices),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4036,7 +4218,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                 let mut public_keys__ = None;
                 let mut signatures__ = None;
                 let mut threshold__ = None;
-                let mut bitmap__ = None;
+                let mut public_key_indices__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::PublicKeys => {
@@ -4070,13 +4252,15 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                                     .0,
                             );
                         }
-                        GeneratedField::Bitmap => {
-                            if bitmap__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("bitmap"));
+                        GeneratedField::PublicKeyIndices => {
+                            if public_key_indices__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("publicKeyIndices"));
                             }
-                            bitmap__ = Some(
-                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
-                                    .0,
+                            public_key_indices__ = Some(
+                                map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
+                                    .into_iter()
+                                    .map(|x| x.0)
+                                    .collect(),
                             );
                         }
                     }
@@ -4085,257 +4269,12 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                     public_keys: public_keys__.unwrap_or_default(),
                     signatures: signatures__.unwrap_or_default(),
                     threshold: threshold__.unwrap_or_default(),
-                    bitmap: bitmap__.unwrap_or_default(),
+                    public_key_indices: public_key_indices__.unwrap_or_default(),
                 })
             }
         }
         deserializer.deserialize_struct(
             "aptos.extractor.v1.MultiEd25519Signature",
-            FIELDS,
-            GeneratedVisitor,
-        )
-    }
-}
-impl serde::Serialize for ScriptFunctionId {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.module.is_some() {
-            len += 1;
-        }
-        if !self.name.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser =
-            serializer.serialize_struct("aptos.extractor.v1.ScriptFunctionId", len)?;
-        if let Some(v) = self.module.as_ref() {
-            struct_ser.serialize_field("module", v)?;
-        }
-        if !self.name.is_empty() {
-            struct_ser.serialize_field("name", &self.name)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for ScriptFunctionId {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &["module", "name"];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            Module,
-            Name,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "module" => Ok(GeneratedField::Module),
-                            "name" => Ok(GeneratedField::Name),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = ScriptFunctionId;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.extractor.v1.ScriptFunctionId")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<ScriptFunctionId, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut module__ = None;
-                let mut name__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::Module => {
-                            if module__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("module"));
-                            }
-                            module__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::Name => {
-                            if name__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("name"));
-                            }
-                            name__ = Some(map.next_value()?);
-                        }
-                    }
-                }
-                Ok(ScriptFunctionId {
-                    module: module__,
-                    name: name__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct(
-            "aptos.extractor.v1.ScriptFunctionId",
-            FIELDS,
-            GeneratedVisitor,
-        )
-    }
-}
-impl serde::Serialize for ScriptFunctionPayload {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.function.is_some() {
-            len += 1;
-        }
-        if !self.type_arguments.is_empty() {
-            len += 1;
-        }
-        if !self.arguments.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser =
-            serializer.serialize_struct("aptos.extractor.v1.ScriptFunctionPayload", len)?;
-        if let Some(v) = self.function.as_ref() {
-            struct_ser.serialize_field("function", v)?;
-        }
-        if !self.type_arguments.is_empty() {
-            struct_ser.serialize_field("typeArguments", &self.type_arguments)?;
-        }
-        if !self.arguments.is_empty() {
-            struct_ser.serialize_field("arguments", &self.arguments)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for ScriptFunctionPayload {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &["function", "typeArguments", "arguments"];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            Function,
-            TypeArguments,
-            Arguments,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "function" => Ok(GeneratedField::Function),
-                            "typeArguments" => Ok(GeneratedField::TypeArguments),
-                            "arguments" => Ok(GeneratedField::Arguments),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = ScriptFunctionPayload;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.extractor.v1.ScriptFunctionPayload")
-            }
-
-            fn visit_map<V>(
-                self,
-                mut map: V,
-            ) -> std::result::Result<ScriptFunctionPayload, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut function__ = None;
-                let mut type_arguments__ = None;
-                let mut arguments__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::Function => {
-                            if function__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("function"));
-                            }
-                            function__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::TypeArguments => {
-                            if type_arguments__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("typeArguments"));
-                            }
-                            type_arguments__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::Arguments => {
-                            if arguments__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("arguments"));
-                            }
-                            arguments__ = Some(map.next_value()?);
-                        }
-                    }
-                }
-                Ok(ScriptFunctionPayload {
-                    function: function__,
-                    type_arguments: type_arguments__.unwrap_or_default(),
-                    arguments: arguments__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct(
-            "aptos.extractor.v1.ScriptFunctionPayload",
             FIELDS,
             GeneratedVisitor,
         )
@@ -5211,10 +5150,13 @@ impl serde::Serialize for TransactionInfo {
         if !self.hash.is_empty() {
             len += 1;
         }
-        if !self.state_root_hash.is_empty() {
+        if !self.state_change_hash.is_empty() {
             len += 1;
         }
         if !self.event_root_hash.is_empty() {
+            len += 1;
+        }
+        if self.state_checkpoint_hash.is_some() {
             len += 1;
         }
         if self.gas_used != 0 {
@@ -5238,16 +5180,22 @@ impl serde::Serialize for TransactionInfo {
             struct_ser
                 .serialize_field("hash", pbjson::private::base64::encode(&self.hash).as_str())?;
         }
-        if !self.state_root_hash.is_empty() {
+        if !self.state_change_hash.is_empty() {
             struct_ser.serialize_field(
-                "stateRootHash",
-                pbjson::private::base64::encode(&self.state_root_hash).as_str(),
+                "stateChangeHash",
+                pbjson::private::base64::encode(&self.state_change_hash).as_str(),
             )?;
         }
         if !self.event_root_hash.is_empty() {
             struct_ser.serialize_field(
                 "eventRootHash",
                 pbjson::private::base64::encode(&self.event_root_hash).as_str(),
+            )?;
+        }
+        if let Some(v) = self.state_checkpoint_hash.as_ref() {
+            struct_ser.serialize_field(
+                "stateCheckpointHash",
+                pbjson::private::base64::encode(&v).as_str(),
             )?;
         }
         if self.gas_used != 0 {
@@ -5279,8 +5227,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
     {
         const FIELDS: &[&str] = &[
             "hash",
-            "stateRootHash",
+            "stateChangeHash",
             "eventRootHash",
+            "stateCheckpointHash",
             "gasUsed",
             "success",
             "vmStatus",
@@ -5291,8 +5240,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Hash,
-            StateRootHash,
+            StateChangeHash,
             EventRootHash,
+            StateCheckpointHash,
             GasUsed,
             Success,
             VmStatus,
@@ -5323,8 +5273,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                     {
                         match value {
                             "hash" => Ok(GeneratedField::Hash),
-                            "stateRootHash" => Ok(GeneratedField::StateRootHash),
+                            "stateChangeHash" => Ok(GeneratedField::StateChangeHash),
                             "eventRootHash" => Ok(GeneratedField::EventRootHash),
+                            "stateCheckpointHash" => Ok(GeneratedField::StateCheckpointHash),
                             "gasUsed" => Ok(GeneratedField::GasUsed),
                             "success" => Ok(GeneratedField::Success),
                             "vmStatus" => Ok(GeneratedField::VmStatus),
@@ -5350,8 +5301,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut hash__ = None;
-                let mut state_root_hash__ = None;
+                let mut state_change_hash__ = None;
                 let mut event_root_hash__ = None;
+                let mut state_checkpoint_hash__ = None;
                 let mut gas_used__ = None;
                 let mut success__ = None;
                 let mut vm_status__ = None;
@@ -5368,11 +5320,11 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                                     .0,
                             );
                         }
-                        GeneratedField::StateRootHash => {
-                            if state_root_hash__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("stateRootHash"));
+                        GeneratedField::StateChangeHash => {
+                            if state_change_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stateChangeHash"));
                             }
-                            state_root_hash__ = Some(
+                            state_change_hash__ = Some(
                                 map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
                                     .0,
                             );
@@ -5382,6 +5334,17 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                                 return Err(serde::de::Error::duplicate_field("eventRootHash"));
                             }
                             event_root_hash__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                        GeneratedField::StateCheckpointHash => {
+                            if state_checkpoint_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field(
+                                    "stateCheckpointHash",
+                                ));
+                            }
+                            state_checkpoint_hash__ = Some(
                                 map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
                                     .0,
                             );
@@ -5428,8 +5391,9 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                 }
                 Ok(TransactionInfo {
                     hash: hash__.unwrap_or_default(),
-                    state_root_hash: state_root_hash__.unwrap_or_default(),
+                    state_change_hash: state_change_hash__.unwrap_or_default(),
                     event_root_hash: event_root_hash__.unwrap_or_default(),
+                    state_checkpoint_hash: state_checkpoint_hash__,
                     gas_used: gas_used__.unwrap_or_default(),
                     success: success__.unwrap_or_default(),
                     vm_status: vm_status__.unwrap_or_default(),
@@ -5469,8 +5433,8 @@ impl serde::Serialize for TransactionPayload {
         }
         if let Some(v) = self.payload.as_ref() {
             match v {
-                transaction_payload::Payload::ScriptFunctionPayload(v) => {
-                    struct_ser.serialize_field("scriptFunctionPayload", v)?;
+                transaction_payload::Payload::EntryFunctionPayload(v) => {
+                    struct_ser.serialize_field("entryFunctionPayload", v)?;
                 }
                 transaction_payload::Payload::ScriptPayload(v) => {
                     struct_ser.serialize_field("scriptPayload", v)?;
@@ -5494,7 +5458,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
     {
         const FIELDS: &[&str] = &[
             "type",
-            "scriptFunctionPayload",
+            "entryFunctionPayload",
             "scriptPayload",
             "moduleBundlePayload",
             "writeSetPayload",
@@ -5503,7 +5467,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Type,
-            ScriptFunctionPayload,
+            EntryFunctionPayload,
             ScriptPayload,
             ModuleBundlePayload,
             WriteSetPayload,
@@ -5532,7 +5496,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "scriptFunctionPayload" => Ok(GeneratedField::ScriptFunctionPayload),
+                            "entryFunctionPayload" => Ok(GeneratedField::EntryFunctionPayload),
                             "scriptPayload" => Ok(GeneratedField::ScriptPayload),
                             "moduleBundlePayload" => Ok(GeneratedField::ModuleBundlePayload),
                             "writeSetPayload" => Ok(GeneratedField::WriteSetPayload),
@@ -5565,13 +5529,13 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             }
                             r#type__ = Some(map.next_value::<transaction_payload::Type>()? as i32);
                         }
-                        GeneratedField::ScriptFunctionPayload => {
+                        GeneratedField::EntryFunctionPayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field(
-                                    "scriptFunctionPayload",
+                                    "entryFunctionPayload",
                                 ));
                             }
-                            payload__ = Some(transaction_payload::Payload::ScriptFunctionPayload(
+                            payload__ = Some(transaction_payload::Payload::EntryFunctionPayload(
                                 map.next_value()?,
                             ));
                         }
@@ -5623,10 +5587,9 @@ impl serde::Serialize for transaction_payload::Type {
         S: serde::Serializer,
     {
         let variant = match self {
-            Self::ScriptFunctionPayload => "SCRIPT_FUNCTION_PAYLOAD",
+            Self::EntryFunctionPayload => "ENTRY_FUNCTION_PAYLOAD",
             Self::ScriptPayload => "SCRIPT_PAYLOAD",
             Self::ModuleBundlePayload => "MODULE_BUNDLE_PAYLOAD",
-            Self::WriteSetPayload => "WRITE_SET_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }
@@ -5638,10 +5601,9 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "SCRIPT_FUNCTION_PAYLOAD",
+            "ENTRY_FUNCTION_PAYLOAD",
             "SCRIPT_PAYLOAD",
             "MODULE_BUNDLE_PAYLOAD",
-            "WRITE_SET_PAYLOAD",
         ];
 
         struct GeneratedVisitor;
@@ -5684,12 +5646,9 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                 E: serde::de::Error,
             {
                 match value {
-                    "SCRIPT_FUNCTION_PAYLOAD" => {
-                        Ok(transaction_payload::Type::ScriptFunctionPayload)
-                    }
+                    "ENTRY_FUNCTION_PAYLOAD" => Ok(transaction_payload::Type::EntryFunctionPayload),
                     "SCRIPT_PAYLOAD" => Ok(transaction_payload::Type::ScriptPayload),
                     "MODULE_BUNDLE_PAYLOAD" => Ok(transaction_payload::Type::ModuleBundlePayload),
-                    "WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -6296,7 +6255,13 @@ impl serde::Serialize for WriteResource {
         if !self.state_key_hash.is_empty() {
             len += 1;
         }
-        if self.data.is_some() {
+        if self.r#type.is_some() {
+            len += 1;
+        }
+        if !self.type_str.is_empty() {
+            len += 1;
+        }
+        if !self.data.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -6310,8 +6275,14 @@ impl serde::Serialize for WriteResource {
                 pbjson::private::base64::encode(&self.state_key_hash).as_str(),
             )?;
         }
-        if let Some(v) = self.data.as_ref() {
-            struct_ser.serialize_field("data", v)?;
+        if let Some(v) = self.r#type.as_ref() {
+            struct_ser.serialize_field("type", v)?;
+        }
+        if !self.type_str.is_empty() {
+            struct_ser.serialize_field("typeStr", &self.type_str)?;
+        }
+        if !self.data.is_empty() {
+            struct_ser.serialize_field("data", &self.data)?;
         }
         struct_ser.end()
     }
@@ -6322,12 +6293,14 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["address", "stateKeyHash", "data"];
+        const FIELDS: &[&str] = &["address", "stateKeyHash", "type", "typeStr", "data"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Address,
             StateKeyHash,
+            Type,
+            TypeStr,
             Data,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -6355,6 +6328,8 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                         match value {
                             "address" => Ok(GeneratedField::Address),
                             "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
+                            "type" => Ok(GeneratedField::Type),
+                            "typeStr" => Ok(GeneratedField::TypeStr),
                             "data" => Ok(GeneratedField::Data),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -6377,6 +6352,8 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
             {
                 let mut address__ = None;
                 let mut state_key_hash__ = None;
+                let mut r#type__ = None;
+                let mut type_str__ = None;
                 let mut data__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
@@ -6395,6 +6372,18 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                                     .0,
                             );
                         }
+                        GeneratedField::Type => {
+                            if r#type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("type"));
+                            }
+                            r#type__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::TypeStr => {
+                            if type_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("typeStr"));
+                            }
+                            type_str__ = Some(map.next_value()?);
+                        }
                         GeneratedField::Data => {
                             if data__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
@@ -6406,7 +6395,9 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                 Ok(WriteResource {
                     address: address__.unwrap_or_default(),
                     state_key_hash: state_key_hash__.unwrap_or_default(),
-                    data: data__,
+                    r#type: r#type__,
+                    type_str: type_str__.unwrap_or_default(),
+                    data: data__.unwrap_or_default(),
                 })
             }
         }

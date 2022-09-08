@@ -34,11 +34,6 @@ impl DbReader for MockDbReaderWriter {
         }
     }
 
-    fn get_latest_version_option(&self) -> Result<Option<Version>> {
-        // return a dummy version for tests
-        Ok(Some(1))
-    }
-
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
         Ok(Some(1))
@@ -63,7 +58,8 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource = AccountResource::new(0, vec![], EventHandle::random(0));
+    let account_resource =
+        AccountResource::new(0, vec![], EventHandle::random(0), EventHandle::random(0));
 
     AccountState::new(
         AccountAddress::random(),

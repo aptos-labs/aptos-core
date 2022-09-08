@@ -5,14 +5,9 @@ test:
 	- poetry run python -m unittest discover -s aptos_sdk/ -p '*.py' -t ..
 
 fmt:
-	- find aptos_sdk -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-	- find aptos_sdk -type f -name "*.py" | xargs poetry run isort
-	- find aptos_sdk -type f -name "*.py" | xargs poetry run black
-
-fmt-classic:
-	- find . -type f -name "*.py" | xargs python -m autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-	- find . -type f -name "*.py" | xargs python -m isort
-	- find . -type f -name "*.py" | xargs python -m black
+	- find . -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
+	- find . -type f -name "*.py" | xargs poetry run isort
+	- find . -type f -name "*.py" | xargs poetry run black
 
 examples:
 	- poetry run python -m examples.transfer-coin

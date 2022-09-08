@@ -1,31 +1,48 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{HashValue, Transaction, U64};
+use crate::{HashValue, Transaction, TransactionOnChainData, U64};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-// TODO: Consider including this in the API.
-// If we do that, change these u64s to U64.
-
-/// A description of a block
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct BlockInfo {
-    pub block_height: u64,
-    pub block_hash: HashValue,
-    pub block_timestamp: u64,
-    pub start_version: u64,
-    pub end_version: u64,
-    pub num_transactions: u16,
-}
-
+/// A Block with or without transactions
+///
+/// This contains the information about a transactions along with
+/// associated transactions if requested
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct Block {
+    /// The block height (number of the block from 0)
     pub block_height: U64,
+    /// The block hash
     pub block_hash: HashValue,
+    /// The block timestamp in Unix epoch microseconds
     pub block_timestamp: U64,
+    /// The first ledger version of the block inclusive
     pub first_version: U64,
+    /// The last ledger version of the block inclusive
     pub last_version: U64,
+    /// The transactions in the block in sequential order
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transactions: Option<Vec<Transaction>>,
+}
+
+/// A Block with or without transactions for encoding in BCS
+///
+/// This contains the information about a transactions along with
+/// associated transactions if requested
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BcsBlock {
+    /// The block height (number of the block from 0)
+    pub block_height: u64,
+    /// The block hash
+    pub block_hash: aptos_crypto::HashValue,
+    /// The block timestamp in Unix epoch microseconds
+    pub block_timestamp: u64,
+    /// The first ledger version of the block inclusive
+    pub first_version: u64,
+    /// The last ledger version of the block inclusive
+    pub last_version: u64,
+    /// The transactions in the block in sequential order
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transactions: Option<Vec<TransactionOnChainData>>,
 }

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
 use aptos_logger::{
-    debug, error,
+    debug, error, info,
     prelude::{sample, SampleRate},
     sample::Sampling,
     Schema,
@@ -48,8 +48,10 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
 
     if log.status >= 500 {
         sample!(SampleRate::Duration(Duration::from_secs(1)), error!(log));
+    } else if log.status >= 400 {
+        sample!(SampleRate::Duration(Duration::from_secs(60)), info!(log));
     } else {
-        debug!(log);
+        sample!(SampleRate::Duration(Duration::from_secs(1)), debug!(log));
     }
 
     // Log response statuses generally.
@@ -74,6 +76,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
 
 // TODO: Figure out how to have certain fields be borrowed, like in the
 // original implementation.
+/// HTTP request log, keeping track of the requests
 #[derive(Schema)]
 pub struct HttpRequestLog {
     #[schema(display)]

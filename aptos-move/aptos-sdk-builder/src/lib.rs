@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::ScriptABI;
+use aptos_types::transaction::EntryABI;
 use std::{ffi::OsStr, fs, io::Read, path::Path};
 
 pub mod golang;
@@ -26,9 +26,9 @@ fn get_abi_paths(dir: &Path) -> std::io::Result<Vec<String>> {
     Ok(abi_paths)
 }
 
-/// Read all ABI files the specified directories. This supports both new and old `ScriptABI`s.
-pub fn read_abis(dir_paths: &[impl AsRef<Path>]) -> anyhow::Result<Vec<ScriptABI>> {
-    let mut abis = Vec::<ScriptABI>::new();
+/// Read all ABI files the specified directories. This supports both new and old `EntryABI`s.
+pub fn read_abis(dir_paths: &[impl AsRef<Path>]) -> anyhow::Result<Vec<EntryABI>> {
+    let mut abis = Vec::<EntryABI>::new();
     for dir in dir_paths.iter() {
         for path in get_abi_paths(dir.as_ref())? {
             let mut buffer = Vec::new();
@@ -42,11 +42,11 @@ pub fn read_abis(dir_paths: &[impl AsRef<Path>]) -> anyhow::Result<Vec<ScriptABI
     #[allow(clippy::unnecessary_sort_by)]
     abis.sort_by(|a, b| {
         let a0 = match a {
-            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            EntryABI::EntryFunction(sf) => sf.module_name().to_string(),
             _ => "".to_owned(),
         };
         let b0 = match b {
-            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            EntryABI::EntryFunction(sf) => sf.module_name().to_string(),
             _ => "".to_owned(),
         };
 
@@ -63,6 +63,6 @@ pub trait SourceInstaller {
     fn install_transaction_builders(
         &self,
         name: &str,
-        abis: &[ScriptABI],
+        abis: &[EntryABI],
     ) -> std::result::Result<(), Self::Error>;
 }

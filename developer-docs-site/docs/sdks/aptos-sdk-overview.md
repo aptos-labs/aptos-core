@@ -10,7 +10,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This document describes the main features and components of the Aptos SDK.
 
-The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos Blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos Blockchain and reading the blockchain's state. 
+The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos blockchain and reading the blockchain's state. 
 
 :::tip
 To see how to use the Aptos SDK, see the tutorial [Transactions with Typescript SDK](/sdks/transactions-with-ts-sdk). Also see the [Aptos SDK docs](https://aptos-labs.github.io/ts-sdk-doc/).
@@ -33,7 +33,7 @@ The following are a few key features of the Aptos SDK:
 - **Key generation:** The Aptos SDK provides convenient methods for generating [Ed25519](https://ed25519.cr.yp.to/) key pairs. The Ed25519 public keys can be used to derive the chain account addresses, while the private keys should be kept private for transaction signing. See the [class TransactionBuilderEd25519](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderEd25519.html).
 - **Transaction signing and submission**: Although the Aptos REST APIs support signing a raw transaction on the server-side, signing the transactions on the client side, using the Aptos SDK, is more secure and should be the preferred choice. 
 - **Transaction status querying**: The Aptos SDK supports transaction status queries (success, failure, pending), by transaction hash.
-- **BCS library:** The Aptos SDK implements a [BCS](https://docs.rs/bcs/latest/bcs/) (Binary Canonical Serialization) library for transaction signing and submission. The Aptos Blockchain uses BCS for data serialization and deserialization. See [Aptos SDK BCS](https://aptos-labs.github.io/ts-sdk-doc/modules/BCS.html).
+- **BCS library:** The Aptos SDK implements a [BCS](https://docs.rs/bcs/latest/bcs/) (Binary Canonical Serialization) library for transaction signing and submission. The Aptos blockchain uses BCS for data serialization and deserialization. See [Aptos SDK BCS](https://aptos-labs.github.io/ts-sdk-doc/modules/BCS.html).
 - **Methods for information retrieval**: Resources, modules, and transactions under a specific account can be retrieved with the Aptos SDK.
 - **Faucet client**: The Aptos [FaucetClient](https://aptos-labs.github.io/ts-sdk-doc/classes/FaucetClient.html) is for minting test coins that are used for development.
 - **Token client**: Aptos SDK provides built-in support for NFT minting and querying. See [TokenClient](https://aptos-labs.github.io/ts-sdk-doc/classes/TokenClient.html).
@@ -92,12 +92,12 @@ The [class AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosCli
 
 In addition, the `AptosClient` component supports two methods for transaction signing and submission.
 
-1. Submitting transactions in JSON format, which delegates the signing message (input to the signing function) creation to the API server. This is applicable when using the REST API and the Aptos server to generate the signing message, the transaction signature and submit the signed transaction to the Aptos Blockchain. See the tutorial [Your First Transaction](/tutorials/first-transaction.md).
+1. Submitting transactions in JSON format, which delegates the signing message (input to the signing function) creation to the API server. This is applicable when using the REST API and the Aptos server to generate the signing message, the transaction signature and submit the signed transaction to the Aptos blockchain. See the tutorial [Your First Transaction](/tutorials/first-transaction.md).
 2. Submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](/guides/sign-a-transaction.md).
 
 :::tip
 
-The second method, i.e., in BCS format, is the recommended way for submitting transactions to the Aptos Blockchain.
+The second method, i.e., in BCS format, is the recommended way for submitting transactions to the Aptos blockchain.
 
 :::
 
@@ -123,11 +123,11 @@ An example of an e2e test for submitting a BCS transaction can be found [here](h
 
 :::
 
-2. The second level of validation is fuzzing tests with test vectors. The test vectors are produced by the same code used by the Aptos Blockchain. The test vectors are arrays of JSON objects. Each JSON object contains randomized inputs and the expected outputs. These test vectors can be parsed and loaded by Aptos SDKs to validate their implementations of Transaction Builder and BCS.
+2. The second level of validation is fuzzing tests with test vectors. The test vectors are produced by the same code used by the Aptos blockchain. The test vectors are arrays of JSON objects. Each JSON object contains randomized inputs and the expected outputs. These test vectors can be parsed and loaded by Aptos SDKs to validate their implementations of Transaction Builder and BCS.
 
 There are a total of three test vectors. Each covers one type of transaction payload.
 
-- [ScriptFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_function_payload.json)
+- [ScriptFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_entry_function_payload.json)
 - [Script vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_payload.json)
 - [ModuleBundle vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_module_payload.json)
 

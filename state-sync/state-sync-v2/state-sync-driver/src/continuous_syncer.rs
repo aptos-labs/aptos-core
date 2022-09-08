@@ -16,6 +16,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
@@ -151,7 +152,7 @@ impl<
         if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
             // If the stream has timed out too many times, we need to reset it
             warn!("Resetting the currently active data stream due to too many timeouts!");
-            self.reset_active_stream();
+            self.reset_active_stream(None).await?;
         }
         result
     }
@@ -250,18 +251,20 @@ impl<
                         let num_transaction_outputs = transaction_outputs_with_proof
                             .transactions_and_outputs
                             .len();
-                        self.storage_synchronizer.apply_transaction_outputs(
-                            notification_id,
-                            transaction_outputs_with_proof,
-                            ledger_info_with_signatures.clone(),
-                            None,
-                        )?;
+                        self.storage_synchronizer
+                            .apply_transaction_outputs(
+                                notification_id,
+                                transaction_outputs_with_proof,
+                                ledger_info_with_signatures.clone(),
+                                None,
+                            )
+                            .await?;
                         num_transaction_outputs
                     } else {
-                        self.terminate_active_stream(
+                        self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
                             NotificationFeedback::PayloadTypeIsIncorrect,
-                        )
+                        )))
                         .await?;
                         return Err(Error::InvalidPayload(
                             "Did not receive transaction outputs with proof!".into(),
@@ -271,18 +274,20 @@ impl<
                 ContinuousSyncingMode::ExecuteTransactions => {
                     if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                         let num_transactions = transaction_list_with_proof.transactions.len();
-                        self.storage_synchronizer.execute_transactions(
-                            notification_id,
-                            transaction_list_with_proof,
-                            ledger_info_with_signatures.clone(),
-                            None,
-                        )?;
+                        self.storage_synchronizer
+                            .execute_transactions(
+                                notification_id,
+                                transaction_list_with_proof,
+                                ledger_info_with_signatures.clone(),
+                                None,
+                            )
+                            .await?;
                         num_transactions
                     } else {
-                        self.terminate_active_stream(
+                        self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
                             NotificationFeedback::PayloadTypeIsIncorrect,
-                        )
+                        )))
                         .await?;
                         return Err(Error::InvalidPayload(
                             "Did not receive transactions with proof!".into(),
@@ -313,10 +318,10 @@ impl<
             .expected_next_version()?;
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_version {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::InvalidPayloadData,
-                )
+                )))
                 .await?;
                 Err(Error::VerificationError(format!(
                     "The payload start version does not match the expected version! Start: {:?}, expected: {:?}",
@@ -326,8 +331,11 @@ impl<
                 Ok(payload_start_version)
             }
         } else {
-            self.terminate_active_stream(notification_id, NotificationFeedback::EmptyPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            )))
+            .await?;
             Err(Error::VerificationError(
                 "The playload starting version is missing!".into(),
             ))
@@ -351,10 +359,10 @@ impl<
             let sync_request_version = sync_request_target.ledger_info().version();
             let proof_version = ledger_info_with_signatures.ledger_info().version();
             if sync_request_version < proof_version {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::PayloadProofFailed,
-                )
+                )))
                 .await?;
                 return Err(Error::VerificationError(format!(
                     "Proof version is higher than the sync target. Proof version: {:?}, sync version: {:?}.",
@@ -368,8 +376,11 @@ impl<
             .get_speculative_stream_state()
             .verify_ledger_info_with_signatures(ledger_info_with_signatures)
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::PayloadProofFailed)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::PayloadProofFailed,
+            )))
+            .await?;
             Err(error)
         } else {
             Ok(())
@@ -382,29 +393,23 @@ impl<
         &mut self,
         data_notification: DataNotification,
     ) -> Result<(), Error> {
-        self.reset_active_stream();
+        // Calculate the feedback based on the notification
+        let notification_feedback = match data_notification.data_payload {
+            DataPayload::EndOfStream => NotificationFeedback::EndOfStream,
+            _ => NotificationFeedback::PayloadTypeIsIncorrect,
+        };
+        let notification_and_feedback =
+            NotificationAndFeedback::new(data_notification.notification_id, notification_feedback);
 
-        utils::handle_end_of_stream_or_invalid_payload(
-            &mut self.streaming_client,
-            data_notification,
-        )
-        .await
-    }
+        // Reset the stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
 
-    /// Terminates the currently active stream with the provided feedback
-    pub async fn terminate_active_stream(
-        &mut self,
-        notification_id: NotificationId,
-        notification_feedback: NotificationFeedback,
-    ) -> Result<(), Error> {
-        self.reset_active_stream();
-
-        utils::terminate_stream_with_feedback(
-            &mut self.streaming_client,
-            notification_id,
-            notification_feedback,
-        )
-        .await
+        // Return an error if the payload was invalid
+        match data_notification.data_payload {
+            DataPayload::EndOfStream => Ok(()),
+            _ => Err(Error::InvalidPayload("Unexpected payload type!".into())),
+        }
     }
 
     /// Returns the speculative stream state. Assumes that the state exists.
@@ -415,8 +420,22 @@ impl<
     }
 
     /// Resets the currently active data stream and speculative state
-    pub fn reset_active_stream(&mut self) {
-        self.speculative_stream_state = None;
+    pub async fn reset_active_stream(
+        &mut self,
+        notification_and_feedback: Option<NotificationAndFeedback>,
+    ) -> Result<(), Error> {
+        if let Some(active_data_stream) = &self.active_data_stream {
+            let data_stream_id = active_data_stream.data_stream_id;
+            utils::terminate_stream_with_feedback(
+                &mut self.streaming_client,
+                data_stream_id,
+                notification_and_feedback,
+            )
+            .await?;
+        }
+
         self.active_data_stream = None;
+        self.speculative_stream_state = None;
+        Ok(())
     }
 }

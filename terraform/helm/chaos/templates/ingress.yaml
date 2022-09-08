@@ -33,14 +33,14 @@ spec:
     http:
       paths:
       # the first path must be for SSL redirect
-      - path: /*
+      - path: /
         pathType: Prefix
         backend:
           service: 
             name: ssl-redirect
             port: 
               name: use-annotation
-      - path: /*
+      - path: /
         pathType: Prefix
         backend:
           service:

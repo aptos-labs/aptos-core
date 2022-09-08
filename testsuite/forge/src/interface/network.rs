@@ -1,10 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use super::Test;
 use crate::success_criteria::SuccessCriteria;
 use crate::{CoreContext, Result, Swarm, TestReport};
-use transaction_emitter_lib::EmitJobRequest;
+use tokio::runtime::Runtime;
+use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -18,8 +21,10 @@ pub struct NetworkContext<'t> {
     core: CoreContext,
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
-    pub global_job: EmitJobRequest,
-    success_criteria: SuccessCriteria,
+    pub global_duration: Duration,
+    pub emit_job: EmitJobRequest,
+    pub success_criteria: SuccessCriteria,
+    pub runtime: Runtime,
 }
 
 impl<'t> NetworkContext<'t> {
@@ -27,15 +32,18 @@ impl<'t> NetworkContext<'t> {
         core: CoreContext,
         swarm: &'t mut dyn Swarm,
         report: &'t mut TestReport,
-        global_job: EmitJobRequest,
+        global_duration: Duration,
+        emit_job: EmitJobRequest,
         success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             core,
             swarm,
             report,
-            global_job,
+            global_duration,
+            emit_job,
             success_criteria,
+            runtime: Runtime::new().unwrap(),
         }
     }
 
@@ -46,7 +54,11 @@ impl<'t> NetworkContext<'t> {
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }
-    pub fn success_criteria(&self) -> &SuccessCriteria {
-        &self.success_criteria
+
+    pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
+        self.runtime.block_on(
+            self.success_criteria
+                .check_for_success(stats, window, self.swarm),
+        )
     }
 }

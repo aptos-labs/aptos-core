@@ -3,43 +3,55 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_config::config::NodeConfig;
+use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};
+use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
+use aptos_types::chain_id::ChainId;
+use futures::channel::mpsc;
+use once_cell::sync::Lazy;
+use rand::Rng;
+use rand_core::OsRng;
+use serde::Deserialize;
+use std::{
+    collections::BTreeMap,
+    env,
+    future::Future,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+use tokio::{
+    runtime::{Builder, Runtime},
+    task::JoinHandle,
+    time,
+};
+use uuid::Uuid;
+
 use crate::{
-    build_information::create_build_info_telemetry_event,
     constants::{
         APTOS_GA_API_SECRET, APTOS_GA_MEASUREMENT_ID, ENV_APTOS_DISABLE_TELEMETRY,
-        ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, GA4_URL, HTTPBIN_URL,
+        ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS, ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS,
+        ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS, ENV_APTOS_FORCE_ENABLE_TELEMETRY,
+        ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, ENV_TELEMETRY_SERVICE_URL, GA4_URL, HTTPBIN_URL,
         NODE_CORE_METRICS_FREQ_SECS, NODE_NETWORK_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS,
-        TELEMETRY_SERVICE_URL,
+        PROMETHEUS_PUSH_METRICS_FREQ_SECS, TELEMETRY_SERVICE_URL,
     },
     core_metrics::create_core_metric_telemetry_event,
     metrics,
     network_metrics::create_network_metric_telemetry_event,
     sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender,
+    utils::create_build_info_telemetry_event,
 };
-use aptos_config::config::NodeConfig;
-use aptos_logger::prelude::*;
-use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::ChainId;
-use futures::StreamExt;
-use once_cell::sync::Lazy;
-use rand::Rng;
-use rand_core::OsRng;
-use serde::Deserialize;
-use std::{
-    env,
-    time::{SystemTime, UNIX_EPOCH},
-};
-use tokio::{
-    runtime::{Builder, Runtime},
-    task::JoinHandle,
-};
-use tokio_stream::wrappers::IntervalStream;
-use uuid::Uuid;
 
-const IP_ADDRESS_KEY: &str = "IP_ADDRESS"; // The IP address key
-const TELEMETRY_TOKEN_KEY: &str = "TELEMETRY_TOKEN"; // The telemetry token key
-const UNKNOWN_METRIC_VALUE: &str = "UNKNOWN"; // The default for unknown metric values
+// The chain ID key
+const CHAIN_ID_KEY: &str = "CHAIN_ID";
+// The IP address key
+const IP_ADDRESS_KEY: &str = "IP_ADDRESS";
+// The telemetry token key
+const TELEMETRY_TOKEN_KEY: &str = "TELEMETRY_TOKEN";
+// The default for unknown metric values
+const UNKNOWN_METRIC_VALUE: &str = "UNKNOWN";
 
 /// The random token presented by the node to connect all
 /// telemetry events.
@@ -55,9 +67,37 @@ fn telemetry_is_disabled() -> bool {
     env::var(ENV_APTOS_DISABLE_TELEMETRY).is_ok()
 }
 
+/// Flag to force enabling/disabling of telemetry
+fn force_enable_telemetry() -> bool {
+    env::var(ENV_APTOS_FORCE_ENABLE_TELEMETRY).is_ok()
+}
+
+/// Flag to control enabling/disabling prometheus push metrics
+fn enable_prometheus_push_metrics() -> bool {
+    force_enable_telemetry()
+        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS).is_ok())
+}
+
+/// Flag to control enabling/disabling push logs
+fn enable_push_logs() -> bool {
+    force_enable_telemetry()
+        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS).is_ok())
+}
+
+/// Flag to control enabling/disabling telemetry push events
+fn enable_push_custom_events() -> bool {
+    force_enable_telemetry()
+        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS).is_ok())
+}
+
 /// Starts the telemetry service and returns the execution runtime.
 /// Note: The service will not be created if telemetry is disabled.
-pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Option<Runtime> {
+pub fn start_telemetry_service(
+    node_config: NodeConfig,
+    chain_id: ChainId,
+    build_info: BTreeMap<String, String>,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
         warn!("Aptos telemetry is disabled!");
@@ -66,18 +106,88 @@ pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Op
 
     // Create the telemetry runtime
     let telemetry_runtime = Builder::new_multi_thread()
-        .thread_name("aptos-telemetry")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("telemetry-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");
 
-    // Spawn the telemetry service
-    let peer_id = fetch_peer_id(&node_config);
-    telemetry_runtime
-        .handle()
-        .spawn(spawn_telemetry_service(peer_id, chain_id, node_config));
+    telemetry_runtime.handle().spawn(spawn_telemetry_service(
+        node_config,
+        chain_id,
+        build_info,
+        remote_log_rx,
+    ));
 
     Some(telemetry_runtime)
+}
+
+async fn spawn_telemetry_service(
+    node_config: NodeConfig,
+    chain_id: ChainId,
+    build_info: BTreeMap<String, String>,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+) {
+    let telemetry_svc_url =
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
+
+    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
+
+    if !force_enable_telemetry() && !telemetry_sender.check_chain_access(chain_id).await {
+        warn!(
+            "Aptos telemetry is not sent to the telemetry service because the service is not configured for chain ID {}",
+            chain_id
+        );
+        // Spawn the custom event sender to send to GA4 only.
+        // This is a temporary workaround while we deprecate and remove GA4 completely.
+        let peer_id = fetch_peer_id(&node_config);
+        tokio::spawn(custom_event_sender(
+            None,
+            peer_id,
+            chain_id,
+            node_config,
+            build_info,
+        ));
+        return;
+    }
+
+    if enable_push_logs() {
+        if let Some(rx) = remote_log_rx {
+            let telemetry_log_sender = TelemetryLogSender::new(telemetry_sender.clone());
+            tokio::spawn(telemetry_log_sender.start(rx));
+        }
+    }
+
+    if enable_prometheus_push_metrics() {
+        let telemetry_sender = telemetry_sender.clone();
+        tokio::spawn(async move {
+            // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
+            let mut interval =
+                time::interval(Duration::from_secs(PROMETHEUS_PUSH_METRICS_FREQ_SECS));
+            loop {
+                interval.tick().await;
+                telemetry_sender.try_push_prometheus_metrics().await;
+            }
+        });
+    }
+
+    if enable_push_custom_events() {
+        // Spawn the custom event sender
+        let peer_id = fetch_peer_id(&node_config);
+        tokio::spawn(custom_event_sender(
+            Some(telemetry_sender),
+            peer_id,
+            chain_id,
+            node_config,
+            build_info,
+        ));
+    }
+
+    info!("Telemetry service started!");
 }
 
 /// Returns the peer id given the node config.
@@ -89,86 +199,104 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
     }
 }
 
-/// Spawns the dedicated telemetry service that operates periodically
-async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
-    let telemetry_sender = TelemetrySender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
+async fn run_function_periodically<Fut>(interval_seconds: u64, function_to_run: impl Fn() -> Fut)
+where
+    Fut: Future<Output = ()>,
+{
+    let mut interval = time::interval(Duration::from_secs(interval_seconds));
+    loop {
+        interval.tick().await;
+        function_to_run().await;
+    }
+}
 
+/// Spawns the dedicated telemetry service that operates periodically
+async fn custom_event_sender(
+    telemetry_sender: Option<TelemetrySender>,
+    peer_id: String,
+    chain_id: ChainId,
+    node_config: NodeConfig,
+    build_info: BTreeMap<String, String>,
+) {
     // Send build information once (only on startup)
     send_build_information(
         peer_id.clone(),
-        chain_id.to_string().clone(),
+        chain_id.to_string(),
+        build_info,
         telemetry_sender.clone(),
     )
     .await;
 
-    // Periodically send node core metrics
-    let mut core_metrics_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_CORE_METRICS_FREQ_SECS),
-    ))
-    .fuse();
-
-    // Periodically send node network metrics
-    let mut network_metrics_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_NETWORK_METRICS_FREQ_SECS),
-    ))
-    .fuse();
-
-    // Periodically send system information
-    let mut system_information_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_SYS_INFO_FREQ_SECS),
-    ))
-    .fuse();
-
-    info!("Telemetry service started!");
-    loop {
-        futures::select! {
-            _ = system_information_interval.select_next_some() => {
-                send_system_information(peer_id.clone(), telemetry_sender.clone()).await;
-            }
-            _ = core_metrics_interval.select_next_some() => {
-                send_node_core_metrics(peer_id.clone(), &node_config, telemetry_sender.clone()).await;
-            }
-            _ = network_metrics_interval.select_next_some() => {
-                send_node_network_metrics(peer_id.clone(), telemetry_sender.clone()).await;
-            }
-        }
-    }
+    futures::future::join3(
+        // Periodically send system information
+        run_function_periodically(NODE_SYS_INFO_FREQ_SECS, || {
+            send_system_information(
+                peer_id.clone(),
+                chain_id.to_string(),
+                telemetry_sender.clone(),
+            )
+        }),
+        // Periodically send node core metrics
+        run_function_periodically(NODE_CORE_METRICS_FREQ_SECS, || {
+            send_node_core_metrics(
+                peer_id.clone(),
+                chain_id.to_string(),
+                &node_config,
+                telemetry_sender.clone(),
+            )
+        }),
+        // Periodically send node network metrics
+        run_function_periodically(NODE_NETWORK_METRICS_FREQ_SECS, || {
+            send_node_network_metrics(
+                peer_id.clone(),
+                chain_id.to_string(),
+                telemetry_sender.clone(),
+            )
+        }),
+    )
+    .await;
 }
 
 /// Collects and sends the build information via telemetry
 async fn send_build_information(
     peer_id: String,
     chain_id: String,
-    telemetry_sender: TelemetrySender,
+    build_info: BTreeMap<String, String>,
+    telemetry_sender: Option<TelemetrySender>,
 ) {
-    let telemetry_event = create_build_info_telemetry_event(chain_id).await;
-    let _join_handle =
-        send_telemetry_event_with_ip(peer_id, Some(telemetry_sender), telemetry_event).await;
+    let telemetry_event = create_build_info_telemetry_event(build_info).await;
+    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the core node metrics via telemetry
 async fn send_node_core_metrics(
     peer_id: String,
+    chain_id: String,
     node_config: &NodeConfig,
-    telemetry_sender: TelemetrySender,
+    telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_core_metric_telemetry_event(node_config).await;
-    let _join_handle =
-        send_telemetry_event_with_ip(peer_id, Some(telemetry_sender), telemetry_event).await;
+    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the node network metrics via telemetry
-async fn send_node_network_metrics(peer_id: String, telemetry_sender: TelemetrySender) {
+async fn send_node_network_metrics(
+    peer_id: String,
+    chain_id: String,
+    telemetry_sender: Option<TelemetrySender>,
+) {
     let telemetry_event = create_network_metric_telemetry_event().await;
-    let _join_handle =
-        send_telemetry_event_with_ip(peer_id, Some(telemetry_sender), telemetry_event).await;
+    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the system information via telemetry
-async fn send_system_information(peer_id: String, telemetry_sender: TelemetrySender) {
+async fn send_system_information(
+    peer_id: String,
+    chain_id: String,
+    telemetry_sender: Option<TelemetrySender>,
+) {
     let telemetry_event = create_system_info_telemetry_event().await;
-    let _join_handle =
-        send_telemetry_event_with_ip(peer_id, Some(telemetry_sender), telemetry_event).await;
+    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Fetches the IP address and sends the given telemetry event
@@ -176,6 +304,7 @@ async fn send_system_information(peer_id: String, telemetry_sender: TelemetrySen
 /// token to help correlate metrics across events.
 pub(crate) async fn send_telemetry_event_with_ip(
     peer_id: String,
+    chain_id: String,
     telemetry_sender: Option<TelemetrySender>,
     telemetry_event: TelemetryEvent,
 ) -> JoinHandle<()> {
@@ -183,6 +312,7 @@ pub(crate) async fn send_telemetry_event_with_ip(
     let TelemetryEvent { name, mut params } = telemetry_event;
     params.insert(IP_ADDRESS_KEY.to_string(), get_origin_ip().await);
     params.insert(TELEMETRY_TOKEN_KEY.to_string(), TELEMETRY_TOKEN.clone());
+    params.insert(CHAIN_ID_KEY.into(), chain_id);
     let telemetry_event = TelemetryEvent { name, params };
 
     // Send the telemetry event
@@ -245,7 +375,7 @@ fn spawn_telemetry_service_event_sender(
         }
         telemetry_sender
             .unwrap()
-            .send_metrics(event_name, telemetry_dump)
+            .try_send_custom_metrics(event_name, telemetry_dump)
             .await;
     })
 }
@@ -282,7 +412,7 @@ fn spawn_telemetry_event_sender(
                     );
                     metrics::increment_telemetry_successes(&event_name);
                 } else {
-                    error!(
+                    debug!(
                         "Failed to send telemetry event! Status: {}, event: {}.",
                         response.status(),
                         event_name
@@ -292,7 +422,7 @@ fn spawn_telemetry_event_sender(
                 }
             }
             Err(error) => {
-                error!(
+                debug!(
                     "Failed to send telemetry event: {}. Error: {:?}",
                     event_name, error
                 );

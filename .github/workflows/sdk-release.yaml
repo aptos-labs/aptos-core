@@ -1,8 +1,8 @@
 ## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
 ## If you are trying to change how this CI works, you MUST go read the important
-## note at the top of build-images. In short, to test this, you must temporarily
-## change build-images to use the pull_request trigger instead of pull_request_target.
+## note at the top of docker-build-test.yaml. In short, to test this, you must temporarily
+## change docker-build-test to use the pull_request trigger instead of pull_request_target.
 
 ## Make sure to add the CICD:CICD:build-images and CICD:run-e2e-tests labels to test
 ## this within an in-review PR.
@@ -28,7 +28,7 @@ on:
 jobs:
   # Confirm that the generated client within the TS SDK has been re-generated
   # if there are any changes that would affect it within the PR / commit. If
-  # everything is checked in, run tests, build the SDK, and upload it to npm.js.
+  # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   test-sdk-confirm-client-generated-publish:
     runs-on: high-perf-docker
     permissions:
@@ -116,21 +116,6 @@ jobs:
           timeout_minutes: 15
           command: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
-
-      # Run example code in typescript.
-      - uses: nick-fields/retry@v2
-        name: ts-example-test
-        with:
-          max_attempts: 3
-          timeout_minutes: 15
-          command: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
-      # Run example code in javascript.
-      - uses: nick-fields/retry@v2
-        name: js-example-test
-        with:
-          max_attempts: 3
-          timeout_minutes: 15
-          command: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
 
       # Ensure the version, changelog, etc. are valid.
       - run: cd ./ecosystem/typescript/sdk && ./check.sh

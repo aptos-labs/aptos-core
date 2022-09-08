@@ -1,0 +1,24 @@
+
+name: Continuous E2E Release Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */12 * * *"
+
+jobs:
+  # Run a faster chaos forge to quickly surface correctness failures
+  run-release-blocking-forge:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-release-blocking
+      # Run for 5 hours
+      FORGE_RUNNER_DURATION_SECS: 18000
+      FORGE_TEST_SUITE: land_blocking
+      # Give us 12 hour timeout
+      TIMEOUT_MINUTES: 720

@@ -12,9 +12,8 @@ class HeaderComponent < ViewComponent::Base
       NavItem.new('#', 'Community', 'Aptos Community'),
       [
         NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
-        NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
-        NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2 Results'),
-        NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
+        NavItem.new('https://forum.aptoslabs.com/', 'Discussion Forum', 'Aptos Forum'),
+        NavItem.new('/incentivized-testnet', 'Incentivized Testnet', 'Aptos Forum')
       ]
     ),
     NavGroup.new(
@@ -27,15 +26,18 @@ class HeaderComponent < ViewComponent::Base
     NavGroup.new(
       NavItem.new('#', 'Network', 'Aptos Network'),
       [
-        NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
-        NavItem.new('https://status.devnet.aptos.dev/', 'Network Status', 'Aptos Network Status')
+        NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer')
       ]
     ),
     NavGroup.new(
       NavItem.new('#', 'About', 'About Aptos'),
       [
         NavItem.new('/currents', 'Currents', 'Aptos Currents'),
-        NavItem.new('/careers', 'Careers', 'Aptos Careers')
+        NavItem.new('/careers', 'Careers', 'Aptos Careers'),
+        NavItem.new(
+          'https://aptos.dev/aptos-white-paper/aptos-white-paper-index/',
+          'Whitepaper', 'Aptos Whitepaper'
+        )
       ]
     )
   ].freeze
@@ -55,7 +57,7 @@ class HeaderComponent < ViewComponent::Base
     ]
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'header'
-    @rest[:data][:action] = 'resize@window->header#windowResize'
+    @rest[:data][:action] = 'resize@window->header#windowResize click@window->header#windowClick'
   end
 
   def nav_groups

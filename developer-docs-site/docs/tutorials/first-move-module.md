@@ -1,6 +1,6 @@
 ---
 title: "Your First Move Module"
-slug: "your-first-move-module"
+slug: "first-move-module"
 sidebar_position: 2
 ---
 
@@ -9,297 +9,168 @@ import TabItem from '@theme/TabItem';
 
 # Your First Move Module
 
-This tutorial details how to write, compile, test, publish and interact with Move Modules on the Aptos Blockchain. The steps are:
+This tutorial details how to compile, test, publish and interact with Move Modules on the Aptos blockchain. The steps are:
 
-1. Write, compile, and test the Move Module
-2. Publish the Move Module to the Aptos Blockchain
-3. Initialize and interact with resources of the Move Module
+1. [Install the CLI from Git][install_cli]
+2. Compile and test a Move module
+3. Publish a Move module to the Aptos blockchain
+4. Interact with a Move module
+5. Understand the code
 
-This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
+## Prepare the CLI environment
 
-For this tutorial, will be focusing on `hello_blockchain.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
+After installing the CLI from Git, prepare your environment for interacting with Aptos by creating and funding an account. Begin by starting a new terminal.
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-For this tutorial, will be focusing on `hello_blockchain.py` and re-using the `first_transaction.py` library from the previous tutorial.
-
-You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-For this tutorial, will be focusing on `hello_blockchain/src` and re-using the `first_transaction/src` library from the previous tutorial.
-
-You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
-
-  </TabItem>
-</Tabs>
-
-## Step 1) Write and test the Move Module
-
-### Step 1.1) Download Aptos-core
-
-For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test Move modules without downloading additional resources. Over time, we will expand this section to describe how to leverage [Move](https://github.com/move-language/move/tree/main/language/documentation/tutorial) tools for development.
-
-For now, download and prepare Aptos-core:
-
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-./scripts/dev_setup.sh
-source ~/.cargo/env
-git checkout origin/devnet
+1. Initialize a new local account: `aptos init`. This will output:
 ```
+Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
 
-Install Aptos Commandline tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos)
+No rest url given, using https://fullnode.devnet.aptoslabs.com/v1...
+Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com | 'skip' to not use a faucet]
 
-```bash
-cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
+No faucet url given, using https://faucet.devnet.aptoslabs.com...
+Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
+
+No key given, generating key...
+Account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a doesn't exist, creating it and funding it with 10000 coins
+Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a!  Run `aptos help` for more information about commands
+{
+  "Result": "Success"
+}
 ```
-
-### Step 1.2) Review the Module
-
-In this terminal, change directories to `aptos-move/move-examples/hello_blockchain`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/HelloBlockchain.move`.
-
-This module enables users to create a `String` resource under their account and set it. Users are only able to set their resource and cannot set other's resources.
-
-```rust
-module HelloBlockchain::Message {
-    use std::string;
-    use std::error;
-    use std::signer;
-
-    struct MessageHolder has key {
-        message: string::String,
-    }
-
-    public entry fun set_message(account: signer, message_bytes: vector<u8>)
-    acquires MessageHolder {
-        let message = string::utf8(message_bytes);
-        let account_addr = signer::address_of(&account);
-        if (!exists<MessageHolder>(account_addr)) {
-            move_to(&account, MessageHolder {
-                message,
-            })
-        } else {
-            let old_message_holder = borrow_global_mut<MessageHolder>(account_addr);
-            old_message_holder.message = message;
-        }
-    }
+2. Now fund this account: `aptos account fund-with-faucet --account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`
+```
+{
+  "Result": "Added 10000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
 }
 ```
 
-In the code above, the two important sections are the struct `MessageHolder` and the function `set_message`. `set_message` is a `script` function allowing it to be called directly by transactions. Upon calling it, the function will determine if the current account has a `MessageHolder` resource and creates and stores the `message` if it does not exist. If the resource exists, the `message` in the `MessageHolder` is overwritten.
+## Compile and test the module
 
-### Step 1.3) Testing the Module
+There are many example Move modules in the [aptos-core/aptos-move/move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples) directory.
 
-Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
+Load a terminal and change directories into the `hello_blockchain` directory: `cd aptos-core/aptos-move/move-examples`.
 
-This can be tested by entering `cargo test test_hello_blockchain -p move-examples -- --exact` at the terminal.
+To compile the module run: `aptos move compile --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
+To test the module run: `aptos move test --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
 
-Note: `sender_can_set_message` is a `script` function in order to call the `script` function `set_message`.
+The CLI entry must contain `--named-addresses` because the `Move.toml` file leaves this as undefined:
 
-```rust
-    const ENO_MESSAGE: u64 = 0;
+```toml
+[addresses]
+hello_blockchain = "_"
+```
 
-    public fun get_message(addr: address): string::String acquires MessageHolder {
-        assert!(exists<MessageHolder>(addr), Errors::not_published(ENO_MESSAGE));
-        *&borrow_global<MessageHolder>(addr).message
+In order to prepare the module for the account created in the previous step, we specify that the named address `hello_blockchain` is set to our account address.
+
+## Publish the Move module
+
+Now that the code can be compiled and tests pass, let's publish the module to the account created for this tutorial:
+`aptos move publish --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`
+
+```
+package size 1631 bytes
+{
+  "Result": {
+    "transaction_hash": "0x45d682997beab297a9a39237c588d31da1cd2c950c5ab498e37984e367b0fc25",
+    "gas_used": 13,
+    "gas_unit_price": 1,
+    "pending": null,
+    "sender": "a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+    "sequence_number": 8,
+    "success": true,
+    "timestamp_us": 1661320216343795,
+    "version": 3977,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+At this point, the module is now stored on the account.
+
+## Interact with the module
+
+Move modules expose access points or `entry functions`. These can be called via transactions. The CLI allows for seamless access to these. `hello_blockchain` exposes a `set_message` entry function that takes in a `string`. This can be called via the CLI:
+
+```
+aptos move run \
+--function-id '0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::set_message' \
+--args 'string:hello, blockchain'
+```
+
+Upon success, the CLI will print out the following:
+
+```
+{
+  "Result": {
+    "transaction_hash": "0x1fe06f61c49777086497b199f3d4acbee9ea58976d37fdc06d1ea48a511a9e82",
+    "gas_used": 1,
+    "gas_unit_price": 1,
+    "pending": null,
+    "sender": "6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
+    "sequence_number": 1,
+    "success": true,
+    "timestamp_us": 1661320878825763,
+    "version": 5936,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+The `set_message` modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](https://move-language.github.io/move/structs-and-resources.html#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
+
+`https://fullnode.devnet.aptoslabs.com/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/resource/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder`
+
+Which after the first exectuion contains the following:
+
+```
+{
+  "type":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder",
+  "data":{
+    "message":"hello, blockchain",
+    "message_change_events":{
+      "counter":"0",
+      "guid":{
+        "id":{
+          "addr":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
+          "creation_num":"3"
+        }
+      }
     }
+  }
+}
+```
 
-    #[test(account = @0x1)]
-    public(script) fun sender_can_set_message(account: signer) acquires MessageHolder {
-        let addr = Signer::address_of(&account);
-        set_message(account,  b"Hello, Blockchain");
+Notice the `message` field contains `hello, blockchain`.
 
-        assert!(
-          get_message(addr) == string::utf8(b"Hello, Blockchain"),
-          0
-        );
+Each succesful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
+
+`http://127.0.0.1:8080/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/events/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder/message_change_events`
+
+Where after a call to set the message to `hello, blockchain, again`, the event stream would contain the following:
+```
+[
+  {
+    "version":"8556",
+    "key":"0x03000000000000006dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
+    "sequence_number":"0","type":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageChangeEvent",
+    "data":{
+      "from_message":"hello, blockchain",
+      "to_message":"hello, blockchain, again"
     }
+  }
+]
 ```
-
-## Step 2) Publishing and Interacting with the Move Module
-
-Now we return to our application to deploy and interact with the module on the Aptos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
-
-### Step 2.1) Publishing the Move Module
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/hello_blockchain.ts section_1
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/hello_blockchain.py section_1
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```rust
-:!: static/examples/rust/hello_blockchain/src/lib.rs section_1
-```
-
-  </TabItem>
-</Tabs>
 
 :::tip
-To initialize the module, you can write a `init_module` function. This private function is executed automatically when the module is published. This `init_module` function must be private, it must only take signer or signer reference as a parameter, and it must not return any value. Here is an example:
 
-```asm
- fun init_module(creator: &signer) {
-        move_to(
-            creator,
-            ModuleData { global_counter: 0 }
-        );
-    }
-```
+Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exerciser to validate this.
 
 :::
-
-### Step 2.2) Reading a resource
-
-The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `Coin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/hello_blockchain.ts section_2
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/hello_blockchain.py section_2
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```rust
-:!: static/examples/rust/hello_blockchain/src/lib.rs section_2
-```
-
-  </TabItem>
-</Tabs>
-
-### Step 2.3) Modifying a resource
-
-Move modules must expose `script` functions for initializing and manipulating resources. The `script` can then be called
-from a transaction.
-
-Note: while the REST interface can display strings, due to limitations of JSON and Move, it cannot determine if an argument is a string or a hex-encoded string. So the transaction arguments always assume the latter. Hence, in this example, the message is encoded as a hex-string.
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/hello_blockchain.ts section_3
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/hello_blockchain.py section_3
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```rust
-:!: static/examples/rust/hello_blockchain/src/lib.rs section_3
-```
-
-  </TabItem>
-</Tabs>
-
-### Step 3) Initialize and interact with the Move module
-
-<Tabs>
-<TabItem value="typescript" label="Typescript" default>
-For Typescript:
-
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Install the required libraries: `yarn install`
-- Execute the example: `yarn hello_blockchain Message.mv`
-
-</TabItem>
-<TabItem value="python" label="Python">
-For Python3:
-
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Install the required libraries: `pip3 install -r requirements.txt`.
-- Execute the example: `python3 hello_blockchain.py Message.mv`
-
-</TabItem>
-<TabItem value="rust" label="Rust">
-For Rust:
-
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Execute the example: `cargo run --bin hello-blockchain -- Message.mv`
-
-</TabItem>
-</Tabs>
-
-- After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
-  and press enter."
-- In the "Move Window" terminal, and for the Move file we had previously looked at:
-  - Copy Alice's address
-  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
-  - Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
-- Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
-
-The output should look like the following:
-
-```
-=== Addresses ===
-Alice: 11c32982d04fbcc79b694647edff88c5b5d5b1a99c9d2854039175facbeefb40
-Bob: 7ec8f962139943bc41c17a72e782b7729b1625cf65ed7812152a5677364a4f88
-
-=== Initial Balances ===
-Alice: 10000000
-Bob: 10000000
-
-Update the module with Alice's address, build, copy to the provided path, and press enter.
-
-=== Testing Alice ===
-Publishing...
-Initial value: None
-Setting the message to "Hello, Blockchain"
-New value: Hello, Blockchain
-
-=== Testing Bob ===
-Initial value: None
-Setting the message to "Hello, Blockchain"
-New value: Hello, Blockchain
-```
-
-The outcome shows that Alice and Bob went from having no resource to one with a `message` set to "Hello, Blockchain".
-
-The data can be verified by visiting either a REST interface or the explorer:
-
-- Alice's account via the [REST interface][alice_account_rest]
-- Bob's account on the [explorer][bob_account_explorer]
 
 [account_basics]: /concepts/basics-accounts
 [alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
+[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
 [rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

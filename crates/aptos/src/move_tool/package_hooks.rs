@@ -3,6 +3,7 @@
 
 use crate::common::types::load_account_arg;
 use crate::move_tool::CachedPackageRegistry;
+use framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use futures::executor::block_on;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use move_deps::move_package::package_hooks::PackageHooks;
@@ -18,7 +19,7 @@ struct AptosPackageHooks {}
 
 impl PackageHooks for AptosPackageHooks {
     fn custom_package_info_fields(&self) -> Vec<String> {
-        vec!["upgrade_policy".to_string()]
+        vec![UPGRADE_POLICY_CUSTOM_FIELD.to_string()]
     }
 
     fn custom_dependency_key(&self) -> Option<String> {
@@ -46,7 +47,7 @@ async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
         )
         .await?;
         let package = registry.get_package(info.package_name).await?;
-        package.save_package_to_disk(info.download_to.clone(), true)
+        package.save_package_to_disk(info.download_to.as_path())
     } else {
         Ok(())
     }

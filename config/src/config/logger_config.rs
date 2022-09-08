@@ -5,7 +5,7 @@ use crate::utils;
 use aptos_logger::{Level, CHANNEL_SIZE};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LoggerConfig {
     // channel size for the asychronous channel for node logging.
@@ -18,6 +18,9 @@ pub struct LoggerConfig {
     pub level: Level,
     // tokio-console port
     pub console_port: Option<u16>,
+    pub enable_telemetry_remote_log: bool,
+    pub enable_telemetry_flush: bool,
+    pub telemetry_level: Level,
 }
 
 impl Default for LoggerConfig {
@@ -27,7 +30,10 @@ impl Default for LoggerConfig {
             enable_backtrace: false,
             is_async: true,
             level: Level::Info,
-            console_port: Some(6669),
+            console_port: None,
+            enable_telemetry_remote_log: true,
+            enable_telemetry_flush: true,
+            telemetry_level: Level::Error,
         }
     }
 }

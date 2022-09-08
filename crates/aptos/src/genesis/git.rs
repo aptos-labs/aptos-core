@@ -14,6 +14,7 @@ use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
+use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
@@ -21,7 +22,7 @@ use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 pub const LAYOUT_FILE: &str = "layout.yaml";
 pub const OPERATOR_FILE: &str = "operator.yaml";
 pub const OWNER_FILE: &str = "owner.yaml";
-pub const FRAMEWORK_DIR: &str = "framework";
+pub const FRAMEWORK_NAME: &str = "framework.mrb";
 
 /// Setup a shared Git repository for Genesis
 ///
@@ -32,6 +33,7 @@ pub const FRAMEWORK_DIR: &str = "framework";
 pub struct SetupGit {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
+
     /// Path to the `Layout` file which defines where all the files are
     #[clap(long, parse(from_os_str))]
     pub(crate) layout_file: PathBuf,
@@ -49,9 +51,6 @@ impl CliCommand<()> for SetupGit {
         // Upload layout file to ensure we can read later
         let client = self.git_options.get_client()?;
         client.put(Path::new(LAYOUT_FILE), &layout)?;
-
-        // Make a place for the modules to be uploaded
-        client.create_dir(Path::new(FRAMEWORK_DIR))?;
 
         Ok(())
     }
@@ -72,7 +71,7 @@ impl FromStr for GithubRepo {
             Err(CliError::CommandArgumentError("Invalid repository must be of the form 'owner/repository` e.g. 'aptos-labs/aptos-core'".to_string()))
         } else {
             Ok(GithubRepo {
-                owner: parts.get(0).unwrap().to_string(),
+                owner: parts.first().unwrap().to_string(),
                 repository: parts.get(1).unwrap().to_string(),
             })
         }
@@ -84,12 +83,15 @@ pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
     #[clap(long)]
     pub(crate) github_repository: Option<GithubRepo>,
+
     /// Github repository branch e.g. main
     #[clap(long, default_value = "main")]
     pub(crate) github_branch: String,
+
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
     pub(crate) github_token_file: Option<PathBuf>,
+
     /// Path to local git repository
     #[clap(long, parse(from_os_str))]
     pub(crate) local_repository_dir: Option<PathBuf>,
@@ -167,9 +169,17 @@ impl Client {
     pub fn put<T: Serialize + ?Sized>(&self, name: &Path, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                self.create_dir(local_repository_path.as_path())?;
-
                 let path = local_repository_path.join(name);
+
+                // Create repository path and any sub-directories
+                if let Some(dir) = path.parent() {
+                    self.create_dir(dir)?;
+                } else {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Path should always have a parent {}",
+                        path.display()
+                    )));
+                }
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),
@@ -198,50 +208,17 @@ impl Client {
         Ok(())
     }
 
-    /// Retrieve bytecode Move modules from a module folder
-    pub fn get_modules(&self, name: &str) -> CliTypedResult<Vec<Vec<u8>>> {
-        let mut modules = Vec::new();
-
+    /// Retrieve framework release bundle.
+    pub fn get_framework(&self) -> CliTypedResult<ReleaseBundle> {
         match self {
-            Client::Local(local_repository_path) => {
-                let module_folder = local_repository_path.join(name);
-                if !module_folder.is_dir() {
-                    return Err(CliError::UnexpectedError(format!(
-                        "{} is not a directory!",
-                        module_folder.display()
-                    )));
-                }
-
-                let files = std::fs::read_dir(module_folder.as_path())
-                    .map_err(|e| CliError::IO(module_folder.display().to_string(), e))?;
-
-                for maybe_file in files {
-                    let file = maybe_file
-                        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
-                        .path();
-                    let extension = file.extension();
-
-                    // Only collect move files
-                    if file.is_file() && extension.is_some() && extension.unwrap() == "mv" {
-                        modules.push(
-                            std::fs::read(file.as_path())
-                                .map_err(|e| CliError::IO(file.display().to_string(), e))?,
-                        );
-                    }
-                }
-            }
+            Client::Local(local_repository_path) => Ok(ReleaseBundle::read(
+                local_repository_path.join(FRAMEWORK_NAME),
+            )?),
             Client::Github(client) => {
-                let files = client.get_directory(name)?;
-
-                for file in files {
-                    // Only collect .mv files
-                    if file.ends_with(".mv") {
-                        modules.push(base64::decode(client.get_file(&file)?)?)
-                    }
-                }
+                let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
+                Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
             }
         }
-        Ok(modules)
     }
 }
 

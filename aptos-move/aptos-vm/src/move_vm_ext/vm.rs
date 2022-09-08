@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{MoveResolverExt, NativeAggregatorContext, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use aptos_gas::NativeGasParameters;
-use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use framework::natives::{
+    aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
+    cryptography::ristretto255_point::NativeRistrettoPointContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+};
 use move_deps::{
     move_binary_format::errors::VMResult,
+    move_bytecode_verifier::VerifierConfig,
     move_table_extension::NativeTableContext,
     move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions},
 };
@@ -19,9 +24,17 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    pub fn new(native_gas_params: NativeGasParameters) -> VMResult<Self> {
+    pub fn new(
+        native_gas_params: NativeGasParameters,
+        abs_val_size_gas_params: AbstractValueSizeGasParameters,
+    ) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new(aptos_natives(native_gas_params))?,
+            inner: MoveVM::new_with_verifier_config(
+                aptos_natives(native_gas_params, abs_val_size_gas_params),
+                VerifierConfig {
+                    max_loop_depth: Some(5),
+                },
+            )?,
         })
     }
 
@@ -31,8 +44,14 @@ impl MoveVmExt {
         session_id: SessionId,
     ) -> SessionExt<'r, '_, S> {
         let mut extensions = NativeContextExtensions::default();
-        extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
-        extensions.add(NativeAggregatorContext::new(session_id.as_uuid(), remote));
+        let txn_hash: [u8; 32] = session_id
+            .as_uuid()
+            .to_vec()
+            .try_into()
+            .expect("HashValue should convert to [u8; 32]");
+        extensions.add(NativeTableContext::new(txn_hash, remote));
+        extensions.add(NativeRistrettoPointContext::new());
+        extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {
             SessionId::Txn {
@@ -44,6 +63,7 @@ impl MoveVmExt {
         };
         extensions.add(NativeTransactionContext::new(script_hash));
         extensions.add(NativeCodeContext::default());
+        extensions.add(NativeStateStorageContext::new(remote));
 
         // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
         // cache needs to be flushed to work around those bugs.

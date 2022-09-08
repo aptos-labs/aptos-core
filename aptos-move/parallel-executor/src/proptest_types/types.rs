@@ -3,13 +3,21 @@
 
 use crate::{
     errors::{Error, Result},
-    executor::MVHashMapView,
+    executor::{MVHashMapView, ReadResult},
     task::{
         ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
         TransactionOutput,
     },
 };
-use aptos_types::{access_path::AccessPath, account_address::AccountAddress};
+use aptos_aggregator::{
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    transaction::AggregatorValue,
+};
+use aptos_types::{
+    access_path::AccessPath,
+    account_address::AccountAddress,
+    write_set::{TransactionWrite, WriteOp},
+};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::collections::hash_map::DefaultHasher;
@@ -24,6 +32,9 @@ use std::{
         Arc,
     },
 };
+
+// When aggregator value has to be resolved from storage, pretend it is this number.
+const STORAGE_DELTA_VAL: u128 = 100;
 
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
@@ -59,6 +70,30 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
+    /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
+    pub V,
+    /// Determines whether V is going to contain a value (o.w. deletion). This is useful for
+    /// testing the bahavior of deleting aggregators, in which case we shouldn't panic
+    /// but let the Move-VM handle the read the same as for any deleted resource.
+    pub bool,
+);
+
+impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
+    for ValueType<V>
+{
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        if self.1 {
+            let mut v = self.0.clone().into();
+            v.resize(16, 1);
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
     /// Each transaction's write-set consists of between 1 and write_size-1 many writes.
@@ -74,7 +109,7 @@ pub struct TransactionGenParams {
 
 #[derive(Arbitrary, Debug, Clone)]
 #[proptest(params = "TransactionGenParams")]
-pub struct TransactionGen<V: Arbitrary + Debug + 'static + Clone> {
+pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     #[proptest(
         strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
@@ -97,10 +132,10 @@ pub enum Transaction<K, V> {
     Write {
         /// Incarnation counter for dynamic behavior i.e. incarnations differ in reads and writes.
         incarnation: Arc<AtomicUsize>,
-        /// Vector of all possible write-sets of transaction execution (chosen round-robin depending
-        /// on the incarnation counter value). Each write set is a vector describing writes, each
-        /// to a key with a provided value.
-        writes: Vec<Vec<(K, V)>>,
+        /// Vector of all possible write-sets and delta-sets of transaction execution (chosen round-robin
+        /// depending on the incarnation counter value). Each write set is a vector describing writes, each
+        /// to a key with a provided value. Each delta-set contains keys and the corresponding DeltaOps.
+        writes_and_deltas: Vec<(Vec<(K, V)>, Vec<(K, DeltaOp)>)>,
         /// Vector of all possible read-sets of the transaction execution (chosen round-robin depending
         /// on the incarnation counter value). Each read set is a vector of keys that are read.
         reads: Vec<Vec<K>>,
@@ -131,25 +166,43 @@ impl Default for TransactionGenParams {
     }
 }
 
-impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
-    fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
+    fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
-    ) -> Vec<Vec<(KeyType<K>, V)>> {
+        delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
+        allow_deletes: bool,
+    ) -> Vec<(Vec<(KeyType<K>, ValueType<V>)>, Vec<(KeyType<K>, DeltaOp)>)> {
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
-            let mut incarnation_writes: Vec<(KeyType<K>, V)> = vec![];
+            let mut incarnation_writes = vec![];
+            let mut incarnation_deltas = vec![];
             for (idx, value) in write_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    incarnation_writes.push((KeyType(key, module_write_fn(i)), value.clone()));
+                    match delta_fn(i, &value) {
+                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
+                        None => {
+                            // One out of 23 writes will be a deletion
+                            let is_deletion = allow_deletes
+                                && AggregatorValue::from_write(&ValueType(value.clone(), true))
+                                    .unwrap()
+                                    .into()
+                                    % 23
+                                    == 0;
+                            incarnation_writes.push((
+                                KeyType(key, module_write_fn(i)),
+                                ValueType(value.clone(), !is_deletion),
+                            ));
+                        }
+                    }
                 }
             }
-            ret.push(incarnation_writes);
+            ret.push((incarnation_writes, incarnation_deltas));
         }
         ret
     }
@@ -177,13 +230,59 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> Transaction<KeyType<K>, V> {
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
+        let is_module_write = |_| -> bool { module_access.0 };
+        let is_module_read = |_| -> bool { module_access.1 };
+        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
+
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            writes: Self::writes_from_gen(universe, self.keys_modified, &|_| -> bool {
-                module_access.0
-            }),
-            reads: Self::reads_from_gen(universe, self.keys_read, &|_| -> bool { module_access.1 }),
+            writes_and_deltas: Self::writes_and_deltas_from_gen(
+                universe,
+                self.keys_modified,
+                &is_module_write,
+                &is_delta,
+                true,
+            ),
+            reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
+        }
+    }
+
+    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord>(
+        self,
+        universe: &[K],
+        delta_threshold: usize,
+        allow_deletes: bool,
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
+        let is_module_write = |_| -> bool { false };
+        let is_module_read = |_| -> bool { false };
+        let is_delta = |i, v: &V| -> Option<DeltaOp> {
+            if i >= delta_threshold {
+                let val = AggregatorValue::from_write(&ValueType(v.clone(), true))
+                    .unwrap()
+                    .into();
+                if val % 10 == 0 {
+                    None
+                } else if val % 10 < 5 {
+                    Some(delta_sub(val % 100, u128::MAX))
+                } else {
+                    Some(delta_add(val % 100, u128::MAX))
+                }
+            } else {
+                None
+            }
+        };
+
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            writes_and_deltas: Self::writes_and_deltas_from_gen(
+                universe,
+                self.keys_modified,
+                &is_module_write,
+                &is_delta,
+                allow_deletes,
+            ),
+            reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
     }
 
@@ -196,17 +295,24 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> Transaction<KeyType<K>, V> {
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
 
         let is_module_write = |i| -> bool { i >= write_threshold };
         let is_module_read = |i| -> bool { i >= read_threshold && i < write_threshold };
+        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            writes: Self::writes_from_gen(universe, self.keys_modified, &is_module_write),
+            writes_and_deltas: Self::writes_and_deltas_from_gen(
+                universe,
+                self.keys_modified,
+                &is_module_write,
+                &is_delta,
+                true,
+            ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
     }
@@ -215,7 +321,7 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
 impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
     type Value = V;
@@ -236,7 +342,7 @@ impl<K, V> Task<K, V> {
 impl<K, V> ExecutorTask for Task<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -256,7 +362,7 @@ where
             Transaction::Write {
                 incarnation,
                 reads,
-                writes,
+                writes_and_deltas,
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
@@ -264,28 +370,32 @@ where
                 // and write-sets (i.e. each are selected round-robin).
                 let idx = incarnation.fetch_add(1, Ordering::SeqCst);
                 let read_idx = idx % reads.len();
-                let write_idx = idx % writes.len();
+                let write_idx = idx % writes_and_deltas.len();
 
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
-                    reads_result.push(view.read(k).map(|v| (*v).clone()));
+                    reads_result.push(view.read(k));
                 }
-                ExecutionStatus::Success(Output(writes[write_idx].clone(), reads_result))
+                ExecutionStatus::Success(Output(
+                    writes_and_deltas[write_idx].0.clone(),
+                    writes_and_deltas[write_idx].1.clone(),
+                    reads_result,
+                ))
             }
-            Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![])),
+            Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![], vec![])),
             Transaction::Abort => ExecutionStatus::Abort(view.txn_idx()),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct Output<K, V>(Vec<(K, V)>, Vec<Option<V>>);
+pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<ReadResult<V>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
 
@@ -293,8 +403,12 @@ where
         self.0.clone()
     }
 
+    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
+        self.1.clone()
+    }
+
     fn skip_output() -> Self {
-        Self(vec![], vec![])
+        Self(vec![], vec![], vec![])
     }
 }
 
@@ -305,52 +419,114 @@ where
 /// Sequential baseline of execution result for dummy transaction.
 pub enum ExpectedOutput<V> {
     Aborted(usize),
-    SkipRest(usize, Vec<Vec<Option<V>>>),
-    Success(Vec<Vec<Option<V>>>),
+    SkipRest(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
+    Success(Vec<Vec<(Option<V>, Option<u128>)>>),
+    DeltaFailure(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
 }
 
-impl<V: Clone + Eq> ExpectedOutput<V> {
+impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
-    pub fn generate_baseline<K: Hash + Clone + Eq>(txns: &[Transaction<K, V>]) -> Self {
+    pub fn generate_baseline<K: Hash + Clone + Eq>(
+        txns: &[Transaction<K, V>],
+        resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
+    ) -> Self {
         let mut current_world = HashMap::new();
+        // Delta world stores the latest u128 value of delta aggregator. When empty, the
+        // value is derived based on deserializing current_world, or falling back to
+        // STORAGE_DELTA_VAL.
+        let mut delta_world = HashMap::new();
+
         let mut result_vec = vec![];
         for (idx, txn) in txns.iter().enumerate() {
+            let delta_writes_at_idx = resolved_deltas.as_ref().map(|delta_writes| {
+                delta_writes[idx]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<K, WriteOp>>()
+            });
+
             match txn {
                 Transaction::Abort => return Self::Aborted(idx),
                 Transaction::Write {
                     incarnation,
+                    writes_and_deltas,
                     reads,
-                    writes,
                 } => {
                     // Determine the read and write sets of the latest incarnation
                     // of the transaction. The index for choosing the read and
                     // write sets is based on the value of the incarnation counter
                     // prior to the fetch_add during the last execution.
                     let incarnation = incarnation.load(Ordering::SeqCst);
-                    // Determine the read- and write-sets of the latest incarnation
-                    // during parallel execution to use for the baseline.
-                    let read_set = if reads.len() == 1 {
-                        // Static read-set.
-                        &reads[0]
-                    } else {
+
+                    if reads.len() == 1 || writes_and_deltas.len() == 1 {
                         assert!(incarnation > 0, "must run after parallel execution");
-                        &reads[(incarnation - 1) as usize % reads.len()]
-                    };
-                    let write_set = if writes.len() == 1 {
-                        // Static write-set.
-                        &writes[0]
-                    } else {
-                        assert!(incarnation > 0, "must run after parallel execution");
-                        &writes[(incarnation - 1) as usize % writes.len()]
-                    };
+                    }
+
+                    // Determine the read-, delta- and write-sets of the latest
+                    // incarnation during parallel execution to use for the baseline.
+                    let read_set = &reads[(incarnation - 1) as usize % reads.len()];
+                    let (write_set, delta_set) =
+                        &writes_and_deltas[(incarnation - 1) as usize % writes_and_deltas.len()];
 
                     let mut result = vec![];
                     for k in read_set.iter() {
-                        result.push(current_world.get(k).cloned());
+                        result.push((current_world.get(k).cloned(), delta_world.get(k).cloned()));
                     }
+
+                    // We ensure that the latest state is always reflected in exactly one of
+                    // the hashmaps, by possibly removing an element from the other Hashmap.
                     for (k, v) in write_set.iter() {
+                        delta_world.remove(k);
                         current_world.insert(k.clone(), v.clone());
                     }
+
+                    for (k, delta) in delta_set.iter() {
+                        let latest_write = current_world.remove(k);
+
+                        match delta_writes_at_idx.as_ref() {
+                            Some(delta_writes) => {
+                                assert_eq!(delta_writes.len(), delta_set.len());
+                                delta_world.insert(
+                                    k.clone(),
+                                    AggregatorValue::from_write(delta_writes.get(k).unwrap())
+                                        .unwrap()
+                                        .into(),
+                                );
+                            }
+                            None => {
+                                let base = match (&latest_write, delta_world.remove(k)) {
+                                    (Some(_), Some(_)) => {
+                                        unreachable!(
+                                            "Must record latest value or resolved delta, not both"
+                                        );
+                                    }
+                                    // Get base value from the latest write.
+                                    (Some(w_value), None) => AggregatorValue::from_write(w_value)
+                                        .map(|value| value.into()),
+                                    // Get base value from latest resolved aggregator value.
+                                    (None, Some(value)) => Some(value),
+                                    // Storage always gets resolved to a default constant.
+                                    (None, None) => Some(STORAGE_DELTA_VAL),
+                                };
+
+                                match base {
+                                    Some(base) => {
+                                        let applied_delta = delta.apply_to(base);
+                                        if applied_delta.is_err() {
+                                            return Self::DeltaFailure(idx, result_vec);
+                                        }
+                                        delta_world.insert(k.clone(), applied_delta.unwrap());
+                                    }
+                                    None => {
+                                        // Latest write was a deletion, can't resolve any delta to
+                                        // it, must keep the deletion as the latest Op.
+                                        current_world.insert(k.clone(), latest_write.unwrap());
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     result_vec.push(result)
                 }
                 Transaction::SkipRest => return Self::SkipRest(idx, result_vec),
@@ -359,25 +535,93 @@ impl<V: Clone + Eq> ExpectedOutput<V> {
         Self::Success(result_vec)
     }
 
-    pub fn check_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) -> bool {
+    fn check_result(
+        expected_results: &[(Option<V>, Option<u128>)],
+        results: &[ReadResult<V>],
+        delta_fail: bool,
+        storage_delta_val: Option<u128>,
+    ) {
+        let mut delta_failed = false;
+        expected_results
+            .iter()
+            .zip(results.iter())
+            .for_each(|(expected_result, result)| {
+                // failure should happen at the last index.
+                assert!(!delta_failed);
+                match result {
+                    ReadResult::Value(v) => {
+                        assert_eq!(**v, expected_result.0.clone().unwrap());
+                        assert_eq!(expected_result.1, None);
+                    }
+                    ReadResult::U128(v) => {
+                        assert_eq!(expected_result.0, None);
+                        assert_eq!(*v, expected_result.1.unwrap());
+                    }
+                    ReadResult::Unresolved(delta) => {
+                        assert_eq!(expected_result.0, None);
+                        let applied_delta =
+                            delta.apply_to(storage_delta_val.unwrap_or(STORAGE_DELTA_VAL));
+                        if applied_delta.is_err() {
+                            delta_failed = true;
+                        }
+                        if delta_failed {
+                            // Should be expected to fail.
+                            assert!(delta_fail);
+                        } else {
+                            assert_eq!(applied_delta.unwrap(), expected_result.1.unwrap());
+                        }
+                    }
+                    ReadResult::None => {
+                        assert_eq!(expected_result.0, None);
+                        assert_eq!(expected_result.1, None);
+                    }
+                }
+            })
+    }
+
+    // Used for testing, hence the function asserts the correctness conditions within
+    // itself to be easily traceable in case of an error.
+    pub fn assert_output<K>(
+        &self,
+        results: &Result<Vec<Output<K, V>>, usize>,
+        storage_delta_val: Option<u128>,
+    ) {
         match (self, results) {
-            (Self::Aborted(i), Err(Error::UserError(idx))) => i == idx,
+            (Self::Aborted(i), Err(Error::UserError(idx))) => {
+                assert_eq!(i, idx);
+            }
             (Self::SkipRest(skip_at, expected_results), Ok(results)) => {
+                // Check_result asserts internally, so no need to return a bool.
                 results
                     .iter()
                     .take(*skip_at)
                     .zip(expected_results.iter())
-                    .all(|(Output(_, result), expected_results)| expected_results == result)
-                    && results
-                        .iter()
-                        .skip(*skip_at)
-                        .all(|Output(_, result)| result.is_empty())
+                    .for_each(|(Output(_, _, result), expected_results)| {
+                        Self::check_result(expected_results, result, false, storage_delta_val)
+                    });
+
+                results
+                    .iter()
+                    .skip(*skip_at)
+                    .for_each(|Output(_, _, result)| assert!(result.is_empty()))
             }
-            (Self::Success(expected_results), Ok(results)) => expected_results
+            (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
+                // Check_result asserts internally, so no need to return a bool.
+                results
+                    .iter()
+                    .take(*fail_idx)
+                    .zip(expected_results.iter())
+                    .for_each(|(Output(_, _, result), expected_results)| {
+                        Self::check_result(expected_results, result, true, storage_delta_val)
+                    });
+            }
+            (Self::Success(expected_results), Ok(results)) => results
                 .iter()
-                .zip(results.iter())
-                .all(|(expected_result, Output(_, result))| expected_result == result),
-            _ => false,
+                .zip(expected_results.iter())
+                .for_each(|(Output(_, _, result), expected_result)| {
+                    Self::check_result(expected_result, result, false, storage_delta_val);
+                }),
+            _ => panic!("Incomparable execution outcomes"),
         }
     }
 }

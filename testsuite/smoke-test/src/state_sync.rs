@@ -6,20 +6,16 @@ use crate::{
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
-use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
-use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
-use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use std::{
-    fs,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-const MAX_CATCH_UP_SECS: u64 = 120; // The max time we'll wait for nodes to catch up
+const MAX_CATCH_UP_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 
 #[tokio::test]
 async fn test_full_node_bootstrap_state_snapshot() {
@@ -219,7 +215,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, swarm: &mut LocalSwarm, epoch_
 
 #[tokio::test]
 async fn test_validator_bootstrap_outputs() {
-    // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
+    // Create a swarm of 4 validators using output syncing
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -237,7 +233,7 @@ async fn test_validator_bootstrap_outputs() {
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot() {
-    // Create a swarm of 4 validators with state sync v2 enabled (snapshot syncing, chunk size = 1)
+    // Create a swarm of 4 validators using snapshot syncing and a chunk size = 1
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -259,9 +255,68 @@ async fn test_validator_bootstrap_state_snapshot() {
     assert_ne!(ledger_information.inner().oldest_ledger_version, 0);
 }
 
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_outputs_network_limit() {
+    // Create a swarm of 4 validators using output syncing and an aggressive network limit
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+            config.state_sync.storage_service.max_network_chunk_bytes = 100 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
+#[tokio::test]
+async fn test_validator_bootstrap_state_snapshot_no_compression() {
+    // Create a swarm of 4 validators using state snapshot syncing
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+            config.state_sync.aptos_data_client.use_compression = false;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_state_snapshot_network_limit() {
+    // Create a swarm of 4 validators using state snapshot syncing and an aggressive network limit
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+            config.state_sync.storage_service.max_network_chunk_bytes = 200 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
 #[tokio::test]
 async fn test_validator_bootstrap_transactions() {
-    // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
+    // Create a swarm of 4 validators using transaction syncing
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -277,9 +332,29 @@ async fn test_validator_bootstrap_transactions() {
     test_validator_sync(&mut swarm, 1).await;
 }
 
+#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[tokio::test]
+async fn test_validator_bootstrap_transactions_network_limit() {
+    // Create a swarm of 4 validators using transaction syncing and an aggressive network limit
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ExecuteTransactionsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+            config.state_sync.storage_service.max_network_chunk_bytes = 100 * 1024;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(&mut swarm, 1).await;
+}
+
 #[tokio::test]
 async fn test_validator_bootstrap_transactions_no_compression() {
-    // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing, no compression)
+    // Create a swarm of 4 validators using transaction syncing and no compression
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -311,7 +386,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
 
     // Stop the validator and delete the storage
     let validator = validator_peer_ids[validator_index_to_test];
-    stop_validator_and_delete_storage(swarm, validator);
+    stop_validator_and_delete_storage(swarm, validator).await;
 
     // Execute more transactions
     execute_transactions(swarm, &validator_client_0, &mut account_1, &account_0, true).await;
@@ -327,8 +402,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
 
 #[tokio::test]
 async fn test_validator_failure_bootstrap_outputs() {
-    // Create a swarm of 4 validators with state sync v2 enabled (snapshot
-    // bootstrapping and transaction output application).
+    // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -346,8 +420,7 @@ async fn test_validator_failure_bootstrap_outputs() {
 
 #[tokio::test]
 async fn test_validator_failure_bootstrap_execution() {
-    // Create a swarm of 4 validators with state sync v2 enabled (snapshot
-    // bootstrapping and transaction execution).
+    // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -382,7 +455,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -399,7 +472,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator);
+        stop_validator_and_delete_storage(&mut swarm, validator).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -501,7 +574,7 @@ async fn execute_transactions_and_wait(
 /// Waits for all nodes to catch up
 async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_SECS))
         .await
         .unwrap();
 }
@@ -515,28 +588,8 @@ async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAcc
 }
 
 /// Stops the specified validator and deletes storage
-fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
-    // Stop the validator
-    swarm.validator_mut(validator).unwrap().stop();
-
-    // Delete the validator storage
-    let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
-    let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-    let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
-    info!(
-        "Deleting ledger, state and state sync db paths ({:?}, {:?}, {:?}) for validator {:?}",
-        ledger_db_path.as_path(),
-        state_db_path.as_path(),
-        state_sync_db_path.as_path(),
-        validator
-    );
-    assert!(
-        ledger_db_path.as_path().exists()
-            && state_db_path.as_path().exists()
-            && state_sync_db_path.as_path().exists()
-    );
-    fs::remove_dir_all(ledger_db_path).unwrap();
-    fs::remove_dir_all(state_db_path).unwrap();
-    fs::remove_dir_all(state_sync_db_path).unwrap();
+async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
+    let validator = swarm.validator_mut(validator).unwrap();
+    // the validator is stopped during the clear_storage step as well
+    validator.clear_storage().await.unwrap();
 }

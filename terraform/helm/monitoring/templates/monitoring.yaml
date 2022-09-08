@@ -206,14 +206,19 @@ spec:
            {{- if .prometheus.deleteWal }}
            rm -r /prometheus/data/wal/*
            {{- end }}
-           prometheus --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+           prometheus \
+            --web.enable-lifecycle \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.retention.time={{ .prometheus.tsdb_retention_time }} \
+            --storage.tsdb.min-block-duration={{ .prometheus.tsdb_min_block_duration }} \
+            --storage.tsdb.max-block-duration={{ .prometheus.tsdb_max_block_duration }}
         resources:
           {{- toYaml .prometheus.resources | nindent 10 }}
         ports:
         - containerPort: 9090
         livenessProbe:
           httpGet:
-            path: /v1/-/healthy
+            path: /-/healthy
             port: 9090
           initialDelaySeconds: 10
         readinessProbe:
@@ -245,7 +250,7 @@ spec:
         - containerPort: 9093
         livenessProbe:
           httpGet:
-            path: /v1/-/healthy
+            path: /-/healthy
             port: 9093
           initialDelaySeconds: 10
         readinessProbe:

@@ -40,6 +40,7 @@ pub enum LogEntry {
     RespondToStreamRequest,
     SendDataRequests,
     StreamNotification,
+    TerminateStream,
 }
 
 #[derive(Clone, Copy, Serialize)]

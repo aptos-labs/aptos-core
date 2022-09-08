@@ -18,6 +18,7 @@ pub const SYSTEM_TTL_INDEX_LABEL: &str = "system_ttl";
 pub const TIMELINE_INDEX_LABEL: &str = "timeline";
 pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
+pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
 // Core mempool commit stages labels
 pub const GET_BLOCK_STAGE_LABEL: &str = "get_block";
@@ -73,7 +74,6 @@ pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 
 // invalid ACK type labels
-pub const INVALID_REQUEST_ID: &str = "invalid_req_id";
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
 /// Counter tracking size of various indices in core mempool

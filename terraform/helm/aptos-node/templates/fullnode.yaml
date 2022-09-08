@@ -110,6 +110,7 @@ spec:
             port: 6182
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
+          runAsUser: 0
           privileged: true
           {{- else }}
           readOnlyRootFilesystem: true
@@ -132,10 +133,16 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
+        {{- if $.Values.enablePrivilegedMode }}
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        {{- else }}
         runAsNonRoot: true
         runAsUser: 6180
         runAsGroup: 6180
         fsGroup: 6180
+        {{- end }}
       {{- end }}
       volumes:
       - name: aptos-config

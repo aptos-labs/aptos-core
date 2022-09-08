@@ -49,13 +49,17 @@ fn test_consensus_events_rejected_txns() {
     let pool = smp.mempool.lock();
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline.get(0).unwrap(), &kept_txn);
+    assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
 
 #[test]
 fn test_mempool_notify_committed_txns() {
     // Create runtime for the mempool notifier and listener
-    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    let runtime = Builder::new_multi_thread()
+        .disable_lifo_slot()
+        .enable_all()
+        .build()
+        .unwrap();
     let _enter = runtime.enter();
 
     // Create a new mempool notifier, listener and shared mempool
@@ -91,5 +95,5 @@ fn test_mempool_notify_committed_txns() {
     let pool = smp.mempool.lock();
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline.get(0).unwrap(), &kept_txn);
+    assert_eq!(timeline.first().unwrap(), &kept_txn);
 }

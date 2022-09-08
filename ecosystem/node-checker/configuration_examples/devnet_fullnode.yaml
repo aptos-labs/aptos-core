@@ -1,7 +1,7 @@
-# Base config generated with: aptos-node-checker configuration create --configuration-name devnet_fullnode --configuration-name-pretty Devnet FullNode --url http://124.231.84.12 --evaluators state_sync_version api_latency network_peers_within_tolerance api_transaction_presence
+# Base config generated with: /Users/dport/a/core/target/debug/aptos-node-checker configuration create --configuration-name devnet_fullnode --configuration-name-pretty Devnet FullNode --url https://fullnode.devnet.aptoslabs.com --api-port 443 --evaluators api_latency,state_sync_version,api_transaction_availability,network_minimum_peers
 ---
 node_address:
-  url: "https://fullnode.devnet.aptoslabs.com"
+  url: "https://fullnode.devnet.aptoslabs.com/"
   metrics_port: 9101
   api_port: 443
   noise_port: 6180
@@ -11,13 +11,18 @@ chain_id: ~
 role_type: ~
 evaluators:
   - api_latency
-  - api_transaction_presence
+  - state_sync_version
+  - api_transaction_availability
+  - network_minimum_peers
 evaluator_args:
   build_version_args: {}
   consensus_proposals_args: {}
   consensus_round_args: {}
   consensus_timeouts_args:
     allowed_consensus_timeouts: 0
+  hardware_args:
+    min_cpu_cores: 8
+    min_ram_gb: 31
   latency_args:
     num_samples: 5
     delay_between_samples_ms: 20
@@ -34,11 +39,8 @@ evaluator_args:
     version_delta_tolerance: 5000
   tps_args:
     emit_args:
-      accounts_per_client: 15
-      workers_per_ac: ~
-      wait_millis: 0
-      burst: false
-      do_not_check_stats_at_end: false
+      mempool_backlog: 5000
+      target_tps: 0
       txn_expiration_time_secs: 30
       duration: 60
       invalid_tx: 0

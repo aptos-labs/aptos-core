@@ -48,12 +48,6 @@ impl FromStr for ListQuery {
 ///
 #[derive(Debug, Parser)]
 pub struct ListAccount {
-    #[clap(flatten)]
-    pub(crate) rest_options: RestOptions,
-
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
-
     /// Address of the account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
@@ -61,6 +55,11 @@ pub struct ListAccount {
     /// Type of items to list: [balance, resources, modules]
     #[clap(long, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -87,7 +86,6 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         };
 
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let map_err_func = |err: anyhow::Error| CliError::ApiError(err.to_string());
         let response = match self.query {
             ListQuery::Balance => vec![
                 client
@@ -95,29 +93,28 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                         account,
                         "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
                     )
-                    .await
-                    .map_err(map_err_func)?
+                    .await?
                     .into_inner()
                     .unwrap()
                     .data,
             ],
             ListQuery::Modules => client
                 .get_account_modules(account)
-                .await
-                .map_err(map_err_func)?
+                .await?
                 .into_inner()
-                .iter()
-                .cloned()
-                .map(|module| module.try_parse_abi().unwrap())
-                .map(|module| json!(module))
+                .into_iter()
+                .map(|module| json!(module.try_parse_abi().unwrap()))
                 .collect::<Vec<serde_json::Value>>(),
             ListQuery::Resources => client
                 .get_account_resources(account)
-                .await
-                .map_err(map_err_func)?
+                .await?
                 .into_inner()
-                .iter()
-                .map(|json| json.data.clone())
+                .into_iter()
+                .map(|resource| {
+                    let mut map = serde_json::Map::new();
+                    map.insert(resource.resource_type.to_string(), resource.data);
+                    serde_json::Value::Object(map)
+                })
                 .collect::<Vec<serde_json::Value>>(),
         };
 

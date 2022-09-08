@@ -96,13 +96,17 @@ impl Default for Layout {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
     /// Account address
-    pub account_address: AccountAddress,
+    pub owner_account_address: AccountAddress,
+    /// Key used for signing transactions with the account
+    pub owner_account_public_key: Ed25519PublicKey,
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub voter_account_address: AccountAddress,
+    pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
     pub consensus_public_key: bls12381::PublicKey,
     /// Corresponding proof of possession of consensus public key
     pub proof_of_possession: bls12381::ProofOfPossession,
-    /// Key used for signing transactions with the account
-    pub account_public_key: Ed25519PublicKey,
     /// Public key used for validator network identity (same as account address)
     pub validator_network_public_key: x25519::PublicKey,
     /// Host for validator which can be an IP or a DNS name
@@ -117,34 +121,10 @@ pub struct ValidatorConfiguration {
     pub stake_amount: u64,
 }
 
-/// For better parsing error messages
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StringValidatorConfiguration {
-    /// Account address
-    pub account_address: String,
-    /// Key used for signing in consensus
-    pub consensus_public_key: String,
-    /// Corresponding proof of possession of consensus public key
-    pub proof_of_possession: String,
-    /// Key used for signing transactions with the account
-    pub account_public_key: String,
-    /// Public key used for validator network identity (same as account address)
-    pub validator_network_public_key: String,
-    /// Host for validator which can be an IP or a DNS name
-    pub validator_host: HostAndPort,
-    /// Public key used for full node network identity (same as account address)
-    pub full_node_network_public_key: Option<String>,
-    /// Host for full node which can be an IP or a DNS name and is optional
-    pub full_node_host: Option<HostAndPort>,
-    /// Stake amount for consensus
-    pub stake_amount: u64,
-}
-
 impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = anyhow::Error;
 
     fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
-        let auth_key = AuthenticationKey::ed25519(&config.account_public_key);
         let validator_addresses = vec![config
             .validator_host
             .as_network_address(config.validator_network_public_key)
@@ -163,18 +143,37 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             vec![]
         };
 
+        let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.account_address != derived_address {
+        if config.owner_account_address != derived_address {
             return Err(anyhow::Error::msg(format!(
-                "AccountAddress {} does not match account key derived one {}",
-                config.account_address, derived_address
+                "owner_account_address {} does not match account key derived one {}",
+                config.owner_account_address, derived_address
             )));
         }
+
+        let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
+        let derived_address = auth_key.derived_address();
+        if config.operator_account_address != derived_address {
+            return Err(anyhow::Error::msg(format!(
+                "operator_account_address {} does not match account key derived one {}",
+                config.operator_account_address, derived_address
+            )));
+        }
+
+        let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
+        let derived_address = auth_key.derived_address();
+        if config.voter_account_address != derived_address {
+            return Err(anyhow::Error::msg(format!(
+                "voter_account_address {} does not match account key derived one {}",
+                config.voter_account_address, derived_address
+            )));
+        }
+
         Ok(Validator {
-            owner_address: derived_address,
-            // TODO: Set operator and voter according to genesis config file.
-            operator_address: derived_address,
-            voter_address: derived_address,
+            owner_address: config.owner_account_address,
+            operator_address: config.operator_account_address,
+            voter_address: config.voter_account_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
@@ -184,6 +183,8 @@ impl TryFrom<ValidatorConfiguration> for Validator {
     }
 }
 
+const LOCALHOST: &str = "localhost";
+
 /// Combined Host (DnsName or IP) and port
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HostAndPort {
@@ -192,6 +193,13 @@ pub struct HostAndPort {
 }
 
 impl HostAndPort {
+    pub fn local(port: u16) -> anyhow::Result<HostAndPort> {
+        Ok(HostAndPort {
+            host: DnsName::try_from(LOCALHOST.to_string())?,
+            port,
+        })
+    }
+
     pub fn as_network_address(&self, key: x25519::PublicKey) -> anyhow::Result<NetworkAddress> {
         let host = self.host.to_string();
 
@@ -235,9 +243,55 @@ impl FromStr for HostAndPort {
                 "Invalid host and port, must be of the form 'host:port` e.g. '127.0.0.1:6180'",
             ))
         } else {
-            let host = DnsName::from_str(*parts.get(0).unwrap())?;
+            let host = DnsName::from_str(*parts.first().unwrap())?;
             let port = u16::from_str(parts.get(1).unwrap())?;
             Ok(HostAndPort { host, port })
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OwnerConfiguration {
+    pub owner_account_address: AccountAddress,
+    pub owner_account_public_key: Ed25519PublicKey,
+    pub voter_account_address: AccountAddress,
+    pub voter_account_public_key: Ed25519PublicKey,
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub stake_amount: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OperatorConfiguration {
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_proof_of_possession: bls12381::ProofOfPossession,
+    pub validator_network_public_key: x25519::PublicKey,
+    pub validator_host: HostAndPort,
+    pub full_node_network_public_key: Option<x25519::PublicKey>,
+    pub full_node_host: Option<HostAndPort>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StringOwnerConfiguration {
+    pub owner_account_address: Option<String>,
+    pub owner_account_public_key: Option<String>,
+    pub voter_account_address: Option<String>,
+    pub voter_account_public_key: Option<String>,
+    pub operator_account_address: Option<String>,
+    pub operator_account_public_key: Option<String>,
+    pub stake_amount: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StringOperatorConfiguration {
+    pub operator_account_address: Option<String>,
+    pub operator_account_public_key: Option<String>,
+    pub consensus_public_key: Option<String>,
+    pub consensus_proof_of_possession: Option<String>,
+    pub validator_network_public_key: Option<String>,
+    pub validator_host: HostAndPort,
+    pub full_node_network_public_key: Option<String>,
+    pub full_node_host: Option<HostAndPort>,
 }

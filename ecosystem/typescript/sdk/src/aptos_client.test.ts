@@ -6,8 +6,14 @@ import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
+import {
+  TxnBuilderTypes,
+  TransactionBuilderMultiEd25519,
+  BCS,
+  TransactionBuilderRemoteABI,
+} from "./transaction_builder";
 import { TokenClient } from "./token_client";
+import { HexString } from "./hex_string";
 
 const account = "0x1::account::Account";
 
@@ -88,8 +94,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -97,7 +103,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -107,6 +113,43 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
+  },
+  30 * 1000,
+);
+
+test(
+  "submits transaction with remote ABI",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 50000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("50000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("0");
+
+    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
+    const rawTxn = await builder.build(
+      "0x1::coin::transfer",
+      ["0x1::aptos_coin::AptosCoin"],
+      [account2.address(), 400],
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("400");
   },
   30 * 1000,
 );
@@ -146,8 +189,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -155,7 +198,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -210,10 +253,10 @@ test(
     await checkAptosCoin();
 
     const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [account2.address().hex(), "100000"],
+      arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
     const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];
@@ -262,8 +305,8 @@ test(
     await checkAptosCoin();
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -271,7 +314,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -353,67 +396,88 @@ test(
 
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
-    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token",
-        "direct_transfer_script",
-        [],
-        [
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(tokenName),
-          BCS.bcsSerializeUint64(propertyVersion),
-          BCS.bcsSerializeUint64(1),
-        ],
-      ),
+    const txnHash = await tokenClient.directTransferToken(
+      alice,
+      bob,
+      alice.address(),
+      collectionName,
+      tokenName,
+      1,
+      propertyVersion,
     );
 
-    const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
-      TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
-    ]);
+    await client.waitForTransaction(txnHash, { checkSuccess: true });
 
-    const aliceSignature = new TxnBuilderTypes.Ed25519Signature(
-      alice.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
-    );
-
-    const aliceAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-      new TxnBuilderTypes.Ed25519PublicKey(alice.signingKey.publicKey),
-      aliceSignature,
-    );
-
-    const bobSignature = new TxnBuilderTypes.Ed25519Signature(
-      bob.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
-    );
-
-    const bobAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-      new TxnBuilderTypes.Ed25519PublicKey(bob.signingKey.publicKey),
-      bobSignature,
-    );
-
-    const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
-      aliceAuthenticator, // sender authenticator
-      [TxnBuilderTypes.AccountAddress.fromHex(bob.address())], // secondary signer addresses
-      [bobAuthenticator], // secondary signer authenticators
-    );
-
-    const bcsTxn = BCS.bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
-
-    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
-
-    await client.waitForTransaction(transactionRes.hash);
-
-    const transaction = await client.getTransactionByHash(transactionRes.hash);
-    expect((transaction as any)?.success).toBe(true);
-
-    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
+    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
+  },
+  30 * 1000,
+);
+
+test(
+  "publishes a package",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const account1 = new AptosAccount(
+      new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
+    );
+    await faucetClient.fundAccount(account1.address(), 50000);
+
+    const txnHash = await client.publishPackage(
+      account1,
+      new HexString(
+        // eslint-disable-next-line max-len
+        "084578616d706c657301000000000000000040314137344146383742383132393043323533323938383036373846304137444637393737373637383734334431434345443230413446354345334238464446388f011f8b08000000000002ff3dccc10ac2300c06e07b9ea2f46ee70b78f0a02f31c6886d74a55d5b1a51417c7713c1915c927cf9c7863ee18d2628b89239187b7ae1da32b18507758eb5e872efa42cc088217462269e60a19ceb7cc9d527bf60fcb9594da0462550f151d9b1dd2b9fbba43f6b4f82de465e302b776e90befe8f03aadd6db3351ff802f2294cdfa100000001076d6573736167658f051f8b08000000000002ff95555d6bdb30147dcfafb8ed20d8c52c1d8c3194a6ec83b0be747be8dec6108a7d9d983a5226c94dc3f07f9f2cd98e6cc769e787884857e79e73bfb4154991236c30cf055de5227e8c372ce3846c5129b646f83b01f3150a41e984109452c879774f656b8e834d2d33be3e6eb29d168aa6926d712fe423212c8e45c175dfc27979c2ea64329b910b722b518942c6682d0d6e116bb877f4ee449ea0840d53f088879a6cf5d5f409381e843cd835ea1b5023979bc57a5404ec4ac8b25aee184f72bca95d7db586f6e0d6c19486df8d21d8f23b41d0bb65592652ec226323247a6c5329b6f445ca5a9cb7291d81d96c063f37681c640ab86894c2cef03434ac4d2cb8d2b0fcfe83de2f1f1e3e7f5b12283ebc87055ccf1dc8ae58e5590c69c1618dbaf11bb0249104aa5fb311f669008bff149939eaa5e728942985525f04f89c29ad6e3a66b7163d8cc0d618215c689a9a1249028f6718ce5bb0abe94a18d33d5de762c5f293686f6be67e806a6d2616f260152a5fa12b4b23cd5675345649a1857a51708e1a6a485a11322176c0a6015c14a94883696de289cb52082e46c2e4e185a1e7ccd6b57842aa450b198d52eb75423476d06f91264284e3de6dd2cd68a71ca575f1cbb0fd5b02e60a7bc4aab819c24d5ae8c6b15f4027e5745be8b3d1990f40fd56337057d3a197a666ba97ebc980db4c3bd5c1d47887f1ebddb845a726c230193ebd6146fc09108bdde174eeca9eec718a260003ada5df2a6f7e6954ba89a931ff74fdfc2efc3dd646dc60d398717aa6a3c25736cdff34cbd8e342482c9169a44d51a44252a7a85b1d27f846d0767ca1d38fc1eaf2ae7a2423f8d2be9297d5341acc362ff6fdd119c262f10a543f9ddeec6b776be2e5a49cfc0325c63f11c007000000000300000000000000000000000000000000000000000000000000000000000000010e4170746f734672616d65776f726b00000000000000000000000000000000000000000000000000000000000000010b4170746f735374646c696200000000000000000000000000000000000000000000000000000000000000010a4d6f76655374646c696200",
+      ).toUint8Array(),
+      [
+        new TxnBuilderTypes.Module(
+          new HexString(
+            // eslint-disable-next-line max-len
+            "a11ceb0b050000000c01000c020c12031e20043e04054228076ad50108bf024006ff020a108903450ace03150ce3035f0dc20404000001010102010301040105000606000007080005080700030e040106010009000100000a020300020f0404000410060000011106080106031209030106040705070105010802020c08020001030305080207080101060c010800010b0301090002070b030109000900076d657373616765076163636f756e74056572726f72056576656e74067369676e657206737472696e67124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c65096e6f745f666f756e640a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e746766284c3984add58e00d20ba272a40d33d5b4ea33c08a904254e28fdff97b9f000000000000000000000000000000000000000000000000000000000000000103080000000000000000126170746f733a3a6d657461646174615f7630310100000000000000000b454e4f5f4d4553534147451b5468657265206973206e6f206d6573736167652070726573656e740002020b08020c08020102020008020d0b030108000001000101030b0a002901030607001102270b002b0110001402010104010105210e0011030c020a022901200308050f0e000b010e00380012012d0105200b022a010c040a041000140c030a040f010b030a01120038010b010b040f0015020100010100",
+          ).toUint8Array(),
+        ),
+      ],
+    );
+
+    await client.waitForTransaction(txnHash);
+
+    const txn = await client.getTransactionByHash(txnHash);
+    expect((txn as any).success).toBeTruthy();
+  },
+  30 * 1000,
+);
+
+test(
+  "rotates auth key ed25519",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const alice = new AptosAccount();
+    await faucetClient.fundAccount(alice.address(), 50000);
+
+    const helperAccount = new AptosAccount();
+
+    const pendingTxn = await client.rotateAuthKeyEd25519(alice, helperAccount.signingKey.secretKey);
+
+    await client.waitForTransaction(pendingTxn.hash);
+
+    const origAddressHex = await client.lookupOriginalAddress(helperAccount.address());
+    // Sometimes the returned addresses do not have leading 0s. To be safe, converting hex addresses to AccountAddress
+    const origAddress = TxnBuilderTypes.AccountAddress.fromHex(origAddressHex);
+    const aliceAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
+
+    expect(HexString.fromUint8Array(BCS.bcsToBytes(origAddress)).hex()).toBe(
+      HexString.fromUint8Array(BCS.bcsToBytes(aliceAddress)).hex(),
+    );
   },
   30 * 1000,
 );

@@ -1,0 +1,26 @@
+specVersion: v0.1.0
+package:
+  name: "aptos_substreams"
+  version: v0.0.3
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/aptos_substreams.wasm
+
+modules:
+  - name: block_to_block_output
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: aptos.extractor.v1.Block
+    output:
+      type: proto:aptos.block_output.v1.BlockOutput
+
+  - name: block_output_to_token
+    kind: map
+    initialBlock: 0
+    inputs:
+      - map: block_to_block_output
+    output:
+      type: proto:aptos.token_output.v1.Tokens

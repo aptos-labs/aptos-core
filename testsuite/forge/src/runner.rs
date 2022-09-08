@@ -3,6 +3,8 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use std::time::Duration;
 use std::{
     io::{self, Write},
@@ -14,6 +16,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::success_criteria::SuccessCriteria;
+use framework::ReleaseBundle;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
@@ -88,13 +91,7 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(
-        options,
-        tests,
-        factory,
-        EmitJobRequest::default(),
-        SuccessCriteria::default(),
-    );
+    let forge = Forge::new(options, tests, Duration::from_secs(300), factory);
 
     if options.list {
         forge.list()?;
@@ -117,6 +114,9 @@ pub enum InitialVersion {
     Newest,
 }
 
+pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
+pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
+
 pub struct ForgeConfig<'cfg> {
     aptos_tests: &'cfg [&'cfg dyn AptosTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
@@ -133,6 +133,18 @@ pub struct ForgeConfig<'cfg> {
 
     /// The initial genesis modules to use when starting a network
     genesis_config: Option<GenesisConfig>,
+
+    /// Optional genesis helm values init function
+    genesis_helm_config_fn: Option<GenesisConfigFn>,
+
+    /// Optional node helm values init function
+    node_helm_config_fn: Option<NodeConfigFn>,
+
+    /// Transaction workload to run on the swarm
+    emit_job_request: EmitJobRequest,
+
+    /// Success criteria
+    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -165,19 +177,47 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn with_genesis_helm_config_fn(mut self, genesis_helm_config_fn: GenesisConfigFn) -> Self {
+        self.genesis_helm_config_fn = Some(genesis_helm_config_fn);
+        self
+    }
+
+    pub fn with_node_helm_config_fn(mut self, node_helm_config_fn: NodeConfigFn) -> Self {
+        self.node_helm_config_fn = Some(node_helm_config_fn);
+        self
+    }
+
     pub fn with_initial_version(mut self, initial_version: InitialVersion) -> Self {
         self.initial_version = initial_version;
         self
     }
 
-    pub fn with_genesis_modules_bytes(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
-        self.genesis_config = Some(GenesisConfig::Bytes(genesis_modules));
+    pub fn with_genesis_module_bundle(mut self, bundle: ReleaseBundle) -> Self {
+        self.genesis_config = Some(GenesisConfig::Bundle(bundle));
         self
     }
 
     pub fn with_genesis_modules_path(mut self, genesis_modules: String) -> Self {
         self.genesis_config = Some(GenesisConfig::Path(genesis_modules));
         self
+    }
+
+    pub fn with_emit_job(mut self, emit_job_request: EmitJobRequest) -> Self {
+        self.emit_job_request = emit_job_request;
+        self
+    }
+
+    pub fn get_emit_job(&self) -> &EmitJobRequest {
+        &self.emit_job_request
+    }
+
+    pub fn with_success_criteria(mut self, success_criteria: SuccessCriteria) -> Self {
+        self.success_criteria = success_criteria;
+        self
+    }
+
+    pub fn get_success_criteria_mut(&mut self) -> &mut SuccessCriteria {
+        &mut self.success_criteria
     }
 
     pub fn number_of_tests(&self) -> usize {
@@ -203,6 +243,12 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
+            genesis_helm_config_fn: None,
+            node_helm_config_fn: None,
+            emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                mempool_backlog: 30000,
+            }),
+            success_criteria: SuccessCriteria::new(3500, 10000, true, None),
         }
     }
 }
@@ -210,25 +256,22 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
 pub struct Forge<'cfg, F> {
     options: &'cfg Options,
     tests: ForgeConfig<'cfg>,
+    global_duration: Duration,
     factory: F,
-    global_job_request: EmitJobRequest,
-    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
     pub fn new(
         options: &'cfg Options,
         tests: ForgeConfig<'cfg>,
+        global_duration: Duration,
         factory: F,
-        global_job_request: EmitJobRequest,
-        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             options,
             tests,
+            global_duration,
             factory,
-            global_job_request,
-            success_criteria,
         }
     }
 
@@ -248,6 +291,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         Ok(())
     }
 
+    /// Get the initial version based on test configuration
     pub fn initial_version(&self) -> Version {
         let versions = self.factory.versions();
         match self.tests.initial_version {
@@ -255,13 +299,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             InitialVersion::Newest => versions.max(),
         }
         .expect("There has to be at least 1 version")
-    }
-
-    pub fn genesis_version(&self) -> Version {
-        self.factory
-            .versions()
-            .max()
-            .expect("There has to be at least 1 version")
     }
 
     pub fn run(&self) -> Result<TestReport> {
@@ -281,7 +318,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     .collect::<Vec<_>>()
             );
             let initial_version = self.initial_version();
-            let genesis_version = self.genesis_version();
+            // The genesis version should always match the initial node version
+            let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap();
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
@@ -291,8 +329,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
-                self.global_job_request.duration
-                    + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                self.tests.genesis_helm_config_fn.clone(),
+                self.tests.node_helm_config_fn.clone(),
             ))?;
 
             // Run AptosTests
@@ -303,6 +342,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = run_test(|| runtime.block_on(test.run(&mut aptos_ctx)));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -314,6 +354,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = run_test(|| test.run(&mut admin_ctx));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -322,10 +363,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     CoreContext::from_rng(&mut rng),
                     &mut *swarm,
                     &mut report,
-                    self.global_job_request.clone(),
-                    self.success_criteria.clone(),
+                    self.global_duration,
+                    self.tests.emit_job_request.clone(),
+                    self.tests.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -378,15 +421,30 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
 enum TestResult {
     Ok,
-    Failed,
     FailedWithMsg(String),
 }
 
+impl Display for TestResult {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            TestResult::Ok => write!(f, "Test Ok"),
+            TestResult::FailedWithMsg(msg) => write!(f, "Test Failed: {}", msg),
+        }
+    }
+}
+
 fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
-    match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(f)) {
-        Ok(Ok(())) => TestResult::Ok,
-        Ok(Err(e)) => TestResult::FailedWithMsg(format!("{:?}", e)),
-        Err(_) => TestResult::Failed,
+    match f() {
+        Ok(()) => TestResult::Ok,
+        Err(e) => {
+            let is_triggerd_by_github_actions =
+                std::env::var("FORGE_TRIGGERED_BY").unwrap_or_default() == "github-actions";
+            if is_triggerd_by_github_actions {
+                // ::error:: is github specific syntax to set an error on the job that is highlighted as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
+                println!("::error::{:?}", e);
+            }
+            TestResult::FailedWithMsg(format!("{:?}", e))
+        }
     }
 }
 
@@ -415,10 +473,6 @@ impl TestSummary {
             TestResult::Ok => {
                 self.passed += 1;
                 self.write_ok()?;
-            }
-            TestResult::Failed => {
-                self.failed.push(name);
-                self.write_failed()?;
             }
             TestResult::FailedWithMsg(msg) => {
                 self.failed.push(name);

@@ -51,7 +51,7 @@ resource "helm_release" "validator" {
       }
       fullnode = {
         storage = {
-          class = "default"
+          class = "managed-premium"
         }
         nodeSelector = {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name

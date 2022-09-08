@@ -1,20 +1,19 @@
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [
-                        (
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
                             AccessPath(
                                 AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
-                            ),
-                            Value(208e0d19280063fa870fe4dbb85cc724091a398451c5c11e1e76e64cdc7b5885100b0000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
-                        ),
-                    ],
-                },
+                            ): Modification(208e0d19280063fa870fe4dbb85cc724091a398451c5c11e1e76e64cdc7b5885100b0000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                        },
+                    },
+                ),
             ),
             events: [],
-            gas_used: 2,
+            gas_used: 1,
             status: Keep(
                 Success,
             ),
@@ -24,10 +23,12 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [],
-                },
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {},
+                    },
+                ),
             ),
             events: [],
             gas_used: 0,
@@ -40,20 +41,19 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet(
-                WriteSetMut {
-                    write_set: [
-                        (
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {
                             AccessPath(
                                 AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
-                            ),
-                            Value(208e0d19280063fa870fe4dbb85cc724091a398451c5c11e1e76e64cdc7b5885100c0000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
-                        ),
-                    ],
-                },
+                            ): Modification(208e0d19280063fa870fe4dbb85cc724091a398451c5c11e1e76e64cdc7b5885100c0000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                        },
+                    },
+                ),
             ),
             events: [],
-            gas_used: 2,
+            gas_used: 1,
             status: Keep(
                 Success,
             ),

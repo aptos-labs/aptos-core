@@ -131,6 +131,7 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_store: Option<Arc<BlockStore>>,
     quorum_store_storage: Arc<QuorumStoreDB>,
@@ -175,6 +176,7 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            round_manager_close_tx: None,
             epoch_state: None,
             block_store: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
@@ -325,7 +327,7 @@ impl EpochManager {
             }
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
-                let default_proposer = proposers.get(0).unwrap();
+                let default_proposer = proposers.first().unwrap();
                 Box::new(RoundProposer::new(
                     round_proposers.clone(),
                     *default_proposer,
@@ -334,7 +336,7 @@ impl EpochManager {
         }
     }
 
-    async fn process_epoch_retrieval(
+    fn process_epoch_retrieval(
         &mut self,
         request: EpochRetrievalRequest,
         peer_id: AccountAddress,
@@ -358,7 +360,7 @@ impl EpochManager {
         ))
     }
 
-    async fn process_different_epoch(
+    fn process_different_epoch(
         &mut self,
         different_epoch: u64,
         peer_id: AccountAddress,
@@ -370,16 +372,34 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // We try to help nodes that have lower epoch than us
             Ordering::Less => {
-                self.process_epoch_retrieval(
-                    EpochRetrievalRequest {
-                        start_epoch: different_epoch,
-                        end_epoch: self.epoch(),
-                    },
-                    peer_id,
-                )
-                .await
+                if self
+                    .epoch_state()
+                    .verifier
+                    .get_voting_power(&self.author)
+                    .is_some()
+                {
+                    // Ignore message from lower epoch if we're part of the validator set, the node would eventually see messages from
+                    // higher epoch and request a proof
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
+                    );
+                    Ok(())
+                } else {
+                    // reply back the epoch change proof if we're not part of the validator set since we won't broadcast
+                    // timeout in this epoch
+                    monitor!(
+                        "process_epoch_retrieval",
+                        self.process_epoch_retrieval(
+                            EpochRetrievalRequest {
+                                start_epoch: different_epoch,
+                                end_epoch: self.epoch(),
+                            },
+                            peer_id
+                        )
+                    )
+                }
             }
             // We request proof to join higher epoch
             Ordering::Greater => {
@@ -585,11 +605,12 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
-        if self.round_manager_tx.is_some() {
+        if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
-            let event = VerifiedEvent::Shutdown(ack_tx);
-            self.forward_to_round_manager(self.author, event);
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop round manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop round manager");
@@ -619,6 +640,9 @@ impl EpochManager {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
+
+        // Shutdown the block retrieval task by dropping the sender
+        self.block_retrieval_tx = None;
     }
 
     async fn start_round_manager(
@@ -743,7 +767,8 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_manager),
             self.time_service.clone(),
-            self.config.max_block_size,
+            self.config.max_block_txns,
+            self.config.max_block_bytes,
             onchain_config.max_failed_authors_to_store(),
         );
 
@@ -767,8 +792,11 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
-        self.block_store = Some(block_store);
-        tokio::spawn(round_manager.start(round_manager_rx));
+        let (close_tx, close_rx) = oneshot::channel();
+        self.round_manager_close_tx = Some(close_tx);
+        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
+
+        self.spawn_block_retrieval_task(epoch, block_store);
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
@@ -812,19 +840,22 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // same epoch -> run well-formedness + signature check
-            let verified_event = unverified_event
-                .clone()
-                .verify(peer_id, &self.epoch_state().verifier)
-                .context("[EpochManager] Verify event")
-                .map_err(|err| {
-                    error!(
-                        SecurityEvent::ConsensusInvalidMessage,
-                        remote_peer = peer_id,
-                        error = ?err,
-                        unverified_event = unverified_event
-                    );
-                    err
-                })?;
+            let verified_event = monitor!(
+                "verify_message",
+                unverified_event
+                    .clone()
+                    .verify(peer_id, &self.epoch_state().verifier)
+            )
+            .context("[EpochManager] Verify event")
+            .map_err(|err| {
+                error!(
+                    SecurityEvent::ConsensusInvalidMessage,
+                    remote_peer = peer_id,
+                    error = ?err,
+                    unverified_event = unverified_event
+                );
+                err
+            })?;
 
             // process the verified event
             self.process_event(peer_id, verified_event)?;
@@ -853,7 +884,7 @@ impl EpochManager {
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch(), peer_id).await
+                        self.process_different_epoch(event.epoch(), peer_id)
                     )?;
                 }
             }
@@ -882,7 +913,7 @@ impl EpochManager {
                 );
                 monitor!(
                     "process_epoch_retrieval",
-                    self.process_epoch_retrieval(*request, peer_id).await
+                    self.process_epoch_retrieval(*request, peer_id)
                 )?;
             }
             _ => {
@@ -939,8 +970,9 @@ impl EpochManager {
         }
     }
 
-    async fn process_block_retrieval(
+    fn process_block_retrieval(
         &self,
+        peer_id: Author,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process::any", |_| {
@@ -976,9 +1008,8 @@ impl EpochManager {
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
-            tokio::select! {
-                // TODO: combine consensus_messages and quorum_store_messages to a stream.
-                Some((peer, msg)) = network_receivers.consensus_messages.next() => {
+            ::futures::select! {
+                (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
@@ -995,7 +1026,7 @@ impl EpochManager {
                 }
                 Some(round) = round_timeout_sender_rx.next() => {
                     self.process_local_timeout(round);
-                }
+                },
             }
             // Continually capture the time of consensus process to ensure that clock skew between
             // validators is reasonable and to find any unusual (possibly byzantine) clock behavior.

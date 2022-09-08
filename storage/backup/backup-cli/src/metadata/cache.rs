@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use async_trait::async_trait;
+use clap::Parser;
 use futures::stream::poll_fn;
 use once_cell::sync::Lazy;
 use std::{
@@ -19,7 +20,6 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, read_dir, remove_file, OpenOptions},
     io::{AsyncRead, AsyncReadExt},
@@ -33,12 +33,14 @@ static TEMP_METADATA_CACHE_DIR: Lazy<TempPath> = Lazy::new(|| {
     dir
 });
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct MetadataCacheOpt {
-    #[structopt(
+    #[clap(
         long = "metadata-cache-dir",
         parse(from_os_str),
-        help = "[Defaults to temporary dir] Metadata cache dir."
+        help = "[Defaults to temporary dir] Metadata cache dir. If specified and shared across runs, \
+        metadata files in cache won't be downloaded again from backup source, speeding up tool \
+        boot up significantly."
     )]
     dir: Option<PathBuf>,
 }
@@ -101,13 +103,15 @@ pub async fn sync_and_load(
     let up_to_date_local_hashes = local_hashes.intersection(&remote_hashes);
 
     for h in stale_local_hashes {
-        let file = cache_dir.join(&*h);
+        let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
     }
+    info!("Deleted stale metadata files in cache.");
 
-    NUM_META_MISS.set(new_remote_hashes.len() as i64);
+    let num_new_files = new_remote_hashes.len();
+    NUM_META_MISS.set(num_new_files as i64);
     NUM_META_DOWNLOAD.set(0);
-    let futs = new_remote_hashes.iter().map(|h| {
+    let futs = new_remote_hashes.iter().enumerate().map(|(i, h)| {
         let fh_by_h_ref = &remote_file_handle_by_hash;
         let storage_ref = &storage;
         let cache_dir_ref = &cache_dir;
@@ -133,6 +137,12 @@ pub async fn sync_and_load(
             // rename to target file only if successful; stale tmp file caused by failure will be
             // reclaimed on next run
             tokio::fs::rename(local_tmp_file, local_file).await?;
+            info!(
+                file_handle = file_handle,
+                processed = i + 1,
+                total = num_new_files,
+                "Metadata file downloaded."
+            );
             NUM_META_DOWNLOAD.inc();
             Ok(())
         }
@@ -145,10 +155,11 @@ pub async fn sync_and_load(
         .collect::<Result<Vec<_>>>()
         .await?;
 
+    info!("Loading all metadata files to memory.");
     // Load metadata from synced cache files.
     let mut metadata_vec = Vec::new();
     for h in new_remote_hashes.into_iter().chain(up_to_date_local_hashes) {
-        let cached_file = cache_dir.join(&*h);
+        let cached_file = cache_dir.join(h);
         metadata_vec.extend(
             OpenOptions::new()
                 .read(true)
@@ -162,8 +173,8 @@ pub async fn sync_and_load(
         )
     }
     info!(
-        "Metadata cache loaded in {:.2} seconds.",
-        timer.elapsed().as_secs_f64()
+        total_time = timer.elapsed().as_secs(),
+        "Metadata cache loaded.",
     );
     Ok(metadata_vec.into())
 }

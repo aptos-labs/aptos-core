@@ -22,17 +22,16 @@ const sidebars = {
 
     {
       type: "category",
-      label: "Aptos Quickstarts",
+      label: "Developer Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
       items: [
-        "tutorials/first-transaction-sdk",
         "tutorials/first-transaction",
+        "tutorials/your-first-nft",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
         "tutorials/first-coin",
-        "tutorials/your-first-nft",
       ],
     },
     {
@@ -50,6 +49,8 @@ const sidebars = {
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
+        "concepts/staking",
+        "concepts/governance",
       ],
     },
     {
@@ -62,6 +63,7 @@ const sidebars = {
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
+        "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
@@ -69,7 +71,13 @@ const sidebars = {
           type: "category",
           label: "Move Guides",
           link: { type: "doc", id: "guides/move-guides/index" },
-          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
+          collapsible: true,
+          collapsed: true,
+          items: [
+            "guides/move-guides/move-on-aptos",
+            "guides/move-guides/upgrading-move-code",
+            "guides/move-guides/guide-move-transactional-testing",
+          ],
         },
       ],
     },
@@ -83,13 +91,16 @@ const sidebars = {
         "nodes/aptos-deployments",
         {
           type: "category",
-          label: "AIT-2",
+          label: "AIT-3",
           link: { type: "doc", id: "nodes/ait/index" },
           collapsible: true,
           collapsed: true,
           items: [
+            "nodes/ait/whats-new-in-ait3",
+            "nodes/ait/steps-in-ait3",
             "nodes/ait/node-requirements",
             "nodes/ait/node-liveness-criteria",
+            "nodes/ait/ait3-leaderboard-metrics",
             "nodes/ait/connect-to-testnet",
             "nodes/ait/additional-doc",
           ],
@@ -110,7 +121,7 @@ const sidebars = {
         },
         {
           type: "category",
-          label: "FullNode for Devnet",
+          label: "Public Fullnode",
           link: { type: "doc", id: "nodes/full-node/index" },
           collapsible: true,
           collapsed: true,
@@ -132,7 +143,6 @@ const sidebars = {
         },
         "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
-        "nodes/staking",
       ],
     },
     {
@@ -141,14 +151,11 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "link",
-          label: "Typescript SDK",
-          href: "https://aptos-labs.github.io/ts-sdk-doc/",
-        },
         "sdks/aptos-sdk-overview",
+        "sdks/typescript-sdk",
         "sdks/transactions-with-ts-sdk",
         "sdks/python-sdk",
+        "sdks/rust-sdk",
       ],
     },
     {
@@ -160,7 +167,14 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     "reference/telemetry",
-    "aptos-white-paper",
+    {
+      type: "category",
+      label: "Aptos White Paper",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "aptos-white-paper/index" },
+      items: ["aptos-white-paper/in-korean"],
+    },
     "reference/glossary",
   ],
 };

@@ -9,14 +9,13 @@ use crate::{
         new_streaming_service_client_listener_pair, ContinuouslyStreamTransactionOutputsRequest,
         ContinuouslyStreamTransactionsRequest, DataStreamingClient,
         GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionOutputsRequest,
-        GetAllTransactionsRequest, NotificationFeedback, StreamRequest, StreamingServiceListener,
-        TerminateStreamRequest,
+        GetAllTransactionsRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
+        StreamingServiceListener, TerminateStreamRequest,
     },
     tests::utils::{create_ledger_info, initialize_logger},
 };
-use channel::{aptos_channel, message_queues::QueueStyle};
-use claim::assert_ok;
-use futures::{executor::block_on, FutureExt, StreamExt};
+use claims::assert_ok;
+use futures::{channel::mpsc, executor::block_on, FutureExt, StreamExt};
 use std::thread::JoinHandle;
 
 #[test]
@@ -209,11 +208,14 @@ fn test_terminate_stream() {
         new_streaming_service_client_listener_pair();
 
     // Note the request we expect to receive on the streaming service side
-    let request_notification_id = 19478;
-    let notification_feedback = NotificationFeedback::InvalidPayloadData;
+    let data_stream_id = 50505;
+    let notification_and_feedback = Some(NotificationAndFeedback::new(
+        19478,
+        NotificationFeedback::InvalidPayloadData,
+    ));
     let expected_request = StreamRequest::TerminateStream(TerminateStreamRequest {
-        notification_id: request_notification_id,
-        notification_feedback: notification_feedback.clone(),
+        data_stream_id,
+        notification_and_feedback: notification_and_feedback.clone(),
     });
 
     // Spawn a new server thread to handle any feedback requests
@@ -222,7 +224,7 @@ fn test_terminate_stream() {
     // Provide payload feedback and verify no error is returned
     let result = block_on(
         streaming_service_client
-            .terminate_stream_with_feedback(request_notification_id, notification_feedback),
+            .terminate_stream_with_feedback(data_stream_id, notification_and_feedback),
     );
     assert_ok!(result);
 }
@@ -280,13 +282,9 @@ fn spawn_service_and_respond_with_error(
 }
 
 /// Creates and returns a new data stream sender and listener pair.
-fn new_data_stream_sender_listener() -> (
-    channel::aptos_channel::Sender<(), DataNotification>,
-    DataStreamListener,
-) {
-    let (notification_sender, notification_receiver) =
-        aptos_channel::new(QueueStyle::KLAST, 1, None);
-    let data_stream_listener = DataStreamListener::new(notification_receiver);
+fn new_data_stream_sender_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {
+    let (notification_sender, notification_receiver) = mpsc::channel(100);
+    let data_stream_listener = DataStreamListener::new(0, notification_receiver);
 
     (notification_sender, data_stream_listener)
 }

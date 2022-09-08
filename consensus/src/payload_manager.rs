@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::{error::QuorumStoreError, state_replication::PayloadManager};
+use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use aptos_types::block_info::Round;

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U64,
+    Address, AptosError, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
+    MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
 use anyhow::{bail, Context as AnyhowContext};
@@ -34,9 +34,16 @@ use std::{
 // TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
 // TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Transaction data
+///
+/// This is a combination enum of an onchain transaction and a pending transaction.
+/// When the transaction is still in mempool, it will be pending.  If it's been committed to the
+/// chain, it will show up as OnChain.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TransactionData {
+    /// A committed transaction
     OnChain(TransactionOnChainData),
+    /// A transaction currently sitting in mempool
     Pending(Box<SignedTransaction>),
 }
 
@@ -52,13 +59,22 @@ impl From<SignedTransaction> for TransactionData {
     }
 }
 
+/// A committed transaction
+///
+/// This is a representation of the onchain payload, outputs, events, and proof of a transaction.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionOnChainData {
+    /// The ledger version of the transaction
     pub version: u64,
+    /// The transaction submitted
     pub transaction: aptos_types::transaction::Transaction,
+    /// Information about the transaction
     pub info: aptos_types::transaction::TransactionInfo,
+    /// Events emitted by the transaction
     pub events: Vec<ContractEvent>,
+    /// The accumulator root hash at this version
     pub accumulator_root_hash: aptos_crypto::HashValue,
+    /// Final state of resources changed by the transaction
     pub changes: aptos_types::write_set::WriteSet,
 }
 
@@ -131,14 +147,20 @@ impl
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// Enum of the different types of transactions in Aptos
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
+    /// A transaction currently in mempool and not committed
     PendingTransaction(PendingTransaction),
+    /// A transaction submitted by a user
     UserTransaction(Box<UserTransaction>),
+    /// A genesis writeset transaction
     GenesisTransaction(GenesisTransaction),
+    /// A block metadata transaction, signifying the beginning of a block
     BlockMetadataTransaction(BlockMetadataTransaction),
+    /// A state checkpoint transaction
     StateCheckpointTransaction(StateCheckpointTransaction),
 }
 
@@ -287,22 +309,39 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Information related to how a transaction affected the state of the blockchain
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TransactionInfo {
+    /// Ledger version of the transaction
     pub version: U64,
+    /// Hash of the transaction
     pub hash: HashValue,
-    pub state_root_hash: HashValue,
+    /// Hash of the state changes
+    pub state_change_hash: HashValue,
+    /// Hash of the event changes
     pub event_root_hash: HashValue,
+    /// Hash of the state checkpoint (if it is a state checkpoint)
+    pub state_checkpoint_hash: Option<HashValue>,
+    /// Total gas units used
+    ///
+    /// Total gas units used can be multiplied by gas price to get the total coins paid
     pub gas_used: U64,
+    /// Whether the transaction was successful
     pub success: bool,
+    /// The VM status of the transaction, can tell useful information in a failure
     pub vm_status: String,
+    /// The accumulator root hash
     pub accumulator_root_hash: HashValue,
+    /// Final state of resources changed by the transaction
     pub changes: Vec<WriteSetChange>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A transaction waiting in mempool
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct PendingTransaction {
+    /// The transaction hash
     pub hash: HashValue,
+    /// The transaction payload
     #[serde(flatten)]
     #[oai(flatten)]
     pub request: UserTransactionRequest,
@@ -317,7 +356,8 @@ impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A transaction submitted by a user to change the state of the blockchain
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
@@ -325,101 +365,163 @@ pub struct UserTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub request: UserTransactionRequest,
+    /// Events generated by the transaction
     pub events: Vec<Event>,
+    /// Timestamp of the transaction's block
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A state checkpoint transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct StateCheckpointTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
+    /// Timestamp of the transaction's block
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A request to submit a transaction
+///
+/// This requires a transaction and a signature of it
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct SubmitTransactionRequest {
     #[serde(flatten)]
     #[oai(flatten)]
     pub user_transaction_request: UserTransactionRequestInner,
-
+    /// Signature of the request
     pub signature: TransactionSignature,
 }
 
+/// Batch transaction submission result
+///
+/// Tells which transactions failed
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct TransactionsBatchSubmissionResult {
+    /// Summary of the failed transactions
+    pub transaction_failures: Vec<TransactionsBatchSingleSubmissionFailure>,
+}
+
+/// Information telling which batch submission transactions failed
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct TransactionsBatchSingleSubmissionFailure {
+    /// The error from submitting the transaction
+    pub error: AptosError,
+    /// The index of which transaction failed, same as submission order
+    pub transaction_index: usize,
+}
+
 // TODO: Rename this to remove the Inner when we cut over.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserTransactionRequestInner {
+    /// Sender account address
     pub sender: Address,
+    /// Sequence number of the sender for this transaction
     pub sequence_number: U64,
+    /// Max gas units allowed for this transaction
     pub max_gas_amount: U64,
+    /// Gas unit price used for this transaction
     pub gas_unit_price: U64,
+    /// Expiration timestamp in seconds from the UNIX epoch
     pub expiration_timestamp_secs: U64,
+    /// The payload of the transaction
     pub payload: TransactionPayload,
 }
 
 // TODO: Remove this when we cut over.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserTransactionRequest {
+    /// Sender account address
     pub sender: Address,
+    /// Sequence number of the sender for this transaction
     pub sequence_number: U64,
+    /// Max gas units allowed for this transaction
     pub max_gas_amount: U64,
+    /// Gas unit price used for this transaction
     pub gas_unit_price: U64,
+    /// Expiration timestamp in seconds from the UNIX epoch
     pub expiration_timestamp_secs: U64,
+    /// The payload of the transaction
     pub payload: TransactionPayload,
+    /// Signature of the transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Request to create signing messages
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserCreateSigningMessageRequest {
     #[serde(flatten)]
     #[oai(flatten)]
     pub transaction: UserTransactionRequest,
+    /// Secondary signer accounts of the request for Multi-agent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_signers: Option<Vec<Address>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Request to encode a submission
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct EncodeSubmissionRequest {
     #[serde(flatten)]
     #[oai(flatten)]
     pub transaction: UserTransactionRequestInner,
+    /// Secondary signer accounts of the request for Multi-agent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_signers: Option<Vec<Address>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// The genesis transaction
+///
+/// This only occurs at the genesis transaction (version 0)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct GenesisTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
+    /// The genesis transaction payload
     pub payload: GenesisPayload,
+    /// Events emitted during genesis
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A block metadata transaction
+///
+/// This signifies the beginning of a block, and contains information
+/// about the specific block
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct BlockMetadataTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
+    /// The block hash
     pub id: HashValue,
+    /// The block epoch
     pub epoch: U64,
+    /// The block epoch round
     pub round: U64,
+    /// The events emitted at the block creation
     pub events: Vec<Event>,
+    /// Previous block votes
     pub previous_block_votes_bitvec: Vec<u8>,
+    /// The address of the proposer of the block
     pub proposer: Address,
+    /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
+    /// The timestamp of the block in microseconds from the UNIX epoch
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// An event from a transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct Event {
     pub key: EventKey,
+    /// The sequence number of the event
     pub sequence_number: U64,
+    /// The [`MoveType`] of the event
     #[serde(rename = "type")]
     #[oai(rename = "type")]
     pub typ: MoveType,
-    // TODO: Use the real data here, not a JSON representation.
+    /// The JSON representation of the event
     pub data: serde_json::Value,
 }
 
@@ -436,15 +538,19 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// An event from a transaction with a version
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct VersionedEvent {
+    /// The version that the event was emitted
     pub version: U64,
     pub key: EventKey,
+    /// The sequence number of the event
     pub sequence_number: U64,
+    /// The [`MoveType`] of the event
     #[serde(rename = "type")]
     #[oai(rename = "type")]
     pub typ: MoveType,
-    // TODO: Use the real data here, not a JSON representation.
+    /// The JSON representation of the event
     pub data: serde_json::Value,
 }
 
@@ -462,41 +568,51 @@ impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// The writeset payload of the Genesis transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum GenesisPayload {
+    /// The write set payload of Genesis
     WriteSetPayload(WriteSetPayload),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// An enum of the possible transaction payloads
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionPayload {
-    ScriptFunctionPayload(ScriptFunctionPayload),
+    /// Payload which runs a single entry function
+    EntryFunctionPayload(EntryFunctionPayload),
+    /// Payload which runs a script that can run multiple functions
     ScriptPayload(ScriptPayload),
     ModuleBundlePayload(ModuleBundlePayload),
-    WriteSetPayload(WriteSetPayload),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ModuleBundlePayload {
     pub modules: Vec<MoveModuleBytecode>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
-pub struct ScriptFunctionPayload {
-    pub function: ScriptFunctionId,
+/// Payload which runs a single entry function
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct EntryFunctionPayload {
+    /// Id of the function to be run e.g. 0x1::account::transfer
+    pub function: EntryFunctionId,
+    /// Type arguments of the function
     pub type_arguments: Vec<MoveType>,
-    // TODO: Use the real data here, not a JSON representation.
+    /// Arguments of the function
     pub arguments: Vec<serde_json::Value>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Payload which runs a script that can run multiple functions
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ScriptPayload {
+    /// Bytecode of the script
     pub code: MoveScriptBytecode,
+    /// Type arguments of the function
     pub type_arguments: Vec<MoveType>,
-    // TODO: Use the real data here, not a JSON representation.
+    /// Arguments of the function
     pub arguments: Vec<serde_json::Value>,
 }
 
@@ -516,12 +632,14 @@ impl TryFrom<Script> for ScriptPayload {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A writeset payload, used only for genesis
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct WriteSetPayload {
     pub write_set: WriteSet,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// The associated writeset with a payload
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum WriteSet {
@@ -529,48 +647,60 @@ pub enum WriteSet {
     DirectWriteSet(DirectWriteSet),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ScriptWriteSet {
     pub execute_as: Address,
     pub script: ScriptPayload,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DirectWriteSet {
     pub changes: Vec<WriteSetChange>,
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// A final state change of a transaction on a resource or module
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum WriteSetChange {
+    /// Delete a module
     DeleteModule(DeleteModule),
+    /// Delete a resource
     DeleteResource(DeleteResource),
+    /// Delete a table item
     DeleteTableItem(DeleteTableItem),
+    /// Write a new module or update an existing one
     WriteModule(WriteModule),
+    /// Write a resource or update an existing one
     WriteResource(WriteResource),
+    /// Write a table item or update an existing one
     WriteTableItem(WriteTableItem),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Delete a module
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DeleteModule {
     pub address: Address,
     pub state_key_hash: String,
     pub module: MoveModuleId,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Delete a resource
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DeleteResource {
     pub address: Address,
     pub state_key_hash: String,
     pub resource: MoveStructTag,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Delete a table item
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DeleteTableItem {
     pub state_key_hash: String,
+    /// Table handle a u256 encoded as an Address
     pub handle: HexEncodedBytes,
+    /// Key of the item
     pub key: HexEncodedBytes,
     // This is optional, and only possible to populate if the table indexer is enabled for this node
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -578,39 +708,57 @@ pub struct DeleteTableItem {
     pub data: Option<DeletedTableData>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Write a new module or update an existing one
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct WriteModule {
+    /// Address of module
     pub address: Address,
     pub state_key_hash: String,
+    /// New bytecode of module
     pub data: MoveModuleBytecode,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Write a resource or update an existing one
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct WriteResource {
+    /// Address of resource
     pub address: Address,
     pub state_key_hash: String,
+    /// New state of resource
     pub data: MoveResource,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Decoded table data
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DecodedTableData {
+    /// Key of table in JSON
     pub key: serde_json::Value,
+    /// Type of key
     pub key_type: String,
+    /// Value of table in JSON
     pub value: serde_json::Value,
+    /// Type of value
     pub value_type: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Deleted table data
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct DeletedTableData {
+    /// Deleted key
     pub key: serde_json::Value,
+    /// Deleted key type
     pub key_type: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Change set to write a table item
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct WriteTableItem {
     pub state_key_hash: String,
+    /// Table handle a u256 encoded as an Address
     pub handle: HexEncodedBytes,
+    /// Key of item in table
     pub key: HexEncodedBytes,
+    /// Value of item in table
     pub value: HexEncodedBytes,
     // This is optional, and only possible to populate if the table indexer is enabled for this node
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -631,12 +779,16 @@ impl WriteSetChange {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// An enum representing the different transaction signatures available
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionSignature {
+    /// Single Ed25519 signer signature
     Ed25519Signature(Ed25519Signature),
+    /// Multi Ed25519 signer signature
     MultiEd25519Signature(MultiEd25519Signature),
+    /// Multi Agent (multiple accounts) signer signature
     MultiAgentSignature(MultiAgentSignature),
 }
 
@@ -651,9 +803,12 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A single Ed25519 signature
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct Ed25519Signature {
+    /// Ed25519 public key of the account
     pub public_key: HexEncodedBytes,
+    /// Signature of the transaction
     pub signature: HexEncodedBytes,
 }
 
@@ -699,11 +854,18 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A Ed25519 multi-sig signature
+///
+/// This allows k-of-n signing for a transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MultiEd25519Signature {
+    /// The public keys for the Ed25519 signature
     pub public_keys: Vec<HexEncodedBytes>,
+    /// Signature associated with the public keys in the same order
     pub signatures: Vec<HexEncodedBytes>,
+    /// The number of signatures required for a successful transaction
     pub threshold: u8,
+    /// The bitmap representing which keys are being used
     pub bitmap: HexEncodedBytes,
 }
 
@@ -767,11 +929,19 @@ impl TryFrom<MultiEd25519Signature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+/// Account signature scheme
+///
+/// The account signature scheme allows you to have two types of accounts:
+///
+///   1. A single Ed25519 key account, one private key
+///   2. A k-of-n multi-Ed25519 key account, multiple private keys, such that k-of-n must sign a transaction.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum AccountSignature {
+    /// A single Ed25519 key account
     Ed25519Signature(Ed25519Signature),
+    /// A multi Ed25519 key account for a multi-sig account
     MultiEd25519Signature(MultiEd25519Signature),
 }
 
@@ -786,10 +956,16 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Multi agent signature for multi agent transactions
+///
+/// This allows you to have transactions across multiple accounts
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MultiAgentSignature {
+    /// Sender of the transaction, which will pay for gas
     pub sender: AccountSignature,
+    /// The other involved parties' addresses
     pub secondary_signer_addresses: Vec<Address>,
+    /// The associated signatures, in the same order as the secondary addresses
     pub secondary_signers: Vec<AccountSignature>,
 }
 
@@ -915,13 +1091,17 @@ impl From<TransactionAuthenticator> for TransactionSignature {
     }
 }
 
+/// A transaction identifier
+///
 /// There are 2 types transaction ids from HTTP request inputs:
 /// 1. Transaction hash: hex-encoded string, e.g. "0x374eda71dce727c6cd2dd4a4fd47bfb85c16be2e3e95ab0df4948f39e1af9981"
 /// 2. Transaction version: u64 number string (as we encode u64 into string in JSON), e.g. "122"
 #[derive(Clone, Debug, Union)]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionId {
+    /// A transaction hash
     Hash(HashValue),
+    /// A ledger version
     Version(U64),
 }
 
@@ -946,8 +1126,10 @@ impl fmt::Display for TransactionId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// A hex encoded BCS encoded transaction from the EncodeSubmission API
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TransactionSigningMessage {
+    /// The hex encoded BCS encoded message
     pub message: HexEncodedBytes,
 }
 
@@ -957,4 +1139,11 @@ impl TransactionSigningMessage {
             message: bytes.into(),
         }
     }
+}
+
+/// Struct holding the outputs of the estimate gas API
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct GasEstimation {
+    /// The current estimate for the gas unit price
+    pub gas_estimate: u64,
 }

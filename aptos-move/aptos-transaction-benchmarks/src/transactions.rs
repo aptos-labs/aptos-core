@@ -134,7 +134,6 @@ impl TransactionBenchState {
             0,
             0,
             *validator_set.payload().next().unwrap().account_address(),
-            Some(0),
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             vec![],
             1,

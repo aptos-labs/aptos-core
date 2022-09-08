@@ -13,31 +13,31 @@ use crate::{
         COORDINATOR_FAIL_TS, COORDINATOR_START_TS, COORDINATOR_SUCC_TS, COORDINATOR_TARGET_VERSION,
     },
     storage::BackupStorage,
-    utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode},
+    utils::{unix_timestamp_sec, GlobalRestoreOptions},
 };
 use anyhow::{bail, Result};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
+use clap::Parser;
 use std::sync::Arc;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct RestoreCoordinatorOpt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
-    #[structopt(
+    #[clap(
         long,
         help = "Replay all transactions, don't try to use a state snapshot."
     )]
     pub replay_all: bool,
-    #[structopt(
+    #[clap(
         long,
-        default_value = "0",
-        help = "Ignore restoring the ledger history (transactions and events) before this version \
-                if possible"
+        help = "[default to only start ledger history after selected state snapshot] \
+        Ignore restoring the ledger history (transactions and events) before this version \
+        if possible, set 0 for full ledger history."
     )]
-    pub ledger_history_start_version: Version,
-    #[structopt(long, help = "Skip restoring epoch ending info, used for debugging.")]
+    pub ledger_history_start_version: Option<Version>,
+    #[clap(long, help = "Skip restoring epoch ending info, used for debugging.")]
     pub skip_epoch_endings: bool,
 }
 
@@ -46,7 +46,7 @@ pub struct RestoreCoordinator {
     global_opt: GlobalRestoreOptions,
     metadata_cache_opt: MetadataCacheOpt,
     replay_all: bool,
-    ledger_history_start_version: Version,
+    ledger_history_start_version: Option<Version>,
     skip_epoch_endings: bool,
 }
 
@@ -98,31 +98,31 @@ impl RestoreCoordinator {
             metadata_view.select_transaction_backups(0, self.target_version())?;
         let actual_target_version = self.get_actual_target_version(&transactions)?;
         let epoch_endings = metadata_view.select_epoch_ending_backups(actual_target_version)?;
-        let state_snapshot = if self.replay_all {
+        let txn_resume_point = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
+
+        let state_snapshot = if self.replay_all || txn_resume_point != 0 {
             None
+        } else if let Some(version) = self.global_opt.run_mode.get_in_progress_state_snapshot()? {
+            info!("Found in progress state snapshot restore, at version {}, looking for matching backup.", version);
+            Some(metadata_view.expect_state_snapshot(version)?)
         } else {
             metadata_view.select_state_snapshot(actual_target_version)?
         };
         let replay_transactions_from_version = match &state_snapshot {
             Some(b) => b.version + 1,
-            None => 0,
+            None => txn_resume_point,
         };
         COORDINATOR_TARGET_VERSION.set(actual_target_version as i64);
         info!("Planned to restore to version {}.", actual_target_version);
-
-        let txn_resume_point = match self.global_opt.run_mode.as_ref() {
-            RestoreRunMode::Restore { restore_handler } => {
-                restore_handler.get_next_expected_transaction_version()?
+        let mut start_version = state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0);
+        if let Some(v) = self.ledger_history_start_version {
+            if v < start_version {
+                start_version = v;
             }
-            RestoreRunMode::Verify => {
-                info!("This is a dry run.");
-                0
-            }
-        };
-        let start_version = std::cmp::min(
-            self.ledger_history_start_version,
-            state_snapshot.as_ref().map(|s| s.version + 1).unwrap_or(0),
-        );
+        }
         transactions = transactions
             .into_iter()
             .skip_while(|p| p.last_version < start_version)
@@ -131,7 +131,7 @@ impl RestoreCoordinator {
             if txn_resume_point > 0 {
                 if actual_start_version > txn_resume_point {
                     panic!(
-                        "DB has transactions till {}, requesting to add transactions from {}, might \
+                        "DB has transactions till {}, requesting to add transactions from {:?}, might \
                     result in non-continuous ledger history, aborting. Try to adjust the \
                     --ledger_history_start_version flag.",
                         txn_resume_point,

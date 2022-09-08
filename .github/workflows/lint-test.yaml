@@ -29,6 +29,13 @@ jobs:
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
 
+  terraform-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run terraform fmt, validate, and tflint
+        run: ./scripts/lint_terraform.sh
+
   ecosystem-lint:
     runs-on: ubuntu-latest
     steps:
@@ -147,7 +154,7 @@ jobs:
       - uses: taiki-e/install-action@v1.5.6
         with:
           tool: nextest
-      - run: cargo nextest run --profile ci --workspace --exclude smoke-test --exclude backup-cli --exclude testcases
+      - run: cargo nextest run --profile ci --workspace --exclude smoke-test --exclude backup-cli --exclude testcases --retries 3 --no-fail-fast
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
@@ -167,8 +174,9 @@ jobs:
       - uses: taiki-e/install-action@v1.5.6
         with:
           tool: nextest
+      # prebuild node binary, so that tests don't start before node is built.
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo nextest run --profile ci --package smoke-test --test-threads 6 --retries 3
+      - run: cargo build --bin=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
@@ -190,3 +198,7 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 1
 
+  forge-unittests:
+    uses: ./.github/workflows/forge-unittests.yaml
+    with:
+      GIT_SHA: ${{ inputs.GIT_SHA }}

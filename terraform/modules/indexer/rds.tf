@@ -29,6 +29,12 @@ resource "aws_db_parameter_group" "indexer" {
     value = "1"
   }
 
+  parameter {
+    name         = "rds.logical_replication"
+    apply_method = "pending-reboot"
+    value        = "1"
+  }
+
   lifecycle {
     ignore_changes = [
       parameter
@@ -43,6 +49,8 @@ resource "aws_db_instance" "indexer" {
   instance_class        = var.db_instance_class
   allocated_storage     = var.db_allocated_storage
   max_allocated_storage = var.db_max_allocated_storage
+
+  iops = var.db_iops > 0 ? var.db_iops : null
 
   engine                       = var.db_engine
   engine_version               = var.db_engine_version

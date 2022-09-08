@@ -100,12 +100,12 @@
 #![allow(clippy::integer_arithmetic)]
 use bytes::Bytes;
 use hex::FromHex;
-use mirai_annotations::assume;
+use more_asserts::{debug_assert_ge, debug_assert_lt};
 use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::{
     self,
     convert::{AsRef, TryFrom},
@@ -205,7 +205,7 @@ impl HashValue {
 
     /// Returns the `index`-th bit in the bytes.
     pub fn bit(&self, index: usize) -> bool {
-        assume!(index < Self::LENGTH_IN_BITS); // assumed precondition
+        debug_assert!(index < Self::LENGTH_IN_BITS); // assumed precondition
         let pos = index / 8;
         let bit = 7 - index % 8;
         (self.hash[pos] >> bit) & 1 != 0
@@ -213,7 +213,7 @@ impl HashValue {
 
     /// Returns the `index`-th nibble in the bytes.
     pub fn nibble(&self, index: usize) -> u8 {
-        assume!(index < Self::LENGTH * 2); // assumed precondition
+        debug_assert!(index < Self::LENGTH * 2); // assumed precondition
         let pos = index / 2;
         let shift = if index % 2 == 0 { 4 } else { 0 };
         (self.hash[pos] >> shift) & 0x0f
@@ -290,8 +290,12 @@ impl ser::Serialize for HashValue {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
             // as the original type.
-            serializer
-                .serialize_newtype_struct("HashValue", serde_bytes::Bytes::new(&self.hash[..]))
+            #[derive(Serialize)]
+            #[serde(rename = "HashValue")]
+            struct Value<'a> {
+                hash: &'a [u8; HashValue::LENGTH],
+            }
+            Value { hash: &self.hash }.serialize(serializer)
         }
     }
 }
@@ -307,12 +311,15 @@ impl<'de> de::Deserialize<'de> for HashValue {
                 .map_err(<D::Error as ::serde::de::Error>::custom)
         } else {
             // See comment in serialize.
-            #[derive(::serde::Deserialize)]
+            #[derive(Deserialize)]
             #[serde(rename = "HashValue")]
-            struct Value<'a>(&'a [u8]);
+            struct Value {
+                hash: [u8; HashValue::LENGTH],
+            }
 
-            let value = Value::deserialize(deserializer)?;
-            Self::from_slice(value.0).map_err(<D::Error as ::serde::de::Error>::custom)
+            let value = Value::deserialize(deserializer)
+                .map_err(<D::Error as ::serde::de::Error>::custom)?;
+            Ok(Self::new(value.hash))
         }
     }
 }
@@ -431,9 +438,9 @@ impl<'a> HashValueBitIterator<'a> {
 
     /// Returns the `index`-th bit in the bytes.
     fn get_bit(&self, index: usize) -> bool {
-        assume!(index < self.pos.end); // assumed precondition
-        assume!(self.hash_bytes.len() == HashValue::LENGTH); // invariant
-        assume!(self.pos.end == self.hash_bytes.len() * 8); // invariant
+        debug_assert_eq!(self.hash_bytes.len(), HashValue::LENGTH); // invariant
+        debug_assert_lt!(index, self.hash_bytes.len() * 8); // assumed precondition
+        debug_assert_ge!(index, 0); // assumed precondition
         let pos = index / 8;
         let bit = 7 - index % 8;
         (self.hash_bytes[pos] >> bit) & 1 != 0

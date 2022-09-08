@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::prompt_yes_with_override;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
@@ -14,38 +15,29 @@ use crate::{
     config::GlobalConfig,
     genesis::git::from_yaml,
 };
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::{
-    aptos_api_types::{
-        DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteSetChange,
-        WriteTableItem,
-    },
-    Client, Transaction,
-};
-use aptos_sdk::{
-    move_types::{
-        ident_str,
-        language_storage::{ModuleId, TypeTag},
-    },
-    transaction_builder::TransactionFactory,
-    types::LocalAccount,
-};
+use aptos_rest_client::aptos_api_types::{HashValue, UserTransaction};
+use aptos_rest_client::error::RestError;
+use aptos_rest_client::{Client, Transaction};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, ScriptFunction, TransactionPayload,
+    authenticator::AuthenticationKey, SignedTransaction, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -53,6 +45,8 @@ use std::{
     time::Instant,
 };
 use thiserror::Error;
+
+const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -108,6 +102,12 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
         }
+    }
+}
+
+impl From<RestError> for CliError {
+    fn from(e: RestError) -> Self {
+        CliError::ApiError(e.to_string())
     }
 }
 
@@ -170,7 +170,7 @@ impl From<bcs::Error> for CliError {
 pub struct CliConfig {
     /// Map of profile configs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profiles: Option<HashMap<String, ProfileConfig>>,
+    pub profiles: Option<BTreeMap<String, ProfileConfig>>,
 }
 
 const CONFIG_FILE: &str = "config.yaml";
@@ -197,10 +197,36 @@ pub struct ProfileConfig {
     pub faucet_url: Option<String>,
 }
 
+/// ProfileConfig but without the private parts
+#[derive(Debug, Serialize)]
+pub struct ProfileSummary {
+    pub has_private_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<Ed25519PublicKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rest_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faucet_url: Option<String>,
+}
+
+impl From<&ProfileConfig> for ProfileSummary {
+    fn from(config: &ProfileConfig) -> Self {
+        ProfileSummary {
+            has_private_key: config.private_key.is_some(),
+            public_key: config.public_key.clone(),
+            account: config.account,
+            rest_url: config.rest_url.clone(),
+            faucet_url: config.faucet_url.clone(),
+        }
+    }
+}
+
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfig {
-            profiles: Some(HashMap::new()),
+            profiles: Some(BTreeMap::new()),
         }
     }
 }
@@ -479,7 +505,7 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Parser)]
+#[derive(Clone, Copy, Debug, Default, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
     #[clap(long, group = "prompt_options")]
@@ -687,7 +713,7 @@ pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
-    #[clap(long, parse(try_from_str))]
+    #[clap(long)]
     url: Option<reqwest::Url>,
 }
 
@@ -871,79 +897,98 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 }
 
 /// A shortened transaction output
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransactionSummary {
-    changes: Vec<ChangeSummary>,
-    gas_used: Option<u64>,
-    success: bool,
-    version: Option<u64>,
-    vm_status: String,
+    pub transaction_hash: HashValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_unit_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vm_status: Option<String>,
 }
 
 impl From<Transaction> for TransactionSummary {
     fn from(transaction: Transaction) -> Self {
-        let mut summary = TransactionSummary {
-            success: transaction.success(),
-            version: transaction.version(),
-            vm_status: transaction.vm_status(),
-            ..Default::default()
-        };
-
-        if let Ok(info) = transaction.transaction_info() {
-            summary.gas_used = Some(info.gas_used.0);
-            summary.changes = info
-                .changes
-                .iter()
-                .map(|change| match change {
-                    WriteSetChange::DeleteModule(DeleteModule { module, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        module: Some(module.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteResource(DeleteResource {
-                        address, resource, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        resource: Some(resource.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::DeleteTableItem(DeleteTableItem { handle, key, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            handle: Some(handle.to_string()),
-                            key: Some(key.to_string()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteModule(WriteModule { address, .. }) => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
-                        ChangeSummary {
-                            event: change.type_str(),
-                            address: Some(*address.inner()),
-                            resource: Some(data.typ.to_string()),
-                            data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
-                            ..Default::default()
-                        }
-                    }
-                    WriteSetChange::WriteTableItem(WriteTableItem {
-                        handle, key, value, ..
-                    }) => ChangeSummary {
-                        event: change.type_str(),
-                        handle: Some(handle.to_string()),
-                        key: Some(key.to_string()),
-                        value: Some(value.to_string()),
-                        ..Default::default()
-                    },
-                })
-                .collect();
+        TransactionSummary::from(&transaction)
+    }
+}
+impl From<&Transaction> for TransactionSummary {
+    fn from(transaction: &Transaction) -> Self {
+        match transaction {
+            Transaction::PendingTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.hash,
+                pending: Some(true),
+                sender: Some(*txn.request.sender.inner()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                gas_used: None,
+                gas_unit_price: None,
+                success: None,
+                version: None,
+                vm_status: None,
+                timestamp_us: None,
+            },
+            Transaction::UserTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                sender: Some(*txn.request.sender.inner()),
+                gas_used: Some(txn.info.gas_used.0),
+                gas_unit_price: Some(txn.request.gas_unit_price.0),
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sequence_number: Some(txn.request.sequence_number.0),
+                timestamp_us: Some(txn.timestamp.0),
+                pending: None,
+            },
+            Transaction::GenesisTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+                timestamp_us: None,
+            },
+            Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
         }
-
-        summary
     }
 }
 
@@ -996,12 +1041,8 @@ impl FaucetOptions {
     }
 }
 
-// TODO(Gas): double check if this is correct
-pub const DEFAULT_MAX_GAS: u64 = 1_000;
-pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
-
 /// Gas price options for manipulating how to prioritize transactions
-#[derive(Debug, Eq, Parser, PartialEq)]
+#[derive(Debug, Default, Eq, Parser, PartialEq)]
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
@@ -1010,8 +1051,10 @@ pub struct GasOptions {
     /// be used as a multiplier for the amount of coins willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
-    #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
-    pub gas_unit_price: u64,
+    ///
+    /// Without a value, it will determine the price based on the current estimated price
+    #[clap(long)]
+    pub gas_unit_price: Option<u64>,
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
@@ -1021,22 +1064,24 @@ pub struct GasOptions {
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
     /// a maximum price of 100 coins.
-    #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
-    pub max_gas: u64,
+    ///
+    /// Without a value, it will determine the price based on simulating the current transaction
+    #[clap(long)]
+    pub max_gas: Option<u64>,
 }
 
-impl Default for GasOptions {
-    fn default() -> Self {
-        GasOptions {
-            gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas: DEFAULT_MAX_GAS,
-        }
-    }
-}
+const DEFAULT_MAX_GAS: u64 = 50000;
 
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
+    /// Estimate maximum gas via simulation
+    ///
+    /// This will simulate the transaction, and use the simulated actual amount of gas
+    /// to be used as the max gas.  If disabled, and no max gas provided, 50000 will be used
+    /// as the max gas
+    #[clap(long)]
+    pub(crate) estimate_max_gas: bool,
     #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
@@ -1047,6 +1092,8 @@ pub struct TransactionOptions {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) gas_options: GasOptions,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
 }
 
 impl TransactionOptions {
@@ -1064,32 +1111,24 @@ impl TransactionOptions {
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        let sender_key = self.private_key()?;
-        Ok(account_address_from_public_key(&sender_key.public_key()))
-    }
-
-    /// Submits a script function based on module name and function inputs
-    pub async fn submit_script_function(
-        &self,
-        address: AccountAddress,
-        module: &'static str,
-        function: &'static str,
-        type_args: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-    ) -> CliTypedResult<Transaction> {
-        let txn = TransactionPayload::ScriptFunction(ScriptFunction::new(
-            ModuleId::new(address, ident_str!(module).to_owned()),
-            ident_str!(function).to_owned(),
-            type_args,
-            args,
-        ));
-        self.submit_transaction(txn).await
+        // If private key flags are specified, do not use the profile's account address
+        if self
+            .private_key_options
+            .extract_private_key_cli(self.encoding_options.encoding)?
+            .is_some()
+        {
+            let sender_key = self.private_key()?;
+            Ok(account_address_from_public_key(&sender_key.public_key()))
+        } else {
+            self.profile_options.account_address()
+        }
     }
 
     /// Submit a transaction
     pub async fn submit_transaction(
         &self,
         payload: TransactionPayload,
+        amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
         let sender_key = self.private_key()?;
         let client = self.rest_client()?;
@@ -1100,10 +1139,45 @@ impl TransactionOptions {
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
 
+        // Ask to confirm price if the gas unit price is estimated above the lowest value when
+        // it is automatically estimated
+        let ask_to_confirm_price;
+        let gas_unit_price = if let Some(gas_unit_price) = self.gas_options.gas_unit_price {
+            ask_to_confirm_price = false;
+            gas_unit_price
+        } else {
+            let gas_unit_price = client.estimate_gas_price().await?.into_inner().gas_estimate;
+
+            ask_to_confirm_price = gas_unit_price > 1;
+            gas_unit_price
+        };
+
+        let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
+            max_gas
+        } else if self.estimate_max_gas {
+            let simulated_txn = self
+                .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
+                .await?;
+            if !simulated_txn.info.success {
+                return Err(CliError::ApiError(format!(
+                    "Simulated transaction failed with status {}",
+                    simulated_txn.info.vm_status
+                )));
+            }
+            simulated_txn.info.gas_used.0
+        } else {
+            // TODO: Remove once simulation is stabilized and can handle all cases
+            DEFAULT_MAX_GAS
+        };
+
+        if ask_to_confirm_price {
+            prompt_yes_with_override(&format!("Estimated gas price is currently {}, do you want to execute a transaction for a total of {} coins?", gas_unit_price, max_gas * gas_unit_price), self.prompt_options)?;
+        }
+
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
-            .with_gas_unit_price(self.gas_options.gas_unit_price)
-            .with_max_gas_amount(self.gas_options.max_gas);
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
@@ -1114,30 +1188,98 @@ impl TransactionOptions {
 
         Ok(response.into_inner())
     }
+
+    pub async fn simulate_transaction(
+        &self,
+        payload: TransactionPayload,
+        gas_price: Option<u64>,
+        amount_transfer: Option<u64>,
+    ) -> CliTypedResult<UserTransaction> {
+        let sender_key = self.private_key()?;
+        let client = self.rest_client()?;
+
+        // Get sender address
+        let sender_address = self.sender_address()?;
+
+        // Get sequence number for account
+        let sequence_number = get_sequence_number(&client, sender_address).await?;
+
+        // Estimate gas price if necessary
+        let gas_price = if let Some(gas_price) = gas_price {
+            gas_price
+        } else {
+            self.estimate_gas_price().await?
+        };
+        // Simulate transaction
+        // To get my known possible max gas, I need to get my current balance
+        let account_balance = client
+            .get_account_balance(sender_address)
+            .await?
+            .into_inner()
+            .coin
+            .value
+            .0;
+
+        let max_possible_gas = if gas_price == 0 {
+            MAX_POSSIBLE_GAS_UNITS
+        } else if let Some(amount) = amount_transfer {
+            std::cmp::min(
+                account_balance
+                    .saturating_sub(amount)
+                    .saturating_div(gas_price),
+                MAX_POSSIBLE_GAS_UNITS,
+            )
+        } else {
+            std::cmp::min(
+                account_balance.saturating_div(gas_price),
+                MAX_POSSIBLE_GAS_UNITS,
+            )
+        };
+
+        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+            .with_gas_unit_price(gas_price)
+            .with_max_gas_amount(max_possible_gas);
+
+        let unsigned_transaction = transaction_factory
+            .payload(payload)
+            .sender(sender_address)
+            .sequence_number(sequence_number)
+            .build();
+
+        let signed_transaction = SignedTransaction::new(
+            unsigned_transaction,
+            sender_key.public_key(),
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+        );
+        let txns = client.simulate(&signed_transaction).await?.into_inner();
+        Ok(txns.first().unwrap().clone())
+    }
+
+    pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
+        let client = self.rest_client()?;
+        client
+            .estimate_gas_price()
+            .await
+            .map(|inner| inner.into_inner().gas_estimate)
+            .map_err(|err| {
+                CliError::UnexpectedError(format!(
+                    "Failed to retrieve gas price estimate {:?}",
+                    err
+                ))
+            })
+    }
 }
 
 #[derive(Parser)]
 pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: Option<AccountAddressWrapper>,
-}
-
-impl OptionalPoolAddressArgs {
-    pub fn pool_address(&self) -> Option<AccountAddress> {
-        self.pool_address.map(|inner| inner.account_address)
-    }
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: Option<AccountAddress>,
 }
 
 #[derive(Parser)]
 pub struct PoolAddressArgs {
     /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddressWrapper,
-}
-
-impl PoolAddressArgs {
-    pub fn pool_address(&self) -> AccountAddress {
-        self.pool_address.account_address
-    }
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: AccountAddress,
 }

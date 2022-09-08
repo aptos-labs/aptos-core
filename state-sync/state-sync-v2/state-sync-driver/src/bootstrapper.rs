@@ -24,6 +24,7 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
@@ -351,15 +352,15 @@ impl<
     }
 
     /// Marks bootstrapping as complete and notifies any listeners
-    pub fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+    pub async fn bootstrapping_complete(&mut self) -> Result<(), Error> {
         info!(LogSchema::new(LogEntry::Bootstrapper)
             .message("The node has successfully bootstrapped!"));
         self.bootstrapped = true;
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Subscribes the specified channel to bootstrap completion notifications
-    pub fn subscribe_to_bootstrap_notifications(
+    pub async fn subscribe_to_bootstrap_notifications(
         &mut self,
         bootstrap_notifier_channel: oneshot::Sender<Result<(), Error>>,
     ) -> Result<(), Error> {
@@ -368,11 +369,11 @@ impl<
         }
 
         self.bootstrap_notifier_channel = Some(bootstrap_notifier_channel);
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Notifies any listeners if we've now bootstrapped
-    fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
+    async fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
         if self.bootstrapped {
             if let Some(notifier_channel) = self.bootstrap_notifier_channel.take() {
                 if let Err(error) = notifier_channel.send(Ok(())) {
@@ -382,7 +383,7 @@ impl<
                     )));
                 }
             }
-            self.reset_active_stream();
+            self.reset_active_stream(None).await?;
             self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
@@ -416,7 +417,7 @@ impl<
         }
 
         // Check if we've now bootstrapped
-        self.notify_listeners_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped().await
     }
 
     /// Returns true iff the bootstrapper should continue to fetch epoch ending
@@ -450,7 +451,7 @@ impl<
 
         // If we've already synced to the highest known version, there's nothing to do
         if highest_synced_version >= highest_known_ledger_version {
-            return self.bootstrapping_complete();
+            return self.bootstrapping_complete().await;
         }
 
         // Bootstrap according to the mode
@@ -513,7 +514,7 @@ impl<
                 // We've already bootstrapped to an initial state snapshot. If this a fullnode, the
                 // continuous syncer will take control and get the node up-to-date. If this is a
                 // validator, consensus will take control and sync depending on how it sees fit.
-                self.bootstrapping_complete()
+                self.bootstrapping_complete().await
             } else {
                 panic!("Snapshot syncing is currently unsupported for nodes with existing state! \
                         You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
@@ -532,7 +533,7 @@ impl<
         if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
             // If the stream has timed out too many times, we need to reset it
             warn!("Resetting the currently active data stream due to too many timeouts!");
-            self.reset_active_stream();
+            self.reset_active_stream(None).await?;
         }
         result
     }
@@ -822,8 +823,11 @@ impl<
         // Verify the payload start index is valid
         let expected_start_index = self.state_value_syncer.next_state_index_to_process;
         if expected_start_index != state_value_chunk_with_proof.first_index {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The start index of the state values was invalid! Expected: {:?}, received: {:?}",
                 expected_start_index, state_value_chunk_with_proof.first_index
@@ -840,8 +844,11 @@ impl<
             })?;
         let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
         if expected_num_state_values != num_state_values {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The expected number of state values was invalid! Expected: {:?}, received: {:?}",
                 expected_num_state_values, num_state_values,
@@ -857,8 +864,11 @@ impl<
                 Error::IntegerOverflow("The expected end of index has overflown!".into())
             })?;
         if expected_end_index != state_value_chunk_with_proof.last_index {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The expected end index was invalid! Expected: {:?}, received: {:?}",
                 expected_num_state_values, state_value_chunk_with_proof.last_index,
@@ -879,8 +889,11 @@ impl<
         if self.should_fetch_epoch_ending_ledger_infos()
             || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected state values payload!".into(),
             ));
@@ -925,8 +938,11 @@ impl<
             .ensure_state_checkpoint_hash()
             .expect("Must be at state checkpoint.");
         if state_value_chunk_with_proof.root_hash != expected_root_hash {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(format!(
                 "The states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
                 state_value_chunk_with_proof.root_hash, expected_root_hash,
@@ -939,8 +955,11 @@ impl<
             .storage_synchronizer
             .save_state_values(notification_id, state_value_chunk_with_proof)
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(format!(
                 "The states chunk with proof was invalid! Error: {:?}",
                 error,
@@ -966,8 +985,11 @@ impl<
     ) -> Result<(), Error> {
         // Verify that we're expecting epoch ending ledger info payloads
         if !self.should_fetch_epoch_ending_ledger_infos() {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected epoch ending payload!".into(),
             ));
@@ -975,8 +997,11 @@ impl<
 
         // Verify the payload isn't empty
         if epoch_ending_ledger_infos.is_empty() {
-            self.terminate_active_stream(notification_id, NotificationFeedback::EmptyPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            )))
+            .await?;
             return Err(Error::VerificationError(
                 "The epoch ending payload was empty!".into(),
             ));
@@ -989,10 +1014,10 @@ impl<
                 &epoch_ending_ledger_info,
                 &self.driver_configuration.waypoint,
             ) {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::PayloadProofFailed,
-                )
+                )))
                 .await?;
                 return Err(error);
             }
@@ -1018,8 +1043,11 @@ impl<
             || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
-            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )))
+            .await?;
             return Err(Error::InvalidPayload(
                 "Received an unexpected transaction or output payload!".into(),
             ));
@@ -1068,18 +1096,20 @@ impl<
                     let num_transaction_outputs = transaction_outputs_with_proof
                         .transactions_and_outputs
                         .len();
-                    self.storage_synchronizer.apply_transaction_outputs(
-                        notification_id,
-                        transaction_outputs_with_proof,
-                        proof_ledger_info,
-                        end_of_epoch_ledger_info,
-                    )?;
+                    self.storage_synchronizer
+                        .apply_transaction_outputs(
+                            notification_id,
+                            transaction_outputs_with_proof,
+                            proof_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await?;
                     num_transaction_outputs
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
@@ -1089,18 +1119,20 @@ impl<
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     let num_transactions = transaction_list_with_proof.transactions.len();
-                    self.storage_synchronizer.execute_transactions(
-                        notification_id,
-                        transaction_list_with_proof,
-                        proof_ledger_info,
-                        end_of_epoch_ledger_info,
-                    )?;
+                    self.storage_synchronizer
+                        .execute_transactions(
+                            notification_id,
+                            transaction_list_with_proof,
+                            proof_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await?;
                     num_transactions
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
@@ -1157,10 +1189,10 @@ impl<
                             .set_transaction_output_to_sync(transaction_outputs_with_proof);
                     }
                     Err(error) => {
-                        self.terminate_active_stream(
+                        self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
                             NotificationFeedback::PayloadProofFailed,
-                        )
+                        )))
                         .await?;
                         return Err(Error::VerificationError(format!(
                             "Transaction outputs with proof is invalid! Error: {:?}",
@@ -1169,20 +1201,20 @@ impl<
                     }
                 }
             } else {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::InvalidPayloadData,
-                )
+                )))
                 .await?;
                 return Err(Error::InvalidPayload(
                     "Payload does not contain a single transaction info!".into(),
                 ));
             }
         } else {
-            self.terminate_active_stream(
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,
                 NotificationFeedback::PayloadTypeIsIncorrect,
-            )
+            )))
             .await?;
             return Err(Error::InvalidPayload(
                 "Did not receive transaction outputs with proof!".into(),
@@ -1201,10 +1233,10 @@ impl<
     ) -> Result<Version, Error> {
         if let Some(payload_start_version) = payload_start_version {
             if payload_start_version != expected_start_version {
-                self.terminate_active_stream(
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
                     notification_id,
                     NotificationFeedback::InvalidPayloadData,
-                )
+                )))
                 .await?;
                 Err(Error::VerificationError(format!(
                     "The payload start version does not match the expected version! Start: {:?}, expected: {:?}",
@@ -1214,8 +1246,11 @@ impl<
                 Ok(payload_start_version)
             }
         } else {
-            self.terminate_active_stream(notification_id, NotificationFeedback::EmptyPayloadData)
-                .await?;
+            self.reset_active_stream(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            )))
+            .await?;
             Err(Error::VerificationError(
                 "The playload starting version is missing!".into(),
             ))
@@ -1240,10 +1275,10 @@ impl<
                         .transactions_and_outputs
                         .len()
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transaction outputs with proof!".into(),
@@ -1254,10 +1289,10 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
                 } else {
-                    self.terminate_active_stream(
+                    self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
-                    )
+                    )))
                     .await?;
                     return Err(Error::InvalidPayload(
                         "Did not receive transactions with proof!".into(),
@@ -1307,29 +1342,23 @@ impl<
         &mut self,
         data_notification: DataNotification,
     ) -> Result<(), Error> {
-        self.reset_active_stream();
+        // Calculate the feedback based on the notification
+        let notification_feedback = match data_notification.data_payload {
+            DataPayload::EndOfStream => NotificationFeedback::EndOfStream,
+            _ => NotificationFeedback::PayloadTypeIsIncorrect,
+        };
+        let notification_and_feedback =
+            NotificationAndFeedback::new(data_notification.notification_id, notification_feedback);
 
-        utils::handle_end_of_stream_or_invalid_payload(
-            &mut self.streaming_client,
-            data_notification,
-        )
-        .await
-    }
+        // Reset the stream
+        self.reset_active_stream(Some(notification_and_feedback))
+            .await?;
 
-    /// Terminates the currently active stream with the provided feedback
-    pub async fn terminate_active_stream(
-        &mut self,
-        notification_id: NotificationId,
-        notification_feedback: NotificationFeedback,
-    ) -> Result<(), Error> {
-        self.reset_active_stream();
-
-        utils::terminate_stream_with_feedback(
-            &mut self.streaming_client,
-            notification_id,
-            notification_feedback,
-        )
-        .await
+        // Return an error if the payload was invalid
+        match data_notification.data_payload {
+            DataPayload::EndOfStream => Ok(()),
+            _ => Err(Error::InvalidPayload("Unexpected payload type!".into())),
+        }
     }
 
     /// Returns the speculative stream state. Assumes that the state exists.
@@ -1340,9 +1369,23 @@ impl<
     }
 
     /// Resets the currently active data stream and speculative state
-    fn reset_active_stream(&mut self) {
-        self.speculative_stream_state = None;
+    pub async fn reset_active_stream(
+        &mut self,
+        notification_and_feedback: Option<NotificationAndFeedback>,
+    ) -> Result<(), Error> {
+        if let Some(active_data_stream) = &self.active_data_stream {
+            let data_stream_id = active_data_stream.data_stream_id;
+            utils::terminate_stream_with_feedback(
+                &mut self.streaming_client,
+                data_stream_id,
+                notification_and_feedback,
+            )
+            .await?;
+        }
+
         self.active_data_stream = None;
+        self.speculative_stream_state = None;
+        Ok(())
     }
 
     /// Returns the verified epoch states struct for testing purposes

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
     SwarmExt, Validator, Version,
@@ -10,6 +11,7 @@ use aptos_config::config::NetworkConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -18,6 +20,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -78,7 +81,7 @@ impl AsRef<Path> for SwarmDirectory {
 
 #[derive(Debug)]
 pub struct LocalSwarm {
-    node_name_counter: u64,
+    node_name_counter: usize,
     genesis: Transaction,
     genesis_waypoint: Waypoint,
     versions: Arc<HashMap<Version, LocalVersion>>,
@@ -91,6 +94,8 @@ pub struct LocalSwarm {
     root_key: ConfigKey<Ed25519PrivateKey>,
 
     launched: bool,
+    #[allow(dead_code)]
+    guard: ActiveNodesGuard,
 }
 
 impl LocalSwarm {
@@ -102,7 +107,8 @@ impl LocalSwarm {
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
+        guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -121,12 +127,14 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
                 move |index, config, genesis_stake_amount| {
+                    // for local tests, turn off parallel execution:
+                    config.execution.concurrency_level = 1;
+
                     // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                     // which cause flakiness in tests.
                     if number_of_validators.get() == 1 {
@@ -161,7 +169,13 @@ impl LocalSwarm {
         let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
+                let node = LocalNode::new(
+                    version.to_owned(),
+                    v.name,
+                    v.index,
+                    v.dir,
+                    v.account_private_key,
+                )?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
@@ -192,6 +206,14 @@ impl LocalSwarm {
                 Ok((validator.peer_id(), public_network))
             })
             .collect::<Result<HashMap<_, _>>>()?;
+
+        // We print out the root key to make it easy for users to deploy a local faucet
+        let encoded_root_key = hex::encode(&root_key.to_bytes());
+        info!(
+            "The root (or mint) key for the swarm is: 0x{}",
+            encoded_root_key
+        );
+
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
             aptos_sdk::types::account_config::aptos_test_root_address(),
@@ -200,7 +222,7 @@ impl LocalSwarm {
         );
 
         Ok(LocalSwarm {
-            node_name_counter: validators.len() as u64,
+            node_name_counter: validators.len(),
             genesis,
             genesis_waypoint,
             versions,
@@ -212,6 +234,7 @@ impl LocalSwarm {
             chain_id: ChainId::test(),
             root_key,
             launched: false,
+            guard,
         })
     }
 
@@ -242,7 +265,7 @@ impl LocalSwarm {
     }
 
     async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 10;
+        let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
             info!("Wait for startup attempt: {} of {}", i, num_attempts);
@@ -306,6 +329,7 @@ impl LocalSwarm {
         }
 
         let name = self.node_name_counter.to_string();
+        let index = self.node_name_counter;
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::validator_fullnode(
             name,
@@ -321,7 +345,9 @@ impl LocalSwarm {
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
+            index,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -335,6 +361,7 @@ impl LocalSwarm {
 
     fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         let name = self.node_name_counter.to_string();
+        let index = self.node_name_counter;
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::public_fullnode(
             name,
@@ -348,7 +375,9 @@ impl LocalSwarm {
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
+            index,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -376,11 +405,17 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        self.validators.values()
+        // sort by id to keep the order consistent:
+        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
+        validators.sort_by_key(|v| v.index());
+        validators.into_iter()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        self.validators.values_mut()
+        // sort by id to keep the order consistent:
+        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
+        validators.sort_by_key(|v| v.index());
+        validators.into_iter()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
@@ -412,15 +447,23 @@ impl Swarm for LocalSwarm {
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {
-        Box::new(self.validators.values().map(|v| v as &'a dyn Validator))
+        let mut validators: Vec<_> = self
+            .validators
+            .values()
+            .map(|v| v as &'a dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        Box::new(
-            self.validators
-                .values_mut()
-                .map(|v| v as &'a mut dyn Validator),
-        )
+        let mut validators: Vec<_> = self
+            .validators
+            .values_mut()
+            .map(|v| v as &'a mut dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
@@ -524,11 +567,11 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
-    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+    async fn ensure_no_validator_restart(&self) -> Result<()> {
         todo!()
     }
 
-    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+    async fn ensure_no_fullnode_restart(&self) -> Result<()> {
         todo!()
     }
 
@@ -539,5 +582,59 @@ impl Swarm for LocalSwarm {
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
         todo!()
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        _start_time: i64,
+        _end_time: i64,
+        _threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct ActiveNodesGuard {
+    counter: Arc<Mutex<usize>>,
+    slots: usize,
+}
+
+impl ActiveNodesGuard {
+    pub async fn grab(slots: usize, counter: Arc<Mutex<usize>>) -> Self {
+        let max = num_cpus::get();
+        let mut idx = 0;
+        loop {
+            {
+                let mut guard = counter.lock();
+                // first check is so that if test needs more slots than cores,
+                // we still allow it to run (during low contention)
+                if *guard <= 2 || *guard + slots <= max {
+                    info!(
+                        "Grabbed {} node slots to start test, already active {} swarm nodes",
+                        slots, *guard
+                    );
+                    *guard += slots;
+                    drop(guard);
+                    return Self { counter, slots };
+                }
+                idx += 1;
+                // log only if idx is power of two, to reduce logs
+                if (idx & (idx - 1)) == 0 {
+                    info!(
+                        "Too many active swarm nodes ({}), max allowed is {}, waiting to start {} new ones",
+                        *guard, max, slots,
+                    );
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+}
+
+impl Drop for ActiveNodesGuard {
+    fn drop(&mut self) {
+        let mut guard = self.counter.lock();
+        *guard -= self.slots;
     }
 }

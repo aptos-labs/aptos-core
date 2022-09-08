@@ -22,7 +22,7 @@ use tokio::time::timeout;
 
 const MEMPOOL_NOTIFICATION_CHANNEL_SIZE: usize = 1;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Commit notification failed: {0}")]
     CommitNotificationError(String),
@@ -224,7 +224,7 @@ mod tests {
         },
         write_set::WriteSetMut,
     };
-    use claim::{assert_matches, assert_ok};
+    use claims::{assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use tokio::runtime::{Builder, Runtime};
 
@@ -375,7 +375,6 @@ mod tests {
             0,
             300000001,
             AccountAddress::random(),
-            Some(0),
             vec![0],
             vec![],
             1,
@@ -392,6 +391,10 @@ mod tests {
     }
 
     fn create_runtime() -> Runtime {
-        Builder::new_multi_thread().enable_all().build().unwrap()
+        Builder::new_multi_thread()
+            .disable_lifo_slot()
+            .enable_all()
+            .build()
+            .unwrap()
     }
 }

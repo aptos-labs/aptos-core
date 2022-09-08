@@ -74,6 +74,25 @@ pub enum ConsensusMsg {
     ProofOfStoreBroadcastMsg(Box<ProofOfStore>),
 }
 
+/// Network type for consensus
+impl ConsensusMsg {
+    /// ConsensusMsg type in string
+    ///
+    pub fn name(&self) -> &str {
+        match self {
+            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
+            ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
+            ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::SyncInfo(_) => "SyncInfo",
+            ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
+            ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
+            ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
+        }
+    }
+}
+
 /// The interface from Network to Consensus layer.
 ///
 /// `ConsensusNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
@@ -194,10 +213,12 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
                 Err(_) => not_available.push(peer),
             }
         }
-        sample!(
-            SampleRate::Duration(Duration::from_secs(10)),
-            error!("Unavailable peers: {:?}", not_available)
-        );
+        if !not_available.is_empty() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(10)),
+                error!("Unavailable peers: {:?}", not_available)
+            );
+        }
         for (protocol, peers) in peers_per_protocol {
             self.network_sender
                 .send_to_many(peers.into_iter(), protocol, message.clone())?;

@@ -33,6 +33,7 @@ async fn test_proposal_generation_empty_tree() {
         Arc::new(SimulatedTimeService::new()),
         1,
         10,
+        10,
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -67,6 +68,7 @@ async fn test_proposal_generation_parent() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
@@ -134,6 +136,7 @@ async fn test_old_proposal_generation() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
@@ -166,6 +169,7 @@ async fn test_correct_failed_authors() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
+        1000,
         10,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(

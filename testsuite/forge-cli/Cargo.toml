@@ -13,15 +13,16 @@ edition = "2018"
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 structopt = "0.3.21"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-
-cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
+framework = { path = "../../aptos-move/framework" }
+serde_yaml = "0.8.24"
 testcases = { path = "../testcases" }
 
 [[bin]]

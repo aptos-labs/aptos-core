@@ -6,6 +6,10 @@ sidebar_position: 13
 
 # Using Aptos-core source code
 
+:::tip For validator fullnode
+Use the `fullnode.yaml` to run a validator fullnode. See [Step 13](#source-code-vfn).
+:::
+
 1. Clone the Aptos repo.
 
       ```
@@ -30,25 +34,43 @@ sidebar_position: 13
     source ~/.cargo/env
     ```
 
-With your development environment ready, now you can start to setup your Validator node.
+With your development environment ready, now you can start to setup your validator node.
 
 5. Checkout the `testnet` branch using `git checkout --track origin/testnet`.
 
-6. Create a directory for your Aptos node composition. e.g.
+6. Create a directory for your Aptos node composition, and pick a username for your node. e.g.
     ```
     export WORKSPACE=testnet
+    export USERNAME=alice
     mkdir ~/$WORKSPACE
     ```
 
-7. Generate key pairs (node owner key, consensus key and networking key) in your working directory.
+:::tip Install Aptos CLI
+
+Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli 
+
+:::
+
+7. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
     ```
-    cargo run --release -p aptos -- genesis generate-keys --output-dir ~/$WORKSPACE
+    aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
     ```
 
-    This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. **IMPORTANT**: Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. Never share those keys with anyone else.
+    This will create 4 key files under `~/$WORKSPACE/keys` directory: 
+      - `public-keys.yaml`
+      - `private-keys.yaml`
+      - `validator-identity.yaml`, and
+      - `validator-full-node-identity.yaml`.
+      
+      :::caution IMPORTANT
 
-8. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. This is all the info you need to register on our community website later.
+       Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
+      :::
+
+8. Configure validator information. You need to setup a static IP / DNS address (DNS is much preferred) which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections.
+
+    You will need this information to register on Aptos community website later.
 
     :::tip
 
@@ -57,133 +79,118 @@ With your development environment ready, now you can start to setup your Validat
     :::
 
     ```
-    cargo run --release -p aptos -- genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
-        --username <pick a username for your node> \
-        --validator-host <Validator Node IP / DNS address>:<Port> \
-        --full-node-host <Full Node IP / DNS address>:<Port>
+    cd ~/$WORKSPACE
+    aptos genesis set-validator-configuration \
+        --local-repository-dir ~/$WORKSPACE \
+        --username $USERNAME \
+        --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
+        --validator-host <validator node IP / DNS address>:<Port> \
+        --full-node-host <Full Node IP / DNS address>:<Port> \
+        --stake-amount 100000000000000
 
     # for example, with IP:
 
-    cargo run --release -p aptos -- genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
-        --username aptosbot \
+    aptos genesis set-validator-configuration \
+        --local-repository-dir ~/$WORKSPACE \
+        --username $USERNAME \
+        --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
         --validator-host 35.232.235.205:6180 \
-        --full-node-host 34.135.169.144:6182
+        --full-node-host 34.135.169.144:6182 \
+        --stake-amount 100000000000000
 
-    # for example, with DNS:
+    # For example, with DNS:
 
-    cargo run --release -p aptos -- genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
-        --username aptosbot \
+    aptos genesis set-validator-configuration \
+        --local-repository-dir ~/$WORKSPACE \
+        --username $USERNAME \
+        --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
         --validator-host bot.aptosdev.com:6180 \
-        --full-node-host fn.bot.aptosdev.com:6182
+        --full-node-host fn.bot.aptosdev.com:6182 \
+        --stake-amount 100000000000000
     ```
 
-    This will create a YAML file in your working directory with your username, e.g., `aptosbot.yaml`. It looks like the below:
+    This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
+
+9. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
+
+  ```
+  aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
+  ```
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
+
+  ```
+  root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
+  users: ["<username you specified from previous step>"]
+  chain_id: 43
+  allow_new_validators: false
+  epoch_duration_secs: 7200
+  is_test: true
+  min_stake: 100000000000000
+  min_voting_threshold: 100000000000000
+  max_stake: 100000000000000000
+  recurring_lockup_duration_secs: 86400
+  required_proposer_stake: 100000000000000
+  rewards_apy_percentage: 10
+  voting_duration_secs: 43200
+  voting_power_increase_limit: 20
+  ```
+
+  Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
+
+10. Build and copy the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    ---
-    account_address: 7410973313fd0b5c69560fd8cd9c4aaeef873f869d292d1bb94b1872e737d64f
-    consensus_public_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
-    account_public_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
-    validator_network_public_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
-    validator_host:
-      host: 35.232.235.205
-      port: 6180
-    full_node_network_public_key: "0xd66c403cae9f2939ade811e2f582ce8ad24122f0d961aa76be032ada68124f19"
-    full_node_host:
-      host: 35.232.235.206
-      port: 6182
-    stake_amount: 1
+    cd ~/aptos-core
+    cargo run --package framework -- release
+    cp head.mrb ~/$WORKSPACE/framework.mrb
     ```
 
-9. Create layout YAML file, which defines the node in the validatorSet, for test mode, we can create a genesis blob containing only one node.
+11. Compile genesis blob and waypoint
 
     ```
-    vi ~/$WORKSPACE/layout.yaml
+    aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
     ```
 
-    Add the public key for root account, node username, and chain_id in the `layout.yaml` file, for example:
-
-    ```
-    ---
-    root_key: "F22409A93D1CD12D2FC92B5F8EB84CDCD24C348E32B3E7A720F3D2E288E63394"
-    users:
-      - "<username you specified from previous step>"
-    chain_id: 40
-    min_stake: 0
-    max_stake: 100000
-    min_lockup_duration_secs: 0
-    max_lockup_duration_secs: 2592000
-    epoch_duration_secs: 86400
-    initial_lockup_timestamp: 1656615600
-    min_price_per_gas_unit: 1
-    allow_new_validators: true
-    ```
-
-    Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
-
-10. Build AptosFramework Move bytecode and copy into the framework folder.
-
-    ```
-    cargo run --release --package framework -- --package aptos-framework --output current
-
-    mkdir ~/$WORKSPACE/framework
-
-    mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/*.mv ~/$WORKSPACE/framework/
-
-    mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/dependencies/**/*.mv ~/$WORKSPACE/framework/
-    ```
-
-    Alternatively, you can download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.2.0
-
-    ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.2.0/framework.zip
-    unzip framework.zip
-    ```
-
-    You will now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
-
-11. Compile genesis blob and waypoint.
-
-    ```
-    cargo run --release -p aptos -- genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
-    ```
-
-    This will create two files, `genesis.blob` and `waypoint.txt`, in your working directory.
+    This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
 
 12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```
     mkdir ~/$WORKSPACE/config
-    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/validator.yaml
-    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/fullnode.yaml
+    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/config/validator.yaml
+    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/config/fullnode.yaml
     ```
 
-    Modify the config file to update the key path, genesis file path, waypoint path.
+    Modify the config files to update the data directory, key path, genesis file path, waypoint path.
+    User must have write access to data directory.
 
-13. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
-    - `validator.yaml` validator config file
-    - `fullnode.yaml` fullnode config file
-    - `private-keys.yaml` Private keys for owner account, consensus, networking
-    - `validator-identity.yaml` Private keys for setting validator identity
-    - `validator-full-node-identity.yaml` Private keys for setting validator full node identity
-    - `<username>.yaml` Node info for both validator / fullnode
-    - `layout.yaml` layout file to define root key, validator user, and chain ID
-    - `framework` folder which contains all the move bytecode for AptosFramework.
-    - `waypoint.txt` waypoint for genesis transaction
-    - `genesis.blob` genesis binary contains all the info about framework, validatorSet and more.
+13. <span id="source-code-vfn">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
+
+    - `config` folder, which includes:
+      - `validator.yaml` validator config file
+      - `fullnode.yaml` fullnode config file
+    - `keys` folder, which includes:
+      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 7).
+      - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 7).
+      - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 7).
+      - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 7).
+    - `username` folder, which includes: 
+      - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 8).
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 8). 
+    - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 9).
+    - `framework.mrb`: The AptosFramework Move package (from step 10).
+    - `waypoint.txt`: The waypoint for the genesis transaction (from step 11).
+    - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 11).
 
 14. Start your local Validator by running the below command:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/validator.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run fullnode in another machine:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/fullnode.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
 Now you have completed setting up your node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration.

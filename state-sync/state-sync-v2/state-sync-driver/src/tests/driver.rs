@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     driver_factory::DriverFactory,
+    metadata_storage::PersistentMetadataStorage,
     tests::utils::{
         create_event, create_ledger_info_at_version, create_transaction,
         verify_mempool_and_event_notification,
@@ -21,7 +21,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use claim::{assert_err, assert_none};
+use claims::{assert_err, assert_none};
 use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use event_notifications::{

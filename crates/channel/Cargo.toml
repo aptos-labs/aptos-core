@@ -18,6 +18,6 @@ aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 
 [dev-dependencies]
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.21.0", features = ["full"] }
 
 aptos-types = { path = "../../types" }

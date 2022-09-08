@@ -31,7 +31,7 @@ spec:
   - host: fullnode.{{ .Values.service.domain }}
     http:
       paths:
-      - path: /*
+      - path: /
         pathType: Prefix
         backend:
           service:
@@ -55,7 +55,7 @@ spec:
             name: {{ include "testnet-addons.fullname" . }}-waypoint
             port:
               number: 80
-      - path: /*
+      - path: /
         pathType: Prefix
         backend:
           service:

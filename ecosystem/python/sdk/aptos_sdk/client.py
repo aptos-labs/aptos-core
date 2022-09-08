@@ -11,9 +11,9 @@ from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
 from .transactions import (
+    EntryFunction,
     MultiAgentRawTransaction,
     RawTransaction,
-    ScriptFunction,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload,
@@ -46,7 +46,8 @@ class RestClient:
         """Returns the sequence number and authentication key for an account"""
 
         response = self.client.get(f"{self.base_url}/accounts/{account_address}")
-        assert response.status_code == 200, f"{response.text} - {account_address}"
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
     def account_balance(self, account_address: str) -> int:
@@ -67,7 +68,8 @@ class RestClient:
         )
         if response.status_code == 404:
             return None
-        assert response.status_code == 200, response.text
+        if response.status_code >= 400:
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
     def get_table_item(
@@ -81,7 +83,8 @@ class RestClient:
                 "key": key,
             },
         )
-        assert response.status_code == 200, response.text
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
         return response.json()
 
     #
@@ -90,7 +93,8 @@ class RestClient:
 
     def info(self) -> Dict[str, str]:
         response = self.client.get(self.base_url)
-        assert response.status_code == 200, f"{response.text}"
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
         return response.json()
 
     #
@@ -104,7 +108,8 @@ class RestClient:
             headers=headers,
             content=signed_transaction.bytes(),
         )
-        assert response.status_code == 202, f"{response.text} - {signed_transaction}"
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
         return response.json()["hash"]
 
     def submit_transaction(self, sender: Account, payload: Dict[str, Any]) -> str:
@@ -124,12 +129,13 @@ class RestClient:
             "payload": payload,
         }
 
-        res = self.client.post(
+        response = self.client.post(
             f"{self.base_url}/transactions/encode_submission", json=txn_request
         )
-        assert res.status_code == 200, res.text
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
 
-        to_sign = bytes.fromhex(res.json()[2:])
+        to_sign = bytes.fromhex(response.json()[2:])
         signature = sender.sign(to_sign)
         txn_request["signature"] = {
             "type": "ed25519_signature",
@@ -141,14 +147,16 @@ class RestClient:
         response = self.client.post(
             f"{self.base_url}/transactions", headers=headers, json=txn_request
         )
-        assert response.status_code == 202, f"{response.text} - {txn_request}"
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         if response.status_code == 404:
             return True
-        assert response.status_code == 200, f"{response.text} - {txn_hash}"
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
         return response.json()["type"] == "pending_transaction"
 
     def wait_for_transaction(self, txn_hash: str) -> None:
@@ -236,7 +244,7 @@ class RestClient:
         Returns the sequence number of the transaction used to transfer."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
@@ -246,6 +254,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
+    #:!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -254,7 +263,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -266,13 +275,16 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+    # <:!:bcs_transfer
+
     #
     # Token transaction wrappers
     #
 
+    #:!:>create_collection
     def create_collection(
         self, account: Account, name: str, description: str, uri: str
-    ) -> str:
+    ) -> str:  # <:!:create_collection
         """Creates a new collection within the specified account"""
 
         transaction_arguments = [
@@ -285,7 +297,7 @@ class RestClient:
             ),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_collection_script",
             [],
@@ -297,6 +309,7 @@ class RestClient:
         )
         return self.submit_bcs_transaction(signed_transaction)
 
+    #:!:>create_token
     def create_token(
         self,
         account: Account,
@@ -306,7 +319,7 @@ class RestClient:
         supply: int,
         uri: str,
         royalty_points_per_million: int,
-    ) -> str:
+    ) -> str:  # <:!:create_token
         transaction_arguments = [
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
@@ -315,7 +328,8 @@ class RestClient:
             TransactionArgument(supply, Serializer.u64),
             TransactionArgument(uri, Serializer.str),
             TransactionArgument(account.address(), Serializer.struct),
-            TransactionArgument(1000000, Serializer.u64),  # SDK assumes per million
+            # SDK assumes per million
+            TransactionArgument(1000000, Serializer.u64),
             TransactionArgument(royalty_points_per_million, Serializer.u64),
             TransactionArgument(
                 [False, False, False, False, False],
@@ -326,7 +340,7 @@ class RestClient:
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_token_script",
             [],
@@ -356,7 +370,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "offer_script",
             [],
@@ -384,7 +398,7 @@ class RestClient:
             TransactionArgument(property_version, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "claim_script",
             [],
@@ -413,7 +427,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "direct_transfer_script",
             [],
@@ -431,7 +445,7 @@ class RestClient:
     # Token accessors
     #
 
-    def get_token_balance(
+    def get_token(
         self,
         owner: AccountAddress,
         creator: AccountAddress,
@@ -439,9 +453,9 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_store = self.account_resource(owner, "0x3::token::TokenStore")["data"][
-            "tokens"
-        ]["handle"]
+        token_store_handle = self.account_resource(owner, "0x3::token::TokenStore")[
+            "data"
+        ]["tokens"]["handle"]
 
         token_id = {
             "token_data_id": {
@@ -452,13 +466,34 @@ class RestClient:
             "property_version": str(property_version),
         }
 
-        return self.get_table_item(
-            token_store,
-            "0x3::token::TokenId",
-            "0x3::token::Token",
-            token_id,
+        try:
+            return self.get_table_item(
+                token_store_handle,
+                "0x3::token::TokenId",
+                "0x3::token::Token",
+                token_id,
+            )
+        except ApiError as e:
+            if e.status_code == 404:
+                return {
+                    "id": token_id,
+                    "amount": "0",
+                }
+            raise
+
+    def get_token_balance(
+        self,
+        owner: AccountAddress,
+        creator: AccountAddress,
+        collection_name: str,
+        token_name: str,
+        property_version: int,
+    ) -> str:
+        return self.get_token(
+            owner, creator, collection_name, token_name, property_version
         )["amount"]
 
+    #:!:>read_token_data_table
     def get_token_data(
         self,
         creator: AccountAddress,
@@ -466,9 +501,9 @@ class RestClient:
         token_name: str,
         property_version: int,
     ) -> Any:
-        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "token_data"
-        ]["handle"]
+        token_data_handle = self.account_resource(creator, "0x3::token::Collections")[
+            "data"
+        ]["token_data"]["handle"]
 
         token_data_id = {
             "creator": creator.hex(),
@@ -477,11 +512,11 @@ class RestClient:
         }
 
         return self.get_table_item(
-            token_data,
+            token_data_handle,
             "0x3::token::TokenDataId",
             "0x3::token::TokenData",
             token_data_id,
-        )
+        )  # <:!:read_token_data_table
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
@@ -494,6 +529,32 @@ class RestClient:
             "0x3::token::CollectionData",
             collection_name,
         )
+
+    #
+    # Package publishing
+    #
+
+    def publish_package(
+        self, sender: Account, package_metadata: bytes, modules: List[bytes]
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(package_metadata, Serializer.bytes),
+            TransactionArgument(
+                modules, Serializer.sequence_serializer(Serializer.bytes)
+            ),
+        ]
+
+        payload = EntryFunction.natural(
+            "0x1::code",
+            "publish_package_txn",
+            [],
+            transaction_arguments,
+        )
+
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            sender, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
 
 
 class FaucetClient:
@@ -512,9 +573,19 @@ class FaucetClient:
     def fund_account(self, address: str, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
-        txns = self.rest_client.client.post(
+        response = self.rest_client.client.post(
             f"{self.base_url}/mint?amount={amount}&address={address}"
         )
-        assert txns.status_code == 200, txns.text
-        for txn_hash in txns.json():
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        for txn_hash in response.json():
             self.rest_client.wait_for_transaction(txn_hash)
+
+
+class ApiError(Exception):
+    """Error thrown when the API returns >= 400"""
+
+    def __init__(self, message, status_code):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+        self.status_code = status_code

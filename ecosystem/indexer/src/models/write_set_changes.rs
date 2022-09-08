@@ -6,10 +6,13 @@ use aptos_rest_client::aptos_api_types::{
     DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
     WriteSetChange as APIWriteSetChange, WriteTableItem,
 };
+use field_count::FieldCount;
 use serde::Serialize;
 use serde_json::json;
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+)]
 #[diesel(table_name = "write_set_changes")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(transaction_hash, hash)]
@@ -42,7 +45,7 @@ impl WriteSetChange {
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
                 address: address.to_string(),
-                module: serde_json::to_value(module).unwrap(),
+                module: serde_json::to_value(module).expect("Should be able to parse module"),
                 resource: Default::default(),
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
@@ -57,7 +60,7 @@ impl WriteSetChange {
                 type_: write_set_change.type_str().to_string(),
                 address: address.to_string(),
                 module: Default::default(),
-                resource: serde_json::to_value(resource).unwrap(),
+                resource: serde_json::to_value(resource).expect("Should be able to parse resource"),
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
@@ -104,7 +107,8 @@ impl WriteSetChange {
                 address: address.to_string(),
                 module: Default::default(),
                 resource: Default::default(),
-                data: serde_json::to_value(data).unwrap(),
+                data: serde_json::to_value(data)
+                    .expect("Should be able to parse write resource data"),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
             APIWriteSetChange::WriteTableItem(WriteTableItem {

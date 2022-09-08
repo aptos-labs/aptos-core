@@ -1,0 +1,31 @@
+name: "Sync Grafana Dashboards"
+
+permissions:
+  # Permissions to push to branch and create a PR
+  pull-requests: write
+  contents: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+env:
+  GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+
+jobs:
+  grafana-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Pull and sync Grafana dashboards
+        run: ./scripts/sync_grafana_dashboards.sh
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          add-paths: dashboards
+          title: "[dashboards] sync grafana dashboards"
+          body: Automated dashboard sync from Grafana
+          commit-message: "[dashboards] sync grafana dashboards"
+          branch: sync-grafana-dashboards
+          delete-branch: true

@@ -3,7 +3,7 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::account::create::DEFAULT_FUNDED_COINS;
-use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
+use aptos::common::types::GasOptions;
 use aptos_keygen::KeyGen;
 
 #[tokio::test]
@@ -20,15 +20,7 @@ async fn test_account_flow() {
 
     let transfer_amount = 100;
     let response = cli
-        .transfer_coins(
-            0,
-            1,
-            transfer_amount,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_coins(0, 1, transfer_amount, None)
         .await
         .unwrap();
     let expected_sender_amount =
@@ -53,4 +45,40 @@ async fn test_account_flow() {
         .unwrap();
     cli.assert_account_balance_now(2, DEFAULT_FUNDED_COINS)
         .await;
+
+    // Test gas options
+    // Override gas unit price should use it instead of the estimated one
+    let summary = cli
+        .transfer_coins(
+            2,
+            1,
+            5,
+            Some(GasOptions {
+                gas_unit_price: Some(2),
+                max_gas: None,
+            }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(2, summary.gas_unit_price);
+    let gas_used = summary.gas_used * summary.gas_unit_price;
+
+    cli.assert_account_balance_now(2, DEFAULT_FUNDED_COINS - gas_used - 5)
+        .await;
+    // Setting max gas skips simulation (this should fail for too little gas units, but be charged gas)
+    // If it was simulated, it wouldn't charge gas, and it would need to be caught by the VM.  Mempool
+    // submission doesn't check max gas is correct, just that the user has enough to pay it
+    cli.transfer_coins(
+        2,
+        1,
+        5,
+        Some(GasOptions {
+            gas_unit_price: None,
+            max_gas: Some(1),
+        }),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(cli.account_balance_now(2).await.unwrap() < DEFAULT_FUNDED_COINS - gas_used - 5);
 }

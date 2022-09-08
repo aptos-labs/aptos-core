@@ -3,21 +3,21 @@
 
 use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
 
 use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
 use crate::pruner::pruner_manager::PrunerManager;
-use crate::utils;
+use crate::{utils, StateStore};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
 
 /// The `PrunerManager` for `LedgerPruner`.
 #[derive(Debug)]
-pub struct LedgerPrunerManager {
+pub(crate) struct LedgerPrunerManager {
     pruner_enabled: bool,
     /// DB version window, which dictates how many version of other stores like transaction, ledger
     /// info, events etc to keep.
@@ -43,11 +43,17 @@ pub struct LedgerPrunerManager {
 }
 
 impl PrunerManager for LedgerPrunerManager {
+    type Pruner = LedgerPruner;
+
+    fn pruner(&self) -> &Self::Pruner {
+        &self.pruner
+    }
+
     fn is_pruner_enabled(&self) -> bool {
         self.pruner_enabled
     }
 
-    fn get_pruner_window(&self) -> Version {
+    fn get_prune_window(&self) -> Version {
         self.prune_window
     }
 
@@ -90,67 +96,35 @@ impl PrunerManager for LedgerPrunerManager {
             .as_ref()
             .set_target_db_version(latest_version.saturating_sub(self.prune_window));
     }
-
-    #[cfg(test)]
-    fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()> {
-        use std::{
-            thread::sleep,
-            time::{Duration, Instant},
-        };
-
-        *self.latest_version.lock() = latest_version;
-
-        if latest_version
-            >= *self.last_version_sent_to_pruner.as_ref().lock() + self.pruning_batch_size as u64
-        {
-            self.set_pruner_target_db_version(latest_version);
-            *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
-        }
-
-        if self.pruner_enabled && latest_version > self.prune_window {
-            let min_readable_ledger_version = latest_version - self.prune_window;
-
-            // Assuming no big pruning chunks will be issued by a test.
-            const TIMEOUT: Duration = Duration::from_secs(10);
-            let end = Instant::now() + TIMEOUT;
-
-            while Instant::now() < end {
-                if self.get_min_readable_version() >= min_readable_ledger_version {
-                    return Ok(());
-                }
-                sleep(Duration::from_millis(1));
-            }
-            anyhow::bail!("Timeout waiting for pruner worker.");
-        }
-        Ok(())
-    }
 }
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_rocksdb: Arc<DB>, storage_pruner_config: StoragePrunerConfig) -> Self {
-        let ledger_db_clone = Arc::clone(&ledger_rocksdb);
+    pub fn new(
+        ledger_rocksdb: Arc<DB>,
+        state_store: Arc<StateStore>,
+        ledger_pruner_config: LedgerPrunerConfig,
+    ) -> Self {
+        let ledger_pruner = utils::create_ledger_pruner(ledger_rocksdb, state_store);
 
-        let ledger_pruner = utils::create_ledger_pruner(ledger_db_clone);
-
-        if storage_pruner_config.enable_ledger_pruner {
+        if ledger_pruner_config.enable {
             PRUNER_WINDOW
                 .with_label_values(&["ledger_pruner"])
-                .set(storage_pruner_config.ledger_prune_window as i64);
+                .set(ledger_pruner_config.prune_window as i64);
 
             PRUNER_BATCH_SIZE
                 .with_label_values(&["ledger_pruner"])
-                .set(storage_pruner_config.ledger_pruning_batch_size as i64);
+                .set(ledger_pruner_config.batch_size as i64);
         }
 
         let ledger_pruner_worker = Arc::new(LedgerPrunerWorker::new(
             Arc::clone(&ledger_pruner),
-            storage_pruner_config,
+            ledger_pruner_config,
         ));
 
         let ledger_pruner_worker_clone = Arc::clone(&ledger_pruner_worker);
 
-        let ledger_pruner_worker_thread = if storage_pruner_config.enable_ledger_pruner {
+        let ledger_pruner_worker_thread = if ledger_pruner_config.enable {
             Some(
                 std::thread::Builder::new()
                     .name("aptosdb_ledger_pruner".into())
@@ -164,15 +138,15 @@ impl LedgerPrunerManager {
         let min_readable_version = ledger_pruner.min_readable_version();
 
         Self {
-            pruner_enabled: storage_pruner_config.enable_ledger_pruner,
-            prune_window: storage_pruner_config.ledger_prune_window,
+            pruner_enabled: ledger_pruner_config.enable,
+            prune_window: ledger_pruner_config.prune_window,
             pruner: ledger_pruner,
             pruner_worker: ledger_pruner_worker,
             worker_thread: ledger_pruner_worker_thread,
             last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
-            pruning_batch_size: storage_pruner_config.ledger_pruning_batch_size,
+            pruning_batch_size: ledger_pruner_config.batch_size,
             latest_version: Arc::new(Mutex::new(min_readable_version)),
-            user_pruning_window_offset: storage_pruner_config.user_pruning_window_offset,
+            user_pruning_window_offset: ledger_pruner_config.user_pruning_window_offset,
         }
     }
 

@@ -4,7 +4,7 @@
 use crate::{
     executor::ParallelTransactionExecutor,
     proptest_types::types::{
-        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams,
+        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
 };
 use criterion::{BatchSize, Bencher as CBencher};
@@ -27,15 +27,19 @@ pub struct Bencher<K, V> {
     phantom_value: PhantomData<V>,
 }
 
-pub(crate) struct BencherState<K: Hash + Clone + Debug + Eq + PartialOrd, V> {
-    transactions: Vec<Transaction<KeyType<K>, V>>,
-    expected_output: ExpectedOutput<V>,
+pub(crate) struct BencherState<K: Hash + Clone + Debug + Eq + PartialOrd, V: Clone + Eq + Arbitrary>
+where
+    Vec<u8>: From<V>,
+{
+    transactions: Vec<Transaction<KeyType<K>, ValueType<V>>>,
+    expected_output: ExpectedOutput<ValueType<V>>,
 }
 
 impl<K, V> Bencher<K, V>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + Arbitrary + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     pub fn new(transaction_size: usize, universe_size: usize) -> Self {
         Self {
@@ -67,6 +71,7 @@ impl<K, V> BencherState<K, V>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     /// Creates a new benchmark state with the given account universe strategy and number of
     /// transactions.
@@ -94,7 +99,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions);
+        let expected_output = ExpectedOutput::generate_baseline(&transactions, None);
 
         Self {
             transactions,
@@ -103,12 +108,13 @@ where
     }
 
     pub(crate) fn run(self) {
-        let output =
-            ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
-                num_cpus::get(),
-            )
-            .execute_transactions_parallel((), self.transactions.clone());
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<K>, ValueType<V>>,
+            Task<KeyType<K>, ValueType<V>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), self.transactions.clone())
+        .map(|(res, _)| res);
 
-        assert!(self.expected_output.check_output(&output));
+        self.expected_output.assert_output(&output, None);
     }
 }

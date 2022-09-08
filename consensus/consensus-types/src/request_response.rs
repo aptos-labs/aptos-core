@@ -16,6 +16,8 @@ pub enum WrapperCommand {
         Round,
         // max block size
         u64,
+        // max byte size
+        u64,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
@@ -50,4 +52,5 @@ impl fmt::Display for WrapperCommand {
 #[derive(Debug)]
 pub enum ConsensusResponse {
     GetBlockResponse(Payload),
+    CleanResponse(),
 }

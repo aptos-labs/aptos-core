@@ -3,12 +3,12 @@ module aptos_std::big_vector {
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
 
-    /// The index into the vector is out of bounds
-    const EINDEX_OUT_OF_BOUNDS: u64 = 0;
-    /// Need to reserve more buckets for push_back_no_grow.
-    const EOUT_OF_CAPACITY: u64 = 1;
-    /// Destory a non-empty vector.
-    const ENOT_EMPTY: u64 = 2;
+    /// Vector index is out of bounds
+    const EINDEX_OUT_OF_BOUNDS: u64 = 1;
+    /// Vector is full
+    const EOUT_OF_CAPACITY: u64 = 2;
+    /// Cannot destroy a non-empty vector
+    const EVECTOR_NOT_EMPTY: u64 = 3;
 
     /// Index of the value in the buckets.
     struct BigVectorIndex has copy, drop, store {
@@ -50,7 +50,7 @@ module aptos_std::big_vector {
     /// Destroy the vector `v`.
     /// Aborts if `v` is not empty.
     public fun destroy_empty<T>(v: BigVector<T>) {
-        assert!(is_empty(&v), error::invalid_argument(ENOT_EMPTY));
+        assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
         shrink_to_fit(&mut v);
         let BigVector { buckets, end_index: _, num_buckets: _, bucket_size: _ } = v;
         table_with_length::destroy_empty(buckets);

@@ -1,964 +1,574 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [],
-          "type": "dashboard"
-        },
-        "type": "dashboard"
-      }
-    ]
-  },
+  "uid": "validator_connectivity",
+  "slug": "",
+  "title": "Validator Connectivity",
+  "originalTitle": "",
+  "tags": [],
+  "style": "dark",
+  "timezone": "browser",
   "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "id": 13,
-  "iteration": 1650604665160,
-  "links": [
-    {
-      "asDropdown": true,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "title": "Other Dashboards",
-      "type": "dashboards"
-    }
-  ],
-  "liveNow": false,
+  "hideControls": false,
+  "sharedCrosshair": false,
   "panels": [
     {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 14,
+      "isNew": false,
+      "span": 0,
       "title": "Overview",
-      "type": "row"
+      "transparent": false,
+      "type": "row",
+      "panels": null,
+      "collapsed": false
     },
     {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 3,
-        "x": 0,
-        "y": 1
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 3, "x": 0, "y": 1 },
       "id": 16,
-      "links": [],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "mean"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "v1.0",
-      "targets": [
-        {
-          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
+      "isNew": false,
+      "span": 0,
       "title": "ValidatorSet",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "#EAB839",
-                "value": 10
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "red",
-                "value": 30
-              }
-            ]
-          },
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 3,
-        "x": 3,
-        "y": 1
-      },
-      "id": 18,
-      "links": [],
+      "transparent": false,
+      "type": "stat",
+      "colors": null,
+      "colorValue": false,
+      "colorBackground": false,
+      "decimals": 0,
+      "format": "",
+      "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
+      "nullPointMode": "",
+      "sparkline": {},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "intervalFactor": 1,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "thresholds": "",
+      "valueFontSize": "",
+      "valueMaps": null,
+      "valueName": "",
       "options": {
+        "orientation": "auto",
+        "textMode": "auto",
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "mean"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "v1.0",
-      "targets": [
-        {
-          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
+        "displayMode": "",
+        "content": "",
+        "mode": "",
+        "reduceOptions": { "values": false, "fields": "", "calcs": ["mean"] }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 3, "x": 3, "y": 1 },
+      "id": 18,
+      "isNew": false,
+      "span": 0,
       "title": "Down node %",
-      "type": "stat"
+      "transparent": false,
+      "type": "stat",
+      "colors": null,
+      "colorValue": false,
+      "colorBackground": false,
+      "decimals": 0,
+      "format": "",
+      "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
+      "nullPointMode": "",
+      "sparkline": {},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) \u003e 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "intervalFactor": 1,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "thresholds": "",
+      "valueFontSize": "",
+      "valueMaps": null,
+      "valueName": "",
+      "options": {
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "displayMode": "",
+        "content": "",
+        "mode": "",
+        "reduceOptions": { "values": false, "fields": "", "calcs": ["mean"] }
+      }
     },
     {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "displayMode": "auto",
-            "filterable": false,
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 4,
-        "x": 6,
-        "y": 1
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 4, "x": 6, "y": 1 },
       "id": 22,
-      "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": false
-      },
-      "pluginVersion": "v1.0",
-      "targets": [
-        {
-          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"aptos-procs\", role=\"validator\"} == 0",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
+      "isNew": false,
+      "span": 0,
       "title": "Not reporting metrics",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "__name__": true,
-              "instance": true,
-              "job": true,
-              "kubernetes_pod_name": true,
-              "role": true
-            },
-            "indexByName": {},
-            "renameByName": {}
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "displayMode": "auto",
-            "filterable": false,
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 5,
-        "x": 10,
-        "y": 1
-      },
-      "id": 20,
-      "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "frameIndex": 1,
-        "showHeader": false
-      },
-      "pluginVersion": "v1.0",
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"}[1m]) == 0",
-          "format": "table",
+          "refId": "A",
+          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"aptos-procs\", role=\"validator\"} == 0",
           "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
+          "format": "table"
         }
       ],
+      "scroll": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 5, "w": 5, "x": 10, "y": 1 },
+      "id": 20,
+      "isNew": false,
+      "span": 0,
       "title": "Node not Participating Consensus",
-      "transformations": [
+      "transparent": false,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
         {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true,
-              "instance": true,
-              "job": true,
-              "kubernetes_pod_name": true,
-              "role": true
-            },
-            "indexByName": {},
-            "renameByName": {}
-          }
+          "refId": "A",
+          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"}[1m]) == 0",
+          "instant": true,
+          "format": "table"
         }
       ],
-      "type": "table"
+      "scroll": false
     },
     {
-      "collapsed": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 6
-      },
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
       "id": 12,
-      "panels": [],
+      "isNew": false,
+      "span": 0,
       "title": "Connected Peers",
-      "type": "row"
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 7 },
+      "id": 4,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Total Connected Peers",
+      "description": "Total Connected Peers for both inbound and outbound per peer.",
+      "transparent": false,
+      "type": "graph",
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "description": "Total Connected Peers for both inbound and outbound per peer.",
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
       "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 7
-      },
-      "hiddenSeries": false,
-      "id": 4,
       "legend": {
+        "alignAsTable": false,
         "avg": false,
         "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
         "max": false,
         "min": false,
+        "rightSide": false,
         "show": false,
         "total": false,
         "values": false
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
       "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
       "percentage": false,
-      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
+          "refId": "A",
           "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
-          "format": "time_series",
-          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A"
+          "format": "time_series"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Total Connected Peers",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
       "yaxes": [
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
       ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "description": "Total Inbound connected peers. There should be at most one peer with 0 inbound connections.",
       "fieldConfig": {
         "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 7
-      },
-      "hiddenSeries": false,
-      "id": 6,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "v1.0",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Inbound Connected Peers",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "description": "Total outbound connections per peer. Every node should have an outbound connection.",
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 7
-      },
-      "hiddenSeries": false,
-      "id": 8,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "v1.0",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
-          "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Outbound Connected Peers",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
-    },
-    {
-      "collapsed": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 10,
-      "panels": [],
-      "title": "Connectivity Matrix",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "description": "An adjacency matrix showing each (validator -> remote validator) connection. Each row shows the \"kubernetes_pod_name\" node's view of its own connections to each other validator.\n\nA green \"1\" means there is currently a connection, while a red \"0\" means the nodes are not currently connected. An empty square means there is no reported metric for this (kubernetes_pod_name_i, kubernetes_pod_name_j) pair, which is expected for (kubernetes_pod_name_i, kubernetes_pod_name_i) since we don't allow self-connections.",
-      "fieldConfig": {
-        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
           "custom": {
-            "align": "right",
-            "displayMode": "auto",
-            "filterable": false,
-            "inspect": false,
-            "width": 100
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "rgb(45, 47, 51)",
-                "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byType",
-              "options": "number"
-            },
-            "properties": [
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "rgba(45, 47, 50, 0)",
-                      "value": null
-                    },
-                    {
-                      "color": "semi-dark-red",
-                      "value": 0
-                    },
-                    {
-                      "color": "green",
-                      "value": 1
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.align",
-                "value": "left"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
           }
-        ]
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 7 },
+      "id": 6,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Inbound Connected Peers",
+      "description": "Total Inbound connected peers. There should be at most one peer with 0 inbound connections.",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
       },
-      "gridPos": {
-        "h": 23,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 24,
-      "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "kubernetes_pod_name"
-          }
-        ]
-      },
-      "pluginVersion": "v1.0",
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
       "targets": [
         {
-          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
-          "format": "time_series",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
+          "refId": "A",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+          "legendFormat": "{{kubernetes_pod_name}}"
         }
       ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 7 },
+      "id": 8,
+      "isNew": false,
+      "renderer": "flot",
+      "span": 0,
+      "title": "Outbound Connected Peers",
+      "description": "Total outbound connections per peer. Every node should have an outbound connection.",
+      "transparent": false,
+      "type": "graph",
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 0,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+          "legendFormat": "{{kubernetes_pod_name}}"
+        }
+      ],
+      "tooltip": { "shared": true, "value_type": "individual" },
+      "xaxis": { "format": "", "logBase": 0, "show": true },
+      "yaxes": [
+        { "format": "short", "logBase": 1, "show": true },
+        { "format": "short", "logBase": 1, "show": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "" },
+          "thresholds": { "mode": "", "steps": null },
+          "custom": {
+            "axisPlacement": "",
+            "barAlignment": 0,
+            "drawStyle": "",
+            "fillOpacity": 0,
+            "gradientMode": "",
+            "lineInterpolation": "",
+            "lineWidth": 0,
+            "pointSize": 0,
+            "showPoints": "",
+            "spanNulls": false,
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineStyle": { "fill": "" },
+            "scaleDistribution": { "type": "" },
+            "stacking": { "group": "", "mode": "" },
+            "thresholdsStyle": { "mode": "" }
+          }
+        }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 10,
+      "isNew": false,
+      "span": 0,
+      "title": "Connectivity Matrix",
+      "transparent": false,
+      "type": "row",
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "editable": false,
+      "error": false,
+      "gridPos": { "h": 23, "w": 24, "x": 0, "y": 16 },
+      "id": 24,
+      "isNew": false,
+      "span": 0,
       "title": "Current Validator Connections",
-      "transformations": [
+      "description": "An adjacency matrix showing each (validator -\u003e remote validator) connection. Each row shows the \"kubernetes_pod_name\" node's view of its own connections to each other validator.\n\nA green \"1\" means there is currently a connection, while a red \"0\" means the nodes are not currently connected. An empty square means there is no reported metric for this (kubernetes_pod_name_i, kubernetes_pod_name_j) pair, which is expected for (kubernetes_pod_name_i, kubernetes_pod_name_i) since we don't allow self-connections.",
+      "transparent": true,
+      "type": "table",
+      "columns": null,
+      "styles": null,
+      "transform": "",
+      "targets": [
         {
-          "id": "labelsToFields",
-          "options": {
-            "valueLabel": "remote_kubernetes_pod_name"
-          }
-        },
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {
-              "Anchorage": 2,
-              "Time": 0,
-              "a16z": 3,
-              "bcap": 4,
-              "bisontrails": 5,
-              "breakthrough": 6,
-              "checkout": 7,
-              "coinbase": 8,
-              "cs-aptosv0": 9,
-              "farfetch": 10,
-              "figment": 11,
-              "iliad": 12,
-              "kiva": 13,
-              "lyft": 14,
-              "mercycorps": 15,
-              "novi": 16,
-              "kubernetes_pod_name": 1,
-              "paradigm": 17,
-              "payu": 18,
-              "ribbit": 19,
-              "shopify": 20,
-              "slow": 21,
-              "spotify": 22,
-              "temasek": 23,
-              "thrive": 24,
-              "uber": 25,
-              "usv": 26,
-              "wwb": 27,
-              "xapo": 28
-            },
-            "renameByName": {}
-          }
+          "refId": "A",
+          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -\u003e \"remote_peer_id\" and \"kubernetes_pod_name\" -\u003e \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
+          "instant": true,
+          "format": "time_series"
         }
       ],
-      "transparent": true,
-      "type": "table"
+      "scroll": false
     }
   ],
-  "schemaVersion": 36,
-  "style": "dark",
-  "tags": [],
+  "rows": null,
   "templating": {
     "list": [
       {
-        "hide": 0,
-        "includeAll": false,
-        "multi": false,
         "name": "Datasource",
+        "type": "datasource",
+        "datasource": null,
+        "refresh": 1,
         "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
         "query": "prometheus",
-        "queryValue": "",
-        "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "type": "datasource"
+        "current": { "text": null, "value": null },
+        "label": "",
+        "hide": 0,
+        "sort": 0
       },
       {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${Datasource}"
-        },
-        "definition": "label_values(namespace)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
         "name": "namespace",
-        "options": [],
-        "query": {
-          "query": "label_values(namespace)",
-          "refId": "Prometheus-chain-name-Variable-Query"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
         "type": "query",
-        "useTags": false
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${Datasource}"
-        },
-        "definition": "label_values(chain_name)",
-        "hide": 0,
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
         "includeAll": false,
-        "label": "",
+        "allFormat": "",
+        "allValue": "",
         "multi": false,
-        "name": "chain_name",
-        "options": [],
-        "query": {
-          "query": "label_values(chain_name)",
-          "refId": "Prometheus-chain-name-Variable-Query"
-        },
-        "refresh": 1,
+        "multiFormat": "",
+        "query": { "query": "label_values(namespace)", "refId": "Prometheus-chain-name-Variable-Query" },
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       },
       {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
-        },
-        "definition": "label_values(aptos_network_peer_connected, kubernetes_pod_name)",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "kubernetes_pod_name",
+        "name": "chain_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
         "options": [],
+        "includeAll": false,
+        "allFormat": "",
+        "allValue": "",
+        "multi": false,
+        "multiFormat": "",
+        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
+        "regex": "",
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
+      },
+      {
+        "name": "kubernetes_pod_name",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "refresh": 1,
+        "options": [],
+        "includeAll": true,
+        "allFormat": "",
+        "allValue": ".*",
+        "multi": true,
+        "multiFormat": "",
         "query": {
           "query": "label_values(aptos_network_peer_connected, kubernetes_pod_name)",
           "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
-        "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "current": { "text": ["All"], "value": ["$__all"] },
+        "label": "",
+        "hide": 0,
+        "sort": 1
       }
     ]
   },
-  "time": {
-    "from": "now-3h",
-    "to": "now"
-  },
-  "timepicker": {
-    "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
-      "1m",
-      "5m",
-      "15m",
-      "30m",
-      "1h",
-      "2h",
-      "1d"
-    ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
+  "annotations": {
+    "list": [
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "datasource", "uid": "grafana" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      }
     ]
   },
-  "timezone": "browser",
-  "title": "Validator Connectivity",
-  "uid": "validator_connectivity",
-  "version": 1,
-  "weekStart": ""
+  "schemaVersion": 36,
+  "version": 4,
+  "links": [
+    {
+      "title": "Other Dashboards",
+      "type": "dashboards",
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+  },
+  "graphTooltip": 1
 }

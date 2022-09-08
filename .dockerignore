@@ -9,14 +9,19 @@
 !docker/build-rust-all.sh
 !docker/tools/boto.cfg
 
+!.cargo/
 !**/Cargo.toml
 !**/Cargo.lock
 !**/*.mv
 !**/*.rs
+!**/*.mrb
 !config/src/config/test_data
 !aptos-move/framework/
+!crates/aptos/src/move_tool/*.bpl
 !api/doc/
 !ecosystem/indexer/migrations/**/*.sql
+!ecosystem/sf-indexer/aptos-sf-indexer/migrations/**/*.sql
+!ecosystem/sf-indexer/aptos-substreams/*.spkg
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/

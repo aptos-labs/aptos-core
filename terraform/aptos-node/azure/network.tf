@@ -26,9 +26,9 @@ resource "azurerm_public_ip" "nat" {
 }
 
 resource "azurerm_nat_gateway" "nat" {
-  name                  = "aptos-${terraform.workspace}-nat"
-  resource_group_name   = azurerm_resource_group.aptos.name
-  location              = azurerm_resource_group.aptos.location
+  name                = "aptos-${terraform.workspace}-nat"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 }
 
 resource "azurerm_nat_gateway_public_ip_association" "nat" {
@@ -50,51 +50,51 @@ resource "azurerm_network_security_group" "nodes" {
   location            = azurerm_resource_group.aptos.location
 
   security_rule {
-    name                         = "nodes-tcp"
-    priority                     = 1000
-    direction                    = "Inbound"
-    access                       = "Allow"
-    protocol                     = "Tcp"
-    destination_address_prefix   = "*"
-    destination_port_range       = "1025-65535"
-    source_address_prefixes      = local.cluster_ips
-    source_port_range            = "*"
+    name                       = "nodes-tcp"
+    priority                   = 1000
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    destination_address_prefix = "*"
+    destination_port_range     = "1025-65535"
+    source_address_prefixes    = local.cluster_ips
+    source_port_range          = "*"
   }
 
   security_rule {
-    name                         = "nodes-udp"
-    priority                     = 1010
-    direction                    = "Inbound"
-    access                       = "Allow"
-    protocol                     = "Udp"
-    destination_address_prefix   = "*"
-    destination_port_range       = "1025-65535"
-    source_address_prefixes      = local.cluster_ips
-    source_port_range            = "*"
+    name                       = "nodes-udp"
+    priority                   = 1010
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Udp"
+    destination_address_prefix = "*"
+    destination_port_range     = "1025-65535"
+    source_address_prefixes    = local.cluster_ips
+    source_port_range          = "*"
   }
 
   security_rule {
-    name                         = "nodes-icmp"
-    priority                     = 1020
-    direction                    = "Inbound"
-    access                       = "Allow"
-    protocol                     = "Icmp"
-    destination_address_prefix   = "*"
-    destination_port_range       = "*"
-    source_address_prefixes      = local.cluster_ips
-    source_port_range            = "*"
+    name                       = "nodes-icmp"
+    priority                   = 1020
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Icmp"
+    destination_address_prefix = "*"
+    destination_port_range     = "*"
+    source_address_prefixes    = local.cluster_ips
+    source_port_range          = "*"
   }
 
   security_rule {
-    name                         = "nodes-dns"
-    priority                     = 1030
-    direction                    = "Inbound"
-    access                       = "Allow"
-    protocol                     = "Udp"
-    destination_address_prefix   = "*"
-    destination_port_range       = "53"
-    source_address_prefixes      = local.cluster_ips
-    source_port_range            = "*"
+    name                       = "nodes-dns"
+    priority                   = 1030
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Udp"
+    destination_address_prefix = "*"
+    destination_port_range     = "53"
+    source_address_prefixes    = local.cluster_ips
+    source_port_range          = "*"
   }
 
   security_rule {

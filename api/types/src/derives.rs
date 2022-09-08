@@ -8,7 +8,7 @@
 //! In some cases we use these derives because the underlying types are not
 //! expressible via OpenAPI, e.g. Address. In other cases, we use them because
 //! we do not want to use the default serialization of the types, but instead
-//! serialize them as strings, e.g. ScriptFunctionId.
+//! serialize them as strings, e.g. EntryFunctionId.
 //!
 //! For potential future improvements here, see:
 //! https://github.com/aptos-labs/aptos-core/issues/2319.
@@ -23,8 +23,8 @@ use serde_json::json;
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId, MoveStructTag,
-    MoveType, ScriptFunctionId, U128, U64,
+    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper,
+    MoveModuleId, MoveStructTag, MoveType, U128, U64,
 };
 use indoc::indoc;
 
@@ -36,7 +36,14 @@ impl_poem_type!(
             "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
-        description = Some("Hex encoded 32 byte Aptos account address")
+        description = Some(indoc! {"
+            A hex encoded 32 byte Aptos account address.
+
+            This is represented in a string as a 64 character hex string, sometimes
+            shortened by stripping leading 0s, and adding a 0x.
+
+            For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
+        "})
     )
 );
 
@@ -229,14 +236,14 @@ impl_poem_type!(
 );
 
 impl_poem_type!(
-    ScriptFunctionId,
+    EntryFunctionId,
     "string",
     (
         example = Some(serde_json::Value::String(
             "0x1::aptos_coin::transfer".to_string()
         )),
         description = Some(indoc! {"
-            Script function id is string representation of a script function defined on-chain.
+            Entry function id is string representation of a entry function defined on-chain.
 
             Format: `{address}::{module name}::{function name}`
 
@@ -254,7 +261,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 64-bit unsigned integer.
 
-        We represent u64 values as a string to ensure compatability with languages such
+        We represent u64 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )
@@ -271,7 +278,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 128-bit unsigned integer.
 
-        We represent u128 values as a string to ensure compatability with languages such
+        We represent u128 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )

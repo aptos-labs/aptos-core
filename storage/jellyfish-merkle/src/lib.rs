@@ -73,7 +73,7 @@ pub mod iterator;
 mod jellyfish_merkle_test;
 pub mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
-mod mock_tree_store;
+pub mod mock_tree_store;
 pub mod node_type;
 pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -81,11 +81,13 @@ pub mod test_helper;
 
 use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::proof::SparseMerkleProofExt;
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
-    proof::{SparseMerkleProof, SparseMerkleRangeProof},
+    proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -110,6 +112,7 @@ const NUM_IO_THREADS: usize = 32;
 pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
     ThreadPoolBuilder::new()
         .num_threads(NUM_IO_THREADS)
+        .thread_name(|index| format!("jmt-io-{}", index))
         .build()
         .unwrap()
 });
@@ -143,16 +146,14 @@ pub trait TreeWriter<K>: Send + Sync {
     fn write_node_batch(&self, node_batch: &HashMap<NodeKey, Node<K>>) -> Result<()>;
 }
 
-pub trait StateValueWriter<K, V>: Send + Sync {
-    /// Writes a kv batch into storage.
-    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()>;
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
+    fn key_size(&self) -> usize;
 }
 
-/// `Key` defines the types of data key that can be stored in a Jellyfish Merkle tree.
-pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {}
-
 /// `Value` defines the types of data that can be stored in a Jellyfish Merkle tree.
-pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {}
+pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {
+    fn value_size(&self) -> usize;
+}
 
 /// `TestKey` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
@@ -167,17 +168,23 @@ pub trait TestKey:
 #[cfg(any(test, feature = "fuzzing"))]
 pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
 
-impl Key for StateKey {}
+impl Key for StateKey {
+    fn key_size(&self) -> usize {
+        self.size()
+    }
+}
 
-impl Value for StateValue {}
+impl Value for StateValue {
+    fn value_size(&self) -> usize {
+        self.size()
+    }
+}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestKey for StateKey {}
 
 /// Node batch that will be written into db atomically with other batches.
 pub type NodeBatch<K> = HashMap<NodeKey, Node<K>>;
-/// Key-Value batch that will be written into db atomically with other batches.
-pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NodeStats {
@@ -408,7 +415,7 @@ where
             .collect::<Vec<_>>();
 
         let mut batch = TreeUpdateBatch::new();
-        let root_node = if let Some(persisted_version) = persisted_version {
+        let root_node_opt = if let Some(persisted_version) = persisted_version {
             IO_POOL.install(|| {
                 self.batch_insert_at(
                     &NodeKey::new_empty_path(persisted_version),
@@ -428,14 +435,19 @@ where
                 &node_hashes,
                 &mut batch,
             )?
-        }
-        .ok_or_else(|| format_err!("Empty tree is impossible."))?;
+        };
 
         let node_key = NodeKey::new_empty_path(version);
-        let root_hash = root_node.hash();
-
-        APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
-        batch.put_node(node_key, root_node);
+        let root_hash = if let Some(root_node) = root_node_opt {
+            APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
+            let hash = root_node.hash();
+            batch.put_node(node_key, root_node);
+            hash
+        } else {
+            APTOS_JELLYFISH_LEAF_COUNT.set(0);
+            batch.put_node(node_key, Node::Null);
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
 
         Ok((root_hash, batch))
     }
@@ -557,6 +569,10 @@ where
             Node::Leaf(leaf_node) => self.batch_update_subtree_with_existing_leaf(
                 node_key, version, leaf_node, kvs, depth, hash_cache, batch,
             ),
+            Node::Null => {
+                ensure!(depth == 0, "Null node can only exist at depth 0");
+                self.batch_update_subtree(node_key, version, kvs, 0, hash_cache, batch)
+            }
         }
     }
 
@@ -839,6 +855,9 @@ where
                         }),
                     ));
                 }
+                Node::Null => {
+                    return Ok((None, SparseMerkleProofExt::new(None, vec![])));
+                }
             }
         }
         bail!("Jellyfish Merkle tree has cyclic graph inside.");
@@ -897,6 +916,33 @@ where
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
         self.get_root_node(version).map(|n| n.leaf_count())
     }
+
+    pub fn get_all_nodes_referenced(&self, version: Version) -> Result<Vec<NodeKey>> {
+        let mut out_keys = vec![];
+        self.get_all_nodes_referenced_impl(NodeKey::new_empty_path(version), &mut out_keys)?;
+        Ok(out_keys)
+    }
+
+    fn get_all_nodes_referenced_impl(
+        &self,
+        key: NodeKey,
+        out_keys: &mut Vec<NodeKey>,
+    ) -> Result<()> {
+        match self.reader.get_node(&key)? {
+            Node::Internal(internal_node) => {
+                for (child_nibble, child) in internal_node.children_sorted() {
+                    self.get_all_nodes_referenced_impl(
+                        key.gen_child_node_key(child.version, *child_nibble),
+                        out_keys,
+                    )?;
+                }
+            }
+            Node::Leaf(_) | Node::Null => {}
+        };
+
+        out_keys.push(key);
+        Ok(())
+    }
 }
 
 trait NibbleExt {
@@ -907,7 +953,6 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        mirai_annotations::precondition!(index < HashValue::LENGTH);
         Nibble::from(if index % 2 == 0 {
             self[index / 2] >> 4
         } else {

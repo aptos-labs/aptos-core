@@ -7,7 +7,7 @@ xclippy = [
   "-Dwarnings",
   "-Wclippy::all",
   "-Aclippy::unit_arg",
-  "-Aclippy::eval-order-dependence",
+  "-Aclippy::mixed_read_write_in_expression",
   "-Aclippy::new-without-default",
   "-Aclippy::rc_buffer",
   "-Aclippy::upper_case_acronyms",

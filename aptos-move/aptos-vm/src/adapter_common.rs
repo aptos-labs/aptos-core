@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache, delta_ext::TransactionOutputExt};
+use crate::{counters::*, data_cache::StateViewCache};
 use anyhow::Result;
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
@@ -17,9 +18,7 @@ use crate::{
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_metadata::BlockMetadata,
-    transaction::{
-        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
     write_set::WriteSet,
 };
 use rayon::prelude::*;
@@ -167,7 +166,7 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
         )?;
 
         // Apply deltas.
-        let output = output_ext.into_transaction_output(&data_cache)?;
+        let output = output_ext.into_transaction_output(&data_cache);
 
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
@@ -207,7 +206,6 @@ pub enum PreprocessedTransaction {
     UserTransaction(Box<SignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),
     BlockMetadata(BlockMetadata),
-    WriteSet(Box<SignatureCheckedTransaction>),
     InvalidSignature,
     StateCheckpoint,
 }
@@ -227,12 +225,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                     return PreprocessedTransaction::InvalidSignature;
                 }
             };
-            match checked_txn.payload() {
-                TransactionPayload::WriteSet(_) => {
-                    PreprocessedTransaction::WriteSet(Box::new(checked_txn))
-                }
-                _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
-            }
+            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
         }
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }

@@ -19,7 +19,7 @@ impl Test for NetworkLatencyTest {
 
 impl NetworkTest for NetworkLatencyTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
         let delay = SwarmChaos::Delay(SwarmNetworkDelay {
             latency_ms: LATENCY_MS,
             jitter_ms: JITTER_MS,
@@ -46,8 +46,7 @@ impl NetworkTest for NetworkLatencyTest {
         ctx.swarm().remove_chaos(delay)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

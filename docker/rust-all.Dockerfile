@@ -1,13 +1,13 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:buster-20220228@sha256:fd510d85d7e0691ca551fe08e8a2516a86c7f24601a940a299b5fe5cdd22c03a AS debian-base
+FROM debian:buster-20220822@sha256:faa416b9eeda2cbdb796544422eedd698e716dbd99841138521a94db51bf6123 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.61-buster AS rust-base
+FROM rust:1.63.0-buster@sha256:0110d1b4193029735f1db1c0ed661676ed4b6f705b11b1ebe95c655b52e6906f AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 
@@ -31,15 +31,28 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
 
-RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
+# cargo profile and features
+ARG PROFILE
+ENV PROFILE ${PROFILE}
+ARG FEATURES
+ENV FEATURES ${FEATURES}
+
+RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
 
 ### Validator Image ###
 FROM debian-base AS validator
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    # Needed to run debugging tools like perf
+    linux-perf \
+    sudo \
+    procps \
+    gdb \
+    curl \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
-### Needed to run debugging tools like perf
-RUN apt-get update && apt-get install -y linux-perf sudo procps gdb
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
@@ -80,10 +93,20 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base AS indexer
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
+# streamingfast indexer
+COPY --link --from=builder /aptos/dist/aptos-sf-indexer /usr/local/bin/aptos-sf-indexer
+COPY --link --from=builder /aptos/ecosystem/sf-indexer/aptos-substreams/*.spkg /aptos-substreams/
 
 ENV RUST_LOG_FORMAT=json
 
@@ -102,7 +125,14 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base AS node-checker
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
@@ -126,10 +156,16 @@ FROM debian-base AS tools
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
-RUN apt-get update && \
-    apt-get --no-install-recommends --yes install wget curl libssl1.1 ca-certificates socat python3-botocore/bullseye awscli/bullseye && \
-    apt-get clean && \
-    rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get --no-install-recommends -y \
+    install \
+    wget \
+    curl \
+    libssl1.1 \
+    ca-certificates \
+    socat \
+    python3-botocore/bullseye \
+    awscli/bullseye \ 
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python
 COPY --link docker/tools/boto.cfg /etc/boto.cfg
@@ -143,17 +179,12 @@ COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup
 COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
+COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
 COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
 
-### Get Aptos Move modules bytecodes for genesis ceremony
-RUN mkdir -p /aptos-framework/move/build
-RUN mkdir -p /aptos-framework/move/modules
-COPY --link --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
-COPY --link --from=builder /aptos/aptos-token/releases/artifacts/current/build /aptos-framework/move/build
-
-RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
-RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
-RUN rm -rf /aptos-framework/move/build
+### Get Aptos Move releases for genesis ceremony
+RUN mkdir -p /aptos-framework/move
+COPY --link --from=builder /aptos/dist/head.mrb /aptos-framework/move/head.mrb
 
 # add build info
 ARG BUILD_DATE
@@ -169,7 +200,14 @@ ENV GIT_SHA ${GIT_SHA}
 ### Faucet Image ###
 FROM debian-base AS faucet
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tools tcpdump iproute2 netcat \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    nano \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /aptos/client/data/wallet/
@@ -198,12 +236,21 @@ ENV GIT_SHA ${GIT_SHA}
 
 FROM debian-base as forge
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates openssh-client wget busybox git unzip awscli && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl1.1 \
+    ca-certificates \
+    openssh-client \
+    wget \
+    busybox \
+    git \
+    unzip \
+    awscli \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir /aptos
 
 # copy helm charts from source
 COPY --link --from=builder /aptos/terraform/helm /aptos/terraform/helm
+COPY --link --from=builder /aptos/testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml /aptos/terraform/aptos-node-default-values.yaml
 
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 RUN cd /usr/local/bin && wget "https://get.helm.sh/helm-v3.8.0-linux-amd64.tar.gz" -O- | busybox tar -zxvf - && mv linux-amd64/helm . && chmod +x helm
@@ -229,7 +276,14 @@ ENTRYPOINT ["/tini", "--", "forge"]
 
 FROM debian-base AS telemetry-service
 
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
@@ -244,3 +298,31 @@ ARG GIT_BRANCH
 ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
+
+
+### EXPERIMENTAL ###
+
+### Validator Image ###
+FROM validator AS validator-testing
+
+RUN apt-get update && apt-get install -y \
+    # Extra goodies for debugging
+    less \
+    vim \
+    nano \
+    libjemalloc-dev \
+    binutils \
+    graphviz \
+    ghostscript \
+    strace \
+    htop \
+    valgrind \
+    bpfcc-tools \
+    python-bpfcc \
+    libbpfcc \
+    libbpfcc-dev \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+# Capture backtrace on error
+ENV RUST_BACKTRACE 1
+ENV RUST_LOG_FORMAT=json

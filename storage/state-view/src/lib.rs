@@ -8,6 +8,7 @@
 use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress, state_store::state_key::StateKey, transaction::Version,
 };
@@ -31,6 +32,9 @@ pub trait StateView: Sync {
     /// VM needs this method to know whether the current state view is for genesis state creation.
     /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.
     fn is_genesis(&self) -> bool;
+
+    /// Get state storage usage info at epoch ending.
+    fn get_usage(&self) -> Result<StateStorageUsage>;
 }
 
 #[derive(Copy, Clone)]
@@ -60,6 +64,10 @@ where
 
     fn is_genesis(&self) -> bool {
         self.deref().is_genesis()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.deref().get_usage()
     }
 }
 

@@ -24,9 +24,10 @@ use crate::{
     protocols::{
         direct_send::Message,
         rpc::{InboundRpcRequest, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
+        stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, NetworkMessage, NetworkMessageSink, NetworkMessageStream,
-            Priority, ReadError, WriteError,
+            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
+            MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
@@ -44,8 +45,9 @@ use futures::{
     channel::oneshot,
     io::{AsyncRead, AsyncWrite},
     stream::StreamExt,
-    FutureExt, SinkExt, TryFutureExt,
+    SinkExt,
 };
+use futures_util::stream::select;
 use serde::Serialize;
 use short_hex_str::AsShortHexStr;
 use std::{fmt, panic, time::Duration};
@@ -131,18 +133,22 @@ pub struct Peer<TSocket> {
     /// Flag to indicate if the actor is being shut down.
     state: State,
     /// The maximum size of an inbound or outbound request frame
-    /// Currently, requests are only a single frame
     max_frame_size: usize,
+    /// The maximum size of an inbound or outbound request message
+    max_message_size: usize,
     /// Optional inbound rate limiter
     inbound_rate_limiter: Option<SharedBucket>,
     /// Optional outbound rate limiter
     outbound_rate_limiter: Option<SharedBucket>,
+    /// Inbound stream buffer
+    inbound_stream: InboundStreamBuffer,
 }
 
 impl<TSocket> Peer<TSocket>
 where
     TSocket: AsyncRead + AsyncWrite + Send + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         network_context: NetworkContext,
         executor: Handle,
@@ -155,6 +161,7 @@ where
         max_concurrent_inbound_rpcs: u32,
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
+        max_message_size: usize,
         inbound_rate_limiter: Option<SharedBucket>,
         outbound_rate_limiter: Option<SharedBucket>,
     ) -> Self {
@@ -187,8 +194,10 @@ where
             ),
             state: State::Connected,
             max_frame_size,
+            max_message_size,
             inbound_rate_limiter,
             outbound_rate_limiter,
+            inbound_stream: InboundStreamBuffer::new(),
         }
     }
 
@@ -210,13 +219,13 @@ where
         let (read_socket, write_socket) =
             tokio::io::split(self.connection.take().unwrap().compat());
 
-        let mut reader = NetworkMessageStream::new(
+        let mut reader = MultiplexMessageStream::new(
             read_socket.compat(),
             self.max_frame_size,
             self.inbound_rate_limiter.clone(),
         )
         .fuse();
-        let writer = NetworkMessageSink::new(
+        let writer = MultiplexMessageSink::new(
             write_socket.compat_write(),
             self.max_frame_size,
             self.outbound_rate_limiter.clone(),
@@ -232,6 +241,8 @@ where
             self.connection_metadata.clone(),
             self.network_context,
             writer,
+            self.max_frame_size,
+            self.max_message_size,
         );
 
         // Start main Peer event loop.
@@ -250,7 +261,7 @@ where
                         None => self.shutdown(DisconnectReason::Requested),
                     }
                 },
-                // Handle a new inbound NetworkMessage that we've just read off
+                // Handle a new inbound MultiplexMessage that we've just read off
                 // the wire from the remote peer.
                 maybe_message = reader.next() => {
                     match maybe_message {
@@ -296,7 +307,7 @@ where
     }
 
     // Start a new task on the given executor which is responsible for writing outbound messages on
-    // the wire. The function returns two channels which can be used to send intructions to the
+    // the wire. The function returns two channels which can be used to send instructions to the
     // task:
     // 1. The first channel is used to send outbound NetworkMessages to the task
     // 2. The second channel is used to instruct the task to close the connection and terminate.
@@ -307,52 +318,37 @@ where
         time_service: TimeService,
         connection_metadata: ConnectionMetadata,
         network_context: NetworkContext,
-        mut writer: NetworkMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
-    ) -> (
-        channel::Sender<(
-            NetworkMessage,
-            oneshot::Sender<Result<(), PeerManagerError>>,
-        )>,
-        oneshot::Sender<()>,
-    ) {
+        mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
+        max_frame_size: usize,
+        max_message_size: usize,
+    ) -> (channel::Sender<NetworkMessage>, oneshot::Sender<()>) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (
-            channel::Sender<(
-                NetworkMessage,
-                oneshot::Sender<Result<(), PeerManagerError>>,
-            )>,
-            _,
-        ) = channel::new(1024, &counters::PENDING_WIRE_MESSAGES);
-        let (close_tx, close_rx) = oneshot::channel();
+        let (write_reqs_tx, mut write_reqs_rx): (channel::Sender<NetworkMessage>, _) =
+            channel::new(1024, &counters::PENDING_WIRE_MESSAGES);
+        let (close_tx, mut close_rx) = oneshot::channel();
+
+        let (mut msg_tx, msg_rx) = channel::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (stream_msg_tx, stream_msg_rx) =
+            channel::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
+
+        // this task ends when the multiplex task ends (by dropping the senders)
         let writer_task = async move {
-            let mut close_rx = close_rx.into_stream();
-            loop {
-                futures::select! {
-                    (message, ack_ch) = write_reqs_rx.select_next_some() => {
-                        if let Err(err) = writer
-                            .send(&message)
-                            .map_ok(|_| ack_ch.send(Ok(())))
-                            .await
-                        {
-                            warn!(
-                                NetworkSchema::new(&network_context)
-                                    .connection_metadata(&connection_metadata),
-                                error = %err,
-                                "{} Error in sending message to peer: {}, error: {}",
-                                network_context,
-                                remote_peer_id.short_str(),
-                                err
-                            );
-                            break;
-                        }
-                    },
-                    _ = close_rx.select_next_some() => {
-                        break;
-                    }
+            let mut stream = select(msg_rx, stream_msg_rx);
+            let log_context =
+                NetworkSchema::new(&network_context).connection_metadata(&connection_metadata);
+            while let Some(message) = stream.next().await {
+                if let Err(err) = writer.send(&message).await {
+                    warn!(
+                        log_context,
+                        error = %err,
+                        "{} Error in sending message to peer: {}",
+                        network_context,
+                        remote_peer_id.short_str(),
+                    );
                 }
             }
             info!(
-                NetworkSchema::new(&network_context).connection_metadata(&connection_metadata),
+                log_context,
                 "{} Closing connection to peer: {}",
                 network_context,
                 remote_peer_id.short_str()
@@ -368,8 +364,7 @@ where
             {
                 Err(_) => {
                     info!(
-                        NetworkSchema::new(&network_context)
-                            .connection_metadata(&connection_metadata),
+                        log_context,
                         "{} Timeout in flush/close of connection to peer: {}",
                         network_context,
                         remote_peer_id.short_str()
@@ -377,8 +372,7 @@ where
                 }
                 Ok(Err(err)) => {
                     info!(
-                        NetworkSchema::new(&network_context)
-                            .connection_metadata(&connection_metadata),
+                        log_context,
                         error = %err,
                         "{} Failure in flush/close of connection to peer: {}, error: {}",
                         network_context,
@@ -388,8 +382,7 @@ where
                 }
                 Ok(Ok(())) => {
                     info!(
-                        NetworkSchema::new(&network_context)
-                            .connection_metadata(&connection_metadata),
+                        log_context,
                         "{} Closed connection to peer: {}",
                         network_context,
                         remote_peer_id.short_str()
@@ -397,50 +390,42 @@ where
                 }
             }
         };
+        let multiplex_task = async move {
+            let mut outbound_stream =
+                OutboundStream::new(max_frame_size, max_message_size, stream_msg_tx);
+            loop {
+                futures::select! {
+                    message = write_reqs_rx.select_next_some() => {
+                        // either channel full would block the other one
+                        let result = if outbound_stream.should_stream(&message) {
+                            outbound_stream.stream_message(message).await
+                        } else {
+                            msg_tx.send(MultiplexMessage::Message(message)).await.map_err(|_| anyhow::anyhow!("Writer task ended"))
+                        };
+                        if let Err(err) = result {
+                            warn!(
+                                error = %err,
+                                "{} Error in sending message to peer: {}",
+                                network_context,
+                                remote_peer_id.short_str(),
+                            );
+                        }
+                    },
+                    _ = close_rx => {
+                        break;
+                    }
+                }
+            }
+        };
         executor.spawn(writer_task);
+        executor.spawn(multiplex_task);
         (write_reqs_tx, close_tx)
     }
 
-    async fn handle_inbound_message(
+    async fn handle_inbound_network_message(
         &mut self,
-        message: Result<NetworkMessage, ReadError>,
-        write_reqs_tx: &mut channel::Sender<(
-            NetworkMessage,
-            oneshot::Sender<Result<(), PeerManagerError>>,
-        )>,
+        message: NetworkMessage,
     ) -> Result<(), PeerManagerError> {
-        trace!(
-            NetworkSchema::new(&self.network_context)
-                .connection_metadata(&self.connection_metadata),
-            "{} Received message from peer {}",
-            self.network_context,
-            self.remote_peer_id().short_str()
-        );
-
-        let message = match message {
-            Ok(message) => message,
-            Err(err) => match err {
-                ReadError::DeserializeError(_, _, ref frame_prefix) => {
-                    // DeserializeError's are recoverable so we'll let the other
-                    // peer know about the error and log the issue, but we won't
-                    // close the connection.
-                    let message_type = frame_prefix.as_ref().get(0).unwrap_or(&0);
-                    let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
-                    let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
-                    let message = NetworkMessage::Error(error_code);
-
-                    let (ack_tx, _) = oneshot::channel();
-                    write_reqs_tx.send((message, ack_tx)).await?;
-                    return Err(err.into());
-                }
-                ReadError::IoError(_) => {
-                    // IoErrors are mostly unrecoverable so just close the connection.
-                    self.shutdown(DisconnectReason::ConnectionLost);
-                    return Err(err.into());
-                }
-            },
-        };
-
         match message {
             NetworkMessage::DirectSendMsg(message) => self.handle_inbound_direct_send(message),
             NetworkMessage::Error(error_msg) => {
@@ -474,6 +459,67 @@ where
             }
         };
         Ok(())
+    }
+
+    async fn handle_inbound_stream_message(
+        &mut self,
+        message: StreamMessage,
+    ) -> Result<(), PeerManagerError> {
+        match message {
+            StreamMessage::Header(header) => {
+                self.inbound_stream.new_stream(header)?;
+            }
+            StreamMessage::Fragment(fragment) => {
+                if let Some(message) = self.inbound_stream.append_fragment(fragment)? {
+                    self.handle_inbound_network_message(message).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_inbound_message(
+        &mut self,
+        message: Result<MultiplexMessage, ReadError>,
+        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
+    ) -> Result<(), PeerManagerError> {
+        trace!(
+            NetworkSchema::new(&self.network_context)
+                .connection_metadata(&self.connection_metadata),
+            "{} Received message from peer {}",
+            self.network_context,
+            self.remote_peer_id().short_str()
+        );
+
+        let message = match message {
+            Ok(message) => message,
+            Err(err) => match err {
+                ReadError::DeserializeError(_, _, ref frame_prefix) => {
+                    // DeserializeError's are recoverable so we'll let the other
+                    // peer know about the error and log the issue, but we won't
+                    // close the connection.
+                    let message_type = frame_prefix.as_ref().first().unwrap_or(&0);
+                    let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
+                    let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
+                    let message = NetworkMessage::Error(error_code);
+
+                    write_reqs_tx.send(message).await?;
+                    return Err(err.into());
+                }
+                ReadError::IoError(_) => {
+                    // IoErrors are mostly unrecoverable so just close the connection.
+                    self.shutdown(DisconnectReason::ConnectionLost);
+                    return Err(err.into());
+                }
+            },
+        };
+
+        match message {
+            MultiplexMessage::Message(message) => {
+                self.handle_inbound_network_message(message).await
+            }
+            MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message).await,
+        }
     }
 
     /// Handle an inbound DirectSendMsg from the remote peer. There's not much to
@@ -516,10 +562,7 @@ where
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut channel::Sender<(
-            NetworkMessage,
-            oneshot::Sender<Result<(), PeerManagerError>>,
-        )>,
+        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -542,9 +585,8 @@ where
                     priority: Priority::default(),
                     raw_msg: Vec::from(message.mdata.as_ref()),
                 });
-                let (ack_tx, _ack_rx) = oneshot::channel();
 
-                match write_reqs_tx.send((message, ack_tx)).await {
+                match write_reqs_tx.send(message).await {
                     Ok(_) => {
                         counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
                         counters::direct_send_bytes(&self.network_context, SENT_LABEL)

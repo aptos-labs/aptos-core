@@ -32,7 +32,8 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_block_request(
         &self,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         payload_filter: PayloadFilter,
         callback: oneshot::Sender<Result<ConsensusResponse>>,
     ) {

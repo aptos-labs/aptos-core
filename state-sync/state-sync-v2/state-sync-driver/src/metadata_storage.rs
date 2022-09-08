@@ -77,10 +77,10 @@ impl PersistentMetadataStorage {
             vec![METADATA_CF_NAME],
             &options,
         )
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|error| {
             panic!(
-                "Failed to open/create the state sync database at: {:?}",
-                state_sync_db_path
+                "Failed to open/create the state sync database at: {:?}. Error: {:?}",
+                state_sync_db_path, error
             )
         });
         info!(

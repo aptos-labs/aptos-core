@@ -1,0 +1,277 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+use anyhow::Context;
+use aptos_rest_client::Client as RestClient;
+use async_trait::async_trait;
+use core::time;
+use futures::future::join_all;
+use std::time::Duration;
+use std::{collections::HashSet, time::Instant};
+
+use crate::{wait_for_all_nodes_to_catchup_to_version, Swarm, SwarmExt};
+
+#[derive(Clone, Debug)]
+pub struct NodeState {
+    pub version: u64,
+    pub epoch: u64,
+    pub round: u64,
+}
+
+// TODO: check if we can fetch consensus round, not just committed round.
+async fn get_node_state(validator_client: &RestClient) -> NodeState {
+    let (events, state) = validator_client
+        .get_new_block_events(None, Some(1))
+        .await
+        .unwrap()
+        .into_parts();
+    let event = events.first().unwrap();
+    assert!(event.version <= state.version);
+    NodeState {
+        version: state.version,
+        epoch: event.event.epoch(),
+        round: event.event.round(),
+    }
+}
+
+/// Run a test, where we spin up a set of validators, and then
+/// check a reliability scenario.
+/// After scenario finishes, we always return reliability to 100%,
+/// and we confirm that chain recouperates, makes progress, and
+/// all nodes agree on ledger.
+///
+/// Scenario is performed via two nested loops:
+/// outer cycles, and within each cycle over parts.
+/// Scenario can specify failpoint changes on every part,
+/// and can check the performance of the network after every cycle.
+///
+/// Transaction can be inserted on every part, to control the throughput.
+/// I.e. if part is shorter than how long it takes for empty block to be
+/// generated, we can make sure one block gets created on every part.
+pub async fn test_consensus_fault_tolerance(
+    swarm: &mut dyn Swarm,
+    cycles: usize,
+    cycle_duration_s: f32,
+    parts_in_cycle: usize,
+    mut failure_injection: Box<dyn FailureInjection>,
+    // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
+    mut check_cycle: Box<
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+    >,
+    new_epoch_on_cycle: bool,
+) -> anyhow::Result<()> {
+    let validator_clients = swarm.get_validator_clients_with_names();
+
+    async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
+        join_all(
+            validator_clients
+                .iter()
+                .cloned()
+                .map(move |(_, v)| async move { get_node_state(&v).await }),
+        )
+        .await
+    }
+
+    for cycle in 0..cycles {
+        let previous = get_all_states(&validator_clients).await;
+
+        let now = Instant::now();
+        for part in 0..parts_in_cycle {
+            failure_injection
+                .inject(&validator_clients, cycle, part)
+                .await;
+            let elapsed = now.elapsed().as_secs_f32();
+            let wanted = (1 + part) as f32 * cycle_duration_s / (parts_in_cycle as f32);
+            if elapsed < wanted {
+                tokio::time::sleep(time::Duration::from_secs_f32(wanted - elapsed)).await;
+            }
+        }
+
+        let cur = get_all_states(&validator_clients).await;
+
+        let epochs = cur.iter().map(|s| s.epoch).max().unwrap()
+            - previous.iter().map(|s| s.epoch).max().unwrap();
+        let rounds = cur
+            .iter()
+            .map(|s| s.round)
+            .max()
+            .unwrap()
+            .saturating_sub(previous.iter().map(|s| s.round).max().unwrap());
+        let transactions = cur.iter().map(|s| s.version).max().unwrap()
+            - previous.iter().map(|s| s.version).max().unwrap();
+
+        println!(
+            "cycle {} lasted {:.3} with {} epochs, {} rounds and {} transactions",
+            cycle,
+            now.elapsed().as_secs_f32(),
+            epochs,
+            rounds,
+            transactions,
+        );
+        println!(
+            "All at versions: {:?}",
+            cur.iter().map(|s| s.version).collect::<Vec<_>>()
+        );
+        println!(
+            "All at rounds: {:?}",
+            cur.iter().map(|s| s.round).collect::<Vec<_>>()
+        );
+
+        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous)?;
+        if new_epoch_on_cycle {
+            swarm.aptos_public_info().reconfig().await;
+        }
+    }
+
+    failure_injection.clear(&validator_clients).await;
+
+    let cur = get_all_states(&validator_clients).await;
+    println!(
+        "All at versions: {:?}",
+        cur.iter().map(|s| s.version).collect::<Vec<_>>()
+    );
+    let largest_v = cur.iter().map(|s| s.version).max().unwrap();
+    println!("Largest version {}", largest_v);
+    let target_v = largest_v + 10;
+
+    wait_for_all_nodes_to_catchup_to_version(&validator_clients, target_v, Duration::from_secs(30))
+        .await?;
+
+    let transactions: Vec<_> =
+        join_all(validator_clients.iter().cloned().map(move |v| async move {
+            let mut txns =
+                v.1.get_transactions_bcs(Some(target_v.saturating_sub(1000)), Some(1000))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{:?}", e))?
+                    .into_inner();
+            txns.retain(|t| t.version <= target_v);
+            <anyhow::Result<Vec<_>>>::Ok(txns)
+        }))
+        .await;
+
+    let txns_a = transactions
+        .first()
+        .unwrap()
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+
+    for i in 1..transactions.len() {
+        let txns_b = transactions
+            .get(i)
+            .unwrap()
+            .as_ref()
+            .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+        assert_eq!(
+            txns_a.len(),
+            txns_b.len(),
+            "Fetched length of transactions for target_v {} doesn't match: from {} to {} vs from {} to {}",
+            target_v,
+            txns_a.first().map(|t| t.version).unwrap_or(0),
+            txns_a.last().map(|t| t.version).unwrap_or(0),
+            txns_b.first().map(|t| t.version).unwrap_or(0),
+            txns_b.last().map(|t| t.version).unwrap_or(0),
+        );
+        for i in 0..txns_a.len() {
+            assert_eq!(
+                txns_a[i], txns_b[i],
+                "Transaction at index {} after target version {}, doesn't match",
+                i, target_v
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[async_trait]
+pub trait FailureInjection {
+    async fn inject(
+        &mut self,
+        validator_clients: &[(String, RestClient)],
+        cycle: usize,
+        part: usize,
+    );
+    async fn clear(&mut self, validator_clients: &[(String, RestClient)]);
+}
+
+pub struct NoFailureInjection {}
+
+#[async_trait]
+impl FailureInjection for NoFailureInjection {
+    async fn inject(&mut self, _: &[(String, RestClient)], _: usize, _: usize) {}
+    async fn clear(&mut self, _: &[(String, RestClient)]) {}
+}
+
+pub fn no_failure_injection() -> Box<dyn FailureInjection> {
+    Box::new(NoFailureInjection {})
+}
+
+pub struct FailPointFailureInjection {
+    modified_failpoints: HashSet<(usize, String)>,
+    // (cycle, part) -> (Vec(validator_index, name, action), reset_old_enpoints)
+    get_fail_points_to_set:
+        Box<dyn FnMut(usize, usize) -> (Vec<(usize, String, String)>, bool) + Send>,
+}
+
+impl FailPointFailureInjection {
+    pub fn new(
+        get_fail_points_to_set: Box<
+            dyn FnMut(usize, usize) -> (Vec<(usize, String, String)>, bool) + Send,
+        >,
+    ) -> Self {
+        Self {
+            modified_failpoints: HashSet::new(),
+            get_fail_points_to_set,
+        }
+    }
+}
+
+pub fn fail_point_injection(
+    get_fail_points_to_set: Box<
+        dyn FnMut(usize, usize) -> (Vec<(usize, String, String)>, bool) + Send,
+    >,
+) -> Box<dyn FailureInjection> {
+    Box::new(FailPointFailureInjection::new(get_fail_points_to_set))
+}
+
+#[async_trait]
+impl FailureInjection for FailPointFailureInjection {
+    async fn inject(
+        &mut self,
+        validator_clients: &[(String, RestClient)],
+        cycle: usize,
+        part: usize,
+    ) {
+        let (fail_points_to_set, reset_old_failpoints) = (self.get_fail_points_to_set)(cycle, part);
+        if reset_old_failpoints {
+            for (validator_idx, name) in self.modified_failpoints.iter() {
+                validator_clients[*validator_idx]
+                    .1
+                    .set_failpoint(name.clone(), "off".to_string())
+                    .await
+                    .context(validator_clients[*validator_idx].0.clone())
+                    .unwrap();
+            }
+            self.modified_failpoints = HashSet::new();
+        }
+        for (validator_idx, name, actions) in fail_points_to_set {
+            validator_clients[validator_idx]
+                .1
+                .set_failpoint(name.clone(), actions.clone())
+                .await
+                .context(validator_clients[validator_idx].0.clone())
+                .unwrap();
+            self.modified_failpoints.insert((validator_idx, name));
+        }
+    }
+    async fn clear(&mut self, validator_clients: &[(String, RestClient)]) {
+        for (validator_idx, name) in self.modified_failpoints.iter() {
+            validator_clients[*validator_idx]
+                .1
+                .set_failpoint(name.clone(), "off".to_string())
+                .await
+                .context(validator_clients[*validator_idx].0.clone())
+                .unwrap();
+        }
+    }
+}

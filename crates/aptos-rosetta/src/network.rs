@@ -109,12 +109,10 @@ async fn network_options(
         operation_types,
         errors,
         historical_balance_lookup: true,
-        timestamp_start_index: None,
+        timestamp_start_index: 2,
         call_methods: vec![],
         balance_exemptions: vec![],
         mempool_coins: false,
-        block_hash_case: None,
-        transaction_hash_case: None,
     };
 
     let response = NetworkOptionsResponse { version, allow };
@@ -139,21 +137,25 @@ async fn network_status(
     );
 
     check_network(request.network_identifier, &server_context)?;
+    let chain_id = server_context.chain_id;
     let rest_client = server_context.rest_client()?;
     let block_cache = server_context.block_cache()?;
-    let genesis_block_identifier = block_cache.get_block_info_by_height(0).await?.block_id;
+    let genesis_block_identifier = block_cache
+        .get_block_info_by_height(0, chain_id)
+        .await?
+        .block_id;
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
     // Get the oldest block
     let oldest_block_identifier = block_cache
-        .get_block_info_by_height(state.oldest_block_height)
+        .get_block_info_by_height(state.oldest_block_height, chain_id)
         .await?
         .block_id;
 
     // Get the latest block
     let current_block = block_cache
-        .get_block_info_by_height(state.block_height)
+        .get_block_info_by_height(state.block_height, chain_id)
         .await?;
     let current_block_identifier = current_block.block_id;
 
@@ -161,7 +163,7 @@ async fn network_status(
         current_block_identifier,
         current_block_timestamp: current_block.timestamp,
         genesis_block_identifier,
-        oldest_block_identifier: Some(oldest_block_identifier),
+        oldest_block_identifier,
         sync_status: None,
         peers: vec![],
     };

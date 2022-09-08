@@ -1,0 +1,18 @@
+[package]
+name = "aptos-build-info"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos build information provider"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+build = "build.rs"
+
+[dependencies]
+shadow-rs = "0.16.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+shadow-rs = "0.16.2"

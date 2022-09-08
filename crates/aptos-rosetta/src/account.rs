@@ -7,8 +7,7 @@
 //!
 
 use crate::types::{
-    account_module_identifier, account_resource_identifier, coin_module_identifier,
-    AccountBalanceMetadata,
+    AccountBalanceMetadata, ACCOUNT_MODULE, ACCOUNT_RESOURCE, COIN_MODULE, COIN_STORE_RESOURCE,
 };
 use crate::{
     common::{
@@ -16,10 +15,7 @@ use crate::{
         with_context,
     },
     error::{ApiError, ApiResult},
-    types::{
-        coin_store_resource_identifier, AccountBalanceRequest, AccountBalanceResponse, Amount,
-        Currency, CurrencyMetadata,
-    },
+    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, CurrencyMetadata},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
@@ -77,7 +73,7 @@ async fn account_balance(
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_info = server_context
         .block_cache()?
-        .get_block_info_by_height(block_height)
+        .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
 
@@ -100,7 +96,9 @@ async fn account_balance(
     Ok(AccountBalanceResponse {
         block_identifier: block_info.block_id,
         balances: amounts,
-        metadata: AccountBalanceMetadata { sequence_number },
+        metadata: AccountBalanceMetadata {
+            sequence_number: sequence_number.into(),
+        },
     })
 }
 
@@ -166,8 +164,8 @@ async fn get_balances(
         let maybe_sequence_number = if let Some(account_resource) =
             response.iter().find(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == account_module_identifier()
-                    && resource.resource_type.name == account_resource_identifier()
+                    && resource.resource_type.module.as_str() == ACCOUNT_MODULE
+                    && resource.resource_type.name.as_str() == ACCOUNT_RESOURCE
             }) {
             if let Ok(resource) =
                 serde_json::from_value::<AccountData>(account_resource.data.clone())
@@ -183,7 +181,7 @@ async fn get_balances(
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
         } else {
-            return Err(ApiError::AptosError(Some(
+            return Err(ApiError::InternalError(Some(
                 "Failed to retrieve account sequence number".to_string(),
             )));
         };
@@ -192,8 +190,8 @@ async fn get_balances(
             .iter()
             .filter(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == coin_module_identifier()
-                    && resource.resource_type.name == coin_store_resource_identifier()
+                    && resource.resource_type.module.as_str() == COIN_MODULE
+                    && resource.resource_type.name.as_str() == COIN_STORE_RESOURCE
             })
             .filter_map(|resource| {
                 // Currency must have a type
@@ -277,7 +275,7 @@ impl CoinCache {
         struct CoinInfo {
             name: String,
             symbol: String,
-            decimals: U64,
+            decimals: u8,
         }
 
         let struct_tag = match coin {
@@ -318,7 +316,7 @@ impl CoinCache {
 
             Ok(Some(Currency {
                 symbol: coin_info.symbol,
-                decimals: coin_info.decimals.0,
+                decimals: coin_info.decimals,
                 metadata: Some(CurrencyMetadata {
                     move_type: struct_tag.to_string(),
                 }),

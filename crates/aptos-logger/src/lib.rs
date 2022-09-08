@@ -139,7 +139,7 @@ pub mod prelude {
         debug, error, info, sample,
         sample::{SampleRate, Sampling},
         security::SecurityEvent,
-        trace, warn,
+        spawn_named, trace, warn,
     };
 }
 
@@ -151,6 +151,7 @@ mod logger;
 mod macros;
 mod metadata;
 pub mod sample;
+pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 
 mod security;

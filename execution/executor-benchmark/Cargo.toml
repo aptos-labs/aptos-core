@@ -14,7 +14,6 @@ chrono = "0.4.19"
 criterion = "0.3.5"
 indicatif = "0.15.0"
 itertools = "0.10.3"
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 num_cpus = "1.13.1"
 rand = "0.7.3"
 rayon = "1.5.2"
@@ -28,10 +27,9 @@ aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-push-metrics = { path = "../../crates/aptos-push-metrics" }
 aptos-sdk = { path = "../../sdk" }
-aptos-secure-push-metrics = { path = "../../secure/push-metrics" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
@@ -41,6 +39,9 @@ executor-types = { path = "../executor-types" }
 schemadb = { path = "../../storage/schemadb" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 
 [dev-dependencies]
 aptos-temppath = { path = "../../crates/aptos-temppath" }

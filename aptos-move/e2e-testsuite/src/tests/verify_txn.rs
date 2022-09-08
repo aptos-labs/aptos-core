@@ -3,7 +3,6 @@
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address::AccountAddress,
     account_config,
@@ -12,6 +11,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
 };
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor,
@@ -325,7 +325,7 @@ fn verify_simple_payment() {
                 vec![],
             ))
             .sequence_number(10)
-            .gas_unit_price(txn_gas_params.max_price_per_gas_unit + 1)
+            .gas_unit_price((txn_gas_params.max_price_per_gas_unit + 1.into()).into())
             .max_gas_amount(1_000_000)
             .sign();
         assert_prologue_parity!(
@@ -336,22 +336,21 @@ fn verify_simple_payment() {
 
         // Test for a max_gas_amount that is insufficient to pay the minimum fee.
         // Find the minimum transaction gas units and subtract 1.
-        let mut gas_limit = txn_gas_params
-            .to_external_units(txn_gas_params.min_transaction_gas_units)
-            ;
-        if gas_limit > 0 {
-            gas_limit -= 1;
+        let gas_limit = txn_gas_params.min_transaction_gas_units.to_unit_round_up_with_params(&txn_gas_params);
+
+        if gas_limit > 0.into() {
+            gas_limit.checked_sub(1.into()).unwrap();
         }
         // Calculate how many extra bytes of transaction arguments to add to ensure
         // that the minimum transaction gas gets rounded up when scaling to the
         // external gas units. (Ignore the size of the script itself for simplicity.)
-        let extra_txn_bytes = if txn_gas_params.gas_unit_scaling_factor
-            > txn_gas_params.min_transaction_gas_units
+        let extra_txn_bytes = if u64::from(txn_gas_params.gas_unit_scaling_factor)
+            > u64::from(txn_gas_params.min_transaction_gas_units)
         {
             txn_gas_params.large_transaction_cutoff
-                + (txn_gas_params.gas_unit_scaling_factor / txn_gas_params.intrinsic_gas_per_byte)
+                + (u64::from(txn_gas_params.gas_unit_scaling_factor) / u64::from(txn_gas_params.intrinsic_gas_per_byte)).into()
         } else {
-            0
+            0.into()
         };
         let txn = sender
             .account()
@@ -359,11 +358,11 @@ fn verify_simple_payment() {
             .script(Script::new(
                 empty_script.clone(),
                 vec![],
-                vec![TransactionArgument::U8(42); extra_txn_bytes as usize],
+                vec![TransactionArgument::U8(42); u64::from(extra_txn_bytes) as usize],
             ))
             .sequence_number(10)
-            .max_gas_amount(gas_limit)
-            .gas_unit_price(txn_gas_params.max_price_per_gas_unit)
+            .max_gas_amount(gas_limit.into())
+            .gas_unit_price(txn_gas_params.max_price_per_gas_unit.into())
             .sign();
         assert_prologue_parity!(
             executor.verify_transaction(txn.clone()).status(),
@@ -380,8 +379,8 @@ fn verify_simple_payment() {
                 vec![],
             ))
             .sequence_number(10)
-            .max_gas_amount(txn_gas_params.maximum_number_of_gas_units + 1)
-            .gas_unit_price(txn_gas_params.max_price_per_gas_unit)
+            .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + 1.into()).into())
+            .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
             .sign();
         assert_prologue_parity!(
             executor.verify_transaction(txn.clone()).status(),
@@ -398,8 +397,8 @@ fn verify_simple_payment() {
                 vec![TransactionArgument::U8(42); MAX_TRANSACTION_SIZE_IN_BYTES as usize],
             ))
             .sequence_number(10)
-            .max_gas_amount(txn_gas_params.maximum_number_of_gas_units + 1)
-            .gas_unit_price(txn_gas_params.max_price_per_gas_unit)
+            .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + 1.into()).into())
+            .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
             .sign();
         assert_prologue_parity!(
             executor.verify_transaction(txn.clone()).status(),
@@ -720,8 +719,9 @@ fn good_module_uses_bad(
         address,
     );
 
+    let framework_modules = cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules()
+        deps: framework_modules
             .iter()
             .chain(std::iter::once(&bad_dep))
             .collect(),

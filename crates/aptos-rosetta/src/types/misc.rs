@@ -15,12 +15,9 @@ use std::{
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Error {
     /// Error code
-    pub code: u64,
+    pub code: u32,
     /// Message that always matches the error code
     pub message: String,
-    /// Possible generic information about an error code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
     /// Whether a call can retry on the error
     pub retriable: bool,
     /// Specific details of the error e.g. stack trace
@@ -78,25 +75,31 @@ pub struct Version {
 }
 
 /// An internal enum to support Operation typing
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum OperationType {
+    // Create must always be first for ordering
     CreateAccount,
-    Deposit,
+    // Withdraw must come before deposit
     Withdraw,
+    Deposit,
     SetOperator,
+    // Fee must always be last for ordering
+    Fee,
 }
 
 impl OperationType {
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const WITHDRAW: &'static str = "withdraw";
+    const FEE: &'static str = "fee";
     const SET_OPERATOR: &'static str = "set_operator";
 
     pub fn all() -> Vec<OperationType> {
         vec![
             OperationType::CreateAccount,
-            OperationType::Deposit,
             OperationType::Withdraw,
+            OperationType::Deposit,
+            OperationType::Fee,
             OperationType::SetOperator,
         ]
     }
@@ -110,6 +113,7 @@ impl FromStr for OperationType {
             Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
+            Self::FEE => Ok(OperationType::Fee),
             Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
@@ -126,6 +130,7 @@ impl Display for OperationType {
             OperationType::Deposit => Self::DEPOSIT,
             OperationType::Withdraw => Self::WITHDRAW,
             OperationType::SetOperator => Self::SET_OPERATOR,
+            OperationType::Fee => Self::FEE,
         })
     }
 }

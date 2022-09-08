@@ -1,61 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::net::{IpAddr, Ipv4Addr};
-
 use super::traits::{MetricCollector, MetricCollectorError, SystemInformation};
+use crate::configuration::NodeAddress;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use log::debug;
-use reqwest::{Client as ReqwestClient, Url};
+use reqwest::Url;
 use std::{collections::HashMap, time::Duration};
-use url::Host;
 
 // TODO Make it possible to reject nodes unless they are a specific type.
 #[derive(Clone, Debug)]
 pub struct ReqwestMetricCollector {
-    client: ReqwestClient,
-
-    /// We assume this points to the "base" of a node. We will add ports
-    /// and paths to this ourselves.
-    node_url: Url,
-
-    /// Metrics port.
-    metrics_port: u16,
+    node_address: NodeAddress,
 }
 
 impl ReqwestMetricCollector {
-    pub fn new(node_url: Url, metrics_port: u16) -> Self {
-        let mut client_builder = ReqwestClient::builder().timeout(Duration::from_secs(4));
-        let mut is_localhost = false;
-        if let Some(host) = node_url.host() {
-            match host {
-                Host::Domain(s) => {
-                    if s.contains("localhost") {
-                        is_localhost = true;
-                    }
-                }
-                Host::Ipv4(ip) => {
-                    if ip == Ipv4Addr::LOCALHOST {
-                        is_localhost = true;
-                    }
-                }
-                _ => {}
-            }
-            if is_localhost {
-                client_builder = client_builder.local_address(IpAddr::from([127, 0, 0, 1]));
-            }
-        }
-        ReqwestMetricCollector {
-            client: client_builder.build().unwrap(),
-            node_url,
-            metrics_port,
-        }
+    pub fn new(node_address: NodeAddress) -> Self {
+        ReqwestMetricCollector { node_address }
     }
 
     fn get_url(&self, path: &str) -> Url {
-        let mut url = self.node_url.clone();
-        url.set_port(Some(self.metrics_port)).unwrap();
+        let mut url = self.node_address.get_metrics_url();
         url.set_path(path);
         url
     }
@@ -64,7 +30,8 @@ impl ReqwestMetricCollector {
         let url = self.get_url(path);
         debug!("Connecting to {}", url);
         let response = self
-            .client
+            .node_address
+            .get_metrics_client(Duration::from_secs(4))
             .get(url.clone())
             .send()
             .await

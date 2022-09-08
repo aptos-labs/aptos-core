@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::reconfig;
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
@@ -15,13 +14,15 @@ use anyhow::{bail, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use backup_cli::metadata::view::BackupStorageState;
-use forge::{NodeExt, Swarm, SwarmExt};
+use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
     path::Path,
     process::Command,
     time::{Duration, Instant},
 };
+
+const MAX_WAIT_SECS: u64 = 60;
 
 #[tokio::test]
 async fn test_db_restore() {
@@ -41,6 +42,17 @@ async fn test_db_restore() {
     // set up: two accounts, a lot of money
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000).await;
     let account_1 = create_and_fund_account(&mut swarm, 1000000).await;
+
+    // we need to wait for all nodes to see it, as client_1 is different node from the
+    // one creating accounts above
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    assert_balance(&client_1, &account_0, 1000000).await;
+    assert_balance(&client_1, &account_1, 1000000).await;
+
     let mut expected_balance_0 = 999999;
     let mut expected_balance_1 = 1000001;
 
@@ -133,12 +145,12 @@ async fn test_db_restore() {
     swarm
         .validator_mut(node_to_restart)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 
@@ -301,6 +313,8 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
             "auto",
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
+            "--ledger-history-start-version",
+            "0",
             "local-fs",
             "--dir",
             backup_path.to_str().unwrap(),

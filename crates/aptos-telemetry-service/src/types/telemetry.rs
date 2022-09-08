@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::types::common::EventIdentity;
 use serde::{Deserialize, Serialize};
 
 /// A useful struct for serialization a telemetry event
@@ -19,4 +20,13 @@ pub struct TelemetryDump {
     pub user_id: String,
     pub timestamp_micros: String,
     pub events: Vec<TelemetryEvent>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct BigQueryRow {
+    #[serde(flatten)]
+    pub event_identity: EventIdentity,
+    pub event_name: String,
+    pub event_timestamp: u64,
+    pub event_params: Vec<serde_json::Value>,
 }

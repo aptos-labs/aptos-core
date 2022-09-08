@@ -3,4 +3,7 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-BetterHtml.config = BetterHtml::Config.new(YAML.load(File.read(Rails.root.join('.better-html.yml'))))
+BetterHtml.configure do |config|
+  # Ignore ERB files from gems or Rails itself.
+  config.template_exclusion_filter = proc { |filename| !filename.start_with?(Rails.root.to_s) }
+end

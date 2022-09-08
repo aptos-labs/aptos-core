@@ -17,10 +17,7 @@ use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
-use move_deps::move_core_types::{
-    gas_schedule::{GasAlgebra, GasPrice},
-    vm_status::StatusCode::TYPE_MISMATCH,
-};
+use move_deps::move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
 fn failed_transaction_cleanup_test() {
@@ -36,8 +33,8 @@ fn failed_transaction_cleanup_test() {
 
         let txn_data = TransactionMetadata {
             sender: *sender.address(),
-            max_gas_amount: 100_000,
-            gas_unit_price: GasPrice::new(0),
+            max_gas_amount: 100_000.into(),
+            gas_unit_price: 0.into(),
             sequence_number: 10,
             ..Default::default()
         };

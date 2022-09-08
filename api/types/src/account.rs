@@ -7,9 +7,18 @@ use aptos_types::account_config::AccountResource;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+/// Account data
+///
+/// A simplified version of the onchain Account resource
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct AccountData {
+    /// Next sequence number of the account
+    ///
+    /// This will be the sequence number of the next transaction committed on this account
     pub sequence_number: U64,
+    /// Authentication key
+    ///
+    /// A SHA-256 of public keys and authentication scheme of the account
     pub authentication_key: HexEncodedBytes,
 }
 

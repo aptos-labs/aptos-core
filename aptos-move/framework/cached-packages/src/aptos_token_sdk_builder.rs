@@ -14,7 +14,7 @@
 #![allow(unused_imports)]
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{ScriptFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayload},
 };
 use move_deps::move_core_types::{
     ident_str,
@@ -23,17 +23,17 @@ use move_deps::move_core_types::{
 
 type Bytes = Vec<u8>;
 
-/// Structured representation of a call into a known Move script function.
+/// Structured representation of a call into a known Move entry function.
 /// ```ignore
-/// impl ScriptFunctionCall {
+/// impl EntryFunctionCall {
 ///     pub fn encode(self) -> TransactionPayload { .. }
-///     pub fn decode(&TransactionPayload) -> Option<ScriptFunctionCall> { .. }
+///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
-pub enum ScriptFunctionCall {
+pub enum EntryFunctionCall {
     TokenBurn {
         creators_address: AccountAddress,
         collection: Vec<u8>,
@@ -101,6 +101,10 @@ pub enum ScriptFunctionCall {
         types: Vec<Vec<u8>>,
     },
 
+    TokenOptInDirectTransfer {
+        opt_in: bool,
+    },
+
     /// Token owner lists their token for swapping
     TokenCoinSwapListTokenForSwap {
         coin_type: TypeTag,
@@ -139,10 +143,10 @@ pub enum ScriptFunctionCall {
     },
 }
 
-impl ScriptFunctionCall {
-    /// Build an Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
+impl EntryFunctionCall {
+    /// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
     pub fn encode(self) -> TransactionPayload {
-        use ScriptFunctionCall::*;
+        use EntryFunctionCall::*;
         match self {
             TokenBurn {
                 creators_address,
@@ -228,6 +232,7 @@ impl ScriptFunctionCall {
                 values,
                 types,
             ),
+            TokenOptInDirectTransfer { opt_in } => token_opt_in_direct_transfer(opt_in),
             TokenCoinSwapListTokenForSwap {
                 coin_type,
                 creators_address,
@@ -285,9 +290,9 @@ impl ScriptFunctionCall {
         }
     }
 
-    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
-    pub fn decode(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
+    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
+    pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
             match SCRIPT_FUNCTION_DECODER_MAP.get(&format!(
                 "{}_{}",
                 script.module().name(),
@@ -309,7 +314,7 @@ pub fn token_burn(
     property_version: u64,
     amount: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -337,7 +342,7 @@ pub fn token_create_collection_script(
     maximum: u64,
     mutate_setting: Vec<bool>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -373,7 +378,7 @@ pub fn token_create_token_script(
     property_values: Vec<Vec<u8>>,
     property_types: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -408,7 +413,7 @@ pub fn token_direct_transfer_script(
     property_version: u64,
     amount: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -429,7 +434,7 @@ pub fn token_direct_transfer_script(
 }
 
 pub fn token_initialize_token_script() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -450,7 +455,7 @@ pub fn token_mint_script(
     name: Vec<u8>,
     amount: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -483,7 +488,7 @@ pub fn token_mutate_token_properties(
     values: Vec<Vec<u8>>,
     types: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -507,6 +512,21 @@ pub fn token_mutate_token_properties(
     ))
 }
 
+pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("opt_in_direct_transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&opt_in).unwrap()],
+    ))
+}
+
 /// Token owner lists their token for swapping
 pub fn token_coin_swap_list_token_for_swap(
     coin_type: TypeTag,
@@ -518,7 +538,7 @@ pub fn token_coin_swap_list_token_for_swap(
     min_coin_per_token: u64,
     locked_until_secs: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -547,7 +567,7 @@ pub fn token_transfers_cancel_offer_script(
     name: Vec<u8>,
     property_version: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -574,7 +594,7 @@ pub fn token_transfers_claim_script(
     name: Vec<u8>,
     property_version: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -602,7 +622,7 @@ pub fn token_transfers_offer_script(
     property_version: u64,
     amount: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -624,9 +644,9 @@ pub fn token_transfers_offer_script(
 }
 mod decoder {
     use super::*;
-    pub fn token_burn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenBurn {
+    pub fn token_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenBurn {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -640,9 +660,9 @@ mod decoder {
 
     pub fn token_create_collection_script(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateCollectionScript {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenCreateCollectionScript {
                 name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
                 uri: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -654,9 +674,9 @@ mod decoder {
         }
     }
 
-    pub fn token_create_token_script(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateTokenScript {
+    pub fn token_create_token_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenCreateTokenScript {
                 collection: bcs::from_bytes(script.args().get(0)?).ok()?,
                 name: bcs::from_bytes(script.args().get(1)?).ok()?,
                 description: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -676,11 +696,9 @@ mod decoder {
         }
     }
 
-    pub fn token_direct_transfer_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenDirectTransferScript {
+    pub fn token_direct_transfer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenDirectTransferScript {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -694,17 +712,17 @@ mod decoder {
 
     pub fn token_initialize_token_script(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::TokenInitializeTokenScript {})
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TokenInitializeTokenScript {})
         } else {
             None
         }
     }
 
-    pub fn token_mint_script(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenMintScript {
+    pub fn token_mint_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenMintScript {
                 token_data_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -717,9 +735,9 @@ mod decoder {
 
     pub fn token_mutate_token_properties(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenMutateTokenProperties {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenMutateTokenProperties {
                 token_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection_name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -735,11 +753,21 @@ mod decoder {
         }
     }
 
+    pub fn token_opt_in_direct_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenOptInDirectTransfer {
+                opt_in: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_coin_swap_list_token_for_swap(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCoinSwapListTokenForSwap {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenCoinSwapListTokenForSwap {
                 coin_type: script.ty_args().get(0)?.clone(),
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -756,9 +784,9 @@ mod decoder {
 
     pub fn token_transfers_cancel_offer_script(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersCancelOfferScript {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenTransfersCancelOfferScript {
                 receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -770,11 +798,9 @@ mod decoder {
         }
     }
 
-    pub fn token_transfers_claim_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersClaimScript {
+    pub fn token_transfers_claim_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenTransfersClaimScript {
                 sender: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -786,11 +812,9 @@ mod decoder {
         }
     }
 
-    pub fn token_transfers_offer_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersOfferScript {
+    pub fn token_transfers_offer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TokenTransfersOfferScript {
                 receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -804,18 +828,18 @@ mod decoder {
     }
 }
 
-type ScriptFunctionDecoderMap = std::collections::HashMap<
+type EntryFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
-        dyn Fn(&TransactionPayload) -> Option<ScriptFunctionCall>
+        dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall>
             + std::marker::Sync
             + std::marker::Send,
     >,
 >;
 
-static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderMap> =
+static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
-        let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
+        let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
         map.insert(
             "token_create_collection_script".to_string(),
@@ -840,6 +864,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "token_mutate_token_properties".to_string(),
             Box::new(decoder::token_mutate_token_properties),
+        );
+        map.insert(
+            "token_opt_in_direct_transfer".to_string(),
+            Box::new(decoder::token_opt_in_direct_transfer),
         );
         map.insert(
             "token_coin_swap_list_token_for_swap".to_string(),

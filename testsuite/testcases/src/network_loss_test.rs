@@ -18,7 +18,7 @@ impl Test for NetworkLossTest {
 
 impl NetworkTest for NetworkLossTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
+        let duration = ctx.global_duration;
         let loss_percentage = LOSS_PERCENTAGE;
         let correlation_percentage = CORRELATION_PERCENTAGE;
         let loss = SwarmChaos::Loss(SwarmNetworkLoss {
@@ -46,8 +46,7 @@ impl NetworkTest for NetworkLossTest {
         ctx.swarm().remove_chaos(loss)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

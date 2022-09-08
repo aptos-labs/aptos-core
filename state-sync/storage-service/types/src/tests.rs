@@ -1,20 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+use crate::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
+        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
+    Epoch, StorageServiceRequest,
 };
-use crate::responses::{CompleteDataRange, DataSummary, ProtocolMetadata};
-use crate::{Epoch, StorageServiceRequest};
 use aptos_crypto::hash::HashValue;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::multi_signature::MultiSignature;
-use aptos_types::transaction::Version;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
-use claim::{assert_err, assert_ok};
-use proptest::arbitrary::any;
-use proptest::prelude::*;
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    transaction::Version,
+};
+use claims::{assert_err, assert_ok};
+use proptest::{arbitrary::any, prelude::*};
 
 #[test]
 fn test_complete_data_range() {
@@ -197,7 +200,7 @@ fn create_mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
             BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None),
             HashValue::zero(),
         ),
-        MultiSignature::empty(),
+        AggregateSignature::empty(),
     )
 }
 

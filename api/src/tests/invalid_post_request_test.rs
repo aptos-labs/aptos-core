@@ -14,7 +14,7 @@ async fn test_invalid_type_argument_data_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_argument_data_type() {
+async fn test_invalid_entry_function_argument_data_type() {
     let mut req = signing_message_request();
     req["payload"]["arguments"][0] = json!(true);
 
@@ -22,7 +22,7 @@ async fn test_invalid_script_function_argument_data_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_argument_u64_string() {
+async fn test_invalid_entry_function_argument_u64_string() {
     let mut req = signing_message_request();
     req["payload"]["arguments"][0] = json!("invalid");
 
@@ -30,7 +30,7 @@ async fn test_invalid_script_function_argument_u64_string() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_argument_address_type() {
+async fn test_invalid_entry_function_argument_address_type() {
     let mut req = signing_message_request();
     req["payload"]["arguments"][0] = json!(1);
 
@@ -38,7 +38,7 @@ async fn test_invalid_script_function_argument_address_type() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_argument_address_string() {
+async fn test_invalid_entry_function_argument_address_string() {
     let mut req = signing_message_request();
     req["payload"]["arguments"][0] = json!("invalid");
 
@@ -46,7 +46,7 @@ async fn test_invalid_script_function_argument_address_string() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_missing_script_function_arguments() {
+async fn test_missing_entry_function_arguments() {
     let mut req = signing_message_request();
     req["payload"]["arguments"] = json!(["0"]);
 
@@ -54,7 +54,7 @@ async fn test_missing_script_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_function_name() {
+async fn test_invalid_entry_function_function_name() {
     let mut req = signing_message_request();
     req["payload"]["function"] = json!("0x1::account::invalid");
 
@@ -62,7 +62,7 @@ async fn test_invalid_script_function_function_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_module_name() {
+async fn test_invalid_entry_function_module_name() {
     let mut req = signing_message_request();
     req["payload"]["function"] = json!("0x1::invalid::invalid");
 
@@ -70,7 +70,7 @@ async fn test_invalid_script_function_module_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_module_address() {
+async fn test_invalid_entry_function_module_address() {
     let mut req = signing_message_request();
     req["payload"]["function"] = json!("0x2342342342::Invalid::invalid");
 
@@ -78,7 +78,7 @@ async fn test_invalid_script_function_module_address() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_invalid_script_function_function_id() {
+async fn test_invalid_entry_function_function_id() {
     let mut req = signing_message_request();
     req["payload"]["function"] = json!("invalid");
 
@@ -130,8 +130,8 @@ fn signing_message_request() -> Value {
         "max_gas_amount": "1000000",
         "expiration_timestamp_secs": "9991638487317",
         "payload": {
-            "type": "script_function_payload",
-            "function": "0x1::account::create_account",
+            "type": "entry_function_payload",
+            "function": "0x1::aptos_account::create_account",
             "type_arguments": [
             ],
             "arguments": [

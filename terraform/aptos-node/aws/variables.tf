@@ -3,6 +3,11 @@ variable "region" {
   type        = string
 }
 
+variable "num_azs" {
+  description = "Number of availability zones"
+  default     = 3
+}
+
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for EKS cluster"
   default     = "1.22"
@@ -135,6 +140,11 @@ variable "vpc_cidr_block" {
   description = "VPC CIDR Block"
 }
 
+variable "maximize_single_az_capacity" {
+  description = "Whether to maximize the capacity of the cluster by allocating more IPs to the first AZ"
+  default     = false
+}
+
 variable "helm_enable_validator" {
   description = "Enable deployment of the validator Helm chart"
   default     = true
@@ -160,9 +170,14 @@ variable "utility_instance_max_num" {
   default     = 0
 }
 
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint the instances in the utility nodegroup"
+  default     = false
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.4xlarge"
 }
 
 variable "validator_instance_num" {
@@ -180,9 +195,19 @@ variable "validator_instance_max_num" {
   default     = 0
 }
 
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  default     = false
+}
+
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""
+}
+
+variable "enable_calico" {
+  description = "Enable Calico networking for NetworkPolicy"
+  default     = true
 }
 
 variable "enable_logger" {

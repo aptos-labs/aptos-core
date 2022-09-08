@@ -45,7 +45,7 @@ pub struct CommittedStateSnapshot {
 }
 
 /// A commit notification for new transactions
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommittedTransactions {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
@@ -157,6 +157,13 @@ impl ConsensusSyncRequest {
     pub fn get_sync_target(&self) -> LedgerInfoWithSignatures {
         self.consensus_sync_notification.target.clone()
     }
+
+    pub fn get_sync_target_version(&self) -> Version {
+        self.consensus_sync_notification
+            .target
+            .ledger_info()
+            .version()
+    }
 }
 
 /// A simple handler for consensus notifications
@@ -182,7 +189,7 @@ impl ConsensusNotificationHandler {
     }
 
     /// Returns the active sync request that consensus is waiting on
-    pub fn get_consensus_sync_request(&self) -> Arc<Mutex<Option<ConsensusSyncRequest>>> {
+    pub fn get_sync_request(&self) -> Arc<Mutex<Option<ConsensusSyncRequest>>> {
         self.consensus_sync_request.clone()
     }
 
@@ -230,7 +237,7 @@ impl ConsensusNotificationHandler {
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Fetch the sync target version
-        let consensus_sync_request = self.get_consensus_sync_request();
+        let consensus_sync_request = self.get_sync_request();
         let sync_target_version = consensus_sync_request.lock().as_ref().map(|sync_request| {
             sync_request
                 .consensus_sync_notification
@@ -253,7 +260,7 @@ impl ConsensusNotificationHandler {
 
             // Check if we've hit the target
             if latest_committed_version == sync_target_version {
-                let consensus_sync_request = self.get_consensus_sync_request().lock().take();
+                let consensus_sync_request = self.get_sync_request().lock().take();
                 if let Some(consensus_sync_request) = consensus_sync_request {
                     self.respond_to_sync_notification(
                         consensus_sync_request.consensus_sync_notification,

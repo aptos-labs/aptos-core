@@ -9,6 +9,7 @@
 
 use std::ops::{Deref, DerefMut};
 
+use aptos_api_types::mime_types::BCS;
 use poem::{http::header, FromRequest, IntoResponse, Request, RequestBody, Response, Result};
 use poem_openapi::{
     impl_apirequest_for_payload,
@@ -18,8 +19,7 @@ use poem_openapi::{
     ApiResponse,
 };
 
-pub const CONTENT_TYPE: &str = "application/x-bcs";
-
+/// A wrapper struct for a payload containing BCS encoded bytes
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Bcs(pub Vec<u8>);
 
@@ -38,7 +38,7 @@ impl DerefMut for Bcs {
 }
 
 impl Payload for Bcs {
-    const CONTENT_TYPE: &'static str = CONTENT_TYPE;
+    const CONTENT_TYPE: &'static str = BCS;
 
     fn schema_ref() -> MetaSchemaRef {
         Vec::<u8>::schema_ref()

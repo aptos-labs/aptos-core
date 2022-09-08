@@ -6,18 +6,21 @@
 class It3sController < ApplicationController
   layout 'it3'
 
+  before_action :authenticate_user!
   before_action :ensure_confirmed!
+  before_action :ensure_registration_open!
 
   def show
-    redirect_to root_path unless user_signed_in?
-    redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
-    @it3_registration_closed = Flipper.enabled?(:it3_registration_closed, current_user)
+    return redirect_to root_path unless current_user.it3_profile
+    return redirect_to root_path unless current_user.kyc_complete?
+
+    @it3_registration_closed = Flipper.enabled?(:it3_registration_closed) && !Flipper.enabled?(
+      :it3_registration_override, current_user
+    )
     @steps = [
       connect_discord_step,
-      connect_wallet_step,
       survey_step,
-      node_registration_step,
-      identity_verification_step
+      node_registration_step
     ].map do |h|
       # rubocop:disable Style/OpenStructUse
       OpenStruct.new(**h)
@@ -42,6 +45,10 @@ class It3sController < ApplicationController
 
   private
 
+  def ensure_registration_open!
+    redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
+  end
+
   def connect_discord_step
     completed = current_user.authorizations.where(provider: :discord).exists?
     {
@@ -64,19 +71,20 @@ class It3sController < ApplicationController
     completed = !current_user.it3_survey.nil?
     {
       name: :survey,
-      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
+      disabled: !Flipper.enabled?(:it3_node_registration_enabled, current_user),
       completed:,
       href: completed ? edit_it3_survey_path(current_user.it3_survey) : new_it3_survey_path
     }
   end
 
   def node_registration_step
-    completed = !!current_user.it3_profile&.validator_verified?
+    completed = !current_user.it3_profile&.fullnode_metrics_port&.nil?
+    href = current_user.it3_profile.nil? ? nil : edit_it3_profile_path(current_user.it3_profile)
     {
       name: :node_registration,
       completed:,
-      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
-      href: completed ? edit_it3_profile_path(current_user.it3_profile) : new_it3_profile_path
+      disabled: current_user.it3_profile.nil? || !Flipper.enabled?(:it3_node_registration_enabled, current_user),
+      href:
     }
   end
 

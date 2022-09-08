@@ -5,7 +5,7 @@ use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
     #[serde(default = "default_enabled")]
@@ -20,6 +20,18 @@ pub struct ApiConfig {
     pub content_length_limit: Option<u64>,
     #[serde(default = "default_disabled")]
     pub failpoints_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub json_output_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub bcs_output_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub encode_submission_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub transaction_submission_enabled: bool,
+    #[serde(default = "default_enabled")]
+    pub transaction_simulation_enabled: bool,
+
+    pub max_submit_transaction_batch_size: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -45,6 +57,12 @@ impl Default for ApiConfig {
             tls_key_path: None,
             content_length_limit: None,
             failpoints_enabled: default_disabled(),
+            bcs_output_enabled: default_enabled(),
+            json_output_enabled: default_enabled(),
+            encode_submission_enabled: default_enabled(),
+            transaction_submission_enabled: default_enabled(),
+            transaction_simulation_enabled: default_enabled(),
+            max_submit_transaction_batch_size: 100,
         }
     }
 }

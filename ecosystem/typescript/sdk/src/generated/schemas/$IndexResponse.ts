@@ -7,35 +7,57 @@ export const $IndexResponse = {
     properties: {
         chain_id: {
             type: 'number',
+            description: `Chain ID of the current chain`,
             isRequired: true,
             format: 'uint8',
         },
         epoch: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         ledger_version: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         oldest_ledger_version: {
-            type: 'U64',
-            isRequired: true,
-        },
-        block_height: {
-            type: 'U64',
-            isRequired: true,
-        },
-        oldest_block_height: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         ledger_timestamp: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         node_role: {
-            type: 'RoleType',
+            type: 'all-of',
+            contains: [{
+                type: 'RoleType',
+            }],
+            isRequired: true,
+        },
+        oldest_block_height: {
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
+            isRequired: true,
+        },
+        block_height: {
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
     },

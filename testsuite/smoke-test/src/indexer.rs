@@ -9,7 +9,7 @@ use aptos_indexer::{
     token_processor::TokenTransactionProcessor,
 };
 use aptos_sdk::types::LocalAccount;
-use cached_framework_packages::aptos_stdlib::aptos_token_stdlib;
+use cached_packages::aptos_stdlib::aptos_token_stdlib;
 use diesel::connection::Connection;
 use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
@@ -113,14 +113,14 @@ pub async fn execute_nft_txns<'t>(
 }
 
 #[tokio::test]
-async fn test_indexer() {
+async fn test_old_indexer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     if aptos_indexer::should_skip_pg_tests() {
         return;
     }
-    let (conn_pool, mut tailer) = setup_indexer(&mut info).unwrap();
+    let (conn_pool, tailer) = setup_indexer(&mut info).unwrap();
 
     info.client().get_ledger_information().await.unwrap();
 
@@ -132,12 +132,12 @@ async fn test_indexer() {
     let t_tx = info.transfer(&mut account1, &account2, 717).await.unwrap();
     // test NFT creation event indexing
     execute_nft_txns(account1, &mut info).await.unwrap();
+    tailer.transaction_fetcher.lock().await.start().await;
 
     // Why do this twice? To ensure the idempotency of the tailer :-)
-    let mut version: u64 = 0;
     for _ in 0..2 {
         // Process the next versions
-        version = info
+        let version = info
             .client()
             .get_ledger_information()
             .await
@@ -185,10 +185,7 @@ async fn test_indexer() {
         assert!(bmt2.is_none());
         assert!(wsc2.len() > 1);
         assert_eq!(events2.len(), 2);
-        assert_eq!(events2.get(0).unwrap().type_, "0x1::coin::WithdrawEvent");
+        assert_eq!(events2.first().unwrap().type_, "0x1::coin::WithdrawEvent");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
     }
-
-    let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
-    assert!(latest_version > version);
 }

@@ -3,7 +3,10 @@
 
 use crate::AptosValidatorInterface;
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
+use aptos_config::config::{
+    RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    TARGET_SNAPSHOT_SIZE,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -27,6 +30,7 @@ impl DBDebuggerInterface {
             RocksdbConfigs::default(),
             false,
             TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?)))
     }
 }

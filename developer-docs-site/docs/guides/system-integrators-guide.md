@@ -34,7 +34,7 @@ There are two options to run a local testnet:
 1. Directly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
 2. Use the CLI by 1) [installing with the CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet)
 
-This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
+This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
 ### Access Devnet
 
@@ -44,27 +44,29 @@ REST API service: https://fullnode.devnet.aptoslabs.com/v1
 ### SDKs
 
 Aptos currently has two SDKs:
-1. [Python](/sdks/python-sdk)
-2. [Typescript](/sdks/transactions-with-ts-sdk)
+1. [Typescript](/sdks/typescript-sdk)
+2. [Python](/sdks/python-sdk)
 
 
 ### Other Areas
 
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
-* [Typescript SDK](../transactions-with-ts-sdk)
+* [Typescript SDK](../sdks/typescript-sdk)
 * [Python SDK](../sdks/python-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 
 ## Accounts on Aptos
 
-An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L398) or explicitly via [`account::create_account`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L370).
+An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) or explicitly via [`aptos_account::create_account`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L13).
 
-At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L20) contains:
+At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/account.move#L23) contains:
 * A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
 * An authentication key associated with their current public, private key(s).
 * A strictly increasing sequence number that represents the account's next transaction's sequence number to prevent replay attacks.
+* A strictly increasing number that represents the next distinct guid creation number.
 * An event stream for all new types of coins added to the account.
+* An event stream for all key rotations for the account.
 
 ### Account identifiers
 
@@ -151,7 +153,7 @@ Within a given transaction, the target of execution can be one of two types:
 - An entry point (formerly known as script function), and/or
 - A script (payload). 
 
-Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
+Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`. 
 
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
 
@@ -167,7 +169,7 @@ See the following documentation for generating valid transactions:
 - [Python example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L240).
 - [Typescript example of BCS encoded coin transfers](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.test.ts#L122).
 - [CLI-based transaction publishing](http://aptos.dev/cli-tools/aptos-cli-tool/use-aptos-cli#publishing-a-move-package-with-a-named-address).
-- [Publish your first Move module](https://aptos.dev/tutorials/your-first-move-module) via Typescript, Python, and Rust.
+- [Publish your first Move module](https://aptos.dev/tutorials/first-move-module) via Typescript, Python, and Rust.
 
 :::
 
@@ -218,7 +220,7 @@ Coins are stored within an account under the resource `CoinStore<T>`. At account
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
 
 :::caution
 It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
@@ -240,7 +242,7 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
       "guid": {
         "id": {
           "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-          "creation_num": "1"
+          "creation_num": "2"
         }
       }
     },
@@ -249,7 +251,7 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
       "guid": {
         "id": {
           "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-          "creation_num": "2"
+          "creation_num": "3"
         }
       }
     }
@@ -257,27 +259,11 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
 }
 ```
 
-### Querying events
+### Querying transactions
 
-Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+In Aptos, each transaction is committed as a distinct version to the Blockchain. This allows for the convenience of sharing committed transactions by their version number, to do so query `https://{rest_server_api}/transactions/by_version/{version}`. Transactions submitted by an account can also be queried via `https://{rest_server_api}/account/{address}/transactions?start={sequence_number}&limit=1`, where the `sequence_number` matches the sequence number of the transaction.
 
-Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
-
-```
-[
-  {
-    "version":"13629679",
-    "key": "0x0200000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-    "sequence_number": "0",
-    "type": "0x1::coin::WithdrawEvent",
-    "data": {
-      "amount": "1000"
-    }
-  }
-]
-```
-
-More information can be gathered from the transaction that generated the event. To do so, query: `https://{rest_server_api}/transactions/by_version/{version}`, where `{version}` is the same value as the `{version}` in the event query.
+A transfer transaction would appear as follows:
 
 ```
 {
@@ -286,6 +272,28 @@ More information can be gathered from the transaction that generated the event. 
   "success": true,
   "vm_status": "Executed successfully",
   "changes": [
+    {
+      "address": "0xb258b91eee04111039320a85b0c24a2dd433909e14a6b5c32ee722e0fdecfddc",
+      "data": {
+        "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        "data": {
+          "coin": {
+            "value": "1000"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+                "creaton_num": "2",
+              }
+            }
+          },
+          ...
+        }
+      },
+      "type": "write_resource"
+    },
     ...
   ],
   "sender": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
@@ -302,11 +310,11 @@ More information can be gathered from the transaction that generated the event. 
       "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "1000"
     ],
-    "type": "script_function_payload"
+    "type": "entry_function_payload"
   },
   "events": [
     {
-      "key": "0x0200000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+      "key": "0x0300000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
       "sequence_number": "0",
       "type": "0x1::coin::WithdrawEvent",
       "data": {
@@ -314,7 +322,7 @@ More information can be gathered from the transaction that generated the event. 
       }
     },
     {
-      "key": "0x01000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      "key": "0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "sequence_number": "0",
       "type": "0x1::coin::DepositEvent",
       "data": {
@@ -327,11 +335,46 @@ More information can be gathered from the transaction that generated the event. 
 }
 ```
 
-The transaction in turn provides other important information for generating a complete perspective on what caused the event. For example, this gives the `timestamp` for when the transaction was executed, other related events, and the `gas_used`. Transactions contain all relevant information to present to the user including the events, time executed, and changes made.
+There's a lot of information in a transaction:
+* `version` indicates the globally unique identifier for this transaction, its ordered position in all the committed transactions on the Blockchain
+* `sender` is the account address of the entity that submitted the transaction
+* `gas_used` is the units paid for executing the transaction
+* `success` and `vm_status` indicate whether or not the transaction successfully executed and any reasons why it might not have
+* `changes` include the final values for any state resources that have been modified during the execution of the transaction
+* `events` contain all the events emitted during the transaction execution
+* `timetstamp` is the near real time timestamp of the transactions execution
+
+If `success` is false, then `vm_status` will contain an error code or message that resultd in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
+
+Each event in `events` is differentiated by an `key`. The `key` is derived from the `guid` from `changes`. Specifically, the `key` is a 40-byte hex string where the first 8-bytes (or 16 characters) are the little endian representation of the `creation_num` in the `guid` of the `changes` event and the remaining characters are the account address. As events do not dictate what emitted them, it is imperative to track the path in `changes` to determine the source of an event. In particular, each `CoinStore<T>` has both a `WithdrawEvent` and a `DepositEvent`, based upon the type of coin. In order to determine which coin based upon a transaction, an indexer can compare the `guid::creation_num` in a `changes` event combined with the address to the `key` for events in `events`.
+
+Using the above example, `events[1].key` is `0x02000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`. This is equivalent to `changes[0].data.data.deposit_events.guid`, which is `{"addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e", "creation_num": "2"}`.
+
+### Querying events
+
+Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+
+Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
+
+```
+[
+  {
+    "version":"13629679",
+    "key": "0x0300000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+    "sequence_number": "0",
+    "type": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "1000"
+    }
+  }
+]
+```
+
+More information can be gathered from the transaction that generated the event. To do so, query: `https://{rest_server_api}/transactions/by_version/{version}`, where `{version}` is the same value as the `{version}` in the event query.
 
 :::tip
 
-When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires also look at the `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
+When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires considering `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
 
 :::
 

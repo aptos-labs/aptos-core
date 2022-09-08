@@ -7,7 +7,7 @@ use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -129,7 +129,7 @@ fn gen_ledger_info(
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 #[test]
@@ -321,7 +321,7 @@ fn create_transaction_chunks(
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
     let mut parent_block_id = executor.committed_block_id();
-    let first_txn = encode_reconfiguration_transaction(gen_address(1));
+    let first_txn = encode_reconfiguration_transaction();
     let first_block_id = gen_block_id(1);
     let output1 = executor
         .execute_block((first_block_id, vec![first_txn]), parent_block_id)
@@ -425,14 +425,14 @@ fn test_deleted_key_from_state_store() {
     let transaction2 = create_test_transaction(1);
     let write_set1 = WriteSetMut::new(vec![(
         dummy_state_key1.clone(),
-        WriteOp::Value(dummy_value1.clone()),
+        WriteOp::Modification(dummy_value1.clone()),
     )])
     .freeze()
     .unwrap();
 
     let write_set2 = WriteSetMut::new(vec![(
         dummy_state_key2.clone(),
-        WriteOp::Value(dummy_value2.clone()),
+        WriteOp::Modification(dummy_value2.clone()),
     )])
     .freeze()
     .unwrap();
@@ -619,7 +619,7 @@ proptest! {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
             let num_txns = block.txns.len() as LeafCount;
-            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction(gen_address(reconfig_txn_index));
+            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction();
             let executor = TestExecutor::new();
 
             let parent_block_id = executor.committed_block_id();
@@ -731,8 +731,11 @@ proptest! {
 
         // Commit the first chunk without committing the ledger info.
         let TestExecutor { _path, db, executor } = TestExecutor::new();
-        ChunkExecutor::<MockVM>::new(db)
-            .execute_and_commit_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
+        {
+            let executor = ChunkExecutor::<MockVM>::new(db);
+            executor.execute_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
+            executor.commit().unwrap();
+        }
 
         first_block_txns.extend(overlap_txn_list_with_proof.transactions);
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)

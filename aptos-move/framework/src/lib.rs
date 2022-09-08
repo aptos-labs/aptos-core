@@ -3,86 +3,60 @@
 
 #![forbid(unsafe_code)]
 
-use move_deps::{
-    move_command_line_common::files::{
-        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
-    },
-    move_compiler::{
-        compiled_unit::{CompiledUnit, NamedCompiledModule},
-        shared::{NumberFormat, NumericalAddress},
-    },
-    move_package::compilation::compiled_package::CompiledPackage,
-};
-use std::{collections::BTreeMap, path::PathBuf};
-use tempfile::tempdir;
+mod aptos;
 
-pub mod aptos;
+pub use aptos::*;
+use std::io::{Read, Write};
+
+mod built_package;
+pub use built_package::*;
+
+mod module_metadata;
+pub use module_metadata::*;
+
+mod error_map;
 pub mod natives;
-pub mod release;
+mod release_builder;
+pub use release_builder::*;
+mod release_bundle;
+pub use release_bundle::*;
 
-const CORE_MODULES_DIR: &str = "core/sources";
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
 where
     S: Into<String>,
 {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(relative.into());
-    path
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative.into())
 }
 
-pub fn core_modules_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), CORE_MODULES_DIR)
+pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
+    let crate_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.strip_prefix(crate_path).unwrap_or(&path).to_path_buf()
 }
 
-/// Load the serialized modules from the specified paths.
-pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {
-    find_filenames(paths, |path| {
-        extension_equals(path, MOVE_COMPILED_EXTENSION)
-    })
-    .expect("module loading failed")
-    .iter()
-    .map(|file_name| std::fs::read(file_name).unwrap())
-    .collect::<Vec<_>>()
+pub fn zip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut e = GzEncoder::new(Vec::new(), Compression::best());
+    e.write_all(data)?;
+    Ok(e.finish()?)
 }
 
-pub(crate) fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
-    pkg.all_compiled_units()
-        .filter_map(|unit| match unit {
-            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
-                let mut bytes = vec![];
-                module.serialize(&mut bytes).unwrap();
-                Some(bytes)
-            }
-            CompiledUnit::Script(_) => None,
-        })
-        .collect()
+pub fn zip_metadata_str(s: &str) -> anyhow::Result<Vec<u8>> {
+    zip_metadata(s.as_bytes())
 }
 
-pub(crate) fn move_files_in_path(path: &str) -> Vec<String> {
-    let modules_path = path_in_crate(path);
-    find_filenames(&[modules_path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
+pub fn unzip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut d = GzDecoder::new(data);
+    let mut res = vec![];
+    d.read_to_end(&mut res)?;
+    Ok(res)
 }
 
-pub(crate) fn named_addresses(pkg: &CompiledPackage) -> BTreeMap<String, NumericalAddress> {
-    pkg.compiled_package_info
-        .address_alias_instantiation
-        .iter()
-        .map(|(name, addr)| {
-            (
-                name.to_string(),
-                NumericalAddress::new(addr.into_bytes(), NumberFormat::Hex),
-            )
-        })
-        .collect()
-}
-
-pub(crate) fn package(name: &str) -> CompiledPackage {
-    let build_config = move_deps::move_package::BuildConfig {
-        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-        ..Default::default()
-    };
-    build_config
-        .compile_package(&path_in_crate(name), &mut Vec::new())
-        .unwrap()
+pub fn unzip_metadata_str(data: &[u8]) -> anyhow::Result<String> {
+    let r = unzip_metadata(data)?;
+    let s = String::from_utf8(r)?;
+    Ok(s)
 }
