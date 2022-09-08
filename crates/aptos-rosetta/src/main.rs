@@ -52,7 +52,7 @@ async fn main() {
         let total_wait_duration = Duration::from_secs(TOTAL_REST_API_WAIT_DURATION_S);
         let start = Instant::now();
         while start.elapsed() < total_wait_duration {
-            if client.get_index().await.is_ok() {
+            if client.get_index_bcs().await.is_ok() {
                 successful = true;
                 break;
             }
