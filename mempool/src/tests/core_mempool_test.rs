@@ -578,3 +578,20 @@ fn test_bytes_limit() {
     let hit_limit = pool.get_batch(100, txn_size * limit, HashSet::new());
     assert_eq!(hit_limit.len(), limit as usize);
 }
+
+#[test]
+fn test_sequence_number_cache_at_capacity() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 2;
+    // config.mempool.system_transaction_timeout_secs = 0;
+    let mut pool = CoreMempool::new(&config);
+
+    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+    add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(2), 0, false);
+
+    let batch = pool.get_batch(10, 10240, HashSet::new());
+    assert_eq!(batch.len(), 1);
+}
