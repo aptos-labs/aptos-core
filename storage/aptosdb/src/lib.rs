@@ -268,7 +268,7 @@ impl AptosDB {
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        // hack to delete un-pruned state value due to bug
+        // hack to delete un-pruned stale value indice due to bug
         {
             let min_readable_version = ledger_rocksdb
                 .get::<crate::db_metadata::DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)
