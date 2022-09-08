@@ -802,6 +802,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
             prompt_options: PromptOptions::yes(),
+            estimate_max_gas: true,
             ..Default::default()
         }
     }
