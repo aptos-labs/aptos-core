@@ -3,12 +3,6 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 module LeaderboardHelper
-  def truncate_address(string, separator: '…')
-    string.truncate(
-      (4 * 2) + separator.size, omission: "#{separator}#{string.last(4)}"
-    )
-  end
-
   def availability_color(availability)
     if availability >= 97
       'bg-teal-400'

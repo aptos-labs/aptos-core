@@ -11,8 +11,9 @@ export default class extends Controller {
     apiUrl: String,
   };
 
-  static targets = ["dateMinted", "mintNumber", "image"];
+  static targets = ["transactionFailedError", "dateMinted", "mintNumber", "image"];
 
+  declare readonly transactionFailedErrorTarget: HTMLElement;
   declare readonly dateMintedTarget: HTMLElement;
   declare readonly mintNumberTarget: HTMLElement;
   declare readonly imageTarget: HTMLImageElement;
@@ -35,6 +36,11 @@ export default class extends Controller {
     const transaction: Types.OnChainTransaction = await response.json();
 
     if (!('timestamp' in transaction && 'events' in transaction)) return;
+
+    if (!transaction.success) {
+      this.transactionFailedErrorTarget.classList.remove('hidden');
+      return;
+    }
 
     const createEvent = transaction.events.find(event =>
       event.type === '0x3::token::CreateTokenDataEvent');

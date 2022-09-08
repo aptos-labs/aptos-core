@@ -17,7 +17,7 @@
       </div>
     </section>
     <section class="max-w-screen-xl mx-auto py-12 lg:py-18 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-0">
-      <%= turbo_frame_tag dom_id(@nft_offer), class: 'md:col-span-6 lg:col-span-4' do %>
+      <%= content_tag :div, class: 'md:col-span-6 lg:col-span-4' do %>
         <%= render 'layouts/flash' %>
         <h2 class="font-display text-3xl mb-8">Claim your NFT</h2>
         <ol class="pl-4">
@@ -44,7 +44,7 @@
                 <% if step.name == :sign_in %>
                   To begin, sign in to Aptos.
                 <% elsif step.name == :connect_wallet %>
-                  Connect your wallet.
+                  Connect your wallet. You will need an <%= render(LinkComponent.new(href: 'https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci')) { 'Aptos Wallet' } %> with a funded account and the network set to <%= @nft_offer.network.capitalize %>.
                 <% elsif step.name == :claim_nft %>
                   Your NFT is ready to mint!
                 <% end %>
@@ -66,7 +66,7 @@
                     <% end %>
                   <% end %>
                 <% elsif step.name == :connect_wallet %>
-                  <%= render(ConnectWalletButtonComponent.new(wallet: @wallet, scheme: :primary, size: :large, class: 'inline-flex', turbo_frame: dom_id(@nft_offer))) %>
+                  <%= render(ConnectWalletButtonComponent.new(wallet: @wallet, required_network: @nft_offer.network, scheme: :primary, size: :large, class: 'inline-flex')) %>
                 <% elsif step.name == :claim_nft %>
                   <%= render(ClaimNftButtonComponent.new(nft_offer: @nft_offer, wallet: @wallet, scheme: :primary, size: :large, class: 'inline-flex')) %>
                 <% end %>

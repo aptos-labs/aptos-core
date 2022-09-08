@@ -25,7 +25,18 @@ class WalletsController < ApplicationController
     )
 
     if result.created?
-      redirect_to stored_location_for(current_user) || result.wallet
+      stored_location = stored_location_for(current_user)
+      if stored_location
+        stored_location = if '?' in stored_location
+                            "#{stored_location}&"
+                          else
+                            "#{stored_location}?"
+                          end
+        stored_location += "wallet=#{wallet.public_key}"
+        redirect_to stored_location
+      else
+        redirect_to result.wallet
+      end
     else
       render turbo_stream: turbo_stream.replace(:connect_wallet, ConnectWalletButtonComponent
         .new(wallet: result.wallet)
