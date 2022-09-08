@@ -15,14 +15,11 @@ bcs = "0.1.3"
 rand = "0.7.3"
 serde = { version = "1.0.137", features = ["rc"], default-features = false }
 serde_yaml = "0.8.24"
-toml = { version = "0.5.9", default-features = false }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
-aptos-global-constants = { path = "../../config/global-constants" }
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
-aptos-secure-storage = { path = "../../secure/storage" }
 aptos-state-view =  { path = "../../storage/state-view" }
 aptos-temppath = { path = "../aptos-temppath" }
 aptos-types = { path = "../../types" }
@@ -30,7 +27,6 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 aptosdb = { path = "../../storage/aptosdb" }
 cached-packages = { path = "../../aptos-move/framework/cached-packages" }
-consensus-types = { path = "../../consensus/consensus-types" }
 executor = { path = "../../execution/executor" }
 framework = { path = "../../aptos-move/framework" }
 storage-interface = { path = "../../storage/storage-interface" }
