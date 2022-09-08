@@ -16,12 +16,14 @@ use move_deps::move_core_types::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, sync::Arc};
 
+mod approved_execution_hashes;
 mod aptos_version;
 mod consensus_config;
 mod gas_schedule;
 mod validator_set;
 
 pub use self::{
+    approved_execution_hashes::ApprovedExecutionHashes,
     aptos_version::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
@@ -57,6 +59,7 @@ impl fmt::Display for ConfigID {
 
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
+    ApprovedExecutionHashes::CONFIG_ID,
     GasSchedule::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
