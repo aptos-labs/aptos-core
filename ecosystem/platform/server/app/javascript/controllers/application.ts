@@ -15,6 +15,12 @@ declare global {
       signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
       network: () => Promise<string>;
     }
+    martian?: {
+      connect: () => Promise<{address: string, publicKey: string}>;
+      signAndSubmitTransaction: (transaction: {}) => Promise<string>;
+      signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
+      network: () => Promise<string>;
+    }
   }
 }
 
