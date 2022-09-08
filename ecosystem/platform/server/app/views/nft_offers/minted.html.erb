@@ -23,6 +23,9 @@
       <%= content_tag :div, class: 'md:col-span-6 lg:col-span-4' do %>
         <%= render 'layouts/flash' %>
         <h2 class="font-display text-3xl mb-8">Minted NFT Details</h2>
+        <p class="text-red-400 hidden mb-8" data-minted-nft-target="transactionFailedError">
+        NFT minting failed. Please ensure that your account has sufficient tokens to perform the transaction and try again.
+        </p>
         <dl class="mb-8 font-mono uppercase leading-8">
           <dd class="text-neutral-400 float-left">Series</dd>
           <dt class="text-right">Aptos:Zero</dt>
@@ -30,6 +33,8 @@
           <dt class="text-right" data-minted-nft-target="dateMinted">#</dt>
           <dd class="text-neutral-400 float-left">Sequence</dd>
           <dt class="text-right" data-minted-nft-target="mintNumber">#</dt>
+          <dd class="text-neutral-400 float-left">Address</dd>
+          <dt class="text-right" data-minted-nft-target="address">#</dt>
         </dl>
         <hr class="border-t-2 border-dotted border-neutral-400 mb-8">
         <ul>
@@ -39,7 +44,7 @@
             <% end %>
           </li>
           <li>
-            <%= link_to "http://twitter.com/intent/tweet?url=#{CGI.escape(request.url)}", class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300' do %>
+            <%= link_to "http://twitter.com/intent/tweet?url=#{CGI.escape(request.url)}", class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300', target: '_blank' do %>
               Share on Twitter
             <% end %>
           </li>
