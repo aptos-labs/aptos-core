@@ -49,6 +49,7 @@ export default class extends Controller<HTMLAnchorElement> {
       'transactions'
     ].join('/');
     const response = await fetch(accountTransactionsUrl);
+    if (!response.ok) return;
     const transactions: Types.OnChainTransaction[] = await response.json();
     const mintTransaction = transactions.find((transaction) =>
       transaction.success &&
@@ -71,6 +72,7 @@ export default class extends Controller<HTMLAnchorElement> {
 
   async handleClick(event: Event) {
     event.preventDefault();
+    this.transactionFailedErrorTarget.classList.add('hidden');
 
     const csrfToken = (document.getElementsByName("csrf-token")[0] as HTMLMetaElement).content;
     const response = await fetch(this.element.querySelector('a')!.href, {
@@ -89,7 +91,9 @@ export default class extends Controller<HTMLAnchorElement> {
     const json = await response.json();
 
     if ('error' in json) {
-      throw json.error;
+      this.transactionFailedErrorTarget.classList.remove('hidden');
+      console.error(json.error);
+      return;
     }
 
     return this.submitTransaction(json as ClaimDetails);
