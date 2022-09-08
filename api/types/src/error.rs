@@ -15,6 +15,7 @@ pub struct AptosError {
     /// A code providing more granular error information beyond the HTTP status code
     pub error_code: AptosErrorCode,
     /// A code providing VM error details when submitting transactions to the VM
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_error_code: Option<u64>,
 }
 
