@@ -146,14 +146,15 @@ export class AptosAccount {
    * Takes source address and seeds and returns the resource account address
    * @param sourceAddress Address used to derive the resource account
    * @param seeds The seeds need to be in hexadecimal format
-   * @return The resource account address
+   * @returns The resource account address
    */
 
   getResourceAccountAddress(sourceAddress: MaybeHexString, seeds: string): HexString {
     const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
     const seed = new HexString(seeds).toUint8Array();
 
-    let originBytes = new Uint8Array(source.length + seed.length);
+    const originBytes = new Uint8Array(source.length + seed.length);
+    this.address();
 
     originBytes.set(source);
     originBytes.set(seed, source.length);
