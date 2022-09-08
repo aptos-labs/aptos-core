@@ -186,6 +186,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    if suite_name == "compat" {
+        panic!("{}", suite_name);
+    }
+
+    let duration = Duration::from_secs(11 * 15 * 60);
+    let suite_name = "load_vs_perf_benchmark";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
