@@ -84,10 +84,10 @@ impl CommandAdapterConfig {
         let mut content = Vec::new();
         file.read_to_end(&mut content).await.err_notes(path_str)?;
 
-        Ok(toml::from_slice(&content)?)
+        Ok(serde_yaml::from_slice(&content)?)
     }
 
     pub fn load_from_str(content: &str) -> Result<Self> {
-        Ok(toml::from_str(content)?)
+        Ok(serde_yaml::from_str(content)?)
     }
 }

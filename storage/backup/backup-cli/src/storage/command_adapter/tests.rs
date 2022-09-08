@@ -19,17 +19,17 @@ fn get_store(tmpdir: &TempPath) -> Box<dyn BackupStorage> {
     tmpdir.create_as_dir().unwrap();
     let config = CommandAdapterConfig::load_from_str(
         &format!(r#"
-                [[env_vars]]
-                key = "FOLDER"
-                value = "{}"
+env_vars:
+  - key: "FOLDER"
+    value: "{}"
 
-                [commands]
-                create_backup = 'cd "$FOLDER" && mkdir $BACKUP_NAME && echo $BACKUP_NAME'
-                create_for_write = 'cd "$FOLDER" && cd "$BACKUP_HANDLE" && test ! -f $FILE_NAME && touch $FILE_NAME && echo $BACKUP_HANDLE/$FILE_NAME && exec >&- && cat > $FILE_NAME'
-                open_for_read = 'cat "$FOLDER/$FILE_HANDLE"'
-                save_metadata_line= 'cd "$FOLDER" && mkdir -p metadata && cd metadata && cat > $FILE_NAME'
-                list_metadata_files = 'cd "$FOLDER" && (test -d metadata && cd metadata && ls -1 || exec) | while read f; do echo metadata/$f; done'
-            "#, tmpdir.path().to_str().unwrap()),
+commands:
+  create_backup: 'cd "$FOLDER" && mkdir $BACKUP_NAME && echo $BACKUP_NAME'
+  create_for_write: 'cd "$FOLDER" && cd "$BACKUP_HANDLE" && test ! -f $FILE_NAME && touch $FILE_NAME && echo $BACKUP_HANDLE/$FILE_NAME && exec >&- && cat > $FILE_NAME'
+  open_for_read: 'cat "$FOLDER/$FILE_HANDLE"'
+  save_metadata_line: 'cd "$FOLDER" && mkdir -p metadata && cd metadata && cat > $FILE_NAME'
+  list_metadata_files: 'cd "$FOLDER" && (test -d metadata && cd metadata && ls -1 || exec) | while read f; do echo metadata/$f; done'
+"#, tmpdir.path().to_str().unwrap()),
     ).unwrap();
 
     Box::new(CommandAdapter::new(config))
