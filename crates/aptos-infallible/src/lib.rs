@@ -10,4 +10,4 @@ mod time;
 pub use math::ArithmeticError;
 pub use mutex::{Mutex, MutexGuard};
 pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-pub use time::duration_since_epoch;
+pub use time::{duration_since_epoch, system_time_since_epoch};

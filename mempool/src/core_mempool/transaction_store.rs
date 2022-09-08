@@ -119,16 +119,10 @@ impl TransactionStore {
         }
     }
 
-    /// Fetch mempool transaction by account address + sequence_number.
-    pub(crate) fn get_mempool_txn(
-        &self,
-        address: &AccountAddress,
-        sequence_number: u64,
-    ) -> Option<MempoolTransaction> {
+    pub(crate) fn exists(&self, address: &AccountAddress) -> bool {
         self.transactions
             .get(address)
-            .and_then(|txns| txns.get(&sequence_number))
-            .cloned()
+            .map_or_else(|| false, |transactions| !transactions.is_empty())
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
@@ -486,8 +480,9 @@ impl TransactionStore {
     pub(crate) fn gc_by_system_ttl(
         &mut self,
         metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
+        gc_time: SystemTime,
     ) {
-        let now = aptos_infallible::duration_since_epoch();
+        let now = aptos_infallible::system_time_since_epoch(&gc_time);
 
         self.gc(now, true, metrics_cache);
     }

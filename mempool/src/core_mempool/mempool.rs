@@ -42,13 +42,16 @@ pub struct Mempool {
 
 impl Mempool {
     pub fn new(config: &NodeConfig) -> Self {
+        let system_transaction_timeout =
+            Duration::from_secs(config.mempool.system_transaction_timeout_secs);
         Mempool {
             transactions: TransactionStore::new(&config.mempool),
-            sequence_number_cache: TtlCache::new(config.mempool.capacity, Duration::from_secs(100)),
-            metrics_cache: TtlCache::new(config.mempool.capacity, Duration::from_secs(100)),
-            system_transaction_timeout: Duration::from_secs(
-                config.mempool.system_transaction_timeout_secs,
+            sequence_number_cache: TtlCache::new(
+                config.mempool.capacity,
+                system_transaction_timeout,
             ),
+            metrics_cache: TtlCache::new(config.mempool.capacity, system_transaction_timeout),
+            system_transaction_timeout,
         }
     }
 
@@ -82,27 +85,14 @@ impl Mempool {
                     .reject_transaction(sender, sequence_number);
             }
         } else {
-            let new_seq_number = max(current_seq_number, sequence_number + 1);
-            self.sequence_number_cache.insert(*sender, new_seq_number);
-
-            let new_seq_number = if let Some(mempool_transaction) =
-                self.transactions.get_mempool_txn(sender, sequence_number)
-            {
-                match mempool_transaction
-                    .sequence_info
-                    .account_sequence_number_type
-                {
-                    AccountSequenceInfo::Sequential(_) => {
-                        AccountSequenceInfo::Sequential(new_seq_number)
-                    }
-                }
-            } else {
-                AccountSequenceInfo::Sequential(new_seq_number)
-            };
-            // update current cached sequence number for account
-            self.sequence_number_cache
-                .insert(*sender, new_seq_number.min_seq());
+            let new_seq_number =
+                AccountSequenceInfo::Sequential(max(current_seq_number, sequence_number + 1));
             self.transactions.commit_transaction(sender, new_seq_number);
+            // only insert cached sequence number for account if there are remaining transactions
+            if self.transactions.exists(sender) {
+                self.sequence_number_cache
+                    .insert(*sender, new_seq_number.min_seq());
+            }
         }
     }
 
@@ -264,7 +254,7 @@ impl Mempool {
     /// cache and sequence number cache.
     pub(crate) fn gc(&mut self) {
         let now = SystemTime::now();
-        self.transactions.gc_by_system_ttl(&self.metrics_cache);
+        self.transactions.gc_by_system_ttl(&self.metrics_cache, now);
         self.metrics_cache.gc(now);
         self.sequence_number_cache.gc(now);
     }

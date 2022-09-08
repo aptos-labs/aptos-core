@@ -338,7 +338,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                AccountSequenceInfo::Sequential(0),
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::Accepted);
@@ -348,7 +348,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                AccountSequenceInfo::Sequential(0),
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
