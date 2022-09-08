@@ -4,6 +4,17 @@
 import { Controller } from "./controller";
 import type { Types } from "aptos";
 
+function hexToAscii(hex: string) {
+  return hex.match(/.{1,2}/g)!
+    .map((byte: string) => String.fromCharCode(parseInt(byte, 16)))
+    .join('');
+}
+
+function decodeMintNumber(mintNumber: string) {
+  const ascii = hexToAscii(mintNumber.substring(2));
+  return parseInt(ascii, 16);
+}
+
 // Connects to data-controller="minted-nft"
 export default class extends Controller {
   static values = {
@@ -55,7 +66,7 @@ export default class extends Controller {
     if (createEvent == null) return;
 
     const dateMinted = new Date(parseInt(transaction.timestamp) / 1000);
-    const mintNumber = parseInt(createEvent.data.property_values[0], 16);
+    const mintNumber = decodeMintNumber(createEvent.data.property_values[0]);
     const imageUrl = createEvent.data.uri;
 
     this.dateMintedTarget.textContent = dateMinted.toDateString();
