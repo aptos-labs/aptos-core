@@ -76,6 +76,7 @@ jobs:
       - run: bundle exec rubocop
       - run: bundle exec erblint --lint-all
       - run: yarn install --frozen-lockfile
+      - run: yarn run prettier --check .
       - run: yarn run tsc
 
   community-platform-test:
