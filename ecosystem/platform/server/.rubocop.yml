@@ -36,7 +36,7 @@ Style/FrozenStringLiteralComment:
 
 Lint/MissingSuper:
   Exclude:
-    - 'app/components/**/*'
+    - "app/components/**/*"
 
 Style/DoubleNegation:
   Enabled: false

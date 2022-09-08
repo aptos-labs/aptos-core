@@ -12,8 +12,9 @@ interface ClaimDetails {
 }
 
 const fromHexString = (hexString: string) =>
-  Array.from(hexString.match(/.{1,2}/g)!
-    .map((byte: string) => parseInt(byte, 16)));
+  Array.from(
+    hexString.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16))
+  );
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
@@ -34,7 +35,7 @@ export default class extends Controller<HTMLAnchorElement> {
   declare readonly moduleAddressValue: string;
 
   get mintFunctionName() {
-    return this.moduleAddressValue.replace(/0x0+/, '0x') + '::claim_mint';
+    return this.moduleAddressValue.replace(/0x0+/, "0x") + "::claim_mint";
   }
 
   connect() {
@@ -44,18 +45,20 @@ export default class extends Controller<HTMLAnchorElement> {
   async redirectIfMinted() {
     const accountTransactionsUrl = [
       this.apiUrlValue,
-      'accounts',
+      "accounts",
       this.addressValue,
-      'transactions'
-    ].join('/');
+      "transactions",
+    ].join("/");
     const response = await fetch(accountTransactionsUrl);
     if (!response.ok) return;
     const transactions: Types.OnChainTransaction[] = await response.json();
-    const mintTransaction = transactions.find((transaction) =>
-      transaction.success &&
-      'payload' in transaction &&
-      'function' in transaction.payload &&
-      transaction.payload.function === this.mintFunctionName);
+    const mintTransaction = transactions.find(
+      (transaction) =>
+        transaction.success &&
+        "payload" in transaction &&
+        "function" in transaction.payload &&
+        transaction.payload.function === this.mintFunctionName
+    );
     if (mintTransaction) {
       this.redirectToTransaction(mintTransaction);
     }
@@ -72,26 +75,28 @@ export default class extends Controller<HTMLAnchorElement> {
 
   async handleClick(event: Event) {
     event.preventDefault();
-    this.transactionFailedErrorTarget.classList.add('hidden');
+    this.transactionFailedErrorTarget.classList.add("hidden");
 
-    const csrfToken = (document.getElementsByName("csrf-token")[0] as HTMLMetaElement).content;
-    const response = await fetch(this.element.querySelector('a')!.href, {
+    const csrfToken = (
+      document.getElementsByName("csrf-token")[0] as HTMLMetaElement
+    ).content;
+    const response = await fetch(this.element.querySelector("a")!.href, {
       method: "PUT",
       headers: {
         "X-CSRF-Token": csrfToken,
         "Content-Type": "application/json",
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     });
 
     if (!response.ok) {
-      throw 'Unable to retrieve claim details.'
+      throw "Unable to retrieve claim details.";
     }
 
     const json = await response.json();
 
-    if ('error' in json) {
-      this.transactionFailedErrorTarget.classList.remove('hidden');
+    if ("error" in json) {
+      this.transactionFailedErrorTarget.classList.remove("hidden");
       console.error(json.error);
       return;
     }
@@ -103,20 +108,22 @@ export default class extends Controller<HTMLAnchorElement> {
     // Module expects signature as array of bytes.
     const signature = fromHexString(claimDetails.signature.substring(2));
     const transaction = {
-      type: 'entry_function_payload',
+      type: "entry_function_payload",
       function: this.mintFunctionName,
-      arguments: [
-        claimDetails.message,
-        signature,
-      ],
+      arguments: [claimDetails.message, signature],
       type_arguments: [],
     };
-    this.transactionFailedErrorTarget.classList.add('hidden');
+    this.transactionFailedErrorTarget.classList.add("hidden");
 
-    if (claimDetails.wallet_name === 'petra') {
+    if (claimDetails.wallet_name === "petra") {
       try {
-        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
-        if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
+        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(
+          transaction
+        );
+        if (
+          "hash" in pendingTransaction &&
+          typeof pendingTransaction.hash === "string"
+        ) {
           return this.redirectToTransaction(pendingTransaction);
         }
       } catch (error) {
@@ -126,6 +133,6 @@ export default class extends Controller<HTMLAnchorElement> {
       // TODO: Add support for other wallets here.
     }
 
-    this.transactionFailedErrorTarget.classList.remove('hidden');
+    this.transactionFailedErrorTarget.classList.remove("hidden");
   }
 }

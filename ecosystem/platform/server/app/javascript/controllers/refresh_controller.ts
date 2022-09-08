@@ -5,7 +5,7 @@ import type { FrameElement } from "@hotwired/turbo/dist/types/elements";
 export default class extends Controller<FrameElement> {
   static values = {
     src: String,
-    interval: {type: Number, default: 5},
+    interval: { type: Number, default: 5 },
   };
 
   timeoutId: number | undefined;
