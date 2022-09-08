@@ -11,6 +11,7 @@ module aptos_framework::coin {
     use aptos_std::event::{Self, EventHandle};
 
     use aptos_std::type_info;
+    use aptos_std::type_info::TypeInfo;
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
@@ -92,11 +93,13 @@ module aptos_framework::coin {
     /// Event emitted when some amount of a coin is deposited into an account.
     struct DepositEvent has drop, store {
         amount: u64,
+        type_info: TypeInfo
     }
 
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
         amount: u64,
+        type_info: TypeInfo
     }
 
     /// Capability required to mint coins.
@@ -237,7 +240,10 @@ module aptos_framework::coin {
 
         event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
-            DepositEvent { amount: coin.value },
+            DepositEvent {
+                amount: coin.value,
+                type_info: type_info::type_of<CoinType>()
+            },
         );
 
         merge(&mut coin_store.coin, coin);
@@ -439,7 +445,10 @@ module aptos_framework::coin {
 
         event::emit_event<WithdrawEvent>(
             &mut coin_store.withdraw_events,
-            WithdrawEvent { amount },
+            WithdrawEvent {
+                amount,
+                type_info: type_info::type_of<CoinType>()
+            },
         );
 
         extract(&mut coin_store.coin, amount)
