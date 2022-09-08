@@ -10,7 +10,7 @@ use crate::{
     common::{to_hex_lower, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_rest_client::aptos_api_types::{HashValue, TransactionInfo};
+use aptos_types::transaction::TransactionInfo;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,12 +70,12 @@ pub struct BlockIdentifier {
 
 impl BlockIdentifier {
     pub fn from_block(
-        block: &aptos_rest_client::aptos_api_types::Block,
+        block: &aptos_rest_client::aptos_api_types::BcsBlock,
         chain_id: ChainId,
     ) -> BlockIdentifier {
         BlockIdentifier {
-            index: block.block_height.0,
-            hash: BlockHash::new(chain_id, block.block_height.0).to_string(),
+            index: block.block_height,
+            hash: BlockHash::new(chain_id, block.block_height).to_string(),
         }
     }
 }
@@ -175,15 +175,7 @@ pub struct TransactionIdentifier {
 impl From<&TransactionInfo> for TransactionIdentifier {
     fn from(txn: &TransactionInfo) -> Self {
         TransactionIdentifier {
-            hash: to_hex_lower(&txn.hash),
-        }
-    }
-}
-
-impl From<HashValue> for TransactionIdentifier {
-    fn from(hash: HashValue) -> Self {
-        TransactionIdentifier {
-            hash: to_hex_lower(&hash),
+            hash: to_hex_lower(&txn.transaction_hash()),
         }
     }
 }

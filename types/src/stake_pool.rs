@@ -15,7 +15,7 @@ pub struct StakePool {
     pub delegated_voter: AccountAddress,
 
     initialize_validator_events: EventHandle,
-    set_operator_events: EventHandle,
+    pub set_operator_events: EventHandle,
     add_stake_events: EventHandle,
     reactivate_stake_events: EventHandle,
     rotate_consensus_key_events: EventHandle,
