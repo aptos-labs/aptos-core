@@ -27,7 +27,6 @@ google_keybased:
   project: aptos-community-<%= ENV['STORAGE_ENV'] %>
   bucket: aptos-community-assets-<%= ENV['STORAGE_ENV'] %>
   credentials: <%= Rails.root.join("aptos-community-sa-keys.json") %>
-
 # mirror:
 #   service: Mirror
 #   primary: local

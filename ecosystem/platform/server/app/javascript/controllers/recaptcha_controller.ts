@@ -1,13 +1,13 @@
-import { Controller } from "@hotwired/stimulus"
-import { shake } from '../utils';
+import { Controller } from "@hotwired/stimulus";
+import { shake } from "../utils";
 
 interface Grecaptcha {
-  getResponse: (widgetId?: string) => string
+  getResponse: (widgetId?: string) => string;
 }
 
 declare global {
   interface Window {
-    grecaptcha: Grecaptcha
+    grecaptcha: Grecaptcha;
   }
 }
 

@@ -13,10 +13,10 @@ module.exports = {
       colors: {
         neutral: {
           ...defaultTheme.colors.neutral,
-          "100": "#f5f5f5",
-          "700": "#414141",
-          "800": "#262626",
-          "900": "#171717",
+          100: "#f5f5f5",
+          700: "#414141",
+          800: "#262626",
+          900: "#171717",
         },
         teal: {
           50: "#eafff7",
@@ -40,8 +40,8 @@ module.exports = {
         normal: 300,
       },
       screens: {
-        'max-sm': {'max': '767px'},
-      }
+        "max-sm": { max: "767px" },
+      },
     },
     container: {
       padding: {
