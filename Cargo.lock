@@ -940,6 +940,7 @@ dependencies = [
  "network",
  "network-builder",
  "rand 0.7.3",
+ "rayon",
  "state-sync-driver",
  "storage-interface",
  "storage-service-client",

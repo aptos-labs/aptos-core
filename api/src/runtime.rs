@@ -20,6 +20,7 @@ use poem::{
     EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
 
@@ -33,7 +34,11 @@ pub fn bootstrap(
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
     let runtime = Builder::new_multi_thread()
-        .thread_name("api")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("api-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
