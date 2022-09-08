@@ -16,6 +16,9 @@ application.register("dialog", DialogController)
 import HeaderController from "./header_controller"
 application.register("header", HeaderController)
 
+import MintedNftController from "./minted_nft_controller"
+application.register("minted-nft", MintedNftController)
+
 import ProjectImagesController from "./project_images_controller"
 application.register("project-images", ProjectImagesController)
 

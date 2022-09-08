@@ -100,3 +100,6 @@ __pycache__
 
 # Grafana sync
 grafana-sync*
+
+# ignore framework release bundle file
+**/*.mrb

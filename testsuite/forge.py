@@ -448,14 +448,15 @@ class ForgeResult:
     def set_debugging_output(self, output: str) -> None:
         self.debugging_output = output
 
-    def format(self) -> str:
-        output = "\n".join([
+    def format(self, context: ForgeContext) -> str:
+        output_lines = []
+        if not self.succeeded():
+            output_lines.append(self.debugging_output)
+        output_lines.extend([
             f"Forge output: {self.output}",
             f"Forge {self.state.value.lower()}ed",
         ])
-        if not self.succeeded():
-            output += "\n" + self.debugging_output
-        return output
+        return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
         return self.state == ForgeState.PASS
@@ -511,6 +512,7 @@ class ForgeContext:
     image_tag: str
     upgrade_image_tag: str
     forge_cluster_name: str
+    forge_test_suite: str
     forge_blocking: bool
 
     github_actions: str
@@ -690,17 +692,25 @@ def get_humio_logs_link(forge_namespace: str) -> str:
 
 
 def format_github_info(context: ForgeContext) -> str:
-    return (
-        textwrap.dedent(
-            f"""
-          * [Test runner output]({context.github_job_url})
-          * Test run is {'' if context.forge_blocking else 'not '}land-blocking
-        """
+    if not context.github_job_url:
+        return ""
+    else:
+        return (
+            textwrap.dedent(
+                f"""
+            * [Test runner output]({context.github_job_url})
+            * Test run is {'' if context.forge_blocking else 'not '}land-blocking
+            """
+            )
+            .lstrip()
+            .strip()
         )
-        .lstrip()
-        .strip()
-    )
 
+def get_testsuite_images(context: ForgeContext) -> str:
+    if context.image_tag != context.upgrade_image_tag: # We're upgrading
+        return f"`{context.image_tag}` ==> `{context.upgrade_image_tag}`"
+    else:
+        return f"`{context.image_tag}`"
 
 def format_pre_comment(context: ForgeContext) -> str:
     dashboard_link = get_dashboard_link(
@@ -717,7 +727,7 @@ def format_pre_comment(context: ForgeContext) -> str:
     return (
         textwrap.dedent(
             f"""
-        ### Forge is running with `{context.image_tag}`
+        ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
         * [Grafana dashboard (auto-refresh)]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
         * [(Deprecated) OpenSearch Logs]({validator_logs_link})
@@ -743,15 +753,15 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
 
     if result.state == ForgeState.PASS:
         forge_comment_header = (
-            f"### :white_check_mark: Forge test success on `{context.image_tag}`"
+            f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
         )
     elif result.state == ForgeState.FAIL:
         forge_comment_header = (
-            f"### :x: Forge test perf regression on `{context.image_tag}`"
+            f"### :x: Forge suite `{context.forge_test_suite}` failure on {get_testsuite_images(context)}"
         )
     elif result.state == ForgeState.SKIP:
         forge_comment_header = (
-            f"### :thought_balloon: Forge test preempted on `{context.image_tag}`"
+            f"### :thought_balloon: Forge suite `{context.forge_test_suite}` preempted on {get_testsuite_images(context)}"
         )
     else:
         raise Exception(f"Invalid forge state: {result.state}")
@@ -907,7 +917,7 @@ class K8sForgeRunner(ForgeRunner):
                     "wait",
                     "-n",
                     "default",
-                    "--timeout=1m",
+                    "--timeout=5m",
                     "--for=condition=Ready",
                     f"pod/{forge_pod_name}",
                 ]
@@ -988,12 +998,12 @@ def list_eks_clusters(shell: Shell) -> List[str]:
     cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
     # This type annotation is not enforced, just helpful
     try:
-        cluster_result: ListClusterResult = json.loads(cluster_json)
-        return [
-            cluster_name
-            for cluster_name in cluster_result["clusters"]
-            if cluster_name.startswith("aptos-forge-")
-        ]
+        cluster_result: ListClusterResult = json.loads(cluster_json.decode())
+        clusters = []
+        for cluster_name in cluster_result["clusters"]:
+            if cluster_name.startswith("aptos-forge-"):
+                clusters.append(cluster_name)
+        return clusters
     except Exception as e:
         raise AwsError("Failed to list eks clusters") from e
 
@@ -1044,12 +1054,14 @@ class Git:
 
 
 def assert_provided_image_tags_has_profile_or_features(
-    forge_image_tag,
-    image_tag,
-    enable_failpoints_feature: bool = False,
-    enable_performance_profile: bool = False,
+    image_tag: Optional[str],
+    upgrade_image_tag: Optional[str],
+    enable_failpoints_feature: bool,
+    enable_performance_profile: bool,
 ):
-    for tag in [forge_image_tag, image_tag]:
+    for tag in [image_tag, upgrade_image_tag]:
+        if not tag:
+            continue
         if enable_failpoints_feature:
             assert tag.startswith(
                 "failpoints"
@@ -1316,7 +1328,7 @@ def test(
     try:
         current_cluster = get_current_cluster_name(shell)
     except Exception as e:
-        print("Warning: failed to get current cluster name: {e}")
+        print(f"Warning: failed to get current cluster name: {e}")
 
     if not forge_cluster_name or balance_clusters:
         cluster_names = list_eks_clusters(shell)
@@ -1337,7 +1349,7 @@ def test(
 
     assert_provided_image_tags_has_profile_or_features(
         image_tag,
-        forge_image_tag,
+        upgrade_image_tag,
         enable_failpoints_feature=enable_failpoints_feature,
         enable_performance_profile=enable_performance_profile,
     )
@@ -1365,13 +1377,20 @@ def test(
                 shell,
                 git,
                 1,
-                enable_failpoints_feature=enable_performance_profile,
+                enable_failpoints_feature=enable_failpoints_feature,
                 enable_performance_profile=enable_performance_profile,
             )
         )
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
+
+    assert_provided_image_tags_has_profile_or_features(
+        image_tag,
+        upgrade_image_tag,
+        enable_failpoints_feature=enable_failpoints_feature,
+        enable_performance_profile=enable_performance_profile,
+    )
 
     assert image_tag is not None, "Image tag is required"
     assert forge_image_tag is not None, "Forge image tag is required"
@@ -1413,9 +1432,10 @@ def test(
         forge_namespace=forge_namespace,
         keep_port_forwards=forge_namespace_keep == "true",
         forge_cluster_name=forge_cluster_name,
+        forge_test_suite=forge_test_suite,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
-        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}",
+        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}" if github_run_id else None,
         forge_args=forge_args,
     )
     forge_runner_mapping = {
@@ -1430,6 +1450,8 @@ def test(
             ForgeResult.empty(),
             [ForgeFormatter(forge_pre_comment, lambda *_: pre_comment)],
         )
+    else:
+        print(pre_comment)
 
     if forge_runner_mode == "pre-forge":
         return
@@ -1441,18 +1463,22 @@ def test(
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(context)
 
-        print(result.format())
-
         outputs = []
         if forge_output:
             outputs.append(ForgeFormatter(forge_output, lambda *_: result.output))
         if forge_report:
             outputs.append(ForgeFormatter(forge_report, format_report))
+        else:
+            print(format_report(context, result))
         if forge_comment:
             outputs.append(ForgeFormatter(forge_comment, format_comment))
+        else:
+            print(format_comment(context, result))
         if github_step_summary:
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
         context.report(result, outputs)
+
+        print(result.format(context))
 
         if not result.succeeded() and forge_blocking == "true":
             raise SystemExit(1)
@@ -1462,7 +1488,7 @@ def test(
             try:
                 set_current_cluster(shell, current_cluster)
             except Exception as ee:
-                print("Warning: failed to restore current cluster: {ee}")
+                print(f"Warning: failed to restore current cluster: {ee}")
                 print("Set cluster manually with aws eks update-kubeconfig --name {current_cluster}")
         raise Exception(
             "Forge state:\n" + dump_forge_state(shell, forge_namespace)

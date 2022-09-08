@@ -49,6 +49,7 @@ const GENESIS_BLOB: &str = "genesis.blob";
 #[derive(Debug, Clone)]
 pub struct ValidatorNodeConfig {
     pub name: String,
+    pub index: usize,
     pub config: NodeConfig,
     pub dir: PathBuf,
     pub account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
@@ -59,6 +60,7 @@ impl ValidatorNodeConfig {
     /// Create a new validator and initialize keys appropriately
     pub fn new(
         name: String,
+        index: usize,
         base_dir: &Path,
         mut config: NodeConfig,
         genesis_stake_amount: u64,
@@ -70,6 +72,7 @@ impl ValidatorNodeConfig {
 
         Ok(ValidatorNodeConfig {
             name,
+            index,
             config,
             dir,
             account_private_key: None,
@@ -506,6 +509,7 @@ impl Builder {
 
         let mut validator = ValidatorNodeConfig::new(
             name,
+            index,
             self.config_dir.as_path(),
             config,
             genesis_stake_amount,

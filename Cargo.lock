@@ -164,6 +164,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "async-trait",
+ "backup-cli",
  "base64 0.13.0",
  "bcs",
  "cached-packages",
@@ -594,6 +595,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-fn-check-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-node-checker",
+ "aptos-sdk",
+ "clap 3.2.17",
+ "env_logger 0.9.0",
+ "futures",
+ "gcp-bigquery-client",
+ "log",
+ "reqwest",
+ "serde 1.0.144",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
@@ -921,6 +940,7 @@ dependencies = [
  "network",
  "network-builder",
  "rand 0.7.3",
+ "rayon",
  "state-sync-driver",
  "storage-interface",
  "storage-service-client",
@@ -1476,24 +1496,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-vfn-check-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-node-checker",
- "aptos-sdk",
- "clap 3.2.17",
- "env_logger 0.9.0",
- "futures",
- "gcp-bigquery-client",
- "log",
- "reqwest",
- "serde 1.0.144",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "aptos-vm"
 version = "0.1.0"
 dependencies = [
@@ -1978,6 +1980,7 @@ dependencies = [
  "backup-service",
  "bcs",
  "bytes 1.2.1",
+ "clap 3.2.17",
  "executor",
  "executor-test-helpers",
  "executor-types",
@@ -1994,7 +1997,6 @@ dependencies = [
  "serde 1.0.144",
  "serde_json",
  "storage-interface",
- "structopt 0.3.26",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.3",
@@ -4143,6 +4145,7 @@ dependencies = [
 name = "generate-format"
 version = "0.1.0"
 dependencies = [
+ "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
  "aptos-crypto-derive",

@@ -22,13 +22,13 @@ cargo run -p aptos-node-checker -- server run --baseline-node-config-paths ~/a/i
 
 Run the tool:
 ```
-cargo run -p aptos-vfn-check-client -- --node-address http://127.0.0.1:8080 --nhc-address http://127.0.0.1:20121 --nhc-baseline-config-name ait3_vfn --big-query-key-path ~/a/internal-ops/helm/observability-center/files/bigquery-cron-key.json
+cargo run -p aptos-fn-check-client -- --nhc-address http://127.0.0.1:20121 --nhc-baseline-config-name ait3_vfn --big-query-key-path ~/a/internal-ops/helm/observability-center/files/bigquery-cron-key.json --big-query-dry-run check-validator-full-nodes --node-address http://127.0.0.1:8080
 ```
 Output: https://gist.github.com/banool/29e18a863709c1998891551da1dfb429.
 
 Submitting to BigQuery instead:
 ```
-cargo run -p aptos-vfn-check-client -- --node-address http://127.0.0.1:8080 --nhc-address http://127.0.0.1:20121 --nhc-baseline-config-name ait3_vfn --big-query-key-path ~/a/internal-ops/helm/observability-center/files/bigquery-cron-key.json --output-style big-query
+cargo run -p aptos-fn-check-client -- --nhc-address http://127.0.0.1:20121 --nhc-baseline-config-name ait3_vfn --big-query-key-path ~/a/internal-ops/helm/observability-center/files/bigquery-cron-key.json --big-query-dry-run check-public-full-nodes --input-file ~/test_data.json
 ```
 
 ## Deployment

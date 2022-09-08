@@ -21,13 +21,13 @@ use aptos_types::{
     transaction::Version,
     waypoint::Waypoint,
 };
+use clap::Parser;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Instant};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct EpochEndingRestoreOpt {
-    #[structopt(long = "epoch-ending-manifest")]
+    #[clap(long = "epoch-ending-manifest")]
     pub manifest_handle: FileHandle,
 }
 

@@ -4,31 +4,12 @@
 use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
 use aptos_crypto::HashValue;
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    transaction::{Transaction, TransactionListWithProof},
-};
-use executor::fuzzing::{fuzz_execute_and_commit_blocks, fuzz_execute_and_commit_chunk};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
+use executor::fuzzing::fuzz_execute_and_commit_blocks;
 use proptest::{collection::vec, prelude::*};
 
 #[derive(Clone, Debug, Default)]
 pub struct ExecuteAndCommitChunk;
-
-impl FuzzTargetImpl for ExecuteAndCommitChunk {
-    fn description(&self) -> &'static str {
-        "state-sync > executor::execute_and_commit_chunk"
-    }
-
-    fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        Some(corpus_from_strategy(execute_and_commit_chunk_input()))
-    }
-
-    fn fuzz(&self, data: &[u8]) {
-        let (txn_list_with_proof, verified_target_li) =
-            fuzz_data_to_value(data, execute_and_commit_chunk_input());
-        fuzz_execute_and_commit_chunk(txn_list_with_proof, verified_target_li);
-    }
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct ExecuteAndCommitBlocks;
@@ -45,15 +26,6 @@ impl FuzzTargetImpl for ExecuteAndCommitBlocks {
     fn fuzz(&self, data: &[u8]) {
         let (blocks, li_with_sigs) = fuzz_data_to_value(data, execute_and_commit_blocks_input());
         fuzz_execute_and_commit_blocks(blocks, li_with_sigs);
-    }
-}
-
-prop_compose! {
-    fn execute_and_commit_chunk_input()(
-        txn_list_with_proof in any::<TransactionListWithProof>(),
-        verified_target_li in any::<LedgerInfoWithSignatures>()
-    ) -> (TransactionListWithProof, LedgerInfoWithSignatures) {
-        (txn_list_with_proof, verified_target_li)
     }
 }
 

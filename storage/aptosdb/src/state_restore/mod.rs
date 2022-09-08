@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::OTHER_TIMERS_SECONDS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
@@ -87,6 +88,7 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
                 ((k, self.version), Some(v))
             })
             .collect();
+
         self.db.write_kv_batch(
             self.version,
             &kv_batch,
@@ -140,6 +142,10 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
         })
     }
+
+    pub fn previous_key_hash(&self) -> Option<HashValue> {
+        self.tree_restore.previous_key_hash()
+    }
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
@@ -148,9 +154,19 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
         // Write KV out first because we are likely to resume according to the rightmost key in the
         // tree after crashing.
-        self.kv_restore.add_chunk(chunk.clone())?;
-        self.tree_restore
-            .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["state_value_add_chunk"])
+                .start_timer();
+            self.kv_restore.add_chunk(chunk.clone())?;
+        }
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["jmt_add_chunk"])
+                .start_timer();
+            self.tree_restore
+                .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
+        }
         Ok(())
     }
 

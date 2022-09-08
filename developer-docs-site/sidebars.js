@@ -31,7 +31,7 @@ const sidebars = {
         "tutorials/your-first-nft",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
-        // "tutorials/first-coin",
+        "tutorials/first-coin",
       ],
     },
     {

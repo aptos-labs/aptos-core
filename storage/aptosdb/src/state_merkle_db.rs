@@ -322,6 +322,9 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
 impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["tree_writer_write_batch"])
+            .start_timer();
         let batch = SchemaBatch::new();
         node_batch.iter().try_for_each(|(node_key, node)| {
             batch.put::<JellyfishMerkleNodeSchema>(node_key, node)

@@ -23,9 +23,17 @@ pub async fn get_node_identity(
     node_address: &NodeAddress,
     timeout: Duration,
 ) -> Result<(ChainId, RoleType)> {
-    let index_response = node_address.get_index_response(timeout)
+    let index_response = node_address
+        .get_index_response(timeout)
         .await
-        .map_err(|e| format_err!("Failed to get response from index (/) of API. Make sure your API port ({}) is open: {}", node_address.api_port, e))?;
+        .map_err(|e| {
+            format_err!(
+                "Failed to get response from index (/) of API. Make sure \
+            your API port ({}) is open: {}",
+                node_address.get_api_port(),
+                e
+            )
+        })?;
     Ok((
         ChainId::new(index_response.chain_id),
         index_response.node_role,

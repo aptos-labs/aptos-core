@@ -31,3 +31,7 @@ This needs to be updated to use the CLI
 - ### [Your First NFT](your-first-nft.md)
 
     Learn the Aptos `Token` interface and how to use it.
+
+- ### [Your First Coin](first-coin.md)
+
+    Learn how to deploy and managed a coin.

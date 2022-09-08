@@ -236,8 +236,12 @@ pub trait SwarmExt: Swarm {
         version: u64,
         timeout: Duration,
     ) -> Result<()> {
-        wait_for_all_nodes_to_catchup_to_version(&self.get_clients_with_names(), version, timeout)
-            .await
+        wait_for_all_nodes_to_catchup_to_version(
+            &self.get_all_nodes_clients_with_names(),
+            version,
+            timeout,
+        )
+        .await
     }
 
     /// Wait for all nodes in the network to be caught up. This is done by first querying each node
@@ -245,10 +249,16 @@ pub trait SwarmExt: Swarm {
     /// that version. Once done, we can guarantee that all transactions committed before invocation
     /// of this function are available at all the nodes in the swarm
     async fn wait_for_all_nodes_to_catchup(&self, timeout: Duration) -> Result<()> {
-        wait_for_all_nodes_to_catchup(&self.get_clients_with_names(), timeout).await
+        wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
     }
 
-    fn get_clients_with_names(&self) -> Vec<(String, RestClient)> {
+    fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {
+        self.validators()
+            .map(|node| (node.name().to_string(), node.rest_client()))
+            .collect()
+    }
+
+    fn get_all_nodes_clients_with_names(&self) -> Vec<(String, RestClient)> {
         self.validators()
             .map(|node| (node.name().to_string(), node.rest_client()))
             .chain(

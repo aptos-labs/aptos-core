@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable max-len */
-import * as Nacl from "tweetnacl";
+import nacl from "tweetnacl";
 import { bytesToHex } from "../bytes_to_hex.js";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";
 import { HexString } from "../hex_string";
@@ -41,11 +41,11 @@ function hexSignedTxn(signedTxn: Uint8Array): string {
 
 function sign(rawTxn: RawTransaction): Bytes {
   const privateKeyBytes = new HexString(PRIVATE_KEY).toUint8Array();
-  const signingKey = Nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
+  const signingKey = nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
   const { publicKey } = signingKey;
 
   const txnBuilder = new TransactionBuilderEd25519(
-    (signingMessage) => new Ed25519Signature(Nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64)),
+    (signingMessage) => new Ed25519Signature(nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64)),
     publicKey,
   );
 

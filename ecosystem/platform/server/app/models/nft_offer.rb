@@ -17,7 +17,7 @@ class NftOffer
     when APTOS_ZERO
       NftOffer.new(
         slug: APTOS_ZERO,
-        network: 'testnet',
+        network: Rails.env.development? ? 'devnet' : 'testnet',
         module_address: ENV.fetch('APTOS_ZERO_NFT_MODULE_ADDRESS'),
         private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY'),
         distinct_images: true

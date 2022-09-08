@@ -1,3 +1,4 @@
+from cgitb import enable
 from contextlib import ExitStack
 from importlib.metadata import files
 import json
@@ -36,6 +37,7 @@ from .forge import (
     get_all_forge_jobs,
     get_dashboard_link,
     get_humio_logs_link,
+    get_testsuite_images,
     get_validator_logs_link,
     list_eks_clusters,
     main,
@@ -211,6 +213,7 @@ def fake_context(
         forge_namespace="potato",
         keep_port_forwards=False,
         forge_cluster_name="tomato",
+        forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",
@@ -270,7 +273,7 @@ class ForgeRunnerTests(unittest.TestCase):
                     ),
                     ("kubectl apply -n default -f temp1", RunResult(0, b"")),
                     (
-                        "kubectl wait -n default --timeout=1m --for=condition=Ready pod/potato-1659078000-asdf",
+                        "kubectl wait -n default --timeout=5m --for=condition=Ready pod/potato-1659078000-asdf",
                         RunResult(0, b""),
                     ),
                     (
@@ -411,11 +414,34 @@ class TestFindRecentImage(unittest.TestCase):
                 "potato_tomato",
                 "failpoints_performance_potato",
                 enable_failpoints_feature=True,
+                enable_performance_profile=False,
             )
+
+    def testFailpointsNoProvidedImageTag(self) -> None:
+        assert_provided_image_tags_has_profile_or_features(
+            None,
+            None,
+            enable_failpoints_feature=True,
+            enable_performance_profile=False,
+        )
 
 
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
+
+    def testTestsuiteImages(self) -> None:
+        context = fake_context()
+        # set the image tag and upgrade image tag to the same value
+        upgrade_img = context.upgrade_image_tag
+        context.upgrade_image_tag = context.image_tag
+        # do not expect an upgrade
+        txt = get_testsuite_images(context)
+        self.assertEqual(txt, f"`{context.image_tag}`")
+
+        # upgrade
+        context.upgrade_image_tag = upgrade_img
+        txt = get_testsuite_images(context)
+        self.assertEqual(txt, f"`{context.image_tag}` ==> `{context.upgrade_image_tag}`")
 
     def testReport(self) -> None:
         filesystem = SpyFilesystem({"test": b"banana"}, {})
@@ -531,7 +557,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 RunResult(0, b''),
             ),
             (
-                'kubectl wait -n default --timeout=1m --for=condition=Ready '
+                'kubectl wait -n default --timeout=5m --for=condition=Ready '
                 'pod/forge-perry-1659078000-1659078000-banana',
                 RunResult(0, b''),
             ),

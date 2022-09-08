@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Controller } from "./controller";
+import type { Types } from "aptos";
 
 interface ClaimDetails {
   wallet_name: string;
@@ -16,11 +17,65 @@ const fromHexString = (hexString: string) =>
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
+  static targets = ["transactionFailedError"];
+
+  declare readonly transactionFailedErrorTarget: HTMLElement;
+
+  static values = {
+    address: String,
+    network: String,
+    apiUrl: String,
+    moduleAddress: String,
+  };
+
+  declare readonly addressValue: string;
+  declare readonly networkValue: string;
+  declare readonly apiUrlValue: string;
+  declare readonly moduleAddressValue: string;
+
+  get mintFunctionName() {
+    return this.moduleAddressValue.replace(/0x0+/, '0x') + '::claim_mint';
+  }
+
+  connect() {
+    this.redirectIfMinted();
+  }
+
+  async redirectIfMinted() {
+    const accountTransactionsUrl = [
+      this.apiUrlValue,
+      'accounts',
+      this.addressValue,
+      'transactions'
+    ].join('/');
+    const response = await fetch(accountTransactionsUrl);
+    if (!response.ok) return;
+    const transactions: Types.OnChainTransaction[] = await response.json();
+    const mintTransaction = transactions.find((transaction) =>
+      transaction.success &&
+      'payload' in transaction &&
+      'function' in transaction.payload &&
+      transaction.payload.function === this.mintFunctionName);
+    if (mintTransaction) {
+      this.redirectToTransaction(mintTransaction);
+    }
+  }
+
+  redirectToTransaction(transaction: Types.Transaction) {
+    const url = new URL(location.href);
+    url.search = `?txn=${transaction.hash}`;
+
+    // Full page load instead of Turbo.visit due to bug with controller not
+    // being mounted.
+    location.href = url.toString();
+  }
+
   async handleClick(event: Event) {
     event.preventDefault();
+    this.transactionFailedErrorTarget.classList.add('hidden');
 
     const csrfToken = (document.getElementsByName("csrf-token")[0] as HTMLMetaElement).content;
-    const response = await fetch(this.element.href, {
+    const response = await fetch(this.element.querySelector('a')!.href, {
       method: "PUT",
       headers: {
         "X-CSRF-Token": csrfToken,
@@ -36,7 +91,9 @@ export default class extends Controller<HTMLAnchorElement> {
     const json = await response.json();
 
     if ('error' in json) {
-      throw json.error;
+      this.transactionFailedErrorTarget.classList.remove('hidden');
+      console.error(json.error);
+      return;
     }
 
     return this.submitTransaction(json as ClaimDetails);
@@ -47,25 +104,28 @@ export default class extends Controller<HTMLAnchorElement> {
     const signature = fromHexString(claimDetails.signature.substring(2));
     const transaction = {
       type: 'entry_function_payload',
-      function: claimDetails.module_address + '::claim_mint',
+      function: this.mintFunctionName,
       arguments: [
         claimDetails.message,
         signature,
       ],
       type_arguments: [],
     };
+    this.transactionFailedErrorTarget.classList.add('hidden');
 
     if (claimDetails.wallet_name === 'petra') {
-      const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
-      if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
-        // TODO: Do something more intelligent with the transaction.
-        window.open(`https://explorer.devnet.aptos.dev/txn/${pendingTransaction.hash}?network=testnet`);
-        return;
+      try {
+        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
+        if ('hash' in pendingTransaction && typeof pendingTransaction.hash === 'string') {
+          return this.redirectToTransaction(pendingTransaction);
+        }
+      } catch (error) {
+        console.error(error);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.
     }
 
-    throw 'Unable to submit transaction.'
+    this.transactionFailedErrorTarget.classList.remove('hidden');
   }
 }

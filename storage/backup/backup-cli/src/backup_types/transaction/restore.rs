@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::OTHER_TIMERS_SECONDS;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
@@ -29,6 +30,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
+use clap::Parser;
 use executor::chunk_executor::ChunkExecutor;
 use executor_types::TransactionReplayer;
 use futures::{
@@ -39,18 +41,22 @@ use futures::{
     StreamExt,
 };
 use itertools::zip_eq;
-use std::{cmp::min, pin::Pin, sync::Arc, time::Instant};
+use std::{
+    cmp::{max, min},
+    pin::Pin,
+    sync::Arc,
+    time::Instant,
+};
 use storage_interface::DbReaderWriter;
-use structopt::StructOpt;
 use tokio::io::BufReader;
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct TransactionRestoreOpt {
-    #[structopt(long = "transaction-manifest")]
+    #[clap(long = "transaction-manifest")]
     pub manifest_handle: FileHandle,
-    #[structopt(
+    #[clap(
         long = "replay-transactions-from-version",
         help = "Transactions with this version and above will be replayed so state and events are \
         gonna pop up. Requires state at the version right before this to exist, either by \
@@ -217,6 +223,7 @@ impl TransactionRestoreBatchController {
             .await?;
 
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+            AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;
@@ -317,10 +324,22 @@ impl TransactionRestoreBatchController {
         loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>> + Unpin,
         restore_handler: &RestoreHandler,
     ) -> Result<Option<impl Stream<Item = Result<(Transaction, TransactionInfo)>>>> {
+        let next_expected_version = self
+            .global_opt
+            .run_mode
+            .get_next_expected_transaction_version()?;
         let start = Instant::now();
 
         let restore_handler_clone = restore_handler.clone();
-        let first_to_replay = self.replay_from_version.unwrap_or(Version::MAX);
+        // DB doesn't allow replaying anything before what's in DB already.
+        //
+        // TODO: notice that ideals we detect and avoid calling rh.save_transactions() for txns
+        //       before `first_to_replay` calculated below, but we don't deal with it for now,
+        //       because unlike replaying, that's allowed by the DB. Need to follow up later.
+        let first_to_replay = max(
+            self.replay_from_version.unwrap_or(Version::MAX),
+            next_expected_version,
+        );
         let target_version = self.global_opt.target_version;
 
         let mut txns_to_execute_stream = loaded_chunk_stream
@@ -416,6 +435,9 @@ impl TransactionRestoreBatchController {
                 let (txns, txn_infos): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["replay_txn_chunk"])
+                        .start_timer();
                     tokio::task::spawn_blocking(move || chunk_replayer.replay(txns, txn_infos))
                         .err_into::<anyhow::Error>()
                         .await
@@ -428,6 +450,9 @@ impl TransactionRestoreBatchController {
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["commit_txn_chunk"])
+                        .start_timer();
                     tokio::task::spawn_blocking(move || {
                         let committed_chunk = chunk_replayer.commit()?;
                         let v = committed_chunk.result_view.version().unwrap_or(0);
