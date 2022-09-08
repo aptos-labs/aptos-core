@@ -353,14 +353,34 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // Ignore message from lower epoch, the node would eventually see messages from
-            // higher epoch and request a proof
             Ordering::Less => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(1)),
-                    debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
-                );
-                Ok(())
+                if self
+                    .epoch_state()
+                    .verifier
+                    .get_voting_power(&self.author)
+                    .is_some()
+                {
+                    // Ignore message from lower epoch if we're part of the validator set, the node would eventually see messages from
+                    // higher epoch and request a proof
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
+                    );
+                    Ok(())
+                } else {
+                    // reply back the epoch change proof if we're not part of the validator set since we won't broadcast
+                    // timeout in this epoch
+                    monitor!(
+                        "process_epoch_retrieval",
+                        self.process_epoch_retrieval(
+                            EpochRetrievalRequest {
+                                start_epoch: different_epoch,
+                                end_epoch: self.epoch(),
+                            },
+                            peer_id
+                        )
+                    )
+                }
             }
             // We request proof to join higher epoch
             Ordering::Greater => {
