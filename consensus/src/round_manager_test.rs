@@ -355,7 +355,7 @@ fn vote_on_successful_proposal() {
 }
 
 #[test]
-/// In sync only mode, verify that the proposals are processed after we get out of the sync only mode.
+/// In back pressure mode, verify that the proposals are processed after we get out of back pressure.
 fn delay_proposal_processing_in_sync_only() {
     let mut runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -384,16 +384,6 @@ fn delay_proposal_processing_in_sync_only() {
         let proposal_id = proposal.id();
         node.round_manager
             .process_proposal(proposal.clone())
-            .await
-            .unwrap();
-
-        // Wait for some time to ensure that the proposal was not processed
-        timeout(Duration::from_millis(200), node.next_vote())
-            .await
-            .unwrap_err();
-
-        node.round_manager
-            .process_verified_proposal(proposal.clone())
             .await
             .unwrap();
 
