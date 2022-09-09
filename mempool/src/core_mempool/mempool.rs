@@ -297,4 +297,9 @@ impl Mempool {
     pub fn get_parking_lot_size(&self) -> usize {
         self.transactions.get_parking_lot_size()
     }
+
+    #[cfg(test)]
+    pub fn get_transaction_store(&self) -> &TransactionStore {
+        &self.transactions
+    }
 }

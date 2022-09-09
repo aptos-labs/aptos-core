@@ -165,6 +165,7 @@ impl TransactionStore {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
                         self.index_remove(&txn);
+                        self.account_remove(&txn.get_sender());
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
@@ -190,14 +191,14 @@ impl TransactionStore {
             ));
         }
 
-        self.transactions
-            .entry(address)
-            .or_insert_with(AccountTransactions::new);
-
         self.clean_committed_transactions(
             &address,
             sequence_number.account_sequence_number_type.min_seq(),
         );
+
+        self.transactions
+            .entry(address)
+            .or_insert_with(AccountTransactions::new);
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -281,6 +282,7 @@ impl TransactionStore {
                         ))
                     );
                     self.index_remove(&txn);
+                    self.account_remove(&address);
                 }
             }
         }
@@ -392,6 +394,7 @@ impl TransactionStore {
                 address,
                 sequence_number
             );
+            self.account_remove(address);
         }
     }
 
@@ -418,6 +421,7 @@ impl TransactionStore {
                 self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
+            self.account_remove(account);
         }
     }
 
@@ -432,6 +436,15 @@ impl TransactionStore {
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
         self.track_indices();
+    }
+
+    /// Removes account datastructures if there are no more transactions for the account
+    fn account_remove(&mut self, address: &AccountAddress) {
+        if let Some(txns) = self.transactions.get(&address) {
+            if txns.is_empty() {
+                self.transactions.remove(&address);
+            }
+        }
     }
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
@@ -570,6 +583,7 @@ impl TransactionStore {
                     // remove txn
                     self.index_remove(&txn);
                 }
+                self.account_remove(&key.address);
             }
         }
 
@@ -603,5 +617,10 @@ impl TransactionStore {
     #[cfg(test)]
     pub(crate) fn get_parking_lot_size(&self) -> usize {
         self.parking_lot_index.size()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
+        &self.transactions
     }
 }
