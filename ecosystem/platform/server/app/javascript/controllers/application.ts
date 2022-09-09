@@ -14,11 +14,14 @@ declare global {
       signAndSubmitTransaction: (transaction: {}) => Promise<Types.Transaction>;
       signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
       network: () => Promise<string>;
-    }
+    };
     martian?: {
-      connect: () => Promise<{address: string, publicKey: string}>;
-      account: () => Promise<{address: string, publicKey: string}>;
-      generateSignAndSubmitTransaction: (sender: string, transaction: {}) => Promise<string>;
+      connect: () => Promise<{ address: string; publicKey: string }>;
+      account: () => Promise<{ address: string; publicKey: string }>;
+      generateSignAndSubmitTransaction: (
+        sender: string,
+        transaction: {}
+      ) => Promise<string>;
       signMessage: (transaction: {}) => Promise<Record<string, unknown>>;
       network: () => Promise<string>;
     };
