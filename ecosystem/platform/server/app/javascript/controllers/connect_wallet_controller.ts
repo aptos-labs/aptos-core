@@ -29,6 +29,8 @@ export default class extends Controller<HTMLFormElement> {
   get walletName() {
     if ("aptos" in window) {
       return "petra";
+    } else if ("martian" in window) {
+      return "martian";
     } else if (false) {
       // TODO: Add more wallet detection logic here.
     } else {
@@ -63,6 +65,9 @@ export default class extends Controller<HTMLFormElement> {
     if (this.walletName === "petra") {
       const { publicKey } = await window.aptos!.connect();
       return publicKey;
+    } else if (this.walletName === "martian") {
+      const { publicKey } = await window.martian!.connect();
+      return publicKey;
     } else if (false) {
       // TODO: Add support for other wallets here.
     } else {
@@ -73,6 +78,9 @@ export default class extends Controller<HTMLFormElement> {
   async getNetwork() {
     if (this.walletName === "petra") {
       const network = await window.aptos!.network();
+      return network.toLowerCase();
+    } else if (this.walletName === "martian") {
+      const network = await window.martian!.network();
       return network.toLowerCase();
     } else if (false) {
       // TODO: Add support for other wallets here.
@@ -91,6 +99,14 @@ export default class extends Controller<HTMLFormElement> {
       });
       if ("signature" in response && typeof response.signature === "string") {
         return "0x" + response.signature.slice(0, 128);
+      }
+    } else if (this.walletName === "martian") {
+      const response = await window.martian!.signMessage({
+        message: "verify_wallet",
+        nonce: challenge,
+      });
+      if ("signature" in response && typeof response.signature === "string") {
+        return response.signature;
       }
     } else if (false) {
       // TODO: Add support for other wallets here.

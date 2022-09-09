@@ -60,13 +60,13 @@ export default class extends Controller<HTMLAnchorElement> {
         transaction.payload.function === this.mintFunctionName
     );
     if (mintTransaction) {
-      this.redirectToTransaction(mintTransaction);
+      this.redirectToTransaction(mintTransaction.hash);
     }
   }
 
-  redirectToTransaction(transaction: Types.Transaction) {
+  redirectToTransaction(hash: string) {
     const url = new URL(location.href);
-    url.search = `?txn=${transaction.hash}`;
+    url.search = `?txn=${hash}`;
 
     // Full page load instead of Turbo.visit due to bug with controller not
     // being mounted.
@@ -124,8 +124,19 @@ export default class extends Controller<HTMLAnchorElement> {
           "hash" in pendingTransaction &&
           typeof pendingTransaction.hash === "string"
         ) {
-          return this.redirectToTransaction(pendingTransaction);
+          return this.redirectToTransaction(pendingTransaction.hash);
         }
+      } catch (error) {
+        console.error(error);
+      }
+    } else if (claimDetails.wallet_name === "martian") {
+      try {
+        const { address } = await window.martian!.account();
+        const txnHash = await window.martian!.generateSignAndSubmitTransaction(
+          address,
+          transaction
+        );
+        return this.redirectToTransaction(txnHash);
       } catch (error) {
         console.error(error);
       }
