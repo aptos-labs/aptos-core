@@ -788,7 +788,7 @@ impl AptosVM {
         let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
-            None,
+            Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         ) {
             Ok(cse) => cse,
