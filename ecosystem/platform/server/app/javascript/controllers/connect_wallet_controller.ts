@@ -12,10 +12,11 @@ const FIELD_NAMES = Object.freeze({
 });
 
 // Connects to data-controller="connect-wallet"
-export default class extends Controller<HTMLFormElement> {
-  static targets = ["requiredNetworkError"];
+export default class extends Controller<HTMLElement> {
+  static targets = ["form", "requiredNetworkError"];
 
   declare readonly hasRequiredNetworkErrorTarget: boolean;
+  declare readonly formTarget: HTMLFormElement;
   declare readonly requiredNetworkErrorTarget: HTMLElement;
 
   static values = {
@@ -27,21 +28,22 @@ export default class extends Controller<HTMLFormElement> {
   declare readonly walletPersistedValue: boolean;
 
   get walletName() {
-    if ("aptos" in window) {
-      return "petra";
-    } else if ("martian" in window) {
-      return "martian";
-    } else if (false) {
-      // TODO: Add more wallet detection logic here.
-    } else {
-      throw "Aptos wallet not detected.";
-    }
+    return this.getInput(FIELD_NAMES.walletName).value;
+  }
+
+  selectWallet(event: Event) {
+    if (!(event.currentTarget instanceof HTMLButtonElement)) return;
+    const walletName = event.currentTarget.dataset.wallet;
+    if (!walletName) return;
+    this.element.querySelector("dialog")?.close();
+    this.getInput(FIELD_NAMES.walletName).value = walletName;
+    this.formTarget.requestSubmit();
   }
 
   onPageLoad() {
     const urlParams = new URLSearchParams(location.search);
     if (urlParams.get("wallet") && !this.walletPersistedValue) {
-      this.element.requestSubmit();
+      this.formTarget.requestSubmit();
     }
   }
 
@@ -116,7 +118,7 @@ export default class extends Controller<HTMLFormElement> {
   }
 
   getInput(fieldName: string): HTMLInputElement {
-    const input = this.element[fieldName];
+    const input = this.formTarget[fieldName];
     if (!(input instanceof HTMLInputElement)) {
       throw `input with name ${fieldName} not found.`;
     }
@@ -141,9 +143,9 @@ export default class extends Controller<HTMLFormElement> {
     this.getInput(FIELD_NAMES.signedChallenge).value =
       await this.getSignedChallenge();
 
-    const formData = new FormData(this.element);
-    const response = await fetch(this.element.action, {
-      method: this.element.method,
+    const formData = new FormData(this.formTarget);
+    const response = await fetch(this.formTarget.action, {
+      method: this.formTarget.method,
       headers: {
         Accept: "application/json",
       },
