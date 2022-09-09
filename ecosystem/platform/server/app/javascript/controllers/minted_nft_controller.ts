@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Controller } from "./controller";
+import type { FrameElement } from "@hotwired/turbo/dist/types/elements";
 import type { Types } from "aptos";
 
 function hexToAscii(hex: string) {
@@ -20,6 +21,7 @@ function decodeMintNumber(mintNumber: string) {
 export default class extends Controller {
   static values = {
     transactionHash: String,
+    transactionVersion: Number,
     apiUrl: String,
   };
 
@@ -29,6 +31,7 @@ export default class extends Controller {
     "mintNumber",
     "image",
     "address",
+    "transactionLinks",
   ];
 
   declare readonly transactionFailedErrorTarget: HTMLElement;
@@ -36,8 +39,10 @@ export default class extends Controller {
   declare readonly mintNumberTargets: HTMLElement[];
   declare readonly addressTarget: HTMLElement;
   declare readonly imageTargets: HTMLImageElement[];
+  declare readonly transactionLinksTarget: FrameElement;
 
-  declare readonly transactionHashValue: string;
+  declare readonly transactionHashValue: string | null;
+  declare readonly transactionVersionValue: number | null;
   declare readonly apiUrlValue: string;
 
   retries = 0;
@@ -46,14 +51,28 @@ export default class extends Controller {
     this.fetchNftInfo();
   }
 
+  get transactionUrl() {
+    if (this.transactionVersionValue) {
+      return [
+        this.apiUrlValue,
+        "transactions",
+        "by_version",
+        this.transactionVersionValue,
+      ].join("/");
+    } else if (this.transactionHashValue) {
+      return [
+        this.apiUrlValue,
+        "transactions",
+        "by_hash",
+        this.transactionHashValue,
+      ].join("/");
+    } else {
+      throw "unable to determine transaction url";
+    }
+  }
+
   fetchNftInfo = async () => {
-    const transactionUrl = [
-      this.apiUrlValue,
-      "transactions",
-      "by_hash",
-      this.transactionHashValue,
-    ].join("/");
-    const response = await fetch(transactionUrl);
+    const response = await fetch(this.transactionUrl);
     if (!response.ok && ++this.retries <= 1) {
       return setTimeout(this.fetchNftInfo, 1000);
     }
@@ -65,6 +84,15 @@ export default class extends Controller {
     if (!transaction.success) {
       this.transactionFailedErrorTarget.classList.remove("hidden");
       return;
+    }
+
+    const urlParams = new URLSearchParams(location.search);
+    if (!urlParams.get("v")) {
+      urlParams.delete("txn");
+      urlParams.set("v", transaction.version);
+      const url = new URL(location.href);
+      url.search = urlParams.toString();
+      this.transactionLinksTarget.src = url.toString();
     }
 
     const createEvent = transaction.events.find(

@@ -3,7 +3,7 @@
 <% content_for(:meta) do %>
   <meta property="og:image" content="<%= image_url('meta/aptos_meta_og_nft-aptos-zero.jpg') %>">
 <% end %>
-<div class="bg-neutral-900 text-neutral-100 h-full" data-controller="minted-nft" data-minted-nft-transaction-hash-value="<%= @transaction_hash %>" data-minted-nft-api-url-value="<%= @wallet.api_url %>">
+<div class="bg-neutral-900 text-neutral-100 h-full" data-controller="minted-nft" data-minted-nft-transaction-hash-value="<%= @transaction_hash %>" data-minted-nft-transaction-version-value="<%= @transaction_version %>" data-minted-nft-api-url-value="<%= @wallet.api_url %>">
   <div class="max-w-screen-2xl mx-auto px-6 pb-24">
     <section class="py-12 lg:py-32">
       <h3 class="text-base uppercase text-teal-400 mb-4 font-mono">Community</h3>
@@ -40,20 +40,32 @@
           <dt class="text-right normal-case" data-minted-nft-target="address">#</dt>
         </dl>
         <hr class="border-t-2 border-dotted border-neutral-400 mb-8">
+        <%= turbo_frame_tag :transaction_links, data: { minted_nft_target: 'transactionLinks' } do %>
         <ul>
           <li class="mb-4">
-            <%= link_to "https://explorer.devnet.aptos.dev/txn/#{@transaction_hash}?network=#{@wallet.network}", class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300 flex gap-2', target: '_blank' do %>
+            <% explorer_url = if @transaction_version
+                                "https://explorer.devnet.aptos.dev/txn/#{@transaction_version}?network=#{@wallet.network}"
+                              else
+                                "https://explorer.devnet.aptos.dev/txn/#{@transaction_hash}?network=#{@wallet.network}"
+                              end %>
+            <%= link_to explorer_url, class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300 flex gap-2', target: '_blank' do %>
               <%= render IconComponent.new(:search, class: 'w-5') %>
               View in Explorer
             <% end %>
           </li>
           <li>
-            <%= link_to "http://twitter.com/intent/tweet?url=#{CGI.escape(request.url)}&text=Check%20out%20my%20APTOS%20%3A%20ZERO%20Testnet%20NFT&hashtags=AptosNFTs", class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300 flex gap-2', target: '_blank' do %>
+            <% twitter_url = if @transaction_version
+                               nft_offer_short_url(offer_id: @nft_offer.id, txn_version: @transaction_version)
+                             else
+                               request.url
+                             end %>
+            <%= link_to "http://twitter.com/intent/tweet?url=#{CGI.escape(twitter_url)}&text=Check%20out%20my%20APTOS%20%3A%20ZERO%20Testnet%20NFT&hashtags=AptosNFTs", class: 'font-mono uppercase text-base text-teal-400 hover:text-teal-300 flex gap-2', target: '_blank' do %>
               <%= render IconComponent.new(:twitter, class: 'w-5') %>
               Share on Twitter
             <% end %>
           </li>
         </ul>
+        <% end %>
       <% end %>
       <div class="md:col-start-8 md:col-end-13 lg:col-span-5 lg:col-start-8 order-first md:order-last">
         <%= render CardOutlineComponent.new(scheme: :filled) do %>
