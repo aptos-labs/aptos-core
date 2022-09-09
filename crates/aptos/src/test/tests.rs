@@ -54,6 +54,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move", "prove", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "publish", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "run", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "run-script", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "test", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "transactional-test", "--help"]).await;
 
