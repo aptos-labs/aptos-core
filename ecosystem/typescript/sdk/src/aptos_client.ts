@@ -256,19 +256,29 @@ export class AptosClient {
   }
 
   /**
-   * Queries events by event key
-   * @param eventKey Event key for an event stream. It is BCS serialized bytes
-   * of `guid` field in the Move struct `EventHandle`
+   * Event streams are globally identifiable by an account `address` and
+   * monotonically increasing `creation_number`, one per event stream
+   * originating from the given account. This API returns events
+   * corresponding to that event stream.
+   * @param address Hex-encoded 32 byte Aptos account from which events are queried.
+   * This is should be the account that published the Move module that defined the
+   * event stream you are trying to read, not any account the event might be affecting.
+   * @param creationNumber Creation number corresponding to the event stream originating
+   * from the given account.
    * @returns Array of events assotiated with given key
    */
   @parseApiError
-  async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByEventKey(eventKey);
+  async getEventsByCreationNumber(
+    address: MaybeHexString,
+    creationNumber: number | BigInt | string,
+  ): Promise<Gen.Event[]> {
+    return this.client.events.getEventsByCreationNumber(HexString.ensure(address).hex(), creationNumber.toString());
   }
 
   /**
-   * Extracts event key from the account resource identified by the
-   * `event_handle_struct` and `field_name`, then returns events identified by the event key
+   * This API uses the given account `address`, `eventHandle`, and `fieldName`
+   * to build a key that globally identify an event stream. It then uses this
+   * key to return events from that stream.
    * @param address Hex-encoded 32 byte Aptos account from which events are queried
    * @param eventHandleStruct String representation of an on-chain Move struct type.
    * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)

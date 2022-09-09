@@ -10,10 +10,14 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
+use aptos_types::event::EventKey;
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
+
+use crate::{Address, U64};
 
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -62,5 +66,34 @@ impl Deref for IdentifierWrapper {
 impl fmt::Display for IdentifierWrapper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Identifier::fmt(&self.0, f)
+    }
+}
+
+// Unlike IdentifierWrapper, we don't use this struct as a path / query param.
+// Instead, we define this wrapper struct for two reasons:
+// 1. To avoid implementing Poem derives on types outside of the API crate.
+// 2. To express the EventKey as types that already work in the API, such as
+//    Address and U64 instead of AccountAddress and u64.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
+pub struct EventKeyWrapper {
+    pub creation_number: U64,
+    pub account_address: Address,
+}
+
+impl From<EventKey> for EventKeyWrapper {
+    fn from(event_key: EventKey) -> Self {
+        Self {
+            creation_number: U64(event_key.get_creation_number()),
+            account_address: Address::from(event_key.get_creator_address()),
+        }
+    }
+}
+
+impl From<EventKeyWrapper> for EventKey {
+    fn from(event_key_wrapper: EventKeyWrapper) -> EventKey {
+        EventKey::new(
+            event_key_wrapper.creation_number.0,
+            event_key_wrapper.account_address.into(),
+        )
     }
 }

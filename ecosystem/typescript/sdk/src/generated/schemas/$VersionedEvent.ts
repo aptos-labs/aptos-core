@@ -8,12 +8,18 @@ export const $VersionedEvent = {
             type: 'U64',
             isRequired: true,
         },
-        key: {
-            type: 'EventKey',
+        guid: {
+            type: 'all-of',
+            contains: [{
+                type: 'EventKeyWrapper',
+            }],
             isRequired: true,
         },
         sequence_number: {
-            type: 'U64',
+            type: 'all-of',
+            contains: [{
+                type: 'U64',
+            }],
             isRequired: true,
         },
         type: {

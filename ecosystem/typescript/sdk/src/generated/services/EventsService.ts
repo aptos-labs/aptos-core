@@ -2,7 +2,6 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Address } from '../models/Address';
-import type { EventKey } from '../models/EventKey';
 import type { IdentifierWrapper } from '../models/IdentifierWrapper';
 import type { MoveStructTag } from '../models/MoveStructTag';
 import type { U64 } from '../models/U64';
@@ -16,10 +15,17 @@ export class EventsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
 
     /**
-     * Get events by event key
-     * This endpoint allows you to get a list of events of a specific type
-     * as identified by its event key, which is a globally unique ID.
-     * @param eventKey Event key to retrieve events by
+     * Get events by creation number
+     * Event streams are globally identifiable by an account `address` and
+     * monotonically increasing `creation_number`, one per event stream
+     * originating from the given account. This API returns events
+     * corresponding to that event stream.
+     * @param address Address of account with or without a `0x` prefix. This is should be
+     * the account that published the Move module that defined the event
+     * stream you are trying to read, not any account he event might be
+     * affecting.
+     * @param creationNumber Creation number corresponding to the event stream originating
+     * from the given account.
      * @param start Starting sequence number of events.
      *
      * By default, will retrieve the most recent events
@@ -29,16 +35,18 @@ export class EventsService {
      * @returns VersionedEvent
      * @throws ApiError
      */
-    public getEventsByEventKey(
-        eventKey: EventKey,
+    public getEventsByCreationNumber(
+        address: Address,
+        creationNumber: U64,
         start?: U64,
         limit?: number,
     ): CancelablePromise<Array<VersionedEvent>> {
         return this.httpRequest.request({
             method: 'GET',
-            url: '/events/{event_key}',
+            url: '/accounts/{address}/events/{creation_number}',
             path: {
-                'event_key': eventKey,
+                'address': address,
+                'creation_number': creationNumber,
             },
             query: {
                 'start': start,
@@ -49,9 +57,9 @@ export class EventsService {
 
     /**
      * Get events by event handle
-     * This API extracts event key from the account resource identified
-     * by the `event_handle_struct` and `field_name`, then returns
-     * events identified by the event key.
+     * This API uses the given account `address`, `event_handle`, and
+     * `field_name` to build a key that globally identify an event stream.
+     * It then uses this key to return events from tha stream.
      * @param address Address of account with or without a `0x` prefix
      * @param eventHandle Name of struct to lookup event handle e.g. `0x1::account::Account`
      * @param fieldName Name of field to lookup event handle e.g. `withdraw_events`

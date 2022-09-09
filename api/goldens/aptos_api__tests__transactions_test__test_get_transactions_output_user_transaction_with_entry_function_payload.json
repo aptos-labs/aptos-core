@@ -82,7 +82,10 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "guid": {
+          "creation_number": "3",
+          "account_address": "0x1"
+        },
         "sequence_number": "1",
         "type": "0x1::block::NewBlockEvent",
         "data": {
@@ -251,7 +254,10 @@
     },
     "events": [
       {
-        "key": "0x000000000000000034bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf"
+        },
         "sequence_number": "0",
         "type": "0x1::account::CoinRegisterEvent",
         "data": {

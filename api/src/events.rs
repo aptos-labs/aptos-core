@@ -13,10 +13,9 @@ use crate::response::{
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
-    Address, AptosErrorCode, EventKey, IdentifierWrapper, LedgerInfo, MoveStructTag, U64,
-};
+use aptos_api_types::{Address, AptosErrorCode, IdentifierWrapper, LedgerInfo, MoveStructTag, U64};
 use aptos_api_types::{AsConverter, VersionedEvent};
+use aptos_types::event::EventKey;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
 
@@ -26,22 +25,29 @@ pub struct EventsApi {
 
 #[OpenApi]
 impl EventsApi {
-    /// Get events by event key
+    /// Get events by creation number
     ///
-    /// This endpoint allows you to get a list of events of a specific type
-    /// as identified by its event key, which is a globally unique ID.
+    /// Event streams are globally identifiable by an account `address` and
+    /// monotonically increasing `creation_number`, one per event stream
+    /// originating from the given account. This API returns events
+    /// corresponding to that event stream.
     #[oai(
-        path = "/events/:event_key",
+        path = "/accounts/:address/events/:creation_number",
         method = "get",
-        operation_id = "get_events_by_event_key",
+        operation_id = "get_events_by_creation_number",
         tag = "ApiTags::Events"
     )]
-    async fn get_events_by_event_key(
+    async fn get_events_by_creation_number(
         &self,
         accept_type: AcceptType,
-        // TODO: https://github.com/aptos-labs/aptos-core/issues/2278
-        /// Event key to retrieve events by
-        event_key: Path<EventKey>,
+        /// Address of account with or without a `0x` prefix. This is should be
+        /// the account that published the Move module that defined the event
+        /// stream you are trying to read, not any account the event might be
+        /// affecting.
+        address: Path<Address>,
+        /// Creation number corresponding to the event stream originating
+        /// from the given account.
+        creation_number: Path<U64>,
         /// Starting sequence number of events.
         ///
         /// By default, will retrieve the most recent events
@@ -57,20 +63,21 @@ impl EventsApi {
         let page = Page::new(start.0.map(|v| v.0), limit.0);
 
         // Ensure that account exists
-        let account = Account::new(
-            self.context.clone(),
-            event_key.0 .0.get_creator_address().into(),
-            None,
-        )?;
+        let account = Account::new(self.context.clone(), address.0, None)?;
         account.account_state()?;
-        self.list(account.latest_ledger_info, accept_type, page, event_key.0)
+        self.list(
+            account.latest_ledger_info,
+            accept_type,
+            page,
+            EventKey::new(creation_number.0 .0, address.0.into()),
+        )
     }
 
     /// Get events by event handle
     ///
-    /// This API extracts event key from the account resource identified
-    /// by the `event_handle_struct` and `field_name`, then returns
-    /// events identified by the event key.
+    /// This API uses the given account `address`, `event_handle`, and
+    /// `field_name` to build a key that globally identify an event stream.
+    ///  It then uses this key to return events from that stream.
     #[oai(
         path = "/accounts/:address/events/:event_handle/:field_name",
         method = "get",
@@ -101,9 +108,7 @@ impl EventsApi {
             .check_api_output_enabled("Get events by event handle", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
-        let key = account
-            .find_event_key(event_handle.0, field_name.0.into())?
-            .into();
+        let key = account.find_event_key(event_handle.0, field_name.0.into())?;
         self.list(account.latest_ledger_info, accept_type, page, key)
     }
 }
@@ -121,7 +126,7 @@ impl EventsApi {
         let events = self
             .context
             .get_events(
-                &event_key.into(),
+                &event_key,
                 page.start_option(),
                 page.limit(&latest_ledger_info)?,
                 ledger_version,

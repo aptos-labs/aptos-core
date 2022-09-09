@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- **[Breaking Change]** The `getEventsByEventKey` function has been removed. In its place, a new function called `getEventsByCreationNumber` has been added. For more information on this change, see the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md).
+
 ## 1.3.12 (2022-09-08)
 
 - Feature to rotate auth key for single signature account

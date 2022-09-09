@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, AptosError, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
+    Address, AptosError, EntryFunctionId, EventKeyWrapper, HashValue, HexEncodedBytes,
+    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
+    MoveValue, U64,
 };
 
 use anyhow::{bail, Context as AnyhowContext};
@@ -32,7 +33,6 @@ use std::{
 
 // TODO: Add read_only / write_only (and their all variants) where appropriate.
 // TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
-// TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
 /// Transaction data
 ///
@@ -475,7 +475,9 @@ pub struct BlockMetadataTransaction {
 /// An event from a transaction
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct Event {
-    pub key: EventKey,
+    /// The globally unique identifer of this event stream.
+    pub guid: EventKeyWrapper,
+    /// The sequence number of the event
     pub sequence_number: U64,
     #[serde(rename = "type")]
     #[oai(rename = "type")]
@@ -488,7 +490,7 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
-                key: (*v0.key()).into(),
+                guid: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
                 data,
@@ -501,7 +503,9 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct VersionedEvent {
     pub version: U64,
-    pub key: EventKey,
+    /// The globally unique identifier of this event stream.
+    pub guid: EventKeyWrapper,
+    /// The sequence number of the event
     pub sequence_number: U64,
     #[serde(rename = "type")]
     #[oai(rename = "type")]
@@ -515,7 +519,7 @@ impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
         match &event.event {
             ContractEvent::V0(v0) => Self {
                 version: event.transaction_version.into(),
-                key: (*v0.key()).into(),
+                guid: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
                 data,

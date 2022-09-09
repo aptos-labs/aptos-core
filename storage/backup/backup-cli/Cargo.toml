@@ -13,7 +13,7 @@ anyhow = "1.0.57"
 async-trait = "0.1.53"
 bcs = "0.1.3"
 bytes = "1.1.0"
-clap = { version = "3.1.8", features=["derive"]}
+clap = { version = "3.1.8", features = ["derive"] }
 futures = "0.3.21"
 itertools = "0.10.0"
 num_cpus = "1.13.1"
