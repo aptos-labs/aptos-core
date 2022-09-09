@@ -159,13 +159,6 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - uses: ./.github/actions/upload-test-results
-        with:
-          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          SUITE: rust-unit
-
   rust-smoke-test:
     runs-on: high-perf-docker
     steps:
@@ -180,13 +173,6 @@ jobs:
       - run: cargo build --bin=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-
-      - uses: ./.github/actions/upload-test-results
-        with:
-          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          SUITE: rust-smoke
 
       - name: Upload smoke test logs for failures
         uses: actions/upload-artifact@v3
