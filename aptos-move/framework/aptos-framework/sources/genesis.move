@@ -156,7 +156,7 @@ module aptos_framework::genesis {
             aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
 
             // Initialize the stake pool and join the validator set.
-            stake::initialize_owner_internal(
+            stake::initialize_stake_owner(
                 owner,
                 validator.stake_amount,
                 validator.operator_address,
