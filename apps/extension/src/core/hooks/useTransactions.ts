@@ -21,6 +21,10 @@ type UserTransaction = Types.UserTransaction;
 type RawTransaction = TxnBuilderTypes.RawTransaction;
 type TransactionPayload = TxnBuilderTypes.TransactionPayload;
 
+// Taken from https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
+export const maxPricePerGasUnit = 10_000;
+export const maxNumberOfGasUnits = 4_000_000;
+
 function isSequenceNumberTooOldError(err: unknown) {
   return err instanceof MoveVmError
     && err.statusCode === MoveStatusCode.SEQUENCE_NUMBER_TOO_OLD;
@@ -130,7 +134,7 @@ export function useTransactionSimulation(
       const payload = payloadFactory();
       // TODO: Should cap by maximum maxGasAmount
       const txnOptions = options?.maxGasOctaAmount
-        ? { maxGasAmount: options.maxGasOctaAmount }
+        ? { maxGasAmount: Math.min(options.maxGasOctaAmount, maxNumberOfGasUnits) }
         : {};
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
