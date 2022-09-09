@@ -3,67 +3,54 @@ title: "State Synchronization"
 slug: "state-sync"
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # State Synchronization
 
-State sync is a component that runs within each Aptos node and is responsible
-for synchronizing the node to the latest blockchain state. It is required by
-both validators and fullnodes to ensure that they do not fall behind the rest
-of the network. To achieve this, state sync identifies and fetches new
-blockchain data from peers, validates the data and persists it to local
-storage.
+Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchroned to the latest Aptos blockchain state, and must not fall behind the rest
+of the network. The state synchronization (state sync) component that runs on each Aptos node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
 
 ## State sync modes
 
-State sync can operate in different synchronization modes, depending on the
-data the node operator would like to synchronize. There are two different
-operations that users can configure when running their nodes:
-1. **Bootstrapping mode**: The bootstrapping mode is the mode the node uses to 
-get up-to-date. There are three possible bootstrapping modes:
-   1. **Execute all transactions since genesis**. This will retrieve all
-   transactions since genesis (i.e., the start of the blockchain's history) and
-   re-execute those transactions. Naturally, this synchronization mode takes
-   the longest amount of time.
-   2. **Apply transaction outputs since genesis**. This will retrieve all
-   transactions since genesis but it will skip transaction execution and only
-   apply the outputs of the transactions as previously produced by validator
-   execution. This reduces the amount of CPU time required.
-   3. **Download the latest state directly**. This will skip the transaction
-   history in the blockchain and download the latest blockchain state directly.
-   As a result, the node won't have historical transaction data, but it will
-   be able to catch up much more quickly.
+If you are a node operator, you can configure the state sync mode to operate in one of the two synchronization modes, depending on the state of the node, i.e., whether the node has just started or has been running for some time. 
 
-2. **Continuous syncing mode**: The continuous syncing mode is the mode the
-node uses to stay up-to-date once bootstrapped. There are two possible
-continuous syncing modes:
-   1. **Executing transactions**. This will keep the node up-to-date by
-   executing new transactions as they are committed to the blockchain.
-   2. **Applying transaction outputs**. This will keep the node up-to-date by
-   skipping transaction execution and simply applying the outputs of the
-   transactions as previously produced by validator execution.
+### Bootstrapping mode
 
-The sections below provide instructions for how to configure your node for
-various different use-cases.
+When the node starts the state sync should be in the bootstrapping mode so that the node can catch up to the Aptos network. There are three bootstrapping modes:
+
+- **Execute all the transactions since genesis**. In this state sync mode the node will retrieve from the Aptos network all the transactions since genesis, i.e., the start of the blockchain's history, and re-execute those transactions. Naturally, this synchronization mode takes the longest amount of time.
+- **Apply transaction outputs since genesis**. In this state sync mode the node will retrieve all the transactions since genesis but it will skip the transaction execution and only apply the outputs of the transactions that were previously produced by validator execution. This mode reduces the amount of CPU time required.
+- **Download the latest state directly**. In this state sync mode the node will skip the transaction history in the blockchain and will download only the latest blockchain state directly. As a result, the node will not have the historical transaction data, but it will be able to catch up to the Aptos network much more rapidly.
+
+### Continuous syncing mode
+
+After the node has bootstrapped and caught up to the Aptos network initially, the node's state sync should be in the continuous syncing mode to stay up-to-date with the blockchain. There are two continuous syncing modes:
+
+- **Executing transactions**. This state sync mode will keep the node up-to-date by executing new transactions as they are committed to the blockchain.
+- **Applying transaction outputs**. This state sync mode will keep the node up-to-date by skipping the transaction execution and only applying the outputs of the transactions as previously produced by validator execution.
+
+## Configuring the state sync modes
+
+The below sections provide instructions for how to configure your node for different use cases.
 
 ### Executing all transactions
 
-To execute all transactions since genesis and continue to execute new
+To execute all the transactions since genesis and continue to execute new
 transactions as they are committed, add the following to your node
-configuration file:
+configuration file (for example,`fullnode.yaml` or `validator.yaml`):
 
-```
+```yaml
  state_sync:
      state_sync_driver:
          bootstrapping_mode: ExecuteTransactionsFromGenesis
          continuous_syncing_mode: ExecuteTransactions
 ```
 
+:::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-`aptos_state_sync_version{type="synced"}` metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+:::
 
 ### Applying all transaction outputs
 
@@ -71,25 +58,29 @@ To apply all transaction outputs since genesis and continue to apply new
 transaction outputs as transactions are committed, add the following to your
 node configuration file:
 
-```
+```yaml
  state_sync:
      state_sync_driver:
          bootstrapping_mode: ApplyTransactionOutputsFromGenesis
          continuous_syncing_mode: ApplyTransactionOutputs
 ```
 
+:::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-`aptos_state_sync_version{type="synced"}` metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+:::
 
-### Fast Syncing
+## Fast syncing
 
-Note: this is the fastest and cheapest method of syncing your node.
+:::tip 
+This is the fastest and cheapest method of syncing your node.
+:::
 
 To download the latest blockchain state and continue to apply new
 transaction outputs as transactions are committed, add the following to your
 node configuration file:
 
-```
+```yaml
  state_sync:
      state_sync_driver:
          bootstrapping_mode: DownloadLatestStates
@@ -104,10 +95,10 @@ amount of data, network bandwidth and node resources available.
 
 ## State sync architecture
 
-State sync is broken down into 4 sub-components, each with a specific purpose:
+The state synchronization component is comprised of four sub-components, each with a specific purpose:
 
 1. **Driver**: The driver “drives” the synchronization progress of the node.
-It is responsible for verifying all data that it receives from peers. Data
+It is responsible for verifying all data that the node receives from peers. Data
 is forwarded from peers via the data streaming service. After data
 verification, the driver persists the data to storage.
 2. **Data Streaming Service**: The streaming service creates data streams for
@@ -127,7 +118,7 @@ each node which allows peers to fetch data. For example, the data client on
 peer `X` can send the data request to the storage service on peer `Y` to fetch
 a batch of transactions.
 
-### Code structure
+## State sync code structure
 
 The state sync code structure matches the architecture outlined above:
 - **Driver:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver)
