@@ -6,6 +6,7 @@ use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::success_criteria::SuccessCriteria;
+use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use forge::{ForgeConfig, Options, *};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -428,7 +429,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
             .with_initial_fullnode_count(4)
             .with_network_tests(&[&StateSyncPerformance])
-            .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None)),
+            .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None)),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(&[&SimpleValidatorUpgrade])
@@ -437,12 +438,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 false,
                 Some(Duration::from_secs(240)),
+                None,
             )),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config
             .with_network_tests(&[&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None)),
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
@@ -456,6 +458,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(240)),
+                None,
             )),
         "account_creation_state_sync" => config
             .with_network_tests(&[&PerformanceBenchmarkWithFN])
@@ -476,6 +479,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(240)),
+                None,
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
@@ -497,6 +501,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(30)),
+                None,
             )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
@@ -525,6 +530,12 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             } else {
                 60
             })),
+            Some(SystemMetricsThreshold::new(
+                // Threshold of more than 12 CPU cores for 30% of the time
+                MetricsThreshold::new(12, 30),
+                // Threshold of more than 5 GB of memory for 30% of the time
+                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+            )),
         ))
 }
 
@@ -547,6 +558,12 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
             10000,
             true,
             None,
+            Some(SystemMetricsThreshold::new(
+                // Threshold of more than 12 CPU cores for 30% of the time
+                MetricsThreshold::new(12, 30),
+                // Threshold of more than 5 GB of memory for 30% of the time
+                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+            )),
         ))
 }
 

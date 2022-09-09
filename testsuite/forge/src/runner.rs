@@ -16,6 +16,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::success_criteria::SuccessCriteria;
+use crate::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use framework::ReleaseBundle;
 use rand::rngs::OsRng;
 
@@ -248,7 +249,18 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 30000,
             }),
-            success_criteria: SuccessCriteria::new(3500, 10000, true, None),
+            success_criteria: SuccessCriteria::new(
+                3500,
+                10000,
+                true,
+                None,
+                Some(SystemMetricsThreshold::new(
+                    // Threshold of more than 12 CPU cores for 30% of the time
+                    MetricsThreshold::new(12, 30),
+                    // Threshold of more than 5 GB of memory for 30% of the time
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+            ),
         }
     }
 }
