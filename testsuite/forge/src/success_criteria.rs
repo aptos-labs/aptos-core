@@ -4,7 +4,6 @@
 use anyhow::bail;
 use serde::Serialize;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 use transaction_emitter_lib::emitter::stats::TxnStats;
 
 use crate::system_metrics::SystemMetricsThreshold;
@@ -67,14 +66,14 @@ impl SuccessCriteria {
         // TODO(skedia) Add latency success criteria after we have support for querying prometheus
         // latency
 
-        let runtime = Runtime::new().unwrap();
-
         if let Some(system_metrics_threshold) = self.system_metrics_threshold.clone() {
-            runtime.block_on(swarm.ensure_healthy_system_metrics(
-                start_time as i64,
-                end_time as i64,
-                system_metrics_threshold,
-            ))?;
+            swarm
+                .ensure_healthy_system_metrics(
+                    start_time as i64,
+                    end_time as i64,
+                    system_metrics_threshold,
+                )
+                .await?;
         }
 
         Ok(())
