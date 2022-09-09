@@ -51,7 +51,7 @@ async fn create_swarm(num_nodes: usize, max_block_size: u64) -> (LocalSwarm, Vec
     let swarm = SwarmBuilder::new_local(num_nodes)
         .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
-            config.consensus.max_block_size = max_block_size;
+            config.consensus.max_block_txns = max_block_size;
             config.consensus.round_initial_timeout_ms = 1000;
             // no increase in timeout, to have stable round/second rate.
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
