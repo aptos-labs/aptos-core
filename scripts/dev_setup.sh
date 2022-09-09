@@ -956,6 +956,7 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
     export DOTNET_INSTALL_DIR="/opt/dotnet/"
     mkdir -p "$DOTNET_INSTALL_DIR" || true
   fi
+  install_pkg unzip "$PACKAGE_MANAGER"
   install_z3
   install_cvc5
   install_dotnet
@@ -992,7 +993,13 @@ fi
 
 install_python3
 pip3 install pre-commit
-pre-commit install
+
+# For now best effort install, will need to improve later
+if command -v pre-commit; then
+  pre-commit install
+else
+  ~/.local/bin/pre-commit install
+fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
 cat <<EOF
