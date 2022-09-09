@@ -60,7 +60,6 @@ spec:
             - --target-tps={{ .config.target_tps }}
             - --duration={{ .config.duration }}
             - --txn-expiration-time-secs={{ .config.txn_expiration_time_secs }}
-            {{- end }}
             env:
             - name: RUST_BACKTRACE
               value: "1"
