@@ -23,7 +23,7 @@
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "generate-client": "yarn && openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "./checked_publish.sh"
   },
   "repository": {
