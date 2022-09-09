@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
     check_for_container_restart, create_k8s_client, delete_all_chaos, get_free_port,
     get_stateful_set_image,
+    interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold},
     node::K8sNode,
     prometheus::{self, query_with_metadata},
     query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
@@ -103,10 +103,10 @@ impl K8sSwarm {
         })
     }
 
-    fn get_rest_api_url(&self) -> String {
+    fn get_rest_api_url(&self, idx: usize) -> String {
         self.validators
             .values()
-            .next()
+            .nth(idx)
             .unwrap()
             .rest_api_endpoint()
             .to_string()
@@ -240,7 +240,7 @@ impl Swarm for K8sSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        let rest_api_url = self.get_rest_api_url();
+        let rest_api_url = self.get_rest_api_url(0);
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
@@ -341,6 +341,11 @@ impl Swarm for K8sSwarm {
         } else {
             bail!("No prom client");
         }
+    }
+
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+        let rest_api_url = self.get_rest_api_url(idx);
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 }
 
