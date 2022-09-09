@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Union
 from unittest.mock import patch
 
-from . import forge
-from .forge import (
+import forge
+from forge import (
     FakeTime,
     ForgeCluster,
     ForgeFormatter,
