@@ -45,6 +45,7 @@ const sidebars = {
         "concepts/basics-accounts",
         "concepts/basics-events",
         "concepts/basics-gas-txn-fee",
+        "concepts/aptos-token",
         "concepts/basics-merkle-proof",
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
