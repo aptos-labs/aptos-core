@@ -49,7 +49,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let mut first_batch = all_validators.clone();
         let second_batch = first_batch.split_off(first_batch.len() / 2);
         let first_node = first_batch.pop().unwrap();
-        let duration = Duration::from_secs(5);
+        let duration = Duration::from_secs(30);
 
         let msg = format!(
             "1. Check liveness of validators at old version: {}",
