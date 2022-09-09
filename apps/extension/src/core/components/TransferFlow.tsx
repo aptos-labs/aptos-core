@@ -9,8 +9,6 @@ import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
 import {
   useCoinTransferTransaction,
 } from 'core/mutations/transaction';
-import useDebounce from 'core/hooks/useDebounce';
-import { OCTA_POSITIVE_EXPONENT } from 'core/utils/coin';
 import { transferAptFormId, TransferFlowProvider, useTransferFlow } from 'core/hooks/useTransferFlow';
 import { SubmitHandler } from 'react-hook-form';
 import { coinTransferAbortToast, coinTransferSuccessToast, transactionErrorToast } from './Toast';
@@ -37,6 +35,8 @@ export interface CoinTransferFormData {
 
 function TransferFlow() {
   const {
+    amountAptNumber,
+    amountOctaNumber,
     backOnClick,
     canSubmitForm,
     closeDrawer,
@@ -45,14 +45,7 @@ function TransferFlow() {
     validRecipientAddress,
   } = useTransferFlow();
 
-  const { handleSubmit, reset: resetForm, watch } = formMethods;
-
-  const amount = watch('amount');
-  const numberAmountApt = parseFloat(amount || '0');
-  const numberAmountOcta = parseInt((numberAmountApt * OCTA_POSITIVE_EXPONENT).toString(), 10);
-  const {
-    debouncedValue: debouncedNumberAmountOcta,
-  } = useDebounce(numberAmountOcta, 500);
+  const { handleSubmit, reset: resetForm } = formMethods;
 
   const {
     mutateAsync: submitCoinTransfer,
@@ -66,13 +59,13 @@ function TransferFlow() {
 
     try {
       const onChainTxn = await submitCoinTransfer({
-        amount: debouncedNumberAmountOcta,
+        amount: amountOctaNumber,
         doesRecipientExist: doesRecipientAccountExist!,
         recipient: validRecipientAddress!,
       });
 
       if (onChainTxn.success) {
-        coinTransferSuccessToast(debouncedNumberAmountOcta, onChainTxn);
+        coinTransferSuccessToast(amountAptNumber, onChainTxn);
         resetForm();
         backOnClick();
         closeDrawer();

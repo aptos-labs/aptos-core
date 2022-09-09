@@ -49,7 +49,7 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
     address: validRecipientAddress,
   });
 
-  const amountAptNumber = parseFloat(amount || '0');
+  const amountAptNumber = parseFloat(amount?.replace(/[^0-9.]/g, '') || '0');
   const amountOctaNumber = parseInt((amountAptNumber * OCTA_POSITIVE_EXPONENT).toString(), 10);
   const {
     debouncedValue: debouncedNumberAmountOcta,
