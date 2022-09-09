@@ -33,9 +33,9 @@ export default class extends Controller {
 
   declare readonly transactionFailedErrorTarget: HTMLElement;
   declare readonly dateMintedTarget: HTMLElement;
-  declare readonly mintNumberTarget: HTMLElement;
+  declare readonly mintNumberTargets: HTMLElement[];
   declare readonly addressTarget: HTMLElement;
-  declare readonly imageTarget: HTMLImageElement;
+  declare readonly imageTargets: HTMLImageElement[];
 
   declare readonly transactionHashValue: string;
   declare readonly apiUrlValue: string;
@@ -78,10 +78,14 @@ export default class extends Controller {
     const imageUrl = createEvent.data.uri;
 
     this.dateMintedTarget.textContent = dateMinted.toDateString();
-    this.mintNumberTarget.textContent = `#${mintNumber}`;
+    this.mintNumberTargets.forEach((el) => {
+      el.textContent = `#${mintNumber}`;
+    });
     this.addressTarget.textContent =
       transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
     this.addressTarget.title = transaction.sender;
-    this.imageTarget.src = imageUrl;
+    this.imageTargets.forEach((el) => {
+      el.src = imageUrl;
+    });
   };
 }
