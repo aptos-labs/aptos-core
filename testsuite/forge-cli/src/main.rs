@@ -441,7 +441,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 false,
                 Some(Duration::from_secs(240)),
-            )),
+            ))
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 30.into();
+            })),
         "config" => config.with_network_tests(vec![&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(vec![&NetworkPartitionTest]),
         "network_latency" => config
