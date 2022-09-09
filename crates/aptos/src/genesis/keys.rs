@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::OptionalPoolAddressArgs;
+use crate::common::types::{AccountAddressWrapper, OptionalPoolAddressArgs};
 use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
 use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
+use crate::governance::CompileScriptFunction;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -15,6 +16,7 @@ use crate::{
 use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
 use aptos_genesis::keys::PublicIdentity;
 use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
+use aptos_types::transaction::{Script, Transaction, WriteSetPayload};
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::{Path, PathBuf};
@@ -268,6 +270,48 @@ impl CliCommand<()> for GenerateLayoutTemplate {
             self.output_file.as_path(),
             &self.output_file.display().to_string(),
             to_yaml(&layout)?.as_bytes(),
+        )
+    }
+}
+
+/// Generate a WriteSet genesis compiled from a script file.
+///
+/// This will compile a piece of Move script and generate a writeset from that script.
+#[derive(Parser)]
+pub struct GenerateAdminWriteSet {
+    /// Path of the output genesis file
+    #[clap(long, parse(from_os_str))]
+    pub(crate) output_file: PathBuf,
+
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+
+    #[clap(long)]
+    pub(crate) execute_as: AccountAddressWrapper,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<()> for GenerateAdminWriteSet {
+    fn command_name(&self) -> &'static str {
+        "GenerateLayoutTemplate"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile(self.prompt_options)?;
+
+        let txn = Transaction::GenesisTransaction(WriteSetPayload::Script {
+            execute_as: self.execute_as.account_address,
+            script: Script::new(bytecode, vec![], vec![]),
+        });
+
+        write_to_user_only_file(
+            self.output_file.as_path(),
+            &self.output_file.display().to_string(),
+            &bcs::to_bytes(&txn).map_err(CliError::from)?,
         )
     }
 }
