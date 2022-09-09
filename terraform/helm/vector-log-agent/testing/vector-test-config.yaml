@@ -1,0 +1,14 @@
+sources:
+  kubernetes_logs:
+    type: stdin
+    decoding:
+      codec: json
+
+sinks:
+  test_sink:
+    type: console
+    inputs:
+      - final_logs
+    target: stdout
+    encoding: 
+      codec: json
