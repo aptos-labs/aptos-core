@@ -5,10 +5,10 @@ use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
     nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
     Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
-    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
-    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
-    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
-    VALIDATOR_SERVICE_SUFFIX,
+    FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
+    GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
+    MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
+    VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
@@ -539,6 +539,7 @@ pub fn construct_genesis_helm_values(
     value["chain"]["root_key"] = DEFAULT_ROOT_KEY.into();
     value["genesis"]["numValidators"] = num_validators.into();
     value["genesis"]["validator"]["internal_host_suffix"] = validator_internal_host_suffix.into();
+    value["genesis"]["validator"]["key_seed"] = FORGE_KEY_SEED.into();
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
     value["labels"]["forge-namespace"] = kube_namespace.into();
     value["labels"]["forge-image-tag"] = genesis_image_tag.into();
@@ -989,6 +990,7 @@ genesis:
   numValidators: 5
   validator:
     internal_host_suffix: validator-lb
+    key_seed: \"80001\"
   fullnode:
     internal_host_suffix: fullnode-lb
 labels:

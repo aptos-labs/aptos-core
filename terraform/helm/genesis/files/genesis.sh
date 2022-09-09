@@ -41,11 +41,17 @@ echo "FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX}"
 echo "STAKE_AMOUNT=${STAKE_AMOUNT}"
 echo "NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE}"
 echo "LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT}"
+echo "RANDOM_SEED=${RANDOM_SEED}"
+
+RANDOM_SEED_IN_DECIMAL=$(printf "%d" 0x${RANDOM_SEED})
 
 # generate all validator configurations
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     username="${USERNAME_PREFIX}-${i}"
     user_dir="${WORKSPACE}/${username}"
+    seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL}+i))")
+    echo "seed=$seed for ${i}th validator"
+
     mkdir $user_dir
 
     if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]; then
@@ -68,7 +74,7 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
 
     echo "CUR_STAKE_AMOUNT=${CUR_STAKE_AMOUNT} for ${i} validator"
 
-    aptos genesis generate-keys --output-dir $user_dir
+    aptos genesis generate-keys --random-seed $seed --output-dir $user_dir
     aptos genesis set-validator-configuration --owner-public-identity-file $user_dir/public-keys.yaml --local-repository-dir $WORKSPACE \
         --username $username \
         --validator-host $validator_host \
