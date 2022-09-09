@@ -66,6 +66,9 @@ async fn test_block_request_no_txns() {
                 _ => panic!("Unexpected payload {:?}", payload),
             }
         }
+        _ => {
+            todo!()
+        }
     }
 
     std::mem::drop(consensus_to_quorum_store_sender);

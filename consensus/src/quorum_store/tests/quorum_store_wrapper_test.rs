@@ -11,6 +11,7 @@ use crate::quorum_store::{
 };
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::transaction::SignedTransaction;
 use consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
@@ -53,7 +54,12 @@ async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
     quorum_store_to_mempool_receiver: &mut Receiver<QuorumStoreRequest>,
 ) -> Vec<TransactionSummary> {
-    if let QuorumStoreRequest::GetBatchRequest(_max_batch_size, exclude_txns, callback) = timeout(
+    if let QuorumStoreRequest::GetBatchRequest(
+        _max_batch_size,
+        _max_block_bytes,
+        exclude_txns,
+        callback,
+    ) = timeout(
         Duration::from_millis(1_000),
         quorum_store_to_mempool_receiver.select_next_some(),
     )
@@ -92,6 +98,7 @@ async fn test_batch_creation() {
         memory_quota: 100000000,
         db_quota: 10000000000,
         mempool_txn_pull_max_count: 100,
+        mempool_txn_pull_max_bytes: 10000000,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -101,6 +108,7 @@ async fn test_batch_creation() {
         wrapper_quorum_store_tx,
         10_000,
         config.mempool_txn_pull_max_count,
+        config.mempool_txn_pull_max_bytes,
         config.max_batch_bytes,
         config.max_batch_expiry_round_gap,
         config.end_batch_ms,
@@ -197,6 +205,7 @@ async fn test_block_request() {
         memory_quota: 100000000,
         db_quota: 10000000000,
         mempool_txn_pull_max_count: 100,
+        mempool_txn_pull_max_bytes: 10000000,
     };
 
     let mut wrapper = QuorumStoreWrapper::new(
@@ -206,24 +215,34 @@ async fn test_block_request() {
         wrapper_quorum_store_tx,
         10_000,
         config.mempool_txn_pull_max_count,
+        config.mempool_txn_pull_max_bytes,
         config.max_batch_bytes,
         config.max_batch_expiry_round_gap,
         config.end_batch_ms,
     );
 
     let digest = HashValue::random();
-    let proof = ProofOfStore::new(SignedDigestInfo::new(digest, LogicalTime::new(0, 10)));
+    let proof = ProofOfStore::new(
+        SignedDigestInfo::new(digest, LogicalTime::new(0, 10)),
+        AggregateSignature::empty(),
+    );
     wrapper.insert_proof(proof.clone()).await;
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = WrapperCommand::GetBlockRequest(
         1,
         100,
+        10000000,
         PayloadFilter::InQuorumStore(HashSet::new()),
         callback_tx,
     );
     wrapper.handle_consensus_request(req).await;
-    let ConsensusResponse::GetBlockResponse(payload) = callback_rx.await.unwrap().unwrap();
+    let payload =
+        if let ConsensusResponse::GetBlockResponse(payload) = callback_rx.await.unwrap().unwrap() {
+            payload
+        } else {
+            todo!()
+        };
     if let Payload::InQuorumStore(proofs) = payload {
         assert_eq!(proofs.len(), 1);
         assert_eq!(proofs[0], proof);

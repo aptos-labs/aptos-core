@@ -726,7 +726,6 @@ fn response_on_block_retrieval() {
         };
         node.block_store
             .process_block_retrieval(single_block_request)
-            .await
             .unwrap();
         match rx1.await {
             Ok(Ok(bytes)) => {
@@ -750,7 +749,6 @@ fn response_on_block_retrieval() {
 
         node.block_store
             .process_block_retrieval(missing_block_request)
-            .await
             .unwrap();
         match rx2.await {
             Ok(Ok(bytes)) => {
@@ -773,7 +771,6 @@ fn response_on_block_retrieval() {
         };
         node.block_store
             .process_block_retrieval(many_block_request)
-            .await
             .unwrap();
         match rx3.await {
             Ok(Ok(bytes)) => {

@@ -6,7 +6,7 @@ use crate::quorum_store::{
     tests::utils::create_vec_serialized_transactions,
     types::{BatchId, SerializedTransaction},
 };
-use claim::{assert_ge, assert_matches, assert_ok, assert_ok_eq};
+use claims::{assert_ge, assert_matches, assert_ok, assert_ok_eq};
 
 fn split_vec(txns: &Vec<SerializedTransaction>, size: usize) -> Vec<Vec<SerializedTransaction>> {
     let mut ret = Vec::new();
