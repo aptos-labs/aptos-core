@@ -131,7 +131,7 @@ export default class extends Controller<HTMLAnchorElement> {
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {
-        const { address } = await window.martian!.account();
+        const { address } = await window.martian!.connect();
         const txnHash = await window.martian!.generateSignAndSubmitTransaction(
           address,
           transaction
