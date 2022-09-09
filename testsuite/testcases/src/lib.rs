@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
+pub mod consensus_reliability_tests;
 pub mod continuous_progress_test;
 pub mod forge_setup_test;
 pub mod gas_price_test;
@@ -152,8 +153,6 @@ impl NetworkTest for dyn NetworkLoadTest {
         )?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
-
-        ctx.check_for_success(&txn_stat, &actual_test_duration)?;
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
