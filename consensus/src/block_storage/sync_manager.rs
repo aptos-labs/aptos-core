@@ -105,6 +105,7 @@ impl BlockStore {
         match self.need_fetch_for_quorum_cert(qc) {
             NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
+            NeedFetchResult::QCAlreadyExist => return Ok(()),
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
