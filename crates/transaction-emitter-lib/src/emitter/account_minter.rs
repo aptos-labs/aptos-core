@@ -71,7 +71,7 @@ impl<'t> AccountMinter<'t> {
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
         let expected_num_seed_accounts =
-            if total_requested_accounts / req.rest_clients.len() > MAX_CHILD_VASP_NUM {
+            if total_requested_accounts / req.get_mint_rest_clients().len() > MAX_CHILD_VASP_NUM {
                 total_requested_accounts / MAX_CHILD_VASP_NUM + 1
             } else {
                 (total_requested_accounts / 50).max(1)
@@ -90,10 +90,11 @@ impl<'t> AccountMinter<'t> {
             .checked_add(1_000_000)
             .unwrap();
         if req.mint_to_root {
-            self.mint_to_root(&req.rest_clients, coins_for_root).await?;
+            self.mint_to_root(req.get_mint_rest_clients(), coins_for_root)
+                .await?;
         } else {
             let balance = &self
-                .pick_mint_client(&req.rest_clients)
+                .pick_mint_client(req.get_mint_rest_clients())
                 .get_account_balance(self.root_account.address())
                 .await?
                 .into_inner();
@@ -117,7 +118,7 @@ impl<'t> AccountMinter<'t> {
         // additional fund for paying gas fees later.
         let seed_accounts = self
             .create_and_fund_seed_accounts(
-                &req.rest_clients,
+                req.get_mint_rest_clients(),
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 mode_params.max_submit_batch_size,
@@ -147,8 +148,8 @@ impl<'t> AccountMinter<'t> {
             .enumerate()
             .map(|(i, seed_account)| {
                 // Spawn new threads
-                let index = i % req.rest_clients.len();
-                let cur_client = req.rest_clients[index].clone();
+                let index = i % req.get_mint_rest_clients().len();
+                let cur_client = req.get_mint_rest_clients()[index].clone();
                 create_and_fund_new_accounts(
                     seed_account,
                     num_new_child_accounts,

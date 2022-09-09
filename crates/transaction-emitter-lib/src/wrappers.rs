@@ -64,7 +64,8 @@ pub async fn emit_transactions_with_cluster(
             .invalid_transaction_ratio(args.invalid_tx)
             .transaction_mix(transaction_mix)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
-            .gas_price(1);
+            .gas_price(1)
+            .use_for_minting_only(args.use_for_minting_only_first);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }

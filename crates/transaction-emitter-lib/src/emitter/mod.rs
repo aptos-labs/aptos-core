@@ -121,6 +121,8 @@ pub struct EmitJobRequest {
     max_account_working_set: usize,
 
     txn_expiration_time_secs: u64,
+
+    use_for_minting_only: Option<usize>,
 }
 
 impl Default for EmitJobRequest {
@@ -138,6 +140,7 @@ impl Default for EmitJobRequest {
             add_created_accounts_to_pool: true,
             max_account_working_set: 1_000_000,
             txn_expiration_time_secs: 60,
+            use_for_minting_only: None,
         }
     }
 }
@@ -145,6 +148,19 @@ impl Default for EmitJobRequest {
 impl EmitJobRequest {
     pub fn new(rest_clients: Vec<RestClient>) -> Self {
         Self::default().rest_clients(rest_clients)
+    }
+
+    pub fn use_for_minting_only(mut self, use_for_minting_only: Option<usize>) -> Self {
+        self.use_for_minting_only = use_for_minting_only;
+        self
+    }
+
+    pub fn get_mint_rest_clients(&self) -> &[RestClient] {
+        if let Some(use_for_minting_only_count) = self.use_for_minting_only {
+            &self.rest_clients[..use_for_minting_only_count]
+        } else {
+            &self.rest_clients
+        }
     }
 
     pub fn rest_clients(mut self, rest_clients: Vec<RestClient>) -> Self {

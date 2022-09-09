@@ -106,6 +106,9 @@ pub struct EmitArgs {
 
     #[clap(long, min_values = 0)]
     pub transaction_type_weights: Vec<usize>,
+
+    #[clap(long)]
+    pub use_for_minting_only_first: Option<usize>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
