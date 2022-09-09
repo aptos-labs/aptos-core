@@ -6,9 +6,9 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::proof::TransactionAccumulatorSummary;
 use aptos_types::{
-    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures, transaction::Version,
+    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionAccumulatorSummary, transaction::Version,
 };
 use consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
@@ -273,7 +273,7 @@ impl RecoveryData {
     ) -> Vec<HashValue> {
         // prune all the blocks that don't have root as ancestor
         let mut tree = HashSet::new();
-        let mut to_remove = vec![];
+        let mut to_remove = HashSet::new();
         tree.insert(root_id);
         // assume blocks are sorted by round already
         blocks.retain(|block| {
@@ -281,12 +281,19 @@ impl RecoveryData {
                 tree.insert(block.id());
                 true
             } else {
-                to_remove.push(block.id());
+                to_remove.insert(block.id());
                 false
             }
         });
-        quorum_certs.retain(|qc| tree.contains(&qc.certified_block().id()));
-        to_remove
+        quorum_certs.retain(|qc| {
+            if tree.contains(&qc.certified_block().id()) {
+                true
+            } else {
+                to_remove.insert(qc.certified_block().id());
+                false
+            }
+        });
+        to_remove.into_iter().collect()
     }
 }
 
