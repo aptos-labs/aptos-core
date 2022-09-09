@@ -1,0 +1,24 @@
+name: Continuous E2E State Sync Slow Processing Catching Up Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  ### Please remember to use different namespace for different tests
+  # Performance test in an optimal setting
+  run-state-sync-slow-processing-catching-up-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test
+      FORGE_CLUSTER_NAME: aptos-forge-big-1
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: slow_processing_catching_up
+      POST_TO_SLACK: true
+      FORGE_ENABLE_FAILPOINTS: true

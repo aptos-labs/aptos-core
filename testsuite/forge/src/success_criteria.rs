@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
-use futures::future::join_all;
 use serde::Serialize;
 use std::time::Duration;
 use transaction_emitter_lib::emitter::stats::TxnStats;
@@ -69,12 +68,21 @@ impl SuccessCriteria {
         }
 
         if let Some(timeout) = self.wait_for_all_nodes_to_catchup {
-            swarm.wait_for_all_nodes_to_catchup_to_next(timeout).await?;
+            swarm
+                .wait_for_all_nodes_to_catchup_to_next(timeout)
+                .await
+                .context("Failed waiting for all nodes to catchup to next version")?;
         }
 
         if self.check_no_restarts {
-            swarm.ensure_no_validator_restart().await?;
-            swarm.ensure_no_fullnode_restart().await?;
+            swarm
+                .ensure_no_validator_restart()
+                .await
+                .context("Failed ensuring no validator restarted")?;
+            swarm
+                .ensure_no_fullnode_restart()
+                .await
+                .context("Failed ensuring no fullnode restarted")?;
         }
 
         // TODO(skedia) Add latency success criteria after we have support for querying prometheus
@@ -92,7 +100,8 @@ impl SuccessCriteria {
 
         if let Some(chain_progress_threshold) = &self.chain_progress_check {
             self.check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
-                .await?;
+                .await
+                .context("Failed check chain progress")?;
         }
 
         Ok(())
@@ -106,19 +115,10 @@ impl SuccessCriteria {
         end_version: u64,
     ) -> anyhow::Result<()> {
         // Choose client with newest ledger version to fetch NewBlockEvents from:
-        let clients = swarm.get_all_nodes_clients_with_names();
-        let ledger_infos = join_all(
-            clients
-                .iter()
-                .map(|(_name, client)| client.get_ledger_information()),
-        )
-        .await;
-        let (_max_v, client) = ledger_infos
-            .into_iter()
-            .zip(clients.into_iter())
-            .flat_map(|(resp, (_, client))| resp.map(|r| (r.into_inner().version, client)))
-            .max_by_key(|(v, _c)| *v)
-            .unwrap();
+        let (_max_v, client) = swarm
+            .get_client_with_newest_ledger_version()
+            .await
+            .context("No clients replied in check_chain_progress")?;
 
         let epochs = FetchMetadata::fetch_new_block_events(&client, None, None)
             .await
