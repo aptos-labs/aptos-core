@@ -375,11 +375,8 @@ module aptos_framework::stake {
         initial_stake_amount: u64,
         operator: address,
         voter: address,
-    ) acquires OwnerCapability, StakePool, ValidatorSet {
-        // TODO: Undo when ready
-        abort 0;
-
-        initialize_owner_internal(owner, initial_stake_amount, operator, voter);
+    ) {
+        abort 0
     }
 
     /// This is only called internally or externally during genesis.
@@ -1295,7 +1292,7 @@ module aptos_framework::stake {
         locked_until_secs: u64,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_address = signer::address_of(account);
-        initialize_stake_owner(account, 0, account_address, account_address);
+        initialize_owner_internal(account, 0, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
         coin::merge(&mut stake_pool.pending_inactive, pending_inactive);
@@ -2143,7 +2140,7 @@ module aptos_framework::stake {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        initialize_stake_owner(validator, 0, validator_address, validator_address);
+        initialize_owner_internal(validator, 0, validator_address, validator_address);
         mint_and_add_stake(validator, 100);
 
         // Join the validator set with enough stake. This should fail because the validator didn't initialize validator
@@ -2161,7 +2158,7 @@ module aptos_framework::stake {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        initialize_stake_owner(validator, 0, validator_address, validator_address);
+        initialize_owner_internal(validator, 0, validator_address, validator_address);
         mint_and_add_stake(validator, 100);
 
         // Initialize validator config.
