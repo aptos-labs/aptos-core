@@ -8,6 +8,7 @@ pub mod forge_setup_test;
 pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
+pub mod network_chaos_test;
 pub mod network_latency_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
@@ -120,9 +121,6 @@ pub trait NetworkLoadTest: Test {
         std::thread::sleep(duration);
         Ok(())
     }
-    fn finish(&self, _swarm: &mut dyn Swarm, _start_time: u64, _end_time: u64) -> Result<()> {
-        Ok(())
-    }
 }
 
 impl NetworkTest for dyn NetworkLoadTest {
@@ -150,9 +148,12 @@ impl NetworkTest for dyn NetworkLoadTest {
             .expect("Time went backwards")
             .as_secs();
 
-        ctx.check_for_success(&txn_stat, &actual_test_duration)?;
-
-        self.finish(ctx.swarm(), start_timestamp, end_timestamp)?;
+        ctx.check_for_success(
+            &txn_stat,
+            &actual_test_duration,
+            start_timestamp as i64,
+            end_timestamp as i64,
+        )?;
 
         Ok(())
     }

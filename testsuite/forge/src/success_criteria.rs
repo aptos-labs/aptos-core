@@ -4,8 +4,10 @@
 use anyhow::bail;
 use serde::Serialize;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 use transaction_emitter_lib::emitter::stats::TxnStats;
 
+use crate::system_metrics::SystemMetricsThreshold;
 use crate::{Swarm, SwarmExt};
 
 #[derive(Default, Clone, Debug, Serialize)]
@@ -14,6 +16,8 @@ pub struct SuccessCriteria {
     pub max_latency_ms: usize,
     check_no_restarts: bool,
     wait_for_all_nodes_to_catchup: Option<Duration>,
+    // Maximum amount of CPU cores and memory bytes used by the nodes.
+    system_metrics_threshold: Option<SystemMetricsThreshold>,
 }
 
 impl SuccessCriteria {
@@ -22,12 +26,14 @@ impl SuccessCriteria {
         max_latency_ms: usize,
         check_no_restarts: bool,
         wait_for_all_nodes_to_catchup: Option<Duration>,
+        system_metrics_threshold: Option<SystemMetricsThreshold>,
     ) -> Self {
         Self {
             avg_tps: tps,
             max_latency_ms,
             check_no_restarts,
             wait_for_all_nodes_to_catchup,
+            system_metrics_threshold,
         }
     }
 
@@ -35,7 +41,9 @@ impl SuccessCriteria {
         &self,
         stats: &TxnStats,
         window: &Duration,
-        swarm: &dyn Swarm,
+        swarm: &mut dyn Swarm,
+        start_time: i64,
+        end_time: i64,
     ) -> anyhow::Result<()> {
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
         let avg_tps = stats.committed / window.as_secs();
@@ -58,6 +66,17 @@ impl SuccessCriteria {
 
         // TODO(skedia) Add latency success criteria after we have support for querying prometheus
         // latency
+
+        let runtime = Runtime::new().unwrap();
+
+        if let Some(system_metrics_threshold) = self.system_metrics_threshold.clone() {
+            runtime.block_on(swarm.ensure_healthy_system_metrics(
+                start_time as i64,
+                end_time as i64,
+                system_metrics_threshold,
+            ))?;
+        }
+
         Ok(())
     }
 }
