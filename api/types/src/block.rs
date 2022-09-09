@@ -11,15 +11,10 @@ use serde::{Deserialize, Serialize};
 /// associated transactions if requested
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct Block {
-    /// The block height (number of the block from 0)
     pub block_height: U64,
-    /// The block hash
     pub block_hash: HashValue,
-    /// The block timestamp in Unix epoch microseconds
     pub block_timestamp: U64,
-    /// The first ledger version of the block inclusive
     pub first_version: U64,
-    /// The last ledger version of the block inclusive
     pub last_version: U64,
     /// The transactions in the block in sequential order
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,7 +29,6 @@ pub struct Block {
 pub struct BcsBlock {
     /// The block height (number of the block from 0)
     pub block_height: u64,
-    /// The block hash
     pub block_hash: aptos_crypto::HashValue,
     /// The block timestamp in Unix epoch microseconds
     pub block_timestamp: u64,

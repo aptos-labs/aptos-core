@@ -10,6 +10,9 @@ import type { MoveModuleBytecode } from './MoveModuleBytecode';
  */
 export type WriteModule = {
     address: Address;
+    /**
+     * State key hash
+     */
     state_key_hash: string;
     data: MoveModuleBytecode;
 };

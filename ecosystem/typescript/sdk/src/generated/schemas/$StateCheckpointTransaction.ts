@@ -5,44 +5,26 @@ export const $StateCheckpointTransaction = {
     description: `A state checkpoint transaction`,
     properties: {
         version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_change_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         event_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_checkpoint_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
         },
         gas_used: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         success: {
@@ -56,10 +38,7 @@ export const $StateCheckpointTransaction = {
             isRequired: true,
         },
         accumulator_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         changes: {
@@ -70,10 +49,7 @@ export const $StateCheckpointTransaction = {
             isRequired: true,
         },
         timestamp: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
     },

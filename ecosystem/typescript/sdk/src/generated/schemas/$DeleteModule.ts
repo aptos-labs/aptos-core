@@ -10,6 +10,7 @@ export const $DeleteModule = {
         },
         state_key_hash: {
             type: 'string',
+            description: `State key hash`,
             isRequired: true,
         },
         module: {

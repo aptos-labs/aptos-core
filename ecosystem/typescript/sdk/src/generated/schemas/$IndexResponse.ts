@@ -12,52 +12,31 @@ export const $IndexResponse = {
             format: 'uint8',
         },
         epoch: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         ledger_version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         oldest_ledger_version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         ledger_timestamp: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         node_role: {
-            type: 'all-of',
-            contains: [{
-                type: 'RoleType',
-            }],
+            type: 'RoleType',
             isRequired: true,
         },
         oldest_block_height: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         block_height: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
     },

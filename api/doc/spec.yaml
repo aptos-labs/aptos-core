@@ -7825,19 +7825,9 @@ components:
       - authentication_key
       properties:
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: |-
-              Next sequence number of the account
-
-              This will be the sequence number of the next transaction committed on this account
+          $ref: '#/components/schemas/U64'
         authentication_key:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: |-
-              Authentication key
-
-              A SHA-256 of public keys and authentication scheme of the account
+          $ref: '#/components/schemas/HexEncodedBytes'
     AccountSignature:
       type: object
       description: |-
@@ -7899,10 +7889,7 @@ components:
           type: string
           description: A message describing the error
         error_code:
-          allOf:
-          - $ref: '#/components/schemas/AptosErrorCode'
-          - description: A code providing more granular error information beyond the
-              HTTP status code
+          $ref: '#/components/schemas/AptosErrorCode'
         vm_error_code:
           type: integer
           format: uint64
@@ -7949,25 +7936,15 @@ components:
       - last_version
       properties:
         block_height:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The block height (number of the block from 0)
+          $ref: '#/components/schemas/U64'
         block_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The block hash
+          $ref: '#/components/schemas/HashValue'
         block_timestamp:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The block timestamp in Unix epoch microseconds
+          $ref: '#/components/schemas/U64'
         first_version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The first ledger version of the block inclusive
+          $ref: '#/components/schemas/U64'
         last_version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The last ledger version of the block inclusive
+          $ref: '#/components/schemas/U64'
         transactions:
           type: array
           description: The transactions in the block in sequential order
@@ -8000,32 +7977,17 @@ components:
       - timestamp
       properties:
         version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Ledger version of the transaction
+          $ref: '#/components/schemas/U64'
         hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the transaction
+          $ref: '#/components/schemas/HashValue'
         state_change_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state changes
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the event changes
+          $ref: '#/components/schemas/HashValue'
         state_checkpoint_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state checkpoint (if it is a state checkpoint)
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: |-
-              Total gas units used
-
-              Total gas units used can be multiplied by gas price to get the total coins paid
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
           description: Whether the transaction was successful
@@ -8034,26 +7996,18 @@ components:
           description: The VM status of the transaction, can tell useful information
             in a failure
         accumulator_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The accumulator root hash
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           description: Final state of resources changed by the transaction
           items:
             $ref: '#/components/schemas/WriteSetChange'
         id:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The block hash
+          $ref: '#/components/schemas/HashValue'
         epoch:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The block epoch
+          $ref: '#/components/schemas/U64'
         round:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The block epoch round
+          $ref: '#/components/schemas/U64'
         events:
           type: array
           description: The events emitted at the block creation
@@ -8066,9 +8020,7 @@ components:
             type: integer
             format: uint8
         proposer:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: The address of the proposer of the block
+          $ref: '#/components/schemas/Address'
         failed_proposer_indices:
           type: array
           description: The indices of the proposers who failed to propose
@@ -8076,10 +8028,7 @@ components:
             type: integer
             format: uint32
         timestamp:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The timestamp of the block in microseconds from the UNIX
-              epoch
+          $ref: '#/components/schemas/U64'
     DecodedTableData:
       type: object
       description: Decoded table data
@@ -8111,6 +8060,7 @@ components:
           $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
+          description: State key hash
         module:
           $ref: '#/components/schemas/MoveModuleId'
     DeleteResource:
@@ -8125,6 +8075,7 @@ components:
           $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
+          description: State key hash
         resource:
           $ref: '#/components/schemas/MoveStructTag'
     DeleteTableItem:
@@ -8138,13 +8089,9 @@ components:
         state_key_hash:
           type: string
         handle:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Table handle a u256 encoded as an Address
+          $ref: '#/components/schemas/HexEncodedBytes'
         key:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Key of the item
+          $ref: '#/components/schemas/HexEncodedBytes'
         data:
           $ref: '#/components/schemas/DeletedTableData'
     DeletedTableData:
@@ -8181,13 +8128,9 @@ components:
       - signature
       properties:
         public_key:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Ed25519 public key of the account
+          $ref: '#/components/schemas/HexEncodedBytes'
         signature:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Signature of the transaction
+          $ref: '#/components/schemas/HexEncodedBytes'
     EncodeSubmissionRequest:
       type: object
       description: Request to encode a submission
@@ -8200,29 +8143,17 @@ components:
       - payload
       properties:
         sender:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Sender account address
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Sequence number of the sender for this transaction
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Max gas units allowed for this transaction
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Gas unit price used for this transaction
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Expiration timestamp in seconds from the UNIX epoch
+          $ref: '#/components/schemas/U64'
         payload:
-          allOf:
-          - $ref: '#/components/schemas/TransactionPayload'
-          - description: The payload of the transaction
+          $ref: '#/components/schemas/TransactionPayload'
         secondary_signers:
           type: array
           description: Secondary signer accounts of the request for Multi-agent
@@ -8246,9 +8177,7 @@ components:
       - arguments
       properties:
         function:
-          allOf:
-          - $ref: '#/components/schemas/EntryFunctionId'
-          - description: Id of the function to be run e.g. 0x1::account::transfer
+          $ref: '#/components/schemas/EntryFunctionId'
         type_arguments:
           type: array
           description: Type arguments of the function
@@ -8270,13 +8199,9 @@ components:
         key:
           $ref: '#/components/schemas/EventKey'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The sequence number of the event
+          $ref: '#/components/schemas/U64'
         type:
-          allOf:
-          - $ref: '#/components/schemas/MoveType'
-          - description: The [`MoveType`] of the event
+          $ref: '#/components/schemas/MoveType'
         data:
           description: The JSON representation of the event
     EventKey:
@@ -8342,32 +8267,17 @@ components:
       - events
       properties:
         version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Ledger version of the transaction
+          $ref: '#/components/schemas/U64'
         hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the transaction
+          $ref: '#/components/schemas/HashValue'
         state_change_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state changes
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the event changes
+          $ref: '#/components/schemas/HashValue'
         state_checkpoint_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state checkpoint (if it is a state checkpoint)
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: |-
-              Total gas units used
-
-              Total gas units used can be multiplied by gas price to get the total coins paid
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
           description: Whether the transaction was successful
@@ -8376,18 +8286,14 @@ components:
           description: The VM status of the transaction, can tell useful information
             in a failure
         accumulator_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The accumulator root hash
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           description: Final state of resources changed by the transaction
           items:
             $ref: '#/components/schemas/WriteSetChange'
         payload:
-          allOf:
-          - $ref: '#/components/schemas/GenesisPayload'
-          - description: The genesis transaction payload
+          $ref: '#/components/schemas/GenesisPayload'
         events:
           type: array
           description: Events emitted during genesis
@@ -8434,33 +8340,19 @@ components:
           format: uint8
           description: Chain ID of the current chain
         epoch:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Current epoch of the chain
+          $ref: '#/components/schemas/U64'
         ledger_version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Current ledger version of the chain
+          $ref: '#/components/schemas/U64'
         oldest_ledger_version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Oldest non-pruned ledger version of the chain
+          $ref: '#/components/schemas/U64'
         ledger_timestamp:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Current timestamp of the chain
+          $ref: '#/components/schemas/U64'
         node_role:
-          allOf:
-          - $ref: '#/components/schemas/RoleType'
-          - description: Role of the node `Validator` or `FullNode`
+          $ref: '#/components/schemas/RoleType'
         oldest_block_height:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Oldest non-pruned block height of the chain
+          $ref: '#/components/schemas/U64'
         block_height:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Current block height of the chain
+          $ref: '#/components/schemas/U64'
     ModuleBundlePayload:
       type: object
       required:
@@ -8484,13 +8376,9 @@ components:
       - return
       properties:
         name:
-          allOf:
-          - $ref: '#/components/schemas/IdentifierWrapper'
-          - description: Name of the function
+          $ref: '#/components/schemas/IdentifierWrapper'
         visibility:
-          allOf:
-          - $ref: '#/components/schemas/MoveFunctionVisibility'
-          - description: Visibility of the function e.g. public
+          $ref: '#/components/schemas/MoveFunctionVisibility'
         is_entry:
           type: boolean
           description: Whether the function can be called as an entry function directly
@@ -8540,13 +8428,9 @@ components:
       - structs
       properties:
         address:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Address of the move module
+          $ref: '#/components/schemas/Address'
         name:
-          allOf:
-          - $ref: '#/components/schemas/IdentifierWrapper'
-          - description: Name of the module
+          $ref: '#/components/schemas/IdentifierWrapper'
         friends:
           type: array
           description: Friends of the module
@@ -8569,13 +8453,9 @@ components:
       - bytecode
       properties:
         bytecode:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Hex encoded bytecode of the module
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
-          allOf:
-          - $ref: '#/components/schemas/MoveModule'
-          - description: ABI of the module
+          $ref: '#/components/schemas/MoveModule'
     MoveModuleId:
       type: string
       description: |
@@ -8595,13 +8475,9 @@ components:
       - data
       properties:
         type:
-          allOf:
-          - $ref: '#/components/schemas/MoveStructTag'
-          - description: The Move struct tag e.g. 0x1::account::Account
+          $ref: '#/components/schemas/MoveStructTag'
         data:
-          allOf:
-          - $ref: '#/components/schemas/MoveStructValue'
-          - description: The JSON struct data converted from the Move resource
+          $ref: '#/components/schemas/MoveStructValue'
     MoveScriptBytecode:
       type: object
       description: Move script bytecode
@@ -8609,13 +8485,9 @@ components:
       - bytecode
       properties:
         bytecode:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Hex encoded bytecode of the script
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
-          allOf:
-          - $ref: '#/components/schemas/MoveFunction'
-          - description: ABI of the script
+          $ref: '#/components/schemas/MoveFunction'
     MoveStruct:
       type: object
       description: A move struct
@@ -8627,9 +8499,7 @@ components:
       - fields
       properties:
         name:
-          allOf:
-          - $ref: '#/components/schemas/IdentifierWrapper'
-          - description: Name of the struct
+          $ref: '#/components/schemas/IdentifierWrapper'
         is_native:
           type: boolean
           description: Whether the struct is a native struct of Move
@@ -8656,13 +8526,9 @@ components:
       - type
       properties:
         name:
-          allOf:
-          - $ref: '#/components/schemas/IdentifierWrapper'
-          - description: Name of the field
+          $ref: '#/components/schemas/IdentifierWrapper'
         type:
-          allOf:
-          - $ref: '#/components/schemas/MoveType'
-          - description: The move type associated with the field. e.g. bool
+          $ref: '#/components/schemas/MoveType'
     MoveStructGenericTypeParam:
       type: object
       description: Move generic type param
@@ -8803,9 +8669,7 @@ components:
       - secondary_signers
       properties:
         sender:
-          allOf:
-          - $ref: '#/components/schemas/AccountSignature'
-          - description: Sender of the transaction, which will pay for gas
+          $ref: '#/components/schemas/AccountSignature'
         secondary_signer_addresses:
           type: array
           description: The other involved parties' addresses
@@ -8844,9 +8708,7 @@ components:
           format: uint8
           description: The number of signatures required for a successful transaction
         bitmap:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: The bitmap representing which keys are being used
+          $ref: '#/components/schemas/HexEncodedBytes'
     PendingTransaction:
       type: object
       description: A transaction waiting in mempool
@@ -8860,37 +8722,21 @@ components:
       - payload
       properties:
         hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The transaction hash
+          $ref: '#/components/schemas/HashValue'
         sender:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Sender account address
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Sequence number of the sender for this transaction
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Max gas units allowed for this transaction
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Gas unit price used for this transaction
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Expiration timestamp in seconds from the UNIX epoch
+          $ref: '#/components/schemas/U64'
         payload:
-          allOf:
-          - $ref: '#/components/schemas/TransactionPayload'
-          - description: The payload of the transaction
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          allOf:
-          - $ref: '#/components/schemas/TransactionSignature'
-          - description: Signature of the transaction
+          $ref: '#/components/schemas/TransactionSignature'
     RoleType:
       type: string
       enum:
@@ -8905,9 +8751,7 @@ components:
       - arguments
       properties:
         code:
-          allOf:
-          - $ref: '#/components/schemas/MoveScriptBytecode'
-          - description: Bytecode of the script
+          $ref: '#/components/schemas/MoveScriptBytecode'
         type_arguments:
           type: array
           description: Type arguments of the function
@@ -8943,32 +8787,17 @@ components:
       - timestamp
       properties:
         version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Ledger version of the transaction
+          $ref: '#/components/schemas/U64'
         hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the transaction
+          $ref: '#/components/schemas/HashValue'
         state_change_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state changes
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the event changes
+          $ref: '#/components/schemas/HashValue'
         state_checkpoint_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state checkpoint (if it is a state checkpoint)
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: |-
-              Total gas units used
-
-              Total gas units used can be multiplied by gas price to get the total coins paid
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
           description: Whether the transaction was successful
@@ -8977,18 +8806,14 @@ components:
           description: The VM status of the transaction, can tell useful information
             in a failure
         accumulator_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The accumulator root hash
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           description: Final state of resources changed by the transaction
           items:
             $ref: '#/components/schemas/WriteSetChange'
         timestamp:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Timestamp of the transaction's block
+          $ref: '#/components/schemas/U64'
     SubmitTransactionRequest:
       type: object
       description: |-
@@ -9005,33 +8830,19 @@ components:
       - signature
       properties:
         sender:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Sender account address
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Sequence number of the sender for this transaction
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Max gas units allowed for this transaction
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Gas unit price used for this transaction
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Expiration timestamp in seconds from the UNIX epoch
+          $ref: '#/components/schemas/U64'
         payload:
-          allOf:
-          - $ref: '#/components/schemas/TransactionPayload'
-          - description: The payload of the transaction
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          allOf:
-          - $ref: '#/components/schemas/TransactionSignature'
-          - description: Signature of the request
+          $ref: '#/components/schemas/TransactionSignature'
     TableItemRequest:
       type: object
       description: Table Item request for the GetTableItem API
@@ -9041,13 +8852,9 @@ components:
       - key
       properties:
         key_type:
-          allOf:
-          - $ref: '#/components/schemas/MoveType'
-          - description: The [`MoveType`] of the table item's key
+          $ref: '#/components/schemas/MoveType'
         value_type:
-          allOf:
-          - $ref: '#/components/schemas/MoveType'
-          - description: The [`MoveType`] of the table item's value
+          $ref: '#/components/schemas/MoveType'
         key:
           description: The value of the table item's key
     Transaction:
@@ -9211,9 +9018,7 @@ components:
       - transaction_index
       properties:
         error:
-          allOf:
-          - $ref: '#/components/schemas/AptosError'
-          - description: The error from submitting the transaction
+          $ref: '#/components/schemas/AptosError'
         transaction_index:
           type: integer
           format: uint64
@@ -9273,32 +9078,17 @@ components:
       - timestamp
       properties:
         version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Ledger version of the transaction
+          $ref: '#/components/schemas/U64'
         hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the transaction
+          $ref: '#/components/schemas/HashValue'
         state_change_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state changes
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the event changes
+          $ref: '#/components/schemas/HashValue'
         state_checkpoint_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: Hash of the state checkpoint (if it is a state checkpoint)
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: |-
-              Total gas units used
-
-              Total gas units used can be multiplied by gas price to get the total coins paid
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
           description: Whether the transaction was successful
@@ -9307,51 +9097,33 @@ components:
           description: The VM status of the transaction, can tell useful information
             in a failure
         accumulator_root_hash:
-          allOf:
-          - $ref: '#/components/schemas/HashValue'
-          - description: The accumulator root hash
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           description: Final state of resources changed by the transaction
           items:
             $ref: '#/components/schemas/WriteSetChange'
         sender:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Sender account address
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Sequence number of the sender for this transaction
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Max gas units allowed for this transaction
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Gas unit price used for this transaction
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Expiration timestamp in seconds from the UNIX epoch
+          $ref: '#/components/schemas/U64'
         payload:
-          allOf:
-          - $ref: '#/components/schemas/TransactionPayload'
-          - description: The payload of the transaction
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          allOf:
-          - $ref: '#/components/schemas/TransactionSignature'
-          - description: Signature of the transaction
+          $ref: '#/components/schemas/TransactionSignature'
         events:
           type: array
           description: Events generated by the transaction
           items:
             $ref: '#/components/schemas/Event'
         timestamp:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: Timestamp of the transaction's block
+          $ref: '#/components/schemas/U64'
     VersionedEvent:
       type: object
       description: An event from a transaction with a version
@@ -9363,19 +9135,13 @@ components:
       - data
       properties:
         version:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The version that the event was emitted
+          $ref: '#/components/schemas/U64'
         key:
           $ref: '#/components/schemas/EventKey'
         sequence_number:
-          allOf:
-          - $ref: '#/components/schemas/U64'
-          - description: The sequence number of the event
+          $ref: '#/components/schemas/U64'
         type:
-          allOf:
-          - $ref: '#/components/schemas/MoveType'
-          - description: The [`MoveType`] of the event
+          $ref: '#/components/schemas/MoveType'
         data:
           description: The JSON representation of the event
     WriteModule:
@@ -9387,15 +9153,12 @@ components:
       - data
       properties:
         address:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Address of module
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
+          description: State key hash
         data:
-          allOf:
-          - $ref: '#/components/schemas/MoveModuleBytecode'
-          - description: New bytecode of module
+          $ref: '#/components/schemas/MoveModuleBytecode'
     WriteResource:
       type: object
       description: Write a resource or update an existing one
@@ -9405,15 +9168,12 @@ components:
       - data
       properties:
         address:
-          allOf:
-          - $ref: '#/components/schemas/Address'
-          - description: Address of resource
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
+          description: State key hash
         data:
-          allOf:
-          - $ref: '#/components/schemas/MoveResource'
-          - description: New state of resource
+          $ref: '#/components/schemas/MoveResource'
     WriteSet:
       type: object
       description: The associated writeset with a payload
@@ -9544,17 +9304,11 @@ components:
         state_key_hash:
           type: string
         handle:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Table handle a u256 encoded as an Address
+          $ref: '#/components/schemas/HexEncodedBytes'
         key:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Key of item in table
+          $ref: '#/components/schemas/HexEncodedBytes'
         value:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: Value of item in table
+          $ref: '#/components/schemas/HexEncodedBytes'
         data:
           $ref: '#/components/schemas/DecodedTableData'
 externalDocs:

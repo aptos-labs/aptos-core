@@ -5,21 +5,16 @@ export const $WriteModule = {
     description: `Write a new module or update an existing one`,
     properties: {
         address: {
-            type: 'all-of',
-            contains: [{
-                type: 'Address',
-            }],
+            type: 'Address',
             isRequired: true,
         },
         state_key_hash: {
             type: 'string',
+            description: `State key hash`,
             isRequired: true,
         },
         data: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveModuleBytecode',
-            }],
+            type: 'MoveModuleBytecode',
             isRequired: true,
         },
     },

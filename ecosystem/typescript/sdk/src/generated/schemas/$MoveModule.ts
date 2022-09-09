@@ -5,17 +5,11 @@ export const $MoveModule = {
     description: `A Move module`,
     properties: {
         address: {
-            type: 'all-of',
-            contains: [{
-                type: 'Address',
-            }],
+            type: 'Address',
             isRequired: true,
         },
         name: {
-            type: 'all-of',
-            contains: [{
-                type: 'IdentifierWrapper',
-            }],
+            type: 'IdentifierWrapper',
             isRequired: true,
         },
         friends: {
