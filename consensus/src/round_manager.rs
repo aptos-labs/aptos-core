@@ -49,7 +49,7 @@ use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::mem::discriminant;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
-use tokio::time::sleep;
+use tokio::time::{sleep, Instant};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -60,7 +60,8 @@ pub enum UnverifiedEvent {
     CommitDecision(Box<CommitDecision>),
 }
 
-pub const SYNC_ONLY_PROPOSAL_PROCESSING_INTERVAL_MS: u64 = 100;
+pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
+pub const BACK_PRESSURE_PROPOSAL_TIMEOUT_MS: u64 = 2000;
 
 impl UnverifiedEvent {
     pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
@@ -193,10 +194,6 @@ impl RoundManager {
 
     fn decoupled_execution(&self) -> bool {
         self.onchain_config.decoupled_execution()
-    }
-
-    fn back_pressure_limit(&self) -> u64 {
-        self.onchain_config.back_pressure_limit()
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
@@ -418,28 +415,15 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         if self.decoupled_execution() {
-            let commit_round = self.block_store.commit_root().round();
-            let ordered_round = self.block_store.ordered_root().round();
-            let sync_or_not =
-                self.sync_only || ordered_round > self.back_pressure_limit() + commit_round;
-
+            let sync_or_not = self.sync_only || self.block_store.back_pressure();
             counters::OP_COUNTERS
                 .gauge("sync_only")
                 .set(sync_or_not as i64);
-
-            counters::OP_COUNTERS
-                .gauge("back_pressure")
-                .set((ordered_round - commit_round) as i64);
 
             sync_or_not
         } else {
             self.sync_only
         }
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn set_sync_only(&mut self, sync_only: bool) {
-        self.sync_only = sync_only
     }
 
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
@@ -563,26 +547,41 @@ impl RoundManager {
         self.process_verified_proposal(proposal).await
     }
 
-    async fn resend_verified_proposal_to_self(&self, proposal: Block, interval_ms: u64) {
+    async fn resend_verified_proposal_to_self(
+        &self,
+        proposal: Block,
+        polling_interval_ms: u64,
+        timeout_ms: u64,
+    ) {
+        let start = Instant::now();
         let author = self.network.author();
+        let block_store = self.block_store.clone();
         let self_sender = self.round_manager_tx.clone();
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
-            sleep(Duration::from_millis(interval_ms)).await;
-            if let Err(e) = self_sender.push((author, discriminant(&event)), (author, event)) {
-                error!("Failed to send event to round manager {:?}", e);
+            while start.elapsed() < Duration::from_millis(timeout_ms) {
+                if !block_store.back_pressure() {
+                    if let Err(e) =
+                        self_sender.push((author, discriminant(&event)), (author, event))
+                    {
+                        error!("Failed to send event to round manager {:?}", e);
+                    }
+                    break;
+                }
+                sleep(Duration::from_millis(polling_interval_ms)).await;
             }
         });
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
-        if self.sync_only() {
-            // In case of sync only mode, we delay processing proposal. This is done by resending the
+        if self.decoupled_execution() && self.block_store.back_pressure() {
+            // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time.
             return Ok(self
                 .resend_verified_proposal_to_self(
                     proposal,
-                    SYNC_ONLY_PROPOSAL_PROCESSING_INTERVAL_MS,
+                    BACK_PRESSURE_POLLING_INTERVAL_MS,
+                    BACK_PRESSURE_PROPOSAL_TIMEOUT_MS,
                 )
                 .await);
         }
