@@ -41,6 +41,7 @@ pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),
     GenerateKeys(keys::GenerateKeys),
     GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
+    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
 }
@@ -51,6 +52,7 @@ impl GenesisTool {
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
+            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
         }
