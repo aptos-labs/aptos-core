@@ -7,6 +7,11 @@ import type { TransactionPayload } from './TransactionPayload';
 import type { TransactionSignature } from './TransactionSignature';
 import type { U64 } from './U64';
 
+/**
+ * A request to submit a transaction
+ *
+ * This requires a transaction and a signature of it
+ */
 export type SubmitTransactionRequest = {
     sender: Address;
     sequence_number: U64;

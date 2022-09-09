@@ -13,11 +13,18 @@ const FIELD_NAMES = Object.freeze({
 
 // Connects to data-controller="connect-wallet"
 export default class extends Controller<HTMLFormElement> {
-  get isValid() {
-    return Object.values(FIELD_NAMES).every((fieldName) =>
-      this.getInput(fieldName).value.length > 0
-    );
+  static targets = ["requiredNetworkError"];
+
+  declare readonly hasRequiredNetworkErrorTarget: boolean;
+  declare readonly requiredNetworkErrorTarget: HTMLElement;
+
+  static values = {
+    requiredNetwork: String,
+    walletPersisted: Boolean,
   }
+
+  declare readonly requiredNetworkValue: string | null;
+  declare readonly walletPersistedValue: boolean;
 
   get walletName() {
     if ('aptos' in window) {
@@ -29,10 +36,45 @@ export default class extends Controller<HTMLFormElement> {
     }
   }
 
+  onPageLoad() {
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('wallet') && !this.walletPersistedValue) {
+      this.element.requestSubmit();
+    }
+  }
+
+  async renderErrors() {
+    if (this.requiredNetworkValue) {
+      const network = await this.getNetwork();
+      if (network !== this.requiredNetworkValue) {
+        this.requiredNetworkErrorTarget.textContent =
+          `Please set your wallet network to ${this.requiredNetworkValue}. It is currently set to ${network}.`
+        this.requiredNetworkErrorTarget.classList.remove('hidden');
+      }
+    }
+  }
+
+  hideErrors() {
+    if (this.hasRequiredNetworkErrorTarget) {
+      this.requiredNetworkErrorTarget.classList.add('hidden');
+    }
+  }
+
   async getPublicKey() {
     if (this.walletName === 'petra') {
       const {publicKey} = await window.aptos!.connect();
       return publicKey;
+    } else if (false) {
+      // TODO: Add support for other wallets here.
+    } else {
+      throw 'Unable to determine public key.'
+    }
+  }
+
+  async getNetwork() {
+    if (this.walletName === 'petra') {
+      const network = await window.aptos!.network();
+      return network.toLowerCase();
     } else if (false) {
       // TODO: Add support for other wallets here.
     } else {
@@ -67,18 +109,42 @@ export default class extends Controller<HTMLFormElement> {
   }
 
   async beforeSubmit(event: SubmitEvent) {
-    if (this.isValid) {
-      // The form is ready for submit. Allow the event to propagate.
+    // Prevent the form submission and get the wallet info.
+    event.preventDefault();
+    this.hideErrors();
+
+    const publicKey = await this.getPublicKey();
+    const network = await this.getNetwork();
+    if (this.requiredNetworkValue && network !== this.requiredNetworkValue) {
+      this.renderErrors();
       return;
     }
 
-    // Prevent the form submission and get the wallet info.
-    event.preventDefault();
-
     this.getInput(FIELD_NAMES.walletName).value = this.walletName;
-    this.getInput(FIELD_NAMES.publicKey).value = await this.getPublicKey();
+    this.getInput(FIELD_NAMES.network).value = network;
+    this.getInput(FIELD_NAMES.publicKey).value = publicKey;
     this.getInput(FIELD_NAMES.signedChallenge).value = await this.getSignedChallenge();
 
-    this.element.requestSubmit();
+    const formData = new FormData(this.element);
+    const response = await fetch(this.element.action, {
+      method: this.element.method,
+      headers: {
+        "Accept": "application/json",
+      },
+      body: formData
+    });
+    const {created} = await response.json();
+    if (created) {
+      const urlParams = new URLSearchParams(location.search);
+      urlParams.set('wallet', publicKey);
+      const url = new URL(location.href);
+      url.search = urlParams.toString();
+
+      // Full page load instead of Turbo.visit due to bug with controller not
+      // being mounted.
+      location.href = url.toString();
+    } else {
+      console.error('connect wallet failed');
+    }
   }
 }

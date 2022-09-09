@@ -11,7 +11,7 @@ variable "fullnode_helm_values" {
 }
 
 variable "do_token" {
-  type = string
+  type        = string
   description = "Digital Notion API token"
 }
 

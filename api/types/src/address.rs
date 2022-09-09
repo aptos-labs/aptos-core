@@ -6,6 +6,10 @@ use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
+/// The address of an account
+///
+/// This is represented in a string as a 64 character hex string, sometimes
+/// shortened by stripping leading 0s, and adding a 0x.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Address(AccountAddress);
 
@@ -17,6 +21,7 @@ impl Address {
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: This should not be hex literal, it should be the full hex
         write!(f, "{}", self.0.to_hex_literal())
     }
 }

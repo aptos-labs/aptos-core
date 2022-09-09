@@ -1070,9 +1070,18 @@ pub struct GasOptions {
     pub max_gas: Option<u64>,
 }
 
+const DEFAULT_MAX_GAS: u64 = 50000;
+
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
+    /// Estimate maximum gas via simulation
+    ///
+    /// This will simulate the transaction, and use the simulated actual amount of gas
+    /// to be used as the max gas.  If disabled, and no max gas provided, 50000 will be used
+    /// as the max gas
+    #[clap(long)]
+    pub(crate) estimate_max_gas: bool,
     #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
@@ -1145,7 +1154,7 @@ impl TransactionOptions {
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             max_gas
-        } else {
+        } else if self.estimate_max_gas {
             let simulated_txn = self
                 .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
                 .await?;
@@ -1156,6 +1165,9 @@ impl TransactionOptions {
                 )));
             }
             simulated_txn.info.gas_used.0
+        } else {
+            // TODO: Remove once simulation is stabilized and can handle all cases
+            DEFAULT_MAX_GAS
         };
 
         if ask_to_confirm_price {

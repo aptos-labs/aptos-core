@@ -25,7 +25,7 @@ use crate::node::{
     ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
-use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
+use crate::op::key::{ExtractPeer, GenerateKey, NetworkKeyInputOptions, SaveKey};
 use crate::stake::{
     AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
     WithdrawStake,
@@ -50,6 +50,9 @@ use std::collections::HashMap;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
+
+#[cfg(test)]
+mod tests;
 
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
@@ -569,17 +572,20 @@ impl CliTestFramework {
 
     pub async fn extract_peer(
         &self,
+        host: HostAndPort,
         private_key_file: PathBuf,
         output_file: PathBuf,
     ) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
         ExtractPeer {
-            private_key_input_options: PrivateKeyInputOptions::from_file(private_key_file),
+            host,
+            network_key_input_options: NetworkKeyInputOptions::from_private_key_file(
+                private_key_file,
+            ),
             output_file_options: SaveFile {
                 output_file,
                 prompt_options: PromptOptions::yes(),
             },
             encoding_options: Default::default(),
-            profile_options: Default::default(),
         }
         .execute()
         .await
@@ -796,6 +802,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
             prompt_options: PromptOptions::yes(),
+            estimate_max_gas: true,
             ..Default::default()
         }
     }

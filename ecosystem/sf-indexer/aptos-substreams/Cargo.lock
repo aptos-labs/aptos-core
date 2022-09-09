@@ -22,6 +22,7 @@ dependencies = [
 name = "aptos-substreams"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "aptos-protos",
  "serde",
  "serde_json",

@@ -17,6 +17,8 @@ on:
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
+        # HACK: Undo this after decommission old clusters
+        default: aptos-forge-big-0
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
@@ -35,11 +37,6 @@ on:
         type: boolean
         default: false
         description: Whether to post the test results comment to Slack
-      USE_NEW_WRAPPER:
-        required: false
-        type: boolean
-        default: true
-        description: Set to true to enable new wrapper
       TIMEOUT_MINUTES:
         required: false
         type: number
@@ -60,7 +57,6 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-  FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
@@ -72,8 +68,8 @@ env:
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
-  USE_NEW_WRAPPER: ${{ inputs.USE_NEW_WRAPPER }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
+  VERBOSE: true
 
 jobs:
   forge:
@@ -84,70 +80,35 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v3
-        if: env.FORGE_ENABLED == 'true'
         with:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
       - uses: actions/setup-python@v4
-        if: env.FORGE_ENABLED == 'true'
       - name: Install python deps
-        if: env.FORGE_ENABLED == 'true' && env.USE_NEW_WRAPPER == 'true'
         run: pip3 install click==8.1.3 psutil==5.9.1
       - name: Run pre-Forge checks
-        if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
-        run: |
-          set +e
-
-          source testsuite/run_forge.sh
-
-          # append some GHA-specific content to the comment
-          cat << EOF >> $FORGE_PRE_COMMENT
-          * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          * Pending test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
-          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
-          EOF
-
+        run: testsuite/run_forge.sh
       - name: Post pre-Forge comment
-        if: env.FORGE_ENABLED == 'true' && github.event.number != null
+        if: github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           append: true
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
-        if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
           PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
           PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
           PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
-        run: |
-          set +e
-
-          # source this script to run and get environment variables
-          source testsuite/run_forge.sh
-
-          # append some GHA-specific content to the comment
-          cat << EOF >> $FORGE_COMMENT
-          * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          * Test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
-          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
-          EOF
-
-          # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
-          cat $FORGE_COMMENT >> $GITHUB_STEP_SUMMARY
-
-          if [ "$FORGE_BLOCKING" = "true" ]; then
-            exit $FORGE_EXIT_CODE
-          fi
-
+        run: testsuite/run_forge.sh
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
-        if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
+        if: github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           append: true
@@ -155,7 +116,7 @@ jobs:
           path: ${{ env.FORGE_COMMENT }}
       - name: Post to a Slack channel
         # Post a Slack comment if the run has not been cancelled and the envs are set
-        if: env.FORGE_ENABLED == 'true' && env.POST_TO_SLACK == 'true' && !cancelled()
+        if: env.POST_TO_SLACK == 'true' && !cancelled()
         id: slack
         uses: slackapi/slack-github-action@v1.21.0
         with:

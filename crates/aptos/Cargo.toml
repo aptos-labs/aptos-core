@@ -59,6 +59,7 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 aptosdb = { path = "../../storage/aptosdb" }
+backup-cli = { path = "../../storage/backup/backup-cli" }
 cached-packages = { path = '../../aptos-move/framework/cached-packages' }
 executor = { path = "../../execution/executor" }
 framework = { path = '../../aptos-move/framework' }

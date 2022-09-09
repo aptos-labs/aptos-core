@@ -13,17 +13,17 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
+use clap::Parser;
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
-use structopt::StructOpt;
 use tokio::io::AsyncWriteExt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct EpochEndingBackupOpt {
-    #[structopt(long = "start-epoch", help = "First epoch to be backed up.")]
+    #[clap(long = "start-epoch", help = "First epoch to be backed up.")]
     pub start_epoch: u64,
 
-    #[structopt(
+    #[clap(
         long = "end-epoch",
         help = "Epoch before which epoch ending backup stops. Pass in the current open epoch to get all."
     )]

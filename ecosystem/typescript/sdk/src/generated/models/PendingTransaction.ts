@@ -8,6 +8,9 @@ import type { TransactionPayload } from './TransactionPayload';
 import type { TransactionSignature } from './TransactionSignature';
 import type { U64 } from './U64';
 
+/**
+ * A transaction waiting in mempool
+ */
 export type PendingTransaction = {
     hash: HashValue;
     sender: Address;

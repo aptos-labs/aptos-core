@@ -124,6 +124,10 @@ spec:
           value: {{ .Values.genesis.fullnode.internal_host_suffix | quote }}
         - name: STAKE_AMOUNT
           value: {{ .Values.genesis.validator.stake_amount | quote }}
+        - name: NUM_VALIDATORS_WITH_LARGER_STAKE
+          value: {{ .Values.genesis.validator.num_validators_with_larger_stake | quote }}
+        - name: LARGER_STAKE_AMOUNT
+          value: {{ .Values.genesis.validator.larger_stake_amount | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml

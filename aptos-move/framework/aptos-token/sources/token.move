@@ -889,6 +889,10 @@ module aptos_token::token {
         royalty.payee_address
     }
 
+    public fun get_token_amount(token: &Token): u64 {
+        token.amount
+    }
+
     // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test_only]
@@ -1115,7 +1119,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xAF, owner = @0xBB)]
-    #[expected_failure(abort_code = 3)]
+    #[expected_failure(abort_code = 393219)]
     fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 

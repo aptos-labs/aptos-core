@@ -1,24 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_metadata::DbMetadataSchema;
-use crate::pruner::state_store::state_value_pruner::StateValuePruner;
-use crate::schema::db_metadata::DbMetadataKey;
-use crate::schema::db_metadata::DbMetadataValue;
 use crate::{
+    db_metadata::DbMetadataSchema,
     metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
         event_store::event_store_pruner::EventStorePruner,
+        state_store::state_value_pruner::StateValuePruner,
         transaction_store::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataValue},
+        transaction::TransactionSchema,
+    },
     utils, EventStore, StateStore, TransactionStore,
 };
+
+use aptos_logger::warn;
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::{SchemaBatch, DB};
+use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
@@ -64,10 +68,33 @@ impl DBPruner for LedgerPruner {
     }
 
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        Ok(self
+        let stored_min_version = self
             .db
             .get::<DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)?
-            .map_or(0, |v| v.expect_version()))
+            .map_or(0, |v| v.expect_version());
+        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
+        iter.seek(&stored_min_version)?;
+        let version = match iter.next().transpose()? {
+            Some((version, _)) => version,
+            None => 0,
+        };
+        match version.cmp(&stored_min_version) {
+            std::cmp::Ordering::Greater => {
+                self.db.put::<DbMetadataSchema>(
+                    &DbMetadataKey::LedgerPrunerProgress,
+                    &DbMetadataValue::Version(version),
+                )?;
+                warn!(
+                    "Updated stored min readable transaction version ({}) to the actual one ({}).",
+                    stored_min_version, version
+                );
+                Ok(version)
+            }
+            std::cmp::Ordering::Equal => Ok(version),
+            std::cmp::Ordering::Less => {
+                panic!("No transaction is found at or after stored ledger pruner progress ({}), db might be corrupted.", stored_min_version)
+            }
+        }
     }
 
     fn min_readable_version(&self) -> Version {

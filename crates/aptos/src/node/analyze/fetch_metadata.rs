@@ -7,7 +7,6 @@ use aptos_rest_client::{
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
 use aptos_types::account_address::AccountAddress;
-use std::convert::TryFrom;
 use std::str::FromStr;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -72,6 +71,25 @@ impl FetchMetadata {
         }
     }
 
+    async fn get_transactions(
+        client: &RestClient,
+        start: u64,
+        last: u64,
+    ) -> Result<Vec<Transaction>> {
+        let mut result = Vec::new();
+        let mut cursor = start;
+        while cursor < last {
+            let limit = std::cmp::min(1000, last - cursor);
+            let mut current = client
+                .get_transactions(Some(cursor), Some(limit as u16))
+                .await?
+                .into_inner();
+            result.append(&mut current);
+            cursor += limit
+        }
+        Ok(result)
+    }
+
     fn get_validators_from_transaction(transaction: &Transaction) -> Result<Vec<ValidatorInfo>> {
         if let Ok(info) = transaction.transaction_info() {
             for change in &info.changes {
@@ -108,11 +126,11 @@ impl FetchMetadata {
         start_epoch: Option<i64>,
         end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
-        let mut start_seq_num = 0;
         let (last_events, state) = client
             .get_new_block_events(None, Some(1))
             .await?
             .into_parts();
+        let mut start_seq_num = state.oldest_block_height;
         assert_eq!(last_events.len(), 1, "{:?}", last_events);
         let last_event = last_events.first().unwrap();
         let last_seq_num = last_event.sequence_number;
@@ -122,7 +140,24 @@ impl FetchMetadata {
             if wanted_start_epoch < 0 {
                 wanted_start_epoch = last_event.event.epoch() as i64 + wanted_start_epoch + 1;
             }
-            std::cmp::max(2, wanted_start_epoch) as u64
+
+            let oldest_event = client
+                .get_new_block_events(Some(start_seq_num), Some(1))
+                .await?
+                .into_inner()
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("No blocks at oldest_block_height {}", start_seq_num))?;
+            let oldest_fetchable_epoch = std::cmp::max(oldest_event.event.epoch() + 1, 2);
+            if oldest_fetchable_epoch > wanted_start_epoch as u64 {
+                println!(
+                    "Oldest full epoch that can be retreived is {} ",
+                    oldest_fetchable_epoch
+                );
+                oldest_fetchable_epoch
+            } else {
+                wanted_start_epoch as u64
+            }
         };
         let wanted_end_epoch = {
             let mut wanted_end_epoch = end_epoch.unwrap_or(i64::MAX);
@@ -169,12 +204,14 @@ impl FetchMetadata {
             "Fetching {} to {} sequence number, wanting epochs [{}, {}), last version: {} and epoch: {}",
             start_seq_num, last_seq_num, wanted_start_epoch, wanted_end_epoch, state.version, state.epoch,
         );
+        let mut result: Vec<EpochInfo> = vec![];
+        if wanted_start_epoch >= wanted_end_epoch {
+            return Ok(result);
+        }
 
         let mut validators: Vec<ValidatorInfo> = vec![];
-        let mut epoch = 0;
-
         let mut current: Vec<VersionedNewBlockEvent> = vec![];
-        let mut result: Vec<EpochInfo> = vec![];
+        let mut epoch = 0;
 
         let mut cursor = start_seq_num;
         loop {
@@ -204,13 +241,12 @@ impl FetchMetadata {
                     } else {
                         let last = current.last().cloned();
                         if let Some(last) = last {
-                            let transactions = client
-                                .get_transactions(
-                                    Some(last.version),
-                                    Some(u16::try_from(event.version - last.version).unwrap()),
-                                )
-                                .await?
-                                .into_inner();
+                            let transactions = FetchMetadata::get_transactions(
+                                client,
+                                last.version,
+                                event.version,
+                            )
+                            .await?;
                             assert_eq!(
                                 transactions.first().unwrap().version().unwrap(),
                                 last.version
@@ -257,7 +293,7 @@ impl FetchMetadata {
             batch_index += 1;
             if batch_index % 100 == 0 {
                 println!(
-                    "Fetched {} epochs (in epoch {} with {} blocks) from {} transactions",
+                    "Fetched {} epochs (in epoch {} with {} blocks) from {} NewBlockEvents",
                     result.len(),
                     epoch,
                     current.len(),

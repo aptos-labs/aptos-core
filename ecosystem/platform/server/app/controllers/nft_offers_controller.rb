@@ -9,8 +9,15 @@ class NftOffersController < ApplicationController
   def show
     store_location_for(:user, request.path)
     @nft_offer = NftOffer.find(params[:slug])
-    @wallet = current_user&.wallets&.where(network: @nft_offer.network)&.first ||
+    @wallet = current_user&.wallets&.find_by(network: @nft_offer.network, public_key: params[:wallet]) ||
               Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
+
+    @transaction_hash = params[:txn]
+
+    return render :minted if @transaction_hash.is_a?(String) && @transaction_hash.match?(/^0x[0-9a-f]{64}$/)
+
+    @transaction_hash = nil
+
     @steps = [
       sign_in_step,
       connect_wallet_step,
@@ -26,7 +33,7 @@ class NftOffersController < ApplicationController
 
   def update
     @nft_offer = NftOffer.find(params[:slug])
-    @wallet = current_user.wallets.where(network: @nft_offer.network).first!
+    @wallet = current_user.wallets.find_by(network: @nft_offer.network, public_key: params[:wallet])
 
     result = NftClaimer.new.claim_nft(
       nft_offer: @nft_offer,
@@ -46,6 +53,7 @@ class NftOffersController < ApplicationController
   private
 
   def sign_in_step
+    @login_dialog = DialogComponent.new(id: 'login_dialog')
     completed = user_signed_in?
     {
       name: :sign_in,
@@ -54,7 +62,7 @@ class NftOffersController < ApplicationController
   end
 
   def connect_wallet_step
-    completed = user_signed_in? && @wallet.persisted?
+    completed = user_signed_in? && @wallet.persisted? && @wallet.network == @nft_offer.network
     {
       name: :connect_wallet,
       completed:

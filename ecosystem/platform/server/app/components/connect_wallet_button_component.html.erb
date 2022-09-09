@@ -1,4 +1,4 @@
-<%= form_with id: 'connect_wallet', model: @wallet, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame } do |form| %>
+<%= form_with id: 'connect_wallet', model: @wallet, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame, connect_wallet_wallet_persisted_value: @wallet.persisted?, connect_wallet_required_network_value: @required_network } do |form| %>
   <% if @wallet.errors.any? %>
     <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700">
@@ -11,6 +11,11 @@
         </ul>
       </div>
     </div>
+  <% end %>
+
+  <% if @required_network %>
+    <p class="text-red-400 hidden mb-4" data-connect-wallet-target="requiredNetworkError">
+    </p>
   <% end %>
 
   <%= form.hidden_field :network %>

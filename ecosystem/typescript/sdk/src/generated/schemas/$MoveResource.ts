@@ -2,13 +2,20 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveResource = {
+    description: `A parsed Move resource`,
     properties: {
         type: {
-            type: 'MoveStructTag',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveStructTag',
+            }],
             isRequired: true,
         },
         data: {
-            type: 'MoveStructValue',
+            type: 'all-of',
+            contains: [{
+                type: 'MoveStructValue',
+            }],
             isRequired: true,
         },
     },

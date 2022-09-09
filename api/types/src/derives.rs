@@ -36,7 +36,14 @@ impl_poem_type!(
             "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
-        description = Some("Hex encoded 32 byte Aptos account address")
+        description = Some(indoc! {"
+            A hex encoded 32 byte Aptos account address.
+
+            This is represented in a string as a 64 character hex string, sometimes
+            shortened by stripping leading 0s, and adding a 0x.
+
+            For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
+        "})
     )
 );
 
@@ -254,7 +261,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 64-bit unsigned integer.
 
-        We represent u64 values as a string to ensure compatability with languages such
+        We represent u64 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )
@@ -271,7 +278,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 128-bit unsigned integer.
 
-        We represent u128 values as a string to ensure compatability with languages such
+        We represent u128 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )

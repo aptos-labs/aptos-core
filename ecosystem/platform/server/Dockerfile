@@ -9,6 +9,12 @@ RUN npm install -g yarn && \
   mkdir /home/app/webapp && \
   chown app: /home/app/webapp
 
+RUN apt-get update && apt-get install -y \
+  imagemagick libmagickcore-dev \
+  pngquant \
+  libvips \
+  && rm -rf /var/lib/apt/lists/*
+
 USER app
 ENV HOME /home/app
 ENV RAILS_ENV production

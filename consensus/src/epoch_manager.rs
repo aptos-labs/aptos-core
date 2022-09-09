@@ -121,6 +121,7 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
@@ -159,6 +160,7 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
         }
@@ -351,14 +353,34 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // Ignore message from lower epoch, the node would eventually see messages from
-            // higher epoch and request a proof
             Ordering::Less => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(1)),
-                    debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
-                );
-                Ok(())
+                if self
+                    .epoch_state()
+                    .verifier
+                    .get_voting_power(&self.author)
+                    .is_some()
+                {
+                    // Ignore message from lower epoch if we're part of the validator set, the node would eventually see messages from
+                    // higher epoch and request a proof
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
+                    );
+                    Ok(())
+                } else {
+                    // reply back the epoch change proof if we're not part of the validator set since we won't broadcast
+                    // timeout in this epoch
+                    monitor!(
+                        "process_epoch_retrieval",
+                        self.process_epoch_retrieval(
+                            EpochRetrievalRequest {
+                                start_epoch: different_epoch,
+                                end_epoch: self.epoch(),
+                            },
+                            peer_id
+                        )
+                    )
+                }
             }
             // We request proof to join higher epoch
             Ordering::Greater => {
@@ -486,11 +508,12 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
-        if self.round_manager_tx.is_some() {
+        if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
-            let event = VerifiedEvent::Shutdown(ack_tx);
-            self.forward_to_round_manager(self.author, event);
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop round manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop round manager");
@@ -624,7 +647,9 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
-        tokio::spawn(round_manager.start(round_manager_rx));
+        let (close_tx, close_rx) = oneshot::channel();
+        self.round_manager_close_tx = Some(close_tx);
+        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }

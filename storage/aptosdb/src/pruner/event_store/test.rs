@@ -5,10 +5,10 @@ use crate::{AptosDB, EventStore, LedgerPrunerManager, PrunerManager};
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
-use aptos_types::transaction::Version;
 use aptos_types::{
     contract_event::ContractEvent,
     proptest_types::{AccountInfoUniverse, ContractEventGen},
+    transaction::Version,
 };
 use proptest::{collection::vec, prelude::*, proptest};
 use schemadb::SchemaBatch;
@@ -67,20 +67,18 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
 
+    let pruner = LedgerPrunerManager::new(
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
-        // Initialize a pruner in every iteration to test the min_readable_version initialization
-        // logic.
-        let pruner = LedgerPrunerManager::new(
-            Arc::clone(&aptos_db.ledger_db),
-            Arc::clone(&aptos_db.state_store),
-            LedgerPrunerConfig {
-                enable: true,
-                prune_window: 0,
-                batch_size: 1,
-                user_pruning_window_offset: 0,
-            },
-        );
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();

@@ -5,13 +5,13 @@ slug: "interacting-with-the-aptos-blockchain"
 
 # Interacting with the Aptos Blockchain
 
-The Aptos Blockchain uses the [Move][move_url] virtual machine (VM) for executing operations. While many blockchains implement a set of
+The Aptos blockchain uses the [Move][move_url] virtual machine (VM) for executing operations. While many blockchains implement a set of
 native operations, Aptos delegates all operations to Move, including: account creation, fund transfer and publishing Move modules.
 To support these operations, blockchains built on top of Move must provide a framework (akin to
 an operating system for a computer or a minimal viable set of functions) for interacting with the blockchain. In this section, we discuss
 these functions, exposed via the Aptos Framework's `script` functions.
 
-This guide (in concert with the [Move module tutorial][your-first-move-module]) will unlock the minimal amount of information required to start building rich applications on top of the Aptos Blockchain. Note: the Aptos Framework is under heavy development and this document may not
+This guide (in concert with the [Move module tutorial][your-first-move-module]) will unlock the minimal amount of information required to start building rich applications on top of the Aptos blockchain. Note: the Aptos Framework is under heavy development and this document may not
 be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
 
 The core functions provided to users within the Aptos Framework include:

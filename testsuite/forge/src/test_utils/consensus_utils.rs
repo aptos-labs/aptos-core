@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Context;
 use aptos_rest_client::Client as RestClient;
 use async_trait::async_trait;
 use core::time;
@@ -54,10 +55,12 @@ pub async fn test_consensus_fault_tolerance(
     parts_in_cycle: usize,
     mut failure_injection: Box<dyn FailureInjection>,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
-    mut check_cycle: Box<dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>)>,
+    mut check_cycle: Box<
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+    >,
     new_epoch_on_cycle: bool,
 ) -> anyhow::Result<()> {
-    let validator_clients = swarm.get_clients_with_names();
+    let validator_clients = swarm.get_validator_clients_with_names();
 
     async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
         join_all(
@@ -114,7 +117,7 @@ pub async fn test_consensus_fault_tolerance(
             cur.iter().map(|s| s.round).collect::<Vec<_>>()
         );
 
-        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous);
+        check_cycle(cycle, epochs, rounds, transactions, cur.clone(), previous)?;
         if new_epoch_on_cycle {
             swarm.aptos_public_info().reconfig().await;
         }
@@ -137,29 +140,43 @@ pub async fn test_consensus_fault_tolerance(
     let transactions: Vec<_> =
         join_all(validator_clients.iter().cloned().map(move |v| async move {
             let mut txns =
-                v.1.get_transactions(None, Some(1000))
+                v.1.get_transactions_bcs(Some(target_v.saturating_sub(1000)), Some(1000))
                     .await
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?
                     .into_inner();
-            txns.retain(|t| t.version().unwrap() <= target_v);
+            txns.retain(|t| t.version <= target_v);
             <anyhow::Result<Vec<_>>>::Ok(txns)
         }))
         .await;
 
+    let txns_a = transactions
+        .first()
+        .unwrap()
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
+
     for i in 1..transactions.len() {
-        let txns_a = transactions
-            .first()
-            .unwrap()
-            .as_ref()
-            .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
         let txns_b = transactions
             .get(i)
             .unwrap()
             .as_ref()
             .map_err(|e| anyhow::anyhow!("{:?}", &e))?;
-        assert_eq!(txns_a.len(), txns_b.len());
+        assert_eq!(
+            txns_a.len(),
+            txns_b.len(),
+            "Fetched length of transactions for target_v {} doesn't match: from {} to {} vs from {} to {}",
+            target_v,
+            txns_a.first().map(|t| t.version).unwrap_or(0),
+            txns_a.last().map(|t| t.version).unwrap_or(0),
+            txns_b.first().map(|t| t.version).unwrap_or(0),
+            txns_b.last().map(|t| t.version).unwrap_or(0),
+        );
         for i in 0..txns_a.len() {
-            assert_eq!(txns_a[i], txns_b[i]);
+            assert_eq!(
+                txns_a[i], txns_b[i],
+                "Transaction at index {} after target version {}, doesn't match",
+                i, target_v
+            );
         }
     }
 
@@ -232,6 +249,7 @@ impl FailureInjection for FailPointFailureInjection {
                     .1
                     .set_failpoint(name.clone(), "off".to_string())
                     .await
+                    .context(validator_clients[*validator_idx].0.clone())
                     .unwrap();
             }
             self.modified_failpoints = HashSet::new();
@@ -241,6 +259,7 @@ impl FailureInjection for FailPointFailureInjection {
                 .1
                 .set_failpoint(name.clone(), actions.clone())
                 .await
+                .context(validator_clients[validator_idx].0.clone())
                 .unwrap();
             self.modified_failpoints.insert((validator_idx, name));
         }
@@ -251,6 +270,7 @@ impl FailureInjection for FailPointFailureInjection {
                 .1
                 .set_failpoint(name.clone(), "off".to_string())
                 .await
+                .context(validator_clients[*validator_idx].0.clone())
                 .unwrap();
         }
     }

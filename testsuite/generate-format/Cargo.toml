@@ -17,6 +17,7 @@ serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev
 serde_yaml = "0.8.24"
 structopt = "0.3.21"
 
+aptos-api-types = { path = "../../api/types", package = "aptos-api-types" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }

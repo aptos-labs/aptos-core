@@ -3,6 +3,7 @@
 /* eslint-disable */
 export const $TransactionPayload = {
     type: 'one-of',
+    description: `An enum of the possible transaction payloads`,
     contains: [{
         type: 'TransactionPayload_EntryFunctionPayload',
     }, {

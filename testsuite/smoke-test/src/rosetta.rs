@@ -1109,7 +1109,12 @@ async fn check_balances(
             assert_eq!(
                 expected_balance,
                 u64::parse(&balance.value).expect("Should have a balance from account balance")
-                    as i128
+                    as i128,
+                "Expected {} to have a balance of {}, but was {} at block {}",
+                account,
+                expected_balance,
+                balance.value,
+                block_height
             );
         }
     }

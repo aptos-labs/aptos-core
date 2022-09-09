@@ -11,6 +11,7 @@ use poem_openapi::param::{Path, Query};
 use poem_openapi::OpenApi;
 use std::sync::Arc;
 
+/// API for block transactions and information
 pub struct BlocksApi {
     pub context: Arc<Context>,
 }
@@ -21,6 +22,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information.
+    ///
+    /// If the block is pruned, it will return a 410
     #[oai(
         path = "/blocks/by_height/:block_height",
         method = "get",
@@ -30,7 +33,11 @@ impl BlocksApi {
     async fn get_block_by_height(
         &self,
         accept_type: AcceptType,
+        /// Block height to lookup.  Starts at 0
         block_height: Path<u64>,
+        /// If set to true, include all transactions in the block
+        ///
+        /// If not provided, no transactions will be retrieved
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_height")?;
@@ -47,6 +54,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information given a version in the block.
+    ///
+    /// If the block has been pruned, it will return a 410
     #[oai(
         path = "/blocks/by_version/:version",
         method = "get",
@@ -56,7 +65,11 @@ impl BlocksApi {
     async fn get_block_by_version(
         &self,
         accept_type: AcceptType,
+        /// Ledger version to lookup block information for.
         version: Path<u64>,
+        /// If set to true, include all transactions in the block
+        ///
+        /// If not provided, no transactions will be retrieved
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_version")?;
@@ -101,6 +114,7 @@ impl BlocksApi {
         self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
     }
 
+    /// Renders a [`BcsBlock`] into a [`Block`] if it's a JSON accept type
     fn render_bcs_block(
         &self,
         accept_type: &AcceptType,

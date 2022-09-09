@@ -21,7 +21,6 @@ serde = "1.0.137"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-jellyfish-merkle = { path = "../jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
@@ -30,8 +29,6 @@ aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-
-executor-types = { path = "../../execution/executor-types" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad" }
@@ -48,4 +45,4 @@ schemadb = { path = "../schemadb", features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

@@ -9,12 +9,12 @@ import TabItem from '@theme/TabItem';
 
 # Your First Move Module
 
-This tutorial details how to compile, test, publish and interact with Move Modules on the Aptos Blockchain. The steps are:
+This tutorial details how to compile, test, publish and interact with Move Modules on the Aptos blockchain. The steps are:
 
 1. [Install the CLI from Git][install_cli]
 2. Compile and test a Move module
-3. Publish a Move module to the Aptos Blockchain
-4. Interact with a Move Module
+3. Publish a Move module to the Aptos blockchain
+4. Interact with a Move module
 5. Understand the code
 
 

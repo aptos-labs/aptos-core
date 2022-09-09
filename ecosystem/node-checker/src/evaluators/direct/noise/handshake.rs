@@ -83,7 +83,8 @@ impl Evaluator for HandshakeEvaluator {
                 format!(
                     "{}. This indicates your noise port ({}) is open and the node is \
                     running with the private key matching the provided public key.",
-                    message, input.target_node_address.noise_port
+                    message,
+                    input.target_node_address.get_noise_port()
                 ),
             ),
             Err(e) => self.build_evaluation_result(
@@ -92,7 +93,8 @@ impl Evaluator for HandshakeEvaluator {
                 format!(
                     "{:#}. Either the noise port ({}) is closed or the node is not \
                     running with the private key matching the provided public key.",
-                    e, input.target_node_address.noise_port
+                    e,
+                    input.target_node_address.get_noise_port()
                 ),
             ),
         }])
@@ -117,7 +119,7 @@ impl Evaluator for HandshakeEvaluator {
     }
 
     fn validate_check_node_call(&self, target_node_address: &NodeAddress) -> anyhow::Result<()> {
-        if target_node_address.public_key.is_none() {
+        if target_node_address.get_public_key().is_none() {
             return Err(format_err!(
                 "A public key must be provided to use the handshake evaluator"
             ));

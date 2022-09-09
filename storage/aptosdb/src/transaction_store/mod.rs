@@ -424,21 +424,6 @@ impl<'a> Iterator for TransactionIter<'a> {
     }
 }
 
-// TODO(philiphayes): this will need to change to support CRSNs
-// (Conflict-Resistant Sequence Numbers)[https://github.com/diem/dip/blob/main/dips/dip-168.md].
-//
-// It depends on the implementation details, but we'll probably index by _requested_
-// transaction sequence number rather than committed account sequence number.
-// This would mean the property: `seq_num_{i+1} == seq_num_{i} + 1` would no longer
-// be guaranteed and the check should be removed.
-//
-// This index would also no longer iterate over an account's transactions in
-// committed order, meaning the outer method would need to overread by
-// `CRSN_WINDOW_SIZE`, sort by version, and take only `limit` entries to get
-// at most `limit` transactions in committed order. Alternatively, add another
-// index for scanning an accounts transactions in committed order, e.g.,
-// `(AccountAddress, Version) -> SeqNum`.
-
 pub struct AccountTransactionVersionIter<'a> {
     inner: SchemaIterator<'a, TransactionByAccountSchema>,
     address: AccountAddress,

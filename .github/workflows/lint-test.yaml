@@ -29,6 +29,13 @@ jobs:
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
 
+  terraform-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run terraform fmt, validate, and tflint
+        run: ./scripts/lint_terraform.sh
+
   ecosystem-lint:
     runs-on: ubuntu-latest
     steps:
@@ -191,3 +198,7 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 1
 
+  forge-unittests:
+    uses: ./.github/workflows/forge-unittests.yaml
+    with:
+      GIT_SHA: ${{ inputs.GIT_SHA }}

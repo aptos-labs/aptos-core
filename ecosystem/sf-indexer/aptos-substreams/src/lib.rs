@@ -1,19 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod token_converter;
 pub mod transaction_converter;
 
 pub use aptos_protos::{
     block_output::v1::{
-        transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
+        transaction_output::TxnData as TxnDataOutput, write_set_change_output::Change, BlockOutput,
+        TransactionOutput,
     },
     extractor::v1::{
         transaction::TransactionType, transaction::TxnData as TxnDataInput, Block, Event,
         Transaction,
     },
+    tokens::v1::Tokens,
 };
-
-use substreams::{errors::Error, store};
+use std::collections::HashMap;
+use substreams::errors::Error;
 
 #[substreams::handlers::map]
 fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
@@ -85,26 +88,62 @@ fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
     })
 }
 
-#[substreams::handlers::store]
-fn store_count(transaction: Transaction, store: store::StoreAddInt64) {
-    store.add(transaction.version, generate_trx_key(), 1);
-    store.add(
-        transaction.version,
-        generate_trx_type_key(transaction.r#type()),
-        1,
-    );
-}
-
-fn generate_trx_key() -> String {
-    String::from("total")
-}
-
-fn generate_trx_type_key(trx_type: TransactionType) -> String {
-    match trx_type {
-        TransactionType::Genesis => "genesis",
-        TransactionType::BlockMetadata => "block_metadata",
-        TransactionType::StateCheckpoint => "state_checkpoint",
-        TransactionType::User => "user",
+#[substreams::handlers::map]
+fn block_output_to_token(block: BlockOutput) -> Result<Tokens, Error> {
+    let mut tokens = vec![];
+    // let mut token_ownerships = vec![];
+    let mut token_datas = vec![];
+    let mut collection_datas = vec![];
+    for txn in block.transactions {
+        let txn_version = txn.transaction_info_output.unwrap().version;
+        match &txn.txn_data {
+            Some(TxnDataOutput::User(_)) => {}
+            _ => {
+                continue;
+            }
+        }
+        // First pass to get a list of table handle to owner from write_resource
+        // Note that this will not catch offers which will be handled separately
+        let mut table_handle_to_owner: token_converter::TableHandleToOwner = HashMap::new();
+        for write_set_change in &txn.write_set_changes {
+            if let Some(Change::MoveResource(resource)) = &write_set_change.change {
+                let maybe_map =
+                    token_converter::get_table_handle_to_owner(resource, txn_version).unwrap();
+                if let Some(map) = maybe_map {
+                    table_handle_to_owner.extend(map);
+                }
+            }
+        }
+        for write_set_change in &txn.write_set_changes {
+            if let Some(Change::TableItem(table_item)) = &write_set_change.change {
+                let (maybe_token, maybe_token_data, maybe_collection_data) = (
+                    token_converter::get_token(&table_item, txn_version, &table_handle_to_owner)
+                        .unwrap(),
+                    token_converter::get_token_data(&table_item, txn_version).unwrap(),
+                    token_converter::get_collection_data(
+                        &table_item,
+                        txn_version,
+                        &table_handle_to_owner,
+                    )
+                    .unwrap(),
+                );
+                if let Some(token) = maybe_token {
+                    tokens.push(token);
+                }
+                if let Some(token_data) = maybe_token_data {
+                    token_datas.push(token_data);
+                }
+                if let Some(collection_data) = maybe_collection_data {
+                    collection_datas.push(collection_data);
+                }
+            }
+        }
     }
-    .to_string()
+    Ok(Tokens {
+        block_height: block.height,
+        chain_id: block.chain_id,
+        tokens,
+        token_datas,
+        collection_datas,
+    })
 }

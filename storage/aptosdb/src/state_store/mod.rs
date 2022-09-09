@@ -3,15 +3,14 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
-use crate::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue};
-use crate::state_restore::StateSnapshotProgress;
 use crate::{
+    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
     state_merkle_db::StateMerkleDb,
-    state_restore::{StateSnapshotRestore, StateValueWriter},
+    state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
@@ -26,12 +25,12 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_state_view::StateViewId;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
+        state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
     },
     transaction::Version,
@@ -741,6 +740,8 @@ impl StateStore {
             if index.stale_since_version > end {
                 break;
             }
+            // Prune the stale state value index itself first.
+            db_batch.delete::<StaleStateValueIndexSchema>(&index)?;
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         for version in begin..end {
@@ -780,6 +781,9 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         node_batch: &StateValueBatch,
         progress: StateSnapshotProgress,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["state_value_writer_write_chunk"])
+            .start_timer();
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;
         batch.put::<DbMetadataSchema>(

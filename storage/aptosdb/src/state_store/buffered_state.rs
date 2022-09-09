@@ -3,19 +3,26 @@
 
 //! This file defines state store buffered state that has been committed.
 
-use crate::metrics::LATEST_CHECKPOINT_VERSION;
-use crate::state_store::state_snapshot_committer::StateSnapshotCommitter;
-use crate::state_store::StateDb;
+use crate::{
+    metrics::LATEST_CHECKPOINT_VERSION,
+    state_store::{state_snapshot_committer::StateSnapshotCommitter, StateDb},
+};
 use anyhow::{ensure, Result};
 use aptos_logger::info;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::state_value::StateValue;
-use aptos_types::transaction::Version;
-use std::collections::{HashMap, VecDeque};
-use std::mem::swap;
-use std::sync::mpsc::{Receiver, Sender, SyncSender};
-use std::sync::{mpsc, Arc};
-use std::thread::JoinHandle;
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
+use std::{
+    collections::{HashMap, VecDeque},
+    mem::swap,
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender, SyncSender},
+        Arc,
+    },
+    thread::JoinHandle,
+};
 use storage_interface::state_delta::StateDelta;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
@@ -60,7 +67,7 @@ impl BufferedState {
         let arc_state_db = Arc::clone(state_db);
         let (initial_snapshot_ready_sender, initial_snapshot_ready_receiver) = mpsc::channel();
         let join_handle = std::thread::Builder::new()
-            .name("state_snapshot_committer".to_string())
+            .name("state-committer".to_string())
             .spawn(move || {
                 let committer = StateSnapshotCommitter::new(arc_state_db, state_commit_receiver);
                 committer.run();

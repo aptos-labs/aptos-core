@@ -18,6 +18,7 @@ use aptos_config::config::{
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
+use aptos_logger::info;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -30,6 +31,7 @@ use aptosdb::{
     state_restore::{StateSnapshotRestore, StateValueBatch, StateValueWriter},
     AptosDB, GetRestoreHandler,
 };
+use clap::Parser;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -37,13 +39,12 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use structopt::StructOpt;
 use tokio::fs::metadata;
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct GlobalBackupOpt {
     // Defaults to 128MB, so concurrent chunk downloads won't take up too much memory.
-    #[structopt(
+    #[clap(
         long = "max-chunk-size",
         default_value = "134217728",
         help = "Maximum chunk file size in bytes."
@@ -51,21 +52,21 @@ pub struct GlobalBackupOpt {
     pub max_chunk_size: usize,
 }
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct RocksdbOpt {
-    #[structopt(long, default_value = "5000")]
+    #[clap(long, default_value = "5000")]
     ledger_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     ledger_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "5000")]
+    #[clap(long, default_value = "5000")]
     state_merkle_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "1000")]
+    #[clap(long, default_value = "1000")]
     index_db_max_open_files: i32,
-    #[structopt(long, default_value = "1073741824")] // 1GB
+    #[clap(long, default_value = "1073741824")] // 1GB
     index_db_max_total_wal_size: u64,
-    #[structopt(long, default_value = "16")]
+    #[clap(long, default_value = "16")]
     max_background_jobs: i32,
 }
 
@@ -100,12 +101,12 @@ impl Default for RocksdbOpt {
     }
 }
 
-#[derive(Clone, StructOpt)]
+#[derive(Clone, Parser)]
 pub struct GlobalRestoreOpt {
-    #[structopt(long, help = "Dry run without writing data to DB.")]
+    #[clap(long, help = "Dry run without writing data to DB.")]
     pub dry_run: bool,
 
-    #[structopt(
+    #[clap(
         long = "target-db-dir",
         parse(from_os_str),
         conflicts_with = "dry-run",
@@ -113,21 +114,24 @@ pub struct GlobalRestoreOpt {
     )]
     pub db_dir: Option<PathBuf>,
 
-    #[structopt(
+    #[clap(
         long,
         help = "Content newer than this version will not be recovered to DB, \
         defaulting to the largest version possible, meaning recover everything in the backups."
     )]
     pub target_version: Option<Version>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub trusted_waypoints: TrustedWaypointOpt,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub rocksdb_opt: RocksdbOpt,
 
-    #[structopt(flatten)]
-    pub concurernt_downloads: ConcurrentDownloadsOpt,
+    #[clap(flatten)]
+    pub concurrent_downloads: ConcurrentDownloadsOpt,
+
+    #[clap(flatten)]
+    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
 }
 
 pub enum RestoreRunMode {
@@ -206,6 +210,27 @@ impl RestoreRunMode {
             Self::Verify => (),
         }
     }
+
+    pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.get_next_expected_transaction_version()
+            }
+            RestoreRunMode::Verify => {
+                info!("This is a dry run. Assuming resuming point at version 0.");
+                Ok(0)
+            }
+        }
+    }
+
+    pub fn get_in_progress_state_snapshot(&self) -> Result<Option<Version>> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.get_in_progress_state_snapshot_version()
+            }
+            RestoreRunMode::Verify => Ok(None),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -214,6 +239,7 @@ pub struct GlobalRestoreOptions {
     pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
     pub run_mode: Arc<RestoreRunMode>,
     pub concurrent_downloads: usize,
+    pub replay_concurrency_level: usize,
 }
 
 impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
@@ -221,7 +247,8 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
 
     fn try_from(opt: GlobalRestoreOpt) -> Result<Self> {
         let target_version = opt.target_version.unwrap_or(Version::max_value());
-        let concurrent_downloads = opt.concurernt_downloads.get();
+        let concurrent_downloads = opt.concurrent_downloads.get();
+        let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             let restore_handler = Arc::new(AptosDB::open(
                 db_dir,
@@ -242,13 +269,14 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             trusted_waypoints: Arc::new(opt.trusted_waypoints.verify()?),
             run_mode: Arc::new(run_mode),
             concurrent_downloads,
+            replay_concurrency_level,
         })
     }
 }
 
-#[derive(Clone, Default, StructOpt)]
+#[derive(Clone, Default, Parser)]
 pub struct TrustedWaypointOpt {
-    #[structopt(
+    #[clap(
         long,
         help = "(multiple) When provided, an epoch ending LedgerInfo at the waypoint version will be \
         checked against the hash in the waypoint, but signatures on it are NOT checked. \
@@ -277,19 +305,48 @@ impl TrustedWaypointOpt {
     }
 }
 
-#[derive(Clone, Copy, Default, StructOpt)]
+#[derive(Clone, Copy, Default, Parser)]
 pub struct ConcurrentDownloadsOpt {
-    #[structopt(
+    #[clap(
         long,
         help = "[Defaults to number of CPUs] \
-        number of concurrent downloads including metadata files from the backup storage."
+        number of concurrent downloads including metadata files from the backup storage. \
+        Speeds up accessing remote backup access."
     )]
     concurrent_downloads: Option<usize>,
 }
 
 impl ConcurrentDownloadsOpt {
     pub fn get(&self) -> usize {
-        self.concurrent_downloads.unwrap_or_else(num_cpus::get)
+        let ret = self.concurrent_downloads.unwrap_or_else(num_cpus::get);
+        info!(
+            concurrent_downloads = ret,
+            "Determined concurrency level for downloading."
+        );
+        ret
+    }
+}
+
+#[derive(Clone, Copy, Default, Parser)]
+pub struct ReplayConcurrencyLevelOpt {
+    /// AptosVM::set_concurrency_level_once() is called with this
+    #[clap(
+        long,
+        help = "[Defaults to number of CPUs] \
+        concurrency_level used by the transaction executor, applicable when replaying transactions \
+        after a state snapshot."
+    )]
+    replay_concurrency_level: Option<usize>,
+}
+
+impl ReplayConcurrencyLevelOpt {
+    pub fn get(&self) -> usize {
+        let ret = self.replay_concurrency_level.unwrap_or_else(num_cpus::get);
+        info!(
+            concurrency = ret,
+            "Determined concurrency level for transaction replaying."
+        );
+        ret
     }
 }
 

@@ -30,6 +30,8 @@ move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 scratchpad = { path = "../scratchpad" }
 
 [dev-dependencies]
+assert_unordered = "0.1.1"
+
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 
 [features]

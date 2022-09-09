@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $DeleteModule = {
+    description: `Delete a module`,
     properties: {
         address: {
             type: 'Address',
