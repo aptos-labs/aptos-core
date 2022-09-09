@@ -12,16 +12,16 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use clap::Parser;
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
 use tokio::{
     fs::{create_dir_all, read_dir, OpenOptions},
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct LocalFsOpt {
-    #[structopt(
+    #[clap(
         long = "dir",
         parse(from_os_str),
         help = "Target local dir to hold backups."

@@ -102,6 +102,9 @@ impl NetworkSender {
 
         ensure!(from != self.author, "Retrieve block from self");
         let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc();
         let response_msg = monitor!(
             "block_retrieval",
             self.network_sender.send_rpc(from, msg, timeout).await
@@ -141,13 +144,20 @@ impl NetworkSender {
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
         let self_author = self.author;
-        let other_validators = self
+        let other_validators: Vec<_> = self
             .validators
             .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author);
+            .filter(|author| author != &self_author)
+            .collect();
 
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
         // Broadcast message over direct-send to all other validators.
-        if let Err(err) = self.network_sender.send_to_many(other_validators, msg) {
+        if let Err(err) = self
+            .network_sender
+            .send_to_many(other_validators.into_iter(), msg)
+        {
             error!(error = ?err, "Error broadcasting message");
         }
     }
@@ -165,6 +175,9 @@ impl NetworkSender {
                 }
                 continue;
             }
+            counters::CONSENSUS_SENT_MSGS
+                .with_label_values(&[msg.name()])
+                .inc();
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
                 error!(
                     remote_peer = peer,
@@ -192,9 +205,9 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_epoch_change(&mut self, epoch_chnage_proof: EpochChangeProof) {
+    pub async fn broadcast_epoch_change(&mut self, epoch_change_proof: EpochChangeProof) {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
-        let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_chnage_proof));
+        let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_change_proof));
         self.broadcast(msg).await
     }
 
@@ -282,6 +295,9 @@ impl NetworkTask {
         while let Some(message) = self.all_events.next().await {
             match message {
                 Event::Message(peer_id, msg) => {
+                    counters::CONSENSUS_RECEIVED_MSGS
+                        .with_label_values(&[msg.name()])
+                        .inc();
                     if let Err(e) = self
                         .consensus_messages_tx
                         .push((peer_id, discriminant(&msg)), (peer_id, msg))
@@ -294,6 +310,9 @@ impl NetworkTask {
                 }
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
+                        counters::CONSENSUS_RECEIVED_MSGS
+                            .with_label_values(&["BlockRetrievalRequest"])
+                            .inc();
                         debug!(
                             remote_peer = peer_id,
                             event = LogEvent::ReceiveBlockRetrieval,

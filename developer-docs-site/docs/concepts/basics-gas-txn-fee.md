@@ -4,20 +4,20 @@ slug: "basics-gas-txn-fee"
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-When a transaction is executed on the Aptos Blockchain, resource usage is tracked and measured in gas.
+When a transaction is executed on the Aptos blockchain, resource usage is tracked and measured in gas.
 
 # Introduction
 
-Gas ensures that all Move programs running on the Aptos Blockchain eventually terminate. This bounds the computational resources that are used. Gas also provides the ability to charge a transaction fee, partly based on consumed resources during execution.
+Gas ensures that all Move programs running on the Aptos blockchain eventually terminate. This bounds the computational resources that are used. Gas also provides the ability to charge a transaction fee, partly based on consumed resources during execution.
 
-When a client submits a transaction for execution to the Aptos Blockchain, it contains a specified:
+When a client submits a transaction for execution to the Aptos blockchain, it contains a specified:
 
 * `max_gas_amount`: The maximum amount of gas units that can be used to execute the transaction. This bounds the computational resources that can be consumed by the transaction.
 * `gas_price`: The gas price in the blockchain's utility token. Gas price is a way to translate from gas units (the abstract units of resources consumed by the virtual machine) to a transaction fee in the blockchain's utility token.
 
 The transaction fee charged to the client will be at most `gas_price * max_gas_amount`.
 
-The gas price, and hence the transaction fee, should follow the market characteristics of the Aptos Blockchain as resource supply and demand fluctuate.
+The gas price, and hence the transaction fee, should follow the market characteristics of the Aptos blockchain as resource supply and demand fluctuate.
 
 ## Types of resource usage
 
@@ -25,7 +25,7 @@ For the virtual machine (VM) to execute a transaction, the gas system needs to t
 
 1. The computational cost of executing the transaction.
 2. The network cost of propagating the transaction through the Aptos ecosystem.
-3. The storage cost of data created and used during transaction execution on the Aptos Blockchain.
+3. The storage cost of data created and used during transaction execution on the Aptos blockchain.
 
 The first two of these resources (computational and network) are ephemeral. However, the third (storage), is long lived. Once data is allocated, that data persists until it is deleted. In the case of accounts, the data lives indefinitely.
 
@@ -49,7 +49,7 @@ After the prologue has run, and we've checked in part that the account can cover
 * The transaction execution is complete, after which the cost of storing the transaction data is charged, and the epilogue is run and the execution fee deducted, or
 * The "gas tank" becomes empty, in which case an `OutOfGas` error is raised.
 
-In the former, the fee is collected and the result of the transaction is persisted on the Aptos Blockchain. In the latter, the execution of the transaction stops when the error is raised. After which, the total gas liability of the transaction is collected. No other remnants of the execution are committed other than the deduction in this case.
+In the former, the fee is collected and the result of the transaction is persisted on the Aptos blockchain. In the latter, the execution of the transaction stops when the error is raised. After which, the total gas liability of the transaction is collected. No other remnants of the execution are committed other than the deduction in this case.
 
 ## Using gas to prioritize a transaction
 

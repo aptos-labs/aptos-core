@@ -20,7 +20,6 @@ dirs = "4.0.0"
 futures = "0.3.21"
 hex = "0.4.3"
 itertools = "0.10.3"
-parse_duration = "2.1.1"
 rand = "0.7.3"
 regex = "1.1.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
@@ -60,6 +59,7 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 
 aptosdb = { path = "../../storage/aptosdb" }
+backup-cli = { path = "../../storage/backup/backup-cli" }
 cached-packages = { path = '../../aptos-move/framework/cached-packages' }
 executor = { path = "../../execution/executor" }
 framework = { path = '../../aptos-move/framework' }

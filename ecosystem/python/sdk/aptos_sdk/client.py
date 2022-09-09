@@ -45,11 +45,9 @@ class RestClient:
     def account(self, account_address: AccountAddress) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
-        response = self.client.get(
-            f"{self.base_url}/accounts/{account_address}")
+        response = self.client.get(f"{self.base_url}/accounts/{account_address}")
         if response.status_code >= 400:
-            raise ApiError(
-                f"{response.text} - {account_address}", response.status_code)
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
     def account_balance(self, account_address: str) -> int:
@@ -71,8 +69,7 @@ class RestClient:
         if response.status_code == 404:
             return None
         if response.status_code >= 400:
-            raise ApiError(
-                f"{response.text} - {account_address}", response.status_code)
+            raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
 
     def get_table_item(
@@ -155,8 +152,7 @@ class RestClient:
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
-        response = self.client.get(
-            f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         if response.status_code == 404:
             return True
         if response.status_code >= 400:
@@ -171,8 +167,7 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-        response = self.client.get(
-            f"{self.base_url}/transactions/by_hash/{txn_hash}")
+        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
@@ -205,15 +200,13 @@ class RestClient:
         authenticator = Authenticator(
             MultiAgentAuthenticator(
                 Authenticator(
-                    Ed25519Authenticator(
-                        sender.public_key(), sender.sign(keyed_txn))
+                    Ed25519Authenticator(sender.public_key(), sender.sign(keyed_txn))
                 ),
                 [
                     (
                         x.address(),
                         Authenticator(
-                            Ed25519Authenticator(
-                                x.public_key(), x.sign(keyed_txn))
+                            Ed25519Authenticator(x.public_key(), x.sign(keyed_txn))
                         ),
                     )
                     for x in secondary_accounts
@@ -281,6 +274,7 @@ class RestClient:
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
+
     # <:!:bcs_transfer
 
     #
@@ -299,8 +293,7 @@ class RestClient:
             TransactionArgument(uri, Serializer.str),
             TransactionArgument(U64_MAX, Serializer.u64),
             TransactionArgument(
-                [False, False, False], Serializer.sequence_serializer(
-                    Serializer.bool)
+                [False, False, False], Serializer.sequence_serializer(Serializer.bool)
             ),
         ]
 
@@ -342,12 +335,9 @@ class RestClient:
                 [False, False, False, False, False],
                 Serializer.sequence_serializer(Serializer.bool),
             ),
-            TransactionArgument(
-                [], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument(
-                [], Serializer.sequence_serializer(Serializer.bytes)),
-            TransactionArgument(
-                [], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
         payload = EntryFunction.natural(
@@ -544,11 +534,14 @@ class RestClient:
     # Package publishing
     #
 
-    def publish_package(self, sender: Account, package_metadata: bytes, modules: List[bytes]) -> str:
+    def publish_package(
+        self, sender: Account, package_metadata: bytes, modules: List[bytes]
+    ) -> str:
         transaction_arguments = [
             TransactionArgument(package_metadata, Serializer.bytes),
             TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.bytes)),
+                modules, Serializer.sequence_serializer(Serializer.bytes)
+            ),
         ]
 
         payload = EntryFunction.natural(

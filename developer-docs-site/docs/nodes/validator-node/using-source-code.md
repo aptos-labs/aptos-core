@@ -34,7 +34,7 @@ Use the `fullnode.yaml` to run a validator fullnode. See [Step 13](#source-code-
     source ~/.cargo/env
     ```
 
-With your development environment ready, now you can start to setup your Validator node.
+With your development environment ready, now you can start to setup your validator node.
 
 5. Checkout the `testnet` branch using `git checkout --track origin/testnet`.
 
@@ -84,7 +84,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
         --local-repository-dir ~/$WORKSPACE \
         --username $USERNAME \
         --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
-        --validator-host <Validator Node IP / DNS address>:<Port> \
+        --validator-host <validator node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port> \
         --stake-amount 100000000000000
 
@@ -116,7 +116,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-  Edit the `layout.yaml`, add the `root_key`, the Validator node username, and `chain_id`:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
   root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
@@ -175,7 +175,7 @@ Before proceeding further, install **Aptos CLI 0.3.1**: https://aptos.dev/cli-to
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 7).
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 8).
-      - `operator.yaml`: Node information that will be used for both the Validator and the FullNode (from step 8). 
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 8). 
     - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 9).
     - `framework.mrb`: The AptosFramework Move package (from step 10).
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 11).

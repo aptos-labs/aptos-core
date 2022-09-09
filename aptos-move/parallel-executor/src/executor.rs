@@ -19,7 +19,7 @@ use std::{hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
-        .thread_name(|index| format!("parallel_executor_{}", index))
+        .thread_name(|index| format!("par_exec_{}", index))
         .build()
         .unwrap()
 });

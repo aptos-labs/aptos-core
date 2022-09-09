@@ -5,9 +5,9 @@ id: "basics-accounts"
 
 # Accounts
 
-An account on the Aptos Blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature scarce and must be access-controlled. Any such asset is represented in the blockchain account as a **resource**. A resource is a Move language primitive that emphasizes access control and scarcity in its representation. However, a resource can also be used to represent other on-chain capabilities, identifying information, and access control. 
+An account on the Aptos blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature scarce and must be access-controlled. Any such asset is represented in the blockchain account as a **resource**. A resource is a Move language primitive that emphasizes access control and scarcity in its representation. However, a resource can also be used to represent other on-chain capabilities, identifying information, and access control. 
 
-Each account on the Aptos Blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account. 
+Each account on the Aptos blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account. 
 
 :::tip Account address example
 Account addresses are 32-bytes. They are usually shown as 64 hex characters, with each hex character a nibble. See the [Your First Transaction](/tutorials/first-transaction.md#output) for an example of how an address looks like, reproduced below:
@@ -45,13 +45,13 @@ However, the authentication key may subsequently change, for example, when you g
 
 ## Signature schemes
 
-An account can send transactions. The Aptos Blockchain supports the following signature schemes: 
+An account can send transactions. The Aptos blockchain supports the following signature schemes: 
 
 1. The [Ed25519](https://ed25519.cr.yp.to/) for single signature transactions, and
 2. The MultiEd25519, for multi-signature transactions. 
 
 :::note
-The Aptos Blockchain defaults to single signature transactions.
+The Aptos blockchain defaults to single signature transactions.
 :::
 
 ## Signature scheme identifiers
@@ -65,7 +65,7 @@ Generating the authentication key for an account requires that you provide one o
 
 To generate an authentication key and the account address for a single signature account:
 
-1. **Generate a key-pair**: Generate a fresh key-pair (`privkey_A`, `pubkey_A`). The Aptos Blockchain uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
+1. **Generate a key-pair**: Generate a fresh key-pair (`privkey_A`, `pubkey_A`). The Aptos blockchain uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
 2. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key from the `pubkey_A`:
      ```
      auth_key = sha3-256(pubkey_A | 0x00)
@@ -122,5 +122,5 @@ module Test::Coin {
 
 The state of each account comprises both the code (Move modules) and the data (Move resources). An account may contain an arbitrary number of Move modules and Move resources:
 
-- **Move modules**: Move modules contain code, for example, type and procedure declarations, but they do not contain data. A Move module encodes the rules for updating the Aptos Blockchain's global state.
-- **Move resources**: Move resources contain data but no code. Every resource value has a type that is declared in a module published in the Aptos Blockchain's distributed database.
+- **Move modules**: Move modules contain code, for example, type and procedure declarations, but they do not contain data. A Move module encodes the rules for updating the Aptos blockchain's global state.
+- **Move resources**: Move resources contain data but no code. Every resource value has a type that is declared in a module published in the Aptos blockchain's distributed database.

@@ -83,10 +83,11 @@ We're now ready to run our example Substream!
 > Don't forget to be at the root of the project to run the following commands
 
 ```bash
-make stream
+make stream_block
+make stream_token
 ```
 
-Note, you can change the make commands in ./Makefile
+You can add additional commands in ./Makefile
 ## Next Steps
 
 Congratulations! You've successfully run a Substream.

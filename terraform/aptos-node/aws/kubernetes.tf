@@ -254,6 +254,12 @@ resource "helm_release" "monitoring" {
           }
         }
       }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
     }),
     jsonencode(var.monitoring_helm_values),
   ]

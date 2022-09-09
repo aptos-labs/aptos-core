@@ -9,7 +9,7 @@
  */
 
 import path from "path";
-import * as Nacl from "tweetnacl";
+import nacl from "tweetnacl";
 import fs from "fs";
 import { bytesToHex } from "../bytes_to_hex.js";
 import {
@@ -141,11 +141,11 @@ function parseTransactionArgument(arg: any): TransactionArgument {
 
 function sign(rawTxn: RawTransaction, privateKey: string): string {
   const privateKeyBytes = new HexString(privateKey).toUint8Array();
-  const signingKey = Nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
+  const signingKey = nacl.sign.keyPair.fromSeed(privateKeyBytes.slice(0, 32));
   const { publicKey } = signingKey;
 
   const txnBuilder = new TransactionBuilderEd25519(
-    (signingMessage) => new Ed25519Signature(Nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64)),
+    (signingMessage) => new Ed25519Signature(nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64)),
     publicKey,
   );
 

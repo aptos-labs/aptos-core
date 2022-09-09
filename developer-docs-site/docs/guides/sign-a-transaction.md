@@ -10,12 +10,12 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Creating a Signed Transaction
 
-All transactions executed on the Aptos Blockchain must be signed. This requirement is enforced by the chain for security reasons.
+All transactions executed on the Aptos blockchain must be signed. This requirement is enforced by the chain for security reasons.
 
 ## Generating the signing message 
 
 The first step in signing a transaction is to generate the signing message from the transaction. To generate such a signing message, you can use:
-- The Aptos node's [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). The Aptos node will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
+- The Aptos node's [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). The Aptos node will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
 - However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
@@ -25,13 +25,13 @@ This guide will introduce the concepts behind constructing a transaction, genera
 
 :::tip
 
-We strongly recommend that you use the BCS format for submitting transactions to the Aptos Blockchain.
+We strongly recommend that you use the BCS format for submitting transactions to the Aptos blockchain.
 
 :::
 
 ## Overview
 
-Creating a transaction that is ready to be executed on the Aptos Blockchain requires the following four steps:
+Creating a transaction that is ready to be executed on the Aptos blockchain requires the following four steps:
 
 1. Create a raw transaction, `RawTransaction`, also called unsigned transaction.
 2. Generate the signing message containing the appropriate salt (`prefix_bytes`), and generate the signature of the raw transaction by using the client's private key.
@@ -54,11 +54,11 @@ See the below high-level flow diagram showing how a raw transaction becomes a si
 
 Unsigned transactions are known as `RawTransaction`s. They contain all the information about how to execute an operation on an account within Aptos. But they lack the appropriate authorization with a signature or `Authenticator`.
 
-In Aptos Blockchain, all the data is encoded as [BCS][bcs] (Binary Canonical Serialization).
+In Aptos blockchain, all the data is encoded as [BCS][bcs] (Binary Canonical Serialization).
 
 Aptos supports many different approaches to signing a transaction but defaults to a single signer using [Ed25519][Ed25519].
 
-The `Authenticator` produced during the signing of the transaction gives authorization to the Aptos Blockchain to execute the transaction on behalf of the account owner.
+The `Authenticator` produced during the signing of the transaction gives authorization to the Aptos blockchain to execute the transaction on behalf of the account owner.
 
 ## Key concepts
 
@@ -68,7 +68,7 @@ A raw transaction consists of the following fields:
 
 * **sender** (Address): Account address of the sender.
 * **sequence_number** (uint64): Sequence number of this transaction. This must match the sequence number stored in the sender's account at the time the transaction executes.
-* **payload**: Instructions for the Aptos Blockchain, including publishing a module, execute a script function or execute a script payload.
+* **payload**: Instructions for the Aptos blockchain, including publishing a module, execute a script function or execute a script payload.
 * **max_gas_amount** (uint64): Maximum total gas to spend for this transaction. The account must have more than this gas or the transaction will be discarded during validation.
 * **gas_unit_price** (uint64): Price to be paid per gas unit. During execution the `total_gas_amount`, calculated as: `total_gas_amount = total_gas_units_consumed * gas_unit_price`, must not exceed `max_gas_amount` or the transaction will abort during the execution. `total_gas_units_consumed` represents the total units of gas consumed when executing the transaction.
 * **expiration_timestamp_secs** (uint64): The blockchain timestamp at which the blockchain would discard this transaction.
@@ -104,8 +104,8 @@ The prefixing step is not shown in the diagram in the [Overview](#overview) sect
 ### Signature
 A signature is the result of hashing the signing message with the client's private key. By default Aptos uses the [Ed25519][ed25519] scheme to generate the signature of the raw transaction.
 
-* By signing a signing message with the private key, clients prove to the Aptos Blockchain that they have authorized the transaction be executed.
-* Aptos Blockchain will validate the signature with client account's public key to ensure that the transaction submitted is indeed signed by the client.
+* By signing a signing message with the private key, clients prove to the Aptos blockchain that they have authorized the transaction be executed.
+* Aptos blockchain will validate the signature with client account's public key to ensure that the transaction submitted is indeed signed by the client.
 
 ### Signed transaction
 
@@ -118,11 +118,11 @@ This signed transaction is further BCS-serialized (not shown in the diagram in [
 
 ### Multisignature transactions
 
-The Aptos Blockchain supports several signing methods for transactions, including the single signature, the K-of-N multisig, and more.
+The Aptos blockchain supports several signing methods for transactions, including the single signature, the K-of-N multisig, and more.
 
 A K-of-N multisig transaction means that for such a transaction to be executed, at least K out of the N authorized signers have signed the transaction and passed the check conducted by the chain.
 
-Transaction signatures are wrapped in `Authenticator`. The Aptos Blockchain validates the transactions submitted by clients by using the Authenticator data.  See a few examples below:
+Transaction signatures are wrapped in `Authenticator`. The Aptos blockchain validates the transactions submitted by clients by using the Authenticator data.  See a few examples below:
 
 In Typescript, this is how a single signer authenticator looks like:
 ```typescript

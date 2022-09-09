@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import * as SHA3 from "js-sha3";
+import sha3 from "js-sha3";
 import { MemoizeExpiring } from "typescript-memoize";
 import {
   Ed25519PublicKey,
@@ -32,6 +32,8 @@ import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder
 import * as Gen from "../generated/index";
 
 export { TypeTagParser } from "./builder_utils.js";
+
+const { sha3_256: sha3Hash } = sha3;
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -67,7 +69,7 @@ export class TransactionBuilder<F extends SigningFn> {
 
   /** Generates a Signing Message out of a raw transaction. */
   static getSigningMessage(rawTxn: AnyRawTransaction): SigningMessage {
-    const hash = SHA3.sha3_256.create();
+    const hash = sha3Hash.create();
     if (rawTxn instanceof RawTransaction) {
       hash.update(RAW_TRANSACTION_SALT);
     } else if (rawTxn instanceof MultiAgentRawTransaction) {
@@ -192,8 +194,8 @@ export class TransactionBuilderABI {
     });
 
     this.builderConfig = {
-      gasUnitPrice: 1n,
-      maxGasAmount: 2000n,
+      gasUnitPrice: BigInt(1),
+      maxGasAmount: BigInt(2000),
       expSecFromNow: 20,
       ...builderConfig,
     };

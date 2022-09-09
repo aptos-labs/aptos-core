@@ -243,6 +243,16 @@ variable "monitoring_helm_values" {
   default     = {}
 }
 
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
+}
+
 variable "helm_release_name_override" {
   description = "If set, overrides the name of the aptos-node helm chart"
   default     = ""

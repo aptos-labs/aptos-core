@@ -731,8 +731,11 @@ proptest! {
 
         // Commit the first chunk without committing the ledger info.
         let TestExecutor { _path, db, executor } = TestExecutor::new();
-        ChunkExecutor::<MockVM>::new(db)
-            .execute_and_commit_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
+        {
+            let executor = ChunkExecutor::<MockVM>::new(db);
+            executor.execute_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
+            executor.commit().unwrap();
+        }
 
         first_block_txns.extend(overlap_txn_list_with_proof.transactions);
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)

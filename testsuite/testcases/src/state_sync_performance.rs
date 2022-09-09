@@ -54,7 +54,7 @@ impl NetworkTest for StateSyncPerformance {
 
         // Fetch the highest synced version from the swarm
         let highest_synced_version = runtime.block_on(async {
-            get_highest_synced_version(&ctx.swarm().get_clients_with_names())
+            get_highest_synced_version(&ctx.swarm().get_all_nodes_clients_with_names())
                 .await
                 .unwrap_or(0)
         });

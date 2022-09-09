@@ -64,6 +64,25 @@ pub enum ConsensusMsg {
     CommitDecisionMsg(Box<CommitDecision>),
 }
 
+/// Network type for consensus
+impl ConsensusMsg {
+    /// ConsensusMsg type in string
+    ///
+    pub fn name(&self) -> &str {
+        match self {
+            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
+            ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
+            ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::SyncInfo(_) => "SyncInfo",
+            ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
+            ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
+            ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
+        }
+    }
+}
+
 /// The interface from Network to Consensus layer.
 ///
 /// `ConsensusNetworkEvents` is a `Stream` of `PeerManagerNotification` where the

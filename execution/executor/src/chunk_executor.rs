@@ -93,40 +93,6 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             .commit_chunk()
     }
 
-    fn execute_and_commit_chunk(
-        &self,
-        txn_list_with_proof: TransactionListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification> {
-        // Re-sync with DB, make sure the queue is empty.
-        self.reset()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .execute_and_commit_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)
-    }
-
-    fn apply_and_commit_chunk(
-        &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification> {
-        // Re-sync with DB, make sure the queue is empty.
-        self.reset()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .apply_and_commit_chunk(
-                txn_output_list_with_proof,
-                verified_target_li,
-                epoch_change_li,
-            )
-    }
-
     fn reset(&self) -> Result<()> {
         *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
         Ok(())
@@ -323,30 +289,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             committed_transactions: executed_chunk.transactions(),
             reconfiguration_occurred: executed_chunk.has_reconfiguration(),
         })
-    }
-
-    fn execute_and_commit_chunk(
-        &self,
-        txn_list_with_proof: TransactionListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification> {
-        self.execute_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)?;
-        self.commit_chunk()
-    }
-
-    fn apply_and_commit_chunk(
-        &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
-        verified_target_li: &LedgerInfoWithSignatures,
-        epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<ChunkCommitNotification> {
-        self.apply_chunk(
-            txn_output_list_with_proof,
-            verified_target_li,
-            epoch_change_li,
-        )?;
-        self.commit_chunk()
     }
 }
 

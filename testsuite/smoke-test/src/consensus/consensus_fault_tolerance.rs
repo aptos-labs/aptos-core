@@ -57,7 +57,7 @@ impl Drop for ActiveTrafficGuard {
 }
 
 async fn start_traffic(num_accounts: usize, tps: f32, swarm: &mut dyn Swarm) -> ActiveTrafficGuard {
-    let validator_clients = swarm.get_clients_with_names();
+    let validator_clients = swarm.get_all_nodes_clients_with_names();
 
     let finish = Arc::new(AtomicBool::new(false));
     let finish_copy = finish.clone();
@@ -115,7 +115,9 @@ async fn run_fail_point_test(
         dyn FnMut(usize, usize) -> (Vec<(usize, String, String)>, bool) + Send,
     >,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
-    check_cycle: Box<dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>)>,
+    check_cycle: Box<
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+    >,
 ) {
     let mut swarm = create_swarm(num_validators, max_block_size).await;
     let _active_traffic = if traffic_tps > 0.0 {
@@ -161,6 +163,7 @@ async fn test_no_failures() {
                 "no progress with active consensus, only {} rounds",
                 executed_rounds
             );
+            Ok(())
         }),
         true,
     )
@@ -196,7 +199,7 @@ async fn test_fault_tolerance_of_network_send() {
                 false,
             )
         }),
-        Box::new(|_, _, _, _, _, _| {}),
+        Box::new(|_, _, _, _, _, _| Ok(())),
     )
     .await;
 }
@@ -229,7 +232,7 @@ async fn test_fault_tolerance_of_network_receive() {
                 false,
             )
         }),
-        Box::new(|_, _, _, _, _, _| {}),
+        Box::new(|_, _, _, _, _, _| Ok(())),
     )
     .await;
 }
@@ -291,6 +294,7 @@ async fn test_changing_working_consensus() {
                 "no progress with active consensus, only {} rounds",
                 executed_rounds
             );
+            Ok(())
         }),
     )
     .await;
@@ -351,6 +355,7 @@ async fn test_changing_working_consensus_fast() {
                 "no progress with active consensus, only {} rounds",
                 executed_rounds
             );
+            Ok(())
         }),
     )
     .await;
@@ -428,6 +433,7 @@ async fn test_alternating_having_consensus() {
                     executed_rounds
                 );
             }
+            Ok(())
         }),
     )
     .await;
