@@ -65,9 +65,7 @@ module "validator" {
   enable_monitoring               = true
   enable_prometheus_node_exporter = true
   enable_kube_state_metrics       = true
-  enable_logger                   = true
   monitoring_helm_values          = var.monitoring_helm_values
-  logger_helm_values              = var.logger_helm_values
 }
 
 locals {

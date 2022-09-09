@@ -61,9 +61,8 @@ provider "kubernetes" {
 }
 
 locals {
-  pfn_helm_chart_path        = "${path.module}/fullnode"
-  pfn_logger_helm_chart_path = "${path.module}/../../helm/logger"
-  fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
+  pfn_helm_chart_path      = "${path.module}/fullnode"
+  fullnode_helm_chart_path = "${path.module}/../../helm/fullnode"
 }
 
 resource "helm_release" "pfn" {
@@ -123,9 +122,6 @@ resource "helm_release" "fullnode" {
       image = {
         tag = local.image_tag
       }
-      logging = {
-        address = var.enable_pfn_logger ? "fullnode-pfn-aptos-logger:5044" : ""
-      }
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "fullnode"
       }
@@ -163,32 +159,5 @@ resource "helm_release" "fullnode" {
   set {
     name  = "chart_sha1"
     value = sha1(join("", [for f in fileset(local.fullnode_helm_chart_path, "**") : filesha1("${local.fullnode_helm_chart_path}/${f}")]))
-  }
-}
-
-
-resource "helm_release" "pfn-logger" {
-  count       = var.enable_pfn_logger ? 1 : 0
-  name        = "pfn-logger"
-  chart       = local.pfn_logger_helm_chart_path
-  max_history = 10
-  wait        = false
-
-  values = [
-    jsonencode({
-      logger = {
-        name = "pfn"
-      }
-      chain = {
-        name = "aptos-${terraform.workspace}"
-      }
-    }),
-    jsonencode(var.pfn_logger_helm_values),
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.pfn_logger_helm_chart_path, "**") : filesha1("${local.pfn_logger_helm_chart_path}/${f}")]))
   }
 }

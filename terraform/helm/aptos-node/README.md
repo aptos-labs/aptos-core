@@ -26,7 +26,7 @@ Aptos blockchain node deployment
 | fullnode.resources.requests.cpu | float | `3.5` |  |
 | fullnode.resources.requests.memory | string | `"6Gi"` |  |
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
-| fullnode.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the fullnode |
+| fullnode.rust_log_remote | string | `"off"` | Remote log level for the fullnode |
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
 | fullnode.storage.size | string | `"350Gi"` | Size of fullnode persistent storage |
 | fullnode.tolerations | list | `[]` |  |
@@ -72,13 +72,12 @@ Aptos blockchain node deployment
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
 | validator.name | string | `nil` | Internal: name of your validator for use in labels |
 | validator.nodeSelector | object | `{}` |  |
-| validator.remoteLogAddress | string | `nil` | Address for remote logging. See `logger` helm chart |
 | validator.resources.limits.cpu | float | `3.5` |  |
 | validator.resources.limits.memory | string | `"6Gi"` |  |
 | validator.resources.requests.cpu | float | `3.5` |  |
 | validator.resources.requests.memory | string | `"6Gi"` |  |
 | validator.rust_log | string | `"info"` | Log level for the validator |
-| validator.rust_log_remote | string | `"debug,hyper=off"` | Remote log level for the validator |
+| validator.rust_log_remote | string | `"off"` | Remote log level for the validator |
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
 | validator.storage.size | string | `"350Gi"` | Size of validator persistent storage |
 | validator.tolerations | list | `[]` |  |

@@ -15,7 +15,3 @@ subjects:
   name: pfn{{ $e }}-aptos-fullnode
   namespace: {{ $.Release.Namespace }}
 {{- end }}
-- kind: ServiceAccount
-  name: pfn-pfn-aptos-logger
-  namespace: {{ $.Release.Namespace }}
-

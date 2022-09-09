@@ -97,17 +97,6 @@ variable "dns_prefix_name" {
   default     = "fullnode"
 }
 
-variable "enable_pfn_logger" {
-  description = "Enable separate public fullnode logger pod"
-  default     = false
-}
-
-variable "pfn_logger_helm_values" {
-  description = "Map of values to pass to public fullnode logger Helm"
-  type        = any
-  default     = {}
-}
-
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
   default     = "t3.medium"

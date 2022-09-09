@@ -110,17 +110,6 @@ variable "validator_instance_enable_taint" {
   default     = false
 }
 
-variable "enable_logger" {
-  description = "Enable logger helm chart"
-  default     = false
-}
-
-variable "logger_helm_values" {
-  description = "Map of values to pass to logger Helm"
-  type        = any
-  default     = {}
-}
-
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
   default     = false

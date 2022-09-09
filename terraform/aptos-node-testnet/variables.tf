@@ -101,12 +101,6 @@ variable "genesis_helm_values" {
   default     = {}
 }
 
-variable "logger_helm_values" {
-  description = "Map of values to pass to logger helm chart"
-  type        = any
-  default     = {}
-}
-
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring helm chart"
   type        = any
