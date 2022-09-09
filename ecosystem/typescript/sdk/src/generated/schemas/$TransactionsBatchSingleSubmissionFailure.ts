@@ -5,10 +5,7 @@ export const $TransactionsBatchSingleSubmissionFailure = {
     description: `Information telling which batch submission transactions failed`,
     properties: {
         error: {
-            type: 'all-of',
-            contains: [{
-                type: 'AptosError',
-            }],
+            type: 'AptosError',
             isRequired: true,
         },
         transaction_index: {

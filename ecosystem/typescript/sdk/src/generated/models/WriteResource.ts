@@ -10,6 +10,9 @@ import type { MoveResource } from './MoveResource';
  */
 export type WriteResource = {
     address: Address;
+    /**
+     * State key hash
+     */
     state_key_hash: string;
     data: MoveResource;
 };

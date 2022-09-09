@@ -5,17 +5,11 @@ export const $TableItemRequest = {
     description: `Table Item request for the GetTableItem API`,
     properties: {
         key_type: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveType',
-            }],
+            type: 'MoveType',
             isRequired: true,
         },
         value_type: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveType',
-            }],
+            type: 'MoveType',
             isRequired: true,
         },
         key: {
