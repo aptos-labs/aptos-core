@@ -1556,7 +1556,7 @@
   },
   "refresh": "10s",
   "schemaVersion": 35,
-  "version": 4,
+  "version": 1,
   "links": [
     {
       "title": "Other Dashboards",
