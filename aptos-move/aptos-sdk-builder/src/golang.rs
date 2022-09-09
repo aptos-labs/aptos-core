@@ -771,6 +771,11 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("Bytes"),
+                Vector(type_tag) => match type_tag.as_ref() {
+                    U8 => Some("VecBytes"),
+                    type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
+                    // _ => common::type_not_allowed(type_tag),
+                },
                 type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
                 // _ => common::type_not_allowed(type_tag),
             },
