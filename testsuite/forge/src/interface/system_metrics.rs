@@ -61,8 +61,12 @@ pub struct SystemMetricsThreshold {
 
 impl SystemMetricsThreshold {
     pub fn ensure_threshold(&self, metrics: &SystemMetrics) -> anyhow::Result<()> {
-        ensure_metrics_threshold(&self.cpu_threshold, &metrics.cpu_core_metrics)?;
-        ensure_metrics_threshold(&self.memory_threshold, &metrics.memory_bytes_metrics)?;
+        ensure_metrics_threshold("cpu", &self.cpu_threshold, &metrics.cpu_core_metrics)?;
+        ensure_metrics_threshold(
+            "memory",
+            &self.memory_threshold,
+            &metrics.memory_bytes_metrics,
+        )?;
         Ok(())
     }
     pub fn new(cpu_threshold: MetricsThreshold, memory_threshold: MetricsThreshold) -> Self {
@@ -74,6 +78,7 @@ impl SystemMetricsThreshold {
 }
 
 fn ensure_metrics_threshold(
+    metrics_name: &str,
     threshold: &MetricsThreshold,
     metrics: &Vec<Sample>,
 ) -> anyhow::Result<()> {
@@ -87,7 +92,8 @@ fn ensure_metrics_threshold(
     let breach_pct = (breach_count * 100) / metrics.len();
     if breach_pct > threshold.max_breach_pct {
         bail!(
-            "Metrics violated threshold, max_breach_pct {:?}, breach_pct{:?} ",
+            "{:?} metrics violated threshold, max_breach_pct: {:?}, breach_pct: {:?} ",
+            metrics_name,
             threshold.max_breach_pct,
             breach_pct
         );
