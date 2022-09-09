@@ -9,6 +9,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 */3 * * *"
+  push:
+    branches:
+      - rustielin/grafana-sync-folders-canary
 
 env:
   GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
