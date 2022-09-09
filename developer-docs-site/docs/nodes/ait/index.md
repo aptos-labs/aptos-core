@@ -21,7 +21,7 @@ _All dates and times shown are for Pacific Time, year 2022._
 - **August 25:** Registration ends.
 - **August 29:** Notification of the selection results sent out.
 - **August 30:** AIT-3 becomes live.
-- **September 9:** AIT-3 concludes.
+- **September 16 (extended one week from September 9):** AIT-3 concludes.
 
 :::
 
