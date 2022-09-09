@@ -91,7 +91,7 @@ export default function SettingsListItem({
     <VStack width="100%">
       <Grid
         templateColumns={templateColumns}
-        p={4}
+        p={3}
         width="100%"
         cursor="pointer"
         onClick={gridOnClick}
