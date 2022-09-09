@@ -376,13 +376,20 @@ module aptos_framework::stake {
         operator: address,
         voter: address,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
-        initialize_owner(owner);
-        move_to(owner, ValidatorConfig {
-            consensus_pubkey: vector::empty(),
-            network_addresses: vector::empty(),
-            fullnode_addresses: vector::empty(),
-            validator_index: 0,
-        });
+        // TODO: Undo when ready
+        abort 0;
+
+        initialize_owner_internal(owner, initial_stake_amount, operator, voter);
+    }
+
+    /// This is only called internally or externally during genesis.
+    public(friend) fun initialize_owner_internal(
+        owner: &signer,
+        initial_stake_amount: u64,
+        operator: address,
+        voter: address,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        initialize_owner(owner, vector::empty(), vector::empty(), vector::empty());
 
         if (initial_stake_amount > 0) {
             add_stake(owner, initial_stake_amount);
@@ -405,24 +412,23 @@ module aptos_framework::stake {
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ) {
+        // TODO: Undo when ready
+        abort 0;
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
         assert!(option::is_some(
             &mut bls12381::public_key_from_bytes_with_pop(consensus_pubkey,
                 &proof_of_possession_from_bytes(proof_of_possession))
         ), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
-        initialize_owner(account);
-        move_to(account, ValidatorConfig {
-            consensus_pubkey,
-            network_addresses,
-            fullnode_addresses,
-            validator_index: 0,
-        });
+        initialize_owner(account, consensus_pubkey, network_addresses, fullnode_addresses);
     }
 
-    fun initialize_owner(owner: &signer) {
-        // TODO: Undo when ready
-        abort 0;
+    fun initialize_owner(
+        owner: &signer,
+        consensus_pubkey: vector<u8>,
+        network_addresses: vector<u8>,
+        fullnode_addresses: vector<u8>,
+    ) {
         let owner_address = signer::address_of(owner);
         assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
 
@@ -451,6 +457,12 @@ module aptos_framework::stake {
         });
 
         move_to(owner, OwnerCapability { pool_address: owner_address });
+        move_to(owner, ValidatorConfig {
+            consensus_pubkey,
+            network_addresses,
+            fullnode_addresses,
+            validator_index: 0,
+        });
     }
 
     /// Extract and return owner capability from the signing account.
