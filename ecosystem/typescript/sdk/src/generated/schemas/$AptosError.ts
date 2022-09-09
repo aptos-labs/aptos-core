@@ -11,10 +11,7 @@ export const $AptosError = {
             isRequired: true,
         },
         error_code: {
-            type: 'all-of',
-            contains: [{
-                type: 'AptosErrorCode',
-            }],
+            type: 'AptosErrorCode',
             isRequired: true,
         },
         vm_error_code: {

@@ -45,7 +45,14 @@ const isSuccess = (status: number): boolean => {
     return status >= 200 && status < 300;
 };
 
-const base64 = (str: string): string => { return btoa(str); };
+const base64 = (str: string): string => {
+    try {
+        return btoa(str);
+    } catch (err) {
+        // @ts-ignore
+        return Buffer.from(str).toString('base64');
+    }
+};
 
 const getQueryString = (params: Record<string, any>): string => {
     const qs: string[] = [];

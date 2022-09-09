@@ -12,7 +12,6 @@ use std::fmt::Formatter;
 pub struct AptosError {
     /// A message describing the error
     pub message: String,
-    /// A code providing more granular error information beyond the HTTP status code
     pub error_code: AptosErrorCode,
     /// A code providing VM error details when submitting transactions to the VM
     pub vm_error_code: Option<u64>,

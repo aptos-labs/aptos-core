@@ -27,10 +27,7 @@ export const $MultiEd25519Signature = {
             format: 'uint8',
         },
         bitmap: {
-            type: 'all-of',
-            contains: [{
-                type: 'HexEncodedBytes',
-            }],
+            type: 'HexEncodedBytes',
             isRequired: true,
         },
     },

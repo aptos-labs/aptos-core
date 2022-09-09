@@ -5,17 +5,11 @@ export const $MoveFunction = {
     description: `Move function`,
     properties: {
         name: {
-            type: 'all-of',
-            contains: [{
-                type: 'IdentifierWrapper',
-            }],
+            type: 'IdentifierWrapper',
             isRequired: true,
         },
         visibility: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveFunctionVisibility',
-            }],
+            type: 'MoveFunctionVisibility',
             isRequired: true,
         },
         is_entry: {
