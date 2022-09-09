@@ -7,6 +7,7 @@ class NftOffersController < ApplicationController
   before_action :authenticate_user!, only: %i[create]
 
   def show
+    @image_dialog = DialogComponent.new(id: 'image_dialog', class: '!w-max max-h-max')
     store_location_for(:user, request.path)
     @nft_offer = NftOffer.find(params[:slug])
     @wallet = current_user&.wallets&.find_by(network: @nft_offer.network, public_key: params[:wallet]) ||
