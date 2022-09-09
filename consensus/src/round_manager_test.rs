@@ -370,7 +370,9 @@ fn delay_proposal_processing_in_sync_only() {
         node.next_proposal().await;
 
         // Set sync only to true so that new proposal processing is delayed.
-        node.round_manager.set_sync_only(true);
+        node.round_manager
+            .block_store
+            .set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
             Payload::empty(),
             1,
@@ -401,7 +403,9 @@ fn delay_proposal_processing_in_sync_only() {
             .unwrap_err();
 
         // Clear the sync only mode and process verified proposal and ensure it is processed now
-        node.round_manager.set_sync_only(false);
+        node.round_manager
+            .block_store
+            .set_back_pressure_for_test(false);
 
         node.round_manager
             .process_verified_proposal(proposal)
