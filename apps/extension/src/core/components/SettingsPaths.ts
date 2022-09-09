@@ -9,6 +9,7 @@ import { settingsItemLabel } from 'core/constants';
 import { AiFillQuestionCircle } from '@react-icons/all-files/ai/AiFillQuestionCircle';
 import { MdWifiTethering } from '@react-icons/all-files/md/MdWifiTethering';
 import { Divider } from '@chakra-ui/react';
+import { Account } from 'shared/types';
 import { SettingsListItemProps } from './SettingsListItem';
 
 export const signOutSecondaryGridBgColor = {
@@ -26,7 +27,7 @@ export const secondaryGridHoverTextColor = {
   light: 'black',
 };
 
-export default function getSettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
+export default function getSettingsPaths(account: Account): SettingsListItemProps[] {
   let items: SettingsListItemProps[] = [
     {
       iconAfter: FiChevronRight,
@@ -58,9 +59,15 @@ export default function getSettingsPaths(hasMnemonic: boolean): SettingsListItem
       path: Routes.credentials.path,
       title: settingsItemLabel.SHOW_CREDENTIALS,
     },
+    {
+      externalLink: `https://explorer.devnet.aptos.dev/account/${account.address}`,
+      iconAfter: FiChevronRight,
+      path: null,
+      title: settingsItemLabel.EXPLORER,
+    },
   ];
 
-  if (hasMnemonic) {
+  if (account.mnemonic) {
     items.push({
       iconAfter: FiChevronRight,
       path: Routes.recovery_phrase.path,

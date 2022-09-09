@@ -47,8 +47,7 @@ export function CredentialRow({
 function Account() {
   const { activeAccount } = useActiveAccount();
   const { activeNetwork } = useNetworks();
-  const mnemonic = activeAccount?.mnemonic;
-  const settingsPaths = SettingsPaths(mnemonic !== undefined);
+  const settingsPaths = SettingsPaths(activeAccount);
 
   return (
     <WalletLayout title="Settings">

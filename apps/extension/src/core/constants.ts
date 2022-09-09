@@ -20,6 +20,7 @@ export const validStorageUris = [
 ];
 
 export const settingsItemLabel = {
+  EXPLORER: 'View on explorer',
   HELP_SUPPORT: 'Help & Support',
   LOCK_WALLET: 'Lock wallet',
   NETWORK: 'Network',
