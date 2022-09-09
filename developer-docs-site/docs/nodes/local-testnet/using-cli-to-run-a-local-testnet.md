@@ -10,7 +10,7 @@ id: "using-cli-to-run-a-local-testnet"
 If you want to use Docker or `aptos-core` source to start and run a local testnet, see [Run a Local Testnet with Validator](./run-a-local-testnet).
 :::
 
-You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes. A local testnet is a great tool for doing local development against a known version of the codebase without having to interact with a live network or deal with the real world costs of a live network.
+You can run a local testnet of the Aptos blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes. A local testnet is a great tool for doing local development against a known version of the codebase without having to interact with a live network or deal with the real world costs of a live network.
 
 :::tip Aptos CLI documentation
 If you are new to Aptos CLI, then see this comprehensive [Aptos CLI documentation](/cli-tools/aptos-cli-tool/index.md).
@@ -34,7 +34,7 @@ Completed generating configuration:
         Waypoint: 0:74c9d14285ec19e6bd15fbe851007ea8b66efbd772f613c191aa78721cadac25
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/6181
+        Fullnode network: /ip4/0.0.0.0/tcp/6181
 
 Aptos is running, press ctrl-c to exit
 

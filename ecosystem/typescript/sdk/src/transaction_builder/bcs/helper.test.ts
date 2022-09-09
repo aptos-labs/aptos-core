@@ -55,13 +55,13 @@ test("bcsSerializeU32", () => {
 });
 
 test("bcsSerializeU64", () => {
-  expect(bcsSerializeUint64(18446744073709551615n)).toEqual(
+  expect(bcsSerializeUint64(BigInt("18446744073709551615"))).toEqual(
     new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
   );
 });
 
 test("bcsSerializeU128", () => {
-  expect(bcsSerializeU128(340282366920938463463374607431768211455n)).toEqual(
+  expect(bcsSerializeU128(BigInt("340282366920938463463374607431768211455"))).toEqual(
     new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
   );
 });

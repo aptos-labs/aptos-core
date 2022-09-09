@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{proof_fetcher::ProofFetcher, DbReader};
+use anyhow::format_err;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -32,10 +33,23 @@ impl ProofFetcher for SyncProofFetcher {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_hash: Option<HashValue>,
     ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
         let (state_value, proof) = self
             .reader
             .get_state_value_with_proof_by_version_ext(state_key, version)?;
+        if let Some(root_hash) = root_hash {
+            proof
+                .verify(root_hash, state_key.hash(), state_value.as_ref())
+                .map_err(|err| {
+                    format_err!(
+                        "Proof is invalid for key {:?} with state root hash {:?}: {}.",
+                        state_key,
+                        root_hash,
+                        err
+                    )
+                })?;
+        }
         // multiple threads may enter this code, and another thread might add
         // an address before this one. Thus the insertion might return a None here.
         self.state_proof_cache

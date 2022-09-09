@@ -1,11 +1,11 @@
 ---
-title: "Run a FullNode on GCP"
+title: "Run a Fullnode on GCP"
 slug: "run-a-fullnode-on-gcp"
 ---
 
-# Run a FullNode on GCP
+# Run a Fullnode on GCP
 
-This tutorial explains how to configure and deploy a public FullNode to connect to the Aptos devnet using Google Cloud (GCP). Running a FullNode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking for deploying a production grade FullNode, we recommend you to deploy it on the cloud.
+This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking for deploying a production grade fullnode, we recommend you to deploy it on the cloud.
 
 > **Note:** Please read [Run a Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
 >
@@ -48,7 +48,7 @@ This should be enough to get your GCP setup ready to start deploying your fullno
 
 ## Getting started
 
-You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform module, this guide assumes you already have GCP account setup, and have created a new project for deploying Aptos fullnode. If you don't, check out the instructions above for [GCP Setup](#gcp-setup).
+You can deploy a public fullnode on GCP by using the Aptos fullnode Terraform module, this guide assumes you already have GCP account setup, and have created a new project for deploying Aptos fullnode. If you don't, check out the instructions above for [GCP Setup](#gcp-setup).
 
 1. Create a working directory for your configuration.
 
@@ -148,7 +148,7 @@ Once Terraform apply finished, you can follow this section to validate your depl
   # Example command syntax: curl http://104.198.36.142/v1
   ```
 
-5. To verify the correctness of your FullNode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
+5. To verify the correctness of your fullnode, as outlined in the [fullnode documentation](https://aptos.dev/tutorials/run-a-fullnode/#verify-the-correctness-of-your-fullnode), you will need to set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal and test it in another ssh terminal
 
    * Set up the port-forwarding to the aptos-fullnode pod.  Use `kubectl get pods -n aptos` to get the name of the pod
       ```
@@ -166,7 +166,7 @@ Once Terraform apply finished, you can follow this section to validate your depl
 
    * Exit port-forwarding when you are done by entering control-c in the terminal
 
-## Update Fullnode With New Releases
+## Update fullnode with new releases
 
 There could be two types of releasees, one comes with a data wipe to startover the blockchain, one is just a software update.
 

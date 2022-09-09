@@ -82,7 +82,7 @@ pub struct Entry {
     api_port: u16,
 
     /// The noise port.
-    pub noise_port: u16,
+    noise_port: u16,
 
     /// The port the metrics server is running on.
     pub metrics_port: u16,
@@ -98,6 +98,7 @@ impl TryInto<NodeInfo> for Entry {
         Ok(NodeInfo {
             node_url: Url::parse(&self.url).context("Failed to parse URL")?,
             api_port: Some(self.api_port),
+            noise_port: self.noise_port,
             public_key: Some(
                 x25519::PublicKey::from_encoded_string(&self.public_key)
                     .context("Failed to parse public key")?,

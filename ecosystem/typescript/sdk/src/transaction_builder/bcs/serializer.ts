@@ -146,7 +146,7 @@ export class Serializer {
    * assert(serializer.getBytes() === new Uint8Array([0x00, 0xEF, 0xCD, 0xAB, 0x78, 0x56, 0x34, 0x12]));
    * ```
    */
-  @checkNumberRange(0n, MAX_U64_BIG_INT)
+  @checkNumberRange(BigInt(0), MAX_U64_BIG_INT)
   serializeU64(value: AnyNumber): void {
     const low = BigInt(value.toString()) & BigInt(MAX_U32_NUMBER);
     const high = BigInt(value.toString()) >> BigInt(32);
@@ -161,7 +161,7 @@ export class Serializer {
    *
    * BCS layout for "uint128": Sixteen bytes. Binary format in little-endian representation.
    */
-  @checkNumberRange(0n, MAX_U128_BIG_INT)
+  @checkNumberRange(BigInt(0), MAX_U128_BIG_INT)
   serializeU128(value: AnyNumber): void {
     const low = BigInt(value.toString()) & MAX_U64_BIG_INT;
     const high = BigInt(value.toString()) >> BigInt(64);

@@ -11,13 +11,11 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
-aptos-api-types = { path = "../../api/types" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-types = { path = "../../types" }
 clap = "3.2.17"
-fallible = { path = "../fallible" }
 futures = "0.3.21"
 hex = "0.4.3"
 network = { path = "../../network" }

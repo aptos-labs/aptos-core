@@ -5,10 +5,7 @@ export const $MoveStruct = {
     description: `A move struct`,
     properties: {
         name: {
-            type: 'all-of',
-            contains: [{
-                type: 'IdentifierWrapper',
-            }],
+            type: 'IdentifierWrapper',
             isRequired: true,
         },
         is_native: {

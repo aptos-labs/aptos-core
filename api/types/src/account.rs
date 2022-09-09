@@ -12,13 +12,7 @@ use serde::{Deserialize, Serialize};
 /// A simplified version of the onchain Account resource
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct AccountData {
-    /// Next sequence number of the account
-    ///
-    /// This will be the sequence number of the next transaction committed on this account
     pub sequence_number: U64,
-    /// Authentication key
-    ///
-    /// A SHA-256 of public keys and authentication scheme of the account
     pub authentication_key: HexEncodedBytes,
 }
 
