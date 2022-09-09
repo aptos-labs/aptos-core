@@ -69,10 +69,12 @@ async function getActiveNetwork() {
  * Return the active account, or throw if not available
  * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
  */
-async function ensureActiveAccount() {
+async function ensureActiveAccount(promptIfNoAccount = false) {
   const activeAccount = await getActiveAccount();
   if (activeAccount === undefined) {
-    await PromptPresenter.promptUser(warningPrompt());
+    if (promptIfNoAccount) {
+      await PromptPresenter.promptUser(warningPrompt());
+    }
     throw DappErrorType.NO_ACCOUNTS;
   }
   return activeAccount;
@@ -143,7 +145,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
    * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    */
   async connect() {
-    const activeAccount = await ensureActiveAccount();
+    const activeAccount = await ensureActiveAccount(true);
     const domain = await getCurrentDomain();
     const allowed = await Permissions.requestPermissions(
       Permission.CONNECT,
