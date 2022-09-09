@@ -87,14 +87,15 @@ ansi-styles@^3.2.1:
   dependencies:
     color-convert "^1.9.0"
 
-aptos@^1.3.11:
-  version "1.3.11"
-  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.11.tgz#6063113c734e18909b0d7f7233a99cc574153fd4"
-  integrity sha512-IaiXvKGFrL7/dg931KjOU6ny59lCV724NyNNJF/L4zigTsV0+EIGGAyaJBOvWedPr43qrY6CKiEdkDjXsOQJSA==
+aptos@^1.3.12:
+  version "1.3.12"
+  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.3.12.tgz#ab9de80f18a9bbd4e77a338602e80a1734faa1e0"
+  integrity sha512-2y63tYpIaPV4ry5rSoNrWDugFgFgtighLnTjtb74TBTG0bDXva/6Elo+Xyl+tVWJkDEY5BHEdXuZzFjxnb04IQ==
   dependencies:
     "@scure/bip39" "^1.1.0"
     axios "^0.27.2"
     ed25519-hd-key "^1.2.0"
+    form-data "^4.0.0"
     js-sha3 "^0.8.0"
     tweetnacl "^1.0.3"
     typescript-memoize "^1.1.0"
