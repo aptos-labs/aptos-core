@@ -544,7 +544,19 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        self.process_verified_proposal(proposal).await
+        if self.decoupled_execution() && self.block_store.back_pressure() {
+            // In case of back pressure, we delay processing proposal. This is done by resending the
+            // same proposal to self after some time.
+            Ok(self
+                .resend_verified_proposal_to_self(
+                    proposal,
+                    BACK_PRESSURE_POLLING_INTERVAL_MS,
+                    BACK_PRESSURE_PROPOSAL_TIMEOUT_MS,
+                )
+                .await)
+        } else {
+            self.process_verified_proposal(proposal).await
+        }
     }
 
     async fn resend_verified_proposal_to_self(
@@ -574,19 +586,7 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
-        if self.decoupled_execution() && self.block_store.back_pressure() {
-            // In case of back pressure, we delay processing proposal. This is done by resending the
-            // same proposal to self after some time.
-            return Ok(self
-                .resend_verified_proposal_to_self(
-                    proposal,
-                    BACK_PRESSURE_POLLING_INTERVAL_MS,
-                    BACK_PRESSURE_PROPOSAL_TIMEOUT_MS,
-                )
-                .await);
-        }
         let proposal_round = proposal.round();
-
         let vote = self
             .execute_and_vote(proposal)
             .await
