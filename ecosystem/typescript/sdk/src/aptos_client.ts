@@ -561,8 +561,8 @@ export class AptosClient {
     extraArgs?: { maxGasAmount?: BCS.Uint64; gasUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
-      maxGasAmount: 2000n,
-      gasUnitPrice: 1n,
+      maxGasAmount: BigInt(2000),
+      gasUnitPrice: BigInt(1),
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
       ...extraArgs,
     };
@@ -706,13 +706,15 @@ export class AptosClient {
     const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
         "0x1::account",
-        "rotate_authentication_key_ed25519",
+        "rotate_authentication_key",
         [],
         [
+          BCS.bcsSerializeU8(0), // ed25519 scheme
+          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
+          BCS.bcsSerializeU8(0), // ed25519 scheme
+          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
           BCS.bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
           BCS.bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
-          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
         ],
       ),
     );

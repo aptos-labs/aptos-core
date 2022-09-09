@@ -70,13 +70,13 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
         telegram_url: Faker::Internet.url(host: 't.me'),
         linkedin_url: Faker::Internet.url(host: 'linkedin.com'),
         youtube_url: Faker::Internet.url(host: 'www.youtube.com'),
-        thumbnail: Rack::Test::UploadedFile.new('public/favicon.png', 'image/png'),
+        thumbnail: Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png'),
         category_ids: [category.id],
         project_members_attributes: [
           { user_id: @user.id, role: 'admin', public: true }
         ],
         screenshots: [
-          Rack::Test::UploadedFile.new('public/favicon.png', 'image/png')
+          Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png')
         ],
         public: true
       } }

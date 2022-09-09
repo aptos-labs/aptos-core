@@ -98,13 +98,16 @@ db-rollback:
 lint-ruby:
 	bundle exec rubocop -A
 
+lint-js:
+	yarn run prettier --write .
+
 lint-security:
 	bundle exec brakeman
 
 lint-erb:
 	bundle exec erblint --lint-all
 
-lint: lint-ruby lint-security lint-erb
+lint: lint-ruby lint-js lint-security lint-erb
 
 
 run-console:

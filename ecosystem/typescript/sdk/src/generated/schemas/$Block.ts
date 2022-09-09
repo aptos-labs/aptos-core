@@ -8,38 +8,23 @@ export const $Block = {
     associated transactions if requested`,
     properties: {
         block_height: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         block_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         block_timestamp: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         first_version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         last_version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         transactions: {

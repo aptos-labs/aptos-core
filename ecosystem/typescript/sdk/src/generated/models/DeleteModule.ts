@@ -10,6 +10,9 @@ import type { MoveModuleId } from './MoveModuleId';
  */
 export type DeleteModule = {
     address: Address;
+    /**
+     * State key hash
+     */
     state_key_hash: string;
     module: MoveModuleId;
 };

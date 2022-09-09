@@ -48,7 +48,7 @@ pub struct NodeHealthCheckerArgs {
     pub nhc_timeout_secs: u64,
 
     /// Max number of requests to NHC we can have running concurrently.
-    #[clap(long, default_value_t = 64)]
+    #[clap(long, default_value_t = 32)]
     pub max_concurrent_nhc_requests: u16,
 }
 
@@ -146,6 +146,7 @@ impl NodeHealthCheckerArgs {
                     nhc_address,
                     &node_info.node_url,
                     api_port,
+                    node_info.noise_port,
                     node_info.public_key,
                 )
                 .await
@@ -159,6 +160,7 @@ impl NodeHealthCheckerArgs {
                             nhc_address,
                             &node_info.node_url,
                             API_PORTS[index],
+                            node_info.noise_port,
                             node_info.public_key,
                         )
                         .await;
@@ -191,12 +193,14 @@ impl NodeHealthCheckerArgs {
         nhc_address: &Url,
         node_url: &Url,
         api_port: u16,
+        noise_port: u16,
         public_key: Option<x25519::PublicKey>,
     ) -> SingleCheckResult {
         // Build up query params.
         let mut params = HashMap::new();
         params.insert("node_url", node_url.to_string());
         params.insert("api_port", api_port.to_string());
+        params.insert("noise_port", noise_port.to_string());
         params.insert(
             "baseline_configuration_name",
             self.nhc_baseline_config_name.clone(),
@@ -281,6 +285,9 @@ pub struct NodeInfo {
 
     /// If given, we will use this. If not, we'll try each of API_PORTS.
     pub api_port: Option<u16>,
+
+    /// This will be included in the request to NHC.
+    pub noise_port: u16,
 
     /// If this is included, we'll include this in the NHC request.
     pub public_key: Option<x25519::PublicKey>,

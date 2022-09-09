@@ -5,10 +5,7 @@ export const $EntryFunctionPayload = {
     description: `Payload which runs a single entry function`,
     properties: {
         function: {
-            type: 'all-of',
-            contains: [{
-                type: 'EntryFunctionId',
-            }],
+            type: 'EntryFunctionId',
             isRequired: true,
         },
         type_arguments: {

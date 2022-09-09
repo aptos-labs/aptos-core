@@ -5,9 +5,10 @@ import { Controller } from "./controller";
 import type { Types } from "aptos";
 
 function hexToAscii(hex: string) {
-  return hex.match(/.{1,2}/g)!
+  return hex
+    .match(/.{1,2}/g)!
     .map((byte: string) => String.fromCharCode(parseInt(byte, 16)))
-    .join('');
+    .join("");
 }
 
 function decodeMintNumber(mintNumber: string) {
@@ -22,7 +23,13 @@ export default class extends Controller {
     apiUrl: String,
   };
 
-  static targets = ["transactionFailedError", "dateMinted", "mintNumber", "image", "address"];
+  static targets = [
+    "transactionFailedError",
+    "dateMinted",
+    "mintNumber",
+    "image",
+    "address",
+  ];
 
   declare readonly transactionFailedErrorTarget: HTMLElement;
   declare readonly dateMintedTarget: HTMLElement;
@@ -42,10 +49,10 @@ export default class extends Controller {
   fetchNftInfo = async () => {
     const transactionUrl = [
       this.apiUrlValue,
-      'transactions',
-      'by_hash',
+      "transactions",
+      "by_hash",
       this.transactionHashValue,
-    ].join('/');
+    ].join("/");
     const response = await fetch(transactionUrl);
     if (!response.ok && ++this.retries <= 1) {
       return setTimeout(this.fetchNftInfo, 1000);
@@ -53,15 +60,16 @@ export default class extends Controller {
 
     const transaction: Types.OnChainTransaction = await response.json();
 
-    if (!('timestamp' in transaction && 'events' in transaction)) return;
+    if (!("timestamp" in transaction && "events" in transaction)) return;
 
     if (!transaction.success) {
-      this.transactionFailedErrorTarget.classList.remove('hidden');
+      this.transactionFailedErrorTarget.classList.remove("hidden");
       return;
     }
 
-    const createEvent = transaction.events.find(event =>
-      event.type === '0x3::token::CreateTokenDataEvent');
+    const createEvent = transaction.events.find(
+      (event) => event.type === "0x3::token::CreateTokenDataEvent"
+    );
 
     if (createEvent == null) return;
 
@@ -71,8 +79,9 @@ export default class extends Controller {
 
     this.dateMintedTarget.textContent = dateMinted.toDateString();
     this.mintNumberTarget.textContent = `#${mintNumber}`;
-    this.addressTarget.textContent = transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
+    this.addressTarget.textContent =
+      transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
     this.addressTarget.title = transaction.sender;
     this.imageTarget.src = imageUrl;
-  }
+  };
 }

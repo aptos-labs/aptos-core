@@ -138,7 +138,8 @@ export default class extends Controller<HTMLFormElement> {
     this.getInput(FIELD_NAMES.walletName).value = this.walletName;
     this.getInput(FIELD_NAMES.network).value = network;
     this.getInput(FIELD_NAMES.publicKey).value = publicKey;
-    this.getInput(FIELD_NAMES.signedChallenge).value = await this.getSignedChallenge();
+    this.getInput(FIELD_NAMES.signedChallenge).value =
+      await this.getSignedChallenge();
 
     const formData = new FormData(this.element);
     const response = await fetch(this.element.action, {

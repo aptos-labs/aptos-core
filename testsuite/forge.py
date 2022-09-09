@@ -1,16 +1,18 @@
 from __future__ import annotations
-import atexit
 
-import json
 import multiprocessing
-from optparse import Option
 
 
-# Using fork can crash the subprocess, use spawn instead
-multiprocessing.set_start_method("spawn")
+# Using fork can crash the subprocess try use spawn instead
+try:
+    multiprocessing.set_start_method("spawn")
+except RuntimeError:
+    pass
 
 
 import asyncio
+import atexit
+import json
 import os
 import pwd
 import random
@@ -317,6 +319,9 @@ class SystemProcess(Process):
 
     def kill(self) -> None:
         self.process.kill()
+
+    def ppid(self) -> int:
+        return self.process.ppid()
 
 
 @dataclass
@@ -1156,7 +1161,6 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
 
 def create_forge_command(
     forge_runner_mode: Optional[str],
-    enable_failpoints_feature: bool,
     forge_test_suite: Optional[str],
     forge_runner_duration_secs: Optional[str],
     forge_num_validators: Optional[str],
@@ -1181,8 +1185,6 @@ def create_forge_command(
             "cargo",
             "run",
         ]
-        if enable_failpoints_feature:
-            forge_args.extend(["--features", "failpoints"])
         if cargo_args:
             forge_args.extend(cargo_args)
         forge_args.extend([
@@ -1403,7 +1405,6 @@ def test(
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
-        enable_failpoints_feature=enable_failpoints_feature,
         forge_test_suite=forge_test_suite,
         forge_runner_duration_secs=forge_runner_duration_secs,
         forge_num_validators=forge_num_validators,

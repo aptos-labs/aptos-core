@@ -12,7 +12,9 @@ interface ClaimDetails {
 }
 
 const fromHexString = (hexString: string) =>
-  Array.from(hexString.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16)));
+  Array.from(
+    hexString.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16))
+  );
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
@@ -41,7 +43,12 @@ export default class extends Controller<HTMLAnchorElement> {
   }
 
   async redirectIfMinted() {
-    const accountTransactionsUrl = [this.apiUrlValue, "accounts", this.addressValue, "transactions"].join("/");
+    const accountTransactionsUrl = [
+      this.apiUrlValue,
+      "accounts",
+      this.addressValue,
+      "transactions",
+    ].join("/");
     const response = await fetch(accountTransactionsUrl);
     if (!response.ok) return;
     const transactions: Types.OnChainTransaction[] = await response.json();
@@ -50,7 +57,7 @@ export default class extends Controller<HTMLAnchorElement> {
         transaction.success &&
         "payload" in transaction &&
         "function" in transaction.payload &&
-        transaction.payload.function === this.mintFunctionName,
+        transaction.payload.function === this.mintFunctionName
     );
     if (mintTransaction) {
       this.redirectToTransaction(mintTransaction.hash);
@@ -70,7 +77,9 @@ export default class extends Controller<HTMLAnchorElement> {
     event.preventDefault();
     this.transactionFailedErrorTarget.classList.add("hidden");
 
-    const csrfToken = (document.getElementsByName("csrf-token")[0] as HTMLMetaElement).content;
+    const csrfToken = (
+      document.getElementsByName("csrf-token")[0] as HTMLMetaElement
+    ).content;
     const response = await fetch(this.element.querySelector("a")!.href, {
       method: "PUT",
       headers: {
@@ -108,8 +117,13 @@ export default class extends Controller<HTMLAnchorElement> {
 
     if (claimDetails.wallet_name === "petra") {
       try {
-        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(transaction);
-        if ("hash" in pendingTransaction && typeof pendingTransaction.hash === "string") {
+        const pendingTransaction = await window.aptos!.signAndSubmitTransaction(
+          transaction
+        );
+        if (
+          "hash" in pendingTransaction &&
+          typeof pendingTransaction.hash === "string"
+        ) {
           return this.redirectToTransaction(pendingTransaction.hash);
         }
       } catch (error) {

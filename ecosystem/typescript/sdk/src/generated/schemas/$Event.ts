@@ -9,17 +9,11 @@ export const $Event = {
             isRequired: true,
         },
         sequence_number: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         type: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveType',
-            }],
+            type: 'MoveType',
             isRequired: true,
         },
         data: {

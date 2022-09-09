@@ -190,7 +190,6 @@ def fake_context(
         time=time if time else FakeTime(),
         forge_args=create_forge_command(
             forge_runner_mode=mode,
-            enable_failpoints_feature=False,
             forge_test_suite="banana",
             forge_runner_duration_secs="123",
             forge_num_validators="10",

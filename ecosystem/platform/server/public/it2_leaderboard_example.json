@@ -1,121 +1,142 @@
-[{
-  "validator": "e259c83edfdbe5b1b833faf45408f3ce48dc64de77b1aa744cad1ebe54ca6609",
-  "liveness": "97.0",
-  "participation": "92.0",
-  "num_votes": "5184",
-  "latest_reported_timestamp": "2022-07-07T17:24:46Z"
-}, {
-  "validator": "83424ccb8c69982802c35f656a381ea4ee641aa431a8a24d9d1c3134ac697dd9",
-  "liveness": "99.0",
-  "participation": "97.0",
-  "num_votes": "4698",
-  "latest_reported_timestamp": "2022-07-07T05:24:46Z"
-}, {
-  "validator": "e93f2087bf380836825efbd683aaca87e109c7f8c1da8e90c218b250e22bc17e",
-  "liveness": "92.0",
-  "participation": "95.0",
-  "num_votes": "4577",
-  "latest_reported_timestamp": "2022-07-07T17:24:38Z"
-}, {
-  "validator": "4e5a325c29780ebbd924628d559c2577532ca79bea5e6d6451b6c45a426d90e7",
-  "liveness": "98.0",
-  "participation": "96.0",
-  "num_votes": "4428",
-  "latest_reported_timestamp": "2022-07-07T17:24:41Z"
-}, {
-  "validator": "f8b54c48c2b0eebe2d4c376efff3273c0fdf0d640563db6b354aed824b2a4323",
-  "liveness": "95.0",
-  "participation": "91.0",
-  "num_votes": "3214",
-  "latest_reported_timestamp": "2022-07-07T17:24:47Z"
-}, {
-  "validator": "871f63bc252b7428754c4c924d62e25a112790931f7ce82d13418fdae9b73ee3",
-  "liveness": "96.0",
-  "participation": "91.0",
-  "num_votes": "1735",
-  "latest_reported_timestamp": "2022-07-07T17:24:44Z"
-}, {
-  "validator": "1958fae48dae3cf9ed4f92e8308ee213401f2a41ca312980138a06a9b94e541f",
-  "liveness": "90.0",
-  "participation": "98.0",
-  "num_votes": "1335",
-  "latest_reported_timestamp": "2022-07-07T17:24:42Z"
-}, {
-  "validator": "242bf2bb0c9d3afeea4d5e15c14608dade0903b383ef0def954e2091343cdc5",
-  "liveness": "99.0",
-  "participation": "95.0",
-  "num_votes": "1214",
-  "latest_reported_timestamp": "2022-07-07T17:24:49Z"
-}, {
-  "validator": "700816b23b55467f76ce87c0dba228c7c564b61ec173a9f4788ca985c1957b00",
-  "liveness": "96.0",
-  "participation": "97.0",
-  "num_votes": "1138",
-  "latest_reported_timestamp": "2022-07-07T06:33:57Z"
-}, {
-  "validator": "6f409c8b73a18cdeea4546c1df1e93594c07740cc609d93a99ca55c4920beb32",
-  "liveness": "91.0",
-  "participation": "92.0",
-  "num_votes": "1123",
-  "latest_reported_timestamp": "2022-07-07T17:24:47Z"
-}, {
-  "validator": "ff1edbd3e4fd10617261d8f8f9176d77e2093ddada51b248b461a65475e839dd",
-  "liveness": "91.0",
-  "participation": "97.0",
-  "num_votes": "946",
-  "latest_reported_timestamp": "2022-07-07T17:24:45Z"
-}, {
-  "validator": "28c0c0b575af75d0ddac1eb5c17af7a8cf3208a8372415219a7e317264b8f4de",
-  "liveness": "96.0",
-  "participation": "98.0",
-  "num_votes": "938",
-  "latest_reported_timestamp": "2022-07-07T17:24:45Z"
-}, {
-  "validator": "618aabd73e7eea9511853b3b73ccd479584a40282936cdf3cf82c04d4b085ffb",
-  "liveness": "97.0",
-  "participation": "100.0",
-  "num_votes": "927",
-  "latest_reported_timestamp": "2022-07-07T17:24:44Z"
-}, {
-  "validator": "c493bb36ac19d800640b32eb2844da802d6530773b01eeaa4886ad25196d7210",
-  "liveness": "96.0",
-  "participation": "90.0",
-  "num_votes": "911",
-  "latest_reported_timestamp": "2022-07-07T17:24:43Z"
-}, {
-  "validator": "938348b7c0d3fa132af43767c46eec9cdf4f726d0bb02e566b61abb11ac62e3a",
-  "liveness": "92.0",
-  "participation": "97.0",
-  "num_votes": "901",
-  "latest_reported_timestamp": "2022-07-07T17:24:48Z"
-}, {
-  "validator": "a541da2b986ba92d57f20a2de298895273f9601f3eab2cbf4029e0f3b9d45235",
-  "liveness": "99.0",
-  "participation": "92.0",
-  "num_votes": "862",
-  "latest_reported_timestamp": "2022-07-07T17:22:02Z"
-}, {
-  "validator": "b8587a0616068db6ac7bab5a64ac1b474b5c3ff90a5caf61fe67608eb6749441",
-  "liveness": "91.0",
-  "participation": "98.0",
-  "num_votes": "857",
-  "latest_reported_timestamp": "2022-07-07T17:24:35Z"
-}, {
-  "validator": "ffdabcdd88d12ea0681e2667ca5ec85a573dbbe6d5fa527dfd2bca11eb5a7837",
-  "liveness": "100.0",
-  "participation": "91.0",
-  "num_votes": "852",
-  "latest_reported_timestamp": "2022-07-07T17:24:47Z"
-}, {
-  "validator": "f5c22558b436a274913e750d91b55f06c52f84bdef6612ecdc221669e0171328",
-  "liveness": "99.0",
-  "participation": "92.0",
-  "num_votes": "803",
-  "latest_reported_timestamp": "2022-07-07T17:24:49Z"
-}, {
-  "validator": "ce0a5f973a9b70169db96a7e69ba7167dfa453923022de26119f8ae3cdab8172",
-  "liveness": "93.0",
-  "participation": "93.0",
-  "num_votes": "493",
-  "latest_reported_timestamp": "2022-07-07T17:24:27Z"
-}]
+[
+  {
+    "validator": "e259c83edfdbe5b1b833faf45408f3ce48dc64de77b1aa744cad1ebe54ca6609",
+    "liveness": "97.0",
+    "participation": "92.0",
+    "num_votes": "5184",
+    "latest_reported_timestamp": "2022-07-07T17:24:46Z"
+  },
+  {
+    "validator": "83424ccb8c69982802c35f656a381ea4ee641aa431a8a24d9d1c3134ac697dd9",
+    "liveness": "99.0",
+    "participation": "97.0",
+    "num_votes": "4698",
+    "latest_reported_timestamp": "2022-07-07T05:24:46Z"
+  },
+  {
+    "validator": "e93f2087bf380836825efbd683aaca87e109c7f8c1da8e90c218b250e22bc17e",
+    "liveness": "92.0",
+    "participation": "95.0",
+    "num_votes": "4577",
+    "latest_reported_timestamp": "2022-07-07T17:24:38Z"
+  },
+  {
+    "validator": "4e5a325c29780ebbd924628d559c2577532ca79bea5e6d6451b6c45a426d90e7",
+    "liveness": "98.0",
+    "participation": "96.0",
+    "num_votes": "4428",
+    "latest_reported_timestamp": "2022-07-07T17:24:41Z"
+  },
+  {
+    "validator": "f8b54c48c2b0eebe2d4c376efff3273c0fdf0d640563db6b354aed824b2a4323",
+    "liveness": "95.0",
+    "participation": "91.0",
+    "num_votes": "3214",
+    "latest_reported_timestamp": "2022-07-07T17:24:47Z"
+  },
+  {
+    "validator": "871f63bc252b7428754c4c924d62e25a112790931f7ce82d13418fdae9b73ee3",
+    "liveness": "96.0",
+    "participation": "91.0",
+    "num_votes": "1735",
+    "latest_reported_timestamp": "2022-07-07T17:24:44Z"
+  },
+  {
+    "validator": "1958fae48dae3cf9ed4f92e8308ee213401f2a41ca312980138a06a9b94e541f",
+    "liveness": "90.0",
+    "participation": "98.0",
+    "num_votes": "1335",
+    "latest_reported_timestamp": "2022-07-07T17:24:42Z"
+  },
+  {
+    "validator": "242bf2bb0c9d3afeea4d5e15c14608dade0903b383ef0def954e2091343cdc5",
+    "liveness": "99.0",
+    "participation": "95.0",
+    "num_votes": "1214",
+    "latest_reported_timestamp": "2022-07-07T17:24:49Z"
+  },
+  {
+    "validator": "700816b23b55467f76ce87c0dba228c7c564b61ec173a9f4788ca985c1957b00",
+    "liveness": "96.0",
+    "participation": "97.0",
+    "num_votes": "1138",
+    "latest_reported_timestamp": "2022-07-07T06:33:57Z"
+  },
+  {
+    "validator": "6f409c8b73a18cdeea4546c1df1e93594c07740cc609d93a99ca55c4920beb32",
+    "liveness": "91.0",
+    "participation": "92.0",
+    "num_votes": "1123",
+    "latest_reported_timestamp": "2022-07-07T17:24:47Z"
+  },
+  {
+    "validator": "ff1edbd3e4fd10617261d8f8f9176d77e2093ddada51b248b461a65475e839dd",
+    "liveness": "91.0",
+    "participation": "97.0",
+    "num_votes": "946",
+    "latest_reported_timestamp": "2022-07-07T17:24:45Z"
+  },
+  {
+    "validator": "28c0c0b575af75d0ddac1eb5c17af7a8cf3208a8372415219a7e317264b8f4de",
+    "liveness": "96.0",
+    "participation": "98.0",
+    "num_votes": "938",
+    "latest_reported_timestamp": "2022-07-07T17:24:45Z"
+  },
+  {
+    "validator": "618aabd73e7eea9511853b3b73ccd479584a40282936cdf3cf82c04d4b085ffb",
+    "liveness": "97.0",
+    "participation": "100.0",
+    "num_votes": "927",
+    "latest_reported_timestamp": "2022-07-07T17:24:44Z"
+  },
+  {
+    "validator": "c493bb36ac19d800640b32eb2844da802d6530773b01eeaa4886ad25196d7210",
+    "liveness": "96.0",
+    "participation": "90.0",
+    "num_votes": "911",
+    "latest_reported_timestamp": "2022-07-07T17:24:43Z"
+  },
+  {
+    "validator": "938348b7c0d3fa132af43767c46eec9cdf4f726d0bb02e566b61abb11ac62e3a",
+    "liveness": "92.0",
+    "participation": "97.0",
+    "num_votes": "901",
+    "latest_reported_timestamp": "2022-07-07T17:24:48Z"
+  },
+  {
+    "validator": "a541da2b986ba92d57f20a2de298895273f9601f3eab2cbf4029e0f3b9d45235",
+    "liveness": "99.0",
+    "participation": "92.0",
+    "num_votes": "862",
+    "latest_reported_timestamp": "2022-07-07T17:22:02Z"
+  },
+  {
+    "validator": "b8587a0616068db6ac7bab5a64ac1b474b5c3ff90a5caf61fe67608eb6749441",
+    "liveness": "91.0",
+    "participation": "98.0",
+    "num_votes": "857",
+    "latest_reported_timestamp": "2022-07-07T17:24:35Z"
+  },
+  {
+    "validator": "ffdabcdd88d12ea0681e2667ca5ec85a573dbbe6d5fa527dfd2bca11eb5a7837",
+    "liveness": "100.0",
+    "participation": "91.0",
+    "num_votes": "852",
+    "latest_reported_timestamp": "2022-07-07T17:24:47Z"
+  },
+  {
+    "validator": "f5c22558b436a274913e750d91b55f06c52f84bdef6612ecdc221669e0171328",
+    "liveness": "99.0",
+    "participation": "92.0",
+    "num_votes": "803",
+    "latest_reported_timestamp": "2022-07-07T17:24:49Z"
+  },
+  {
+    "validator": "ce0a5f973a9b70169db96a7e69ba7167dfa453923022de26119f8ae3cdab8172",
+    "liveness": "93.0",
+    "participation": "93.0",
+    "num_votes": "493",
+    "latest_reported_timestamp": "2022-07-07T17:24:27Z"
+  }
+]

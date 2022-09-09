@@ -8,44 +8,26 @@ export const $BlockMetadataTransaction = {
     about the specific block`,
     properties: {
         version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_change_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         event_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_checkpoint_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
         },
         gas_used: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         success: {
@@ -59,10 +41,7 @@ export const $BlockMetadataTransaction = {
             isRequired: true,
         },
         accumulator_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         changes: {
@@ -73,24 +52,15 @@ export const $BlockMetadataTransaction = {
             isRequired: true,
         },
         id: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         epoch: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         round: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         events: {
@@ -109,10 +79,7 @@ export const $BlockMetadataTransaction = {
             isRequired: true,
         },
         proposer: {
-            type: 'all-of',
-            contains: [{
-                type: 'Address',
-            }],
+            type: 'Address',
             isRequired: true,
         },
         failed_proposer_indices: {
@@ -124,10 +91,7 @@ export const $BlockMetadataTransaction = {
             isRequired: true,
         },
         timestamp: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
     },

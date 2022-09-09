@@ -5,17 +5,11 @@ export const $MoveStructField = {
     description: `Move struct field`,
     properties: {
         name: {
-            type: 'all-of',
-            contains: [{
-                type: 'IdentifierWrapper',
-            }],
+            type: 'IdentifierWrapper',
             isRequired: true,
         },
         type: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveType',
-            }],
+            type: 'MoveType',
             isRequired: true,
         },
     },

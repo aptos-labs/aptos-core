@@ -52,6 +52,15 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 }
 
 #[test]
+fn test_data_structures() {
+    let named_address = BTreeMap::from([(
+        String::from("data_structures"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("data_structures", named_address);
+}
+
+#[test]
 fn test_hello_blockchain() {
     let named_address = BTreeMap::from([(
         String::from("hello_blockchain"),

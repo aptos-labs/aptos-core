@@ -63,6 +63,7 @@ const sidebars = {
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
+        "guides/building-your-own-wallet",
         "guides/install-petra-wallet",
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
