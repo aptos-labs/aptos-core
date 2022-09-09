@@ -1,2 +1,2 @@
 # Cryptography libraries
-apps/extension/src/core/hooks/*        @alinush @hardsetting @kent-white @leeric92 @hariria
+apps/extension/src/core/hooks/useAccounts.ts        @alinush @hardsetting @kent-white @leeric92 @hariria
