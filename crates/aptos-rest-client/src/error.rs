@@ -155,7 +155,7 @@ pub enum RestError {
     UrlParse(url::ParseError),
     #[error("Timeout waiting for transaction {0}")]
     Timeout(&'static str),
-    #[error("Unknown error {0}")]
+    #[error("Unknown error {0:?}")]
     Unknown(anyhow::Error),
     #[error("HTTP error {0}: {1}")]
     Http(StatusCode, reqwest::Error),

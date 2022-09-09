@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use aptos_rest_client::Client as RestClient;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -159,32 +159,25 @@ pub async fn test_consensus_fault_tolerance(
     let target_v = largest_v + 10;
 
     wait_for_all_nodes_to_catchup_to_version(&validator_clients, target_v, Duration::from_secs(30))
-        .await?;
+        .await
+        .context("catchup failed")?;
 
     let transactions: Vec<_> =
         join_all(validator_clients.iter().cloned().map(move |v| async move {
             let mut txns =
                 v.1.get_transactions_bcs(Some(target_v.saturating_sub(1000)), Some(1000))
                     .await
-                    .map_err(|e| anyhow!("{:?}", e))?
+                    .unwrap()
                     .into_inner();
             txns.retain(|t| t.version <= target_v);
-            <anyhow::Result<Vec<_>>>::Ok(txns)
+            <Result<Vec<_>>>::Ok(txns)
         }))
         .await;
 
-    let txns_a = transactions
-        .first()
-        .unwrap()
-        .as_ref()
-        .map_err(|e| anyhow!("{:?}", &e))?;
+    let txns_a = transactions.first().unwrap().as_ref().unwrap();
 
     for i in 1..transactions.len() {
-        let txns_b = transactions
-            .get(i)
-            .unwrap()
-            .as_ref()
-            .map_err(|e| anyhow!("{:?}", &e))?;
+        let txns_b = transactions.get(i).unwrap().as_ref().unwrap();
         assert_eq!(
             txns_a.len(),
             txns_b.len(),

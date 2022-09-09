@@ -10,7 +10,7 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use prometheus_http_query::response::PromqlResult;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
@@ -296,6 +296,31 @@ pub trait SwarmExt: Swarm {
             })
             .collect()
     }
+
+    async fn get_client_with_newest_ledger_version(&self) -> Option<(u64, RestClient)> {
+        let clients = self.get_all_nodes_clients_with_names();
+        let ledger_infos = join_all(clients.iter().map(|(_name, client)| async {
+            let start = Instant::now();
+            let result = client.get_ledger_information().await;
+
+            info!(
+                "Fetch from {:?} took {}ms, at version: {}",
+                client.path_prefix_string(),
+                start.elapsed().as_millis(),
+                result
+                    .as_ref()
+                    .map(|r| r.inner().version as i64)
+                    .unwrap_or(-1)
+            );
+            result
+        }))
+        .await;
+        ledger_infos
+            .into_iter()
+            .zip(clients.into_iter())
+            .flat_map(|(resp, (_, client))| resp.map(|r| (r.into_inner().version, client)))
+            .max_by_key(|(v, _c)| *v)
+    }
 }
 
 /// Waits for all nodes to have caught up to the specified `verison`.
@@ -330,8 +355,9 @@ pub async fn wait_for_all_nodes_to_catchup_to_version(
 
         if start_time.elapsed() > timeout {
             return Err(anyhow!(
-                "Waiting for nodes to catch up to version {} timed out, current status: {:?}",
+                "Waiting for nodes to catch up to version {} timed out after {}s, current status: {:?}",
                 version,
+                start_time.elapsed().as_secs(),
                 versions.unwrap_or_default()
             ));
         }
