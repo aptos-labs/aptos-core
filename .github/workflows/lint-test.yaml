@@ -184,10 +184,6 @@ jobs:
 
   python-unit-test:
     uses: ./.github/workflows/python-unit-test.yaml
-    with:
-      GIT_SHA: ${{ github.ref || github.sha }}
 
   helm-lint:
     uses: ./.github/workflows/helm-lint.yaml
-    with:
-      GIT_SHA: ${{ github.ref || github.sha }}
