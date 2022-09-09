@@ -737,7 +737,7 @@ pub fn setup_environment(
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_tx, consensus_to_mempool_rx) =
-        channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
+        mpsc::channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
     instant = Instant::now();
     let mempool = aptos_mempool::bootstrap(

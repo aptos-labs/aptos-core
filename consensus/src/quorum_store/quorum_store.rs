@@ -73,6 +73,7 @@ pub struct QuorumStoreConfig {
     pub memory_quota: usize,
     pub db_quota: usize,
     pub mempool_txn_pull_max_count: u64,
+    pub mempool_txn_pull_max_bytes: u64,
 }
 
 impl QuorumStore {

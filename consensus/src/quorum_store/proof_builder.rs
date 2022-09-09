@@ -4,14 +4,14 @@
 use crate::quorum_store::{quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
-use aptos_types::multi_signature::PartialSignatures;
+use aptos_types::aggregate_signature::PartialSignatures;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::PeerId;
 use consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
 use futures::channel::oneshot;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use tokio::{sync::oneshot as TokioOneshot, time};
@@ -28,7 +28,7 @@ pub(crate) type ProofReturnChannel =
 
 struct IncrementalProofState {
     info: SignedDigestInfo,
-    aggregated_signature: HashMap<PeerId, bls12381::Signature>,
+    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
     batch_id: BatchId,
     ret_tx: ProofReturnChannel,
 }
@@ -37,7 +37,7 @@ impl IncrementalProofState {
     fn new(info: SignedDigestInfo, batch_id: BatchId, ret_tx: ProofReturnChannel) -> Self {
         Self {
             info,
-            aggregated_signature: HashMap::new(),
+            aggregated_signature: BTreeMap::new(),
             batch_id,
             ret_tx,
         }
@@ -68,9 +68,9 @@ impl IncrementalProofState {
         validator_verifier: &ValidatorVerifier,
     ) -> (ProofOfStore, BatchId, ProofReturnChannel) {
         let proof = match validator_verifier
-            .aggregate_multi_signature(&PartialSignatures::new(self.aggregated_signature))
+            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature))
         {
-            Ok((sig, _)) => ProofOfStore::new(self.info, sig),
+            Ok(sig) => ProofOfStore::new(self.info, sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
         (proof, self.batch_id, self.ret_tx)

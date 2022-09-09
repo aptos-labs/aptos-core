@@ -345,7 +345,7 @@ impl BlockStore {
     ///
     /// The current version of the function is not really async, but keeping it this way for
     /// future possible changes.
-    pub async fn process_block_retrieval(
+    pub fn process_block_retrieval(
         &self,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {

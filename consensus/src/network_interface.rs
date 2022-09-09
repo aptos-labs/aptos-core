@@ -89,6 +89,10 @@ impl ConsensusMsg {
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
+            ConsensusMsg::SignedDigestMsg(_) => "SignedDigestMsg",
+            ConsensusMsg::BatchMsg(_) => "BatchMsg",
+            ConsensusMsg::FragmentMsg(_) => "FragmentMsg",
+            ConsensusMsg::ProofOfStoreBroadcastMsg(_) => "ProofOfStoreBroadcastMsg",
         }
     }
 }

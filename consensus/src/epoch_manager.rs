@@ -545,6 +545,7 @@ impl EpochManager {
             wrapper_to_quorum_store_tx,
             self.config.mempool_txn_pull_timeout_ms,
             qs_config.mempool_txn_pull_max_count,
+            qs_config.mempool_txn_pull_max_bytes,
             qs_config.max_batch_bytes,
             qs_config.max_batch_expiry_round_gap,
             qs_config.end_batch_ms,
@@ -640,9 +641,6 @@ impl EpochManager {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
-
-        // Shutdown the block retrieval task by dropping the sender
-        self.block_retrieval_tx = None;
     }
 
     async fn start_round_manager(
@@ -708,6 +706,7 @@ impl EpochManager {
                 memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
+                mempool_txn_pull_max_bytes: 10000000,
             };
 
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
@@ -795,8 +794,6 @@ impl EpochManager {
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
         tokio::spawn(round_manager.start(round_manager_rx, close_rx));
-
-        self.spawn_block_retrieval_task(epoch, block_store);
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
@@ -979,7 +976,7 @@ impl EpochManager {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
         });
         if let Some(block_store) = &self.block_store {
-            block_store.process_block_retrieval(request).await
+            block_store.process_block_retrieval(request)
         } else {
             Err(anyhow::anyhow!("Round manager not started"))
         }
@@ -1013,18 +1010,18 @@ impl EpochManager {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some((peer, msg)) = network_receivers.quorum_store_messages.next() => {
+                },
+                (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some(request) = network_receivers.block_retrieval.next() => {
-                    if let Err(e) = self.process_block_retrieval(request).await {
+                },
+                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
+                    if let Err(e) = self.process_block_retrieval(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some(round) = round_timeout_sender_rx.next() => {
+                },
+                round = round_timeout_sender_rx.select_next_some() => {
                     self.process_local_timeout(round);
                 },
             }

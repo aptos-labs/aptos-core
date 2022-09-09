@@ -23,7 +23,8 @@ pub trait PayloadManager: Send + Sync {
     async fn pull_payload(
         &self,
         round: Round,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,

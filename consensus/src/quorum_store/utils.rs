@@ -163,11 +163,12 @@ impl MempoolProxy {
 
     pub async fn pull_internal(
         &self,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_size, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, exclude_txns, callback);
         self.mempool_tx
             .clone()
             .try_send(msg)

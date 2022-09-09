@@ -414,7 +414,7 @@ impl Client {
         &self,
         hash: HashValue,
         expiration_timestamp_secs: u64,
-    ) -> Result<Response<Transaction>> {
+    ) -> AptosResult<Response<Transaction>> {
         const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
 

@@ -806,75 +806,10 @@ impl AptosVM {
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output =
-            get_transaction_output(&mut (), session, 0, &txn_data, ExecutionStatus::Success)?;
-        println!("Igor {:?}", output);
-        Ok((VMStatus::Executed, output))
-    }
-
-    pub(crate) fn process_writeset_transaction<S: MoveResolverExt + StateView>(
-        &self,
-        storage: &S,
-        txn: &SignatureCheckedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        fail_point!("move_adapter::process_writeset_transaction", |_| {
-            Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            ))
-        });
-
-        // Revalidate the transaction.
-        let mut session = self.0.new_session(storage, SessionId::txn(txn));
-        if let Err(e) = validate_signature_checked_transaction::<S, Self>(
-            self,
-            &mut session,
-            txn,
-            false,
-            log_context,
-        ) {
-            return Ok(discard_error_vm_status(e));
-        };
-        self.execute_writeset_transaction(
-            storage,
-            match txn.payload() {
-                TransactionPayload::WriteSet(writeset_payload) => writeset_payload,
-                TransactionPayload::ModuleBundle(_)
-                | TransactionPayload::Script(_)
-                | TransactionPayload::ScriptFunction(_) => {
-                    log_context.alert();
-                    error!(*log_context, "[aptos_vm] UNREACHABLE");
-                    return Ok(discard_error_vm_status(VMStatus::Error(
-                        StatusCode::UNREACHABLE,
-                    )));
-                }
-            },
-            TransactionMetadata::new(txn),
-            log_context,
-        )
-    }
-
-    pub fn execute_writeset_transaction<S: MoveResolverExt + StateView>(
-        &self,
-        storage: &S,
-        writeset_payload: &WriteSetPayload,
-        txn_data: TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let change_set = match self.execute_writeset(
-            storage,
-            writeset_payload,
-            Some(txn_data.sender()),
-            SessionId::txn_meta(&txn_data),
-        ) {
-            Ok(change_set) => change_set,
-            Err(e) => return e,
-        };
-
-        // Run the epilogue function.
-        let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
-        self.0.run_writeset_epilogue(
-            &mut session,
+        let output = get_transaction_output(
+            &mut (),
+            session,
+            0.into(),
             &txn_data,
             ExecutionStatus::Success,
         )?;

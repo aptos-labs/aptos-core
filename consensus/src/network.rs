@@ -60,7 +60,8 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub block_retrieval: aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    pub block_retrieval:
+        aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
 }
 
 #[async_trait::async_trait]
@@ -314,7 +315,8 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    block_retrieval_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    block_retrieval_tx:
+        aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -371,9 +373,6 @@ impl NetworkTask {
                         }
                     }
                     consensus_msg => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                        .with_label_values(&[msg.name()])
-                        .inc();
                         if let Err(e) = self.consensus_messages_tx.push(
                             (peer_id, discriminant(&consensus_msg)),
                             (peer_id, consensus_msg),

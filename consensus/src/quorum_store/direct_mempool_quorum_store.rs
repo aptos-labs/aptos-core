@@ -48,7 +48,7 @@ impl DirectMempoolQuorumStore {
 
         let (txns, result) = match self
             .mempool_proxy
-            .pull_internal(max_size, exclude_txns)
+            .pull_internal(max_txns, max_bytes, exclude_txns)
             .await
         {
             Err(_) => {
@@ -81,8 +81,14 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_consensus_request(&self, req: WrapperCommand) {
         match req {
-            WrapperCommand::GetBlockRequest(_round, max_size, payload_filter, callback) => {
-                self.handle_block_request(max_size, payload_filter, callback)
+            WrapperCommand::GetBlockRequest(
+                _round,
+                max_size,
+                max_bytes,
+                payload_filter,
+                callback,
+            ) => {
+                self.handle_block_request(max_size, max_bytes, payload_filter, callback)
                     .await;
             }
             WrapperCommand::CleanRequest(..) => {

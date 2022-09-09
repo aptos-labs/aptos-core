@@ -50,6 +50,7 @@ pub struct QuorumStoreWrapper {
     latest_logical_time: LogicalTime,
     proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
     mempool_txn_pull_max_count: u64,
+    mempool_txn_pull_max_bytes: u64,
     // For ensuring that batch size does not exceed QuorumStore limit.
     max_batch_bytes: u64,
     max_batch_expiry_round_gap: Round,
@@ -66,6 +67,7 @@ impl QuorumStoreWrapper {
         quorum_store_sender: TokioSender<QuorumStoreCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
+        mempool_txn_pull_max_bytes: u64,
         max_batch_bytes: u64,
         max_batch_expiry_round_gap: Round,
         end_batch_ms: u128,
@@ -90,6 +92,7 @@ impl QuorumStoreWrapper {
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: HashMap::new(),
             mempool_txn_pull_max_count,
+            mempool_txn_pull_max_bytes,
             max_batch_bytes,
             max_batch_expiry_round_gap,
             end_batch_ms,
@@ -112,7 +115,11 @@ impl QuorumStoreWrapper {
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
-            .pull_internal(self.mempool_txn_pull_max_count, exclude_txns)
+            .pull_internal(
+                self.mempool_txn_pull_max_count,
+                self.mempool_txn_pull_max_bytes,
+                exclude_txns,
+            )
             .await
             .unwrap();
 
@@ -225,7 +232,13 @@ impl QuorumStoreWrapper {
     pub(crate) async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
         match msg {
             // TODO: check what max_block_size consensus is using
-            WrapperCommand::GetBlockRequest(round, max_block_size, filter, callback) => {
+            WrapperCommand::GetBlockRequest(
+                round,
+                max_block_size,
+                _max_block_bytes,
+                filter,
+                callback,
+            ) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),

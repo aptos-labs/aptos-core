@@ -29,11 +29,11 @@ pub enum WrapperCommand {
 impl fmt::Display for WrapperCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            WrapperCommand::GetBlockRequest(round, block_size, excluded, _) => {
+            WrapperCommand::GetBlockRequest(round, max_size, max_bytes, excluded, _) => {
                 write!(
                     f,
-                    "GetBlockRequest [round: {}, block_size: {}, excluded: {}]",
-                    round, block_size, excluded
+                    "GetBlockRequest [round: {}, block_size: {}, max_bytes {}, excluded: {}]",
+                    round, max_size, max_bytes, excluded
                 )
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {

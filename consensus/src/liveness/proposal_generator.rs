@@ -160,7 +160,8 @@ impl ProposalGenerator {
                 .payload_manager
                 .pull_payload(
                     round,
-                    self.max_block_size,
+                    self.max_block_txns,
+                    self.max_block_bytes,
                     payload_filter,
                     wait_callback,
                     pending_ordering,

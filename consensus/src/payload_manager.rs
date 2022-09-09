@@ -48,12 +48,18 @@ impl QuorumStoreClient {
     async fn pull_internal(
         &self,
         round: Round,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req =
-            WrapperCommand::GetBlockRequest(round, max_size, exclude_payloads.clone(), callback);
+        let req = WrapperCommand::GetBlockRequest(
+            round,
+            max_txns,
+            max_bytes,
+            exclude_payloads.clone(),
+            callback,
+        );
         // send to shared mempool
         self.consensus_to_quorum_store_sender
             .clone()
@@ -69,6 +75,9 @@ impl QuorumStoreClient {
             }
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 ConsensusResponse::GetBlockResponse(payload) => Ok(payload),
+                _ => Err(
+                    anyhow::anyhow!("[consensus] did not receive expected GetBlockResponse").into(),
+                ),
             },
         }
     }
@@ -79,7 +88,8 @@ impl PayloadManager for QuorumStoreClient {
     async fn pull_payload(
         &self,
         round: Round,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -93,7 +103,7 @@ impl PayloadManager for QuorumStoreClient {
         let payload = loop {
             count -= 1;
             let payload = self
-                .pull_internal(round, max_size, exclude_payloads.clone())
+                .pull_internal(round, max_txns, max_bytes, exclude_payloads.clone())
                 .await?;
             if payload.is_empty() && !pending_ordering && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
