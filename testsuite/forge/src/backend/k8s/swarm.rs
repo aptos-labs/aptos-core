@@ -279,31 +279,27 @@ impl Swarm for K8sSwarm {
 
     async fn ensure_no_validator_restart(&self) -> Result<()> {
         for validator in &self.validators {
-            if let Err(e) = check_for_container_restart(
+            check_for_container_restart(
                 &self.kube_client,
                 &self.kube_namespace.clone(),
                 validator.1.stateful_set_name(),
             )
-            .await
-            {
-                return Err(e);
-            }
+            .await?;
         }
+        info!("Found no validator restarts");
         Ok(())
     }
 
     async fn ensure_no_fullnode_restart(&self) -> Result<()> {
         for fullnode in &self.fullnodes {
-            if let Err(e) = check_for_container_restart(
+            check_for_container_restart(
                 &self.kube_client,
                 &self.kube_namespace.clone(),
                 fullnode.1.stateful_set_name(),
             )
-            .await
-            {
-                return Err(e);
-            }
+            .await?;
         }
+        info!("Found no fullnode restarts");
         Ok(())
     }
 
@@ -337,6 +333,7 @@ impl Swarm for K8sSwarm {
             )
             .await?;
             threshold.ensure_threshold(&system_metrics)?;
+            info!("System metrics are healthy");
             Ok(())
         } else {
             bail!("No prom client");

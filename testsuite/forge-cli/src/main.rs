@@ -186,6 +186,14 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "compat" {
+        "failures_catching_up"
+    } else {
+        "slow_processing_catching_up"
+    };
+
+    let duration = Duration::from_secs(1800);
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -661,6 +669,36 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             },
             false,
         ),
+        "slow_processing_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 0,
+                num_large_validators: 2,
+                add_execution_delay: true,
+                check_period_s: 57,
+            },
+            false,
+        ),
+        "failures_catching_up" => changing_working_quorum_test(
+            10,
+            300,
+            3000,
+            2500,
+            &ChangingWorkingQuorumTest {
+                min_tps: 1500,
+                always_healthy_nodes: 2,
+                max_down_nodes: 1,
+                num_large_validators: 2,
+                add_execution_delay: false,
+                check_period_s: 27,
+            },
+            false,
+        ),
         "twin_validator_test" => config
             .with_network_tests(vec![&TwinValidatorTest])
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -840,8 +878,10 @@ fn changing_working_quorum_test(
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
-            helm_values["validator"]["config"]["consensus"]["max_block_txns"] =
-                (target_tps / 4).into();
+            if !max_load {
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] =
+                    (target_tps / 4).into();
+            }
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
@@ -852,7 +892,7 @@ fn changing_working_quorum_test(
             EmitJobRequest::default()
                 .mode(if max_load {
                     EmitJobMode::MaxLoad {
-                        mempool_backlog: 20000,
+                        mempool_backlog: 30000,
                     }
                 } else {
                     EmitJobMode::ConstTps { tps: target_tps }
@@ -867,7 +907,7 @@ fn changing_working_quorum_test(
             min_avg_tps,
             10000,
             true,
-            Some(Duration::from_secs(30)),
+            Some(Duration::from_secs(if max_load { 60 } else { 30 })),
             None,
             Some(StateProgressThreshold {
                 max_no_progress_secs: 20.0,

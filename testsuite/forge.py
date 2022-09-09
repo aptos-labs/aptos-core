@@ -1277,6 +1277,8 @@ def test(
     forge_cli_args: Optional[List[str]],
     test_args: Optional[List[str]],
 ) -> None:
+    forge_enable_failpoints = "true" 
+
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
     git = Git(shell)

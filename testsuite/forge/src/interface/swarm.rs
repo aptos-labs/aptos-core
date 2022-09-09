@@ -324,8 +324,9 @@ pub async fn wait_for_all_nodes_to_catchup_to_version(
 
         if start_time.elapsed() > timeout {
             return Err(anyhow!(
-                "Waiting for nodes to catch up to version {} timed out, current status: {:?}",
+                "Waiting for nodes to catch up to version {} timed out after {}s, current status: {:?}",
                 version,
+                start_time.elapsed().as_secs(),
                 versions.unwrap_or_default()
             ));
         }
