@@ -287,9 +287,9 @@ impl From<RestError> for ApiError {
             },
             RestError::Bcs(_) => ApiError::DeserializationFailed(None),
             RestError::Json(_) => ApiError::DeserializationFailed(None),
-            RestError::Http(err) => ApiError::InternalError(Some(format!(
-                "Failed internal API call with HTTP code {}",
-                err
+            RestError::Http(status_code, err) => ApiError::InternalError(Some(format!(
+                "Failed internal API call with HTTP code {}: {:#}",
+                status_code, err
             ))),
             RestError::UrlParse(err) => ApiError::InternalError(Some(err.to_string())),
             RestError::Timeout(err) => ApiError::InternalError(Some(err.to_string())),
