@@ -149,6 +149,7 @@ export const Routes = Object.freeze({
   },
 } as const);
 
+export type RoutePath = typeof Routes[keyof typeof Routes]['path'];
 export default Routes;
 
 /**

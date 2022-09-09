@@ -7,13 +7,13 @@ import {
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
-import { aptosCoinStructTag } from 'core/constants';
-import Analytics from 'core/utils/analytics/analytics';
-import { faucetEvents } from 'core/utils/analytics/events';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { DefaultNetworks } from 'shared/types';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { faucetEvents } from 'core/utils/analytics/events';
+import { aptosCoinStructTag } from 'core/constants';
 import { toast } from './Toast';
 
 const defaultFundAmount = 50000;
@@ -22,6 +22,7 @@ export default function Faucet() {
   const { activeAccountAddress } = useActiveAccount();
   const { activeNetwork, activeNetworkName } = useNetworks();
   const { fundAccount, isFunding } = useFundAccount();
+  const { trackEvent } = useAnalytics();
 
   const onClick = async () => {
     try {
@@ -30,13 +31,11 @@ export default function Faucet() {
       }
 
       await fundAccount({ address: activeAccountAddress, amount: defaultFundAmount });
-      Analytics.event({
+      trackEvent({
         eventType: faucetEvents.RECEIVE_FAUCET,
         params: {
-          address: activeAccountAddress,
           amount: defaultFundAmount,
           coinType: aptosCoinStructTag,
-          network: activeNetwork.nodeUrl,
         },
       });
     } catch (err) {

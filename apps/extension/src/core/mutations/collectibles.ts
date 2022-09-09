@@ -9,8 +9,7 @@ import {
 } from 'aptos';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
-import Analytics from 'core/utils/analytics/analytics';
-import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
+import { CombinedEventParams } from 'core/utils/analytics/events';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 import { useNetworks } from 'core/hooks/useNetworks';
@@ -138,21 +137,12 @@ export const createTokenAndCollection = async (
 export const useCreateTokenAndCollection = () => {
   const queryClient = useQueryClient();
   const { aptosAccount } = useActiveAccount();
-  const { activeNetwork, aptosClient } = useNetworks();
+  const { aptosClient } = useNetworks();
 
-  const createTokenAndCollectionOnSettled = useCallback(async (
-    data: CombinedEventParams | undefined,
-  ) => {
+  const createTokenAndCollectionOnSettled = useCallback(async () => {
     queryClient.invalidateQueries(queryKeys.getGalleryItems);
     queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance);
-    Analytics.event({
-      eventType: collectiblesEvents.CREATE_NFT,
-      params: {
-        network: activeNetwork.nodeUrl,
-        ...data,
-      },
-    });
-  }, [activeNetwork, queryClient]);
+  }, [queryClient]);
 
   return useMutation<
   CombinedEventParams | undefined,

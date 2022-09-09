@@ -19,6 +19,7 @@ import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
 import { routes } from 'core/routes';
+import { AnalyticsProvider } from 'core/hooks/useAnalytics';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -76,15 +77,17 @@ const root = createRoot(document.getElementById('root') as Element);
 root.render(
   <StrictMode>
     <AppStateProvider>
-      <QueryClientProvider client={queryClient}>
-        <ChakraProvider theme={theme}>
-          <SimulatedExtensionContainer>
-            <MemoryRouter>
-              <App />
-            </MemoryRouter>
-          </SimulatedExtensionContainer>
-        </ChakraProvider>
-      </QueryClientProvider>
+      <AnalyticsProvider>
+        <QueryClientProvider client={queryClient}>
+          <ChakraProvider theme={theme}>
+            <SimulatedExtensionContainer>
+              <MemoryRouter>
+                <App />
+              </MemoryRouter>
+            </SimulatedExtensionContainer>
+          </ChakraProvider>
+        </QueryClientProvider>
+      </AnalyticsProvider>
     </AppStateProvider>
     <ToastContainer />
   </StrictMode>,
