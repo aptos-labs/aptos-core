@@ -199,7 +199,12 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 1
 
-  forge-unittests:
-    uses: ./.github/workflows/forge-unittests.yaml
+  python-unit-test:
+    uses: ./.github/workflows/python-unit-test.yaml
     with:
-      GIT_SHA: ${{ inputs.GIT_SHA }}
+      GIT_SHA: ${{ github.ref || github.sha }}
+
+  helm-lint:
+    uses: ./.github/workflows/helm-lint.yaml
+    with:
+      GIT_SHA: ${{ github.ref || github.sha }}
