@@ -18,24 +18,12 @@
   <% end %>
 
   <%= form_with id: 'connect_wallet', model: @wallet, data: { action: 'connect-wallet#beforeSubmit', turbo_frame: @turbo_frame, connect_wallet_target: 'form' } do |form| %>
-    <% if @wallet.errors.any? %>
-      <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
-        <div class="ml-3 text-sm font-medium text-red-700">
-          <h2><%= pluralize(@wallet.errors.count, 'error') %> prohibited this wallet from being saved:</h2>
-
-          <ul>
-            <% @wallet.errors.each do |error| %>
-              <li><%= error.full_message %></li>
-            <% end %>
-          </ul>
-        </div>
+    <div class="hidden p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert" data-connect-wallet-target="errors">
+      <div class="ml-3 text-sm font-medium text-red-700">
+        <h2>Errors prohibited this wallet from being saved:</h2>
+        <ul></ul>
       </div>
-    <% end %>
-
-    <% if @required_network %>
-      <p class="text-red-400 hidden mb-4" data-connect-wallet-target="requiredNetworkError">
-      </p>
-    <% end %>
+    </div>
 
     <%= form.hidden_field :network %>
     <%= form.hidden_field :wallet_name %>
