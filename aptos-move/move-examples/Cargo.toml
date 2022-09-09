@@ -6,7 +6,7 @@ repository = "https://github.com/aptos-core/aptos-labs"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 aptos-gas = { path = "../aptos-gas" }

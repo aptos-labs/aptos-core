@@ -35,7 +35,7 @@ fn test_rust(abis: &[EntryABI], demo_file: &str, expected_output: &str) {
         r#"[package]
 name = "framework"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 aptos-types = {{ path = "../aptos-types", version = "0.1.0" }}

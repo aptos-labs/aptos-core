@@ -943,7 +943,7 @@ impl crate::SourceInstaller for Installer {
             r#"[package]
 name = "{}"
 version = "{}"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 once_cell = "1.10.0"
