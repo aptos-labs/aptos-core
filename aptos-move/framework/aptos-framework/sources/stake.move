@@ -26,7 +26,6 @@ module aptos_framework::stake {
     use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -420,35 +419,8 @@ module aptos_framework::stake {
         });
     }
 
-    fun initialize_owner(owner: &signer) {
-        let owner_address = signer::address_of(owner);
-        assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
-
-        move_to(owner, StakePool {
-            active: coin::zero<AptosCoin>(),
-            pending_active: coin::zero<AptosCoin>(),
-            pending_inactive: coin::zero<AptosCoin>(),
-            inactive: coin::zero<AptosCoin>(),
-            locked_until_secs: 0,
-            operator_address: owner_address,
-            delegated_voter: owner_address,
-
-            // Events.
-            initialize_validator_events: account::new_event_handle<RegisterValidatorCandidateEvent>(owner),
-            set_operator_events: account::new_event_handle<SetOperatorEvent>(owner),
-            add_stake_events: account::new_event_handle<AddStakeEvent>(owner),
-            reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(owner),
-            rotate_consensus_key_events: account::new_event_handle<RotateConsensusKeyEvent>(owner),
-            update_network_and_fullnode_addresses_events: account::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
-            increase_lockup_events: account::new_event_handle<IncreaseLockupEvent>(owner),
-            join_validator_set_events: account::new_event_handle<JoinValidatorSetEvent>(owner),
-            distribute_rewards_events: account::new_event_handle<DistributeRewardsEvent>(owner),
-            unlock_stake_events: account::new_event_handle<UnlockStakeEvent>(owner),
-            withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(owner),
-            leave_validator_set_events: account::new_event_handle<LeaveValidatorSetEvent>(owner),
-        });
-
-        move_to(owner, OwnerCapability { pool_address: owner_address });
+    fun initialize_owner(_owner: &signer) {
+        abort 0
     }
 
     /// Extract and return owner capability from the signing account.

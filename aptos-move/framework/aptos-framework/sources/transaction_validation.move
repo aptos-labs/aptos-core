@@ -111,15 +111,15 @@ module aptos_framework::transaction_validation {
     }
 
     fun module_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
+        _sender: signer,
+        _txn_sequence_number: u64,
+        _txn_public_key: vector<u8>,
+        _txn_gas_price: u64,
+        _txn_max_gas_units: u64,
+        _txn_expiration_time: u64,
+        _chain_id: u8,
     ) {
-        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+        abort 0
     }
 
     fun script_prologue(
