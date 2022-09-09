@@ -632,7 +632,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None))
+        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None, None))
 }
 
 /// The config for running a state sync performance test when executing
@@ -648,7 +648,7 @@ fn state_sync_perf_fullnodes_execute_transactions(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None))
+        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None))
 }
 
 /// The config for running a state sync performance test when applying
@@ -779,6 +779,7 @@ fn changing_working_quorum_test(
             10000,
             true,
             Some(Duration::from_secs(30)),
+            None,
         ))
 }
 
