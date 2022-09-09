@@ -81,10 +81,11 @@ export default class extends Controller {
     this.mintNumberTargets.forEach((el) => {
       el.textContent = `#${mintNumber}`;
     });
-    this.addressTarget.textContent = transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
+    this.addressTarget.textContent =
+      transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
     this.addressTarget.title = transaction.sender;
     this.imageTargets.forEach((el) => {
       el.src = imageUrl;
     });
-  }
+  };
 }
