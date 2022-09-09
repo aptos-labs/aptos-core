@@ -10,6 +10,7 @@ export const $DeleteResource = {
         },
         state_key_hash: {
             type: 'string',
+            description: `State key hash`,
             isRequired: true,
         },
         resource: {

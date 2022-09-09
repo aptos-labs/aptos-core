@@ -10577,24 +10577,10 @@
         ],
         "properties": {
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Next sequence number of the account\n\nThis will be the sequence number of the next transaction committed on this account"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "authentication_key": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Authentication key\n\nA SHA-256 of public keys and authentication scheme of the account"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -10674,14 +10660,7 @@
             "description": "A message describing the error"
           },
           "error_code": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AptosErrorCode"
-              },
-              {
-                "description": "A code providing more granular error information beyond the HTTP status code"
-              }
-            ]
+            "$ref": "#/components/schemas/AptosErrorCode"
           },
           "vm_error_code": {
             "type": "integer",
@@ -10728,54 +10707,19 @@
         ],
         "properties": {
           "block_height": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The block height (number of the block from 0)"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "block_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The block hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "block_timestamp": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The block timestamp in Unix epoch microseconds"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "first_version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The first ledger version of the block inclusive"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "last_version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The last ledger version of the block inclusive"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "transactions": {
             "type": "array",
@@ -10810,64 +10754,22 @@
         ],
         "properties": {
           "version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Ledger version of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_change_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the event changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_checkpoint_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state checkpoint (if it is a state checkpoint)"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Total gas units used\n\nTotal gas units used can be multiplied by gas price to get the total coins paid"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean",
@@ -10878,14 +10780,7 @@
             "description": "The VM status of the transaction, can tell useful information in a failure"
           },
           "accumulator_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The accumulator root hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -10895,34 +10790,13 @@
             }
           },
           "id": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The block hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "epoch": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The block epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "round": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The block epoch round"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "events": {
             "type": "array",
@@ -10940,14 +10814,7 @@
             }
           },
           "proposer": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "The address of the proposer of the block"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "failed_proposer_indices": {
             "type": "array",
@@ -10958,14 +10825,7 @@
             }
           },
           "timestamp": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The timestamp of the block in microseconds from the UNIX epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -11008,7 +10868,8 @@
             "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
-            "type": "string"
+            "type": "string",
+            "description": "State key hash"
           },
           "module": {
             "$ref": "#/components/schemas/MoveModuleId"
@@ -11028,7 +10889,8 @@
             "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
-            "type": "string"
+            "type": "string",
+            "description": "State key hash"
           },
           "resource": {
             "$ref": "#/components/schemas/MoveStructTag"
@@ -11048,24 +10910,10 @@
             "type": "string"
           },
           "handle": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Table handle a u256 encoded as an Address"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "key": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Key of the item"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "data": {
             "$ref": "#/components/schemas/DeletedTableData"
@@ -11119,24 +10967,10 @@
         ],
         "properties": {
           "public_key": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Ed25519 public key of the account"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "signature": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Signature of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -11153,64 +10987,22 @@
         ],
         "properties": {
           "sender": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Sender account address"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Sequence number of the sender for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Max gas units allowed for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Gas unit price used for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Expiration timestamp in seconds from the UNIX epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionPayload"
-              },
-              {
-                "description": "The payload of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionPayload"
           },
           "secondary_signers": {
             "type": "array",
@@ -11236,14 +11028,7 @@
         ],
         "properties": {
           "function": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EntryFunctionId"
-              },
-              {
-                "description": "Id of the function to be run e.g. 0x1::account::transfer"
-              }
-            ]
+            "$ref": "#/components/schemas/EntryFunctionId"
           },
           "type_arguments": {
             "type": "array",
@@ -11273,24 +11058,10 @@
             "$ref": "#/components/schemas/EventKey"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The sequence number of the event"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveType"
-              },
-              {
-                "description": "The [`MoveType`] of the event"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveType"
           },
           "data": {
             "description": "The JSON representation of the event"
@@ -11369,64 +11140,22 @@
         ],
         "properties": {
           "version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Ledger version of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_change_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the event changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_checkpoint_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state checkpoint (if it is a state checkpoint)"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Total gas units used\n\nTotal gas units used can be multiplied by gas price to get the total coins paid"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean",
@@ -11437,14 +11166,7 @@
             "description": "The VM status of the transaction, can tell useful information in a failure"
           },
           "accumulator_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The accumulator root hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -11454,14 +11176,7 @@
             }
           },
           "payload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/GenesisPayload"
-              },
-              {
-                "description": "The genesis transaction payload"
-              }
-            ]
+            "$ref": "#/components/schemas/GenesisPayload"
           },
           "events": {
             "type": "array",
@@ -11516,74 +11231,25 @@
             "description": "Chain ID of the current chain"
           },
           "epoch": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Current epoch of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "ledger_version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Current ledger version of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "oldest_ledger_version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Oldest non-pruned ledger version of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "ledger_timestamp": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Current timestamp of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "node_role": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RoleType"
-              },
-              {
-                "description": "Role of the node `Validator` or `FullNode`"
-              }
-            ]
+            "$ref": "#/components/schemas/RoleType"
           },
           "oldest_block_height": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Oldest non-pruned block height of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "block_height": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Current block height of the chain"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -11617,24 +11283,10 @@
         ],
         "properties": {
           "name": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IdentifierWrapper"
-              },
-              {
-                "description": "Name of the function"
-              }
-            ]
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "visibility": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveFunctionVisibility"
-              },
-              {
-                "description": "Visibility of the function e.g. public"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveFunctionVisibility"
           },
           "is_entry": {
             "type": "boolean",
@@ -11700,24 +11352,10 @@
         ],
         "properties": {
           "address": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Address of the move module"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "name": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IdentifierWrapper"
-              },
-              {
-                "description": "Name of the module"
-              }
-            ]
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "friends": {
             "type": "array",
@@ -11750,24 +11388,10 @@
         ],
         "properties": {
           "bytecode": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Hex encoded bytecode of the module"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "abi": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveModule"
-              },
-              {
-                "description": "ABI of the module"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveModule"
           }
         }
       },
@@ -11785,24 +11409,10 @@
         ],
         "properties": {
           "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveStructTag"
-              },
-              {
-                "description": "The Move struct tag e.g. 0x1::account::Account"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveStructTag"
           },
           "data": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveStructValue"
-              },
-              {
-                "description": "The JSON struct data converted from the Move resource"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveStructValue"
           }
         }
       },
@@ -11814,24 +11424,10 @@
         ],
         "properties": {
           "bytecode": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Hex encoded bytecode of the script"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "abi": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveFunction"
-              },
-              {
-                "description": "ABI of the script"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveFunction"
           }
         }
       },
@@ -11847,14 +11443,7 @@
         ],
         "properties": {
           "name": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IdentifierWrapper"
-              },
-              {
-                "description": "Name of the struct"
-              }
-            ]
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "is_native": {
             "type": "boolean",
@@ -11892,24 +11481,10 @@
         ],
         "properties": {
           "name": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IdentifierWrapper"
-              },
-              {
-                "description": "Name of the field"
-              }
-            ]
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveType"
-              },
-              {
-                "description": "The move type associated with the field. e.g. bool"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveType"
           }
         }
       },
@@ -12005,14 +11580,7 @@
         ],
         "properties": {
           "sender": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AccountSignature"
-              },
-              {
-                "description": "Sender of the transaction, which will pay for gas"
-              }
-            ]
+            "$ref": "#/components/schemas/AccountSignature"
           },
           "secondary_signer_addresses": {
             "type": "array",
@@ -12060,14 +11628,7 @@
             "description": "The number of signatures required for a successful transaction"
           },
           "bitmap": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "The bitmap representing which keys are being used"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -12085,84 +11646,28 @@
         ],
         "properties": {
           "hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The transaction hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "sender": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Sender account address"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Sequence number of the sender for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Max gas units allowed for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Gas unit price used for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Expiration timestamp in seconds from the UNIX epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionPayload"
-              },
-              {
-                "description": "The payload of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionPayload"
           },
           "signature": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionSignature"
-              },
-              {
-                "description": "Signature of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionSignature"
           }
         }
       },
@@ -12183,14 +11688,7 @@
         ],
         "properties": {
           "code": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveScriptBytecode"
-              },
-              {
-                "description": "Bytecode of the script"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveScriptBytecode"
           },
           "type_arguments": {
             "type": "array",
@@ -12238,64 +11736,22 @@
         ],
         "properties": {
           "version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Ledger version of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_change_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the event changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_checkpoint_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state checkpoint (if it is a state checkpoint)"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Total gas units used\n\nTotal gas units used can be multiplied by gas price to get the total coins paid"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean",
@@ -12306,14 +11762,7 @@
             "description": "The VM status of the transaction, can tell useful information in a failure"
           },
           "accumulator_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The accumulator root hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -12323,14 +11772,7 @@
             }
           },
           "timestamp": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Timestamp of the transaction's block"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -12348,74 +11790,25 @@
         ],
         "properties": {
           "sender": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Sender account address"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Sequence number of the sender for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Max gas units allowed for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Gas unit price used for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Expiration timestamp in seconds from the UNIX epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionPayload"
-              },
-              {
-                "description": "The payload of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionPayload"
           },
           "signature": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionSignature"
-              },
-              {
-                "description": "Signature of the request"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionSignature"
           }
         }
       },
@@ -12429,24 +11822,10 @@
         ],
         "properties": {
           "key_type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveType"
-              },
-              {
-                "description": "The [`MoveType`] of the table item's key"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveType"
           },
           "value_type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveType"
-              },
-              {
-                "description": "The [`MoveType`] of the table item's value"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveType"
           },
           "key": {
             "description": "The value of the table item's key"
@@ -12748,14 +12127,7 @@
         ],
         "properties": {
           "error": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AptosError"
-              },
-              {
-                "description": "The error from submitting the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/AptosError"
           },
           "transaction_index": {
             "type": "integer",
@@ -12816,64 +12188,22 @@
         ],
         "properties": {
           "version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Ledger version of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_change_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the event changes"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_checkpoint_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "Hash of the state checkpoint (if it is a state checkpoint)"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Total gas units used\n\nTotal gas units used can be multiplied by gas price to get the total coins paid"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean",
@@ -12884,14 +12214,7 @@
             "description": "The VM status of the transaction, can tell useful information in a failure"
           },
           "accumulator_root_hash": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HashValue"
-              },
-              {
-                "description": "The accumulator root hash"
-              }
-            ]
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -12901,74 +12224,25 @@
             }
           },
           "sender": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Sender account address"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Sequence number of the sender for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Max gas units allowed for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Gas unit price used for this transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Expiration timestamp in seconds from the UNIX epoch"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionPayload"
-              },
-              {
-                "description": "The payload of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionPayload"
           },
           "signature": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TransactionSignature"
-              },
-              {
-                "description": "Signature of the transaction"
-              }
-            ]
+            "$ref": "#/components/schemas/TransactionSignature"
           },
           "events": {
             "type": "array",
@@ -12978,14 +12252,7 @@
             }
           },
           "timestamp": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "Timestamp of the transaction's block"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -13001,37 +12268,16 @@
         ],
         "properties": {
           "version": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The version that the event was emitted"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "key": {
             "$ref": "#/components/schemas/EventKey"
           },
           "sequence_number": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/U64"
-              },
-              {
-                "description": "The sequence number of the event"
-              }
-            ]
+            "$ref": "#/components/schemas/U64"
           },
           "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveType"
-              },
-              {
-                "description": "The [`MoveType`] of the event"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveType"
           },
           "data": {
             "description": "The JSON representation of the event"
@@ -13048,27 +12294,14 @@
         ],
         "properties": {
           "address": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Address of module"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
-            "type": "string"
+            "type": "string",
+            "description": "State key hash"
           },
           "data": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveModuleBytecode"
-              },
-              {
-                "description": "New bytecode of module"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveModuleBytecode"
           }
         }
       },
@@ -13082,27 +12315,14 @@
         ],
         "properties": {
           "address": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "description": "Address of resource"
-              }
-            ]
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
-            "type": "string"
+            "type": "string",
+            "description": "State key hash"
           },
           "data": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MoveResource"
-              },
-              {
-                "description": "New state of resource"
-              }
-            ]
+            "$ref": "#/components/schemas/MoveResource"
           }
         }
       },
@@ -13338,34 +12558,13 @@
             "type": "string"
           },
           "handle": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Table handle a u256 encoded as an Address"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "key": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Key of item in table"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "value": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "Value of item in table"
-              }
-            ]
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "data": {
             "$ref": "#/components/schemas/DecodedTableData"
