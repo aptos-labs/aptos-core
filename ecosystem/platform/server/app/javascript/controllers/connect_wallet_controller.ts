@@ -12,11 +12,11 @@ const FIELD_NAMES = Object.freeze({
 });
 
 // Connects to data-controller="connect-wallet"
-export default class extends Controller<HTMLFormElement> {
-  static targets = ["requiredNetworkError"];
+export default class extends Controller<HTMLElement> {
+  static targets = ["form", "errors"];
 
-  declare readonly hasRequiredNetworkErrorTarget: boolean;
-  declare readonly requiredNetworkErrorTarget: HTMLElement;
+  declare readonly formTarget: HTMLFormElement;
+  declare readonly errorsTarget: HTMLElement;
 
   static values = {
     requiredNetwork: String,
@@ -27,38 +27,48 @@ export default class extends Controller<HTMLFormElement> {
   declare readonly walletPersistedValue: boolean;
 
   get walletName() {
-    if ("aptos" in window) {
-      return "petra";
-    } else if ("martian" in window) {
-      return "martian";
-    } else if (false) {
-      // TODO: Add more wallet detection logic here.
-    } else {
-      throw "Aptos wallet not detected.";
-    }
+    return this.getInput(FIELD_NAMES.walletName).value;
+  }
+
+  selectWallet(event: Event) {
+    if (!(event.currentTarget instanceof HTMLButtonElement)) return;
+    const walletName = event.currentTarget.dataset.wallet;
+    if (!walletName) return;
+    this.element.querySelector("dialog")?.close();
+    this.getInput(FIELD_NAMES.walletName).value = walletName;
+    this.formTarget.requestSubmit();
   }
 
   onPageLoad() {
     const urlParams = new URLSearchParams(location.search);
     if (urlParams.get("wallet") && !this.walletPersistedValue) {
-      this.element.requestSubmit();
+      this.formTarget.requestSubmit();
     }
   }
 
-  async renderErrors() {
+  async renderErrors(errors: string[]) {
     if (this.requiredNetworkValue) {
       const network = await this.getNetwork();
       if (network !== this.requiredNetworkValue) {
-        this.requiredNetworkErrorTarget.textContent = `Please set your wallet network to ${this.requiredNetworkValue}. It is currently set to ${network}.`;
-        this.requiredNetworkErrorTarget.classList.remove("hidden");
+        errors.push(
+          `Please set your wallet network to ${this.requiredNetworkValue}. It is currently set to ${network}.`
+        );
       }
+    }
+    if (errors.length > 0) {
+      this.errorsTarget.classList.remove("hidden");
+      const ul = document.createElement("ul");
+      for (const error of errors) {
+        const li = document.createElement("li");
+        li.textContent = error;
+        ul.appendChild(li);
+      }
+      this.errorsTarget.querySelector("ul")?.replaceWith(ul);
     }
   }
 
   hideErrors() {
-    if (this.hasRequiredNetworkErrorTarget) {
-      this.requiredNetworkErrorTarget.classList.add("hidden");
-    }
+    this.errorsTarget.classList.add("hidden");
   }
 
   async getPublicKey() {
@@ -116,7 +126,7 @@ export default class extends Controller<HTMLFormElement> {
   }
 
   getInput(fieldName: string): HTMLInputElement {
-    const input = this.element[fieldName];
+    const input = this.formTarget[fieldName];
     if (!(input instanceof HTMLInputElement)) {
       throw `input with name ${fieldName} not found.`;
     }
@@ -131,7 +141,7 @@ export default class extends Controller<HTMLFormElement> {
     const publicKey = await this.getPublicKey();
     const network = await this.getNetwork();
     if (this.requiredNetworkValue && network !== this.requiredNetworkValue) {
-      this.renderErrors();
+      this.renderErrors([]);
       return;
     }
 
@@ -141,16 +151,16 @@ export default class extends Controller<HTMLFormElement> {
     this.getInput(FIELD_NAMES.signedChallenge).value =
       await this.getSignedChallenge();
 
-    const formData = new FormData(this.element);
-    const response = await fetch(this.element.action, {
-      method: this.element.method,
+    const formData = new FormData(this.formTarget);
+    const response = await fetch(this.formTarget.action, {
+      method: this.formTarget.method,
       headers: {
         Accept: "application/json",
       },
       body: formData,
     });
-    const { created } = await response.json();
-    if (created) {
+    const json = await response.json();
+    if (json.created) {
       const urlParams = new URLSearchParams(location.search);
       urlParams.set("wallet", publicKey);
       const url = new URL(location.href);
@@ -159,6 +169,8 @@ export default class extends Controller<HTMLFormElement> {
       // Full page load instead of Turbo.visit due to bug with controller not
       // being mounted.
       location.href = url.toString();
+    } else if ("errors" in json) {
+      this.renderErrors(json.errors);
     } else {
       console.error("connect wallet failed");
     }
