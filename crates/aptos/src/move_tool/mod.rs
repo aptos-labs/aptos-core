@@ -15,6 +15,7 @@ use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{
     create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
 };
+use crate::governance::CompileScriptFunction;
 use crate::move_tool::manifest::{
     Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
 };
@@ -33,7 +34,7 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
+use aptos_types::transaction::{EntryFunction, ModuleBundle, Script, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
@@ -75,6 +76,7 @@ pub enum MoveTool {
     List(ListPackage),
     Clean(CleanPackage),
     Run(RunFunction),
+    RunScript(RunScript),
     Test(TestPackage),
     Prove(ProvePackage),
     TransactionalTest(TransactionalTestOpts),
@@ -90,6 +92,7 @@ impl MoveTool {
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Clean(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
@@ -762,6 +765,37 @@ impl CliCommand<TransactionSummary> for RunFunction {
             )
             .await
             .map(TransactionSummary::from)
+    }
+}
+
+/// Run a Move script
+#[derive(Parser)]
+pub struct RunScript {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileScriptFunction,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for RunScript {
+    fn command_name(&self) -> &'static str {
+        "RunScript"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (bytecode, _script_hash) = self
+            .compile_proposal_args
+            .compile(self.txn_options.prompt_options)?;
+
+        let txn = self
+            .txn_options
+            .submit_transaction(
+                TransactionPayload::Script(Script::new(bytecode, vec![], vec![])),
+                None,
+            )
+            .await?;
+        Ok(TransactionSummary::from(&txn))
     }
 }
 
