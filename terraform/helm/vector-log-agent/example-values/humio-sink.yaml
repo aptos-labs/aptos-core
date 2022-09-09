@@ -4,25 +4,19 @@
 # most defaults are fine as baseline config.
 # - set compression: gzip. Typically this will save you 90-95% in Network Egress at the cost of some (negligible amount) of CPU to handle the compression.
 # - set rate_limit_num: 100 or something higher than the default. The default is `10` which is a bit too conservative and can easily lead backpressure for high-volume sources.
-logging_sinks:
+loggingSinks:
   humio:
     type: humio_logs
     inputs:
-      - k8s_logs
-    token: ${HUMIO_TOKEN:?err}
-    endpoint: https://cloud.community.humio.com
+      - final_logs
+    endpoint: "https://cloud.us.humio.com"
+    token: "${HUMIO_TOKEN:?err}"
+    compression: gzip
     encoding:
       codec: json
-    compression: gzip
     request:
       rate_limit_num: 100
 
-### PREREQUESITE: create a kubernetes secret via
-### kubectl create secret generic humio-token --namespace vector --from-literal=HUMIO_TOKEN=<YOUR_HUMIO_INGEST_TOKEN>
-env:
-  humio:
-    - name: HUMIO_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: humio-token
-          key: HUMIO_TOKEN
+secretVars:
+  humio-credentials:
+    HUMIO_TOKEN: "<enter_humio_ingest_token_here" # or set via --set-string secretVars.humio-credentials.HUMIO_TOKEN=<humio-ingest_token>

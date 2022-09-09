@@ -10,7 +10,7 @@ use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
-use aptos_rest_client::aptos_api_types::{TransactionPayload, UserTransaction};
+use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
 use aptos_rest_client::Transaction;
 use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
@@ -699,7 +699,7 @@ async fn test_block() {
             .expect("Should be able to get blocks that are already known");
         let block = response.block;
         let actual_block = rest_client
-            .get_block_by_height(block_height, true)
+            .get_block_by_height_bcs(block_height, true)
             .await
             .expect("Should be able to get block for a known block")
             .into_inner();
@@ -727,7 +727,7 @@ async fn test_block() {
         let expected_timestamp = if block_height == 0 {
             Y2K_MS
         } else {
-            actual_block.block_timestamp.0.saturating_div(1000)
+            actual_block.block_timestamp.saturating_div(1000)
         };
         assert_eq!(
             expected_timestamp, block.timestamp,
@@ -736,7 +736,7 @@ async fn test_block() {
 
         // First transaction should be first in block
         assert_eq!(
-            current_version, actual_block.first_version.0,
+            current_version, actual_block.first_version,
             "First transaction in block should be the current version"
         );
 
@@ -747,7 +747,7 @@ async fn test_block() {
         parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
 
         // The full block must have been processed
-        assert_eq!(current_version - 1, actual_block.last_version.0);
+        assert_eq!(current_version - 1, actual_block.last_version);
 
         // Keep track of the previous
         previous_block_index = block_height;
@@ -761,16 +761,14 @@ async fn test_block() {
 async fn parse_block_transactions(
     block: &aptos_rosetta::types::Block,
     balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
-    actual_txns: &[Transaction],
+    actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
     for (txn_number, transaction) in block.transactions.iter().enumerate() {
         let actual_txn = actual_txns
             .get(txn_number)
             .expect("There should be the same number of transactions in the actual block");
-        let actual_txn_info = actual_txn
-            .transaction_info()
-            .expect("Actual transaction should not be pending and have transaction info");
+        let actual_txn_info = &actual_txn.info;
         let txn_metadata = &transaction.metadata;
 
         // Ensure transaction identifier is correct
@@ -779,38 +777,47 @@ async fn parse_block_transactions(
             "There should be no gaps in transaction versions"
         );
         assert_eq!(
-            format!("{:x}", actual_txn_info.hash.0),
+            format!("{:x}", actual_txn_info.transaction_hash()),
             transaction.transaction_identifier.hash,
             "Transaction hash should match the actual hash"
         );
 
         // Ensure the status is correct
-        assert_eq!(txn_metadata.failed, !actual_txn_info.success);
-        assert_eq!(txn_metadata.vm_status, actual_txn_info.vm_status);
+        assert_eq!(txn_metadata.failed, !actual_txn_info.status().is_success());
+        assert_eq!(
+            txn_metadata.vm_status,
+            format!("{:?}", actual_txn_info.status())
+        );
 
         // Type specific checks
         match txn_metadata.transaction_type {
             TransactionType::Genesis => {
                 // For this test, there should only be one genesis
                 assert_eq!(0, *current_version);
-                assert!(matches!(actual_txn, Transaction::GenesisTransaction(_)));
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::GenesisTransaction(_)
+                ));
             }
             TransactionType::User => {
-                assert!(matches!(actual_txn, Transaction::UserTransaction(_)));
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::UserTransaction(_)
+                ));
                 // Must have a gas fee
                 assert!(!transaction.operations.is_empty());
             }
             TransactionType::BlockMetadata => {
                 assert!(matches!(
-                    actual_txn,
-                    Transaction::BlockMetadataTransaction(_)
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockMetadata(_)
                 ));
                 assert!(transaction.operations.is_empty());
             }
             TransactionType::StateCheckpoint => {
                 assert!(matches!(
-                    actual_txn,
-                    Transaction::StateCheckpointTransaction(_)
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::StateCheckpoint(_)
                 ));
                 assert!(transaction.operations.is_empty());
             }
@@ -840,7 +847,7 @@ async fn parse_operations(
     block_height: u64,
     balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
     transaction: &aptos_rosetta::types::Transaction,
-    actual_txn: &Transaction,
+    actual_txn: &TransactionOnChainData,
 ) {
     // If there are no operations, then there is no gas operation
     let mut has_gas_op = false;
@@ -857,6 +864,7 @@ async fn parse_operations(
         .expect("Operation status should be known");
         let operation_type = OperationType::from_str(&operation.operation_type)
             .expect("Operation type should be known");
+        let actual_successful = actual_txn.info.status().is_success();
 
         // Iterate through every operation, keeping track of balances
         match operation_type {
@@ -869,7 +877,7 @@ async fn parse_operations(
                     .account_address()
                     .expect("Account address should be parsable");
 
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account_balances = balances.entry(account).or_default();
 
@@ -894,7 +902,7 @@ async fn parse_operations(
                     .account_address()
                     .expect("Account address should be parsable");
 
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account_balances = balances.entry(account).or_insert_with(|| {
                         let mut map = BTreeMap::new();
@@ -927,7 +935,7 @@ async fn parse_operations(
             }
             OperationType::Withdraw => {
                 // Gas is always successful
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account = operation
                         .account
@@ -971,20 +979,22 @@ async fn parse_operations(
                 }
             }
             OperationType::SetOperator => {
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(
                         OperationStatusType::Success,
                         status,
                         "Successful transaction should have successful set operator operation"
                     );
                     // Check that operator was set the same
-                    if let Transaction::UserTransaction(txn) = actual_txn {
-                        if let TransactionPayload::EntryFunctionPayload(ref payload) =
-                            txn.request.payload
+                    if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                        actual_txn.transaction
+                    {
+                        if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                            ref payload,
+                        ) = txn.payload()
                         {
                             let actual_operator_address: AccountAddress =
-                                serde_json::from_value(payload.arguments.first().unwrap().clone())
-                                    .unwrap();
+                                bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                             let operator = operation
                                 .metadata
                                 .as_ref()
@@ -1045,14 +1055,13 @@ async fn parse_operations(
                 // Subtract with panic on overflow in case of a negative balance
                 let new_balance = *latest_balance - delta as i128;
                 account_balances.insert(block_height, new_balance);
-
-                match actual_txn {
-                    Transaction::UserTransaction(txn) => {
+                match actual_txn.transaction {
+                    aptos_types::transaction::Transaction::UserTransaction(ref txn) => {
                         assert_eq!(
-                            txn.info
-                                .gas_used
-                                .0
-                                .saturating_mul(txn.request.gas_unit_price.0),
+                            actual_txn
+                                .info
+                                .gas_used()
+                                .saturating_mul(txn.gas_unit_price()),
                             delta,
                             "Gas operation should always match gas used * gas unit price"
                         )

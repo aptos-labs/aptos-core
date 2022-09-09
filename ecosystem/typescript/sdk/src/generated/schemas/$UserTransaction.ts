@@ -5,44 +5,26 @@ export const $UserTransaction = {
     description: `A transaction submitted by a user to change the state of the blockchain`,
     properties: {
         version: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_change_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         event_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         state_checkpoint_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
         },
         gas_used: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         success: {
@@ -56,10 +38,7 @@ export const $UserTransaction = {
             isRequired: true,
         },
         accumulator_root_hash: {
-            type: 'all-of',
-            contains: [{
-                type: 'HashValue',
-            }],
+            type: 'HashValue',
             isRequired: true,
         },
         changes: {
@@ -70,52 +49,31 @@ export const $UserTransaction = {
             isRequired: true,
         },
         sender: {
-            type: 'all-of',
-            contains: [{
-                type: 'Address',
-            }],
+            type: 'Address',
             isRequired: true,
         },
         sequence_number: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         max_gas_amount: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         gas_unit_price: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         expiration_timestamp_secs: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
         payload: {
-            type: 'all-of',
-            contains: [{
-                type: 'TransactionPayload',
-            }],
+            type: 'TransactionPayload',
             isRequired: true,
         },
         signature: {
-            type: 'all-of',
-            contains: [{
-                type: 'TransactionSignature',
-            }],
+            type: 'TransactionSignature',
         },
         events: {
             type: 'array',
@@ -125,10 +83,7 @@ export const $UserTransaction = {
             isRequired: true,
         },
         timestamp: {
-            type: 'all-of',
-            contains: [{
-                type: 'U64',
-            }],
+            type: 'U64',
             isRequired: true,
         },
     },

@@ -21,6 +21,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.26.0",
     "@typescript-eslint/parser": "^5.26.0",
+    "prettier": "2.7.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.7.2"
   }

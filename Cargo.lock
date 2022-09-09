@@ -156,13 +156,11 @@ dependencies = [
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-secure-storage",
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
- "aptosdb",
  "async-trait",
  "backup-cli",
  "base64 0.13.0",
@@ -171,7 +169,6 @@ dependencies = [
  "clap 3.2.17",
  "clap_complete",
  "dirs 4.0.0",
- "executor",
  "framework",
  "futures",
  "hex",
@@ -181,11 +178,9 @@ dependencies = [
  "regex",
  "reqwest",
  "serde 1.0.144",
- "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
  "shadow-rs",
- "short-hex-str",
  "storage-interface",
  "tempfile",
  "termcolor",
@@ -193,8 +188,6 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.3",
  "toml",
- "uuid",
- "vm-genesis",
  "walkdir",
 ]
 
@@ -223,31 +216,21 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis",
- "aptos-global-constants",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-sdk",
- "aptos-secure-storage",
  "aptos-state-view",
- "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptosdb",
  "async-trait",
  "bcs",
  "bytes 1.2.1",
- "executor",
- "executor-types",
  "fail 0.5.0",
- "framework",
  "futures",
- "goldenfile",
  "hex",
  "hyper",
- "mempool-notifications",
  "mime",
  "move-deps",
  "once_cell",
@@ -261,14 +244,10 @@ dependencies = [
  "reqwest",
  "serde 1.0.144",
  "serde_json",
- "serde_path_to_error",
  "storage-interface",
- "thiserror",
  "tokio",
  "url",
- "vm-validator",
  "warp",
- "warp-reverse-proxy",
 ]
 
 [[package]]
@@ -281,36 +260,19 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis",
- "aptos-global-constants",
- "aptos-logger",
  "aptos-mempool",
- "aptos-metrics-core",
- "aptos-proptest-helpers",
  "aptos-sdk",
- "aptos-secure-storage",
- "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
  "aptosdb",
- "async-trait",
- "bcs",
  "bytes 1.2.1",
  "cached-packages",
  "executor",
  "executor-types",
- "fail 0.5.0",
- "framework",
- "futures",
  "goldenfile",
- "hex",
  "hyper",
  "mempool-notifications",
- "mime",
- "move-deps",
- "once_cell",
- "paste",
- "percent-encoding",
  "poem",
  "poem-openapi",
  "proptest",
@@ -319,9 +281,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.144",
  "serde_json",
- "serde_path_to_error",
  "storage-interface",
- "thiserror",
  "tokio",
  "url",
  "vm-validator",
@@ -337,14 +297,12 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-openapi",
- "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "async-trait",
  "bcs",
  "hex",
  "indoc",
- "mime",
  "move-deps",
  "poem",
  "poem-openapi",
@@ -677,10 +635,8 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-global-constants",
  "aptos-keygen",
  "aptos-logger",
- "aptos-secure-storage",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
@@ -688,14 +644,12 @@ dependencies = [
  "aptosdb",
  "bcs",
  "cached-packages",
- "consensus-types",
  "executor",
  "framework",
  "rand 0.7.3",
  "serde 1.0.144",
  "serde_yaml 0.8.26",
  "storage-interface",
- "toml",
  "vm-genesis",
 ]
 
@@ -1123,26 +1077,21 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics-core",
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
  "aptos-warp-webserver",
- "async-trait",
  "bcs",
  "cached-packages",
  "clap 3.2.17",
- "framework",
  "futures",
  "hex",
- "itertools",
  "move-deps",
  "percent-encoding",
  "reqwest",
  "serde 1.0.144",
  "serde_json",
- "thiserror",
  "tokio",
  "url",
  "warp",
@@ -1154,13 +1103,10 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos",
- "aptos-config",
- "aptos-crypto",
  "aptos-logger",
  "aptos-rosetta",
  "aptos-types",
  "clap 3.2.17",
- "hex",
  "serde 1.0.144",
  "serde_json",
  "tokio",
@@ -5168,8 +5114,8 @@ dependencies = [
 
 [[package]]
 name = "librocksdb-sys"
-version = "0.8.0+7.4.3"
-source = "git+https://github.com/aptos-labs/rust-rocksdb#c54a01ae9ef01b600ae06d16686fc9be3ccc8c4c"
+version = "0.8.0+7.4.4"
+source = "git+https://github.com/aptos-labs/rust-rocksdb#3698ab20df2bdc4148efc0f0b4caf04dcc7ccf8d"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -5303,8 +5249,9 @@ dependencies = [
 
 [[package]]
 name = "lz4"
-version = "1.23.3"
-source = "git+https://github.com/aptos-labs/lz4-rs#080c31eb9c3955f578b4dc01fb5ed9390d8ab366"
+version = "1.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e9e2dd86df36ce760a60f6ff6ad526f7ba1f14ba0356f8254fb6905e6494df1"
 dependencies = [
  "libc",
  "lz4-sys",
@@ -5312,8 +5259,9 @@ dependencies = [
 
 [[package]]
 name = "lz4-sys"
-version = "1.9.3"
-source = "git+https://github.com/aptos-labs/lz4-rs#080c31eb9c3955f578b4dc01fb5ed9390d8ab366"
+version = "1.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
 dependencies = [
  "cc",
  "libc",
@@ -8001,8 +7949,8 @@ dependencies = [
 
 [[package]]
 name = "rocksdb"
-version = "0.18.0"
-source = "git+https://github.com/aptos-labs/rust-rocksdb#c54a01ae9ef01b600ae06d16686fc9be3ccc8c4c"
+version = "0.19.0"
+source = "git+https://github.com/aptos-labs/rust-rocksdb#3698ab20df2bdc4148efc0f0b4caf04dcc7ccf8d"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -8416,15 +8364,6 @@ dependencies = [
  "indexmap",
  "itoa 1.0.3",
  "ryu",
- "serde 1.0.144",
-]
-
-[[package]]
-name = "serde_path_to_error"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "184c643044780f7ceb59104cef98a5a6f12cb2288a7bc701ab93a362b49fd47d"
-dependencies = [
  "serde 1.0.144",
 ]
 

@@ -7,10 +7,7 @@ export const $MultiAgentSignature = {
     This allows you to have transactions across multiple accounts`,
     properties: {
         sender: {
-            type: 'all-of',
-            contains: [{
-                type: 'AccountSignature',
-            }],
+            type: 'AccountSignature',
             isRequired: true,
         },
         secondary_signer_addresses: {

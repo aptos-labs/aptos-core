@@ -5,17 +5,11 @@ export const $MoveScriptBytecode = {
     description: `Move script bytecode`,
     properties: {
         bytecode: {
-            type: 'all-of',
-            contains: [{
-                type: 'HexEncodedBytes',
-            }],
+            type: 'HexEncodedBytes',
             isRequired: true,
         },
         abi: {
-            type: 'all-of',
-            contains: [{
-                type: 'MoveFunction',
-            }],
+            type: 'MoveFunction',
         },
     },
 } as const;

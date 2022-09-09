@@ -28,7 +28,7 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_types::account_config::AccountResource;
+use aptos_types::account_config::{AccountResource, CoinStoreResource};
 use aptos_types::contract_event::EventWithVersion;
 use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
@@ -190,6 +190,20 @@ impl Client {
         })
     }
 
+    pub async fn get_account_balance_bcs(
+        &self,
+        address: AccountAddress,
+        coin_type: &str,
+    ) -> AptosResult<Response<u64>> {
+        let resp = self
+            .get_account_resource_bcs::<CoinStoreResource>(
+                address,
+                &format!("0x1::coin::CoinStore<{}>", coin_type),
+            )
+            .await?;
+        resp.and_then(|resource| Ok(resource.coin()))
+    }
+
     pub async fn get_account_balance_at_version(
         &self,
         address: AccountAddress,
@@ -215,8 +229,14 @@ impl Client {
         self.get(self.build_path("")?).await
     }
 
+    pub async fn get_index_bcs(&self) -> AptosResult<Response<IndexResponse>> {
+        let url = self.build_path("")?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_ledger_information(&self) -> AptosResult<Response<State>> {
-        let response = self.get_index().await?.map(|r| State {
+        let response = self.get_index_bcs().await?.map(|r| State {
             chain_id: r.chain_id,
             epoch: r.epoch.into(),
             version: r.ledger_version.into(),
@@ -669,6 +689,19 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resources_at_version_bcs(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> AptosResult<Response<BTreeMap<StructTag, Vec<u8>>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resources?ledger_version={}",
+            address, version
+        ))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
@@ -712,6 +745,21 @@ impl Client {
         resource_type: &str,
     ) -> AptosResult<Response<T>> {
         let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_resource_at_version_bcs<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/resource/{}?ledger_version={}",
+            address, resource_type, version
+        ))?;
+
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }

@@ -9,24 +9,15 @@ export const $WriteTableItem = {
             isRequired: true,
         },
         handle: {
-            type: 'all-of',
-            contains: [{
-                type: 'HexEncodedBytes',
-            }],
+            type: 'HexEncodedBytes',
             isRequired: true,
         },
         key: {
-            type: 'all-of',
-            contains: [{
-                type: 'HexEncodedBytes',
-            }],
+            type: 'HexEncodedBytes',
             isRequired: true,
         },
         value: {
-            type: 'all-of',
-            contains: [{
-                type: 'HexEncodedBytes',
-            }],
+            type: 'HexEncodedBytes',
             isRequired: true,
         },
         data: {
