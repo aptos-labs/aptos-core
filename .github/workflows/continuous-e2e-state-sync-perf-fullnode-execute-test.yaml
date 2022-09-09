@@ -1,0 +1,23 @@
+name: Continuous E2E State Sync Performance Test For Fullnode Transaction Execution
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  # Performance test in an optimal setting
+  run-forge-state-sync-perf-fullnode-execute-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute
+      FORGE_CLUSTER_NAME: aptos-forge-big-1
+      # Run for 40 minutes
+      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
+      POST_TO_SLACK: true

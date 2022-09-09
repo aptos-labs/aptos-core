@@ -20,7 +20,7 @@
       </div>
     </section>
     <section class="max-w-screen-xl mx-auto py-12 lg:py-18 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-0">
-      <%= turbo_frame_tag dom_id(@nft_offer), class: 'md:col-span-6 lg:col-span-4' do %>
+      <%= turbo_frame_tag dom_id(@nft_offer), class: 'md:col-span-6 lg:col-span-5' do %>
         <%= render 'layouts/flash' %>
         <h2 class="font-display text-3xl mb-8">Claim your NFT</h2>
         <ol class="pl-4">
@@ -80,7 +80,7 @@
           <% end %>
         </ol>
       <% end %>
-      <div class="md:col-start-8 md:col-end-13 lg:col-span-6 lg:col-start-7">
+      <div class="md:col-start-8 md:col-end-13 lg:col-span-5 lg:col-start-8">
         <%= render CardOutlineComponent.new(scheme: :filled) do %>
           <div class="flex w-full items-center justify-center border-2 border-neutral-900 text-neutral-900 aspect-square">
             <%= render IconComponent.new(:aptos, class: 'w-1/2') %>

@@ -13,7 +13,7 @@ class NftImagesController < ApplicationController
   include ActiveStorage::SetCurrent
 
   def show
-    @nft_offer = NftOffer.find(params[:nft_offer_slug])
+    @nft_offer = NftOffer.find_by(slug: params[:nft_offer_slug])
     @image_num = params[:image_num].to_i
     unless @image_num.positive? && @image_num <= MAX_IMAGE_NUM_ALLOWED
       render plain: nil,

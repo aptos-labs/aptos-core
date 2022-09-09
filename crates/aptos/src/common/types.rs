@@ -7,7 +7,7 @@ use crate::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
             chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_sequence_number, read_from_file, start_logger, to_common_result,
+            get_auth_key, get_sequence_number, read_from_file, start_logger, to_common_result,
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
@@ -362,12 +362,28 @@ pub struct ProfileOptions {
 
 impl ProfileOptions {
     pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
+        let profile = self.profile()?;
+        if let Some(account) = profile.account {
+            return Ok(account);
+        }
+
+        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+    }
+
+    pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        let profile = self.profile()?;
+        if let Some(public_key) = profile.public_key {
+            return Ok(public_key);
+        }
+
+        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+    }
+
+    pub fn profile(&self) -> CliTypedResult<ProfileConfig> {
         if let Some(profile) =
             CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
         {
-            if let Some(account) = profile.account {
-                return Ok(account);
-            }
+            return Ok(profile);
         }
 
         Err(CliError::ConfigNotFoundError(self.profile.clone()))
@@ -546,17 +562,43 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
-        _profile: &str,
+        profile: &str,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--public-key", key)
+        } else if let Some(Some(public_key)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.public_key)
+        {
+            Ok(public_key)
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
+                "One of ['--public-key', '--public-key-file', '--profile'] must be used"
+                    .to_string(),
             ))
+        }
+    }
+}
+
+pub trait ParsePrivateKey {
+    fn parse_private_key(
+        &self,
+        encoding: EncodingType,
+        private_key_file: Option<PathBuf>,
+        private_key: Option<String>,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = private_key_file {
+            Ok(Some(
+                encoding.load_key("--private-key-file", file.as_path())?,
+            ))
+        } else if let Some(ref key) = private_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--private-key", key)?))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -570,6 +612,8 @@ pub struct PrivateKeyInputOptions {
     #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
+
+impl ParsePrivateKey for PrivateKeyInputOptions {}
 
 impl PrivateKeyInputOptions {
     pub fn from_private_key(private_key: &Ed25519PrivateKey) -> CliTypedResult<Self> {
@@ -626,16 +670,11 @@ impl PrivateKeyInputOptions {
         &self,
         encoding: EncodingType,
     ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
-        if let Some(ref file) = self.private_key_file {
-            Ok(Some(
-                encoding.load_key("--private-key-file", file.as_path())?,
-            ))
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            Ok(Some(encoding.decode_key("--private-key", key)?))
-        } else {
-            Ok(None)
-        }
+        self.parse_private_key(
+            encoding,
+            self.private_key_file.clone(),
+            self.private_key.clone(),
+        )
     }
 }
 
@@ -714,7 +753,7 @@ pub struct RestOptions {
     ///
     /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
     #[clap(long)]
-    url: Option<reqwest::Url>,
+    pub(crate) url: Option<reqwest::Url>,
 }
 
 impl RestOptions {
@@ -1098,7 +1137,7 @@ pub struct TransactionOptions {
 
 impl TransactionOptions {
     /// Retrieves the private key
-    fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
+    pub(crate) fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
         self.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
@@ -1124,6 +1163,21 @@ impl TransactionOptions {
         }
     }
 
+    /// Gets the auth key by account address. We need to fetch the auth key from Rest API rather than creating an
+    /// auth key out of the public key.
+    pub(crate) async fn auth_key(
+        &self,
+        sender_address: AccountAddress,
+    ) -> CliTypedResult<AuthenticationKey> {
+        let client = self.rest_client()?;
+        get_auth_key(&client, sender_address).await
+    }
+
+    pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
+        let client = self.rest_client()?;
+        get_sequence_number(&client, sender_address).await
+    }
+
     /// Submit a transaction
     pub async fn submit_transaction(
         &self,
@@ -1137,7 +1191,7 @@ impl TransactionOptions {
         let sender_address = self.sender_address()?;
 
         // Get sequence number for account
-        let sequence_number = get_sequence_number(&client, sender_address).await?;
+        let sequence_number = self.sequence_number(sender_address).await?;
 
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
@@ -1282,4 +1336,23 @@ pub struct PoolAddressArgs {
     /// Address of the Staking pool
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) pool_address: AccountAddress,
+}
+
+// This struct includes TypeInfo (account_address, module_name, and struct_name)
+// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
+// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
+// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
+// Originator refers to the user's address
+#[derive(Serialize, Deserialize)]
+pub struct RotationProofChallenge {
+    // Should be `CORE_CODE_ADDRESS`
+    pub account_address: AccountAddress,
+    // Should be `account`
+    pub module_name: String,
+    // Should be `RotationProofChallenge`
+    pub struct_name: String,
+    pub sequence_number: u64,
+    pub originator: AccountAddress,
+    pub current_auth_key: AccountAddress,
+    pub new_public_key: Vec<u8>,
 }

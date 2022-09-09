@@ -33,7 +33,7 @@ class NftImage < ApplicationRecord
 
   def self.find_or_create(slug, image_num)
     # Verify this is a valid slug
-    nft_offer = NftOffer.find(slug)
+    nft_offer = NftOffer.find_by(slug:)
     # Find or create the nft_image
     img, is_new = NftImageQueryHelper._find_or_create(nft_offer, image_num)
 
@@ -64,7 +64,7 @@ class NftImage < ApplicationRecord
 
   # Returns a `TempFile` with the image contents
   def self.create_image(slug, image_num)
-    case NftOffer.find(slug).slug
+    case NftOffer.find_by(slug:).slug
     when NftOffer::APTOS_ZERO
       create_aptos_zero_image image_num
     end
@@ -117,6 +117,6 @@ class NftImage < ApplicationRecord
   end
 
   def nft_offer
-    NftOffer.find(slug)
+    NftOffer.find_by(slug:)
   end
 end
