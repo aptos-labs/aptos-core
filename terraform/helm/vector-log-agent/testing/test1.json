@@ -1,0 +1,51 @@
+{
+  "file": "/var/log/pods/forge-pr-2175_aptos-node-13-validator-0_f11cb109-8703-49ca-b121-ab314ab0be68/validator/0.log",
+  "kubernetes": {
+    "container_id": "docker://f1ca262722983ed4a6683196adcfab52b4b0b65e9336e9e050d6452f91de0db9",
+    "container_image": "12356.dkr.ecr.asia-central-2.amazonaws.com/aptos/validator:efea1a8000e0bcc9644e5f006cb0060424ebe6dc",
+    "container_name": "validator",
+    "namespace_labels": { "kubernetes.io/metadata.name": "forge-pr-2175" },
+    "node_labels": {
+      "beta.kubernetes.io/arch": "amd64",
+      "beta.kubernetes.io/instance-type": "c5.4xlarge",
+      "beta.kubernetes.io/os": "linux",
+      "eks.amazonaws.com/capacityType": "ON_DEMAND",
+      "eks.amazonaws.com/nodegroup": "validators",
+      "eks.amazonaws.com/nodegroup-image": "ami-048ca123cad83da24",
+      "eks.amazonaws.com/sourceLaunchTemplateId": "lt-0f2417c610be0a3db",
+      "eks.amazonaws.com/sourceLaunchTemplateVersion": "2",
+      "failure-domain.beta.kubernetes.io/region": "asia-central-2",
+      "failure-domain.beta.kubernetes.io/zone": "asia-central-2a",
+      "kubernetes.io/arch": "amd64",
+      "kubernetes.io/hostname": "ip-192-168-127-197.us-west-2.compute.internal",
+      "kubernetes.io/os": "linux",
+      "node.kubernetes.io/instance-type": "c5.4xlarge",
+      "topology.kubernetes.io/region": "asia-central-2",
+      "topology.kubernetes.io/zone": "asia-central-2a"
+    },
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"some_very_long_json\":\"foo_bar\"}",
+      "checksum/validator.yaml": "8430318f1be488c63b67a5041443bd9b70be34179068a89b42f52a1118f850e2",
+      "kubernetes.io/psp": "aptos-node",
+      "seccomp.security.alpha.kubernetes.io/pod": "runtime/default"
+    },
+    "pod_ip": "192.168.130.132",
+    "pod_ips": ["192.168.130.132"],
+    "labels": {
+      "app.kubernetes.io/instance": "validator-13",
+      "app.kubernetes.io/managed-by": "helm",
+      "app.kubernetes.io/name": "validator",
+      "app.kubernetes.io/part-of": "aptos-node",
+      "controller-revision-hash": "aptos-node-13-validator-666476d798",
+      "statefulset.kubernetes.io/pod-name": "aptos-node-13-validator-0"
+    },
+    "pod_name": "aptos-node-13-validator-0",
+    "namespace": "forge-pr-2175",
+    "pod_node_name": "ip-192-168-127-197.us-west-2.compute.internal",
+    "pod_owner": "StatefulSet/aptos-node-13-validator",
+    "pod_uid": "f11cb109-8703-49ca-b121-ab314ab0be68"
+  },
+  "message": "2022-07-24T03:39:54.744745Z [consensus] INFO consensus/src/round_manager.rs:314 Local state SyncInfo[certified_round: 966, ordered_round: 965, timeout round: 0, commit_info: BlockInfo: [epoch: 2, round: 963, id: 6d4833ab, executed_state_id: 81472687, version: 1380763, timestamp (us): 1658633992630447, next_epoch_state: None]], remote state SyncInfo[certified_round: 967, ordered_round: 966, timeout round: 0, commit_info: BlockInfo: [epoch: 2, round: 963, id: 6d4833ab, executed_state_id: 81472687, version: 1380763, timestamp (us): 1658633992630447, next_epoch_state: None]] {\"epoch\":2,\"event\":\"ReceiveNewCertificate\",\"remote_peer\":\"065f70c398566ebd3b806cbd11f7e86dd8e39d9616f2bb45a1bda1a0748c7c88\",\"round\":967}",
+  "source_type": "kubernetes_logs",
+  "stream": "stderr"
+}
