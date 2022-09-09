@@ -122,7 +122,7 @@ The `set_message` modifies the `hello_blockchain` `MessageHolder` resource. A re
 
 `https://fullnode.devnet.aptoslabs.com/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/resource/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder`
 
-Which after the first exectuion contains the following:
+Which after the first execution contains the following:
 
 ```
 {
@@ -144,7 +144,7 @@ Which after the first exectuion contains the following:
 
 Notice the `message` field contains `hello, blockchain`.
 
-Each succesful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
+Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
 
 `http://127.0.0.1:8080/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/events/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder/message_change_events`
 
@@ -165,7 +165,7 @@ Where after a call to set the message to `hello, blockchain, again`, the event s
 
 :::tip
 
-Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exerciser to validate this.
+Other accounts can reuse the published module by calling the exact same function as in this example. It is left as an exercise to validate this.
 
 :::
 
