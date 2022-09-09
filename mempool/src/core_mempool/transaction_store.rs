@@ -440,9 +440,9 @@ impl TransactionStore {
 
     /// Removes account datastructures if there are no more transactions for the account
     fn account_remove(&mut self, address: &AccountAddress) {
-        if let Some(txns) = self.transactions.get(&address) {
+        if let Some(txns) = self.transactions.get(address) {
             if txns.is_empty() {
-                self.transactions.remove(&address);
+                self.transactions.remove(address);
             }
         }
     }
