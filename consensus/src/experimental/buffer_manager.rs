@@ -13,7 +13,7 @@ use futures::{
     },
     FutureExt, SinkExt, StreamExt,
 };
-use tokio::time::Duration;
+use tokio::time::{Duration, Instant};
 
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -41,7 +41,7 @@ use aptos_types::epoch_change::EpochChangeProof;
 use futures::channel::mpsc::unbounded;
 use once_cell::sync::OnceCell;
 
-pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
 pub type ResetAck = ();
 
@@ -105,6 +105,7 @@ pub struct BufferManager {
     // we replace t5 with t3 (from reconfiguration block) since that's the last timestamp
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
+    previous_commit_time: Instant,
 }
 
 impl BufferManager {
@@ -149,6 +150,7 @@ impl BufferManager {
             verifier,
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
+            previous_commit_time: Instant::now(),
         }
     }
 
@@ -295,6 +297,7 @@ impl BufferManager {
                     .await
                     .expect("Failed to send persist request");
                 info!("Advance head to {:?}", self.buffer.head_cursor());
+                self.previous_commit_time = Instant::now();
                 return;
             }
         }
@@ -308,6 +311,7 @@ impl BufferManager {
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
+        self.previous_commit_time = Instant::now();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -472,7 +476,12 @@ impl BufferManager {
 
     /// this function retries all the items until the signing root
     /// note that there might be other signed items after the signing root
-    async fn retry_broadcasting_commit_votes(&mut self) {
+    async fn rebroadcast_commit_votes_if_needed(&mut self) {
+        if self.previous_commit_time.elapsed()
+            < Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+        {
+            return;
+        }
         let mut cursor = *self.buffer.head_cursor();
         let mut count = 0;
         while cursor.is_some() {
@@ -495,7 +504,7 @@ impl BufferManager {
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let mut interval =
-            tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
+            tokio::time::interval(Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS));
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
@@ -531,7 +540,7 @@ impl BufferManager {
                     }
                 },
                 _ = interval.tick().fuse() => {
-                    self.retry_broadcasting_commit_votes().await;
+                    self.rebroadcast_commit_votes_if_needed().await;
                 },
                 // no else branch here because interval.tick will always be available
             }
