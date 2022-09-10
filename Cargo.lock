@@ -9141,6 +9141,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "forge",
+ "futures",
  "rand 0.7.3",
  "reqwest",
  "serde_json",
