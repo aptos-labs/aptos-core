@@ -311,6 +311,7 @@ impl BufferManager {
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
+        self.previous_commit_time = Instant::now();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
