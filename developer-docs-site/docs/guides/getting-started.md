@@ -39,8 +39,8 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     ```
 5. Skip this step if you are not installing an Aptos node.
 
-    <Tabs>
-    <TabItem value="devnet" label="Devnet" default>
+    <Tabs groupId="network">
+    <TabItem value="devnet" label="Devnet">
 
     Checkout the `devnet` branch using:
 
@@ -53,7 +53,7 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
     Checkout the `testnet` branch using:
 
     ```
-    git checkout --track origin/testnet
+    git checkout --track origin/testnet-stable
     ```
     </TabItem>
     </Tabs>
@@ -61,14 +61,23 @@ Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/a
 
 Now your basic Aptos development environment is ready.
 
-### Aptos devnet
+### Aptos Testnet
 
+- [REST API Open API Spec](https://fullnode.testnet.aptoslabs.com/v1/spec#/).
+- **REST service:** [https://fullnode.testnet.aptoslabs.com/v1](https://fullnode.testnet.aptoslabs.com/v1).
+- **Faucet service:** [https://faucet.testnet.aptoslabs.com](https://faucet.testnet.aptoslabs.com).
+- [Genesis](https://testnet.aptoslabs.com/genesis.blob).
+- [Waypoint](https://testnet.aptoslabs.com/waypoint.txt).
+- [ChainID](http://fullnode.testnet.aptoslabs.com/v1).
+
+### Aptos Devnet
 - [REST API Open API Spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 - **REST service:** [https://fullnode.devnet.aptoslabs.com/v1](https://fullnode.devnet.aptoslabs.com/v1).
 - **Faucet service:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
 - [Genesis](https://devnet.aptoslabs.com/genesis.blob).
 - [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
-- [ChainID](http://fullnode.devnet.aptoslabs.com/).
+- [ChainID](http://fullnode.devnet.aptoslabs.com/v1).
+
 
 ### IDE plugins for Move
 
