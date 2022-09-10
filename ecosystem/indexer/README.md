@@ -34,9 +34,9 @@ Try running the indexer with `--help` to get more details
 7. `diesel migration run --database-url postgresql://localhost/postgres`
 8. Start indexer
 ```bash
-cargo run -- --pg-uri "postgresql://localhost/postgres" --node-url "http://0.0.0.0:8080" --emit-every 25 --batch-size 100
+DATABASE_URL=postgres://postgres@localhost:5432/postgres cargo run -- --node-url "https://fullnode.devnet.aptoslabs.com/v1" --emit-every 10  --processor default_processor --check_chain_id
 # or
-cargo run -- --pg-uri "postgresql://localhost/postgres" --node-url "https://fullnode.devnet.aptoslabs.com" --emit-every 25 --batch-size 100
+DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 cargo run -- --node-url "https://fullnode.devnet.aptoslabs.com/v1" --emit-every 10  --processor token_processor --check-chain-id --index-token-uri-data
 ```
 
 
