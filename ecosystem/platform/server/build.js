@@ -7,7 +7,7 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = process.env.RAILS_ENV;
 }
 
-const define = ["NODE_ENV", "SENTRY_DSN"].reduce((acc, env) => {
+const define = ["NODE_ENV", "SENTRY_FRONTEND_DSN"].reduce((acc, env) => {
   acc[`process.env.${env}`] = JSON.stringify(process.env[env]);
   return acc;
 }, {});

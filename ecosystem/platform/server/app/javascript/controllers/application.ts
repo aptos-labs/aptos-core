@@ -37,7 +37,7 @@ application.debug = false;
 window.Stimulus = application;
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  dsn: process.env.SENTRY_FRONTEND_DSN,
   environment: process.env.NODE_ENV,
   enabled: process.env.NODE_ENV === "production",
 });
