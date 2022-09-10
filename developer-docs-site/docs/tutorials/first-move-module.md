@@ -22,7 +22,7 @@ This tutorial details how to compile, test, publish and interact with Move Modul
 
 After installing the CLI from Git, prepare your environment for interacting with Aptos by creating and funding an account. Begin by starting a new terminal.
 
-1. Initialize a new local account: `aptos init`. This will output:
+1. Initialize a new local account: `aptos init`. The output will be similar to below. The account mentioned here `a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` is your new account, and is aliased as the profile `default`.  This is generated randomly, and will differ for you  From now on, either `default` or `0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a` are interchangeable.
 ```
 Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com/v1]
 
@@ -39,7 +39,7 @@ Aptos is now set up for account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c
   "Result": "Success"
 }
 ```
-2. Now fund this account: `aptos account fund-with-faucet --account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`
+2. Now fund this account: `aptos account fund-with-faucet --account default`
 ```
 {
   "Result": "Added 10000 coins to account a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a"
@@ -52,8 +52,8 @@ There are many example Move modules in the [aptos-core/aptos-move/move-examples]
 
 Load a terminal and change directories into the `hello_blockchain` directory: `cd aptos-core/aptos-move/move-examples`.
 
-To compile the module run: `aptos move compile --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
-To test the module run: `aptos move test --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`.
+To compile the module run: `aptos move compile --named-addresses hello_blockchain=default`.
+To test the module run: `aptos move test --named-addresses hello_blockchain=default`.
 
 The CLI entry must contain `--named-addresses` because the `Move.toml` file leaves this as undefined:
 
@@ -67,7 +67,7 @@ In order to prepare the module for the account created in the previous step, we 
 ## Publish the Move module
 
 Now that the code can be compiled and tests pass, let's publish the module to the account created for this tutorial:
-`aptos move publish --named-addresses hello_blockchain=0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a`
+`aptos move publish --named-addresses hello_blockchain=default`
 
 ```
 package size 1631 bytes
@@ -95,7 +95,7 @@ Move modules expose access points or `entry functions`. These can be called via 
 
 ```
 aptos move run \
---function-id '0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::set_message' \
+--function-id 'default::message::set_message' \
 --args 'string:hello, blockchain'
 ```
 
@@ -108,7 +108,7 @@ Upon success, the CLI will print out the following:
     "gas_used": 1,
     "gas_unit_price": 1,
     "pending": null,
-    "sender": "6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
+    "sender": "a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
     "sequence_number": 1,
     "success": true,
     "timestamp_us": 1661320878825763,
@@ -120,20 +120,20 @@ Upon success, the CLI will print out the following:
 
 The `set_message` modifies the `hello_blockchain` `MessageHolder` resource. A resource is a data structure that is stored in [global storage](https://move-language.github.io/move/structs-and-resources.html#storing-resources-in-global-storage). The resource can be read by querying the following REST API:
 
-`https://fullnode.devnet.aptoslabs.com/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/resource/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder`
+`https://fullnode.devnet.aptoslabs.com/v1/accounts/a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/resource/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder`
 
 Which after the first execution contains the following:
 
 ```
 {
-  "type":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder",
+  "type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder",
   "data":{
     "message":"hello, blockchain",
     "message_change_events":{
       "counter":"0",
       "guid":{
         "id":{
-          "addr":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
+          "addr":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
           "creation_num":"3"
         }
       }
@@ -146,15 +146,15 @@ Notice the `message` field contains `hello, blockchain`.
 
 Each successful call to `set_message` after the first call results in an update to `message_change_events`. The `message_change_events` for a given account can be accessed via the REST API: 
 
-`http://127.0.0.1:8080/v1/accounts/6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac/events/0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageHolder/message_change_events`
+`http://127.0.0.1:8080/v1/accounts/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a/events/0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageHolder/message_change_events`
 
 Where after a call to set the message to `hello, blockchain, again`, the event stream would contain the following:
 ```
 [
   {
     "version":"8556",
-    "key":"0x03000000000000006dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac",
-    "sequence_number":"0","type":"0x6dcdbfbbb2a1f5d2cd9b8f78b9ec32feaa0170db64ccfc02442af5384f0439ac::message::MessageChangeEvent",
+    "key":"0x0300000000000000a345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a",
+    "sequence_number":"0","type":"0xa345dbfb0c94416589721360f207dcc92ecfe4f06d8ddc1c286f569d59721e5a::message::MessageChangeEvent",
     "data":{
       "from_message":"hello, blockchain",
       "to_message":"hello, blockchain, again"
