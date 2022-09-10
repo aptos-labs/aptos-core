@@ -120,7 +120,6 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
     ) {
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
-        abort 0
     }
 
     fun script_prologue(
