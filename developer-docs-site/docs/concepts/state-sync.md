@@ -99,7 +99,7 @@ The state synchronization component is comprised of four sub-components, each wi
 
 1. **Driver**: The driver “drives” the synchronization progress of the node.
 It is responsible for verifying all data that the node receives from peers. Data
-is forwarded from peers via the data streaming service. After data
+is forwarded from the peers via the data streaming service. After data
 verification, the driver persists the data to storage.
 2. **Data Streaming Service**: The streaming service creates data streams for
 clients (one of which is the state sync driver). It allows the client to stream
@@ -120,15 +120,15 @@ a batch of transactions.
 
 ## State sync code structure
 
-The state sync code structure matches the architecture outlined above:
+Below are the links to the state sync code showing the structure that matches the architecture outlined above:
 - **Driver:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver)
 - **Data Streaming Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service)
 - **Aptos Data Client**: [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client)
 - **Storage Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service)
 
-In addition, there is also a directory containing the code for
+In addition, see also a directory containing the code for
 **inter-component** communication: [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/inter-component](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/inter-component).
 This is required so that:
-   - State sync can handle notifications from consensus (e.g., to catch up after falling behind)
-   - State sync can notify mempool when transactions are committed (i.e., so they can be removed from mempool)
-   - State sync can update the event subscription service to notify listeners (e.g., other system components for reconfiguration events)
+   - State sync can handle notifications from consensus (e.g., to catch up after falling behind).
+   - State sync can notify mempool when transactions are committed (i.e., so they can be removed from mempool).
+   - State sync can update the event subscription service to notify listeners (e.g., other system components for reconfiguration events).

@@ -21,4 +21,6 @@ Aptos nodes synchronize to the latest state of the Aptos blockchain through two 
 For example, a validator node will invoke state synchronization when it comes online for the first time or reboots (e.g., after being offline for a while). Once the validator is up-to-date with the latest state of the blockchain it will begin participating in consensus and rely exclusively on consensus to stay up-to-date. Fullnodes, however, continuously rely on state synchronization to get and stay up-to-date as the blockchain grows.
 
 ## State synchronizer
-Each Aptos node contains a [State Synchronizer](https://github.com/aptos-labs/aptos-core/tree/main/state-sync) component which is used to synchronize the state of the node with its peers. This component has the same functionality for all types of Aptos nodes: it utilizes the dedicated peer-to-peer network to continuously request and disseminate blockchain data. Validator nodes distribute blockchain data within the validator node network, while fullnodes rely on other fullnodes (i.e., validator nodes or public fullnodes).
+
+Each Aptos node contains a [State Synchronizer](./state-sync) component which is used to synchronize the state of the node with its peers. This component has the same functionality for all types of Aptos nodes: it utilizes the dedicated peer-to-peer network to continuously request and disseminate blockchain data. Validator nodes distribute blockchain data within the validator node network, while fullnodes rely on other fullnodes (i.e., validator nodes or public fullnodes).
+
