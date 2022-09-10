@@ -8,24 +8,23 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # State Synchronization
 
-Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchroned to the latest Aptos blockchain state, and must not fall behind the rest
-of the network. The state synchronization (state sync) component that runs on each Aptos node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
+Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The state synchronization (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, the state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
 
 ## State sync modes
 
-If you are a node operator, you can configure the state sync mode to operate in one of the two synchronization modes, depending on the state of the node, i.e., whether the node has just started or has been running for some time. 
+If you are a node operator, you can configure the state sync mode to operate in one of the two synchronization modes, depending on the state of the node, i.e., whether the node has just started (bootstrapping mode) or has been running for some time (continuous sync mode). 
 
 ### Bootstrapping mode
 
-When the node starts the state sync should be in the bootstrapping mode so that the node can catch up to the Aptos network. There are three bootstrapping modes:
+When the node starts, the state sync should be in the bootstrapping mode so that the node can catch up to the Aptos blockchain. There are three bootstrapping modes:
 
-- **Execute all the transactions since genesis**. In this state sync mode the node will retrieve from the Aptos network all the transactions since genesis, i.e., the start of the blockchain's history, and re-execute those transactions. Naturally, this synchronization mode takes the longest amount of time.
-- **Apply transaction outputs since genesis**. In this state sync mode the node will retrieve all the transactions since genesis but it will skip the transaction execution and only apply the outputs of the transactions that were previously produced by validator execution. This mode reduces the amount of CPU time required.
+- **Execute all the transactions since genesis**. In this state sync mode the node will retrieve from the Aptos network all the transactions since genesis, i.e., since the start of the blockchain's history, and re-execute those transactions. Naturally, this synchronization mode takes the longest amount of time.
+- **Apply transaction outputs since genesis**. In this state sync mode the node will retrieve all the transactions since genesis but it will skip the transaction execution and will only apply the outputs of the transactions that were previously produced by validator execution. This mode reduces the amount of CPU time required.
 - **Download the latest state directly**. In this state sync mode the node will skip the transaction history in the blockchain and will download only the latest blockchain state directly. As a result, the node will not have the historical transaction data, but it will be able to catch up to the Aptos network much more rapidly.
 
 ### Continuous syncing mode
 
-After the node has bootstrapped and caught up to the Aptos network initially, the node's state sync should be in the continuous syncing mode to stay up-to-date with the blockchain. There are two continuous syncing modes:
+After the node has bootstrapped and caught up to the Aptos network initially, the node's state sync should be in the continuous syncing mode, to stay up-to-date with the blockchain. There are two continuous syncing modes:
 
 - **Executing transactions**. This state sync mode will keep the node up-to-date by executing new transactions as they are committed to the blockchain.
 - **Applying transaction outputs**. This state sync mode will keep the node up-to-date by skipping the transaction execution and only applying the outputs of the transactions as previously produced by validator execution.
