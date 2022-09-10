@@ -217,6 +217,11 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    pub async fn send_commit_vote(&mut self, commit_vote: CommitVote, recipient: Author) {
+        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
+        self.send(msg, vec![recipient]).await
+    }
+
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -255,6 +260,11 @@ impl NetworkSender {
 
     pub fn author(&self) -> Author {
         self.author
+    }
+
+    pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
+        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
+        self.broadcast(msg).await
     }
 }
 

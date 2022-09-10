@@ -16,6 +16,7 @@ impl BlockStage {
     pub const QC_ADDED: &'static str = "qc_added";
     pub const ORDERED: &'static str = "ordered";
     pub const EXECUTED: &'static str = "executed";
+    pub const COMMIT_CERTIFIED: &'static str = "commit_certified";
     pub const COMMITTED: &'static str = "committed";
 }
 
