@@ -12,26 +12,33 @@ module aptos_std::big_vector {
     const EVECTOR_NOT_EMPTY: u64 = 3;
     /// The given fixed-size type can not fit in an optimized vector
     const E_TOO_BIG_TO_OPTIMIZE: u64 = 4;
+    /// The given fixed-size type is indicated as occupying 0 bytes
+    const E_NO_ELEMENT_SIZE: u64 = 5;
 
-    /// Optimal sector size, in bytes. Each bucket is stored as a
-    /// vector, which is serialized and stored on disk as a binary large
-    /// object (BLOB). Per the International Disk Drive Equipment and
-    /// Materials Association (IDEMA) Advanced Format (AF) standard
-    /// instituted circa 2010, newer machines are likely to implement a
-    /// 4096-byte (4K) disk sector size. Hence buckets size is matched
-    /// to this figure for optimized read/write performance.
+    /// Optimal bucket size on disk, in bytes. Each bucket is stored as
+    /// a vector, which is serialized and stored on disk as a
+    /// binary large object (BLOB). Per the International Disk Drive
+    /// Equipment and Materials Association (IDEMA) Advanced Format (AF)
+    /// standard instituted circa 2010, newer machines are likely to
+    /// implement a 4096-byte (4K) disk sector size. Hence bucket size
+    /// on disk is matched to this figure for optimal read/write
+    /// performance, in particular (de)serialization.
     const OPTIMAL_BLOB_SIZE: u64 = 4096;
-    /// Per `aptos_std::type_info`, a vector containing n fixed-width
-    /// elements, each of size s, has a size of n * s + 1 bytes, when
-    /// n is less than 128.
+    /// A vector containing n fixed-width elements, each of size s, has
+    /// a size on disk of n * s + 1 bytes, or 1 byte more than the total
+    /// size of all elements combined, for n < 128. See
+    /// `aptos_std::type_info::size_of`.
     const VECTOR_BASE_SIZE_SMALL: u64 = 1;
-    /// Per `aptos_std::type_info`, a vector containing n fixed-width
-    /// elements, each of size s, has a size of n * s + 2 bytes, when
-    /// 128 <= n < 16384
+    /// A vector containing n fixed-width elements, each of size s, has
+    /// a size on disk of n * s + 2 bytes, or 2 bytes more than the
+    /// total size of all elements combined, for 128 <= n < 16384. See
+    /// `aptos_std::type_info::size_of`.
     const VECTOR_BASE_SIZE_LARGE: u64 = 2;
-    /// Per `aptos_std::type_info`, the base size of a vector
-    /// increases to 2 bytes when the 127th element is added
-    const VECTOR_BASE_SIZE_LENGTH_CUTOFF: u64 = 127;
+    /// The "base size" of a vector (bytes on disk required beyond the
+    /// total size of all elements combined), increases from 1 to 2
+    /// bytes when the 128th element is added, per above. Also see
+    /// `aptos_std::type_info::size_of`.
+    const VECTOR_BASE_SIZE_LENGTH_THRESHOLD: u64 = 128;
 
     /// Index of the value in the buckets.
     struct BigVectorIndex has copy, drop, store {
@@ -355,21 +362,24 @@ module aptos_std::big_vector {
     }
 
     /// Inner function for `get_optimal_bucket_size()`, isolated for
-    /// simpler expected-failure unit testing. `element_size` is in
-    /// bytes.
+    /// simpler unit testing. `element_size` is in bytes.
     fun get_optimal_bucket_size_from_element_size(
         element_size: u64
     ): u64 {
-        // Calculate the maximum element size for an optimized bucket
-        // when the underlying bucket vector only takes up one byte
-        // beyond the total size of the fixed-size elements within
-        let max_element_size_base_small =
-            (OPTIMAL_BLOB_SIZE - VECTOR_BASE_SIZE_SMALL) /
-                VECTOR_BASE_SIZE_LENGTH_CUTOFF;
-        // The base size of the bucket vector is the smaller base size
-        // when elements are larger than the cutoff, and the larger
-        // base size when elements are smaller than the cutoff
-        let vector_base_size = if (element_size > max_element_size_base_small)
+        // Assert passed element size is nonzero
+        assert!(element_size != 0, E_NO_ELEMENT_SIZE);
+        // Calculate the maximum size of a fixed-with element for an
+        // optimal bucket whose vector has the larger base size.
+        let max_element_size_large_base =
+            (OPTIMAL_BLOB_SIZE - VECTOR_BASE_SIZE_LARGE) /
+                VECTOR_BASE_SIZE_LENGTH_THRESHOLD;
+        // If the element size is larger than the maximum size of a
+        // fixed-width element corresponding to a bucket vector with the
+        // larger base size, then the vector base size is the smaller
+        // one, because fewer (larger) elements will end up in the
+        // bucket vector than the vector length threshold. Otherwise the
+        // bucket vector has the larger base size.
+        let vector_base_size = if (element_size > max_element_size_large_base)
             VECTOR_BASE_SIZE_SMALL else VECTOR_BASE_SIZE_LARGE;
         // Optimal bucket size is the number of elements that can fit
         // into the optimal BLOB size, after allocating the necessary
@@ -480,16 +490,25 @@ module aptos_std::big_vector {
     #[test]
     #[expected_failure(abort_code = 4)]
     /// Verify failure for an element that is too large
-    fun test_get_optimal_bucket_size_from_element_size() {
-        // Attempt invalid invocation with element that is 1 byte too
-        // large
+    fun test_get_optimal_bucket_size_from_element_size_too_big() {
+        // Attempt invalid invocation for element size 1 byte too large
         get_optimal_bucket_size_from_element_size(OPTIMAL_BLOB_SIZE);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 5)]
+    /// Verify failure for an element that has no size
+    fun test_get_optimal_bucket_size_from_element_size_no_size() {
+        // Attempt invalid invocation for indicated size of 0
+        get_optimal_bucket_size_from_element_size(0);
     }
 
     #[test]
     /// Verify expected returns for assorted sizes
     fun test_get_optimal_bucket_size() {
+        // Smaller vector base size
         assert!(get_optimal_bucket_size_from_element_size(4095) == 1, 0);
+        // Larger vector base size
         assert!(get_optimal_bucket_size_from_element_size(1) == 4094, 0);
         assert!(get_optimal_bucket_size(&false) == 4094, 0);
         assert!(get_optimal_bucket_size<u8>(&0) == 4094, 0);
@@ -502,21 +521,19 @@ module aptos_std::big_vector {
         // Below cases exercise logic associated with the size length
         // cutoff: at a vector base size of 1 byte, 4095 bytes are
         // reserved for elements. 13 is a prime factor of 4095, such
-        // that 105 elements of size 39 can fit perfectly:
+        // that 105 elements of size 39 (3 * 13) can fit perfectly.
         assert!(get_optimal_bucket_size_from_element_size(39) == 105, 0);
-        // The max element size while still having a vector base size of
-        // 1 byte is 32 bytes (after truncating division), hence
-        // elements with a size of 33 result in the lower vector base
-        // size
-        assert!(get_optimal_bucket_size_from_element_size(33) == 124, 0);
-        // An element size of 32 is the cutoff.
+        // The max element size while still having a 2-byte vector base
+        // size is 31 bytes (after truncating division), hence elements
+        // with a size of 32 result in the lower vector base size. Here,
+        // 4095 bytes are reserved for elements, in which 127 may fit.
         assert!(get_optimal_bucket_size_from_element_size(32) == 127, 0);
-        // An element size of 31 is just under the cutoff, hence there
-        // are only 4094 bytes reserved for elements, in which 132 may
-        // fit
+        // An element size of 31 does not exceed the max element size
+        // cutoff, hence there are only 4094 bytes reserved for
+        // elements, in which 132 elements may fit.
         assert!(get_optimal_bucket_size_from_element_size(31) == 132, 0);
         // Here, 4094 bytes are reserved for elements, and 23 is a prime
-        // factor of 23. Hence 178 elements fit perfectly
+        // factor of 4094. Hence 178 elements fit perfectly.
         assert!(get_optimal_bucket_size_from_element_size(23) == 178, 0);
     }
 

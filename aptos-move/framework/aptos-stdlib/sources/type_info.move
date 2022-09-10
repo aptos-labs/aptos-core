@@ -38,11 +38,11 @@ module aptos_std::type_info {
     ///
     /// Does not actually enfore that `T` is a fixed-size type, which
     /// would require determining whether or not vectors are nested
-    /// within, for example.
+    /// within.
     ///
     /// See `test_size_of()` for an analysis of common types and nesting
     /// patterns, as well as `test_size_of_vectors()` for an analysis of
-    /// vector base size dynamism.
+    /// vector size dynamism.
     public fun size_of<T>(
         fixed_size_type_null_ref: &T
     ): u64 {
@@ -174,43 +174,69 @@ module aptos_std::type_info {
     /// For a vector of length n containing fixed-size elements, the
     /// size of the vector is b + n * s bytes, where s is the size of an
     /// element in bytes, and b is a "base size" in bytes that varies
-    /// with n. Per below, b is established as follows:
-    /// * b = 1, n < 128
-    /// * b = 2, 128 <= n < 16384
-    /// * b = 3, 16384 <= n < ?
-    /// ...
+    /// with n.
+    ///
+    /// The base size is an artifact of how vectors are stored on disk,
+    /// namely, with b leading bytes that declare how many elements are
+    /// in the vector. Each such leading byte has a reserved control bit
+    /// (e.g. is this the last leading byte?), such that 7 bits per
+    /// leading byte remain for the actual element count. Hence for a
+    /// single leading byte, the maximum element count that can be
+    /// described is is (2 ^ 7) - 1, and for b leading bytes, the
+    /// maximum element count that can be described is (2 ^ 7) ^ b - 1:
+    ///
+    /// * b = 1,                         n < 128
+    /// * b = 2,                  128 <= n < 16384
+    /// * b = 3,                16384 <= n < 2097152
+    /// * ...
+    /// *           (2 ^ 7) ^ (b - 1) <= n < (2 ^ 7) ^ b
+    /// * ...
+    /// * b = 9,    72057594037927936 <= n < 9223372036854775808
+    /// * b = 10, 9223372036854775808 <= n < 18446744073709551616
+    ///
+    /// Note that the upper bound on n for b = 10 is 2 ^ 64, rather than
+    /// (2 ^ 7) ^ 10 - 1, because the former, lower figure is the
+    /// maximum number of elements that can be stored in a vector in the
+    /// first place, e.g. U64_MAX.
+    ///
+    /// In practice b > 2 is unlikely to be encountered.
     fun test_size_of_vectors() {
+        // Declare vector base sizes
+        let (base_size_1, base_size_2, base_size_3) = (1, 2, 3);
+        // A base size of 1 applies for 127 or less elements
+        let n_elems_cutoff_1 = 127; // (2 ^ 7) ^ 1 - 1
+        // A base size of 2 applies for 128 < n <= 16384 elements
+        let n_elems_cutoff_2 = 16383; // (2 ^ 7) ^ 2 - 1
         let vector_u64 = vector::empty<u64>(); // Declare empty vector
         let null_element = 0; // Declare a null element
         let element_size = size_of(&null_element); // Get element size
         // Vector size is 1 byte when length is 0
-        assert!(size_of(&vector_u64) == 1, 0);
+        assert!(size_of(&vector_u64) == base_size_1, 0);
         let i = 0; // Declare loop counter
-        while (i < 127) { // For 127 iterations
+        while (i < n_elems_cutoff_1) { // Iterate until first cutoff
             // Add an element
             vector::push_back(&mut vector_u64, null_element);
             i = i + 1; // Increment counter
         };
-        // Vector base size is still 1 byte (127 elements)
-        assert!(size_of(&vector_u64) - element_size * i == 1, 0);
-        // Add a 128th element
+        // Vector base size is still 1 byte
+        assert!(size_of(&vector_u64) - element_size * i == base_size_1, 0);
+        // Add another element, exceeding the cutoff
         vector::push_back(&mut vector_u64, null_element);
         i = i + 1; // Increment counter
         // Vector base size is now 2 bytes
-        assert!(size_of(&vector_u64) - element_size * i == 2, 0);
-        // Repeat until (2 ^ 16 / 4 - 1) elements in vector
-        while (i < 16383) {
+        assert!(size_of(&vector_u64) - element_size * i == base_size_2, 0);
+        while (i < n_elems_cutoff_2) { // Iterate until second cutoff
             // Add an element
             vector::push_back(&mut vector_u64, null_element);
             i = i + 1; // Increment counter
         };
         // Vector base size is still 2 bytes
-        assert!(size_of(&vector_u64) - element_size * i == 2, 0);
-        // Add 16384th element
+        assert!(size_of(&vector_u64) - element_size * i == base_size_2, 0);
+        // Add another element, exceeding the cutoff
         vector::push_back(&mut vector_u64, null_element);
         i = i + 1; // Increment counter
         // Vector base size is now 3 bytes
-        assert!(size_of(&vector_u64) - element_size * i == 3, 0);
+        assert!(size_of(&vector_u64) - element_size * i == base_size_3, 0);
         // Repeat for custom struct
         let vector_complex = vector::empty<ComplexStruct<address>>();
         // Declare a null element
@@ -224,33 +250,32 @@ module aptos_std::type_info {
         };
         element_size = size_of(&null_element); // Get element size
         // Vector size is 1 byte when length is 0
-        assert!(size_of(&vector_complex) == 1, 0);
+        assert!(size_of(&vector_complex) == base_size_1, 0);
         i = 0; // Re-initialize loop counter
-        while (i < 127) { // For 127 iterations
+        while (i < n_elems_cutoff_1) {  // Iterate until first cutoff
             // Add an element
             vector::push_back(&mut vector_complex, copy null_element);
             i = i + 1; // Increment counter
         };
-        // Vector base size is still 1 byte (127 elements)
-        assert!(size_of(&vector_complex) - element_size * i == 1, 0);
-        // Add a 128th element
+        // Vector base size is still 1 byte
+        assert!(size_of(&vector_complex) - element_size * i == base_size_1, 0);
+        // Add another element, exceeding the cutoff
         vector::push_back(&mut vector_complex, null_element);
         i = i + 1; // Increment counter
         // Vector base size is now 2 bytes
-        assert!(size_of(&vector_complex) - element_size * i == 2, 0);
-        // Repeat until (2 ^ 16 / 4 - 1) elements in vector
-        while (i < 16383) {
+        assert!(size_of(&vector_complex) - element_size * i == base_size_2, 0);
+        while (i < n_elems_cutoff_2) { // Iterate until second cutoff
             // Add an element
             vector::push_back(&mut vector_complex, copy null_element);
             i = i + 1; // Increment counter
         };
         // Vector base size is still 2 bytes
-        assert!(size_of(&vector_complex) - element_size * i == 2, 0);
-        // Add 16384th element
+        assert!(size_of(&vector_complex) - element_size * i == base_size_2, 0);
+        // Add another element, exceeding the cutoff
         vector::push_back(&mut vector_complex, null_element);
         i = i + 1; // Increment counter
         // Vector base size is now 3 bytes
-        assert!(size_of(&vector_complex) - element_size * i == 3, 0);
+        assert!(size_of(&vector_complex) - element_size * i == base_size_3, 0);
     }
 
 }
