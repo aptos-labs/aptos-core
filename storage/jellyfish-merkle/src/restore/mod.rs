@@ -734,8 +734,13 @@ where
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
     pub fn finish_impl(mut self) -> Result<()> {
-        if let Some((_tx, rx)) = &self.async_commit_channel {
+        if let Some((tx, rx)) = &self.async_commit_channel {
+            // wait for the last commit to complete
             rx.recv()??;
+            // Drop will receive once to make sure there's no in flight committing, adding this so
+            // it's not a dead lock waiting there.
+            tx.try_send(Ok(()))
+                .expect("Always only one commit can be scheduled.");
         }
         // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
@@ -774,5 +779,13 @@ where
         self.freeze(0);
         self.store.write_node_batch(&self.frozen_nodes)?;
         Ok(())
+    }
+}
+
+impl<K> Drop for JellyfishMerkleRestore<K> {
+    fn drop(&mut self) {
+        if let Some((_tx, rx)) = &self.async_commit_channel {
+            rx.recv().unwrap().unwrap();
+        }
     }
 }
