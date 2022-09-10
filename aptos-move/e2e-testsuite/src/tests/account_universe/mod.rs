@@ -25,7 +25,7 @@ proptest! {
         universe in AccountUniverseGen::strategy(2..default_num_accounts(), 0u64..10000),
         pairs in vec(any::<AccountPairGen>(), 0..default_num_transactions()),
     ) {
-        let mut executor = FakeExecutor::from_genesis_file();
+        let mut executor = FakeExecutor::from_head_genesis();
         let mut universe = universe.setup(&mut executor);
 
         for pair in pairs {

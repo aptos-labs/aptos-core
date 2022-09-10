@@ -9,7 +9,7 @@ use language_e2e_tests::{
 
 #[test]
 fn create_account() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish a sender with 1_000_000 coins
