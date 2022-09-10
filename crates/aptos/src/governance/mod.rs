@@ -6,7 +6,6 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-#[cfg(feature = "no-upload-proposal")]
 use crate::common::utils::read_from_file;
 use crate::move_tool::{init_move_dir, IncludedArtifacts};
 use crate::{CliCommand, CliResult};
@@ -59,12 +58,11 @@ impl GovernanceTool {
 #[derive(Parser)]
 pub struct SubmitProposal {
     /// Location of the JSON metadata of the proposal
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_url: Url,
 
-    #[cfg(feature = "no-upload-proposal")]
     /// A JSON file to be uploaded later at the metadata URL
-    #[clap(long, group = "proposal-metadata")]
+    #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -142,14 +140,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 impl SubmitProposal {
     /// Retrieve metadata and validate it
     async fn get_metadata(&self) -> CliTypedResult<(ProposalMetadata, HashValue)> {
-        #[cfg(feature = "no-upload-proposal")]
         let bytes = if let Some(ref path) = self.metadata_path {
             read_from_file(path)?
         } else {
             get_metadata_from_url(&self.metadata_url).await?
         };
-        #[cfg(not(feature = "no-upload-proposal"))]
-        let bytes = get_metadata_from_url(&self.metadata_url).await?;
 
         let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
             CliError::CommandArgumentError(format!(

@@ -25,8 +25,8 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
-    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -449,6 +449,7 @@ module aptos_framework::stake {
         });
 
         move_to(owner, OwnerCapability { pool_address: owner_address });
+        // abort 0 -- re-enable on upgrade
     }
 
     /// Extract and return owner capability from the signing account.

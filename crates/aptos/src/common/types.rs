@@ -508,10 +508,10 @@ impl FromStr for EncodingType {
 #[derive(Clone, Copy, Debug, Default, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[clap(long, group = "prompt_options")]
+    #[clap(long)]
     pub assume_yes: bool,
     /// Assume no for all yes/no prompts
-    #[clap(long, group = "prompt_options")]
+    #[clap(long)]
     pub assume_no: bool,
 }
 
@@ -1134,6 +1134,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
+        let _sender_address = AccountAddress::from_hex_literal("0xa550c18").unwrap(); // self.sender_address()?;
         let sender_address = self.sender_address()?;
 
         // Get sequence number for account

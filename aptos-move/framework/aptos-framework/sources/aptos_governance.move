@@ -352,7 +352,7 @@ module aptos_framework::aptos_governance {
     /// Resolve a successful proposal. This would fail if the proposal is not successful (not enough votes or more no
     /// than yes).
     public fun resolve(proposal_id: u64, signer_address: address): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
-        let proposal = voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
+        let _proposal = voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
         remove_approved_hash(proposal_id);
         get_signer(signer_address)
     }
