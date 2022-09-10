@@ -9,6 +9,7 @@
     "@tailwindcss/typography": "^0.5.2",
     "aptos": "^1.0.0",
     "autoprefixer": "^10.4.7",
+    "dotenv": "^16.0.2",
     "esbuild": "^0.14.39",
     "postcss": "^8.4.13",
     "tailwindcss": "^3.1.0"
@@ -22,7 +23,6 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.26.0",
     "@typescript-eslint/parser": "^5.26.0",
-    "dotenv": "^16.0.2",
     "prettier": "2.7.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.7.2"
