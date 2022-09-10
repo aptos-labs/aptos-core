@@ -215,7 +215,7 @@ async fn sequences(service: &Service, receiver: AccountAddress) -> Result<(u64, 
         .map(|account| account.inner().sequence_number);
     let faucet_seq_num = responses
         .remove(0)
-        .map_err(|_| anyhow::format_err!("faucet account {} not found", faucet_address))?
+        .map_err(|e| anyhow::format_err!("Faucet account {} not found: {:#}", faucet_address, e))?
         .inner()
         .sequence_number;
 
