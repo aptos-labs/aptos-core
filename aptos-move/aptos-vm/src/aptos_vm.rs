@@ -889,6 +889,9 @@ impl AptosVM {
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::ModuleBundle(_module) => {
+                if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
+                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+                }
                 self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
             }
