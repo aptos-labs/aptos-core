@@ -11,7 +11,7 @@ proptest! {
     fn fuzz_scripts_genesis_state(
         txns in vec(any::<EntryFunctionCall>(), 0..10),
     ) {
-        let executor = FakeExecutor::from_genesis_file();
+        let executor = FakeExecutor::from_head_genesis();
         let accounts = vec![
             (Account::new_aptos_root(), 0),
         ];

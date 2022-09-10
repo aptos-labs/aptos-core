@@ -3,20 +3,22 @@
 
 use aptos_types::transaction::{Transaction, TransactionStatus, WriteSetPayload};
 use language_e2e_tests::{
-    common_transactions::peer_to_peer_txn, data_store::GENESIS_CHANGE_SET, executor::FakeExecutor,
+    common_transactions::peer_to_peer_txn, data_store::GENESIS_CHANGE_SET_HEAD,
+    executor::FakeExecutor,
 };
 
 #[test]
 fn no_deletion_in_genesis() {
-    let genesis = GENESIS_CHANGE_SET.clone();
+    let genesis = GENESIS_CHANGE_SET_HEAD.clone();
     assert!(!genesis.write_set().iter().any(|(_, op)| op.is_deletion()))
 }
 
 #[test]
 fn execute_genesis_write_set() {
     let executor = FakeExecutor::no_genesis();
-    println!("{:#?}", *GENESIS_CHANGE_SET);
-    let txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET.clone()));
+    println!("{:#?}", *GENESIS_CHANGE_SET_HEAD);
+    let txn =
+        Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET_HEAD.clone()));
     let mut output = executor.execute_transaction_block(vec![txn]).unwrap();
 
     // Executing the genesis transaction should succeed
@@ -27,7 +29,8 @@ fn execute_genesis_write_set() {
 #[test]
 fn execute_genesis_and_drop_other_transaction() {
     let mut executor = FakeExecutor::no_genesis();
-    let txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET.clone()));
+    let txn =
+        Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET_HEAD.clone()));
 
     let sender = executor.create_raw_account_data(1_000_000, 10);
     let receiver = executor.create_raw_account_data(100_000, 10);
