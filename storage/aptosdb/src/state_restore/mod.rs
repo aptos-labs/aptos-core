@@ -124,12 +124,14 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
+        async_commit: bool,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new(
                 Arc::clone(tree_store),
                 version,
                 expected_root_hash,
+                async_commit,
             )?))),
             kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
                 Arc::clone(value_store),

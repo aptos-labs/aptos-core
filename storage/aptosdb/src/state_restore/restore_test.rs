@@ -188,7 +188,7 @@ proptest! {
         let restore_db = Arc::new(MockSnapshotStore::default());
         {
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash ).unwrap();
+                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async_commit */).unwrap();
             let proof = tree
                 .get_range_proof(batch1.last().map(|(key, _value)| *key).unwrap(), version)
                 .unwrap();
@@ -200,7 +200,7 @@ proptest! {
             let remaining_accounts: Vec<_> = all.clone().into_iter().skip(batch1_size - overlap_size).collect();
 
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash ).unwrap();
+                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async commit */ ).unwrap();
             let proof = tree
                 .get_range_proof(
                     remaining_accounts.last().map(|(h, _)| *h).unwrap(),
@@ -275,7 +275,14 @@ fn restore_without_interruption<V>(
     let expected_root_hash = tree.get_root_hash(source_version).unwrap();
 
     let mut restore = if try_resume {
-        StateSnapshotRestore::new(target_db, target_db, target_version, expected_root_hash).unwrap()
+        StateSnapshotRestore::new(
+            target_db,
+            target_db,
+            target_version,
+            expected_root_hash,
+            true, /* async_commit */
+        )
+        .unwrap()
     } else {
         StateSnapshotRestore::new_overwrite(
             target_db,
