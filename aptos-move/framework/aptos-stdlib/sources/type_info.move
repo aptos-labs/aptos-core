@@ -28,7 +28,7 @@ module aptos_std::type_info {
     /// reference to a quasi-null instance of fixed-size `T`,
     /// `fixed_size_type_null_ref`.
     ///
-    /// Analagous to `sizeof()` in C.
+    /// Analogous to `sizeof()` in C.
     ///
     /// Ideally this function would be implemented as a native function
     /// of the form `public native fun size_of<T>(): u64;`, such that
