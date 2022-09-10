@@ -4,9 +4,10 @@
 use crate::OTHER_TIMERS_SECONDS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     restore::JellyfishMerkleRestore,
-    {Key, TreeReader, TreeWriter, Value},
+    IO_POOL, {Key, TreeReader, TreeWriter, Value},
 };
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{proof::SparseMerkleRangeProof, transaction::Version};
@@ -103,11 +104,18 @@ impl<K: Key + CryptoHash + Eq + Hash, V: Value> StateValueRestore<K, V> {
             progress.map_or(StateStorageUsage::zero(), |p| p.usage),
         )
     }
+
+    pub fn previous_key_hash(&self) -> Result<Option<HashValue>> {
+        Ok(self
+            .db
+            .get_progress(self.version)?
+            .map(|progress| progress.key_hash))
+    }
 }
 
 pub struct StateSnapshotRestore<K, V> {
-    tree_restore: JellyfishMerkleRestore<K>,
-    kv_restore: StateValueRestore<K, V>,
+    tree_restore: Arc<Mutex<Option<JellyfishMerkleRestore<K>>>>,
+    kv_restore: Arc<Mutex<Option<StateValueRestore<K, V>>>>,
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
@@ -118,12 +126,15 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new(
+            tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new(
                 Arc::clone(tree_store),
                 version,
                 expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
+            )?))),
+            kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
+                Arc::clone(value_store),
+                version,
+            )))),
         })
     }
 
@@ -134,17 +145,36 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new_overwrite(
+            tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new_overwrite(
                 Arc::clone(tree_store),
                 version,
                 expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
+            )?))),
+            kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
+                Arc::clone(value_store),
+                version,
+            )))),
         })
     }
 
-    pub fn previous_key_hash(&self) -> Option<HashValue> {
-        self.tree_restore.previous_key_hash()
+    pub fn previous_key_hash(&self) -> Result<Option<HashValue>> {
+        let hash_opt = match (
+            self.kv_restore
+                .lock()
+                .as_ref()
+                .unwrap()
+                .previous_key_hash()?,
+            self.tree_restore
+                .lock()
+                .as_ref()
+                .unwrap()
+                .previous_key_hash(),
+        ) {
+            (None, hash_opt) => hash_opt,
+            (hash_opt, None) => hash_opt,
+            (Some(hash1), Some(hash2)) => Some(std::cmp::min(hash1, hash2)),
+        };
+        Ok(hash_opt)
     }
 }
 
@@ -152,31 +182,45 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     for StateSnapshotRestore<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["state_snapshot_add_chunk"])
+            .start_timer();
         // Write KV out first because we are likely to resume according to the rightmost key in the
         // tree after crashing.
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_value_add_chunk"])
-                .start_timer();
-            self.kv_restore.add_chunk(chunk.clone())?;
-        }
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["jmt_add_chunk"])
-                .start_timer();
-            self.tree_restore
-                .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
-        }
+        let (r1, r2) = IO_POOL.join(
+            || {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["state_value_add_chunk"])
+                    .start_timer();
+                self.kv_restore
+                    .lock()
+                    .as_mut()
+                    .unwrap()
+                    .add_chunk(chunk.clone())
+            },
+            || {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["jmt_add_chunk"])
+                    .start_timer();
+                self.tree_restore
+                    .lock()
+                    .as_mut()
+                    .unwrap()
+                    .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
+            },
+        );
+        r1?;
+        r2?;
         Ok(())
     }
 
     fn finish(self) -> Result<()> {
-        self.kv_restore.finish()?;
-        self.tree_restore.finish_impl()
+        self.kv_restore.lock().take().unwrap().finish()?;
+        self.tree_restore.lock().take().unwrap().finish_impl()
     }
 
     fn finish_box(self: Box<Self>) -> Result<()> {
-        self.kv_restore.finish()?;
-        self.tree_restore.finish_impl()
+        self.kv_restore.lock().take().unwrap().finish()?;
+        self.tree_restore.lock().take().unwrap().finish_impl()
     }
 }

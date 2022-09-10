@@ -1088,7 +1088,7 @@ impl Client {
                     RestError::Api(inner) => {
                         should_retry(inner.status_code, Some(inner.error.clone()))
                     }
-                    RestError::Http(inner) => should_retry(*inner, None),
+                    RestError::Http(status_code, _e) => should_retry(*status_code, None),
                     RestError::Bcs(_)
                     | RestError::Json(_)
                     | RestError::Timeout(_)
@@ -1166,6 +1166,6 @@ async fn parse_error(response: reqwest::Response) -> RestError {
     let maybe_state = parse_state_optional(&response);
     match response.json::<AptosError>().await {
         Ok(error) => (error, maybe_state, status_code).into(),
-        Err(_) => RestError::Http(status_code),
+        Err(e) => RestError::Http(status_code, e),
     }
 }

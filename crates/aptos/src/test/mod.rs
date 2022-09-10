@@ -40,10 +40,8 @@ use aptos_logger::warn;
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
-    validator_info::ValidatorInfo,
-};
+use aptos_types::on_chain_config::ValidatorSet;
+use aptos_types::validator_config::ValidatorConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -262,7 +260,7 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map(|v| to_validator_config(&v))
+        .map(|v| (&v).into())
     }
 
     pub async fn show_validator_set(&self) -> CliTypedResult<ValidatorSet> {
@@ -272,7 +270,7 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map(|v| to_validator_set(&v))
+        .map(|v| (&v).into())
     }
 
     pub async fn show_validator_stake(&self, pool_index: usize) -> CliTypedResult<Value> {
@@ -856,64 +854,6 @@ impl CliTestFramework {
 
 // ValidatorConfig/ValidatorSet doesn't match Move ValidatorSet struct,
 // and json is serialized with different types from both, so hardcoding deserialization.
-
-fn str_to_vec(value: &serde_json::Value) -> Vec<u8> {
-    let str = value.as_str().unwrap();
-    (&*hex::decode(&str[2..str.len()]).unwrap()).to_vec()
-}
-
-fn to_validator_config(value: &serde_json::Value) -> ValidatorConfig {
-    ValidatorConfig {
-        consensus_public_key: serde_json::from_value(
-            value.get("consensus_pubkey").unwrap().clone(),
-        )
-        .unwrap(),
-        validator_network_addresses: str_to_vec(value.get("network_addresses").unwrap()),
-        fullnode_network_addresses: str_to_vec(value.get("fullnode_addresses").unwrap()),
-        validator_index: u64::from_str(value.get("validator_index").unwrap().as_str().unwrap())
-            .unwrap(),
-    }
-}
-
-fn to_validator_info_vec(value: &serde_json::Value) -> Vec<ValidatorInfo> {
-    value
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|value| {
-            let account_addr =
-                AccountAddress::from_hex_literal(value.get("addr").unwrap().as_str().unwrap())
-                    .unwrap();
-            ValidatorInfo::new(
-                account_addr,
-                u64::from_str(value.get("voting_power").unwrap().as_str().unwrap()).unwrap(),
-                to_validator_config(value.get("config").unwrap()),
-            )
-        })
-        .collect()
-}
-
-// Original ValidatorSet has private fields, to make sure invariants are kept,
-// so creating a new one for testing
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValidatorSet {
-    pub consensus_scheme: ConsensusScheme,
-    pub active_validators: Vec<ValidatorInfo>,
-    pub pending_inactive: Vec<ValidatorInfo>,
-    pub pending_active: Vec<ValidatorInfo>,
-}
-
-pub fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
-    ValidatorSet {
-        consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
-            0u64 => ConsensusScheme::BLS12381,
-            _ => panic!(),
-        },
-        active_validators: to_validator_info_vec(value.get("active_validators").unwrap()),
-        pending_inactive: to_validator_info_vec(value.get("pending_inactive").unwrap()),
-        pending_active: to_validator_info_vec(value.get("pending_active").unwrap()),
-    }
-}
 
 fn json_account_to_balance(value: &Value) -> u64 {
     u64::from_str(

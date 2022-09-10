@@ -3,6 +3,7 @@
 
 import { Controller } from "./controller";
 import type { Types } from "aptos";
+import * as Sentry from "@sentry/browser";
 
 interface ClaimDetails {
   wallet_name: string;
@@ -97,7 +98,8 @@ export default class extends Controller<HTMLAnchorElement> {
 
     if ("error" in json) {
       this.transactionFailedErrorTarget.classList.remove("hidden");
-      console.error(json.error);
+      const error = new Error(json.error);
+      Sentry.captureException(error);
       return;
     }
 
@@ -127,18 +129,18 @@ export default class extends Controller<HTMLAnchorElement> {
           return this.redirectToTransaction(pendingTransaction.hash);
         }
       } catch (error) {
-        console.error(error);
+        Sentry.captureException(error);
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {
-        const { address } = await window.martian!.account();
+        const { address } = await window.martian!.connect();
         const txnHash = await window.martian!.generateSignAndSubmitTransaction(
           address,
           transaction
         );
         return this.redirectToTransaction(txnHash);
       } catch (error) {
-        console.error(error);
+        Sentry.captureException(error);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.

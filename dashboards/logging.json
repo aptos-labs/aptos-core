@@ -67,6 +67,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -145,6 +146,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -223,6 +225,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -301,6 +304,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -379,6 +383,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -471,6 +476,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -549,6 +555,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -648,6 +655,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -726,6 +734,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -804,6 +813,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -882,6 +892,7 @@
       "targets": [
         {
           "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}"
         }
@@ -986,7 +997,7 @@
         "allValue": "",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(role)",
+        "query": { "query": "label_values(role)", "refId": "Devinfra Remote Prometheus-role-Variable-Query" },
         "regex": "^fullnode$|^validator$",
         "current": { "text": ["validator"], "value": ["validator"] },
         "label": "",
@@ -1004,7 +1015,10 @@
         "allValue": ".*",
         "multi": true,
         "multiFormat": "",
-        "query": "label_values(kubernetes_pod_name)",
+        "query": {
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Devinfra Remote Prometheus-kubernetes_pod_name-Variable-Query"
+        },
         "regex": "",
         "current": { "text": ["All"], "value": ["$__all"] },
         "label": "",
@@ -1047,7 +1061,26 @@
     "list": [
       {
         "name": "Annotations \u0026 Alerts",
-        "datasource": "-- Grafana --",
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "showLine": false,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "lineColor": "",
+        "iconSize": 0,
+        "enable": true,
+        "query": "",
+        "expr": "",
+        "step": "",
+        "textField": "",
+        "textFormat": "",
+        "titleFormat": "",
+        "tagsField": "",
+        "tags": null,
+        "tagKeys": "",
+        "type": "dashboard"
+      },
+      {
+        "name": "Annotations \u0026 Alerts",
+        "datasource": { "type": "datasource", "uid": "grafana" },
         "showLine": false,
         "iconColor": "rgba(0, 211, 255, 1)",
         "lineColor": "",
@@ -1066,8 +1099,8 @@
       }
     ]
   },
-  "schemaVersion": 26,
-  "version": 4,
+  "schemaVersion": 37,
+  "version": 3,
   "links": [
     {
       "title": "Other Dashboards",

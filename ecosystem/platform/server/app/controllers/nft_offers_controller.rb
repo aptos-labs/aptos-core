@@ -43,7 +43,13 @@ class NftOffersController < ApplicationController
 
   def update
     @nft_offer = NftOffer.find_by(slug: params[:slug])
-    @wallet = current_user.wallets.find_by(network: @nft_offer.network, public_key: params[:wallet])
+    @wallet = current_user.wallets.find_by(
+      network: @nft_offer.network,
+      public_key: params[:wallet],
+      wallet_name: params[:wallet_name]
+    )
+
+    return render json: { error: 'wallet_not_found' } if @wallet.nil?
 
     result = NftClaimer.new.claim_nft(
       nft_offer: @nft_offer,

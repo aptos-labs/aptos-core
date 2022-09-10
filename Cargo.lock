@@ -1930,11 +1930,11 @@ dependencies = [
  "scratchpad",
  "serde 1.0.144",
  "serde_json",
+ "serde_yaml 0.8.26",
  "storage-interface",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.3",
- "toml",
  "warp",
 ]
 
@@ -9141,6 +9141,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "forge",
+ "futures",
  "rand 0.7.3",
  "reqwest",
  "serde_json",

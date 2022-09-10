@@ -74,7 +74,8 @@ export default class extends Controller {
   fetchNftInfo = async () => {
     const response = await fetch(this.transactionUrl);
     if (!response.ok && ++this.retries <= 1) {
-      return setTimeout(this.fetchNftInfo, 1000);
+      setTimeout(this.fetchNftInfo, 1000);
+      return;
     }
 
     const transaction: Types.OnChainTransaction = await response.json();
