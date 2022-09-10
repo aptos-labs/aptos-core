@@ -18,6 +18,7 @@ use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
@@ -576,6 +577,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             },
             false,
         ),
+        "twin_validator_test" => config
+            .with_network_tests(vec![&TwinValidatorTest])
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap()),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)

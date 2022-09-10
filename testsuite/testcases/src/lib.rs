@@ -15,6 +15,7 @@ pub mod performance_test;
 pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
+pub mod twin_validator_test;
 
 use anyhow::{anyhow, ensure};
 use aptos_logger::info;

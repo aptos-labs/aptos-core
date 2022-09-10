@@ -265,6 +265,14 @@ impl Node for LocalNode {
         Ok(())
     }
 
+    async fn get_identity(&mut self) -> Result<String> {
+        todo!()
+    }
+
+    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
+        todo!()
+    }
+
     async fn clear_storage(&mut self) -> Result<()> {
         // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
         let node_config = self.config();

@@ -257,6 +257,14 @@ impl Node for K8sNode {
         ))
         .unwrap()
     }
+
+    async fn get_identity(&mut self) -> Result<String> {
+        todo!()
+    }
+
+    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
+        todo!()
+    }
 }
 
 impl Validator for K8sNode {}

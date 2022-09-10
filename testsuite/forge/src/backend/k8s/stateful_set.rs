@@ -247,6 +247,20 @@ pub async fn scale_stateful_set_replicas(
     Ok(())
 }
 
+pub async fn set_identity(
+    sts_name: &str,
+    kube_namespace: &str,
+    k8s_secret_name: &str,
+) -> Result<()> {
+    //todo
+    Ok(())
+}
+
+pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String> {
+    //todo
+    Ok(String::new())
+}
+
 pub async fn check_for_container_restart(
     kube_client: &K8sClient,
     kube_namespace: &str,
