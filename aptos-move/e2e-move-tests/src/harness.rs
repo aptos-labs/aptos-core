@@ -67,13 +67,6 @@ impl MoveHarness {
         }
     }
 
-    pub fn new_no_parallel() -> Self {
-        Self {
-            executor: FakeExecutor::from_fresh_genesis().set_not_parallel(),
-            txn_seq_no: BTreeMap::default(),
-        }
-    }
-
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
