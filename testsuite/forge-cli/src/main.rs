@@ -471,9 +471,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&ValidatorRebootStressTest])
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
             .with_success_criteria(SuccessCriteria::new(
-                0,
+                2000,
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
