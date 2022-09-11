@@ -18,6 +18,7 @@ use crate::response::{
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::{anyhow, Context as AnyhowContext};
+use aptos_api_types::VerifyInput;
 use aptos_api_types::{
     Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
     HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
@@ -83,6 +84,16 @@ pub enum SubmitTransactionPost {
     Bcs(Bcs),
 }
 
+impl VerifyInput for SubmitTransactionPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionPost::Json(inner) => inner.0.verify(),
+            // TODO: Determine how best to input validate BCS
+            SubmitTransactionPost::Bcs(_) => Ok(()),
+        }
+    }
+}
+
 // We need a custom type here because we use different types for each of the
 // content types possible for the POST data.
 #[derive(ApiRequest, Debug)]
@@ -95,6 +106,21 @@ pub enum SubmitTransactionsBatchPost {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
     #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
     Bcs(Bcs),
+}
+
+impl VerifyInput for SubmitTransactionsBatchPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionsBatchPost::Json(inner) => {
+                for request in inner.0.iter() {
+                    request.verify()?;
+                }
+            }
+            // TODO: Determine how best to input validate BCS
+            SubmitTransactionsBatchPost::Bcs(_) => {}
+        }
+        Ok(())
+    }
 }
 
 /// API for interacting with transactions
@@ -263,6 +289,9 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_submit_transaction")?;
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
@@ -308,6 +337,9 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
         self.context
             .check_api_output_enabled("Submit batch transactions", &accept_type)?;
@@ -361,6 +393,9 @@ impl TransactionsApi {
         estimate_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_simulate_transaction")?;
         self.context
             .check_api_output_enabled("Simulate transaction", &accept_type)?;
