@@ -29,6 +29,7 @@ use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
+use std::collections::BTreeMap;
 use std::fs::read_to_string;
 use std::{
     collections::HashMap,
@@ -297,10 +298,20 @@ fn add_framework_to_dir(git_dir: &Path) {
 
 fn add_balances(git_dir: &Path, initial_balances: &[InitialBalance]) -> CliTypedResult<()> {
     if !initial_balances.is_empty() {
+        // Translate balances to map format
+        let balances: Vec<_> = initial_balances
+            .iter()
+            .map(|initial_balance| {
+                let mut map = BTreeMap::new();
+                map.insert(initial_balance.address, initial_balance.balance);
+                map
+            })
+            .collect();
+
         write_to_file(
             git_dir.join(BALANCES_FILE).as_path(),
             BALANCES_FILE,
-            to_yaml(initial_balances)?.as_bytes(),
+            to_yaml(balances.as_slice())?.as_bytes(),
         )
     } else {
         Ok(())
