@@ -12,12 +12,24 @@
 
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
+use crate::VerifyInput;
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
+
+impl VerifyInput for IdentifierWrapper {
+    fn verify(&self) -> anyhow::Result<()> {
+        if Identifier::is_valid(self.as_str()) {
+            Ok(())
+        } else {
+            bail!("Identifier is invalid {}", self)
+        }
+    }
+}
 
 impl FromStr for IdentifierWrapper {
     type Err = anyhow::Error;

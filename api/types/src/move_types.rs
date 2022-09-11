@@ -741,7 +741,7 @@ pub struct MoveModuleId {
 
 impl VerifyInput for MoveModuleId {
     fn verify(&self) -> anyhow::Result<()> {
-        verify_module_identifier(self.name.as_str()).map_err(|_| invalid_move_module_id(self))
+        self.name.verify().map_err(|_| invalid_move_module_id(self))
     }
 }
 
@@ -1076,7 +1076,9 @@ impl VerifyInput for EntryFunctionId {
         self.module
             .verify()
             .map_err(|_| invalid_entry_function_id(self))?;
-        verify_function_identifier(self.name.as_str()).map_err(|_| invalid_entry_function_id(self))
+        self.name
+            .verify()
+            .map_err(|_| invalid_entry_function_id(self))
     }
 }
 
@@ -1084,24 +1086,13 @@ impl FromStr for EntryFunctionId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut pieces = s.split("::");
-
-        // Entry function Id must contain exactly one `::`
-        let module = pieces
-            .next()
-            .ok_or_else(|| invalid_entry_function_id(s))
-            .and_then(|module| module.parse().map_err(|_| invalid_entry_function_id(s)))?;
-        let name = pieces
-            .next()
-            .ok_or_else(|| invalid_entry_function_id(s))
-            .and_then(|module| module.parse().map_err(|_| invalid_entry_function_id(s)))?;
-
-        // If there are any more `::` it's invalid
-        if pieces.next().is_none() {
-            Err(invalid_entry_function_id(s))
-        } else {
-            Ok(Self { module, name })
+        if let Some((module, name)) = s.rsplit_once("::") {
+            return Ok(Self {
+                module: module.parse().map_err(|_| invalid_entry_function_id(s))?,
+                name: name.parse().map_err(|_| invalid_entry_function_id(s))?,
+            });
         }
+        Err(invalid_entry_function_id(s))
     }
 }
 
@@ -1354,15 +1345,15 @@ mod tests {
     #[test]
     fn test_parse_invalid_move_entry_function_id_string() {
         assert_eq!(
-            "invalid entry function id \"0x1\"",
+            "invalid entry function id 0x1",
             "0x1".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1:\"",
+            "invalid entry function id 0x1:",
             "0x1:".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1:::\"",
+            "invalid entry function id 0x1:::",
             "0x1:::"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1370,7 +1361,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1::???\"",
+            "invalid entry function id 0x1::???",
             "0x1::???"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1378,7 +1369,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"Aptos::Aptos\"",
+            "invalid entry function id Aptos::Aptos",
             "Aptos::Aptos"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1386,7 +1377,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"Aptos::Aptos::??\"",
+            "invalid entry function id Aptos::Aptos::??",
             "Aptos::Aptos::??"
                 .parse::<EntryFunctionId>()
                 .err()
@@ -1394,7 +1385,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid entry function id \"0x1::Aptos::Aptos::Aptos\"",
+            "invalid entry function id 0x1::Aptos::Aptos::Aptos",
             "0x1::Aptos::Aptos::Aptos"
                 .parse::<EntryFunctionId>()
                 .err()

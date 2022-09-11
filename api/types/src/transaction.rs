@@ -835,6 +835,7 @@ impl VerifyInput for Ed25519Signature {
                 ED25519_SIGNATURE_LENGTH
             )
         } else {
+            // TODO: Check if they match / parse correctly?
             Ok(())
         }
     }
