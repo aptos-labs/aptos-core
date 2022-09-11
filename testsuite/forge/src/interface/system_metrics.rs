@@ -92,8 +92,9 @@ fn ensure_metrics_threshold(
     let breach_pct = (breach_count * 100) / metrics.len();
     if breach_pct > threshold.max_breach_pct {
         bail!(
-            "{:?} metrics violated threshold, max_breach_pct: {:?}, breach_pct: {:?} ",
+            "{:?} metric violated threshold of {:?}, max_breach_pct: {:?}, breach_pct: {:?} ",
             metrics_name,
+            threshold.max,
             threshold.max_breach_pct,
             breach_pct
         );

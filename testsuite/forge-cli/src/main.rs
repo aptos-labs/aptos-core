@@ -692,9 +692,9 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 60
             })),
             Some(SystemMetricsThreshold::new(
-                // Threshold of more than 12 CPU cores for 30% of the time
+                // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
-                // Threshold of more than 5 GB of memory for 30% of the time
+                // Check that we don't use more than 5 GB of memory for 30% of the time.
                 MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
             )),
         ))
@@ -724,9 +724,9 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
             true,
             None,
             Some(SystemMetricsThreshold::new(
-                // Threshold of more than 12 CPU cores for 30% of the time
+                // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
-                // Threshold of more than 5 GB of memory for 30% of the time
+                // Check that we don't use more than 5 GB of memory for 30% of the time.
                 MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
             )),
         ))
