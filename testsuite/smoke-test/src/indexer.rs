@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_indexer::indexer::fetcher::TransactionFetcherOptions;
 use aptos_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
     indexer::tailer::Tailer,
@@ -50,6 +51,7 @@ pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Ta
         info.url(),
         conn_pool.clone(),
         Arc::new(DefaultTransactionProcessor::new(conn_pool.clone())),
+        TransactionFetcherOptions::default(),
     )?;
     txn_tailer.run_migrations();
 
@@ -57,6 +59,7 @@ pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Ta
         info.url(),
         conn_pool.clone(),
         Arc::new(TokenTransactionProcessor::new(conn_pool.clone(), false)),
+        TransactionFetcherOptions::default(),
     )?;
 
     Ok((conn_pool, txn_tailer, nft_tailer))
@@ -146,15 +149,11 @@ async fn test_old_indexer() {
     // Why do this twice? To ensure the idempotency of the tailer :-)
     for _ in 0..2 {
         // Process the next versions
-        let version = info
-            .client()
-            .get_ledger_information()
-            .await
-            .unwrap()
-            .into_inner()
-            .version;
-        tailer.process_next_batch((version + 1) as u8).await;
-        nft_tailer.process_next_batch((version + 1) as u8).await;
+
+        let (_, txn_res) = tailer.process_next_batch().await;
+        txn_res.expect("failed to process txn batch");
+        let (_, nft_res) = nft_tailer.process_next_batch().await;
+        nft_res.expect("failed to process nft batch");
 
         // Get them into the array and sort by type in order to prevent ordering from breaking tests
         let mut transactions = vec![];

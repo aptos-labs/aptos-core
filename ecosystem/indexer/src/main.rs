@@ -4,10 +4,11 @@
 //! Indexer is used to index blockchain data into Postgres
 #![forbid(unsafe_code)]
 
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use clap::Parser;
 use std::{env, sync::Arc};
 
+use aptos_indexer::indexer::fetcher::TransactionFetcherOptions;
 use aptos_indexer::{
     counters::start_inspection_service,
     database::new_db_pool,
@@ -57,8 +58,16 @@ struct IndexerArgs {
     check_chain_id: bool,
 
     /// How many versions to fetch and process from a node in parallel
-    #[clap(long, default_value_t = 10)]
-    batch_size: u8,
+    #[clap(long)]
+    batch_size: Option<u16>,
+
+    /// How many tasks to run for fetching the transactions
+    #[clap(long)]
+    fetch_tasks: Option<u8>,
+
+    /// How many tasks to run for processing the transactions
+    #[clap(long, default_value = "5")]
+    processor_tasks: u8,
 
     /// How many versions to process before logging a "processed X versions" message.
     /// This will only be checked every `--batch-size` number of versions.
@@ -115,7 +124,15 @@ async fn main() -> std::io::Result<()> {
         )),
     };
 
-    let tailer = Tailer::new(&args.node_url, conn_pool.clone(), processor)
+    let options = TransactionFetcherOptions::new(
+        None,
+        None,
+        args.batch_size,
+        None,
+        args.fetch_tasks.map(|x| x as usize),
+    );
+
+    let tailer = Tailer::new(&args.node_url, conn_pool.clone(), processor, options)
         .expect("Failed to instantiate tailer");
 
     if !args.skip_migrations {
@@ -145,35 +162,76 @@ async fn main() -> std::io::Result<()> {
 
     let start = chrono::Utc::now().naive_utc();
 
-    info!(processor_name = processor_name, "Indexing loop started!");
-    let mut version_processed: usize = start_version as usize;
+    info!(
+        processor_name = processor_name,
+        start_version = start_version,
+        "Indexing loop started!"
+    );
+
+    let mut versions_processed: usize = 0;
     let mut total_processed: usize = 0;
     let mut base: usize = 0;
     let mut version_to_check_chain_id: usize = 0;
 
-    // Check once here to avoid the boolean check every iteration
-    if args.check_chain_id && version_to_check_chain_id == 0 {
+    // Check once here to avoid a boolean check every iteration
+    if args.check_chain_id {
         tailer
             .check_or_update_chain_id()
             .await
             .expect("Failed to get chain ID");
-        version_to_check_chain_id = version_processed + 100_000;
+        version_to_check_chain_id = versions_processed + 100_000;
+    }
+
+    let (tx, mut receiver) = tokio::sync::mpsc::channel(100);
+    let mut tasks = vec![];
+    for _ in 0..args.processor_tasks {
+        let other_tx = tx.clone();
+        let other_tailer = tailer.clone();
+        let task = tokio::task::spawn(async move {
+            loop {
+                let (num_res, res) = other_tailer.process_next_batch().await;
+                other_tx.send((num_res, res)).await.unwrap();
+            }
+        });
+        tasks.push(task);
     }
 
     loop {
-        if args.check_chain_id && version_to_check_chain_id < version_processed {
+        if args.check_chain_id && version_to_check_chain_id < versions_processed {
             tailer
                 .check_or_update_chain_id()
                 .await
                 .expect("Failed to get chain ID");
-            version_to_check_chain_id = version_processed + 100_000;
+            version_to_check_chain_id = versions_processed + 100_000;
         }
 
-        let (num_res, _) = tailer.process_next_batch(args.batch_size).await;
+        let (num_res, result) = receiver
+            .recv()
+            .await
+            .expect("Failed to receive batch results: got None!");
+
+        let processing_result = match result {
+            Ok(res) => res,
+            Err(tpe) => {
+                let (err, start_version, end_version, _) = tpe.inner();
+                error!(
+                    processor_name = processor_name,
+                    start_version = start_version,
+                    end_version = end_version,
+                    error = format!("{:?}", err),
+                    "Error processing batch!"
+                );
+                panic!(
+                    "Error in '{}' while processing batch: {:?}",
+                    processor_name, err
+                );
+            }
+        };
+
         total_processed += num_res as usize;
-        version_processed += num_res as usize;
+        versions_processed += num_res as usize;
         if args.emit_every != 0 {
-            let new_base: usize = version_processed / args.emit_every;
+            let new_base: usize = versions_processed / args.emit_every;
             if base != new_base {
                 base = new_base;
                 let num_millis =
@@ -181,9 +239,11 @@ async fn main() -> std::io::Result<()> {
                 let tps = (total_processed as f64 / num_millis) as u64;
                 info!(
                     processor_name = processor_name,
-                    version_processed = version_processed,
+                    batch_start_version = processing_result.start_version,
+                    batch_end_version = processing_result.end_version,
+                    versions_processed = versions_processed,
                     tps = tps,
-                    "Processed version"
+                    "Processed batch version"
                 );
             }
         }

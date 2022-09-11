@@ -4,7 +4,7 @@ use crate::{
     database::{execute_with_better_error, PgDbPool},
     indexer::{
         errors::TransactionProcessingError,
-        fetcher::{TransactionFetcher, TransactionFetcherTrait},
+        fetcher::{TransactionFetcher, TransactionFetcherOptions, TransactionFetcherTrait},
         processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
@@ -40,9 +40,10 @@ impl Tailer {
         node_url: &str,
         connection_pool: PgDbPool,
         processor: Arc<dyn TransactionProcessor>,
+        options: TransactionFetcherOptions,
     ) -> Result<Tailer, ParseError> {
         let url = Url::parse(node_url)?;
-        let transaction_fetcher = TransactionFetcher::new(url, None);
+        let transaction_fetcher = TransactionFetcher::new(url, 0, options);
         Ok(Self {
             transaction_fetcher: Arc::new(Mutex::new(transaction_fetcher)),
             connection_pool,
@@ -63,7 +64,7 @@ impl Tailer {
         info!("Migrations complete!");
     }
 
-    /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
+    /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
     pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
         info!("Checking if chain id is correct");
         let conn = self
@@ -121,38 +122,48 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-        batch_size: u8,
-    ) -> (
-        usize,
-        Vec<Result<ProcessingResult, TransactionProcessingError>>,
-    ) {
-        let transactions = self
-            .transaction_fetcher
-            .lock()
-            .await
-            .fetch_next_batch()
-            .await;
-        let num_txns = transactions.len();
-        let mut tasks = vec![];
-        let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
-        for ind in 0..num_batches {
-            let self2 = self.clone();
-            let start_index = ind * batch_size as usize;
-            let end_index = std::cmp::min((ind + 1) * batch_size as usize, transactions.len());
-
-            let mut txns = vec![];
-            for t in &transactions[start_index..end_index] {
-                txns.push(t.clone());
-            }
-            if !txns.is_empty() {
-                let task = tokio::task::spawn(async move {
-                    self2.processor.process_transactions_with_status(txns).await
-                });
-                tasks.push(task);
+    ) -> (usize, Result<ProcessingResult, TransactionProcessingError>) {
+        let mut transactions: Vec<Transaction> = vec![];
+        while transactions.is_empty() {
+            transactions = self
+                .transaction_fetcher
+                .lock()
+                .await
+                .fetch_next_batch()
+                .await;
+            if transactions.is_empty() {
+                info!("Transaction batch was empty, will try again");
             }
         }
-        let results: Vec<Result<ProcessingResult, TransactionProcessingError>> =
-            await_tasks(tasks).await;
+
+        let num_txns = transactions.len();
+        let start_version = transactions.first().unwrap().version();
+        let end_version = transactions.last().unwrap().version();
+
+        info!(
+            num_txns = num_txns,
+            start_version = start_version,
+            end_version = end_version,
+            "Starting processing of transaction batch"
+        );
+
+        let batch_start = chrono::Utc::now().naive_utc();
+
+        let results = self
+            .processor
+            .process_transactions_with_status(transactions)
+            .await;
+
+        let batch_millis = (chrono::Utc::now().naive_utc() - batch_start).num_milliseconds();
+
+        info!(
+            num_txns = num_txns,
+            time_millis = batch_millis,
+            start_version = start_version,
+            end_version = end_version,
+            "Finished processing of transaction batch"
+        );
+
         (num_txns, results)
     }
 
@@ -355,6 +366,7 @@ mod test {
             "http://fake-url.aptos.dev",
             conn_pool.clone(),
             Arc::new(pg_transaction_processor),
+            TransactionFetcherOptions::default(),
         )?;
         tailer.transaction_fetcher = Arc::new(Mutex::new(FakeFetcher::new(
             Url::parse("http://fake-url.aptos.dev")?,
