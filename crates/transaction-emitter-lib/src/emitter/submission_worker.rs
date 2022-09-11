@@ -21,7 +21,6 @@ use core::{
 };
 use futures::future::try_join_all;
 use rand::seq::IteratorRandom;
-use rand::Rng;
 use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
@@ -33,7 +32,7 @@ pub struct SubmissionWorker {
     params: EmitModeParams,
     stats: Arc<DynamicStatsTracking>,
     txn_generator: Box<dyn TransactionGenerator>,
-    worker_index: usize,
+    start_sleep_duration: Duration,
     check_account_sequence_only_once: bool,
     rng: ::rand::rngs::StdRng,
 }
@@ -46,7 +45,7 @@ impl SubmissionWorker {
         params: EmitModeParams,
         stats: Arc<DynamicStatsTracking>,
         txn_generator: Box<dyn TransactionGenerator>,
-        worker_index: usize,
+        start_sleep_duration: Duration,
         check_account_sequence_only_once: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
@@ -57,7 +56,7 @@ impl SubmissionWorker {
             params,
             stats,
             txn_generator,
-            worker_index,
+            start_sleep_duration,
             check_account_sequence_only_once,
             rng,
         }
@@ -65,13 +64,9 @@ impl SubmissionWorker {
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self) -> Vec<LocalAccount> {
-        // Introduce a random jitter between, so that:
-        //  - we don't hammer the rest APIs all at once.
-        //  - allow for even spread for fixed TPS setup
-        let start_sleep_duration = self.start_sleep_time();
-        let start_time = Instant::now() + start_sleep_duration;
+        let start_time = Instant::now() + self.start_sleep_duration;
 
-        self.sleep_check_done(start_sleep_duration).await;
+        self.sleep_check_done(self.start_sleep_duration).await;
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
         let wait_for_accounts_sequence_timeout =
@@ -170,18 +165,6 @@ impl SubmissionWorker {
                 return false;
             }
         }
-    }
-
-    fn start_sleep_time(&mut self) -> Duration {
-        let random_jitter_millis = if self.params.start_jitter_millis > 0 {
-            self.rng.gen_range(0, self.params.start_jitter_millis)
-        } else {
-            0
-        };
-        Duration::from_millis(
-            (self.params.start_offset_multiplier_millis * self.worker_index as f64) as u64
-                + random_jitter_millis,
-        )
     }
 
     /// This function assumes that num_requests == num_accounts, which is
