@@ -444,7 +444,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 false,
                 Some(Duration::from_secs(240)),
                 None,
-                gi,
             ))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 30.into();
@@ -454,7 +453,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_latency" => config
             .with_network_tests(vec![&NetworkLatencyTest])
             .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
-        "network_bandwidth" => config.with_network_tests(vec![&NetworkBandwidthTest]),
+        "network_bandwidth" => config
+            .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
+            .with_network_tests(vec![&NetworkBandwidthTest]),
         "setup_test" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&ForgeSetupTest]),
@@ -509,6 +510,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(60)),
+                None,
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.

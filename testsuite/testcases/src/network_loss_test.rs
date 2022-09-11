@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_chaos_test::NetworkChaosTest;
-use forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkLoss, Test};
+use crate::{LoadDestination, NetworkLoadTest};
+use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkLoss, Test};
 
 pub struct NetworkLossTest;
 
@@ -16,24 +16,33 @@ impl Test for NetworkLossTest {
     }
 }
 
-impl NetworkChaosTest for NetworkLossTest {
-    fn get_chaos(&self) -> SwarmChaos {
-        SwarmChaos::Loss(SwarmNetworkLoss {
-            loss_percentage: LOSS_PERCENTAGE,
-            correlation_percentage: CORRELATION_PERCENTAGE,
-        })
-    }
+impl NetworkLoadTest for NetworkLossTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
+                loss_percentage: LOSS_PERCENTAGE,
+                correlation_percentage: CORRELATION_PERCENTAGE,
+            }))?;
 
-    fn get_message(&self) -> String {
-        format!(
+        let msg = format!(
             "Injected {}% loss with {}% correlation loss to namespace",
             LOSS_PERCENTAGE, CORRELATION_PERCENTAGE,
-        )
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
+        Ok(LoadDestination::AllNodes)
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        swarm.remove_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
+            loss_percentage: LOSS_PERCENTAGE,
+            correlation_percentage: CORRELATION_PERCENTAGE,
+        }))
     }
 }
 
 impl NetworkTest for NetworkLossTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
-        <dyn NetworkChaosTest>::run(self, ctx)
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

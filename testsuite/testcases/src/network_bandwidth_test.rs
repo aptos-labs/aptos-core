@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_chaos_test::NetworkChaosTest;
-use forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkBandwidth, Test};
+use crate::{LoadDestination, NetworkLoadTest};
+use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, Test};
 
 pub struct NetworkBandwidthTest;
 
@@ -20,25 +20,34 @@ impl Test for NetworkBandwidthTest {
     }
 }
 
-impl NetworkChaosTest for NetworkBandwidthTest {
-    fn get_chaos(&self) -> SwarmChaos {
-        SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+impl NetworkLoadTest for NetworkBandwidthTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+                rate: RATE_MBPS,
+                limit: LIMIT_BYTES,
+                buffer: BUFFER_BYTES,
+            }))?;
+        let msg = format!(
+            "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
+            RATE_MBPS, LIMIT_BYTES, BUFFER_BYTES
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
+        Ok(LoadDestination::AllNodes)
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
             rate: RATE_MBPS,
             limit: LIMIT_BYTES,
             buffer: BUFFER_BYTES,
-        })
-    }
-
-    fn get_message(&self) -> String {
-        format!(
-            "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
-            RATE_MBPS, LIMIT_BYTES, BUFFER_BYTES
-        )
+        }))
     }
 }
 
 impl NetworkTest for NetworkBandwidthTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
-        <dyn NetworkChaosTest>::run(self, ctx)
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

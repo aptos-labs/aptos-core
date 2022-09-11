@@ -236,6 +236,24 @@ impl<'cfg> ForgeConfig<'cfg> {
 
 impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
+        let forge_run_mode =
+            std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
+        let success_criteria = if forge_run_mode.eq("local") {
+            SuccessCriteria::new(600, 60000, true, None, None)
+        } else {
+            SuccessCriteria::new(
+                3500,
+                10000,
+                true,
+                None,
+                Some(SystemMetricsThreshold::new(
+                    // Threshold of more than 12 CPU cores for 30% of the time
+                    MetricsThreshold::new(12, 30),
+                    // Threshold of more than 5 GB of memory for 30% of the time
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
+            )
+        };
         Self {
             aptos_tests: vec![],
             admin_tests: vec![],
@@ -249,18 +267,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 30000,
             }),
-            success_criteria: SuccessCriteria::new(
-                3500,
-                10000,
-                true,
-                None,
-                Some(SystemMetricsThreshold::new(
-                    // Threshold of more than 12 CPU cores for 30% of the time
-                    MetricsThreshold::new(12, 30),
-                    // Threshold of more than 5 GB of memory for 30% of the time
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-                )),
-            ),
+            success_criteria,
         }
     }
 }

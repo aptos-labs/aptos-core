@@ -36,7 +36,7 @@ impl LoadVsPerfBenchmark {
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let emit_job_request = ctx.emit_job.clone().mode(EmitJobMode::ConstTps { tps });
         let (stats, actual_duration, ledger_transactions) = self.test.network_load_test(
-            ctx.swarm(),
+            ctx,
             emit_job_request,
             duration,
             // add larger warmup, as we are exceeding the max load,

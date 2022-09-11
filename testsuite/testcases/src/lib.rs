@@ -8,7 +8,6 @@ pub mod forge_setup_test;
 pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
-pub mod network_chaos_test;
 pub mod network_latency_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
@@ -111,7 +110,7 @@ pub enum LoadDestination {
 }
 
 pub trait NetworkLoadTest: Test {
-    fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllNodes)
     }
     // Load is started before this funciton is called, and stops after this function returns.
@@ -119,6 +118,10 @@ pub trait NetworkLoadTest: Test {
     // time to finish. How long this function takes will dictate how long the actual test lasts.
     fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         std::thread::sleep(duration);
+        Ok(())
+    }
+
+    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
         Ok(())
     }
 }
@@ -133,7 +136,7 @@ impl NetworkTest for dyn NetworkLoadTest {
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
         let (txn_stat, actual_test_duration, _ledger_transactions) = self.network_load_test(
-            ctx.swarm(),
+            ctx,
             emit_job_request,
             duration,
             WARMUP_DURATION_FRACTION,
@@ -147,6 +150,8 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+
+        self.finish(ctx.swarm())?;
 
         ctx.check_for_success(
             &txn_stat,
@@ -162,18 +167,26 @@ impl NetworkTest for dyn NetworkLoadTest {
 impl dyn NetworkLoadTest {
     pub fn network_load_test(
         &self,
-        swarm: &mut dyn Swarm,
+        ctx: &mut NetworkContext,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
     ) -> Result<(TxnStats, Duration, u64)> {
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
 
-        let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let all_fullnodes = ctx
+            .swarm()
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
 
-        let nodes_to_send_load_to = match self.setup(swarm)? {
+        let nodes_to_send_load_to = match self.setup(ctx)? {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
@@ -182,8 +195,13 @@ impl dyn NetworkLoadTest {
 
         // Generate some traffic
 
-        let (mut emitter, emit_job_request) =
-            create_emitter_and_request(swarm, emit_job_request, &nodes_to_send_load_to, 1, rng)?;
+        let (mut emitter, emit_job_request) = create_emitter_and_request(
+            ctx.swarm(),
+            emit_job_request,
+            &nodes_to_send_load_to,
+            1,
+            rng,
+        )?;
 
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder.disable_lifo_slot().enable_all();
@@ -192,8 +210,11 @@ impl dyn NetworkLoadTest {
             .build()
             .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
 
-        let job =
-            rt.block_on(emitter.start_job(swarm.chain_info().root_account, emit_job_request, 3))?;
+        let job = rt.block_on(emitter.start_job(
+            ctx.swarm().chain_info().root_account,
+            emit_job_request,
+            3,
+        ))?;
 
         let warmup_duration = duration.mul_f32(warmup_duration_fraction);
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
@@ -203,7 +224,9 @@ impl dyn NetworkLoadTest {
         std::thread::sleep(warmup_duration);
         info!("{}s warmup finished", warmup_duration.as_secs());
 
-        let clients = swarm.get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
+        let clients = ctx
+            .swarm()
+            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
         let max_start_ledger_transactions = rt
             .block_on(join_all(
@@ -218,7 +241,7 @@ impl dyn NetworkLoadTest {
         job.start_next_phase();
 
         let test_start = Instant::now();
-        self.test(swarm, test_duration)?;
+        self.test(ctx.swarm(), test_duration)?;
         let actual_test_duration = test_start.elapsed();
         info!(
             "{}s test finished after {}s",
