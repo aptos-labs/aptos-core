@@ -36,6 +36,8 @@ mod state_sync_config;
 pub use state_sync_config::*;
 mod firehose_streamer_config;
 pub use firehose_streamer_config::*;
+mod indexer_config;
+pub use indexer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -83,6 +85,8 @@ pub struct NodeConfig {
     pub state_sync: StateSyncConfig,
     #[serde(default)]
     pub firehose_stream: FirehoseStreamerConfig,
+    #[serde(default)]
+    pub indexer: IndexerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]

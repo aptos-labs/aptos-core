@@ -18,6 +18,7 @@ use aptos_config::{
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
+use aptos_indexer::runtime::bootstrap as bootstrap_indexer_stream;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -168,6 +169,7 @@ pub struct AptosHandle {
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
     _fh_stream: Option<Runtime>,
+    _index_runtime: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
@@ -734,10 +736,21 @@ pub fn setup_environment(
         aptos_db.clone(),
         mp_client_sender.clone(),
     )?;
-    let sf_runtime = match bootstrap_fh_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+    let sf_runtime = match bootstrap_fh_stream(
+        &node_config,
+        chain_id,
+        aptos_db.clone(),
+        mp_client_sender.clone(),
+    ) {
         None => None,
         Some(res) => Some(res?),
     };
+
+    let index_runtime =
+        match bootstrap_indexer_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+            None => None,
+            Some(res) => Some(res?),
+        };
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -809,6 +822,7 @@ pub fn setup_environment(
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
+        _index_runtime: index_runtime,
         _fh_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,

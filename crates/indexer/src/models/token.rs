@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::events::Event, schema::token_datas};
-use aptos_rest_client::types;
+use aptos_api_types::deserialize_from_string;
 use std::{fmt, fmt::Formatter};
 
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ impl fmt::Display for TokenDataId {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenId {
     pub token_data_id: TokenDataId,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub property_version: bigdecimal::BigDecimal,
 }
 
@@ -59,14 +59,14 @@ impl fmt::Display for TokenId {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WithdrawEventType {
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: bigdecimal::BigDecimal,
     pub id: TokenId,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DepositEventType {
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: bigdecimal::BigDecimal,
     pub id: TokenId,
 }
@@ -75,13 +75,13 @@ pub struct DepositEventType {
 pub struct CreateTokenDataEventType {
     pub id: TokenDataId,
     pub description: String,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub maximum: u64,
     pub uri: String,
     pub royalty_payee_address: String,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub royalty_points_denominator: bigdecimal::BigDecimal,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub royalty_points_numerator: bigdecimal::BigDecimal,
     pub name: String,
     pub mutability_config: serde_json::Value,
@@ -92,14 +92,14 @@ pub struct CreateTokenDataEventType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MintTokenEventType {
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: bigdecimal::BigDecimal,
     pub id: TokenDataId,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BurnTokenEventType {
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: bigdecimal::BigDecimal,
     pub id: TokenId,
 }
@@ -119,7 +119,7 @@ pub struct CreateCollectionEventType {
     pub collection_name: String,
     pub uri: String,
     pub description: String,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
+    #[serde(deserialize_with = "deserialize_from_string")]
     pub maximum: u64,
 }
 

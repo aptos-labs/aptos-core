@@ -4,18 +4,20 @@ use crate::{
     database::{execute_with_better_error, PgDbPool},
     indexer::{
         errors::TransactionProcessingError,
-        fetcher::{TransactionFetcher, TransactionFetcherTrait},
+        fetcher::{TransactionFetcher, TransactionFetcherOptions, TransactionFetcherTrait},
         processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::ledger_info::LedgerInfo,
     schema::ledger_infos::{self, dsl},
     util::bigdecimal_to_u64,
 };
+use aptos_api::context::Context as ApiContext;
+
+use crate::models::ledger_info::LedgerInfo;
 use anyhow::{ensure, Context, Result};
-use aptos_logger::info;
-use aptos_rest_client::Transaction;
+use aptos_logger::{debug, info};
 use bigdecimal::BigDecimal;
+use chrono::ParseError;
 use diesel::{
     prelude::*,
     sql_query,
@@ -24,7 +26,6 @@ use diesel::{
 };
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
-use url::{ParseError, Url};
 
 diesel_migrations::embed_migrations!();
 
@@ -37,12 +38,14 @@ pub struct Tailer {
 
 impl Tailer {
     pub fn new(
-        node_url: &str,
+        context: Arc<ApiContext>,
         connection_pool: PgDbPool,
         processor: Arc<dyn TransactionProcessor>,
+        options: TransactionFetcherOptions,
     ) -> Result<Tailer, ParseError> {
-        let url = Url::parse(node_url)?;
-        let transaction_fetcher = TransactionFetcher::new(url, None);
+        let resolver = Arc::new(context.move_resolver().unwrap());
+        let transaction_fetcher = TransactionFetcher::new(context, resolver, 0, options);
+
         Ok(Self {
             transaction_fetcher: Arc::new(Mutex::new(transaction_fetcher)),
             connection_pool,
@@ -63,8 +66,8 @@ impl Tailer {
         info!("Migrations complete!");
     }
 
-    /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
-    pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
+    /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
+    pub async fn check_or_update_chain_id(&self) -> Result<u64> {
         info!("Checking if chain id is correct");
         let conn = self
             .connection_pool
@@ -82,7 +85,6 @@ impl Tailer {
             .lock()
             .await
             .fetch_ledger_info()
-            .await
             .chain_id as i64;
 
         match maybe_existing_chain_id {
@@ -92,7 +94,7 @@ impl Tailer {
                     chain_id = chain_id,
                     "Chain id matches! Continuing to index chain"
                 );
-                Ok(0)
+                Ok(*chain_id as u64)
             }
             None => {
                 info!(
@@ -106,6 +108,7 @@ impl Tailer {
                     }),
                 )
                 .context(r#"Error updating chain_id!"#)
+                .map(|_| new_chain_id as u64)
             }
         }
     }
@@ -121,47 +124,43 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-        batch_size: u8,
-    ) -> (
-        usize,
-        Vec<Result<ProcessingResult, TransactionProcessingError>>,
-    ) {
+    ) -> (u64, Result<ProcessingResult, TransactionProcessingError>) {
         let transactions = self
             .transaction_fetcher
             .lock()
             .await
             .fetch_next_batch()
             .await;
-        let num_txns = transactions.len();
-        let mut tasks = vec![];
-        let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
-        for ind in 0..num_batches {
-            let self2 = self.clone();
-            let start_index = ind * batch_size as usize;
-            let end_index = std::cmp::min((ind + 1) * batch_size as usize, transactions.len());
 
-            let mut txns = vec![];
-            for t in &transactions[start_index..end_index] {
-                txns.push(t.clone());
-            }
-            if !txns.is_empty() {
-                let task = tokio::task::spawn(async move {
-                    self2.processor.process_transactions_with_status(txns).await
-                });
-                tasks.push(task);
-            }
-        }
-        let results: Vec<Result<ProcessingResult, TransactionProcessingError>> =
-            await_tasks(tasks).await;
+        let num_txns = transactions.len() as u64;
+        let start_version = transactions.first().unwrap().version();
+        let end_version = transactions.last().unwrap().version();
+
+        debug!(
+            num_txns = num_txns,
+            start_version = start_version,
+            end_version = end_version,
+            "Starting processing of transaction batch"
+        );
+
+        let batch_start = chrono::Utc::now().naive_utc();
+
+        let results = self
+            .processor
+            .process_transactions_with_status(transactions)
+            .await;
+
+        let batch_millis = (chrono::Utc::now().naive_utc() - batch_start).num_milliseconds();
+
+        info!(
+            num_txns = num_txns,
+            time_millis = batch_millis,
+            start_version = start_version,
+            end_version = end_version,
+            "Finished processing of transaction batch"
+        );
+
         (num_txns, results)
-    }
-
-    pub async fn get_txn(&self, version: u64) -> Transaction {
-        self.transaction_fetcher
-            .lock()
-            .await
-            .fetch_version(version)
-            .await
     }
 
     /// Get starting version from database. Starting version is defined as the first version that's either
@@ -271,7 +270,8 @@ mod test {
         models::transactions::TransactionModel,
         processors::default_processor::DefaultTransactionProcessor,
     };
-    use aptos_rest_client::State;
+    use aptos_api_test_context::new_test_context;
+    use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
     use diesel::Connection;
     use serde_json::json;
 
@@ -281,7 +281,7 @@ mod test {
     }
 
     impl FakeFetcher {
-        fn new(_node_url: Url, _starting_version: Option<u64>) -> Self {
+        fn new(_starting_version: Option<u64>) -> Self {
             Self {
                 version: 0,
                 chain_id: 0,
@@ -295,19 +295,15 @@ mod test {
             unimplemented!();
         }
 
-        async fn fetch_version(&self, _version: u64) -> Transaction {
-            unimplemented!();
-        }
-
-        async fn fetch_ledger_info(&mut self) -> State {
-            State {
+        fn fetch_ledger_info(&mut self) -> APILedgerInfo {
+            APILedgerInfo {
                 chain_id: self.chain_id,
-                epoch: 0,
-                version: 0,
-                timestamp_usecs: 0,
-                oldest_ledger_version: 0,
-                oldest_block_height: 0,
-                block_height: 0,
+                epoch: U64::from(0),
+                ledger_version: U64::from(0),
+                ledger_timestamp: U64::from(0),
+                oldest_ledger_version: U64::from(0),
+                oldest_block_height: U64::from(0),
+                block_height: U64::from(0),
             }
         }
 
@@ -344,22 +340,22 @@ mod test {
         }
     }
 
-    pub fn setup_indexer() -> anyhow::Result<(PgDbPool, Tailer)> {
+    pub fn setup_indexer() -> Result<(PgDbPool, Tailer)> {
         let database_url = std::env::var("INDEXER_DATABASE_URL")
             .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&conn_pool.get()?);
 
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
+        let test_context = new_test_context("doesnt_matter".to_string(), true);
+        let context: Arc<ApiContext> = Arc::new(test_context.context);
         let mut tailer = Tailer::new(
-            "http://fake-url.aptos.dev",
+            context,
             conn_pool.clone(),
             Arc::new(pg_transaction_processor),
+            TransactionFetcherOptions::default(),
         )?;
-        tailer.transaction_fetcher = Arc::new(Mutex::new(FakeFetcher::new(
-            Url::parse("http://fake-url.aptos.dev")?,
-            None,
-        )));
+        tailer.transaction_fetcher = Arc::new(Mutex::new(FakeFetcher::new(None)));
         tailer.run_migrations();
 
         Ok((conn_pool, tailer))
