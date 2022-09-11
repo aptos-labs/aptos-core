@@ -18,7 +18,10 @@ use crate::response::{
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::{anyhow, Context as AnyhowContext};
-use aptos_api_types::VerifyInput;
+use aptos_api_types::{
+    verify_function_identifier, verify_module_identifier, MoveType, VerifyInput,
+    VerifyInputWithRecursion,
+};
 use aptos_api_types::{
     Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
     HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
@@ -31,7 +34,8 @@ use aptos_types::account_config::CoinStoreResource;
 use aptos_types::account_view::AccountView;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
-    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
+    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionPayload,
+    TransactionStatus,
 };
 use aptos_types::vm_status::StatusCode;
 use aptos_vm::AptosVM;
@@ -88,7 +92,6 @@ impl VerifyInput for SubmitTransactionPost {
     fn verify(&self) -> anyhow::Result<()> {
         match self {
             SubmitTransactionPost::Json(inner) => inner.0.verify(),
-            // TODO: Determine how best to input validate BCS
             SubmitTransactionPost::Bcs(_) => Ok(()),
         }
     }
@@ -116,7 +119,6 @@ impl VerifyInput for SubmitTransactionsBatchPost {
                     request.verify()?;
                 }
             }
-            // TODO: Determine how best to input validate BCS
             SubmitTransactionsBatchPost::Bcs(_) => {}
         }
         Ok(())
@@ -783,7 +785,7 @@ impl TransactionsApi {
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
-                let signed_transaction = bcs::from_bytes(&data.0)
+                let signed_transaction: SignedTransaction = bcs::from_bytes(&data.0)
                     .context("Failed to deserialize input into SignedTransaction")
                     .map_err(|err| {
                         SubmitTransactionError::bad_request_with_code(
@@ -792,6 +794,63 @@ impl TransactionsApi {
                             ledger_info,
                         )
                     })?;
+                // Verify the signed transaction
+                match signed_transaction.payload() {
+                    TransactionPayload::EntryFunction(entry_function) => {
+                        verify_module_identifier(entry_function.module().name().as_str()).map_err(
+                            |err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            },
+                        )?;
+
+                        verify_function_identifier(entry_function.function().as_str()).map_err(
+                            |err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            },
+                        )?;
+                        for arg in entry_function.ty_args() {
+                            let arg: MoveType = arg.into();
+                            arg.verify(0).map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        }
+                    }
+                    TransactionPayload::Script(script) => {
+                        if script.code().is_empty() {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                "Script payload bytecode must not be empty",
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
+
+                        for arg in script.ty_args() {
+                            let arg = MoveType::from(arg);
+                            arg.verify(0).map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        }
+                    }
+                    TransactionPayload::ModuleBundle(_) => {}
+                }
+                // TODO: Verify script args?
+
                 Ok(signed_transaction)
             }
             SubmitTransactionPost::Json(data) => self

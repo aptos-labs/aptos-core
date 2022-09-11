@@ -43,6 +43,12 @@ impl From<Identifier> for IdentifierWrapper {
     }
 }
 
+impl From<&Identifier> for IdentifierWrapper {
+    fn from(value: &Identifier) -> IdentifierWrapper {
+        Self(value.clone())
+    }
+}
+
 impl From<&IdentStr> for IdentifierWrapper {
     fn from(ident_str: &IdentStr) -> Self {
         Self(Identifier::from(ident_str))
