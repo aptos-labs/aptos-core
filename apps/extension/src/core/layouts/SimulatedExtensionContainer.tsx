@@ -14,7 +14,7 @@ import {
 import { MoonIcon, SunIcon } from '@chakra-ui/icons';
 
 interface SimulatedExtensionContainerProps {
-  children: React.ReactNode;
+  children: JSX.Element;
 }
 
 export const boxShadow = 'rgba(149, 157, 165, 0.2) 0px 0px 8px 4px';
@@ -86,20 +86,11 @@ function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
   );
 }
 
-function ExtensionComponent({ children }: SimulatedExtensionContainerProps) {
-  return (
-    <VStack w="100vw" h="100vh" spacing={0}>
-      { children }
-    </VStack>
-  );
-}
-
 export default function SimulatedExtensionContainer({
   children,
 }: SimulatedExtensionContainerProps) {
   const isDevelopment = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development');
-  const Wrapper = isDevelopment ? DesktopComponent : ExtensionComponent;
-  return (
-    <Wrapper>{ children }</Wrapper>
-  );
+  return isDevelopment
+    ? <DesktopComponent>{ children }</DesktopComponent>
+    : children;
 }

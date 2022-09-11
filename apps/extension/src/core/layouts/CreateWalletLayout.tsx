@@ -234,7 +234,7 @@ export default function CreateWalletLayout({
         height="100%"
         width="100%"
         maxW="100%"
-        templateRows="60px 1fr 55px"
+        templateRows="60px 1fr 64px"
         bgColor={secondaryBgColor[colorMode]}
       >
         <Flex px={4}>
@@ -257,7 +257,7 @@ export default function CreateWalletLayout({
             {children}
           </form>
         </Box>
-        <Flex width="100%" justify="flex-end" px={4} pb={4}>
+        <Flex width="100%" justify="flex-end" alignItems="center" px={4}>
           <PrevButton />
           <NextButton />
         </Flex>
