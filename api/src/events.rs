@@ -164,7 +164,7 @@ impl EventsApi {
         event_handle.0.verify(0).map_err(|err| {
             BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
         })?;
-        verify_field_identifier(&field_name.0).map_err(|err| {
+        verify_field_identifier(field_name.as_str()).map_err(|err| {
             BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
         })?;
         fail_point_poem("endpoint_get_events_by_event_handle")?;

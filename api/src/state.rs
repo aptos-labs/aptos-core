@@ -103,7 +103,7 @@ impl StateApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
-        verify_module_identifier(&module_name.0).map_err(|err| {
+        verify_module_identifier(module_name.0.as_str()).map_err(|err| {
             BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
         })?;
         fail_point_poem("endpoint_get_account_module")?;
