@@ -20,6 +20,13 @@ module aptos_framework::genesis {
     use aptos_framework::version;
     use aptos_framework::chain_status;
 
+    /// Owner isn't in the initial balances
+    const  EOWNER_NOT_IN_INITIAL_BALANCES: u64 = 1;
+    /// Operator isn't in the initial balances
+    const  EOPERATOR_NOT_IN_INITIAL_BALANCES: u64 = 2;
+    /// Balance list and account list length mismatch
+    const  EACCOUNT_AND_BALANCE_LENGTH_MISMATCH: u64 = 3;
+
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
         operator_address: address,
@@ -138,34 +145,43 @@ module aptos_framework::genesis {
     /// Also mint initial balances
     fun create_initialize_validators(
         aptos_framework: &signer,
-        initial_balance_accounts: vector<address>,
-        initial_balances: vector<u64>,
+        accounts: vector<address>,
+        balances: vector<u64>,
         validators: vector<ValidatorConfiguration>,
     ) {
+        assert!(vector::length(&accounts) == vector::length(&balances), EACCOUNT_AND_BALANCE_LENGTH_MISMATCH);
+
+        // Mint initial balances saving the senders
+        let signers: vector<signer> = vector[];
+        let i = 0;
+        let len = vector::length(&balances);
+        while (i < len) {
+            let account = *vector::borrow(&accounts, i);
+            let initial_balance = *vector::borrow(&balances, i);
+            // We have to create the account before minting
+            let signer = create_account(aptos_framework, account, initial_balance);
+            vector::push_back(&mut signers, signer);
+            i = i + 1;
+        };
+
         // Create validators and mint associated coins / initialize accounts
         let i = 0;
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
 
-            // Find owner's balance
-            let owner_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.owner_address);
-
-            // Initialize the owner
-            let owner = &create_account(aptos_framework, validator.owner_address, owner_balance);
+            let (found_owner, owner_index) = vector::index_of(&accounts, &validator.owner_address);
+            assert!(found_owner, EOWNER_NOT_IN_INITIAL_BALANCES);
+            let owner = vector::borrow(&signers, owner_index);
 
             let operator = owner;
             // Create the operator account if it's different from owner.
             if (validator.operator_address != validator.owner_address) {
-                let operator_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.operator_address);
-                operator = &create_account(aptos_framework, validator.operator_address, operator_balance);
+                let (found_operator, operator_index) = vector::index_of(&accounts, &validator.operator_address);
+                assert!(found_operator, EOPERATOR_NOT_IN_INITIAL_BALANCES);
+                operator = vector::borrow(&signers, operator_index);
             };
-            // Create the voter account if it's different from owner and operator.
-            if (validator.voter_address != validator.owner_address &&
-                validator.voter_address != validator.operator_address) {
-                let voter_balance = find_initial_balance(&mut initial_balance_accounts, &mut initial_balances, &validator.voter_address);
-                create_account(aptos_framework, validator.voter_address, voter_balance);
-            };
+
             // Initialize the stake pool and join the validator set.
             stake::initialize_stake_owner(
                 owner,
@@ -190,17 +206,6 @@ module aptos_framework::genesis {
             i = i + 1;
         };
 
-        // Mint initial balances that were not handled by validators
-        let i = 0;
-        let len = vector::length(&initial_balances);
-        while (i < len) {
-            let account = *vector::borrow(&initial_balance_accounts, i);
-            let initial_balance = *vector::borrow(&initial_balances, i);
-            // We have to create the account before minting
-            create_account(aptos_framework, account, initial_balance);
-            i = i + 1;
-        };
-
         // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
@@ -217,18 +222,6 @@ module aptos_framework::genesis {
             aptos_coin::mint(aptos_framework, account, balance);
         };
         signer
-    }
-
-    /// Finds the balance of the account and removes it from the list
-    fun find_initial_balance(accounts: &mut vector<address>, balances: &mut vector<u64>, account: &address): u64 {
-        // Lookup account
-        let (found, index) = vector::index_of(accounts, account);
-        assert!(found, 404);
-        let found_address = vector::remove(accounts, index);
-
-        // Ensure it's the right one and remove it from the list
-        assert!(found_address == *account, 404);
-        vector::remove(balances, index)
     }
 
     /// The last step of genesis.
