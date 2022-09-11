@@ -19,7 +19,8 @@ use async_trait::async_trait;
 use field_count::FieldCount;
 use std::fmt::Debug;
 
-pub const NAME: &'static str = "default_processor";
+pub const NAME: &str = "default_processor";
+
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
 }

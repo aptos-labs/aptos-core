@@ -88,11 +88,17 @@ impl Tailer {
         match maybe_existing_chain_id {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
-                info!("Chain id matches! Continuing to index chain {}", chain_id);
+                info!(
+                    chain_id = chain_id,
+                    "Chain id matches! Continuing to index chain"
+                );
                 Ok(0)
             }
             None => {
-                info!("Adding chain id {} to db, continue indexing", new_chain_id);
+                info!(
+                    chain_id = new_chain_id,
+                    "Adding chain id to db, continue indexing"
+                );
                 execute_with_better_error(
                     &conn,
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {
@@ -110,7 +116,7 @@ impl Tailer {
             .await
             .set_version(version)
             .await;
-        aptos_logger::info!(version = version, "Will start fetching from version");
+        info!(version = version, "Will start fetching from version");
     }
 
     pub async fn process_next_batch(
@@ -131,10 +137,9 @@ impl Tailer {
         let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
         for ind in 0..num_batches {
             let self2 = self.clone();
-            let (start_index, end_index) = (
-                ind * batch_size as usize,
-                std::cmp::min((ind + 1) * batch_size as usize, transactions.len()),
-            );
+            let start_index = ind * batch_size as usize;
+            let end_index = std::cmp::min((ind + 1) * batch_size as usize, transactions.len());
+
             let mut txns = vec![];
             for t in &transactions[start_index..end_index] {
                 txns.push(t.clone());

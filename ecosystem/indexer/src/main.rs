@@ -95,7 +95,7 @@ async fn main() -> std::io::Result<()> {
         "Created the inspection service... "
     );
 
-    start_inspection_service(&args.inspection_url.as_str(), args.inspection_port);
+    start_inspection_service(args.inspection_url.as_str(), args.inspection_port);
 
     info!(
         processor_name = processor_name,
@@ -149,17 +149,24 @@ async fn main() -> std::io::Result<()> {
     let mut version_processed: usize = start_version as usize;
     let mut total_processed: usize = 0;
     let mut base: usize = 0;
-    let mut last_checked_chain: usize = 0;
+    let mut version_to_check_chain_id: usize = 0;
+
+    // Check once here to avoid the boolean check every iteration
+    if args.check_chain_id && version_to_check_chain_id == 0 {
+        tailer
+            .check_or_update_chain_id()
+            .await
+            .expect("Failed to get chain ID");
+        version_to_check_chain_id = version_processed + 100_000;
+    }
 
     loop {
-        if args.check_chain_id
-            && (last_checked_chain == 0 || last_checked_chain + 100_000 < version_processed)
-        {
+        if args.check_chain_id && version_to_check_chain_id < version_processed {
             tailer
                 .check_or_update_chain_id()
                 .await
                 .expect("Failed to get chain ID");
-            last_checked_chain = version_processed + 1;
+            version_to_check_chain_id = version_processed + 100_000;
         }
 
         let (num_res, _) = tailer.process_next_batch(args.batch_size).await;
