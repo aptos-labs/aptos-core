@@ -55,6 +55,10 @@ module aptos_framework::aptos_coin {
         (burn_cap, mint_cap)
     }
 
+    public fun has_mint_capability(account: &signer): bool {
+        exists<MintCapStore>(signer::address_of(account))
+    }
+
     /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
     /// and accounts have been initialized during genesis.
     public(friend) fun destroy_mint_cap(aptos_framework: &signer) acquires MintCapStore {

@@ -10,11 +10,18 @@ use crate::{
     },
     models::ledger_info::LedgerInfo,
     schema::ledger_infos::{self, dsl},
+    util::bigdecimal_to_u64,
 };
 use anyhow::{ensure, Context, Result};
 use aptos_logger::info;
 use aptos_rest_client::Transaction;
-use diesel::{prelude::*, RunQueryDsl};
+use bigdecimal::BigDecimal;
+use diesel::{
+    prelude::*,
+    sql_query,
+    sql_types::{BigInt, Numeric, Text},
+    RunQueryDsl,
+};
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 use url::{ParseError, Url};
@@ -24,18 +31,22 @@ diesel_migrations::embed_migrations!();
 #[derive(Clone)]
 pub struct Tailer {
     pub transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
-    processors: Vec<Arc<dyn TransactionProcessor>>,
+    processor: Arc<dyn TransactionProcessor>,
     connection_pool: PgDbPool,
 }
 
 impl Tailer {
-    pub fn new(node_url: &str, connection_pool: PgDbPool) -> Result<Tailer, ParseError> {
+    pub fn new(
+        node_url: &str,
+        connection_pool: PgDbPool,
+        processor: Arc<dyn TransactionProcessor>,
+    ) -> Result<Tailer, ParseError> {
         let url = Url::parse(node_url)?;
         let transaction_fetcher = TransactionFetcher::new(url, None);
         Ok(Self {
             transaction_fetcher: Arc::new(Mutex::new(transaction_fetcher)),
-            processors: vec![],
             connection_pool,
+            processor,
         })
     }
 
@@ -77,11 +88,17 @@ impl Tailer {
         match maybe_existing_chain_id {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
-                info!("Chain id matches! Continuing to index chain {}", chain_id);
+                info!(
+                    chain_id = chain_id,
+                    "Chain id matches! Continuing to index chain"
+                );
                 Ok(0)
             }
             None => {
-                info!("Adding chain id {} to db, continue indexing", new_chain_id);
+                info!(
+                    chain_id = new_chain_id,
+                    "Adding chain id to db, continue indexing"
+                );
                 execute_with_better_error(
                     &conn,
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {
@@ -93,89 +110,13 @@ impl Tailer {
         }
     }
 
-    pub fn add_processor(&mut self, processor: Arc<dyn TransactionProcessor>) {
-        info!("Adding processor to indexer: {}", processor.name());
-        self.processors.push(processor);
-    }
-
-    /// For all versions which have an `success=false` in the `processor_status` table, re-run them
-    /// TODO: also handle gaps in sequence numbers (pg query for this is super easy)
-    pub async fn handle_previous_errors(&self) {
-        info!("Checking for previously errored versions...");
-        let mut tasks = vec![];
-        for processor in &self.processors {
-            let processor2 = processor.clone();
-            let self2 = self.clone();
-            let task = tokio::task::spawn(async move {
-                let errored_versions = processor2.get_error_versions();
-                let err_count = errored_versions.len();
-                info!(
-                    "Found {} previously errored versions for {}",
-                    err_count,
-                    processor2.name(),
-                );
-                if err_count == 0 {
-                    return;
-                }
-                let mut fixed = 0;
-                for version in errored_versions {
-                    let txn = self2.get_txn(version).await;
-                    if processor2
-                        .process_transactions_with_status(vec![txn])
-                        .await
-                        .is_ok()
-                    {
-                        fixed += 1;
-                    };
-                }
-                info!(
-                    "Fixed {}/{} previously errored versions for {}",
-                    fixed,
-                    err_count,
-                    processor2.name(),
-                );
-            });
-            tasks.push(task);
-        }
-        await_tasks(tasks).await;
-        info!("Fixing previously errored versions complete!");
-    }
-
-    /// Sets the version of the fetcher to the lowest version among all processors
-    pub async fn set_fetcher_to_lowest_processor_version(&self) -> u64 {
-        let mut lowest = u64::MAX;
-        for processor in &self.processors {
-            let max_version = processor.get_max_version().unwrap_or_default();
-            aptos_logger::debug!(
-                "Processor {} max version is {}",
-                processor.name(),
-                max_version
-            );
-            if max_version < lowest {
-                lowest = max_version;
-            }
-        }
-        aptos_logger::info!("Lowest version amongst all processors is {}", lowest);
-        self.set_fetcher_version(lowest).await;
-        lowest
-    }
-
-    pub async fn set_fetcher_version(&self, version: u64) -> u64 {
+    pub async fn set_fetcher_version(&self, version: u64) {
         self.transaction_fetcher
             .lock()
             .await
             .set_version(version)
             .await;
-        aptos_logger::info!("Will start fetching from version {}", version);
-        version
-    }
-
-    pub async fn process_version(
-        &mut self,
-        version: u64,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
-        let txn = self.get_txn(version).await;
-        self.process_transactions(vec![txn]).await
+        info!(version = version, "Will start fetching from version");
     }
 
     pub async fn process_next_batch(
@@ -183,7 +124,7 @@ impl Tailer {
         batch_size: u8,
     ) -> (
         usize,
-        Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>>,
+        Vec<Result<ProcessingResult, TransactionProcessingError>>,
     ) {
         let transactions = self
             .transaction_fetcher
@@ -196,40 +137,23 @@ impl Tailer {
         let num_batches = (transactions.len() as f64 / batch_size as f64).ceil() as usize;
         for ind in 0..num_batches {
             let self2 = self.clone();
-            let (start_index, end_index) = (
-                ind * batch_size as usize,
-                std::cmp::min((ind + 1) * batch_size as usize, transactions.len()),
-            );
+            let start_index = ind * batch_size as usize;
+            let end_index = std::cmp::min((ind + 1) * batch_size as usize, transactions.len());
+
             let mut txns = vec![];
             for t in &transactions[start_index..end_index] {
                 txns.push(t.clone());
             }
             if !txns.is_empty() {
-                let task =
-                    tokio::task::spawn(async move { self2.process_transactions(txns).await });
+                let task = tokio::task::spawn(async move {
+                    self2.processor.process_transactions_with_status(txns).await
+                });
                 tasks.push(task);
             }
         }
-        let results: Vec<Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> =
+        let results: Vec<Result<ProcessingResult, TransactionProcessingError>> =
             await_tasks(tasks).await;
         (num_txns, results)
-    }
-
-    pub async fn process_transactions(
-        &self,
-        txns: Vec<Transaction>,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
-        let mut tasks = vec![];
-        for processor in &self.processors {
-            let processor2 = processor.clone();
-            let txns2 = txns.clone();
-            let task = tokio::task::spawn(async move {
-                processor2.process_transactions_with_status(txns2).await
-            });
-            tasks.push(task);
-        }
-        let results = await_tasks(tasks).await;
-        Ok(results)
     }
 
     pub async fn get_txn(&self, version: u64) -> Transaction {
@@ -238,6 +162,90 @@ impl Tailer {
             .await
             .fetch_version(version)
             .await
+    }
+
+    /// Get starting version from database. Starting version is defined as the first version that's either
+    /// not successful or missing from the DB.
+    pub fn get_start_version(&self, processor_name: &String) -> Option<u64> {
+        let conn = self
+            .connection_pool
+            .get()
+            .expect("DB connection should be available to get starting version");
+
+        // This query gets the first version that isn't equal to the next version (versions would be sorted of course).
+        // There's also special handling if the gap happens in the beginning.
+        let sql = "
+          WITH raw_boundaries AS
+          (
+              SELECT
+                  MAX(version) AS MAX_BLOCK,
+                  MIN(version) AS MIN_BLOCK
+              FROM
+                  processor_statuses
+              WHERE
+                  name = $1
+                  AND success = TRUE
+          ),
+          boundaries AS
+          (
+              SELECT
+                  MAX(version) AS MAX_BLOCK,
+                  MIN(version) AS MIN_BLOCK
+              FROM
+                  processor_statuses, raw_boundaries
+              WHERE
+                  name = $1
+                  AND success = true
+                  and version >= GREATEST(MAX_BLOCK - $2, 0)
+
+          ),
+          gap AS
+          (
+              SELECT
+                  MIN(version) + 1 AS maybe_gap
+              FROM
+                  (
+                      SELECT
+                          version,
+                          LEAD(version) OVER (
+                      ORDER BY
+                          version ASC) AS next_version
+                      FROM
+                          processor_statuses,
+                          boundaries
+                      WHERE
+                          name = $1
+                          AND success = TRUE
+                          AND version >= GREATEST(MAX_BLOCK - $2, 0)
+                  ) a
+              WHERE
+                  version + 1 <> next_version
+          )
+          SELECT
+              CASE
+                  WHEN
+                      MIN_BLOCK <> GREATEST(MAX_BLOCK - $2, 0)
+                  THEN
+                      GREATEST(MAX_BLOCK - $2, 0)
+                  ELSE
+                      COALESCE(maybe_gap, MAX_BLOCK + 1)
+              END
+              AS version
+          FROM
+              gap, boundaries
+          ";
+        #[derive(Debug, QueryableByName)]
+        pub struct Gap {
+            #[sql_type = "Numeric"]
+            pub version: BigDecimal,
+        }
+        let mut res: Vec<Option<Gap>> = sql_query(sql)
+            .bind::<Text, _>(processor_name)
+            // This is the number used to determine how far we look back for gaps. Increasing it may result in slower startup
+            .bind::<BigInt, _>(1500000)
+            .get_results(&conn)
+            .unwrap();
+        res.pop().unwrap().map(|g| bigdecimal_to_u64(&g.version))
     }
 }
 
@@ -260,9 +268,8 @@ mod test {
     use super::*;
     use crate::{
         database::{new_db_pool, PgPoolConnection},
-        default_processor::DefaultTransactionProcessor,
         models::transactions::TransactionModel,
-        token_processor::TokenTransactionProcessor,
+        processors::default_processor::DefaultTransactionProcessor,
     };
     use aptos_rest_client::State;
     use diesel::Connection;
@@ -343,17 +350,18 @@ mod test {
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&conn_pool.get()?);
 
-        let mut tailer = Tailer::new("http://fake-url.aptos.dev", conn_pool.clone())?;
+        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
+        let mut tailer = Tailer::new(
+            "http://fake-url.aptos.dev",
+            conn_pool.clone(),
+            Arc::new(pg_transaction_processor),
+        )?;
         tailer.transaction_fetcher = Arc::new(Mutex::new(FakeFetcher::new(
             Url::parse("http://fake-url.aptos.dev")?,
             None,
         )));
         tailer.run_migrations();
 
-        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
-        tailer.add_processor(Arc::new(pg_transaction_processor));
-        tailer.add_processor(Arc::new(token_transaction_processor));
         Ok((conn_pool, tailer))
     }
 
@@ -557,7 +565,8 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transactions(vec![genesis_txn.clone()])
+            .processor
+            .process_transactions_with_status(vec![genesis_txn.clone()])
             .await
             .unwrap();
 
@@ -635,7 +644,8 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transactions(vec![block_metadata_transaction.clone()])
+            .processor
+            .process_transactions_with_status(vec![block_metadata_transaction.clone()])
             .await
             .unwrap();
 
@@ -748,11 +758,13 @@ mod test {
 
         // We run it twice to ensure we don't explode. Idempotency!
         tailer
-            .process_transactions(vec![user_txn.clone()])
+            .processor
+            .process_transactions_with_status(vec![user_txn.clone()])
             .await
             .unwrap();
         tailer
-            .process_transactions(vec![user_txn.clone()])
+            .processor
+            .process_transactions_with_status(vec![user_txn.clone()])
             .await
             .unwrap();
 
@@ -770,10 +782,6 @@ mod test {
         assert_eq!(events2.first().unwrap().type_, "0x1::Whatever::FakeEvent1");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::Whatever::FakeEvent2");
         assert_eq!(wsc2.len(), 2);
-
-        // Fetch the latest status
-        let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
-        assert_eq!(latest_version, 691595);
 
         // Message Transaction -> 0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3
         let message_txn: Transaction = serde_json::from_value(json!(
@@ -836,7 +844,11 @@ mod test {
         )).unwrap();
 
         let txns = crate::indexer::fetcher::remove_null_bytes_from_txns(vec![message_txn.clone()]);
-        tailer.process_transactions(txns).await.unwrap();
+        tailer
+            .processor
+            .process_transactions_with_status(txns)
+            .await
+            .unwrap();
 
         let (_conn_pool, tailer) = setup_indexer().unwrap();
         tailer.set_fetcher_version(4).await;

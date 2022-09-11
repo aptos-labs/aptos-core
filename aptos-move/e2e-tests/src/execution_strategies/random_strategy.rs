@@ -53,7 +53,7 @@ pub struct RandomExecutor {
 impl RandomExecutor {
     pub fn from_seed(seed: [u8; 32]) -> Self {
         Self {
-            executor: FakeExecutor::from_genesis_file(),
+            executor: FakeExecutor::from_head_genesis(),
             strategy: RandomizedStrategy::from_seed(seed),
         }
     }

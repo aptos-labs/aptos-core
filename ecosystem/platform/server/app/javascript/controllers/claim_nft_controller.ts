@@ -128,7 +128,13 @@ export default class extends Controller<HTMLAnchorElement> {
         ) {
           return this.redirectToTransaction(pendingTransaction.hash);
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === "Unauthorized") {
+          // if unauthorized, we need to connect to wallet
+          const url = new URL(location.href);
+          url.search = `connect-wallet`;
+          location.href = url.toString();
+        }
         Sentry.captureException(error);
       }
     } else if (claimDetails.wallet_name === "martian") {

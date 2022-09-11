@@ -24,14 +24,14 @@ use vm_genesis::{
 };
 
 /// Dummy genesis ChangeSet for testing
-pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Compiled));
+pub static GENESIS_CHANGE_SET_HEAD: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Head));
 
-pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Fresh));
+pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Testnet));
 
 pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
-    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Fresh));
+    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///

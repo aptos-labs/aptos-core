@@ -34,7 +34,7 @@ impl Default for BasicExecutor {
 impl BasicExecutor {
     pub fn new() -> Self {
         Self {
-            executor: FakeExecutor::from_genesis_file(),
+            executor: FakeExecutor::from_head_genesis(),
             strategy: BasicStrategy,
         }
     }

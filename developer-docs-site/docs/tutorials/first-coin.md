@@ -215,7 +215,7 @@ public fun initialize<CoinType>(
 }
 ```
 
-This ensures that this coin type has never been initialized before, notice the cehck to ensure that the caller to `initialize` actually published this module and that there is no `CoinInfo` stored on their account. If both those conditions check, then a `CoinInfo` is stored and the caller obtains capabilities for burning, freezing, and minting.
+This ensures that this coin type has never been initialized before, notice the check to ensure that the caller to `initialize` actually published this module and that there is no `CoinInfo` stored on their account. If both those conditions check, then a `CoinInfo` is stored and the caller obtains capabilities for burning, freezing, and minting.
 
 _MoonCoin_ calls this function automatically upon package publishing.
 
@@ -242,7 +242,7 @@ public fun register<CoinType>(account: &signer) {
 }
 ```
 
-As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` t ocall the function.
+As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function.
 
 _MoonCoin_ uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`.
 

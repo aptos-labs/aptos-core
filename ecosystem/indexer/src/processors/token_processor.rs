@@ -31,6 +31,8 @@ use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
 use std::fmt::Debug;
 
+pub const NAME: &str = "token_processor";
+
 pub struct TokenTransactionProcessor {
     connection_pool: PgDbPool,
     index_token_uri: bool,
@@ -243,7 +245,7 @@ fn process_token_on_chain_data(
 #[async_trait]
 impl TransactionProcessor for TokenTransactionProcessor {
     fn name(&self) -> &'static str {
-        "token_processor"
+        NAME
     }
 
     async fn process_transactions(

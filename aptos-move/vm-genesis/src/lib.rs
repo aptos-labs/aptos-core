@@ -450,15 +450,23 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
 /// should be used.
 #[derive(Debug, Eq, PartialEq)]
 pub enum GenesisOptions {
-    Compiled,
-    Fresh,
+    /// Framework compiled from head
+    Head,
+    /// Framework as it was released or upgraded in testnet
+    Testnet,
+    /// Framework as it was released or upgraded in mainnet
+    Mainnet,
 }
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
-        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => {
+            // We don't yet have mainnet, so returning testnet here
+            framework::testnet_release_bundle()
+        }
     };
 
     generate_test_genesis(framework, Some(1)).0
@@ -467,8 +475,12 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
-        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
+        GenesisOptions::Head => cached_packages::head_release_bundle(),
+        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+        GenesisOptions::Mainnet => {
+            // We don't yet have mainnet, so returning testnet here
+            framework::testnet_release_bundle()
+        }
     };
 
     generate_mainnet_genesis(framework, Some(1)).0
