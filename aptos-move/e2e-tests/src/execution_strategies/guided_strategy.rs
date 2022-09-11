@@ -60,7 +60,7 @@ impl<Strategy: PartitionStrategy> GuidedExecutor<Strategy> {
     pub fn new(strategy: Strategy) -> Self {
         Self {
             strategy,
-            executor: FakeExecutor::from_genesis_file(),
+            executor: FakeExecutor::from_head_genesis(),
         }
     }
 }

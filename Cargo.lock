@@ -3365,6 +3365,7 @@ dependencies = [
  "anyhow",
  "aptos",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-keygen",
  "aptos-logger",
  "aptos-parallel-executor",
