@@ -8,7 +8,7 @@ mod bytecode;
 mod convert;
 mod derives;
 mod error;
-mod event_key;
+mod event_key_param;
 mod hash;
 mod headers;
 mod index;
@@ -25,7 +25,7 @@ pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
 pub use error::{AptosError, AptosErrorCode};
-pub use event_key::EventKey;
+pub use event_key_param::EventKeyParam;
 pub use hash::HashValue;
 pub use headers::*;
 pub use index::IndexResponse;
@@ -47,4 +47,4 @@ pub use transaction::{
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::IdentifierWrapper;
+pub use wrappers::{EventGuid, IdentifierWrapper};

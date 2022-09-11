@@ -5,14 +5,16 @@ use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
-static EVENT_KEY: &str =
-    "0x0500000000000000000000000000000000000000000000000000000000000000000000000a550c18";
+static ACCOUNT_ADDRESS: &str = "0xa550c18";
+static CREATION_NUMBER: &str = "0";
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_events() {
     let mut context = new_test_context(current_function_name!());
 
-    let resp = context.get(format!("/events/{}", EVENT_KEY).as_str()).await;
+    let resp = context
+        .get(format!("/accounts/{}/events/{}", ACCOUNT_ADDRESS, CREATION_NUMBER).as_str())
+        .await;
 
     context.check_golden_output(resp);
 }
@@ -22,7 +24,13 @@ async fn test_get_events_filter_by_start_sequence_number() {
     let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .get(format!("/events/{}?start=1", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     context.check_golden_output(resp);
 }
@@ -34,21 +42,36 @@ async fn test_get_events_filter_by_limit_page_size() {
     let context = new_test_context(current_function_name!());
 
     let resp = context
-        .get(format!("/events/{}?start=1&limit=1", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1&limit=1",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 1);
 
     let resp = context
-        .get(format!("/events/{}?start=1&limit=2", EVENT_KEY).as_str())
+        .get(
+            format!(
+                "/accounts/{}/events/{}?start=1&limit=2",
+                ACCOUNT_ADDRESS, CREATION_NUMBER
+            )
+            .as_str(),
+        )
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 2);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_events_by_invalid_key() {
+async fn test_get_events_by_invalid_creation_number() {
     let mut context = new_test_context(current_function_name!());
 
-    let resp = context.expect_status_code(400).get("/events/invalid").await;
+    let resp = context
+        .expect_status_code(400)
+        .get(format!("/accounts/{}/events/invalid", ACCOUNT_ADDRESS).as_str())
+        .await;
     context.check_golden_output(resp);
 }
 

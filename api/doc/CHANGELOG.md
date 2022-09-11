@@ -4,6 +4,50 @@ All notable changes to the Aptos Node API will be captured in this file. This ch
 
 **Note**: The Aptos Node API does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the API will follow semantic versioning closely.
 
+## 1.1.0 (2022-09-08)
+- A new endpoint has been added for getting events by GUID: `/accounts/{address}/events/{creation_number}`. If you would make a request to `/events/{event_key}` like in `Example A` below, you would use the new endpoint like in `Example B`.
+- **[Deprecated]** The `/events/{event_key}` endpoint is now deprecated. In the next release it will be removed entirely. You must migrate to the new endpoint, `/accounts/{address}/events/{creation_number}`, by then.
+- **[Breaking change]** The canonical string representation of `EventKey` is no longer used in responses from the API, effective immediately. Whereas previously you would see a representation of an event like `Output A` below, it now looks like `Output B`. See [#4012](https://github.com/aptos-labs/aptos-core/pull/4012).
+
+Example A (deprecated endpoint):
+```
+$ curl https://fullnode.devnet.aptoslabs.com/v1/events/0x02000000000000000000000000000000000000000000000000000000000000000000000000000001
+```
+
+Example B (new endpoint):
+```
+$ curl https://fullnode.devnet.aptoslabs.com/v1/accounts/0x1/events/2
+```
+
+Output A (old representation):
+```
+{
+  "version": "0",
+  "key": "0x02000000000000000000000000000000000000000000000000000000000000000000000000000001",
+  "sequence_number": "0",
+  "type": "0x1::reconfiguration::NewEpochEvent",
+  "data": {
+    "epoch": "1"
+  }
+}
+```
+
+Output B (new representation):
+```
+{
+  "version": "0",
+  "guid": {
+    "creation_number": "2",
+    "account_address": "0x1"
+  },
+  "sequence_number": "0",
+  "type": "0x1::reconfiguration::NewEpochEvent",
+  "data": {
+    "epoch": "1"
+  }
+}
+```
+
 ## 1.0.1 (2022-08-10)
 - Changed snake casing by updating Poem version. For example, `ed_25519_signature` will now be `ed25519_signature`. This behavior matches serde.
 - Switched back to the string representation of structs like `ScriptFunctionId`, `MoveStructTag`, and `MoveModuleId`. They are now represented how they were in "before" in the changelog notes of 1.0.0, e.g. `0x1::payment_scripts::peer_to_peer_with_metadata`.

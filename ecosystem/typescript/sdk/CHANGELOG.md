@@ -5,6 +5,9 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+- A new function called `getEventsByCreationNumber` has been added, corresponding to the new endpoint on the API. For more information on this change, see the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for API version 1.1.0.
+- **[Deprecated]** The `getEventsByEventKey` function is now deprecated. In the next release it will be removed entirely. You must migrate to the new function, `getEventsByCreationNumber`, by then.
+- **[Breaking change]** The representation of events has changed. In short, the `key` field in the `Event` response struct is now `guid` and has a different format. See the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md for a concrete description of the changes.
 
 ## 1.3.12 (2022-09-08)
 

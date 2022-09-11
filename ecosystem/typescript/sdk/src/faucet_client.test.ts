@@ -68,7 +68,10 @@ test(
     });
     expect(eventSubset[0].type).toBe("0x1::coin::WithdrawEvent");
 
-    const events2 = await client.getEventsByEventKey(events[0].key);
+    const events2 = await client.getEventsByCreationNumber(
+      events[0].guid.account_address,
+      events[0].guid.creation_number,
+    );
     expect(events2[0].type).toBe("0x1::coin::WithdrawEvent");
   },
   30 * 1000,

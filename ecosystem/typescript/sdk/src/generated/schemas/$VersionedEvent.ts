@@ -8,8 +8,8 @@ export const $VersionedEvent = {
             type: 'U64',
             isRequired: true,
         },
-        key: {
-            type: 'EventKey',
+        guid: {
+            type: 'EventGuid',
             isRequired: true,
         },
         sequence_number: {

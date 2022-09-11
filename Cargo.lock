@@ -681,6 +681,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-rest-client",
+ "aptos-types",
  "async-trait",
  "bigdecimal",
  "chrono",
