@@ -385,9 +385,9 @@ pub struct MoveStructTag {
 
 impl VerifyInputWithRecursion for MoveStructTag {
     fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {
-        verify_module_identifier(&self.module)
+        verify_module_identifier(self.module.as_str())
             .map_err(|_| anyhow::anyhow!("invalid struct tag: {}", self))?;
-        verify_identifier(&self.name)
+        verify_identifier(self.name.as_str())
             .map_err(|_| anyhow::anyhow!("invalid struct tag: {}", self))?;
         for param in self.generic_type_params.iter() {
             param.verify(recursion_count)?;
@@ -741,7 +741,7 @@ pub struct MoveModuleId {
 
 impl VerifyInput for MoveModuleId {
     fn verify(&self) -> anyhow::Result<()> {
-        verify_module_identifier(&self.name).map_err(|_| invalid_move_module_id(self))
+        verify_module_identifier(self.name.as_str()).map_err(|_| invalid_move_module_id(self))
     }
 }
 
@@ -1076,7 +1076,7 @@ impl VerifyInput for EntryFunctionId {
         self.module
             .verify()
             .map_err(|_| invalid_entry_function_id(self))?;
-        verify_identifier(&self.name).map_err(|_| invalid_entry_function_id(self))
+        verify_function_identifier(self.name.as_str()).map_err(|_| invalid_entry_function_id(self))
     }
 }
 
@@ -1132,16 +1132,19 @@ impl fmt::Display for EntryFunctionId {
     }
 }
 
-pub fn verify_module_identifier(module: &IdentifierWrapper) -> anyhow::Result<()> {
+pub fn verify_function_identifier(function: &str) -> anyhow::Result<()> {
+    verify_identifier(function).map_err(|_| format_err!("invalid Move function name: {}", function))
+}
+pub fn verify_module_identifier(module: &str) -> anyhow::Result<()> {
     verify_identifier(module).map_err(|_| format_err!("invalid Move module name: {}", module))
 }
 
-pub fn verify_field_identifier(field: &IdentifierWrapper) -> anyhow::Result<()> {
+pub fn verify_field_identifier(field: &str) -> anyhow::Result<()> {
     verify_identifier(field).map_err(|_| format_err!("invalid Move field name: {}", field))
 }
 
-pub fn verify_identifier(identifier: &IdentifierWrapper) -> anyhow::Result<()> {
-    if identifier.as_str().contains("::") {
+pub fn verify_identifier(identifier: &str) -> anyhow::Result<()> {
+    if identifier.contains("::") {
         Err(format_err!(
             "Identifier should not contain '::' {}",
             identifier

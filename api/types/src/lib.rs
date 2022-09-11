@@ -31,10 +31,10 @@ pub use headers::*;
 pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    verify_field_identifier, verify_module_identifier, EntryFunctionId, HexEncodedBytes,
-    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
-    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStruct,
-    MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
+    verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
+    HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
 };
 pub use table::TableItemRequest;
 pub use transaction::{
