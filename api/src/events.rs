@@ -1,24 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use crate::accept_type::AcceptType;
 use crate::accounts::Account;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
+use crate::response::BadRequestError;
 use crate::response::{
     BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, EventKey, IdentifierWrapper, LedgerInfo, MoveStructTag, U64,
+    verify_field_identifier, Address, AptosErrorCode, EventKey, IdentifierWrapper, LedgerInfo,
+    MoveStructTag, VerifyInputWithRecursion, U64,
 };
 use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
+use std::sync::Arc;
 
 pub struct EventsApi {
     pub context: Arc<Context>,
@@ -96,6 +97,12 @@ impl EventsApi {
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         // TODO: Assert that Event represents u64s as strings.
+        event_handle.0.verify(0).map_err(|err| {
+            BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
+        verify_field_identifier(&field_name.0).map_err(|err| {
+            BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         self.context
             .check_api_output_enabled("Get events by event handle", &accept_type)?;

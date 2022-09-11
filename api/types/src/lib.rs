@@ -31,9 +31,10 @@ pub use headers::*;
 pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    EntryFunctionId, HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
+    verify_field_identifier, verify_module_identifier, EntryFunctionId, HexEncodedBytes,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStruct,
+    MoveStructField, MoveStructTag, MoveType, MoveValue, U128, U64,
 };
 pub use table::TableItemRequest;
 pub use transaction::{
@@ -48,3 +49,13 @@ pub use transaction::{
     WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::IdentifierWrapper;
+
+/// For verifying a given struct
+pub trait VerifyInput {
+    fn verify(&self) -> anyhow::Result<()>;
+}
+
+/// For verifying a given struct that needs to limit recursion
+pub trait VerifyInputWithRecursion {
+    fn verify(&self, recursion_count: u8) -> anyhow::Result<()>;
+}
