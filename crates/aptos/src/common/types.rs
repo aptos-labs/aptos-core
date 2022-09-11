@@ -646,6 +646,44 @@ impl PrivateKeyInputOptions {
     }
 
     /// Extract private key from CLI args with fallback to config
+    pub fn extract_private_key_and_address(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            if let Some(address) = maybe_address {
+                Ok((key, address))
+            } else {
+                let address = account_address_from_public_key(&key.public_key());
+                Ok((key, address))
+            }
+        } else if let Some((Some(key), maybe_config_address)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| (p.private_key, p.account))
+        {
+            match (maybe_address, maybe_config_address) {
+                (Some(address), _) => Ok((key, address)),
+                (_, Some(address)) => Ok((key, address)),
+                (None, None) => {
+                    let address = account_address_from_public_key(&key.public_key());
+                    Ok((key, address))
+                }
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+            ))
+        }
+    }
+
+    /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
@@ -1121,6 +1159,14 @@ pub struct TransactionOptions {
     /// as the max gas
     #[clap(long)]
     pub(crate) estimate_max_gas: bool,
+
+    /// Sender account address
+    ///
+    /// This allows you to override the account address from the derived account address
+    /// in the event that the authentication key was rotated or for a resource account
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) sender_account: Option<AccountAddress>,
+
     #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
@@ -1136,31 +1182,23 @@ pub struct TransactionOptions {
 }
 
 impl TransactionOptions {
-    /// Retrieves the private key
-    pub(crate) fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
-        self.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )
-    }
-
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options.profile)
     }
 
+    /// Retrieves the public key and the associated address
+    /// TODO: Cache this information
+    pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
+        self.private_key_options.extract_private_key_and_address(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+            self.sender_account,
+        )
+    }
+
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        // If private key flags are specified, do not use the profile's account address
-        if self
-            .private_key_options
-            .extract_private_key_cli(self.encoding_options.encoding)?
-            .is_some()
-        {
-            let sender_key = self.private_key()?;
-            Ok(account_address_from_public_key(&sender_key.public_key()))
-        } else {
-            self.profile_options.account_address()
-        }
+        Ok(self.get_key_and_address()?.1)
     }
 
     /// Gets the auth key by account address. We need to fetch the auth key from Rest API rather than creating an
@@ -1184,11 +1222,8 @@ impl TransactionOptions {
         payload: TransactionPayload,
         amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
-        let sender_key = self.private_key()?;
         let client = self.rest_client()?;
-
-        // Get sender address
-        let sender_address = self.sender_address()?;
+        let (sender_key, sender_address) = self.get_key_and_address()?;
 
         // Get sequence number for account
         let sequence_number = self.sequence_number(sender_address).await?;
@@ -1249,11 +1284,8 @@ impl TransactionOptions {
         gas_price: Option<u64>,
         amount_transfer: Option<u64>,
     ) -> CliTypedResult<UserTransaction> {
-        let sender_key = self.private_key()?;
         let client = self.rest_client()?;
-
-        // Get sender address
-        let sender_address = self.sender_address()?;
+        let (sender_key, sender_address) = self.get_key_and_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;

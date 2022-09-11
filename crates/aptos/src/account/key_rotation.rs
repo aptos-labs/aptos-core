@@ -83,7 +83,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 )
             })?;
 
-        let sender_address = self.txn_options.sender_address()?;
+        let (current_private_key, sender_address) = self.txn_options.get_key_and_address()?;
 
         // Get sequence number for account
         let sequence_number = self.txn_options.sequence_number(sender_address).await?;
@@ -104,10 +104,8 @@ impl CliCommand<RotateSummary> for RotateKey {
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
         // Signs the struct using both the current private key and the next private key
-        let rotation_proof_signed_by_current_private_key = self
-            .txn_options
-            .private_key()?
-            .sign_arbitrary_message(&rotation_msg.clone());
+        let rotation_proof_signed_by_current_private_key =
+            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
         let rotation_proof_signed_by_new_private_key =
             new_private_key.sign_arbitrary_message(&rotation_msg);
 
@@ -117,11 +115,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 aptos_stdlib::account_rotate_authentication_key(
                     0,
                     // Existing public key
-                    self.txn_options
-                        .private_key()?
-                        .public_key()
-                        .to_bytes()
-                        .to_vec(),
+                    current_private_key.public_key().to_bytes().to_vec(),
                     0,
                     // New public key
                     new_private_key.public_key().to_bytes().to_vec(),
