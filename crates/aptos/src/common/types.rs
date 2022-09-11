@@ -538,6 +538,13 @@ impl PromptOptions {
             assume_no: false,
         }
     }
+
+    pub fn no() -> Self {
+        Self {
+            assume_yes: false,
+            assume_no: true,
+        }
+    }
 }
 
 /// An insertable option for use with encodings.
