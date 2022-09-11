@@ -73,8 +73,16 @@ export default class extends Controller<HTMLElement> {
 
   async getPublicKey() {
     if (this.walletName === "petra") {
-      const { publicKey } = await window.aptos!.connect();
-      return publicKey;
+      if (window.aptos) {
+        const { publicKey } = await window.aptos.connect();
+        return publicKey;
+      } else {
+        window.open(
+          "https://chrome.google.com/webstore/detail/petra-aptos-wallet/ejjladinnckdgjemekebdpeokbikhfci",
+          "_blank"
+        );
+        throw "Petra wallet not installed. Install from the Chrome Web Store and refresh the page.";
+      }
     } else if (this.walletName === "martian") {
       const { publicKey } = await window.martian!.connect();
       return publicKey;
