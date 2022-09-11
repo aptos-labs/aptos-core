@@ -516,6 +516,9 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
+        data.0.verify().map_err(|err| {
+            BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;

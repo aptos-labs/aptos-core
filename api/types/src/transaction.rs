@@ -470,6 +470,12 @@ pub struct EncodeSubmissionRequest {
     pub secondary_signers: Option<Vec<Address>>,
 }
 
+impl VerifyInput for EncodeSubmissionRequest {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.transaction.verify()
+    }
+}
+
 /// The genesis transaction
 ///
 /// This only occurs at the genesis transaction (version 0)
