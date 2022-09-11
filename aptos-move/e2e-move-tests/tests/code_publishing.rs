@@ -15,7 +15,7 @@ mod common;
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
-// to test for multiple versions.
+// to test for multiple feature combinations.
 
 /// Mimics `0xcafe::test::State`
 #[derive(Serialize, Deserialize)]
@@ -23,6 +23,8 @@ struct State {
     value: u64,
 }
 
+/// Runs the basic publishing test for all legacy flag combinations. Otherwise we will only
+/// run tests which are expected to make a difference for legacy flag combinations.
 #[rstest]
 #[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
@@ -63,7 +65,6 @@ fn code_publishing_basic(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -83,7 +84,6 @@ fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_success_compat(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -103,7 +103,6 @@ fn code_publishing_upgrade_success_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_fail_compat(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -124,7 +123,6 @@ fn code_publishing_upgrade_fail_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_fail_immutable(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -145,7 +143,6 @@ fn code_publishing_upgrade_fail_immutable(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_upgrade_fail_overlapping_module(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -209,7 +206,6 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_framework_upgrade(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -224,7 +220,6 @@ fn code_publishing_framework_upgrade(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_framework_upgrade_fail(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -240,7 +235,6 @@ fn code_publishing_framework_upgrade_fail(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_weak_dep_fail(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -267,7 +261,6 @@ fn code_publishing_weak_dep_fail(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
@@ -297,7 +290,6 @@ fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![])]
 #[case(vec![CODE_DEPENDENCY_CHECK])]
 fn code_publishing_using_resource_account(#[case] features: Vec<u64>) {
     let mut h = MoveHarness::new_with_features(features);
