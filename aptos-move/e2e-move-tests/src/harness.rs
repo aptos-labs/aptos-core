@@ -324,7 +324,7 @@ impl MoveHarness {
         let acc = self.aptos_framework_account();
         assert_success!(self.run_entry_function(
             &acc,
-            str::parse("0x1::features::change_feature_flags").unwrap(),
+            str::parse("0x1::features::change_feature_flags_txn").unwrap(),
             vec![],
             vec![
                 bcs::to_bytes(&features).unwrap(),

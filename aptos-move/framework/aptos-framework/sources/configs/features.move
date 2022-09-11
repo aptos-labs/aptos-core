@@ -2,6 +2,7 @@
 module aptos_framework::features {
     use aptos_framework::system_addresses;
     use std::vector;
+    use aptos_framework::reconfiguration;
 
     // ============================================================================================
     // Feature Flag Definitions
@@ -43,7 +44,15 @@ module aptos_framework::features {
         features: vector<u8>,
     }
 
-    /// Entry function to enable and disable features. Can only be called by @aptos_framework.
+    /// Entry function to enable and disable features, and trigger reconfiguration afterwards.
+    /// Can only be called by @aptos_framework.
+    public entry fun change_feature_flags_txn(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>)
+    acquires Features {
+        change_feature_flags(aptos_framework, enable, disable);
+        reconfiguration::reconfigure()
+    }
+
+    /// Function to enable and disable features. Can only be called by @aptos_framework.
     public entry fun change_feature_flags(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>)
     acquires Features {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -54,13 +63,13 @@ module aptos_framework::features {
         let i = 0;
         let n = vector::length(&enable);
         while (i < n) {
-            include_or_exclude(features, *vector::borrow(&enable, i), true);
+            set(features, *vector::borrow(&enable, i), true);
             i = i + 1
         };
         let i = 0;
         let n = vector::length(&disable);
         while (i < n) {
-            include_or_exclude(features, *vector::borrow(&disable, i), false);
+            set(features, *vector::borrow(&disable, i), false);
             i = i + 1
         };
     }
@@ -72,7 +81,7 @@ module aptos_framework::features {
     }
 
     /// Helper to include or exclude a feature flag.
-    fun include_or_exclude(features: &mut vector<u8>, feature: u64, include: bool) {
+    fun set(features: &mut vector<u8>, feature: u64, include: bool) {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
         while (vector::length(features) <= byte_index) {
@@ -95,16 +104,16 @@ module aptos_framework::features {
     #[test]
     fun test_feature_sets() {
         let features = vector[];
-        include_or_exclude(&mut features, 1, true);
-        include_or_exclude(&mut features, 5, true);
-        include_or_exclude(&mut features, 17, true);
-        include_or_exclude(&mut features, 23, true);
+        set(&mut features, 1, true);
+        set(&mut features, 5, true);
+        set(&mut features, 17, true);
+        set(&mut features, 23, true);
         assert!(contains(&features, 1), 0);
         assert!(contains(&features, 5), 1);
         assert!(contains(&features, 17), 2);
         assert!(contains(&features, 23), 3);
-        include_or_exclude(&mut features, 5, false);
-        include_or_exclude(&mut features, 17, false);
+        set(&mut features, 5, false);
+        set(&mut features, 17, false);
         assert!(contains(&features, 1), 0);
         assert!(!contains(&features, 5), 1);
         assert!(!contains(&features, 17), 2);
