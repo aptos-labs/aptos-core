@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::assert_success;
 use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -322,15 +321,18 @@ impl MoveHarness {
     /// Enables features
     pub fn enable_features(&mut self, features: Vec<u64>) {
         let acc = self.aptos_framework_account();
-        assert_success!(self.run_entry_function(
-            &acc,
-            str::parse("0x1::features::change_feature_flags").unwrap(),
+        self.executor.exec(
+            "features",
+            "change_feature_flags",
             vec![],
             vec![
+                MoveValue::Signer(*acc.address())
+                    .simple_serialize()
+                    .unwrap(),
                 bcs::to_bytes(&features).unwrap(),
-                bcs::to_bytes(&Vec::<u64>::new()).unwrap()
+                bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
             ],
-        ));
+        );
     }
 
     /// Increase maximal transaction size.
