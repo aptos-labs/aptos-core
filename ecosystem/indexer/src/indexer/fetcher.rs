@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use url::Url;
 
 // TODO: make this configurable
-const RETRY_TIME_MILLIS: u64 = 1000;
+const RETRY_TIME_MILLIS: u64 = 300;
 const MAX_RETRY_TIME_MILLIS: u64 = 120000;
 const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
@@ -63,24 +63,38 @@ impl Fetcher {
             if self.current_version >= self.highest_known_version {
                 tokio::time::sleep(STARTING_RETRY_TIME).await;
                 if let Err(err) = self.set_highest_known_version().await {
-                    error!("Failed to set highest known version. Err: {:?}", err);
+                    error!(
+                        error = format!("{:?}", err),
+                        "Failed to set highest known version"
+                    );
                     continue;
                 } else {
                     sample!(
                         SampleRate::Frequency(10),
                         aptos_logger::info!(
-                            "Found {} as the new highest known version",
-                            self.highest_known_version
+                            highest_known_version = self.highest_known_version,
+                            "Found new highest known version",
                         )
                     );
                 }
             }
 
             let num_missing = self.highest_known_version - self.current_version;
+
             let num_batches = std::cmp::min(
                 (num_missing as f64 / TRANSACTION_FETCH_BATCH_SIZE as f64).ceil() as u64,
                 MAX_THREADS as u64,
             ) as usize;
+
+            info!(
+                num_missing = num_missing,
+                num_batches = num_batches,
+                current_version = self.current_version,
+                highest_known_version = self.highest_known_version,
+                "Preparing to fetch transactions"
+            );
+
+            let fetch_start = chrono::Utc::now().naive_utc();
             let mut futures = vec![];
             for i in 0..num_batches {
                 futures.push(fetch_nexts(
@@ -89,6 +103,10 @@ impl Fetcher {
                 ));
             }
             let mut res: Vec<Vec<Transaction>> = futures::future::join_all(futures).await;
+            let total_fetched = res.iter().fold(0, |acc, v| acc + v.len());
+            let fetch_millis =
+                (chrono::Utc::now().naive_utc() - fetch_start).num_milliseconds() as f64 / 1000.0;
+
             // Sort by first transaction of batch's version
             res.sort_by(|a, b| {
                 a.first()
@@ -98,6 +116,14 @@ impl Fetcher {
                     .cmp(&b.first().unwrap().version().unwrap())
             });
 
+            info!(
+                total_fetched = total_fetched,
+                fetch_millis = fetch_millis,
+                num_batches = num_batches,
+                "Finished fetching transactions"
+            );
+
+            let send_start = chrono::Utc::now().naive_utc();
             // Send keeping track of the last version sent by the batch
             for batch in res {
                 self.current_version = batch.last().unwrap().version().unwrap();
@@ -106,6 +132,15 @@ impl Fetcher {
                     .await
                     .expect("Should be able to send transaction on channel");
             }
+
+            let send_millis =
+                (chrono::Utc::now().naive_utc() - send_start).num_milliseconds() as f64 / 1000.0;
+            info!(
+                total_sent = total_fetched,
+                send_millis = send_millis,
+                num_batches = num_batches,
+                "Finished sending transactions"
+            );
         }
     }
 }
@@ -128,11 +163,9 @@ async fn fetch_nexts(client: RestClient, starting_version: u64) -> Vec<Transacti
         }
         Err(err) => {
             UNABLE_TO_FETCH_TRANSACTION.inc();
-            aptos_logger::error!(
+            error!(
                 "Could not fetch {} transactions starting at {}. Err: {:?}",
-                TRANSACTION_FETCH_BATCH_SIZE,
-                starting_version,
-                err
+                TRANSACTION_FETCH_BATCH_SIZE, starting_version, err
             );
             panic!(
                 "Could not fetch {} transactions starting at {} in {}ms!",
@@ -193,9 +226,10 @@ impl TransactionFetcherTrait for TransactionFetcher {
                 }
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
-                    aptos_logger::error!(
-                        "Could not fetch version {}, will retry in {}ms. Err: {:?}",
-                        version,
+                    error!(
+                        version = version,
+                        error = format!("{:?}", err),
+                        "Could not fetch version, will retry. in {}ms. Err: {:?}",
                         RETRY_TIME_MILLIS,
                         err
                     );

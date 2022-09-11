@@ -19,6 +19,8 @@ use async_trait::async_trait;
 use field_count::FieldCount;
 use std::fmt::Debug;
 
+pub const NAME: &str = "default_processor";
+
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
 }
@@ -140,7 +142,7 @@ fn insert_to_db(
 #[async_trait]
 impl TransactionProcessor for DefaultTransactionProcessor {
     fn name(&self) -> &'static str {
-        "default_processor"
+        NAME
     }
 
     async fn process_transactions(
