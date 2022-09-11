@@ -77,17 +77,17 @@ const root = createRoot(document.getElementById('root') as Element);
 root.render(
   <StrictMode>
     <AppStateProvider>
-      <AnalyticsProvider>
-        <QueryClientProvider client={queryClient}>
-          <ChakraProvider theme={theme}>
-            <SimulatedExtensionContainer>
-              <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider theme={theme}>
+          <SimulatedExtensionContainer>
+            <MemoryRouter>
+              <AnalyticsProvider>
                 <App />
-              </MemoryRouter>
-            </SimulatedExtensionContainer>
-          </ChakraProvider>
-        </QueryClientProvider>
-      </AnalyticsProvider>
+              </AnalyticsProvider>
+            </MemoryRouter>
+          </SimulatedExtensionContainer>
+        </ChakraProvider>
+      </QueryClientProvider>
     </AppStateProvider>
     <ToastContainer />
   </StrictMode>,

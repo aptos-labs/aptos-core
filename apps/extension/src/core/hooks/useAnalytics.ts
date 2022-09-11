@@ -4,45 +4,47 @@
 
 import constate from 'constate';
 import {
-  useCallback, useState, useMemo,
+  useCallback,
+  useEffect,
+  useMemo,
 } from 'react';
 import { AnalyticsBrowser } from '@segment/analytics-next';
 import { CombinedEventParams, AnalyticsEventTypeValues } from 'core/utils/analytics/events';
 import { getBrowser } from 'core/utils/browser';
 import { getOS } from 'core/utils/os';
 import { defaultNetworkName } from 'shared/types';
+import { useLocation } from 'react-router-dom';
 import { useAppState } from './useAppState';
-import { RoutePath } from '../routes';
 
 const isDevelopment = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development');
 const writeKey = process.env.REACT_APP_SEGMENT_WRITE_KEY;
 
 interface AnalyticsGeneralEventParams {
   eventType: AnalyticsEventTypeValues;
-  page: RoutePath;
+  page: string;
   params?: CombinedEventParams;
   screen: string;
   value?: number;
 }
 
-type AnalyticsPageEventParams = Omit<AnalyticsGeneralEventParams, 'screen'>;
+type AnalyticsPageEventParams = Omit<AnalyticsGeneralEventParams, 'screen' | 'eventType'>;
 
-type AnalyticsScreenEventParams = Omit<AnalyticsGeneralEventParams, 'page'>;
+type AnalyticsScreenEventParams = Omit<AnalyticsGeneralEventParams, 'page' | 'eventType'>;
 
-type AnalyticsEventParams = Omit<AnalyticsPageEventParams, 'page'>;
+type AnalyticsEventParams = Omit<AnalyticsGeneralEventParams, 'page' | 'screen'>;
 
 /**
  * @summary Segment analytics hook that communicates with analytics-node
  */
 export const [AnalyticsProvider, useAnalytics] = constate(() => {
   const { activeAccountAddress, activeNetworkName } = useAppState();
+  const { pathname } = useLocation();
   const analytics = useMemo(
     () => ((writeKey) ? AnalyticsBrowser.load({
       writeKey,
     }) : undefined),
     [],
   );
-  const [pageTracked, setPageTracked] = useState<boolean>(false);
   const userId = (activeAccountAddress) || undefined;
 
   /**
@@ -60,7 +62,7 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
   const trackPage = useCallback(({
     page,
   }: AnalyticsPageEventParams) => {
-    if (pageTracked || isDevelopment || !analytics) {
+    if (isDevelopment || !analytics) {
       return;
     }
 
@@ -76,9 +78,7 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
         userId,
       });
     }).catch((err) => console.error(err));
-
-    setPageTracked(true);
-  }, [pageTracked, analytics, activeNetworkName, userId]);
+  }, [analytics, activeNetworkName, userId]);
 
   /**
    * @summary Analytics event track screen - (different than page,
@@ -169,6 +169,10 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
       });
     }).catch((err) => console.error(err));
   }, [activeNetworkName, analytics, userId]);
+
+  useEffect(() => {
+    trackPage({ page: pathname });
+  }, [pathname, trackPage]);
 
   return {
     trackEvent,
