@@ -14,7 +14,7 @@ use crate::{
     },
     schema,
 };
-use aptos_rest_client::Transaction;
+use aptos_api_types::Transaction;
 use async_trait::async_trait;
 use field_count::FieldCount;
 use std::fmt::Debug;
