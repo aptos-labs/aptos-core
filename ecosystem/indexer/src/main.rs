@@ -21,12 +21,22 @@ use aptos_indexer::{
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct IndexerArgs {
+    /// Postgres database uri, ex: "postgresql://user:pass@localhost/postgres"
+    #[clap(long, env = "INDEXER_DATABASE_URL")]
+    pg_uri: String,
+
     /// URL of an Aptos node, ex: "https://fullnode.devnet.aptoslabs.com"
-    #[clap(long)]
+    #[clap(long, env = "FULLNODE_URL")]
     node_url: String,
 
+    #[clap(long, env = "INSPECTION_URL", default_value = "localhost")]
+    inspection_url: String,
+
+    #[clap(long, env = "INSPECTION_PORT", default_value = "9105")]
+    inspection_port: u16,
+
     /// The specific processor that it will run, ex: "token_processor"
-    #[clap(long)]
+    #[clap(long, env = "PROCESSOR_NAME")]
     processor: String,
 
     /// If set, don't run any migrations
@@ -84,18 +94,14 @@ async fn main() -> std::io::Result<()> {
         processor_name = processor_name,
         "Created the inspection service... "
     );
-    let inspection_url = env::var("INSPECTION_URL").unwrap_or_else(|_| "localhost".to_string());
-    let inspection_port = env::var("INSPECTION_PORT")
-        .map(|v| v.parse::<u16>().unwrap_or(9105))
-        .unwrap_or(9105);
-    start_inspection_service(inspection_url.as_str(), inspection_port);
+
+    start_inspection_service(&args.inspection_url.as_str(), args.inspection_port);
 
     info!(
         processor_name = processor_name,
         "Created the connection pool... "
     );
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let conn_pool = new_db_pool(&database_url).expect("Failed to create connection pool");
+    let conn_pool = new_db_pool(&args.pg_uri).expect("Failed to create connection pool");
 
     info!(processor_name = processor_name, "Instantiating tailer... ");
 

@@ -192,7 +192,7 @@ impl Tailer {
                   name = $1
                   AND success = true
                   and version >= GREATEST(MAX_BLOCK - $2, 0)
-    
+
           ),
           gap AS
           (
@@ -340,8 +340,8 @@ mod test {
     }
 
     pub fn setup_indexer() -> anyhow::Result<(PgDbPool, Tailer)> {
-        let database_url =
-            std::env::var("DATABASE_URL").expect("must set 'DATABASE_URL' to run tests!");
+        let database_url = std::env::var("INDEXER_DATABASE_URL")
+            .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&conn_pool.get()?);
 

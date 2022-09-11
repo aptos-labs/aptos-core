@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 async-trait = "0.1.53"
 bigdecimal = { version = "0.1.2", features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["clock", "serde"] }
-clap = "3.1.17"
+clap = { version = "3.1.17", features = ["env", "suggestions"] }
 diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
 diesel_migrations = { version = "1.4.0", features = ["postgres"] }
 field_count = "0.1.1"
