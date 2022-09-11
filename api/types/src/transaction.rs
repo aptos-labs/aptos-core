@@ -460,6 +460,12 @@ pub struct EncodeSubmissionRequest {
     pub secondary_signers: Option<Vec<Address>>,
 }
 
+impl VerifyInput for EncodeSubmissionRequest {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.transaction.verify()
+    }
+}
+
 /// The genesis transaction
 ///
 /// This only occurs at the genesis transaction (version 0)
@@ -996,7 +1002,10 @@ pub enum AccountSignature {
 
 impl VerifyInput for AccountSignature {
     fn verify(&self) -> anyhow::Result<()> {
-        todo!()
+        match self {
+            AccountSignature::Ed25519Signature(inner) => inner.verify(),
+            AccountSignature::MultiEd25519Signature(inner) => inner.verify(),
+        }
     }
 }
 
