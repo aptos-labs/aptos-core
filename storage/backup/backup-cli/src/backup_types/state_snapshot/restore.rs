@@ -36,7 +36,6 @@ use futures::{stream, TryStreamExt};
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
 use tokio::time::Instant;
-use tokio::try_join;
 
 #[derive(Parser)]
 pub struct StateSnapshotRestoreOpt {
@@ -170,11 +169,12 @@ impl StateSnapshotRestoreController {
         let futs_iter = chunks.into_iter().enumerate().map(|(chunk_idx, chunk)| {
             let storage = storage.clone();
             async move {
-                let (blobs, proof) = try_join!(
-                    Self::read_state_value(&storage, chunk.blobs.clone()),
-                    storage.load_bcs_file(&chunk.proof)
-                )?;
-                Result::<_>::Ok((chunk_idx, chunk, blobs, proof))
+                tokio::spawn(async move {
+                    let blobs = Self::read_state_value(&storage, chunk.blobs.clone()).await?;
+                    let proof = storage.load_bcs_file(&chunk.proof).await?;
+                    Result::<_>::Ok((chunk_idx, chunk, blobs, proof))
+                })
+                .await?
             }
         });
         let con = self.concurrent_downloads;
