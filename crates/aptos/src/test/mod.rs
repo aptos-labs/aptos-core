@@ -33,7 +33,9 @@ use crate::stake::{
 };
 use crate::CliCommand;
 use aptos_config::config::Peer;
-use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_crypto::{
+    bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey, ValidCryptoMaterialStringExt,
+};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -46,7 +48,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
@@ -74,6 +76,7 @@ module NamedAddress0::store {
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
+    account_addresses: Vec<AccountAddress>,
     account_keys: Vec<Ed25519PrivateKey>,
     endpoint: Url,
     faucet_endpoint: Url,
@@ -84,6 +87,7 @@ impl CliTestFramework {
     pub fn local_new(num_accounts: usize) -> CliTestFramework {
         let dummy_url = Url::parse("http://localhost").unwrap();
         let mut framework = CliTestFramework {
+            account_addresses: Vec::new(),
             account_keys: Vec::new(),
             endpoint: dummy_url.clone(),
             faucet_endpoint: dummy_url,
@@ -91,15 +95,15 @@ impl CliTestFramework {
         };
         let mut keygen = KeyGen::from_seed([0; 32]);
         for _ in 0..num_accounts {
-            framework
-                .account_keys
-                .push(keygen.generate_ed25519_private_key());
+            let key = keygen.generate_ed25519_private_key();
+            framework.add_account_to_cli(key);
         }
         framework
     }
 
     pub async fn new(endpoint: Url, faucet_endpoint: Url, num_accounts: usize) -> CliTestFramework {
         let mut framework = CliTestFramework {
+            account_addresses: Vec::new(),
             account_keys: Vec::new(),
             endpoint,
             faucet_endpoint,
@@ -125,6 +129,8 @@ impl CliTestFramework {
     }
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
+        let address = account_address_from_public_key(&private_key.public_key());
+        self.account_addresses.push(address);
         self.account_keys.push(private_key);
         self.account_keys.len() - 1
     }
@@ -180,22 +186,22 @@ impl CliTestFramework {
     }
 
     pub async fn rotate_key(
-        &self,
+        &mut self,
         index: usize,
         new_private_key: String,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<RotateSummary> {
-        RotateKey {
+        let new_key = Ed25519PrivateKey::from_encoded_string(&new_private_key).unwrap();
+        let response = RotateKey {
             txn_options: TransactionOptions {
                 private_key_options: PrivateKeyInputOptions::from_private_key(
                     self.private_key(index),
                 )
                 .unwrap(),
+                sender_account: Some(self.account_id(index)),
                 rest_options: self.rest_options(),
-                gas_options: Default::default(),
-                prompt_options: PromptOptions {
-                    assume_yes: false,
-                    assume_no: true,
-                },
+                gas_options: gas_options.unwrap_or_default(),
+                prompt_options: PromptOptions::no(),
                 estimate_max_gas: true,
                 ..Default::default()
             },
@@ -204,7 +210,11 @@ impl CliTestFramework {
             new_private_key_file: None,
         }
         .execute()
-        .await
+        .await?;
+
+        // Insert the new private key into the test framework
+        let _ = mem::replace(&mut self.account_keys[index], new_key);
+        Ok(response)
     }
 
     pub async fn list_account(&self, index: usize, query: ListQuery) -> CliTypedResult<Vec<Value>> {
@@ -826,6 +836,7 @@ impl CliTestFramework {
         TransactionOptions {
             private_key_options: PrivateKeyInputOptions::from_private_key(self.private_key(index))
                 .unwrap(),
+            sender_account: Some(self.account_id(index)),
             rest_options: self.rest_options(),
             gas_options: gas_options.unwrap_or_default(),
             prompt_options: PromptOptions::yes(),
@@ -847,8 +858,7 @@ impl CliTestFramework {
     }
 
     pub fn account_id(&self, index: usize) -> AccountAddress {
-        let private_key = self.private_key(index);
-        account_address_from_public_key(&private_key.public_key())
+        *self.account_addresses.get(index).unwrap()
     }
 }
 

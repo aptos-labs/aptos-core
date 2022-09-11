@@ -4,7 +4,7 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::account::create::DEFAULT_FUNDED_COINS;
 use aptos::common::types::GasOptions;
-use aptos_crypto::PrivateKey;
+use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
@@ -91,15 +91,14 @@ async fn test_account_flow() {
 
 #[tokio::test]
 async fn test_account_key_rotation() {
-    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .build_with_cli(1)
+        .build_with_cli(2)
         .await;
 
     let mut keygen = KeyGen::from_os_rng();
     let new_private_key = keygen.generate_ed25519_private_key();
-
-    cli.rotate_key(0, hex::encode(new_private_key.to_bytes()))
+    cli.rotate_key(0, new_private_key.to_encoded_string().unwrap(), None)
         .await
         .unwrap();
 
@@ -137,4 +136,8 @@ async fn test_account_key_rotation() {
         .unwrap(),
         cli.account_id(0)
     );
+
+    cli.transfer_coins(0, 1, 5, None)
+        .await
+        .expect("New key should be able to transfer");
 }
