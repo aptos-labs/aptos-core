@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::write_set_changes};
-use aptos_rest_client::aptos_api_types::{
+use aptos_api_types::{
     DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
     WriteSetChange as APIWriteSetChange, WriteTableItem,
 };

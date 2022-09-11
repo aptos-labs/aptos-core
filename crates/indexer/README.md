@@ -121,7 +121,7 @@ one note: *transaction processing is guaranteed at least once*. It's possible fo
 receive the same transaction more than once: and so your implementation must be idempotent.
 
 To implement your own `TransactionProcessor`, check out the documentation and source code
-here: [`./src/indexer/transaction_processor.rs`](./src/indexer/transaction_processor.rs).
+here: [`./src/indexer/transaction_processor.rs`](src/indexer/transaction_processor.rs).
 
 ### Miscellaneous
 1. If you run into

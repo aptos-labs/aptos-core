@@ -25,7 +25,7 @@ use crate::{
     schema,
     schema::ownerships::{dsl::amount as ownership_amount, ownership_id},
 };
-use aptos_rest_client::Transaction;
+use aptos_api_types::Transaction;
 use async_trait::async_trait;
 use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;

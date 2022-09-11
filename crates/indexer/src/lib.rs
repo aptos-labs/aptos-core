@@ -16,6 +16,7 @@ pub mod database;
 pub mod indexer;
 pub mod models;
 pub mod processors;
+pub mod runtime;
 pub mod schema;
 mod util;
 

@@ -46,6 +46,12 @@ pub struct Context {
     gas_estimation: Arc<RwLock<GasEstimationCache>>,
 }
 
+impl std::fmt::Debug for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Context<chain_id: {}>", self.chain_id)
+    }
+}
+
 impl Context {
     pub fn new(
         chain_id: ChainId,
