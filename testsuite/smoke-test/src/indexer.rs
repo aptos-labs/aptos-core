@@ -44,13 +44,9 @@ pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Ta
 
     let conn_pool = new_db_pool(database_url.as_str())?;
     wipe_database(&conn_pool.get()?);
-    let mut tailer = Tailer::new(info.url(), conn_pool.clone())?;
-    tailer.run_migrations();
-
-    let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
     let token_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
-    tailer.add_processor(Arc::new(pg_transaction_processor));
-    tailer.add_processor(Arc::new(token_processor));
+    let mut tailer = Tailer::new(info.url(), conn_pool.clone(), pg_transaction_processor)?;
+    tailer.run_migrations();
     Ok((conn_pool, tailer))
 }
 

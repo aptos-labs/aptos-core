@@ -14,7 +14,7 @@ use aptos_indexer::{
     indexer::{tailer::Tailer, transaction_processor::TransactionProcessor},
     processors::{
         default_processor::{DefaultTransactionProcessor, NAME as DEFAULT_PROCESSOR_NAME},
-        token_processor::{TokenTransactionProcessor, NAME as TOKEN_PROCESSOR_NAME},
+        // token_processor::{TokenTransactionProcessor, NAME as TOKEN_PROCESSOR_NAME},
     },
 };
 
@@ -59,14 +59,14 @@ struct IndexerArgs {
 
 enum Processor {
     DefaultProcessor,
-    TokenProcessor,
+    // TokenProcessor,
 }
 
 impl Processor {
     fn from_string(input_str: &String) -> Self {
         match input_str.as_str() {
             DEFAULT_PROCESSOR_NAME => Self::DefaultProcessor,
-            TOKEN_PROCESSOR_NAME => Self::TokenProcessor,
+            // TOKEN_PROCESSOR_NAME => Self::TokenProcessor,
             _ => panic!("Processor unsupported {}", input_str),
         }
     }
@@ -103,10 +103,10 @@ async fn main() -> std::io::Result<()> {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
-            conn_pool.clone(),
-            args.index_token_uri_data,
-        )),
+        // Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+        //     conn_pool.clone(),
+        //     args.index_token_uri_data,
+        // )),
     };
 
     let tailer = Tailer::new(&args.node_url, conn_pool.clone(), processor)

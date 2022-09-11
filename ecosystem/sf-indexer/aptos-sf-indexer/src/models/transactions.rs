@@ -62,7 +62,6 @@ impl Transaction {
         let mut payload: Option<serde_json::Value> = None;
         let mut txn_details = None;
         if let Some(txn_data) = &transaction.txn_data {
-            // TODO: add payload handling for genesis which requires adding genesis to option and user transaction
             match txn_data {
                 TxnData::BlockMetadata(bm) => {
                     txn_details = Some(TransactionDetail::BlockMetadata(

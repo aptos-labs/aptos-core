@@ -51,7 +51,6 @@ impl Tailer {
     }
 
     pub fn run_migrations(&self) {
-        info!("Running migrations...");
         embedded_migrations::run_with_output(
             &self
                 .connection_pool
@@ -60,12 +59,14 @@ impl Tailer {
             &mut std::io::stdout(),
         )
         .expect("migrations failed!");
-        info!("Migrations complete!");
     }
 
     /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
     pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
-        info!("Checking if chain id is correct");
+        info!(
+            processor_name = self.processor.name(),
+            "Checking if chain id is correct"
+        );
         let conn = self
             .connection_pool
             .get()
@@ -88,11 +89,19 @@ impl Tailer {
         match maybe_existing_chain_id {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
-                info!("Chain id matches! Continuing to index chain {}", chain_id);
+                info!(
+                    processor_name = self.processor.name(),
+                    chain_id = chain_id,
+                    "Chain id matches! Continue to index...",
+                );
                 Ok(0)
             }
             None => {
-                info!("Adding chain id {} to db, continue indexing", new_chain_id);
+                info!(
+                    processor_name = self.processor.name(),
+                    chain_id = new_chain_id,
+                    "Adding chain id to db, continue to index.."
+                );
                 execute_with_better_error(
                     &conn,
                     diesel::insert_into(ledger_infos::table).values(LedgerInfo {

@@ -30,6 +30,7 @@ serde_json = "1.0.81"
 tokio = { version = "1.21.0", features = ["full", "time"] }
 url = "2.2.2"
 
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
