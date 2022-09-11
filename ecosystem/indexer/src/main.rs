@@ -168,10 +168,10 @@ async fn main() -> std::io::Result<()> {
         "Indexing loop started!"
     );
 
-    let mut versions_processed: usize = 0;
-    let mut total_processed: usize = 0;
-    let mut base: usize = 0;
-    let mut version_to_check_chain_id: usize = 0;
+    let mut versions_processed: u64 = 0;
+    let mut total_processed: u64 = 0;
+    let mut base: u64 = 0;
+    let mut version_to_check_chain_id: u64 = 0;
 
     // Check once here to avoid a boolean check every iteration
     if args.check_chain_id {
@@ -195,6 +195,8 @@ async fn main() -> std::io::Result<()> {
         });
         tasks.push(task);
     }
+
+    let emit_every = args.emit_every as u64;
 
     loop {
         if args.check_chain_id && version_to_check_chain_id < versions_processed {
@@ -228,10 +230,10 @@ async fn main() -> std::io::Result<()> {
             }
         };
 
-        total_processed += num_res as usize;
-        versions_processed += num_res as usize;
+        total_processed += num_res;
+        versions_processed += num_res;
         if args.emit_every != 0 {
-            let new_base: usize = versions_processed / args.emit_every;
+            let new_base: u64 = versions_processed / emit_every;
             if base != new_base {
                 base = new_base;
                 let num_millis =

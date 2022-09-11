@@ -65,7 +65,7 @@ impl Tailer {
     }
 
     /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
-    pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
+    pub async fn check_or_update_chain_id(&self) -> Result<u64> {
         info!("Checking if chain id is correct");
         let conn = self
             .connection_pool
@@ -93,7 +93,7 @@ impl Tailer {
                     chain_id = chain_id,
                     "Chain id matches! Continuing to index chain"
                 );
-                Ok(0)
+                Ok(*chain_id as u64)
             }
             None => {
                 info!(
@@ -107,6 +107,7 @@ impl Tailer {
                     }),
                 )
                 .context(r#"Error updating chain_id!"#)
+                .map(|_| new_chain_id as u64)
             }
         }
     }
@@ -122,7 +123,7 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-    ) -> (usize, Result<ProcessingResult, TransactionProcessingError>) {
+    ) -> (u64, Result<ProcessingResult, TransactionProcessingError>) {
         let mut transactions: Vec<Transaction> = vec![];
         while transactions.is_empty() {
             transactions = self
@@ -136,7 +137,7 @@ impl Tailer {
             }
         }
 
-        let num_txns = transactions.len();
+        let num_txns = transactions.len() as u64;
         let start_version = transactions.first().unwrap().version();
         let end_version = transactions.last().unwrap().version();
 
