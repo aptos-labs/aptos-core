@@ -5,6 +5,7 @@ pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod continuous_progress_test;
 pub mod forge_setup_test;
+pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
@@ -16,6 +17,7 @@ pub mod performance_test;
 pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
+pub mod validator_reboot_stress_test;
 
 use anyhow::{anyhow, ensure};
 use aptos_logger::info;
