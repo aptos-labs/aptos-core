@@ -10,9 +10,10 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
+use crate::VerifyInput;
+use anyhow::bail;
 use aptos_types::event::EventKey;
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
-
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
@@ -22,6 +23,16 @@ use crate::{Address, U64};
 /// A wrapper of a Move identifier
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
+
+impl VerifyInput for IdentifierWrapper {
+    fn verify(&self) -> anyhow::Result<()> {
+        if Identifier::is_valid(self.as_str()) {
+            Ok(())
+        } else {
+            bail!("Identifier is invalid {}", self)
+        }
+    }
+}
 
 impl FromStr for IdentifierWrapper {
     type Err = anyhow::Error;
