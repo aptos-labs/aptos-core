@@ -28,7 +28,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::stake;
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -50,6 +50,8 @@ module aptos_framework::aptos_governance {
     const EMETADATA_LOCATION_TOO_LONG: u64 = 9;
     /// Metadata hash cannot be longer than 256 chars
     const EMETADATA_HASH_TOO_LONG: u64 = 10;
+    /// Account is not authorized to call this function.
+    const EUNAUTHORIZED: u64 = 11;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -358,9 +360,9 @@ module aptos_framework::aptos_governance {
     /// Resolve a successful proposal. This would fail if the proposal is not successful (not enough votes or more no
     /// than yes).
     public fun resolve(proposal_id: u64, signer_address: address): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
-        let proposal = voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
+        voting::resolve<GovernanceProposal>(@aptos_framework, proposal_id);
         remove_approved_hash(proposal_id);
-        get_signer(proposal, signer_address)
+        get_signer(signer_address)
     }
 
     /// Remove an approved proposal's execution script hash.
@@ -382,6 +384,15 @@ module aptos_framework::aptos_governance {
         reconfiguration::reconfigure();
     }
 
+    /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.
+    public fun get_signer_testnet_only(
+        core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
+        system_addresses::assert_core_resource(core_resources);
+        // Core resources account only has mint capability in tests/testnets.
+        assert!(aptos_coin::has_mint_capability(core_resources), error::unauthenticated(EUNAUTHORIZED));
+        get_signer(signer_address)
+    }
+
     /// Return the voting power a stake pool has with respect to governance proposals.
     fun get_voting_power(pool_address: address): u64 {
         let allow_validator_set_change = staking_config::get_allow_validator_set_change(&staking_config::get());
@@ -397,7 +408,7 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
+    fun get_signer(signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
         let signer_cap = simple_map::borrow(&governance_responsibility.signer_caps, &signer_address);
         create_signer_with_capability(signer_cap)
