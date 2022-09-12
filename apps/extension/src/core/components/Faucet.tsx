@@ -16,7 +16,7 @@ import { faucetEvents } from 'core/utils/analytics/events';
 import { aptosCoinStructTag } from 'core/constants';
 import { toast } from './Toast';
 
-const defaultFundAmount = 50000;
+const defaultFundAmount = 10000000;
 
 export default function Faucet() {
   const { activeAccountAddress } = useActiveAccount();
