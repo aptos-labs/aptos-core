@@ -46,6 +46,7 @@ module aptos_token::token {
     const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 21;
     const EWITHDRAW_ZERO: u64 = 22;
     const ENOT_TRACKING_SUPPLY: u64 = 23;
+    const ENFT_NOT_SPLITABLE: u64 = 24;
 
     //
     // Core data structures for holding tokens
@@ -325,9 +326,8 @@ module aptos_token::token {
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
             let token = withdraw_with_event_internal(token_owner, token_id, 1);
-            let largest_property_version = token_data.largest_property_version;
             // give a new property_version for each token
-            let cur_property_version = largest_property_version + 1;
+            let cur_property_version = token_data.largest_property_version + 1;
             let new_token_id = create_token_id(token_id.token_data_id, cur_property_version);
             let new_token = Token {
                 id: new_token_id,
@@ -336,6 +336,16 @@ module aptos_token::token {
             };
             direct_deposit(token_owner, new_token);
             update_token_property_internal(token_owner, new_token_id, keys, values, types);
+            event::emit_event<MutateTokenPropertyMapEvent>(
+                &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
+                MutateTokenPropertyMapEvent {
+                    old_id: token_id,
+                    new_id: new_token_id,
+                    keys,
+                    values,
+                    types
+                },
+            );
 
             token_data.largest_property_version = cur_property_version;
             // burn the orignial property_version 0 token after mutation
@@ -344,13 +354,23 @@ module aptos_token::token {
         } else {
             // only 1 copy for the token with property verion bigger than 0
             update_token_property_internal(token_owner, token_id, keys, values, types);
+            event::emit_event<MutateTokenPropertyMapEvent>(
+                &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
+                MutateTokenPropertyMapEvent {
+                    old_id: token_id,
+                    new_id: token_id,
+                    keys,
+                    values,
+                    types
+                },
+            );
             token_id
         }
     }
 
     /// mutate the token property and save the new property in TokenStore
-    /// if the token property_version is 0, we will create a new property_version per token and store the properties
-    /// if the token property_version is not 0, we will just update the propertyMap
+    /// if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
+    /// if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
     public entry fun mutate_token_properties(
         account: &signer,
         token_owner: address,
@@ -395,16 +415,6 @@ module aptos_token::token {
         let value = &mut table::borrow_mut(tokens, token_id).token_properties;
 
         property_map::update_property_map(value, keys, values, types);
-        event::emit_event<MutateTokenPropertyMapEvent>(
-            &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
-            MutateTokenPropertyMapEvent {
-                old_id: token_id,
-                new_id: token_id,
-                keys,
-                values,
-                types
-            },
-        );
     }
 
     /// Deposit the token balance into the owner's account and emit an event.
@@ -432,8 +442,6 @@ module aptos_token::token {
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
-        let token_store = borrow_global_mut<TokenStore>(account_addr);
-
 
         if (!table::contains(&token_store.tokens, token.id)) {
             table::add(&mut token_store.tokens, token.id, token);
@@ -492,7 +500,8 @@ module aptos_token::token {
     }
 
     public fun split(dst_token: &mut Token, amount: u64): Token {
-        assert!(dst_token.amount >= amount,  error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT));
+        assert!(dst_token.id.property_version == 0, error::invalid_state(ENFT_NOT_SPLITABLE));
+        assert!(dst_token.amount > amount,  error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT));
         dst_token.amount = dst_token.amount - amount;
         Token {
             id: dst_token.id,
@@ -537,14 +546,15 @@ module aptos_token::token {
         // Make sure the account has sufficient tokens to withdraw.
         assert!(balance_of(account_addr, id) >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
 
+        assert!(
+            exists<TokenStore>(account_addr),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
+        );
+
         let token_store = borrow_global_mut<TokenStore>(account_addr);
         event::emit_event<WithdrawEvent>(
             &mut token_store.withdraw_events,
             WithdrawEvent{ id, amount },
-        );
-        assert!(
-            exists<TokenStore>(account_addr),
-            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
         assert!(
