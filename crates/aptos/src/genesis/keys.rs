@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{AccountAddressWrapper, OptionalPoolAddressArgs};
+use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
 use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
 use crate::governance::CompileScriptFunction;
@@ -16,6 +16,7 @@ use crate::{
 use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
 use aptos_genesis::keys::PublicIdentity;
 use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
+use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{Script, Transaction, WriteSetPayload};
 use async_trait::async_trait;
 use clap::Parser;
@@ -283,11 +284,12 @@ pub struct GenerateAdminWriteSet {
     #[clap(long, parse(from_os_str))]
     pub(crate) output_file: PathBuf,
 
+    /// Address of the account which execute this script.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) execute_as: AccountAddress,
+
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
-
-    #[clap(long)]
-    pub(crate) execute_as: AccountAddressWrapper,
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
@@ -296,7 +298,7 @@ pub struct GenerateAdminWriteSet {
 #[async_trait]
 impl CliCommand<()> for GenerateAdminWriteSet {
     fn command_name(&self) -> &'static str {
-        "GenerateLayoutTemplate"
+        "GenerateAdminWriteSet"
     }
 
     async fn execute(self) -> CliTypedResult<()> {
@@ -304,7 +306,7 @@ impl CliCommand<()> for GenerateAdminWriteSet {
         let (bytecode, _script_hash) = self.compile_proposal_args.compile(self.prompt_options)?;
 
         let txn = Transaction::GenesisTransaction(WriteSetPayload::Script {
-            execute_as: self.execute_as.account_address,
+            execute_as: self.execute_as,
             script: Script::new(bytecode, vec![], vec![]),
         });
 
