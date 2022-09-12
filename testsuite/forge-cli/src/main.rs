@@ -186,9 +186,9 @@ fn main() -> Result<()> {
     let suite_name: &str = args.suite.as_ref();
 
     let suite_name = if suite_name == "compat" {
-        "failures_catching_up"
-    } else {
         "slow_processing_catching_up"
+    } else {
+        "failures_catching_up"
     };
 
     let duration = Duration::from_secs(1800);
