@@ -477,29 +477,17 @@ dependencies = [
 name = "aptos-faucet-cli"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",
- "aptos-infallible",
  "aptos-logger",
- "aptos-rest-client",
  "aptos-sdk",
- "bcs",
- "bytes 1.2.1",
  "clap 3.2.17",
- "futures",
- "hex",
- "rand 0.7.3",
- "reqwest",
  "serde 1.0.144",
- "serde_json",
  "serde_yaml 0.8.26",
- "tempfile",
  "tokio",
  "url",
- "warp",
 ]
 
 [[package]]
@@ -740,7 +728,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
- "hex",
  "rand 0.7.3",
 ]
 
@@ -842,7 +829,6 @@ dependencies = [
  "aptos-types",
  "clap 3.2.17",
  "futures",
- "hex",
  "network",
  "serde 1.0.144",
  "tokio",
@@ -938,7 +924,6 @@ name = "aptos-openapi"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "mime",
  "percent-encoding",
  "poem",
  "poem-openapi",
@@ -997,7 +982,6 @@ dependencies = [
 name = "aptos-protos"
 version = "0.1.0"
 dependencies = [
- "bytes 1.2.1",
  "pbjson",
  "prost 0.10.4",
  "serde 1.0.144",
