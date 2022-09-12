@@ -821,6 +821,7 @@ dependencies = [
 name = "aptos-metrics-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "prometheus",
 ]
 
@@ -1267,6 +1268,7 @@ dependencies = [
  "futures",
  "httpmock",
  "network",
+ "node-metrics",
  "once_cell",
  "prometheus",
  "rand 0.7.3",
@@ -6419,6 +6421,18 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
+
+[[package]]
+name = "node-metrics"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "once_cell",
+ "prometheus",
+ "sysinfo",
+]
 
 [[package]]
 name = "nom"

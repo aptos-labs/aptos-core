@@ -39,6 +39,7 @@ aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptosdb = { path = "../../storage/aptosdb" }
 consensus = { path = "../../consensus" }
 network = { path = "../../network" }
+node-metrics = { path = "../../crates/node-metrics" }
 state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 
 [dev-dependencies]
