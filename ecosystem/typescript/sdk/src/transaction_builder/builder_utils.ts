@@ -21,6 +21,7 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
+  TypeTagGenericParam,
 } from "./aptos_types";
 import { Serializer } from "./bcs";
 
@@ -124,14 +125,18 @@ export class TypeTagParser {
     }
   }
 
-  private parseCommaList(endToken: TokenValue, allowTraillingComma: boolean): TypeTag[] {
+  private parseCommaList(
+    endToken: TokenValue,
+    allowTraillingComma: boolean,
+    options: { allowGenericParam: boolean },
+  ): TypeTag[] {
     const res: TypeTag[] = [];
     if (this.tokens.length <= 0) {
       bail("Invalid type tag.");
     }
 
     while (this.tokens[0][1] !== endToken) {
-      res.push(this.parseTypeTag());
+      res.push(this.parseTypeTag(options));
 
       if (this.tokens.length > 0 && this.tokens[0][1] === endToken) {
         break;
@@ -149,7 +154,7 @@ export class TypeTagParser {
     return res;
   }
 
-  parseTypeTag(): TypeTag {
+  parseTypeTag(options: { allowGenericParam: boolean } = { allowGenericParam: false }): TypeTag {
     if (this.tokens.length === 0) {
       bail("Invalid type tag.");
     }
@@ -174,7 +179,7 @@ export class TypeTagParser {
     }
     if (tokenVal === "vector") {
       this.consume("<");
-      const res = this.parseTypeTag();
+      const res = this.parseTypeTag(options);
       this.consume(">");
       return new TypeTagVector(res);
     }
@@ -195,7 +200,7 @@ export class TypeTagParser {
       // Check if the struct has ty args
       if (this.tokens.length > 0 && this.tokens[0][1] === "<") {
         this.consume("<");
-        tyTags = this.parseCommaList(">", true);
+        tyTags = this.parseCommaList(">", true, options);
         this.consume(">");
       }
 
@@ -208,6 +213,9 @@ export class TypeTagParser {
       return new TypeTagStruct(structTag);
     }
 
+    if (options.allowGenericParam) {
+      return new TypeTagGenericParam(tokenVal);
+    }
     throw new Error("Invalid type tag.");
   }
 }

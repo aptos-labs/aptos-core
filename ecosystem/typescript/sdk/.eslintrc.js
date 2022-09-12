@@ -25,6 +25,7 @@ module.exports = {
     "no-unused-vars": "off",
     "@typescript-eslint/no-use-before-define": ["error", { functions: false, classes: false }],
     "@typescript-eslint/no-unused-vars": ["error"],
+    "class-methods-use-this": "off",
   },
   settings: {
     "import/resolver": {

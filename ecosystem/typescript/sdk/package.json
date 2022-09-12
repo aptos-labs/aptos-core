@@ -61,7 +61,7 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.25.4",
     "jest": "^28.1.3",
-    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz",
+    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p3/openapi-typescript-codegen-v0.23.0-p3.tgz",
     "prettier": "^2.6.2",
     "standard-version": "^9.5.0",
     "ts-jest": "^28.0.7",

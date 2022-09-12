@@ -206,6 +206,14 @@ const sendRequest = async <T>(
         cancelToken: source.token,
     };
 
+    const isBCS = Object.keys(config.HEADERS || {})
+    .filter((k) => k.toLowerCase() === "accept")
+    .map((k) => (config.HEADERS as Record<string, string>)[k])
+    .includes("application/x-bcs");
+  if (isBCS) {
+    requestConfig.responseType = "arraybuffer";
+  }
+
     onCancel(() => source.cancel('The user aborted a request.'));
 
     try {

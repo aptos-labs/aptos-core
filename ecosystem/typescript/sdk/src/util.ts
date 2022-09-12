@@ -13,13 +13,13 @@ export async function sleep(timeMs: number): Promise<null> {
 
 export const DEFAULT_VERSION_PATH_BASE = "/v1";
 
-export function fixNodeUrl(nodeUrl: string): string {
+export function fixNodeUrl(nodeUrl: string, version = DEFAULT_VERSION_PATH_BASE): string {
   let out = `${nodeUrl}`;
   if (out.endsWith("/")) {
     out = out.substring(0, out.length - 1);
   }
-  if (!out.endsWith(DEFAULT_VERSION_PATH_BASE)) {
-    out = `${out}${DEFAULT_VERSION_PATH_BASE}`;
+  if (!out.endsWith(version)) {
+    out = `${out}${version}`;
   }
   return out;
 }

@@ -3,11 +3,15 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable class-methods-use-this */
+/* eslint-disable max-classes-per-file */
+import { HexString } from "../../hex_string";
 import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";
 import { Identifier } from "./identifier";
 
 export abstract class TypeTag {
+  abstract toString(): string;
+
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): TypeTag {
@@ -36,6 +40,10 @@ export abstract class TypeTag {
 }
 
 export class TypeTagBool extends TypeTag {
+  toString() {
+    return "bool";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(0);
   }
@@ -46,6 +54,10 @@ export class TypeTagBool extends TypeTag {
 }
 
 export class TypeTagU8 extends TypeTag {
+  toString() {
+    return "u8";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(1);
   }
@@ -56,6 +68,10 @@ export class TypeTagU8 extends TypeTag {
 }
 
 export class TypeTagU64 extends TypeTag {
+  toString() {
+    return "u64";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(2);
   }
@@ -66,6 +82,10 @@ export class TypeTagU64 extends TypeTag {
 }
 
 export class TypeTagU128 extends TypeTag {
+  toString() {
+    return "u128";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(3);
   }
@@ -76,6 +96,10 @@ export class TypeTagU128 extends TypeTag {
 }
 
 export class TypeTagAddress extends TypeTag {
+  toString() {
+    return "address";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(4);
   }
@@ -86,6 +110,10 @@ export class TypeTagAddress extends TypeTag {
 }
 
 export class TypeTagSigner extends TypeTag {
+  toString() {
+    return "signer";
+  }
+
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(5);
   }
@@ -98,6 +126,10 @@ export class TypeTagSigner extends TypeTag {
 export class TypeTagVector extends TypeTag {
   constructor(public readonly value: TypeTag) {
     super();
+  }
+
+  toString() {
+    return `vector<${this.value.toString()}>`;
   }
 
   serialize(serializer: Serializer): void {
@@ -114,6 +146,14 @@ export class TypeTagVector extends TypeTag {
 export class TypeTagStruct extends TypeTag {
   constructor(public readonly value: StructTag) {
     super();
+  }
+
+  toString(): string {
+    return this.value.toString();
+  }
+
+  get fullName(): string {
+    return this.value.fullName;
   }
 
   serialize(serializer: Serializer): void {
@@ -134,6 +174,20 @@ export class StructTag {
     public readonly name: Identifier,
     public readonly type_args: Seq<TypeTag>,
   ) {}
+
+  get fullName(): string {
+    return `${HexString.fromUint8Array(this.address.address).toShortString()}::${this.module_name.value}::${
+      this.name.value
+    }`;
+  }
+
+  toString(): string {
+    let typeArgStr = "";
+    if (this.type_args.length > 0) {
+      typeArgStr = `<${this.type_args.map((ta) => ta.toString()).join(", ")}>`;
+    }
+    return `${this.fullName}${typeArgStr}`;
+  }
 
   /**
    * Converts a string literal to a StructTag
@@ -168,5 +222,19 @@ export class StructTag {
     const name = Identifier.deserialize(deserializer);
     const typeArgs = deserializeVector(deserializer, TypeTag);
     return new StructTag(address, moduleName, name, typeArgs);
+  }
+}
+
+export class TypeTagGenericParam extends TypeTag {
+  constructor(public readonly value: string) {
+    super();
+  }
+
+  toString(): string {
+    throw new Error("Not implemented");
+  }
+
+  serialize(serializer: Serializer): void {
+    throw new Error("Not implemented");
   }
 }
