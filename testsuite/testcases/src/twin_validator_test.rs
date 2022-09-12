@@ -34,18 +34,22 @@ impl NetworkTest for TwinValidatorTest {
                 let main_id = all_validators_ids[i];
                 let twin_id = all_validators_ids[i + validator_count - twin_count];
                 ctx.swarm().validator_mut(main_id).unwrap().stop().await;
-                ctx.swarm().validator_mut(twin_id).unwrap().stop().await;
-                let main_node = ctx.swarm().validator_mut(main_id).unwrap();
-                let main_identity: String = main_node.get_identity().await.unwrap();
-                ctx.swarm()
-                    .validator_mut(twin_id)
-                    .unwrap()
-                    .set_identity(main_identity)
-                    .await;
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .clear_storage()
+                    .await;
+                let main_identity: String = ctx
+                    .swarm()
+                    .validator_mut(main_id)
+                    .unwrap()
+                    .get_identity()
+                    .await
+                    .unwrap();
+                ctx.swarm()
+                    .validator_mut(twin_id)
+                    .unwrap()
+                    .set_identity(main_identity)
                     .await;
                 ctx.swarm().validator_mut(twin_id).unwrap().start().await;
                 ctx.swarm()
