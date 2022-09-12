@@ -7,26 +7,12 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Aptos Token
 
-For digital assets, Aptos provides two Move modules:
-- The [`token.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) for the token standard. The token standard covers non-fungible (NFT), semi-fungible and **fungible non-decimal** token.
-- The [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) for the coin standard. The coin standard specifies the **fungible decimal** token. 
-
-## Token vs coin standards
-
-The coin standard is separated out into its own Move module to ensure that:
-
-- The coin standard can be used to create a token with decimal and with minimal metadata. 
-- The coin module remains a part of the Aptos core framework and be used for the gas currency, thereby enhancing the core functionality of the Aptos framework.
-
-The token standard, on the other hand, is deployed as a separate package at the Aptos blockchain address `0x3`. The token standard is designed to create an NFT or a semi-fungible or a fungible non-decimal token, with rich metadata and functionalities. A token definition of this type can be iterated rapidly to respond to the platform and user requirements. 
-
-:::tip Aptos token standard
-This document presents the proposed Aptos token standard. The Aptos implementation for core NFTs or tokens can be found in [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move). Also see the tutorial [Your First NFT](/tutorials/your-first-nft.md).
-
-The coin standard is presented in a different document.
+:::tip Aptos token tutorial
+Also see the tutorial [Your First NFT](/tutorials/your-first-nft.md).
 :::
 
-### Overview of NFT
+
+## Overview of NFT
 
 An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible token or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in [EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). NFTs are typically defined using the following properties:
 
@@ -39,16 +25,16 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 
 - `name`: The name of the collection. The name must be unique within the creator's account.
 - `description`: The description of the collection.
--  `uri`: A URL pointer to off-chain for more information about the asset. The asset could be media such as an image or video or more metadata.
+- `uri`: A URL pointer to off-chain for more information about the asset. The asset could be media such as an image or video or more metadata.
 
 ## Token standard
 
-The Aptos token standard is developed following the below principles:
+The [Aptos token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) is developed with the following principles:
 
-- Provide a standard implementation to improve interoperability across the ecosystem projects.
-- Achieve maximal liquidity by defining the NFT, fungible (non-decimal) and semi-fungible tokens in one contract. These different types of tokens can be easily stored, transferred and transacted in the same way.
-- Enable the customization of the token properties. Users can define their own properties and store them on-chain.
-- Reduce the cost of creating large amounts of NFTs from fungible tokens. 
+- **Interoperability**: Provide a standard implementation to improve interoperability across the ecosystem projects. Morever, Move being a static language without dynamic dispatch makes this principle even more imperative.
+- **Liquidity**: Achieve maximal liquidity by defining the NFT, fungible (non-decimal) and semi-fungible tokens in one contract. These different types of tokens can be easily stored, transferred and transacted in the same way. As a consequence, it becomes easier to achieve maximal interoperability across the marketplaces, exchanges, and other methods for exchange.
+- **Rich on-chain token properties**: Enable the customization of on-chain token properties. Users can define their own properties and store them on-chain. This can potentially eliminate the need for the off-chain metadata.
+- **Reduced overhead**: Reduce the cost of creating large amounts of NFTs from fungible tokens. This can lead to, for example, reduced overhead for similar tokens by the reuse of on-chain metadata for certain fungible tokens.
 
 :::tip Fungible token → NFT
 The Aptos token standard supports mutation of a fungible token to an NFT.
