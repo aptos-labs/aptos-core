@@ -36,7 +36,7 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
                 .unwrap();
             runtime.block_on(async { fullnode_to_reboot.stop().await })?;
             runtime.block_on(async { fullnode_to_reboot.start().await })?;
-            std::thread::sleep(Duration::from_secs(5));
+            std::thread::sleep(Duration::from_secs(10));
         }
 
         Ok(())

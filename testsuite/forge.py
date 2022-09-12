@@ -1260,7 +1260,7 @@ def create_forge_command(
 @envoption("FORGE_ENABLE_HAPROXY")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
-@envoption("FORGE_TEST_SUITE", "validator_reboot_stress_test")
+@envoption("FORGE_TEST_SUITE", "land_blocking")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("IMAGE_TAG")

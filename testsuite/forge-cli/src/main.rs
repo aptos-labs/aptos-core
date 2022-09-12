@@ -380,7 +380,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => single_test_suite("validator_reboot_stress_test"),
+        "land_blocking" => Ok(land_blocking_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -477,7 +477,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_initial_fullnode_count(1)
             .with_network_tests(vec![&ValidatorRebootStressTest])
             .with_success_criteria(SuccessCriteria::new(
-                2000,
+                3000,
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
@@ -488,7 +488,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_network_tests(vec![&FullNodeRebootStressTest])
             .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
             .with_success_criteria(SuccessCriteria::new(
-                0,
+                2000,
                 50000,
                 false,
                 Some(Duration::from_secs(600)),

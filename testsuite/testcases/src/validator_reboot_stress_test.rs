@@ -36,7 +36,7 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
                 .unwrap();
             runtime.block_on(async { validator_to_reboot.stop().await })?;
             runtime.block_on(async { validator_to_reboot.start().await })?;
-            std::thread::sleep(Duration::from_secs(15));
+            std::thread::sleep(Duration::from_secs(10));
         }
 
         Ok(())
