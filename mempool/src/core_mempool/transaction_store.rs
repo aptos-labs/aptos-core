@@ -165,7 +165,7 @@ impl TransactionStore {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
                         self.index_remove(&txn);
-                        self.account_remove(&txn.get_sender());
+                        self.remove_account_if_empty(&txn.get_sender());
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
@@ -282,7 +282,7 @@ impl TransactionStore {
                         ))
                     );
                     self.index_remove(&txn);
-                    self.account_remove(&address);
+                    self.remove_account_if_empty(&address);
                 }
             }
         }
@@ -394,7 +394,7 @@ impl TransactionStore {
                 address,
                 sequence_number
             );
-            self.account_remove(address);
+            self.remove_account_if_empty(address);
         }
     }
 
@@ -421,7 +421,7 @@ impl TransactionStore {
                 self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
-            self.account_remove(account);
+            self.remove_account_if_empty(account);
         }
     }
 
@@ -439,7 +439,7 @@ impl TransactionStore {
     }
 
     /// Removes account datastructures if there are no more transactions for the account
-    fn account_remove(&mut self, address: &AccountAddress) {
+    fn remove_account_if_empty(&mut self, address: &AccountAddress) {
         if let Some(txns) = self.transactions.get(address) {
             if txns.is_empty() {
                 self.transactions.remove(address);
@@ -583,7 +583,7 @@ impl TransactionStore {
                     // remove txn
                     self.index_remove(&txn);
                 }
-                self.account_remove(&key.address);
+                self.remove_account_if_empty(&key.address);
             }
         }
 
