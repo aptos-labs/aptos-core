@@ -256,6 +256,8 @@ export class AptosClient {
   }
 
   /**
+   * @deprecated Use `getEventsByCreationNumber` instead. This will be removed in the next release.
+   *
    * Queries events by event key
    * @param eventKey Event key for an event stream. It is BCS serialized bytes
    * of `guid` field in the Move struct `EventHandle`
@@ -267,9 +269,31 @@ export class AptosClient {
   }
 
   /**
-   * Extracts event key from the account resource identified by the
-   * `event_handle_struct` and `field_name`, then returns events identified by the event key
-   * @param address Hex-encoded 32 byte Aptos account from which events are queried
+   * Event types are globally identifiable by an account `address` and
+   * monotonically increasing `creation_number`, one per event type emitted
+   * to the given account. This API returns events corresponding to that
+   * that event type.
+   * @param address Hex-encoded 32 byte Aptos account, with or without a `0x` prefix,
+   * for which events are queried. This refers to the account that events were emitted
+   * to, not the account hosting the move module that emits that event type.
+   * @param creationNumber Creation number corresponding to the event type.
+   * @returns Array of events assotiated with the given account and creation number.
+   */
+  @parseApiError
+  async getEventsByCreationNumber(
+    address: MaybeHexString,
+    creationNumber: number | bigint | string,
+  ): Promise<Gen.Event[]> {
+    return this.client.events.getEventsByCreationNumber(HexString.ensure(address).hex(), creationNumber.toString());
+  }
+
+  /**
+   * This API uses the given account `address`, `eventHandle`, and `fieldName`
+   * to build a key that can globally identify an event types. It then uses this
+   * key to return events emitted to the given account matching that event type.
+   * @param address Hex-encoded 32 byte Aptos account, with or without a `0x` prefix,
+   * for which events are queried. This refers to the account that events were emitted
+   * to, not the account hosting the move module that emits that event type.
    * @param eventHandleStruct String representation of an on-chain Move struct type.
    * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct

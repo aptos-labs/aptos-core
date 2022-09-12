@@ -47,4 +47,4 @@ pub use transaction::{
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::IdentifierWrapper;
+pub use wrappers::{EventGuid, IdentifierWrapper};
