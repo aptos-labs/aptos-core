@@ -481,7 +481,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
-            )),
+                None,
+            ))
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 120.into();
+            })),
         "fullnode_reboot_stress_test" => config
             .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
             .with_initial_fullnode_count(10)
@@ -492,6 +496,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
+                None,
             )),
         "account_creation_state_sync" => config
             .with_network_tests(vec![&PerformanceBenchmarkWithFN])

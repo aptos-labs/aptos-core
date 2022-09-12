@@ -17,6 +17,6 @@ jobs:
       FORGE_NAMESPACE: forge-validator-reboot-stress
       FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: validator_reboot_stress_test
       POST_TO_SLACK: true

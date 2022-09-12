@@ -18,7 +18,7 @@ impl Test for FullNodeRebootStressTest {
 }
 
 impl NetworkLoadTest for FullNodeRebootStressTest {
-    fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllFullnodes)
     }
 

@@ -18,7 +18,7 @@ impl Test for ValidatorRebootStressTest {
 }
 
 impl NetworkLoadTest for ValidatorRebootStressTest {
-    fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllFullnodes)
     }
 
