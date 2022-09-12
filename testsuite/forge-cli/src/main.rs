@@ -619,8 +619,10 @@ fn state_sync_perf_fullnodes_apply_outputs(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
