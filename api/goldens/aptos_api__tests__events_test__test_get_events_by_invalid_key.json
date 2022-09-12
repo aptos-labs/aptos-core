@@ -1,5 +1,0 @@
-{
-  "message": "failed to parse path `event_key`: failed to parse \"string(EventKey)\": Odd number of digits",
-  "error_code": "web_framework_error",
-  "vm_error_code": null
-}
