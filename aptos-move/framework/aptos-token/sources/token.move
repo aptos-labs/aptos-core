@@ -1,4 +1,11 @@
 /// This module provides the foundation for Tokens.
+/// TODO: Add clear detailed flows for creator and token holder.
+///
+/// Creator:
+/// 1. create_collection_script to create the collection
+/// 2. create_tokendata to create the token data for a specific type of token.
+/// 3. mint_script to mint a token amount to the creator account. Creator can then transfer or sell as desired.
+/// 4. Call mutate_one_token to create a fungible token from semi-fungible tokens.
 module aptos_token::token {
     use std::error;
     use std::signer;
@@ -31,6 +38,7 @@ module aptos_token::token {
     // Constants
     //
 
+    // TODO: Add comments for each error code so huam nreadable errors are displayed to users.
     const EALREADY_HAS_BALANCE: u64 = 0;
     const EBALANCE_NOT_PUBLISHED: u64 = 1;
     const ECOLLECTIONS_NOT_PUBLISHED: u64 = 2;
@@ -38,9 +46,11 @@ module aptos_token::token {
     const ECOLLECTION_ALREADY_EXISTS: u64 = 4;
     const ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM: u64 = 5;
     const EINSUFFICIENT_BALANCE: u64 = 6;
+    // TODO: Remove as this is not used.
     const EINVALID_COLLECTION_NAME: u64 = 7;
     const EINVALID_TOKEN_MERGE: u64 = 8;
     const EMINT_WOULD_EXCEED_TOKEN_MAXIMUM: u64 = 9;
+    // TODO: Remove as this is not used.
     const ENO_BURN_CAPABILITY: u64 = 10;
     const ENO_MINT_CAPABILITY: u64 = 11;
     const ETOKEN_ALREADY_EXISTS: u64 = 12;
@@ -49,11 +59,13 @@ module aptos_token::token {
     const ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT: u64 = 15;
     const EFIELD_NOT_MUTABLE: u64 = 16;
     const ENO_MUTATE_CAPABILITY: u64 = 17;
+    // TODO: Remove as this is not used.
     const ETOEKN_PROPERTY_EXISTED: u64 = 18;
     const ENO_TOKEN_IN_TOKEN_STORE: u64 = 19;
     const ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE: u64 = 20;
     const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 21;
     const EWITHDRAW_ZERO: u64 = 22;
+    // TODO: Remove as this is not used.
     const ENOT_TRACKING_SUPPLY: u64 = 23;
     const ENFT_NOT_SPLITABLE: u64 = 24;
     /// The collection name is too long
@@ -82,7 +94,7 @@ module aptos_token::token {
         // the id to the common token data shared by token with different property_version
         token_data_id: TokenDataId,
         // the property_version of a token.
-        // Token with dfiferent property_version can have different value of PropertyMap
+        // Token with different property_version can have different value of PropertyMap
         property_version: u64,
     }
 
@@ -283,11 +295,7 @@ module aptos_token::token {
         );
         // only creator of the tokendata can mint more tokens for now
         assert!(token_data_id.creator == signer::address_of(account),  error::permission_denied(ENO_MINT_CAPABILITY));
-        mint_token(
-            account,
-            token_data_id,
-            amount,
-        );
+        mint_token(account, token_data_id, amount);
     }
 
     //
@@ -316,6 +324,8 @@ module aptos_token::token {
         initialize_token_store(account);
         let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
         *opt_in_flag = opt_in;
+
+        // TODO: Missing event
     }
 
     public fun  mutate_one_token(
@@ -334,9 +344,11 @@ module aptos_token::token {
             creator
         ).token_data;
 
+        // TODO: Wrap error.
         assert!(table::contains(all_token_data, token_id.token_data_id), ETOKEN_NOT_PUBLISHED);
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
+        // TODO: Wrap error.
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
@@ -398,6 +410,7 @@ module aptos_token::token {
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
+        // TODO: Why need the creator address then if the account's address is expected to be the same as the creator?
         assert!(signer::address_of(account) == creator, error::not_found(ENO_MUTATE_CAPABILITY));
         // validate if the properties is mutable
         assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -405,7 +418,7 @@ module aptos_token::token {
             creator
         ).token_data;
 
-        let token_id: TokenId = create_token_id_raw(creator, collection_name, token_name, token_property_version);
+        let token_id = create_token_id_raw(creator, collection_name, token_name, token_property_version);
         assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
         assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
@@ -478,6 +491,7 @@ module aptos_token::token {
 
     public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
         let account_addr = signer::address_of(account);
+        // TODO: Why not create the token store if it doesn't exist to make this function a bit more convenient?
         assert!(
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
@@ -509,6 +523,7 @@ module aptos_token::token {
 
     public fun merge(dst_token: &mut Token, source_token: Token) {
         assert!(&dst_token.id == &source_token.id, error::invalid_argument(EINVALID_TOKEN_MERGE));
+        // TODO: Why not validate that property_version = 0 here?
         //only property_version = 0 token require merge
         dst_token.amount = dst_token.amount + source_token.amount;
         let Token { id: _, amount: _, token_properties: _ } = source_token;
@@ -601,6 +616,7 @@ module aptos_token::token {
     ) acquires Collections {
         assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+
         let account_addr = signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
@@ -675,6 +691,7 @@ module aptos_token::token {
         assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(account);
+        // TODO: Why not create the Collections resource if it doesn't exist for convenience?
         assert!(
             exists<Collections>(account_addr),
             error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
@@ -835,6 +852,9 @@ module aptos_token::token {
         token_data_id: TokenDataId,
         amount: u64,
     ): TokenId acquires Collections, TokenStore {
+        // TODO: Validate that amount > 0?
+        // TODO: Validate that token being minted has property_version = 0? Otherwise, it's fungible and cannot be
+        // be minted more.
         assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
@@ -916,6 +936,8 @@ module aptos_token::token {
         property_version: u64,
         amount: u64
     ) acquires Collections, TokenStore {
+        // TODO: Verify that amount > 0?
+
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         let creator_addr = token_id.token_data_id.creator;
         assert!(
@@ -944,6 +966,7 @@ module aptos_token::token {
         );
         token_data.supply = token_data.supply - burned_amount;
 
+        // TODO: What if the creator wants to mint more this token later?
         // Delete the token_data if supply drops to 0.
         if (token_data.supply == 0) {
             let TokenData {
