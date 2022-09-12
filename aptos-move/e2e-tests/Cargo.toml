@@ -1,7 +1,7 @@
 [package]
 name = "language-e2e-tests"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Move language e2e testing framework"
 repository = "https://github.com/aptos-labs/aptos-core"
