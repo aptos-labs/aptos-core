@@ -280,7 +280,8 @@ impl EpochHistory {
             warn!(
                 epoch = epoch,
                 epoch_history_until = self.epoch_endings.len(),
-                "Epoch too new, can't verify. Don't worry, node won't be able to start if data is not compatible.",
+                "Epoch too new, can't verify, letting it pass. Don't worry, previous chunks are \
+                verified, and node won't be able to start if this piece of data is indeed malicious.",
             );
             return Ok(());
         }
