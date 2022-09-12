@@ -481,3 +481,32 @@ test(
   },
   30 * 1000,
 );
+
+test(
+  "get account resource over BCS",
+  async () => {
+    const client = new AptosClient(NODE_URL, null, false, { enableBCSRead: false });
+    const clientBCS = new AptosClient(NODE_URL);
+
+    const resources = await client.getAccountResources("0x1");
+    await Promise.all(
+      resources
+        .map((res) => res.type)
+        .map(async (resourceType) => {
+          // Block resource changes constantly, skip them
+          if (
+            !resourceType.startsWith("0x1::block") &&
+            resourceType !== "0x1::stake::ValidatorPerformance" &&
+            resourceType !== "0x1::timestamp::CurrentTimeMicroseconds"
+          ) {
+            const [resFromJson, resFromBcs] = await Promise.all([
+              client.getAccountResource("0x1", resourceType),
+              clientBCS.getAccountResource("0x1", resourceType),
+            ]);
+            expect(resFromJson).toEqual(resFromBcs);
+          }
+        }),
+    );
+  },
+  60 * 1000,
+);
