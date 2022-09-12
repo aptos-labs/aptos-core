@@ -21,9 +21,8 @@ use crate::{
 use aptos_logger::{debug, trace};
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::{AccountResource, CoinStoreResource};
+use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
@@ -245,15 +244,6 @@ impl CoinCache {
         coin: TypeTag,
         version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
-        /// Type for deserializing coin info
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        struct CoinInfo {
-            name: String,
-            symbol: String,
-            decimals: u8,
-            _supply: Option<Vec<u8>>,
-        }
-
         let struct_tag = match coin {
             TypeTag::Struct(ref tag) => tag,
             // This is a poorly formed coin, and we'll just skip over it
@@ -273,25 +263,27 @@ impl CoinCache {
 
         let response = if let Some(version) = version {
             rest_client
-                .get_account_resource_at_version_bcs::<CoinInfo>(
+                .get_account_resource_at_version_bcs::<CoinInfoResource>(
                     address,
                     &encoded_resource_tag,
                     version,
                 )
-                .await?
+                .await
         } else {
             rest_client
-                .get_account_resource_bcs::<CoinInfo>(address, &encoded_resource_tag)
-                .await?
+                .get_account_resource_bcs::<CoinInfoResource>(address, &encoded_resource_tag)
+                .await
         };
 
         // At this point if we've retrieved it and it's bad, we error out
-        let coin_info = response.into_inner();
+        let coin_info = response?.into_inner();
 
         // TODO: The symbol has to come from a trusted list, as the move type is the real indicator
         Ok(Some(Currency {
-            symbol: coin_info.symbol,
-            decimals: coin_info.decimals,
+            symbol: coin_info
+                .symbol()
+                .unwrap_or_else(|err| format!("Invalid Symbol: {}", err)),
+            decimals: coin_info.decimals(),
             metadata: Some(CurrencyMetadata {
                 move_type: struct_tag.to_string(),
             }),
