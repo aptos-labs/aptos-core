@@ -715,11 +715,12 @@ impl StateStore {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        Ok(Box::new(StateSnapshotRestore::new_overwrite(
+        Ok(Box::new(StateSnapshotRestore::new(
             &self.state_merkle_db,
             self,
             version,
             expected_root_hash,
+            true, /* async_commit */
         )?))
     }
 
