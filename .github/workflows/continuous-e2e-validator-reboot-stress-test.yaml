@@ -1,4 +1,4 @@
-name: Continuous E2E Consensus Stress Test
+name: Continuous E2E Validator Reboot Stress Test
 
 permissions:
   issues: write
@@ -10,14 +10,13 @@ on:
     - cron: "0 */3 * * *"
 
 jobs:
-  ### Please remember to use different namespace for different tests
-  # Performance test in an optimal setting
-  run-forge-consensus-stress-test:
+  run-forge-validator-reboot-stress-test:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-consensus-stress-test
+      FORGE_NAMESPACE: forge-validator-reboot-stress
       FORGE_CLUSTER_NAME: aptos-forge-big-1
+      # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: consensus_stress_test
+      FORGE_TEST_SUITE: validator_reboot_stress_test
       POST_TO_SLACK: true
