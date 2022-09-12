@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, SwarmChaos, SwarmNetworkBandwidth, Test};
+use crate::{LoadDestination, NetworkLoadTest};
+use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, Test};
 
 pub struct NetworkBandwidthTest;
 
@@ -20,38 +20,34 @@ impl Test for NetworkBandwidthTest {
     }
 }
 
-impl NetworkTest for NetworkBandwidthTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_duration;
-        let bandwidth = SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-            rate: RATE_MBPS,
-            limit: LIMIT_BYTES,
-            buffer: BUFFER_BYTES,
-        });
-
-        // emit to all validator
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        // INJECT BANDWIDTH LIMIT AND EMIT TXNS
-        ctx.swarm().inject_chaos(bandwidth.clone())?;
+impl NetworkLoadTest for NetworkBandwidthTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+                rate: RATE_MBPS,
+                limit: LIMIT_BYTES,
+                buffer: BUFFER_BYTES,
+            }))?;
         let msg = format!(
             "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
             RATE_MBPS, LIMIT_BYTES, BUFFER_BYTES
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
-        ctx.report
-            .report_txn_stats(format!("{}:bandwidth", self.name()), &txn_stat, duration);
-        ctx.swarm().remove_chaos(bandwidth)?;
+        Ok(LoadDestination::AllNodes)
+    }
 
-        // ensure we meet the success criteria
-        ctx.check_for_success(&txn_stat, &duration)?;
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+            rate: RATE_MBPS,
+            limit: LIMIT_BYTES,
+            buffer: BUFFER_BYTES,
+        }))
+    }
+}
 
-        Ok(())
+impl NetworkTest for NetworkBandwidthTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

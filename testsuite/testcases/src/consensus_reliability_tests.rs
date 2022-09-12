@@ -31,14 +31,14 @@ impl Test for ChangingWorkingQuorumTest {
 }
 
 impl NetworkLoadTest for ChangingWorkingQuorumTest {
-    fn setup(&self, swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
         // because we are doing failure testing, we should be sending
         // traffic to nodes that are alive.
-        if swarm.full_nodes().count() > 0 {
+        if ctx.swarm().full_nodes().count() > 0 {
             Ok(LoadDestination::AllFullnodes)
         } else if self.always_healthy_nodes > 0 {
             Ok(LoadDestination::Peers(
-                swarm
+                ctx.swarm()
                     .validators()
                     .take(self.always_healthy_nodes)
                     .map(|v| v.peer_id())
