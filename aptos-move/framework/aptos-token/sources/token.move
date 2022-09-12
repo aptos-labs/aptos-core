@@ -129,7 +129,7 @@ module aptos_token::token {
         // the id to the common token data shared by token with different property_version
         token_data_id: TokenDataId,
         // the property_version of a token.
-        // Token with dfiferent property_version can have different value of PropertyMap
+        // Token with different property_version can have different value of PropertyMap
         property_version: u64,
     }
 
@@ -330,11 +330,7 @@ module aptos_token::token {
         );
         // only creator of the tokendata can mint more tokens for now
         assert!(token_data_id.creator == signer::address_of(account),  error::permission_denied(ENO_MINT_CAPABILITY));
-        mint_token(
-            account,
-            token_data_id,
-            amount,
-        );
+        mint_token(account, token_data_id, amount);
     }
 
     //
@@ -363,6 +359,8 @@ module aptos_token::token {
         initialize_token_store(account);
         let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
         *opt_in_flag = opt_in;
+
+        // TODO: Missing event
     }
 
     public fun  mutate_one_token(
@@ -384,6 +382,7 @@ module aptos_token::token {
         assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
+        // TODO: Wrap error.
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
@@ -445,6 +444,7 @@ module aptos_token::token {
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
+        // TODO: Why need the creator address then if the account's address is expected to be the same as the creator?
         assert!(signer::address_of(account) == creator, error::not_found(ENO_MUTATE_CAPABILITY));
         // validate if the properties is mutable
         assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -645,6 +645,7 @@ module aptos_token::token {
     ) acquires Collections {
         assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
+
         let account_addr = signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
@@ -719,6 +720,7 @@ module aptos_token::token {
         assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(account);
+        // TODO: Why not create the Collections resource if it doesn't exist for convenience?
         assert!(
             exists<Collections>(account_addr),
             error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
@@ -879,6 +881,9 @@ module aptos_token::token {
         token_data_id: TokenDataId,
         amount: u64,
     ): TokenId acquires Collections, TokenStore {
+        // TODO: Validate that amount > 0?
+        // TODO: Validate that token being minted has property_version = 0? Otherwise, it's fungible and cannot be
+        // be minted more.
         assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
