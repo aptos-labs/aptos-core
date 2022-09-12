@@ -10,10 +10,13 @@ use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 
 use again::RetryPolicy;
 use aptos_logger::info;
+use futures::TryFutureExt;
+use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use kube::{
     api::{Api, Meta, Patch, PatchParams},
     client::Client as K8sClient,
 };
+use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::create_k8s_client;
@@ -252,13 +255,42 @@ pub async fn set_identity(
     kube_namespace: &str,
     k8s_secret_name: &str,
 ) -> Result<()> {
-    //todo
+    let kube_client = create_k8s_client().await;
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+    let patch_op = PatchOperation::Replace(ReplaceOperation {
+        path: "/spec/template/spec/volumes/1/secret/secretName".to_string(),
+        value: json!(k8s_secret_name),
+    });
+    let patch: Patch<Value> = Patch::Json(JsonPatch(vec![patch_op]));
+    let pp = PatchParams::apply("forge").force();
+    stateful_set_api.patch(sts_name, &pp, &patch).await?;
     Ok(())
 }
 
 pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String> {
-    //todo
-    Ok(String::new())
+    let kube_client = create_k8s_client().await;
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+    let sts = stateful_set_api.get(sts_name).await;
+    let ret = sts
+        .as_ref()
+        .unwrap()
+        .spec
+        .as_ref()
+        .unwrap()
+        .template
+        .spec
+        .as_ref()
+        .unwrap()
+        .volumes
+        .as_ref()
+        .unwrap()[1]
+        .secret
+        .as_ref()
+        .unwrap()
+        .secret_name
+        .as_ref()
+        .unwrap();
+    Ok(ret.clone())
 }
 
 pub async fn check_for_container_restart(
