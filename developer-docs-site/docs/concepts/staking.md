@@ -58,6 +58,7 @@ As an owner:
 
 - Bob owns the funds that will be used for staking.
 - Only Bob can add or unlock or withdraw funds.
+- Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 - The reward will be deposited into Bob's (owner's) account.
 
