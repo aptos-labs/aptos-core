@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 # Do NOT add any inter-project dependencies.
 # This is to avoid ever having a circular dependency with the aptos-logger crate.

@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
@@ -689,6 +689,9 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
+ "http",
+ "hyper",
+ "inspection-service",
  "once_cell",
  "reqwest",
  "reqwest-middleware",
@@ -3365,6 +3368,7 @@ dependencies = [
  "anyhow",
  "aptos",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-keygen",
  "aptos-logger",
  "aptos-parallel-executor",

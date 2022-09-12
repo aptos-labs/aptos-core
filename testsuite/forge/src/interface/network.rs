@@ -55,10 +55,16 @@ impl<'t> NetworkContext<'t> {
         &mut self.core
     }
 
-    pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
+    pub fn check_for_success(
+        &mut self,
+        stats: &TxnStats,
+        window: &Duration,
+        start_time: i64,
+        end_time: i64,
+    ) -> Result<()> {
         self.runtime.block_on(
             self.success_criteria
-                .check_for_success(stats, window, self.swarm),
+                .check_for_success(stats, window, self.swarm, start_time, end_time),
         )
     }
 }

@@ -21,7 +21,7 @@ use move_deps::{
 
 #[test]
 fn script_code_unverifiable() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -71,7 +71,7 @@ fn script_code_unverifiable() {
 
 #[test]
 fn script_none_existing_module_dep() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -149,7 +149,7 @@ fn script_none_existing_module_dep() {
 
 #[test]
 fn script_non_existing_function_dep() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -227,7 +227,7 @@ fn script_non_existing_function_dep() {
 
 #[test]
 fn script_bad_sig_function_dep() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -306,7 +306,7 @@ fn script_bad_sig_function_dep() {
 
 #[test]
 fn script_type_argument_module_does_not_exist() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
@@ -371,7 +371,7 @@ fn script_type_argument_module_does_not_exist() {
 
 #[test]
 fn script_nested_type_argument_module_does_not_exist() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender

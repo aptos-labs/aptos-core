@@ -32,7 +32,7 @@ pub fn close_module_publishing(
 }
 
 pub fn start_with_released_df() -> (FakeExecutor, Account) {
-    let executor = FakeExecutor::from_fresh_genesis();
+    let executor = FakeExecutor::from_testnet_genesis();
     let mut dr_account = Account::new_aptos_root();
 
     let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();

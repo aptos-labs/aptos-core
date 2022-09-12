@@ -1,7 +1,7 @@
 [package]
 name = "cached-packages"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Builds framework packages for caching in builds and tests"
 repository = "https://github.com/aptos-labs/aptos-core"

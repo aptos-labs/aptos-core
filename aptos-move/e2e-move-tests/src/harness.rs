@@ -5,6 +5,8 @@ use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
+use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_types::on_chain_config::GasSchedule;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -18,6 +20,7 @@ use language_e2e_tests::{
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_core_types::value::MoveValue;
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
@@ -55,12 +58,21 @@ impl MoveHarness {
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_fresh_genesis(),
+            executor: FakeExecutor::from_head_genesis(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
+    pub fn new_testnet() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
     }
 
     pub fn new_mainnet() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
@@ -280,6 +292,39 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    /// Increase maximal transaction size.
+    pub fn increase_transaction_size(&mut self) {
+        // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
+        // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
+        // do this differently then below, so perhaps improve this...
+        let entries = AptosGasParameters::initial().to_on_chain_gas_schedule();
+        let entries = entries
+            .into_iter()
+            .map(|(name, val)| {
+                if name == "txn.max_transaction_size_in_bytes" {
+                    (name, 1000 * 1024)
+                } else {
+                    (name, val)
+                }
+            })
+            .collect::<Vec<_>>();
+        let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
+        // set_gas_schedule is not a transaction, so directly call as function
+        self.executor.exec(
+            "gas_schedule",
+            "set_gas_schedule",
+            vec![],
+            vec![
+                MoveValue::Signer(AccountAddress::ONE)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::vector_u8(schedule_bytes)
+                    .simple_serialize()
+                    .unwrap(),
+            ],
+        );
     }
 }
 

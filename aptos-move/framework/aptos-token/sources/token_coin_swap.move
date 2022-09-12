@@ -64,6 +64,14 @@ module aptos_token::token_coin_swap {
         coin_type_info: TypeInfo,
     }
 
+    public fun does_listing_exist<CoinType>(
+        token_owner: address,
+        token_id: TokenId
+    ): bool acquires TokenListings {
+        let token_listing = borrow_global<TokenListings<CoinType>>(token_owner);
+        table::contains(&token_listing.listings, token_id)
+    }
+
     /// Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
     public fun exchange_coin_for_token<CoinType>(
         coin_owner: &signer,

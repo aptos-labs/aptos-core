@@ -1,7 +1,7 @@
 [package]
 name = "e2e-move-tests"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Move e2e tests"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -21,6 +21,7 @@ tempfile = "3.3.0"
 
 aptos = { path = "../../crates/aptos" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-gas = { path = "../aptos-gas" }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-parallel-executor = { path = "../parallel-executor" }

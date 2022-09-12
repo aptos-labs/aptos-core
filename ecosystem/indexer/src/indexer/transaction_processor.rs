@@ -78,10 +78,9 @@ pub trait TransactionProcessor: Send + Sync + Debug {
             .with_label_values(&[self.name()])
             .inc();
 
-        let (start_version, end_version) = (
-            txns.first().unwrap().version().unwrap(),
-            txns.last().unwrap().version().unwrap(),
-        );
+        let start_version = txns.first().unwrap().version().unwrap();
+        let end_version = txns.last().unwrap().version().unwrap();
+
         self.mark_versions_started(start_version, end_version);
         let res = self
             .process_transactions(txns, start_version, end_version)

@@ -21,5 +21,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: different_node_speed_and_reliability_test
       POST_TO_SLACK: true
-      USE_NEW_WRAPPER: true
       FORGE_ENABLE_FAILPOINTS: true
