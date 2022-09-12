@@ -134,8 +134,9 @@ export default class extends Controller<HTMLAnchorElement> {
           const url = new URL(location.href);
           url.search = `connect-wallet`;
           location.href = url.toString();
+        } else {
+          Sentry.captureException(error);
         }
-        Sentry.captureException(error);
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {
