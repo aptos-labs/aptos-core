@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "version": "0",
+    "key": "0x0000000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+    "guid": {
+      "creation_number": "0",
+      "account_address": "0xa550c18"
+    },
+    "sequence_number": "0",
+    "type": "0x1::account::CoinRegisterEvent",
+    "data": {
+      "type_info": {
+        "account_address": "0x1",
+        "module_name": "0x6170746f735f636f696e",
+        "struct_name": "0x4170746f73436f696e"
+      }
+    }
+  }
+]

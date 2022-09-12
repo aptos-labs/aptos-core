@@ -541,7 +541,11 @@ mod test {
                      ],
                      "events":[
                         {
-                           "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                          "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                           "guid":{
+                              "account_address":"0xa550c18",
+                              "creation_number":"4",
+                           },
                            "sequence_number":"0",
                            "type":"0x1::reconfiguration::NewEpochEvent",
                            "data":{
@@ -553,7 +557,11 @@ mod test {
                },
                "events":[
                   {
-                     "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                    "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                     "guid":{
+                        "account_address":"0xa550c18",
+                        "creation_number":"4",
+                    },
                      "sequence_number":"0",
                      "type":"0x1::reconfiguration::NewEpochEvent",
                      "data":{
@@ -591,7 +599,11 @@ mod test {
               "timestamp": "1649395495746947",
               "events": [
                  {
-                    "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                    "key":"0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                    "guid":{
+                        "account_address":"0xa550c18",
+                        "creation_number":"6",
+                    },
                     "sequence_number": "0",
                     "type": "0x1::block::NewBlockEvent",
                     "data": {
@@ -701,6 +713,10 @@ mod test {
               "events": [
                 {
                   "key": "0x040000000000000000000000000000000000000000000000000000000000000000000000fefefefe",
+                  "guid":{
+                      "account_address":"0xfefefefe",
+                      "creation_number":"4",
+                  },
                   "sequence_number": "0",
                   "type": "0x1::Whatever::FakeEvent1",
                   "data": {
@@ -709,6 +725,10 @@ mod test {
                 },
                 {
                   "key": "0x040000000000000000000000000000000000000000000000000000000000000000000000fefefefe",
+                  "guid":{
+                      "account_address":"0xfefefefe",
+                      "creation_number":"4",
+                  },
                   "sequence_number": "1",
                   "type": "0x1::Whatever::FakeEvent2",
                   "data": {
