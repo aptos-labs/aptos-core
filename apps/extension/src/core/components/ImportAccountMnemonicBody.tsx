@@ -33,53 +33,53 @@ export default function ImportAccountMnemonicBody({
           <VStack>
             <InputGroup size="sm">
               <InputLeftAddon>1</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-a')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-a')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>2</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-b')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-b')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>3</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-c')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-c')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>4</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-d')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-d')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>5</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-e')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-e')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>6</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-f')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-f')} isRequired variant="outline" />
             </InputGroup>
           </VStack>
           <VStack>
             <InputGroup size="sm">
               <InputLeftAddon>7</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-g')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-g')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>8</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-h')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-h')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>9</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-i')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-i')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>10</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-j')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-j')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>11</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-k')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-k')} isRequired variant="outline" />
             </InputGroup>
             <InputGroup size="sm">
               <InputLeftAddon>12</InputLeftAddon>
-              <Input minLength={1} {...register('mnemonic-l')} isRequired variant="outline" />
+              <Input autoComplete="off" minLength={1} {...register('mnemonic-l')} isRequired variant="outline" />
             </InputGroup>
           </VStack>
         </SimpleGrid>
