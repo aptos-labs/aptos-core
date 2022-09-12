@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::account::key_rotation::LookupAddress;
 use crate::account::{
     create::{CreateAccount, DEFAULT_FUNDED_COINS},
     fund::FundWithFaucet,
@@ -12,8 +13,8 @@ use crate::common::init::InitTool;
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions, RestOptions,
-    RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+    PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
@@ -33,9 +34,8 @@ use crate::stake::{
 };
 use crate::CliCommand;
 use aptos_config::config::Peer;
-use aptos_crypto::{
-    bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey, ValidCryptoMaterialStringExt,
-};
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -185,13 +185,26 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn lookup_address(
+        &self,
+        public_key: &Ed25519PublicKey,
+    ) -> CliTypedResult<AccountAddress> {
+        LookupAddress {
+            public_key_options: PublicKeyInputOptions::from_key(public_key),
+            rest_options: self.rest_options(),
+            encoding_options: Default::default(),
+            profile_options: Default::default(),
+        }
+        .execute()
+        .await
+    }
+
     pub async fn rotate_key(
         &mut self,
         index: usize,
         new_private_key: String,
         gas_options: Option<GasOptions>,
     ) -> CliTypedResult<RotateSummary> {
-        let new_key = Ed25519PrivateKey::from_encoded_string(&new_private_key).unwrap();
         let response = RotateKey {
             txn_options: TransactionOptions {
                 private_key_options: PrivateKeyInputOptions::from_private_key(
@@ -212,8 +225,6 @@ impl CliTestFramework {
         .execute()
         .await?;
 
-        // Insert the new private key into the test framework
-        let _ = mem::replace(&mut self.account_keys[index], new_key);
         Ok(response)
     }
 
@@ -855,6 +866,15 @@ impl CliTestFramework {
 
     pub fn private_key(&self, index: usize) -> &Ed25519PrivateKey {
         self.account_keys.get(index).unwrap()
+    }
+
+    pub fn set_private_key(
+        &mut self,
+        index: usize,
+        new_key: Ed25519PrivateKey,
+    ) -> Ed25519PrivateKey {
+        // Insert the new private key into the test framework, returning the old one
+        mem::replace(&mut self.account_keys[index], new_key)
     }
 
     pub fn account_id(&self, index: usize) -> AccountAddress {

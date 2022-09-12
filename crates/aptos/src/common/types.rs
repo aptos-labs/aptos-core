@@ -565,6 +565,15 @@ pub struct PublicKeyInputOptions {
     public_key: Option<String>,
 }
 
+impl PublicKeyInputOptions {
+    pub fn from_key(key: &Ed25519PublicKey) -> PublicKeyInputOptions {
+        PublicKeyInputOptions {
+            public_key: Some(key.to_encoded_string().unwrap()),
+            public_key_file: None,
+        }
+    }
+}
+
 impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(
         &self,
@@ -740,20 +749,6 @@ pub trait ExtractPublicKey {
         encoding: EncodingType,
         profile: &str,
     ) -> CliTypedResult<Ed25519PublicKey>;
-
-    fn extract_x25519_public_key(
-        &self,
-        encoding: EncodingType,
-        profile: &str,
-    ) -> CliTypedResult<x25519::PublicKey> {
-        let key = self.extract_public_key(encoding, profile)?;
-        x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
-            CliError::UnexpectedError(format!(
-                "Failed to convert ed25519 key to x25519 key {:?}",
-                err
-            ))
-        })
-    }
 }
 
 pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
