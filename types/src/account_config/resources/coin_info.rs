@@ -15,6 +15,7 @@ use move_deps::move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{Deserialize, Serialize};
+use std::string::FromUtf8Error;
 
 /// Rust representation of Aggregator Move struct.
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,6 +72,14 @@ impl MoveStructType for CoinInfoResource {
 impl MoveResource for CoinInfoResource {}
 
 impl CoinInfoResource {
+    pub fn symbol(&self) -> Result<String, FromUtf8Error> {
+        String::from_utf8(self.symbol.clone())
+    }
+
+    pub fn decimals(&self) -> u8 {
+        self.decimals
+    }
+
     pub fn supply(&self) -> &Option<OptionalAggregator> {
         &self.supply
     }
