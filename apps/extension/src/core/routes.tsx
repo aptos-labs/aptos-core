@@ -30,6 +30,7 @@ import Stake from 'pages/Stake';
 import ChangePassword from 'pages/ChangePassword';
 import AutoLockTimer from 'pages/AutoLockTimer';
 import Welcome from 'pages/Welcome';
+import Reauthenticate from 'pages/Reauthenticate';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -113,7 +114,11 @@ export const Routes = Object.freeze({
     path: '/password',
   },
   recovery_phrase: {
-    element: <RecoveryPhrase />,
+    element: (
+      <Reauthenticate>
+        <RecoveryPhrase />
+      </Reauthenticate>
+    ),
     path: '/settings/recovery_phrase',
   },
   rename_account: {
