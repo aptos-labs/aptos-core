@@ -41,6 +41,7 @@ use network::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::RandomState;
+use std::collections::BTreeSet;
 use std::hash::BuildHasher;
 use std::{
     cmp::Ordering,
@@ -376,7 +377,7 @@ impl MempoolNetworkInterface {
         }
 
         // Sync peer's pending broadcasts with latest mempool state.
-        // A pending broadcast might become empty if the corresponding txns were committed through
+        // A pending or retry broadcast might become empty if the corresponding txns were committed through
         // another peer, so don't track broadcasts for committed txns.
         let mempool = smp.mempool.lock();
         state.broadcast_info.sent_batches = state
@@ -386,6 +387,13 @@ impl MempoolNetworkInterface {
             .into_iter()
             .filter(|(id, _batch)| !mempool.timeline_range(id.0, id.1).is_empty())
             .collect::<BTreeMap<BatchId, SystemTime>>();
+        state.broadcast_info.retry_batches = state
+            .broadcast_info
+            .retry_batches
+            .clone()
+            .into_iter()
+            .filter(|id| !mempool.timeline_range(id.0, id.1).is_empty())
+            .collect::<BTreeSet<BatchId>>();
 
         // Check for batch to rebroadcast:
         // 1. Batch that did not receive ACK in configured window of time
