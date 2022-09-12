@@ -14,7 +14,6 @@ echo "FEATURES: $FEATURES"
 cargo build --profile=$PROFILE \
     -p aptos \
     -p aptos-faucet \
-    -p aptos-sf-indexer \
     -p aptos-node \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
@@ -36,7 +35,6 @@ fi
 BINS=(
     aptos
     aptos-faucet
-    aptos-sf-indexer
     aptos-node
     aptos-node-checker
     aptos-openapi-spec-generator
