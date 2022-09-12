@@ -361,7 +361,7 @@ mod test {
         Ok((conn_pool, tailer))
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_parsing_and_writing() {
         if crate::should_skip_pg_tests() {
             return;
