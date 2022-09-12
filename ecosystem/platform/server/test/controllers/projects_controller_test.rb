@@ -72,9 +72,6 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
         youtube_url: Faker::Internet.url(host: 'www.youtube.com'),
         thumbnail: Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png'),
         category_ids: [category.id],
-        project_members_attributes: [
-          { user_id: @user.id, role: 'admin', public: true }
-        ],
         screenshots: [
           Rack::Test::UploadedFile.new('app/assets/images/favicon.png', 'image/png')
         ],
