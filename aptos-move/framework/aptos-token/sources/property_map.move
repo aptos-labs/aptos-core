@@ -174,18 +174,16 @@ module aptos_token::property_map {
 
     /// create a property value from generic type data
     public fun create_property_value<T: copy>(data: &T): PropertyValue {
-        if (type_name<T>() == string::utf8(b"bool")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"bool"))
-        } else if (type_name<T>() == string::utf8(b"u8")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"u8"))
-        } else if (type_name<T>() == string::utf8(b"u64")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"u64"))
-        } else if (type_name<T>() == string::utf8(b"u128")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"u128"))
-        } else if (type_name<T>() == string::utf8(b"address")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"address"))
-        } else if (type_name<T>() == string::utf8(b"0x1::string::String")) {
-            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"0x1::string::String"))
+        let name = type_name<T>();
+        if (
+            name == string::utf8(b"bool") ||
+            name == string::utf8(b"u8") ||
+            name == string::utf8(b"u64") ||
+            name == string::utf8(b"u128") ||
+            name == string::utf8(b"address") ||
+            name == string::utf8(b"0x1::string::String")
+        ) {
+            create_property_value_raw(bcs::to_bytes<T>(data), name)
         } else {
             create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"vector<u8>"))
         }
@@ -255,5 +253,14 @@ module aptos_token::property_map {
         let plist = new(keys, values, types);
         assert!(!read_bool(&plist, &utf8(b"mutable")), 1);
         assert!(read_u8(&plist, &utf8(b"attack")) == 10, 1);
+    }
+
+    #[test]
+    fun test_generate_property_value_convert_back() {
+        let data: address = @0xcafe;
+        let pv = create_property_value(&data);
+        let pm = create_property_list();
+        add(&mut pm, string::utf8(b"addr"), pv);
+        assert!(read_address(&pm, &string::utf8(b"addr")) == data, 1)
     }
 }
