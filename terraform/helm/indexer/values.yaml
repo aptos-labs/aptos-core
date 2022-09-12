@@ -9,13 +9,6 @@ indexer:
     tag: devnet
     pullPolicy: IfNotPresent
 
-indexer_server:
-  enabled: false
-  image:
-    repo: aptoslabs/indexer-server
-    tag: devnet
-    pullPolicy: IfNotPresent
-
 nginx:
   enabled: false
   upstream:
