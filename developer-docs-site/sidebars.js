@@ -133,6 +133,7 @@ const sidebars = {
             "nodes/full-node/network-identity-fullnode",
             "nodes/full-node/troubleshooting-fullnode",
             "nodes/full-node/run-a-fullnode-on-gcp",
+            "nodes/full-node/bootstrap-fullnode",
           ],
         },
         {
