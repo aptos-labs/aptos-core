@@ -1260,7 +1260,7 @@ def create_forge_command(
 @envoption("FORGE_ENABLE_HAPROXY")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
-@envoption("FORGE_TEST_SUITE", "land_blocking")
+@envoption("FORGE_TEST_SUITE", "state_sync_perf_fullnodes_apply_outputs")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("IMAGE_TAG")
@@ -1313,6 +1313,7 @@ def test(
     test_args: Optional[List[str]],
 ) -> None:
     """Run a forge test"""
+    forge_test_suite = "state_sync_perf_fullnodes_apply_outputs"
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)
     filesystem = FakeFilesystem() if dry_run else LocalFilesystem() 
