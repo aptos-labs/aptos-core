@@ -7,7 +7,7 @@ use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkDelay, T
 pub struct NetworkLatencyTest;
 
 // Delay
-pub const LATENCY_MS: u64 = 200;
+pub const LATENCY_MS: u64 = 100;
 pub const JITTER_MS: u64 = 100;
 pub const CORRELATION_PERCENTAGE: u64 = 10;
 

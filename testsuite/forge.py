@@ -264,7 +264,7 @@ HUMIO_LOGS_LINK = (
 
 
 def prometheus_port_forward() -> None:
-    os.execvp("kubectl", ["kubectl", "port-forward", "prometheus", "9090"])
+    os.execvp("kubectl", ["kubectl", "port-forward", "svc/aptos-node-mon-aptos-monitoring-prometheus", "9090"])
 
 
 class Process:

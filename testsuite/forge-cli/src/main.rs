@@ -454,6 +454,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(vec![&NetworkPartitionTest]),
         "network_latency" => config
             .with_network_tests(vec![&NetworkLatencyTest])
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+                mempool_backlog: 50000,
+            }))
             .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
