@@ -10,7 +10,6 @@ publish = false
 edition = "2021"
 
 [dependencies]
-hex = "0.4.3"
 rand = "0.7.3"
 
 aptos-crypto = { path = "../aptos-crypto" }
