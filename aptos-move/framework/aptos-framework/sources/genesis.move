@@ -108,7 +108,7 @@ module aptos_framework::genesis {
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
-    /// Genesis step 2: Initialize Aptos coin
+    /// Genesis step 2: Initialize Aptos coin.
     fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
@@ -141,9 +141,69 @@ module aptos_framework::genesis {
     ///
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
+    fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
+        let i = 0;
+        let num_validators = vector::length(&validators);
+        while (i < num_validators) {
+            let validator = vector::borrow(&validators, i);
+            let owner = &account::create_account(validator.owner_address);
+            let operator = owner;
+            // Create the operator account if it's different from owner.
+            if (validator.operator_address != validator.owner_address) {
+                operator = &account::create_account(validator.operator_address);
+            };
+            // Create the voter account if it's different from owner and operator.
+            if (validator.voter_address != validator.owner_address &&
+                validator.voter_address != validator.operator_address) {
+                account::create_account(validator.voter_address);
+            };
+
+            // Mint the initial staking amount to the validator.
+            coin::register<AptosCoin>(owner);
+            aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
+
+            // Initialize the stake pool and join the validator set.
+            stake::initialize_stake_owner(
+                owner,
+                validator.stake_amount,
+                validator.operator_address,
+                validator.voter_address,
+            );
+            stake::rotate_consensus_key(
+                operator,
+                validator.owner_address,
+                validator.consensus_pubkey,
+                validator.proof_of_possession,
+            );
+            stake::update_network_and_fullnode_addresses(
+                operator,
+                validator.owner_address,
+                validator.network_addresses,
+                validator.full_node_network_addresses,
+            );
+            stake::join_validator_set_internal(operator, validator.owner_address);
+
+            i = i + 1;
+        };
+
+        // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
+        // validators.
+        aptos_coin::destroy_mint_cap(aptos_framework);
+
+        stake::on_new_epoch();
+    }
+
+    /// Sets up the initial validator set for the network with initial balances
+    /// The validator "owner" accounts, and their authentication
+    /// Addresses (and keys) are encoded in the `owners`
+    /// Each validator signs consensus messages with the private key corresponding to the Ed25519
+    /// public key in `consensus_pubkeys`.
+    /// Finally, each validator must specify the network address
+    /// (see types/src/network_address/mod.rs) for itself and its full nodes.
     ///
-    /// Also mint initial balances
-    fun create_initialize_validators(
+    /// Network address fields are a vector per account, where each entry is a vector of addresses
+    /// encoded in a single BCS byte array.
+    fun create_initialize_validators_with_balances(
         aptos_framework: &signer,
         accounts: vector<address>,
         balances: vector<u64>,

@@ -132,7 +132,11 @@ pub fn encode_genesis_change_set(
         initialize_aptos_coin(&mut session);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
-    create_and_initialize_validators(&mut session, initial_balances, validators);
+    if genesis_config.is_test {
+        create_and_initialize_validators(&mut session, validators);
+    } else {
+        create_and_initialize_validators_with_balances(&mut session, initial_balances, validators);
+    }
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
@@ -353,25 +357,41 @@ fn initialize_on_chain_governance(
 /// validator config on-chain.
 fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
-    initial_balances: &[InitialBalance],
     validators: &[Validator],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
-    let mut serialized_values = serialize_values(&vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS),
-        MoveValue::vector_address(initial_balances.iter().map(|inner| inner.address).collect()),
-        MoveValue::Vector(
-            initial_balances
-                .iter()
-                .map(|inner| MoveValue::U64(inner.balance))
-                .collect(),
-        ),
-    ]);
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(validators_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
+        vec![],
+        serialized_values,
+    );
+}
+
+/// Creates and initializes each validator owner and validator operator. This method creates all
+/// the required accounts, sets the validator operators for each validator owner, and sets the
+/// validator config on-chain.
+fn create_and_initialize_validators_with_balances(
+    session: &mut SessionExt<impl MoveResolver>,
+    initial_balances: &[InitialBalance],
+    validators: &[Validator],
+) {
+    let addresses: Vec<_> = initial_balances.iter().map(|inner| inner.address).collect();
+    let balances: Vec<_> = initial_balances.iter().map(|inner| inner.balance).collect();
+    let addresses_bytes = bcs::to_bytes(&addresses).expect("Addresses can be serialized");
+    let balances_bytes = bcs::to_bytes(&balances).expect("Balances can be serialized");
+    let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(addresses_bytes);
+    serialized_values.push(balances_bytes);
+    serialized_values.push(validators_bytes);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_initialize_validators_with_balances",
         vec![],
         serialized_values,
     );
