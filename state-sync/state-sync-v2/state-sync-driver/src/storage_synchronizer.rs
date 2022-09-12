@@ -14,6 +14,9 @@ use crate::{
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::state_value::StateValue;
+use aptos_types::transaction::Version;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -25,6 +28,7 @@ use async_trait::async_trait;
 use data_streaming_service::data_notification::NotificationId;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
+use futures::channel::mpsc::UnboundedSender;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use mempool_notifications::MempoolNotificationSender;
 use std::{
@@ -34,7 +38,7 @@ use std::{
         Arc,
     },
 };
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
 use tokio::{
     runtime::{Handle, Runtime},
     task::JoinHandle,
@@ -671,55 +675,21 @@ fn spawn_state_snapshot_receiver<
                                 continue; // Wait for the next chunk
                             }
 
-                            // All states have been synced! Create a new commit notification
-                            let commit_notification = create_commit_notification(
-                                &target_output_with_proof,
-                                last_committed_state_index,
-                                version,
-                            );
-
-                            // Finalize storage, reset the executor and send a commit
-                            // notification to the listener.
-                            let finalized_result = if let Err(error) =
-                                state_snapshot_receiver.finish_box()
-                            {
-                                Err(format!(
-                                    "Failed to finish the state value synchronization! Error: {:?}",
-                                    error
-                                ))
-                            } else if let Err(error) = storage.writer.finalize_state_snapshot(
-                                version,
-                                target_output_with_proof,
+                            // Finalize storage and send a commit notification
+                            if let Err(error) = finalize_storage_and_send_commit(
+                                chunk_executor,
+                                &mut commit_notification_sender,
+                                metadata_storage,
+                                state_snapshot_receiver,
+                                storage,
                                 &epoch_change_proofs,
-                            ) {
-                                Err(format!(
-                                    "Failed to finalize the state snapshot! Error: {:?}",
-                                    error
-                                ))
-                            } else if let Err(error) = metadata_storage
-                                .clone()
-                                .update_last_persisted_state_value_index(
-                                    target_ledger_info,
-                                    last_committed_state_index,
-                                    all_states_synced,
-                                )
+                                target_output_with_proof,
+                                version,
+                                target_ledger_info,
+                                last_committed_state_index,
+                            )
+                            .await
                             {
-                                Err(format!("All states have synced, but failed to update the metadata storage at version {:?}! Error: {:?}", version, error))
-                            } else if let Err(error) = chunk_executor.reset() {
-                                Err(format!("Failed to reset the chunk executor after state snapshot synchronization! Error: {:?}", error))
-                            } else if let Err(error) =
-                                commit_notification_sender.send(commit_notification).await
-                            {
-                                Err(format!("Failed to send the final state commit notification! Error: {:?}", error))
-                            } else if let Err(error) = utils::initialize_sync_gauges(storage.reader)
-                            {
-                                Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
-                            } else {
-                                Ok(())
-                            };
-
-                            // Notify the state sync driver of any errors
-                            if let Err(error) = finalized_result {
                                 send_storage_synchronizer_error(
                                     error_notification_sender.clone(),
                                     notification_id,
@@ -755,6 +725,86 @@ fn spawn_state_snapshot_receiver<
 
     // Spawn the receiver
     spawn(runtime, receiver)
+}
+
+/// Finalizes storage once all state values have been committed
+/// and sends a commit notification to the driver.
+async fn finalize_storage_and_send_commit<
+    'receiver_lifetime, // Required because of https://github.com/rust-lang/rust/issues/63033
+    ChunkExecutor: ChunkExecutorTrait + 'static,
+    MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
+>(
+    chunk_executor: Arc<ChunkExecutor>,
+    commit_notification_sender: &mut UnboundedSender<CommitNotification>,
+    metadata_storage: MetadataStorage,
+    state_snapshot_receiver: Box<
+        dyn StateSnapshotReceiver<StateKey, StateValue> + 'receiver_lifetime,
+    >,
+    storage: DbReaderWriter,
+    epoch_change_proofs: &[LedgerInfoWithSignatures],
+    target_output_with_proof: TransactionOutputListWithProof,
+    version: Version,
+    target_ledger_info: &LedgerInfoWithSignatures,
+    last_committed_state_index: u64,
+) -> Result<(), String> {
+    // Finalize the state snapshot
+    state_snapshot_receiver.finish_box().map_err(|error| {
+        format!(
+            "Failed to finish the state value synchronization! Error: {:?}",
+            error
+        )
+    })?;
+    storage
+        .writer
+        .finalize_state_snapshot(
+            version,
+            target_output_with_proof.clone(),
+            epoch_change_proofs,
+        )
+        .map_err(|error| format!("Failed to finalize the state snapshot! Error: {:?}", error))?;
+
+    // Update the metadata storage
+    metadata_storage.update_last_persisted_state_value_index(
+            target_ledger_info,
+            last_committed_state_index,
+            true,
+        ).map_err(|error| {
+        format!("All states have synced, but failed to update the metadata storage at version {:?}! Error: {:?}", version, error)
+    })?;
+
+    // Reset the chunk executor
+    chunk_executor.reset().map_err(|error| {
+        format!(
+            "Failed to reset the chunk executor after state snapshot synchronization! Error: {:?}",
+            error
+        )
+    })?;
+
+    // Create and send the commit notification
+    let commit_notification = create_commit_notification(
+        &target_output_with_proof,
+        last_committed_state_index,
+        version,
+    );
+    commit_notification_sender
+        .send(commit_notification)
+        .await
+        .map_err(|error| {
+            format!(
+                "Failed to send the final state commit notification! Error: {:?}",
+                error
+            )
+        })?;
+
+    // Update the counters
+    utils::initialize_sync_gauges(storage.reader).map_err(|error| {
+        format!(
+            "Failed to initialize the state sync version gauges! Error: {:?}",
+            error
+        )
+    })?;
+
+    Ok(())
 }
 
 /// Creates a commit notification for the new committed state snapshot

@@ -1067,7 +1067,7 @@ fn manipulate_verified_epoch_states(
         let epoch_ending_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 0);
         let waypoint_ledger_info = create_random_epoch_ending_ledger_info(0, 1);
         verified_epoch_states
-            .verify_epoch_ending_ledger_info(
+            .update_verified_epoch_states(
                 &epoch_ending_ledger_info,
                 &Waypoint::new_any(waypoint_ledger_info.ledger_info()),
             )
