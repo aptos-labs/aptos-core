@@ -275,12 +275,15 @@ impl EpochHistory {
     pub fn verify_ledger_info(&self, li_with_sigs: &LedgerInfoWithSignatures) -> Result<()> {
         let epoch = li_with_sigs.ledger_info().epoch();
         ensure!(!self.epoch_endings.is_empty(), "Empty epoch history.",);
-        ensure!(
-            epoch <= self.epoch_endings.len() as u64,
-            "History until epoch {} can't verify epoch {}",
-            self.epoch_endings.len(),
-            epoch,
-        );
+        if epoch > self.epoch_endings.len() as u64 {
+            // TODO(aldenhu): fix this from upper level
+            warn!(
+                epoch = epoch,
+                epoch_history_until = self.epoch_endings.len(),
+                "Epoch too new, can't verify. Don't worry, node won't be able to start if data is not compatible.",
+            );
+            return Ok(());
+        }
         if epoch == 0 {
             ensure!(
                 li_with_sigs.ledger_info() == &self.epoch_endings[0],
