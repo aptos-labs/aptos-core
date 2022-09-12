@@ -300,6 +300,64 @@ module aptos_token::token {
         *opt_in_flag = opt_in;
     }
 
+    public entry fun mutate_collection_description(
+        account: &signer,
+        creator: address,
+        collection_name: String,
+        description: String
+    ) acquires Collections {
+        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        // validate if the properties is mutable
+        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
+        let collections = borrow_global_mut<Collections>(
+            creator
+        );
+        let collection_data = check_collection_return_data(collections, collection_name);
+        assert!(collection_data.mutability_config.description, EFIELD_NOT_MUTABLE);
+        collection_data.description = description;
+    }
+
+    public entry fun mutate_collection_uri(
+        account: &signer,
+        creator: address,
+        collection_name: String,
+        uri: String
+    ) acquires Collections {
+        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        // validate if the properties is mutable
+        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
+        let collections = borrow_global_mut<Collections>(
+            creator
+        );
+        let collection_data = check_collection_return_data(collections, collection_name);
+        assert!(collection_data.mutability_config.uri, EFIELD_NOT_MUTABLE);
+        collection_data.uri = uri;
+    }
+
+    public entry fun mutate_collection_maximum(
+        account: &signer,
+        creator: address,
+        collection_name: String,
+        maximum: u64
+    ) acquires Collections {
+        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        // validate if the properties is mutable
+        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
+        let collections = borrow_global_mut<Collections>(
+            creator
+        );
+        let collection_data = check_collection_return_data(collections, collection_name);
+        assert!(collection_data.mutability_config.maximum, EFIELD_NOT_MUTABLE);
+        collection_data.maximum = maximum;
+    }
+
+    fun check_collection_return_data(
+        all_collection_data: &mut Collections,
+        collection_name: String
+    ): &mut CollectionData {
+        assert!(table::contains(&all_collection_data.collection_data, collection_name), ECOLLECTION_NOT_PUBLISHED);
+        table::borrow_mut(&mut all_collection_data.collection_data, collection_name)
+    }
 
 
     /// mutate the token property and save the new property in TokenStore
