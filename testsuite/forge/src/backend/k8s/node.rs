@@ -259,21 +259,17 @@ impl Node for K8sNode {
     }
 
     async fn get_identity(&mut self) -> Result<String> {
-        info!("hahahahaha");
         let ret = get_identity(self.stateful_set_name(), self.namespace()).await;
-        info!("hmmmmmmmmm");
         ret
     }
 
     async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
-        info!("hohohohoho");
         let ret = set_identity(
             self.stateful_set_name(),
             self.namespace(),
             k8s_secret_name.as_str(),
         )
         .await;
-        info!("hnnnnnnnnn");
         ret
     }
 }

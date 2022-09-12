@@ -262,7 +262,7 @@ pub async fn set_identity(
         value: json!(k8s_secret_name),
     });
     let patch: Patch<Value> = Patch::Json(JsonPatch(vec![patch_op]));
-    let pp = PatchParams::apply("forge").force();
+    let pp = PatchParams::apply("forge");
     stateful_set_api.patch(sts_name, &pp, &patch).await?;
     Ok(())
 }
