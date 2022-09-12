@@ -101,6 +101,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
 }
 
@@ -217,8 +218,10 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
         };
+
         for block in blocks {
             block_store
                 .execute_and_insert_block(block)
