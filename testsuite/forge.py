@@ -1312,6 +1312,10 @@ def test(
     forge_cli_args: Optional[List[str]],
     test_args: Optional[List[str]],
 ) -> None:
+
+    # CANARY!!!
+    forge_test_suite = "network_latency"
+
     """Run a forge test"""
     shell = FakeShell() if dry_run else LocalShell(verbose == "true")
     git = Git(shell)
