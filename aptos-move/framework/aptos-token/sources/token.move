@@ -1207,4 +1207,21 @@ module aptos_token::token {
             new_types,
         );
     }
+
+    #[test(creator = @0xAF, owner = @0xBB)]
+    #[expected_failure(abort_code = 16)]
+    fun test_mutate_collection_description_fail(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        assert!(token_id.property_version == 0, 1);
+
+        mutate_collection_description(
+            creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            string::utf8(b"new_description")
+        );
+    }
 }
