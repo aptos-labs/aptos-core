@@ -37,6 +37,10 @@ export class PetraEventListener {
     this.on(ProviderEvent.ACCOUNT_CHANGED, callback);
   }
 
+  onDisconnect(callback?: EventCallback) {
+    this.on(ProviderEvent.DISCONNECT, callback);
+  }
+
   onNetworkChange(callback?: EventCallback<NetworkChangeParams>) {
     this.on(ProviderEvent.NETWORK_CHANGED, callback);
   }

@@ -14,6 +14,7 @@ import { DappErrorType, makeTransactionError } from 'core/types/errors';
 import { PublicAccount } from 'core/types/stateTypes';
 import Permissions from 'core/utils/permissions';
 import PromptPresenter from 'core/utils/promptPresenter';
+import { triggerDisconnect } from 'core/utils/providerEvents';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import { defaultCustomNetworks, defaultNetworkName, defaultNetworks } from 'shared/types';
 import { PetraPublicApi, SignMessagePayload } from './public-api';
@@ -168,6 +169,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
   async disconnect() {
     const { address } = await ensureAccountConnected();
     const domain = await getCurrentDomain();
+    triggerDisconnect();
     await Permissions.removeDomain(domain, address);
   },
 

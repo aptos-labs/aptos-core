@@ -7,6 +7,7 @@ import Permissions from './permissions';
 
 export enum ProviderEvent {
   ACCOUNT_CHANGED = 'accountChanged',
+  DISCONNECT = 'disconnect',
   NETWORK_CHANGED = 'networkChanged',
 }
 
@@ -55,6 +56,15 @@ export async function triggerAccountChange(newPublicAccount: PublicAccount | und
       address: newPublicAccount?.address,
       publicKey: newPublicAccount?.publicKey,
     },
+  );
+}
+
+export async function triggerDisconnect() {
+  await sendToTabs(
+    undefined,
+    ProviderEvent.DISCONNECT,
+    undefined,
+    undefined,
   );
 }
 

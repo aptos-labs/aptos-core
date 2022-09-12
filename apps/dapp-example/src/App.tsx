@@ -58,6 +58,10 @@ function App() {
       setNetwork(params.networkName);
     });
 
+    window.aptos.onDisconnect(() => {
+      console.log('Disconnected');
+    });
+
     fetchStatus();
   }, []);
 
