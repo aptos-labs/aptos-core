@@ -7,7 +7,9 @@ import {
 import { secondaryBgColor } from 'core/colors';
 import ImportAccountHeader from 'core/components/ImportAccountHeader';
 import React from 'react';
-import { DeepPartial, FormProvider, useForm } from 'react-hook-form';
+import {
+  DeepPartial, FormProvider, useForm,
+} from 'react-hook-form';
 
 export interface AddAccountLayoutProps<T> {
   backPage?: string;
@@ -37,12 +39,13 @@ export default function AddAccountLayout<T>({
       width="100%"
       maxW="100%"
       templateRows="60px 1fr"
+      position="relative"
       bgColor={secondaryBgColor[colorMode]}
     >
       <ImportAccountHeader backPage={backPage} headerValue={headerValue} />
       <Box height="100%" width="100%" maxH="100%" overflowY="auto">
         <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={handleSubmit(onSubmit)} style={{ height: '100%' }}>
             {children}
           </form>
         </FormProvider>
@@ -54,7 +57,6 @@ export default function AddAccountLayout<T>({
 export interface CreateAccountFormValues {
   mnemonic: string[];
   mnemonicString: string;
-  secretRecoveryPhrase: boolean;
 }
 
 export interface PrivateKeyFormValues {
