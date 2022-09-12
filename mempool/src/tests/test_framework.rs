@@ -148,6 +148,14 @@ impl MempoolNode {
         }
     }
 
+    pub async fn commit_txns(&mut self, txns: &[TestTransaction]) {
+        for txn in sign_transactions(txns) {
+            self.mempool
+                .lock()
+                .remove_transaction(&txn.sender(), txn.sequence_number(), false);
+        }
+    }
+
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
     pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
         for _ in 0..10 {

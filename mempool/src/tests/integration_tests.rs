@@ -291,6 +291,31 @@ async fn test_mempool_full_rebroadcast() {
         .await;
 }
 
+/// The retry broadcast can become empty due to commits. The next broadcast should ignore this empty broadcast.
+#[tokio::test]
+async fn test_rebroadcast_retry_is_empty() {
+    let mut node = MempoolTestFrameworkBuilder::single_validator();
+    let (other_peer_network_id, other_metadata) =
+        validator_mock_connection(ConnectionOrigin::Outbound, &ALL_PROTOCOLS);
+
+    // Get first txn
+    node.add_txns_via_client(TXN_1).await;
+    node.assert_txns_in_mempool(TXN_1);
+
+    // Send to other node (which is full)
+    node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
+    node.send_broadcast_and_receive_retry(other_peer_network_id, TXN_1)
+        .await;
+
+    // Add txn2. In the meantime, txn1 was committed.
+    node.add_txns_via_client(TXN_2).await;
+    node.commit_txns(TXN_1).await;
+
+    // Txn should be sent again later
+    node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
+        .await;
+}
+
 // -- Multi node tests below here --
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
