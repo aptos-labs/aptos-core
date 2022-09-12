@@ -1,6 +1,6 @@
 ---
 title: "Node Health Checker"
-slug: "node-health-checker"
+slug: "index"
 ---
 
 # Node Health Checker
@@ -46,7 +46,7 @@ docker run -v /tmp/nhc:/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /us
 Finally, send a request to the NHC service you started above. The following command runs health checks of your node that is at `node_url=http://mynode.mysite.com` and compares these results with the downloaded baseline configuration `devnet_fullnode`:
 
 ```
-curl 'http://localhost:20121/check_node?node_url=http://mynode.mysite.com&baseline_configuration_name=devnet_fullnode'
+curl 'http://localhost:20121/check_node?node_url=http://mynode.mysite.com&api_port=80&baseline_configuration_name=devnet_fullnode'
 ```
 
 You will see output similar to this:
@@ -149,7 +149,7 @@ While the Aptos team hosts our own instances of this service, we encourage node 
 When you are ready with baseline configuration YAML and the required files, you can run the NHC server with a command like this, for example, with Docker:
 
 ```
-docker run -v /etc/nhc:/etc/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /etc/nhc/ait2_validator.yaml /etc/nhc/devnet_fullnode.yaml
+docker run -v /etc/nhc:/etc/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /etc/nhc/ait3_fullnode.yaml /etc/nhc/devnet_fullnode.yaml
 ```
 
 :::tip
@@ -211,3 +211,4 @@ cargo run -- server generate-openapi -f json > doc/spec.json
 ```
 
 You can also hit the `/spec.yaml` and `/spec.json` endpoints of the running service.
+

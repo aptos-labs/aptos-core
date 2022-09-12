@@ -143,8 +143,14 @@ const sidebars = {
           collapsed: true,
           items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
         },
-        "nodes/node-health-checker",
-        "nodes/node-health-checker-faq",
+        {
+          type: "category",
+          label: "Node Health Checker",
+          link: { type: "doc", id: "nodes/node-health-checker/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["nodes/node-health-checker/node-health-checker-faq"],
+        },
       ],
     },
     {
