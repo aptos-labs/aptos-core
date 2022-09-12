@@ -32,6 +32,9 @@ function getAptosBip44Path(): string {
 }
 
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
+  if (!bip39.validateMnemonic(mnemonicString, wordlist)) {
+    throw new Error('Invalid mnemonic');
+  }
   const seed = await bip39.mnemonicToSeed(mnemonicString);
   const derivationPath = getAptosBip44Path();
   const { key } = derivePath(derivationPath, Buffer.from(seed).toString('hex'));
