@@ -249,7 +249,7 @@ pub enum EntryFunctionCall {
 
     /// Allows an owner to change the delegated voter of the stake pool.
     StakeSetDelegatedVoter {
-        new_delegated_voter: AccountAddress,
+        new_voter: AccountAddress,
     },
 
     /// Allows an owner to change the operator of the stake pool.
@@ -413,9 +413,7 @@ impl EntryFunctionCall {
             } => {
                 stake_rotate_consensus_key(pool_address, new_consensus_pubkey, proof_of_possession)
             }
-            StakeSetDelegatedVoter {
-                new_delegated_voter,
-            } => stake_set_delegated_voter(new_delegated_voter),
+            StakeSetDelegatedVoter { new_voter } => stake_set_delegated_voter(new_voter),
             StakeSetOperator { new_operator } => stake_set_operator(new_operator),
             StakeUnlock { amount } => stake_unlock(amount),
             StakeUpdateNetworkAndFullnodeAddresses {
@@ -1068,7 +1066,7 @@ pub fn stake_rotate_consensus_key(
 }
 
 /// Allows an owner to change the delegated voter of the stake pool.
-pub fn stake_set_delegated_voter(new_delegated_voter: AccountAddress) -> TransactionPayload {
+pub fn stake_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1079,7 +1077,7 @@ pub fn stake_set_delegated_voter(new_delegated_voter: AccountAddress) -> Transac
         ),
         ident_str!("set_delegated_voter").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_delegated_voter).unwrap()],
+        vec![bcs::to_bytes(&new_voter).unwrap()],
     ))
 }
 
@@ -1525,7 +1523,7 @@ mod decoder {
     pub fn stake_set_delegated_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeSetDelegatedVoter {
-                new_delegated_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None

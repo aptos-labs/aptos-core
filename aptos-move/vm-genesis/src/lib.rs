@@ -21,7 +21,9 @@ use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},
+    on_chain_config::{
+        ConsensusConfigV1, GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION,
+    },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
@@ -248,8 +250,12 @@ fn initialize(
     genesis_config: &GenesisConfiguration,
 ) {
     let genesis_gas_params = AptosGasParameters::initial();
-    let gas_schedule_blob = bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
-        .expect("Failure serializing genesis gas schedule");
+    let gas_schedule = GasScheduleV2 {
+        feature_version: 0,
+        entries: genesis_gas_params.to_on_chain_gas_schedule(),
+    };
+    let gas_schedule_blob =
+        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule");
 
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
