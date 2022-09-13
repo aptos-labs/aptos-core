@@ -57,6 +57,14 @@ pub struct BlockRequest {
     /// A set of search parameters (latest, by hash, or by index)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_identifier: Option<PartialBlockIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BlockRequestMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BlockRequestMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_empty_transactions: Option<bool>,
 }
 
 impl BlockRequest {
@@ -64,6 +72,7 @@ impl BlockRequest {
         Self {
             network_identifier: chain_id.into(),
             block_identifier,
+            metadata: None,
         }
     }
 
@@ -77,6 +86,13 @@ impl BlockRequest {
 
     pub fn by_index(chain_id: ChainId, index: u64) -> Self {
         Self::new(chain_id, Some(PartialBlockIdentifier::block_index(index)))
+    }
+
+    pub fn with_empty_transactions(mut self) -> Self {
+        self.metadata = Some(BlockRequestMetadata {
+            keep_empty_transactions: Some(true),
+        });
+        self
     }
 }
 
