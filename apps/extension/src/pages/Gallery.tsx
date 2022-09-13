@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Center,
   Flex,
-  Grid,
-  Heading,
+  Center,
   SimpleGrid,
   Spinner,
   Text,
@@ -17,7 +15,7 @@ import SquareBox from 'core/components/SquareBox';
 import CreateNFTDrawer from 'core/components/CreateNFTDrawer';
 import GalleryItem from 'core/components/GalleryItem';
 import WalletLayout from 'core/layouts/WalletLayout';
-import { TokenAttributes, useGalleryItems, useDepositTokens } from 'core/queries/collectibles';
+import { TokenAttributes, useDepositTokens } from 'core/queries/collectibles';
 import { secondaryBorderColor } from 'core/colors';
 
 interface SectionProps {
@@ -58,10 +56,6 @@ function GallerySection({ galleryItems, isLoading }: SectionProps) {
 
 function Gallery() {
   const {
-    data: galleryItems,
-    isLoading: isGalleryLoading,
-  } = useGalleryItems();
-  const {
     data: depositItems,
     isLoading: isDepositLoading,
   } = useDepositTokens();
@@ -69,14 +63,9 @@ function Gallery() {
   return (
     <WalletLayout title="Collectibles">
       <VStack width="100%" paddingTop={4} px={4}>
-        <Grid pb={4} templateColumns="1fr 72px" width="100%">
-          <Heading fontWeight={500} fontSize="md">Created by you</Heading>
-          <Flex justifyContent="right">
-            <CreateNFTDrawer />
-          </Flex>
-        </Grid>
-        <GallerySection galleryItems={galleryItems} isLoading={isGalleryLoading} />
-        <Heading fontWeight={500} fontSize="md" pt={8} pb={4} width="100%">Owned Collectibles</Heading>
+        <Flex alignSelf="end">
+          <CreateNFTDrawer />
+        </Flex>
         <GallerySection galleryItems={depositItems} isLoading={isDepositLoading} />
       </VStack>
     </WalletLayout>
