@@ -21,6 +21,7 @@
     "paths": {
       "core/*": ["./core/*"],
       "pages/*": ["./pages/*"],
+      "prompt/*": ["./prompt/*"],
       "shared/*": ["./shared/*"],
     },
   },

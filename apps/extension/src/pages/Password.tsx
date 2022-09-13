@@ -49,7 +49,7 @@ function Password() {
   const onSubmit: SubmitHandler<FormValues> = async ({ password }, event) => {
     event?.preventDefault();
     try {
-      await unlockAccounts!(password);
+      await unlockAccounts(password);
       // Note: redirection occurs automatically, see routing
     } catch (error: any) {
       setError('password', { message: 'Incorrect password', type: 'validate' });

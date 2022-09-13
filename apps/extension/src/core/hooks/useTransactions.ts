@@ -3,7 +3,8 @@
 
 import { Types, TxnBuilderTypes } from 'aptos';
 import {
-  buildRawTransaction as buildRawTransactionInternal,
+  buildRawTransactionFromBCSPayload,
+  buildRawTransactionFromJsonPayload,
   simulateTransaction as simulateTransactionInternal,
   submitTransaction as submitTransactionInternal,
   TransactionOptions,
@@ -19,7 +20,7 @@ import { useActiveAccount } from 'core/hooks/useAccounts';
 
 type UserTransaction = Types.UserTransaction;
 type RawTransaction = TxnBuilderTypes.RawTransaction;
-type TransactionPayload = TxnBuilderTypes.TransactionPayload;
+type TransactionPayload = TxnBuilderTypes.TransactionPayload | Types.EntryFunctionPayload;
 
 // Taken from https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/transaction.rs
 export const maxPricePerGasUnit = 10_000;
@@ -71,19 +72,29 @@ export function useTransactions() {
 
   const { get: getSequenceNumber } = useSequenceNumber();
 
-  async function buildRawTransaction(payload: TransactionPayload, options?: TransactionOptions) {
+  async function buildRawTransaction(
+    payload: TransactionPayload,
+    options?: TransactionOptions,
+  ) {
     const [chainId, sequenceNumber] = await Promise.all([
       aptosClient.getChainId(),
       getSequenceNumber(),
     ]);
 
-    return buildRawTransactionInternal(
-      aptosAccount.address(),
-      sequenceNumber,
-      chainId,
-      payload,
-      options,
-    );
+    return payload instanceof TxnBuilderTypes.TransactionPayload
+      ? buildRawTransactionFromBCSPayload(
+        aptosAccount.address(),
+        sequenceNumber,
+        chainId,
+        payload,
+        options,
+      )
+      : buildRawTransactionFromJsonPayload(
+        aptosClient,
+        aptosAccount.address(),
+        payload,
+        options,
+      );
   }
 
   const simulateTransaction = (rawTxn: RawTransaction) => simulateTransactionInternal(
@@ -107,6 +118,7 @@ export function useTransactions() {
 }
 
 type PayloadFactory<TParams = void> = (params: TParams) => TransactionPayload;
+type PayloadOrFactory<TParams = void> = TransactionPayload | PayloadFactory<TParams>;
 
 /**
  * Allow the consumer to specify the max gas amount.
@@ -119,7 +131,7 @@ export interface UseTransactionSimulationOptions {
 
 export function useTransactionSimulation(
   key: QueryKey,
-  payloadFactory: PayloadFactory,
+  payloadOrFactory: PayloadOrFactory,
   options?: UseQueryOptions<UserTransaction, Error> & UseTransactionSimulationOptions,
 ) {
   const { invalidate: invalidateSeqNumber } = useSequenceNumber();
@@ -131,7 +143,7 @@ export function useTransactionSimulation(
   return useQuery(
     key,
     async () => {
-      const payload = payloadFactory();
+      const payload = payloadOrFactory instanceof Function ? payloadOrFactory() : payloadOrFactory;
       // TODO: Should cap by maximum maxGasAmount
       const txnOptions = options?.maxGasOctaAmount
         ? { maxGasAmount: Math.min(options.maxGasOctaAmount, maxNumberOfGasUnits) }

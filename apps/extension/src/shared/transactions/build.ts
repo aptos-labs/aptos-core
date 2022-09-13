@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  BCS, MaybeHexString, TxnBuilderTypes,
+  AptosClient,
+  BCS,
+  MaybeHexString,
+  TxnBuilderTypes,
+  Types,
 } from 'aptos';
 import { accountNamespace, aptosCoinStructTag, coinNamespace } from 'core/constants';
 
@@ -30,7 +34,7 @@ const {
   TypeTagStruct,
 } = TxnBuilderTypes;
 
-export function buildRawTransaction(
+export function buildRawTransactionFromBCSPayload(
   senderAddress: MaybeHexString,
   sequenceNumber: number | bigint,
   chainId: number,
@@ -54,6 +58,27 @@ export function buildRawTransaction(
     BigInt(expirationTimestamp),
     new ChainId(Number(chainId)),
   );
+}
+
+export function buildRawTransactionFromJsonPayload(
+  aptosClient: AptosClient,
+  senderAddress: MaybeHexString,
+  payload: Types.EntryFunctionPayload,
+  options?: TransactionOptions,
+) {
+  const {
+    expirationSecondsFromNow,
+    gasUnitPrice,
+    maxGasAmount,
+  } = { ...defaultTransactionOptions, ...options };
+
+  const expirationTimestamp = Math.floor(Date.now() / 1000) + expirationSecondsFromNow;
+
+  return aptosClient.generateTransaction(senderAddress, payload, {
+    expiration_timestamp_secs: expirationTimestamp.toString(),
+    gas_unit_price: gasUnitPrice.toString(),
+    max_gas_amount: maxGasAmount.toString(),
+  });
 }
 
 /**

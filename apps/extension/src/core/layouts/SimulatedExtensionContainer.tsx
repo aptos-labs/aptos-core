@@ -1,17 +1,19 @@
+/* eslint-disable no-console */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 import React, { useState } from 'react';
 import {
-  Button,
-  Center,
-  Flex,
-  HStack,
-  IconButton,
-  useColorMode,
-  VStack,
+  Button, Center, Flex, HStack, IconButton, useColorMode, VStack,
 } from '@chakra-ui/react';
 import { MoonIcon, SunIcon } from '@chakra-ui/icons';
+import { useAppState } from 'core/hooks/useAppState';
+import {
+  ConnectPermissionApproval,
+  DappInfo,
+  SignTransactionPermissionApproval,
+  PermissionHandler,
+} from 'shared/permissions';
 
 interface SimulatedExtensionContainerProps {
   children: JSX.Element;
@@ -32,6 +34,13 @@ const secondaryHeaderBgColor = {
   light: 'white',
 };
 
+const localOrigin = window && window.location.origin;
+const localDappInfo = {
+  domain: localOrigin,
+  imageURI: window && `${localOrigin}/icon128.png`,
+  name: 'Petra Dev',
+} as DappInfo;
+
 function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
   const { colorMode, setColorMode } = useColorMode();
   const [
@@ -43,6 +52,41 @@ function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
   const changeDimensionsToExtension = () => setSimulatedDimensions(extensionDimensions);
   const changeDimensionsToFullscreen = () => setSimulatedDimensions(fullscreenDimensions);
 
+  const { activeAccountAddress } = useAppState();
+  const testPayload = {
+    arguments: [activeAccountAddress, 717],
+    function: '0x1::coin::transfer',
+    type: 'entry_function_payload',
+    type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  };
+
+  const promptConnect = async () => {
+    const result = await PermissionHandler.requestPermission(
+      localDappInfo,
+      { type: 'connect' },
+    ) as ConnectPermissionApproval;
+    console.log('Result', result);
+  };
+
+  const promptSignAndSubmitTransaction = async () => {
+    const result = await PermissionHandler.requestPermission(
+      localDappInfo,
+      { payload: testPayload, type: 'signAndSubmitTransaction' },
+    ) as SignTransactionPermissionApproval;
+    console.log('Result', result);
+  };
+
+  const promptSignMessage = async () => {
+    const result = await PermissionHandler.requestPermission(
+      localDappInfo,
+      {
+        message: "Si sta come d'autunno, sugli alberi, le foglie",
+        type: 'signMessage',
+      },
+    );
+    console.log('Result', result);
+  };
+
   return (
     <VStack w="100vw" h="100vh" spacing={0}>
       <Flex
@@ -52,6 +96,15 @@ function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
         bgColor={secondaryHeaderBgColor[colorMode]}
       >
         <HStack spacing={4} pr={4}>
+          <Button onClick={promptConnect}>
+            Connect
+          </Button>
+          <Button onClick={promptSignAndSubmitTransaction}>
+            Sign transaction
+          </Button>
+          <Button onClick={promptSignMessage}>
+            Sign message
+          </Button>
           <Button onClick={changeDimensionsToExtension}>
             Extension
           </Button>

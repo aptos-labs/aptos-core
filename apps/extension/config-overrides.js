@@ -58,7 +58,7 @@ module.exports = {
         },
         prompt: {
           dependOn: ['core'],
-          import: `${craPaths.appSrc}/scripts/prompt.tsx`,
+          import: `${craPaths.appSrc}/prompt/index.tsx`,
         },
       },
     });
