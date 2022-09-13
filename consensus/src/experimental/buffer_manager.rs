@@ -123,6 +123,7 @@ impl BufferManager {
         verifier: ValidatorVerifier,
         ongoing_tasks: Arc<AtomicU64>,
     ) -> Self {
+        counters::NUM_BLOCKS_IN_PIPELINE.set(0);
         let buffer = Buffer::<BufferItem>::new();
 
         Self {
@@ -187,6 +188,7 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
+        counters::NUM_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -282,6 +284,7 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
+                counters::NUM_BLOCKS_IN_PIPELINE.sub(blocks_to_persist.len() as i64);
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,

@@ -26,10 +26,12 @@ use consensus_types::{
 };
 use executor_types::{Error, StateComputeResult};
 use futures::executor::block_on;
+use std::{sync::Arc, time::Duration};
+
 #[cfg(test)]
 use std::collections::VecDeque;
+#[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{sync::Arc, time::Duration};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
