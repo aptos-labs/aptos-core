@@ -543,15 +543,14 @@ impl Swarm for LocalSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        ChainInfo::new(
-            &mut self.root_account,
-            self.validators
-                .values()
-                .map(|v| v.rest_api_endpoint().to_string())
-                .next()
-                .unwrap(),
-            self.chain_id,
-        )
+        let rest_api_url = self
+            .validators()
+            .next()
+            .unwrap()
+            .rest_api_endpoint()
+            .to_string();
+
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
     fn logs_location(&mut self) -> String {

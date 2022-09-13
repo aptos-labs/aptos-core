@@ -50,8 +50,8 @@ async fn test_genesis_transaction_flow() {
         .build_with_cli(0)
         .await;
 
-    println!("1. Set sync_only = true for the second node and check it can sync to others");
-    let node = env.validators_mut().nth(1).unwrap();
+    println!("1. Set sync_only = true for the last node and check it can sync to others");
+    let node = env.validators_mut().nth(4).unwrap();
     let mut new_config = node.config().clone();
     new_config.consensus.sync_only = true;
     update_node_config(node, new_config.clone());
@@ -67,7 +67,7 @@ async fn test_genesis_transaction_flow() {
     }
 
     println!("3. delete one node's db and test they can still sync when sync_only is true for every nodes");
-    let node = env.validators_mut().nth(1).unwrap();
+    let node = env.validators_mut().nth(3).unwrap();
     node.stop();
     fs::remove_dir_all(node.config().storage.dir()).unwrap();
     node.start().unwrap();
@@ -77,22 +77,24 @@ async fn test_genesis_transaction_flow() {
         .await
         .unwrap();
 
-    println!("5. kill all nodes and prepare a genesis txn to remove the first validator");
+    println!("5. kill all nodes and prepare a genesis txn to remove the last validator");
     for node in env.validators_mut() {
         node.stop();
     }
 
-    let first_validator_address = env.validators().next().unwrap().config().peer_id().unwrap();
+    let first_validator_address = env.validators().nth(4).unwrap().config().peer_id().unwrap();
 
     let script = format!(
         r#"
         script {{
             use aptos_framework::stake;
             use aptos_framework::aptos_governance;
+            use aptos_framework::block;
 
             fun main(framework_signer: &signer) {{
                 stake::remove_validators(framework_signer, &vector[@0x{:?}]);
                 aptos_governance::reconfigure(framework_signer);
+                block::emit_writeset_block_event(framework_signer);
             }}
     }}
     "#,
@@ -108,23 +110,26 @@ async fn test_genesis_transaction_flow() {
     let genesis_blob_path = TempPath::new();
     genesis_blob_path.create_as_file().unwrap();
 
-    Command::new(aptos_cli.as_path())
-        .current_dir(workspace_root())
-        .args(&vec![
-            "genesis",
-            "generate-admin-write-set",
-            "--output-file",
-            genesis_blob_path.path().to_str().unwrap(),
-            "--execute-as",
-            CORE_CODE_ADDRESS.clone().to_hex().as_str(),
-            "--script-path",
-            move_script_path.as_path().to_str().unwrap(),
-            "--framework-git-rev",
-            "main",
-            "--assume-yes",
-        ])
-        .output()
-        .unwrap();
+    println!(
+        "{:?}",
+        Command::new(aptos_cli.as_path())
+            .current_dir(workspace_root())
+            .args(&vec![
+                "genesis",
+                "generate-admin-write-set",
+                "--output-file",
+                genesis_blob_path.path().to_str().unwrap(),
+                "--execute-as",
+                CORE_CODE_ADDRESS.clone().to_hex().as_str(),
+                "--script-path",
+                move_script_path.as_path().to_str().unwrap(),
+                "--framework-git-rev",
+                "main",
+                "--assume-yes",
+            ])
+            .output()
+            .unwrap()
+    );
 
     let genesis_transaction = {
         let buf = fs::read(genesis_blob_path.as_ref()).unwrap();
@@ -132,22 +137,11 @@ async fn test_genesis_transaction_flow() {
     };
 
     println!("6. prepare the waypoint with the transaction");
-    println!(
-        "db path: {:?}",
-        env.validators()
-            .nth(2)
-            .unwrap()
-            .config()
-            .storage
-            .dir()
-            .to_str()
-            .unwrap()
-    );
     let waypoint_command = Command::new(db_bootstrapper.as_path())
         .current_dir(workspace_root())
         .args(&vec![
             env.validators()
-                .nth(2)
+                .next()
                 .unwrap()
                 .config()
                 .storage
@@ -160,16 +154,17 @@ async fn test_genesis_transaction_flow() {
         .output()
         .unwrap();
     let output = std::str::from_utf8(&waypoint_command.stdout).unwrap();
-    println!("output: {:?}", waypoint_command);
     let waypoint = parse_waypoint(output);
 
-    println!("7. apply genesis transaction for nodes 3, 4, 5");
-    for node in env.validators_mut().skip(2) {
+    println!("7. apply genesis transaction for nodes 0, 1, 2");
+    for node in env.validators_mut().take(3) {
+        node.stop();
         let mut node_config = node.config().clone();
         insert_waypoint(&mut node_config, waypoint);
         node_config.execution.genesis = Some(genesis_transaction.clone());
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;
+        tokio::time::sleep(Duration::from_secs(5)).await;
         update_node_config(node, node_config);
         node.wait_until_healthy(Instant::now() + Duration::from_secs(5))
             .await
@@ -177,7 +172,7 @@ async fn test_genesis_transaction_flow() {
     }
 
     println!("8. verify it's able to mint after the waypoint");
-    check_create_mint_transfer_node(&mut env, 2).await;
+    check_create_mint_transfer_node(&mut env, 0).await;
 
     let (epoch, version) = {
         let response = env
@@ -193,7 +188,7 @@ async fn test_genesis_transaction_flow() {
 
     let backup_path = db_backup(
         env.validators()
-            .nth(2)
+            .next()
             .unwrap()
             .config()
             .storage
@@ -206,7 +201,7 @@ async fn test_genesis_transaction_flow() {
         &[waypoint],
     );
 
-    println!("9. verify node 0 is out from the validator set");
+    println!("9. verify node 4 is out from the validator set");
     assert_eq!(
         cli.show_validator_set()
             .await
@@ -216,8 +211,8 @@ async fn test_genesis_transaction_flow() {
         4
     );
 
-    println!("10. nuke DB on node 1, and run db-restore, test if it rejoins the network okay.");
-    let node = env.validators_mut().nth(1).unwrap();
+    println!("10. nuke DB on node 3, and run db-restore, test if it rejoins the network okay.");
+    let node = env.validators_mut().nth(3).unwrap();
     let db_dir = node.config().storage.dir();
     fs::remove_dir_all(&db_dir).unwrap();
     db_restore(backup_path.path(), db_dir.as_path(), &[waypoint]);
