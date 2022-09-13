@@ -297,7 +297,7 @@ impl RoundManager {
 
         observe_block(
             proposal_msg.proposal().timestamp_usecs(),
-            BlockStage::RECEIVED,
+            BlockStage::ROUND_MANAGER_RECEIVED,
         );
         info!(
             self.new_log(LogEvent::ReceiveProposal)
