@@ -30,7 +30,14 @@ groups:
     for: 5m
     labels:
       severity: error
-      summary: "State sync is not making progress (i.e., it is not keeping up with the head of the blockchain)"
+      summary: "State sync is not making progress (i.e., the synced version is not increasing!)"
+    annotations:
+  - alert: State sync is lagging significantly
+    expr: (aptos_data_client_highest_advertised_data{data_type="transactions"} - on(kubernetes_pod_name, role) aptos_state_sync_version{type="synced"}) > 1000000
+    for: 5m
+    labels:
+      severity: error
+      summary: "State sync is lagging significantly (i.e., the lag is greater than 1 million versions)"
     annotations:
 
     # Mempool alerts
