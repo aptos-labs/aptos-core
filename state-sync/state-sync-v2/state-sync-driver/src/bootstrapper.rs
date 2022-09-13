@@ -516,7 +516,7 @@ impl<
                 // validator, consensus will take control and sync depending on how it sees fit.
                 self.bootstrapping_complete().await
             } else {
-                panic!("Snapshot syncing is currently unsupported for nodes with existing state! \
+                panic!("Fast syncing is currently unsupported for nodes with existing state! \
                         You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
                         select a different syncing mode, or delete your storage and restart your node.",
                        num_versions_behind, highest_known_ledger_version);
