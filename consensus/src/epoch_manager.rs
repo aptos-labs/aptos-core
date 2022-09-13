@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
     block_storage::BlockStore,
     commit_notifier::CommitNotifier,
@@ -784,6 +785,12 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
+        if let VerifiedEvent::ProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+        }
         match event {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
