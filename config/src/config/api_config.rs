@@ -32,11 +32,17 @@ pub struct ApiConfig {
     pub transaction_simulation_enabled: bool,
 
     pub max_submit_transaction_batch_size: usize,
+
+    /// Maximum page size for paginated APIs
+    pub max_transactions_page_size: u16,
+    pub max_events_page_size: u16,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_PORT: u16 = 8080;
 pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
+pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 100;
+pub const DEFAULT_MAX_PAGE_SIZE: u16 = 1000;
 
 fn default_enabled() -> bool {
     true
@@ -62,7 +68,9 @@ impl Default for ApiConfig {
             encode_submission_enabled: default_enabled(),
             transaction_submission_enabled: default_enabled(),
             transaction_simulation_enabled: default_enabled(),
-            max_submit_transaction_batch_size: 100,
+            max_submit_transaction_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
+            max_transactions_page_size: DEFAULT_MAX_PAGE_SIZE,
+            max_events_page_size: DEFAULT_MAX_PAGE_SIZE,
         }
     }
 }

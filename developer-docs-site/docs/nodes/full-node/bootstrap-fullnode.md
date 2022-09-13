@@ -21,7 +21,7 @@ We're hosting the **AIT3 blockchain** (other network coming soon) backup data on
     - download the restore config file for using S3:
         
         ```
-        curl https://raw.githubusercontent.com/aptos-labs/aptos-core/testnet/docker/compose/data-restore/s3.yaml \
+        curl https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/data-restore/s3.yaml \
         --output restore.yaml
         ```
 

@@ -948,6 +948,24 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_table_item_bcs<K: Serialize, T: DeserializeOwned>(
+        &self,
+        table_handle: AccountAddress,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+    ) -> AptosResult<Response<T>> {
+        let url = self.build_path(&format!("tables/{}/item", table_handle))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.post_bcs(url, data).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_account(&self, address: AccountAddress) -> AptosResult<Response<Account>> {
         let url = self.build_path(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
@@ -1032,6 +1050,21 @@ impl Client {
 
     async fn get_bcs(&self, url: Url) -> AptosResult<Response<bytes::Bytes>> {
         let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        self.check_and_parse_bcs_response(response).await
+    }
+
+    async fn post_bcs(
+        &self,
+        url: Url,
+        data: serde_json::Value,
+    ) -> AptosResult<Response<bytes::Bytes>> {
+        let response = self
+            .inner
+            .post(url)
+            .header(ACCEPT, BCS)
+            .json(&data)
+            .send()
+            .await?;
         self.check_and_parse_bcs_response(response).await
     }
 

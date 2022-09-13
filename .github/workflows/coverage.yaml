@@ -68,6 +68,7 @@ jobs:
     needs: [rust-unit-coverage, rust-smoke-coverage]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3
         with:
           name: lcov_unit
