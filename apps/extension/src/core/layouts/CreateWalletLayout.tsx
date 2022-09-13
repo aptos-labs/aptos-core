@@ -70,7 +70,7 @@ function CopyButton() {
     <Copyable value={mnemonic.join(' ')} width="100%" copiedPrompt="">
       <Button
         width="100%"
-        size="lg"
+        size="md"
         onClick={() => {
           setValue('savedSecretRecoveryPhrase', true);
           setTimeout(() => {
@@ -117,13 +117,13 @@ function NextButton({
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (
-      <Button width="100%" size="lg" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" size="md" onClick={nextOnClick} colorScheme="teal">
         Continue
       </Button>
     );
 
     const disabledNextButton = (
-      <Button width="100%" isDisabled size="lg" onClick={nextOnClick} colorScheme="teal">
+      <Button width="100%" isDisabled size="md" onClick={nextOnClick} colorScheme="teal">
         Continue
       </Button>
     );
@@ -309,53 +309,52 @@ function CreateWalletLayout({
   const { colorMode } = useColorMode();
 
   return (
-    <>
-      <Grid
-        height="100%"
-        width="100%"
-        maxW="100%"
-        templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 125 : 64}px`}
-        bgColor={secondaryBgColor[colorMode]}
-      >
-        <HStack width="100%" px={4} position="relative">
-          <IconButton
-            position="absolute"
-            size="md"
-            aria-label="back"
-            colorScheme="teal"
-            icon={<ArrowBackIcon fontSize={20} />}
-            variant="filled"
-            onClick={prevOnClick}
-            bgColor={secondaryBackButtonBgColor[colorMode]}
-            borderRadius="1rem"
-          />
-          <Flex justifyContent="center" width="100%">
-            <HStack spacing="0" justify="space-evenly" width="40%">
-              {steps.map(({ label }, id) => (
-                <Step
-                  key={label}
-                  cursor="pointer"
-                  onClick={activeStep > id ? prevOnClick : nextOnClick}
-                  isActive={activeStep === id}
-                  isCompleted={activeStep > id}
-                  isLastStep={id === steps.length - 1}
-                />
-              ))}
-            </HStack>
-          </Flex>
-        </HStack>
-        <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
-          <form>
-            {children}
-          </form>
-        </Box>
-        <Flex width="100%" justify="flex-end" alignItems="center" px={4}>
-          <VStack width="full" px={4} pb={6} borderTop="1px" pt={3} borderColor={buttonBorderColor[colorMode]}>
-            <CopyButton />
-            <NextButton />
-          </VStack>
+    <Grid
+      height="100%"
+      width="100%"
+      maxW="100%"
+      templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 125 : 64}px`}
+      bgColor={secondaryBgColor[colorMode]}
+      position="relative"
+    >
+      <HStack width="100%" px={4}>
+        <IconButton
+          position="absolute"
+          size="md"
+          aria-label="back"
+          colorScheme="teal"
+          icon={<ArrowBackIcon fontSize={20} />}
+          variant="filled"
+          onClick={prevOnClick}
+          bgColor={secondaryBackButtonBgColor[colorMode]}
+          borderRadius="1rem"
+        />
+        <Flex justifyContent="center" width="100%">
+          <HStack spacing="0" justify="space-evenly" width="40%">
+            {steps.map(({ label }, id) => (
+              <Step
+                key={label}
+                cursor="pointer"
+                onClick={activeStep > id ? prevOnClick : nextOnClick}
+                isActive={activeStep === id}
+                isCompleted={activeStep > id}
+                isLastStep={id === steps.length - 1}
+              />
+            ))}
+          </HStack>
         </Flex>
-      </Grid>
+      </HStack>
+      <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
+        <form>
+          {children}
+        </form>
+      </Box>
+      <Flex width="100%" justify="flex-end" alignItems="center" px={4}>
+        <VStack width="full" borderTop="1px" pt={2} borderColor={buttonBorderColor[colorMode]}>
+          <CopyButton />
+          <NextButton />
+        </VStack>
+      </Flex>
       <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>
         {(state: TransitionStatus) => (
           <SecretPhraseConfirmationPopup
@@ -373,7 +372,7 @@ function CreateWalletLayout({
           />
         )}
       </Transition>
-    </>
+    </Grid>
   );
 }
 

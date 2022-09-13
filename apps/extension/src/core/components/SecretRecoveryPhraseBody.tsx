@@ -69,6 +69,8 @@ const coverBgColor = {
 
 const timeout = 200;
 
+const inputHeight = 42;
+
 type SecretRecoveryPhraseOverlayProps = {
   showSecretRecoveryPhrase: boolean;
 };
@@ -166,16 +168,16 @@ export default function SecretRecoveryPhraseBody() {
           <VStack key="first-column">
             {mnemonic.slice(0, 6).map((item, index) => (
               <InputGroup key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement color="teal" height={42}>{`${index + 1}.`}</InputLeftElement>
-                <Input height={42} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
+                <InputLeftElement color="teal" height={inputHeight}>{`${index + 1}.`}</InputLeftElement>
+                <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}
           </VStack>
           <VStack key="second-column">
             {mnemonic.slice(6, 12).map((item, index) => (
               <InputGroup size="md" key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement height={42} color="teal">{`${index + 7}.`}</InputLeftElement>
-                <Input height={42} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
+                <InputLeftElement height={inputHeight} color="teal">{`${index + 7}.`}</InputLeftElement>
+                <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}
           </VStack>

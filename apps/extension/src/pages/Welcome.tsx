@@ -23,8 +23,8 @@ function Welcome() {
   }, [navigate]);
 
   return (
-    <Center width="200px" height="100%" alignItems="center">
-      <VStack width="100%" spacing={2}>
+    <Center height="100%" alignItems="center">
+      <VStack width="100%" spacing={2} justifyContent="center">
         <WaletIcon />
         <Text fontSize={28} textAlign="center" fontWeight="bold">Welcome to your wallet</Text>
         <Box>
