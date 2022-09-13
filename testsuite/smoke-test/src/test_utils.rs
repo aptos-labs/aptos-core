@@ -91,7 +91,13 @@ pub mod swarm_utils {
 /// This helper function creates 3 new accounts, mints funds, transfers funds
 /// between the accounts and verifies that these operations succeed.
 pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
-    let client = swarm.validators().next().unwrap().rest_client();
+    check_create_mint_transfer_node(swarm, 0).await;
+}
+
+/// This helper function creates 3 new accounts, mints funds, transfers funds
+/// between the accounts and verifies that these operations succeed on one specific validator.
+pub async fn check_create_mint_transfer_node(swarm: &mut LocalSwarm, idx: usize) {
+    let client = swarm.validators().nth(idx).unwrap().rest_client();
 
     // Create account 0, mint 10 coins and check balance
     let mut account_0 = create_and_fund_account(swarm, 10).await;
