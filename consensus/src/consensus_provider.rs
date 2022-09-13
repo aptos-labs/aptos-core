@@ -21,7 +21,10 @@ use event_notifications::ReconfigNotificationListener;
 use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
@@ -37,7 +40,11 @@ pub fn start_consensus(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
     let runtime = runtime::Builder::new_multi_thread()
-        .thread_name("consensus")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("consensus-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()

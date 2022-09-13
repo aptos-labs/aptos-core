@@ -4,250 +4,284 @@ slug: "your-first-coin"
 sidebar_position: 2
 ---
 
-<!-- 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Your First Coin
 
-This tutorial details how to deploy and manage a new Coin. The steps are:
+This tutorial introduces how one can compile, deploy, and mint their own coin, _MoonCoin_.
 
-1. Deploy moon_coin module. Let's call it moon_coin.
-2. Initialize MoonCoin via the standard Coin framework module.
-3. Register a recipient account to receive MoonCoin.
-4. Mint MoonCoin to the recipient as the owner of the MoonCoin.
+## Step 1: Pick an SDK
 
-This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
+- [Official Aptos Typescript SDK][typescript-sdk]
+- [Official Aptos Python SDK][python-sdk]
+- [Official Aptos Rust SDK][rust-sdk]
 
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
+## Step 2: Acquire the CLI
 
-For this tutorial, will be focusing on `first_coin.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
+[Install the CLI from Git][install_cli]
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
-</TabItem>
-<TabItem value="python" label="Python">
+## Step 3: Run the Example
 
-For this tutorial, will be focusing on `first_coin.py` and re-using the `first_transaction.py` library from the previous tutorial.
+Clone `aptos-core`:
 
-You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python).
+```sh
+git clone https://github.com/aptos-labs/aptos-core.git
+```
+
+### Step 3.1: SDK-Specific Example
+
+<Tabs groupId="examples">
+  <TabItem value="typescript" label="Typescript">
+
+Navigate to the Typescript SDK directory:
+
+```sh
+cd ~/aptos-core/ecosystem/typescript/sdk
+```
+
+Install the necessary dependencies:
+
+```sh
+yarn
+```
+
+Run the `your_coin` example:
+
+```sh
+yarn your_coin ~/aptos-core/aptos-move/move-examples/moon_coin
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+Navigate to the Python SDK directory:
+
+```sh
+cd ~/aptos-core/ecosystem/python/sdk
+```
+
+Install the necessary dependencies:
+
+```
+curl -sSL https://install.python-poetry.org | python3
+poetry update
+```
+
+Run the `your-coin` example:
+
+```sh
+poetry run python -m examples.your-coin ~/aptos-core/aptos-move/move-examples/moon_coin
+```
 
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-For this tutorial, will be focusing on `first_coin/src` and re-using the `first_transaction/src` library from the previous tutorial.
-
-You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
+    Coming soon.
 
   </TabItem>
 </Tabs>
 
-## Step 1) Deploy moon_coin module
+### Step 3.2: Building the Package
 
-### Step 1.1) Download Aptos-core
+Half-way through, the demo will pause with the following output:
 
-For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test Move modules without downloading additional resources. Over time, we will expand this section to describe how to leverage [Move](https://github.com/move-language/move/tree/main/language/documentation/tutorial) tools for development.
+```sh
+=== Addresses ===
+Alice: 0x5e603a89cf690d7134cf2f24fdb16ba90c4f5686333721c12e835fb6c76bc7ba
+Bob: 0xc8421fa4a99153f955e50f1de2a6acff2f3fd0bb33aa17ba1f5b32b699f6c825
 
-For now, download and prepare Aptos-core:
-
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-./scripts/dev_setup.sh
-source ~/.cargo/env
-git checkout origin/devnet
+Update the package with Alice's address, compile, and press enter.
 ```
 
-Install Aptos Command line tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos).
+At this point, open another terminal and change directories to the _MoonCoin_ package's directory:
 
-```bash
-cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
+```sh
+cd ~/aptos-core/aptos-move/move-examples/moon_coin
 ```
 
-### Step 1.2) Review the Module
+Now build the package using your CLI:
 
-In this terminal, change directories to `aptos-move/move-examples/moon_coin`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/MoonCoinType.move`.
+```sh
+aptos move compile --named-addresses MoonCoin=0x5e603a89cf690d7134cf2f24fdb16ba90c4f5686333721c12e835fb6c76bc7ba --save-metadata
+```
 
-This module enables users to create a new MoonCoinType::moon_coin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the moon_coin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::managed_coin (adds mint/burn functionalities).
+The `--named-addresses` is a list of address mappings that must be translated in order for the package to be compiled to be stored in Alice's account. Notice how `MoonCoin` is set to Alice's address printed above. Also `--save-metadata` is required in order to publish package.
+
+### Step 3.3: Completing the Example
+
+Returning to the previous prompt, press enter as the package is now ready to be published.
+
+The application will complete, printing:
+
+```sh
+
+Publishing MoonCoin package.
+
+Bob registers the newly created coin so he can receive it from Alice.
+Bob's initial MoonCoin balance: 0.
+Alice mints Bob some of the new coin.
+Bob's updated MoonCoin balance: 100.
+```
+
+## Step 4: _MoonCoin_ in Depth
+
+### Step 4.1: Building and Publishing the _MoonCoin_ Package
+
+Move software or contracts are effectively a set of modules known as a package. When deploying or upgrading a new package, the compiler must be invoked with `--save-metadata` in order to publish the package. In the case of _MoonCoin_, the following output files are critical:
+
+- `build/Examples/package-metadata.bcs` -- the metadata associated with the package
+- `build/Examples/bytecode_modules/moon_coin.mv` -- the bytecode for the `moon_coin.move` module
+
+These are read by the example and published to the blockchain:
+
+<Tabs groupId="examples">
+  <TabItem value="typescript" label="Typescript">
+
+```typescript
+:!: static/sdks/typescript/examples/typescript/your_coin.ts publish
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/sdks/python/examples/your-coin.py publish
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+    Coming soon.
+
+  </TabItem>
+</Tabs>
+
+### Step 4.2: Understanding the _MoonCoin_ Module
+
+The MoonCoin module defines the `MoonCoin` struct, or the distinct type of coin type. In addition, it contains a function called `init_module`. `init_module` is called when the module is published. In this case, _MoonCoin_ initializes the `MoonCoin` coin type as a `ManagedCoin`, which is maintained by the owner of the account. [`ManagedCoin`](https://github.com/aptos-labs/aptos-core/blob/f81ccb01f00227f9c0f36856fead4879f185a9f6/aptos-move/framework/aptos-framework/sources/managed_coin.move#L1) is a simple coin management framework for coins directly managed by users. It provides convenience wrappers around `mint` and `burn`.
 
 ```rust
-module MoonCoinType::moon_coin {
-    struct MoonCoin {}
+:!: static/move-examples/moon_coin/sources/MoonCoin.move moon
+```
+
+### Step 4.3: Understanding Coins
+
+Coins have several primitives:
+
+- Minting -- creating new coins
+- Burning -- deleting coins
+- Freezing -- preventing an account from storing coins in `CoinStore`
+- Registering -- creating a `CoinStore` resource on an account for storing coins
+- Transferring -- withdrawing and depositing coins into `CoinStore`
+
+The entity that creates a new coin gains the capabilities for minting, burning, and freezing.
+
+In order to transfer, withdraw, or deposit coins, one must have a `CoinStore` registered for the specific coin. In this tutorial, this is `CoinStore<MoonCoin>`.
+
+#### Step 4.3.1: Initializing a Coin
+
+Once a coin type has been published to the blockchain, the entity that published that coin type can initialize it:
+
+```rust
+public fun initialize<CoinType>(
+    account: &signer,
+    name: string::String,
+    symbol: string::String,
+    decimals: u8,
+    monitor_supply: bool,
+): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+    let account_addr = signer::address_of(account);
+
+    assert!(
+        coin_address<CoinType>() == account_addr,
+        error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
+    );
+
+    assert!(
+        !exists<CoinInfo<CoinType>>(account_addr),
+        error::already_exists(ECOIN_INFO_ALREADY_PUBLISHED),
+    );
+
+    let coin_info = CoinInfo<CoinType> {
+        name,
+        symbol,
+        decimals,
+        supply: if (monitor_supply) { option::some(optional_aggregator::new(MAX_U128, false)) } else { option::none() },
+    };
+    move_to(account, coin_info);
+
+    (BurnCapability<CoinType>{ }, FreezeCapability<CoinType>{ }, MintCapability<CoinType>{ })
 }
 ```
 
-The code is very simple as we are not adding more functionalities to MoonCoin beyond the standard ones provided by the framework Coin (transfer, deposit, withdraw, mint, burn). The most important part is struct MoonCoin, which defines a new type of coin that can be registered with 0x1::coin.
+This ensures that this coin type has never been initialized before, notice the check to ensure that the caller to `initialize` actually published this module and that there is no `CoinInfo` stored on their account. If both those conditions check, then a `CoinInfo` is stored and the caller obtains capabilities for burning, freezing, and minting.
 
-### Step 1.3) Deploying the Move module containing MoonCoin type
+_MoonCoin_ calls this function automatically upon package publishing.
 
-<Tabs>
-<TabItem value="typescript" label="Typescript" default>
-For Typescript:
+#### Step 4.2.2: Registering a Coin
 
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Install the required libraries: `yarn install`
-- Execute the example: `yarn first_coin moon_coin.mv`
-
-</TabItem>
-<TabItem value="python" label="Python">
-For Python3:
-
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python).
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Install the required libraries: `pip3 install -r requirements.txt`.
-- Execute the example: `python3 first_coin.py moon_coin.mv`
-
-</TabItem>
-<TabItem value="rust" label="Rust">
-For Rust:
-
-- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
-- Open your favorite terminal and navigate to where you downloaded the above example project
-- Execute the example: `cargo run --bin first_coin -- moon_coin.mv`
-
-</TabItem>
-</Tabs>
-
-### Step 1.4) Verify output
-
-- After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
-  and press enter."
-- In the "Move Window" terminal, and for the Move file we had previously looked at:
-  - Copy Alice's address
-  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses MoonCoinType=0x{alice_address_here}`. Here, we replace the generic named address `MoonCoinType='_'` in `moon_coin/move.toml` with Alice's Address
-  - Copy `build/Examples/bytecode_modules/MoonCoin.mv` to the same folder as this tutorial project code
-- Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
-
-The output should look like the following:
-
-```
-=== Addresses ===
-Alice: 11c32982d04fbcc79b694647edff88c5b5d5b1a99c9d2854039175facbeefb40
-Bob: 7ec8f962139943bc41c17a72e782b7729b1625cf65ed7812152a5677364a4f88
-
-Update the module with Alice's address, build, copy to the provided path, and press enter.
-```
-
-## Step 2) Initialize MoonCoin
-
-The moon_coin module has alreayd been deployed. The next step is to initialize MoonCoin. In this example, we'll be using 0x1::managed_coin::initialize since we want the ability to mint/burn our new MoonCoin. This adds standard functionalities to MoonCoin such as transfer, mint, burn and standard events (register, deposit, withdraw).
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_coin.ts section_1
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/first_coin.py section_1
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
+In order to use a coin, an entity must register a `CoinStore` for it on their account:
 
 ```rust
-:!: static/examples/rust/first_coin/src/lib.rs section_1
+public fun register<CoinType>(account: &signer) {
+    let account_addr = signer::address_of(account);
+    assert!(
+        !is_account_registered<CoinType>(account_addr),
+        error::already_exists(ECOIN_STORE_ALREADY_PUBLISHED),
+    );
+
+    account::register_coin<CoinType>(account_addr);
+    let coin_store = CoinStore<CoinType> {
+        coin: Coin { value: 0 },
+        frozen: false,
+        deposit_events: account::new_event_handle<DepositEvent>(account),
+        withdraw_events: account::new_event_handle<WithdrawEvent>(account),
+    };
+    move_to(account, coin_store);
+}
 ```
 
-  </TabItem>
-</Tabs>
+As this is a `public fun` and not a `public entry fun`, coins will need to provide their own means for registering or users can construct Move `scripts` to call the function.
 
-## Step 3) Register a recipient account to receive MoonCoin
+_MoonCoin_ uses `ManagedCoin` that provides an entry function wrapper: `managed_coin::register`.
 
-In other networks, since tokens/coins are just balance numbers in a contract, anyone can "send" anyone else a random coin, even if the recipient doesn't want it. In Aptos, a user needs to explicitly register to receive a `Coin<RandomCoin>` before it can be sent to them.
+#### Step 4.2.3: Minting a Coin
 
-To register, the recipient just needs to call `0x1::coins::register<CoinType>`:
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_coin.ts section_2
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/first_coin.py section_2
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
+Mint coins requires the mint capability that was produced during initialization. It takes in that capability and an amount and returns back a `Coin<T>` struct containing that amount of coins. If the coin tracks supply, it will be updated.
 
 ```rust
-:!: static/examples/rust/first_coin/src/lib.rs section_2
+public fun mint<CoinType>(
+    amount: u64,
+    _cap: &MintCapability<CoinType>,
+): Coin<CoinType> acquires CoinInfo {
+    if (amount == 0) {
+        return zero<CoinType>()
+    };
+
+    let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+    if (option::is_some(maybe_supply)) {
+        let supply = option::borrow_mut(maybe_supply);
+        optional_aggregator::add(supply, (amount as u128));
+    };
+
+    Coin<CoinType> { value: amount }
+}
 ```
 
-  </TabItem>
-</Tabs>
+`ManagedCoin` makes this easier by providing a entry function `managed_coin::mint`.
 
-## Step 4) Mint MoonCoin to the recipient as the owner of the MoonCoin
+#### Step 4.2.4: Transferring a Coin
 
-When initializing a new Coin (Step 2), the owning account receives capabilities to mint/burn the new coin. The owner account can mint MoonCoin by calling 0x1::managed_coin::mint.
+Aptos provides several building blocks to support transfers:
 
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
+- `coin::deposit<CoinType>` allows any entity to deposit a coin into an account that has already called `coin::register<CoinType>`.
+- `coin::withdraw<CoinType>` allows any entity to extract a coin amount from their account.
+- `coin::transfer<CoinType>` leverages withdraw and deposit to perform an end-to-end transfer.
 
-```typescript
-:!: static/examples/typescript/first_coin.ts section_3
-```
+Aptos does not emit transfer events, but instead it leverages withdraw and deposit events.
 
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/first_coin.py section_3
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```rust
-:!: static/examples/rust/first_coin/src/lib.rs section_3
-```
-
-  </TabItem>
-</Tabs>
-
-## Step 5) Check Bob's balance of MoonCoin
-
-<Tabs>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/first_coin.ts section_4
-```
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-```python
-:!: static/examples/python/first_coin.py section_4
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust">
-
-```rust
-:!: static/examples/rust/first_coin/src/lib.rs section_4
-```
-
-  </TabItem>
-</Tabs>
-
-The data can be verified by visiting either a REST interface or the explorer:
-
-- Alice's account via the [REST interface][alice_account_rest].
-- Bob's account on the [explorer][bob_account_explorer].
-
-[account_basics]: /concepts/basics-accounts
-[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
-[bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
--->
+[typescript-sdk]: /sdks/typescript-sdk
+[python-sdk]: /sdks/python-sdk
+[rust-sdk]: /sdks/rust-sdk
+[install_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli

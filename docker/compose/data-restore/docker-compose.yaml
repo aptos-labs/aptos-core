@@ -3,7 +3,7 @@
 version: "3.8"
 services:
   restore:
-    image: aptoslabs/tools:devnet
+    image: aptoslabs/tools:nightly
     volumes:
       - type: volume
         source: db
@@ -11,15 +11,16 @@ services:
       - type: volume
         source: tmp
         target: /tmp
+      # Depends on which cloud backup data you use, replace this with either:
+      # `s3.yaml` (AWS S3)
+      # `gcs.yaml` (GCP GCS)
+      # You can update the yaml file to specify where you want to download data from,
+      # default data resource is hosted by AptosLabs.
       - type: bind
-        source: ./s3-public.toml
-        target: /opt/aptos/etc/s3-public.toml
+        source: ./s3.yaml
+        target: /opt/aptos/etc/restore.yaml
         read_only: true
-    # Provide the public S3 bucket and the sub directory you want to restore data from.
-    # Aptos Association provides public data backup you can use, check the offical website.
     environment:
-      - BUCKET=<S3 bucket>
-      - SUB_DIR=<sub directory of the S3 bucket>
       - HOME=/tmp
       - RUST_LOG=debug
     command: >
@@ -27,7 +28,7 @@ services:
       /usr/local/bin/db-restore --concurrent-downloads 2 \
         --target-db-dir /opt/aptos/data/db auto \
         --metadata-cache-dir /tmp/aptos-restore-metadata \
-        command-adapter --config /opt/aptos/etc/s3-public.toml
+        command-adapter --config /opt/aptos/etc/restore.yaml
       "
 
 # update the db volume name to the one you want to restore if needed
@@ -35,4 +36,5 @@ services:
 # so make sure you start this docker compose using same project name as the db you want to restore.
 volumes:
   db:
+    name: aptos-validator
   tmp:

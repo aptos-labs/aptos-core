@@ -41,7 +41,7 @@ pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
-pub const MAX_INBOUND_CONNECTIONS: usize = 100;
+pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -115,12 +115,13 @@ impl Default for NetworkConfig {
 
 impl NetworkConfig {
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
+        let mutual_authentication = network_id.is_validator_network();
         let mut config = Self {
             discovery_method: DiscoveryMethod::None,
             discovery_methods: Vec::new(),
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
-            mutual_authentication: false,
+            mutual_authentication,
             network_id,
             runtime_threads: None,
             seed_addrs: HashMap::new(),

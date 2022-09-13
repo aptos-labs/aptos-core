@@ -118,6 +118,8 @@ pub struct EpochStats {
     pub round_failures: u32,
     /// Nil blocks in an epoch
     pub nil_blocks: u32,
+    /// Total voting power
+    pub total_voting_power: u128,
 }
 
 impl EpochStats {
@@ -140,6 +142,20 @@ impl EpochStats {
                 }
             })
             .unwrap_or(NodeState::Absent)
+    }
+
+    pub fn to_votes(&self, validator: &AccountAddress) -> u32 {
+        self.validator_stats
+            .get(validator)
+            .map(|s| s.votes)
+            .unwrap_or(0)
+    }
+
+    pub fn to_voting_power(&self, validator: &AccountAddress) -> u64 {
+        self.validator_stats
+            .get(validator)
+            .map(|s| s.voting_power)
+            .unwrap_or(0)
     }
 }
 
@@ -168,6 +184,7 @@ impl Add for EpochStats {
             round_failures: self.round_failures + other.round_failures,
             nil_blocks: self.nil_blocks + other.nil_blocks,
             total_transactions: self.total_transactions + other.total_transactions,
+            total_voting_power: 0,
         }
     }
 }
@@ -348,6 +365,10 @@ impl AnalyzeValidators {
             round_successes: total_successes,
             round_failures: total_failures,
             nil_blocks,
+            total_voting_power: validators
+                .iter()
+                .map(|validator| validator.voting_power as u128)
+                .sum(),
         };
     }
 
@@ -478,7 +499,7 @@ impl AnalyzeValidators {
         let epochs = stats.keys().sorted();
 
         println!(
-            "{: <8} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <8} | {: <8}",
+            "{: <8} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10}",
             "epoch",
             "reliable",
             "r low vote",
@@ -486,16 +507,28 @@ impl AnalyzeValidators {
             "only vote",
             "down(cons)",
             "rounds",
-            "failure rate"
+            "#r failed",
+            "% failure",
+            "% stake has >10% of votes",
         );
         for cur_epoch in epochs {
-            let counts = validators
-                .iter()
-                .map(|v| stats.get(cur_epoch).unwrap().to_state(v))
-                .counts();
             let epoch_stats = stats.get(cur_epoch).unwrap();
+
+            let counts = validators.iter().map(|v| epoch_stats.to_state(v)).counts();
+
+            let voted_voting_power: u128 = validators
+                .iter()
+                .flat_map(|v| {
+                    if epoch_stats.to_votes(v) > epoch_stats.round_successes / 10 {
+                        Some(epoch_stats.to_voting_power(v) as u128)
+                    } else {
+                        None
+                    }
+                })
+                .sum();
+
             println!(
-                "{: <8} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <8} | {: <8}",
+                "{: <8} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {:10.2} | {:10.2}",
                 cur_epoch,
                 counts.get(&NodeState::Reliable).unwrap_or(&0),
                 counts.get(&NodeState::ReliableLowVotes).unwrap_or(&0),
@@ -505,7 +538,9 @@ impl AnalyzeValidators {
                     .get(&NodeState::NotParticipatingInConsensus)
                     .unwrap_or(&0),
                 epoch_stats.total_rounds,
+                epoch_stats.round_failures,
                 100.0 * epoch_stats.round_failures as f32 / epoch_stats.total_rounds as f32,
+                100.0 * voted_voting_power as f32 / epoch_stats.total_voting_power as f32,
             );
         }
     }

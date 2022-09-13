@@ -51,7 +51,7 @@ resource "helm_release" "fullnode" {
         tag = var.image_tag
       }
       nodeSelector = {
-        "cloud.google.com/gke-nodepool" = "fullnodes"
+        "cloud.google.com/gke-nodepool"          = "fullnodes"
         "iam.gke.io/gke-metadata-server-enabled" = "true"
       }
       storage = {

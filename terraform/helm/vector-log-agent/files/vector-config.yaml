@@ -1,0 +1,32 @@
+data_dir: /vector-data-dir
+# TODO: change this to expire_metrics_sec after vector 0.25 has been released.
+expire_metrics: { secs: 1800, nanos: 0 } # expire metrics when no sample has been received after 30 minutes
+api:
+  enabled: true
+  address: "127.0.0.1:8686"
+  playground: false
+sources:
+  kubernetes_logs:
+    type: kubernetes_logs
+    pod_annotation_fields:
+      pod_annotations: kubernetes.annotations
+      pod_labels: kubernetes.labels
+      pod_namespace: kubernetes.namespace
+
+  internal_metrics:
+    type: internal_metrics
+
+transforms:
+  # applying workaround from https://github.com/vectordotdev/vector/issues/11821#issuecomment-1068041226 to reduce internal metrics cardinality
+  internal_metrics_cardinality_reduce:
+    inputs:
+      - internal_metrics
+    type: filter
+    condition: "!exists(.tags.file) && !exists(.tags.pod_name)"
+
+sinks:
+  prom_exporter:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics_cardinality_reduce
+    address: "0.0.0.0:9090"

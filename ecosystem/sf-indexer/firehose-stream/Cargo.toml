@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
@@ -23,7 +23,6 @@ prost = "0.10.4"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 tokio = { version = "1.21.0", features = ["full"] }
-warp = { version = "0.3.2", features = ["default", "tls"] }
 
 aptos-api = { path = "../../../api", package = "aptos-api" }
 aptos-api-types = { path = "../../../api/types" }

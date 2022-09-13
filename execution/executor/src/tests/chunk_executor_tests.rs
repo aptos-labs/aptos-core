@@ -53,40 +53,45 @@ fn execute_and_commit_chunk(
 ) {
     // Execute the first chunk. After that we should still get the genesis ledger info from DB.
     executor
-        .execute_and_commit_chunk(chunks[0].clone(), &ledger_info, None)
+        .execute_chunk(chunks[0].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the second chunk. After that we should still get the genesis ledger info from DB.
     executor
-        .execute_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
+        .execute_chunk(chunks[1].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
     executor
-        .execute_and_commit_chunk(TransactionListWithProof::new_empty(), &ledger_info, None)
+        .execute_chunk(TransactionListWithProof::new_empty(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the second chunk again. After that we should still get the same thing.
     executor
-        .execute_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
+        .execute_chunk(chunks[1].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the third chunk. After that we should get the new ledger info.
     executor
-        .execute_and_commit_chunk(chunks[2].clone(), &ledger_info, None)
+        .execute_chunk(chunks[2].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li, ledger_info);
 }
@@ -141,45 +146,51 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
         executor,
     } = TestExecutor::new();
     // Execute the first chunk. After that we should still get the genesis ledger info from DB.
+    executor.reset().unwrap();
     executor
-        .apply_and_commit_chunk(chunks[0].clone(), &ledger_info, None)
+        .apply_chunk(chunks[0].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the second chunk. After that we should still get the genesis ledger info from DB.
     executor
-        .apply_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
+        .apply_chunk(chunks[1].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
     executor
-        .apply_and_commit_chunk(
+        .apply_chunk(
             TransactionOutputListWithProof::new_empty(),
             &ledger_info,
             None,
         )
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the second chunk again. After that we should still get the same thing.
     executor
-        .apply_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
+        .apply_chunk(chunks[1].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li.ledger_info().version(), 0);
     assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
 
     // Execute the third chunk. After that we should get the new ledger info.
     executor
-        .apply_and_commit_chunk(chunks[2].clone(), &ledger_info, None)
+        .apply_chunk(chunks[2].clone(), &ledger_info, None)
         .unwrap();
+    executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li, ledger_info);
 }
@@ -207,8 +218,9 @@ fn test_executor_execute_and_commit_chunk_restart() {
     // First we simulate syncing the first chunk of transactions.
     {
         executor
-            .execute_and_commit_chunk(chunks[0].clone(), &ledger_info, None)
+            .execute_chunk(chunks[0].clone(), &ledger_info, None)
             .unwrap();
+        executor.commit_chunk().unwrap();
         let li = db.reader.get_latest_ledger_info().unwrap();
         assert_eq!(li.ledger_info().version(), 0);
         assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
@@ -219,8 +231,9 @@ fn test_executor_execute_and_commit_chunk_restart() {
         let executor = ChunkExecutor::<MockVM>::new(db.clone());
 
         executor
-            .execute_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
+            .execute_chunk(chunks[1].clone(), &ledger_info, None)
             .unwrap();
+        executor.commit_chunk().unwrap();
         let li = db.reader.get_latest_ledger_info().unwrap();
         assert_eq!(li, ledger_info);
     }
@@ -268,6 +281,6 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     chunk_manager.reset().unwrap();
 
     assert!(chunk_manager
-        .execute_and_commit_chunk(chunks[0].clone(), &ledger_info, None)
+        .execute_chunk(chunks[1].clone(), &ledger_info, None)
         .is_err());
 }

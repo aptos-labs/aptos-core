@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::NetworkLoadTest;
+use anyhow::bail;
 use forge::test_utils::consensus_utils::{no_failure_injection, test_consensus_fault_tolerance};
 use forge::{NetworkContext, NetworkTest, Result, Swarm, Test};
 use std::time::Duration;
@@ -47,21 +48,24 @@ impl NetworkLoadTest for ContinuousProgressTest {
                 let transactions = cur.iter().map(|s| s.version).min().unwrap()
                     - previous.iter().map(|s| s.version).max().unwrap();
 
-                assert!(
-                    transactions >= (target_tps * check_period_s / 2) as u64,
-                    "no progress with active consensus, only {} transactions, expected >= {}",
-                    transactions,
-                    (target_tps * check_period_s / 2),
-                );
-                assert!(
-                    epochs > 0 || rounds >= (check_period_s / 2) as u64,
-                    "no progress with active consensus, only {} epochs and {} rounds, expectd >= {}",
-                    epochs,
-                    rounds,
-                    (check_period_s / 2),
-                );
+                if transactions < (target_tps * check_period_s / 2) as u64 {
+                    bail!(
+                        "no progress with active consensus, only {} transactions, expected >= {}",
+                        transactions,
+                        (target_tps * check_period_s / 2),
+                    );
+                }
+                if epochs == 0 && rounds < (check_period_s / 2) as u64 {
+                    bail!("no progress with active consensus, only {} epochs and {} rounds, expectd >= {}",
+                        epochs,
+                        rounds,
+                        (check_period_s / 2),
+                    );
+                }
+                Ok(())
             }),
             false,
+            true,
         ))?;
 
         Ok(())

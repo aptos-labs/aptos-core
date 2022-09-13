@@ -9,6 +9,8 @@ export class AccountAddress {
 
   readonly address: Bytes;
 
+  static CORE_CODE_ADDRESS: AccountAddress = AccountAddress.fromHex("0x1");
+
   constructor(address: Bytes) {
     if (address.length !== AccountAddress.LENGTH) {
       throw new Error("Expected address of length 32");

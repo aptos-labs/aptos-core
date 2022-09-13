@@ -6,10 +6,16 @@
 class ConnectWalletButtonComponent < ViewComponent::Base
   include ActionText::Engine.helpers
 
-  def initialize(wallet:, **rest)
+  def initialize(wallet:, required_network: nil, **rest)
     @rest = rest
     @wallet = wallet
+    @required_network = required_network
     @turbo_frame = @rest[:turbo_frame]
+    @dialog = DialogComponent.new
+  end
+
+  def supported_wallets
+    %w[petra martian]
   end
 
   private

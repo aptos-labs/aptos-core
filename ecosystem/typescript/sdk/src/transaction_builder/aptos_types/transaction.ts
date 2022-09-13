@@ -5,7 +5,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
-import * as SHA3 from "js-sha3";
+import sha3 from "js-sha3";
 import { HexString } from "../../hex_string";
 import {
   Deserializer,
@@ -23,6 +23,8 @@ import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
+
+const { sha3_256: sha3Hash } = sha3;
 
 export class RawTransaction {
   /**
@@ -528,7 +530,7 @@ export abstract class Transaction {
   abstract hash(): Bytes;
 
   getHashSalt(): Bytes {
-    const hash = SHA3.sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update("APTOS::Transaction");
     return new Uint8Array(hash.arrayBuffer());
   }
@@ -550,7 +552,7 @@ export class UserTransaction extends Transaction {
   }
 
   hash(): Bytes {
-    const hash = SHA3.sha3_256.create();
+    const hash = sha3Hash.create();
     hash.update(this.getHashSalt());
     hash.update(bcsToBytes(this));
     return new Uint8Array(hash.arrayBuffer());

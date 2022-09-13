@@ -20,7 +20,7 @@ cargo build --profile=$PROFILE \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
-    -p aptos-vfn-check-client \
+    -p aptos-fn-check-client \
     -p backup-cli \
     -p db-bootstrapper \
     -p forge-cli \
@@ -43,7 +43,7 @@ BINS=(
     aptos-node-checker
     aptos-openapi-spec-generator
     aptos-telemetry-service
-    aptos-vfn-check-client
+    aptos-fn-check-client
     db-backup
     db-backup-verify
     db-bootstrapper

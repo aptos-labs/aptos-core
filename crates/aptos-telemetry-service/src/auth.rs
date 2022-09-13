@@ -5,6 +5,7 @@ use crate::context::Context;
 use crate::error::ServiceError;
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
+use crate::types::common::NodeType;
 use anyhow::{anyhow, Result};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
@@ -106,11 +107,29 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         }
     }?;
 
+    let node_type = match peer_role {
+        PeerRole::Validator => NodeType::Validator,
+        PeerRole::ValidatorFullNode => NodeType::ValidatorFullNode,
+        PeerRole::Unknown => context
+            .pfn_cache()
+            .read()
+            .get(&body.chain_id)
+            .map(|peer_set| {
+                if peer_set.contains_key(&body.peer_id) {
+                    NodeType::PublicFullNode
+                } else {
+                    NodeType::Unknown
+                }
+            })
+            .unwrap_or(NodeType::Unknown),
+        _ => NodeType::Unknown,
+    };
+
     let token = create_jwt_token(
         context.clone(),
         body.chain_id,
         body.peer_id,
-        peer_role,
+        node_type,
         epoch,
     )
     .map_err(|e| {
@@ -141,7 +160,7 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
 
 pub fn with_auth(
     context: Context,
-    roles: Vec<PeerRole>,
+    roles: Vec<NodeType>,
 ) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
     headers_cloned()
         .map(move |headers: HeaderMap<HeaderValue>| headers)

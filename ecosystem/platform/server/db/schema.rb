@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_09_03_154019) do
+ActiveRecord::Schema[7.0].define(version: 2022_09_10_032621) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -298,6 +298,14 @@ ActiveRecord::Schema[7.0].define(version: 2022_09_03_154019) do
     t.datetime "notified_at", comment: "The time at which a notification was sent for this network operation."
   end
 
+  create_table "nft_images", force: :cascade do |t|
+    t.string "slug", null: false
+    t.integer "image_number"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["slug", "image_number"], name: "index_nft_images_on_slug_and_image_number", unique: true
+  end
+
   create_table "notification_preferences", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.integer "delivery_method", default: 0, null: false
@@ -407,7 +415,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_09_03_154019) do
     t.string "address", null: false, comment: "The account address."
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["public_key", "network"], name: "index_wallets_on_public_key_and_network", unique: true
+    t.index ["public_key", "network", "wallet_name"], name: "index_wallets_on_public_key_and_network_and_wallet_name", unique: true
     t.index ["user_id"], name: "index_wallets_on_user_id"
     t.check_constraint "public_key::text ~ '^0x[0-9a-f]{64}$'::text"
   end

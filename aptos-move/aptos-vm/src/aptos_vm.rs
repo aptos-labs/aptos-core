@@ -45,6 +45,8 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
+use move_deps::move_binary_format::errors::VMError;
+use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
@@ -54,7 +56,6 @@ use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
         ident_str,
-        language_storage::ModuleId,
         transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
     },
@@ -62,7 +63,7 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
@@ -409,10 +410,15 @@ impl AptosVM {
         session: &mut SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
         modules: &[CompiledModule],
+        exists: BTreeSet<ModuleId>,
         senders: &[AccountAddress],
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
         for module in modules {
+            if exists.contains(&module.self_id()) {
+                // Call initializer only on first publish.
+                continue;
+            }
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
@@ -430,7 +436,7 @@ impl AptosVM {
                         gas_meter,
                     )?;
                 } else {
-                    return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
                         .finish(Location::Undefined));
                 }
             }
@@ -490,6 +496,7 @@ impl AptosVM {
             &mut session,
             gas_meter,
             &self.deserialize_module_bundle(modules)?,
+            BTreeSet::new(),
             &[txn_data.sender()],
         )?;
 
@@ -513,6 +520,7 @@ impl AptosVM {
             destination,
             bundle,
             expected_modules,
+            allowed_deps,
             check_compat,
         }) = session.extract_publish_request()
         {
@@ -523,7 +531,16 @@ impl AptosVM {
             let modules = self.deserialize_module_bundle(&bundle)?;
 
             // Validate the module bundle
-            self.validate_publish_request(&modules, expected_modules)?;
+            self.validate_publish_request(&modules, expected_modules, allowed_deps)?;
+
+            // Check what modules exist before publishing.
+            let mut exists = BTreeSet::new();
+            for m in &modules {
+                let id = m.self_id();
+                if session.get_data_store().exists_module(&id)? {
+                    exists.insert(id);
+                }
+            }
 
             // Publish the bundle
             if check_compat {
@@ -537,7 +554,7 @@ impl AptosVM {
             }
 
             // Execute initializers
-            self.execute_module_initialization(session, gas_meter, &modules, &[destination])
+            self.execute_module_initialization(session, gas_meter, &modules, exists, &[destination])
         } else {
             Ok(())
         }
@@ -547,19 +564,45 @@ impl AptosVM {
     fn validate_publish_request(
         &self,
         modules: &[CompiledModule],
-        expected_names: BTreeSet<String>,
+        mut expected_modules: BTreeSet<String>,
+        allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        let given_names = modules
-            .iter()
-            .map(|m| m.self_id().name().as_str().to_string())
-            .collect::<BTreeSet<_>>();
-        if given_names != expected_names {
-            Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                .with_message("metadata and code bundle mismatch".to_owned())
-                .finish(Location::Undefined))
-        } else {
-            Ok(())
+        for m in modules {
+            if !expected_modules.remove(m.self_id().name().as_str()) {
+                return Err(Self::metadata_validation_error(&format!(
+                    "unregistered module: '{}'",
+                    m.self_id().name()
+                )));
+            }
+            if let Some(allowed) = &allowed_deps {
+                for dep in m.immediate_dependencies() {
+                    if !allowed
+                        .get(dep.address())
+                        .map(|modules| {
+                            modules.contains("") || modules.contains(dep.name().as_str())
+                        })
+                        .unwrap_or(false)
+                    {
+                        return Err(Self::metadata_validation_error(&format!(
+                            "unregistered dependency: '{}'",
+                            dep
+                        )));
+                    }
+                }
+            }
         }
+        if !expected_modules.is_empty() {
+            return Err(Self::metadata_validation_error(
+                "not all registered modules published",
+            ));
+        }
+        Ok(())
+    }
+
+    fn metadata_validation_error(msg: &str) -> VMError {
+        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+            .with_message(format!("metadata and code bundle mismatch: {}", msg))
+            .finish(Location::Undefined)
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
@@ -582,6 +625,7 @@ impl AptosVM {
         if let Err(err) = validate_signature_checked_transaction::<S, Self>(
             self,
             &mut session,
+            storage,
             txn,
             false,
             log_context,
@@ -829,22 +873,26 @@ impl AptosVM {
     fn run_prologue_with_payload<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
-                self.0.check_gas(txn_data, log_context)?;
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
-                self.0.check_gas(txn_data, log_context)?;
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::ModuleBundle(_module) => {
-                self.0.check_gas(txn_data, log_context)?;
+                if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
+                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+                }
+                self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
             }
         }
@@ -933,12 +981,19 @@ impl VMAdapter for AptosVM {
     fn run_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let txn_data = TransactionMetadata::new(transaction);
         //let account_blob = session.data_cache.get_resource
-        self.run_prologue_with_payload(session, transaction.payload(), &txn_data, log_context)
+        self.run_prologue_with_payload(
+            session,
+            storage,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+        )
     }
 
     fn should_restart_execution(vm_output: &TransactionOutput) -> bool {
@@ -957,6 +1012,7 @@ impl VMAdapter for AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
+                fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =
                     self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
                 (vm_status, output, Some("block_prologue".to_string()))
@@ -1024,13 +1080,19 @@ impl AptosSimulationVM {
     fn validate_simulated_transaction<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         transaction: &SignedTransaction,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         self.0.check_transaction_format(transaction)?;
-        self.0
-            .run_prologue_with_payload(session, transaction.payload(), txn_data, log_context)
+        self.0.run_prologue_with_payload(
+            session,
+            storage,
+            transaction.payload(),
+            txn_data,
+            log_context,
+        )
     }
 
     /*
@@ -1051,9 +1113,13 @@ impl AptosSimulationVM {
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
         let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
-        if let Err(err) =
-            self.validate_simulated_transaction::<S>(&mut session, txn, &txn_data, log_context)
-        {
+        if let Err(err) = self.validate_simulated_transaction::<S>(
+            &mut session,
+            storage,
+            txn,
+            &txn_data,
+            log_context,
+        ) {
             return discard_error_vm_status(err);
         };
 

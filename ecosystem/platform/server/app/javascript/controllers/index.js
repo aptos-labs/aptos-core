@@ -2,34 +2,37 @@
 // Run that command whenever you add a new controller or create them with
 // ./bin/rails generate stimulus controllerName
 
-import { application } from "./application"
+import { application } from "./application";
 
-import ClaimNftController from "./claim_nft_controller"
-application.register("claim-nft", ClaimNftController)
+import ClaimNftController from "./claim_nft_controller";
+application.register("claim-nft", ClaimNftController);
 
-import ConnectWalletController from "./connect_wallet_controller"
-application.register("connect-wallet", ConnectWalletController)
+import ConnectWalletController from "./connect_wallet_controller";
+application.register("connect-wallet", ConnectWalletController);
 
-import DialogController from "./dialog_controller"
-application.register("dialog", DialogController)
+import DialogController from "./dialog_controller";
+application.register("dialog", DialogController);
 
-import HeaderController from "./header_controller"
-application.register("header", HeaderController)
+import HeaderController from "./header_controller";
+application.register("header", HeaderController);
 
-import ProjectImagesController from "./project_images_controller"
-application.register("project-images", ProjectImagesController)
+import MintedNftController from "./minted_nft_controller";
+application.register("minted-nft", MintedNftController);
 
-import RecaptchaController from "./recaptcha_controller"
-application.register("recaptcha", RecaptchaController)
+import ProjectImagesController from "./project_images_controller";
+application.register("project-images", ProjectImagesController);
 
-import RefreshController from "./refresh_controller"
-application.register("refresh", RefreshController)
+import RecaptchaController from "./recaptcha_controller";
+application.register("recaptcha", RecaptchaController);
 
-import ShakeController from "./shake_controller"
-application.register("shake", ShakeController)
+import RefreshController from "./refresh_controller";
+application.register("refresh", RefreshController);
 
-import VisibilityController from "./visibility_controller"
-application.register("visibility", VisibilityController)
+import ShakeController from "./shake_controller";
+application.register("shake", ShakeController);
 
-import TableRowController from "./table_row_controller"
-application.register("table_row", TableRowController)
+import VisibilityController from "./visibility_controller";
+application.register("visibility", VisibilityController);
+
+import TableRowController from "./table_row_controller";
+application.register("table_row", TableRowController);

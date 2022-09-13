@@ -174,6 +174,7 @@ pub struct UserTransaction {
     pub gas_unit_price: bigdecimal::BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
+    pub entry_function_id_str: String,
 }
 
 impl UserTransaction {
@@ -201,6 +202,7 @@ impl UserTransaction {
                     txn.version,
                 ),
                 inserted_at: chrono::Utc::now().naive_utc(),
+                entry_function_id_str: txn.entry_function_id_str.clone(),
             },
             Signature::from_signatures(&txn.signatures, block_height),
         )

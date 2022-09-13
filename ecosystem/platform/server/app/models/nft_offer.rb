@@ -7,20 +7,38 @@
 class NftOffer
   include ActiveModel::Model
 
-  attr_accessor :slug, :network, :module_address, :private_key
+  attr_accessor :slug, :network, :module_address, :private_key, :distinct_images
 
-  def self.find(slug)
+  # Constants for slugs
+  APTOS_ZERO = 'aptos-zero'
+
+  ID_TO_SLUG = {
+    0 => APTOS_ZERO
+  }.freeze
+
+  SLUG_TO_ID = ID_TO_SLUG.invert.freeze
+
+  def self.find(id)
+    find_by(slug: ID_TO_SLUG.fetch(id.to_i, ''))
+  end
+
+  def self.find_by(slug:)
     case slug
-    when 'aptos-zero'
+    when APTOS_ZERO
       NftOffer.new(
-        slug: 'aptos-zero',
-        network: 'devnet',
+        slug: APTOS_ZERO,
+        network: Rails.env.development? ? 'devnet' : 'testnet',
         module_address: ENV.fetch('APTOS_ZERO_NFT_MODULE_ADDRESS'),
-        private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY')
+        private_key: ENV.fetch('APTOS_ZERO_NFT_PRIVATE_KEY'),
+        distinct_images: true
       )
     else
       raise ActiveRecord::RecordNotFound
     end
+  end
+
+  def id
+    SLUG_TO_ID[slug]
   end
 
   def private_key_bytes

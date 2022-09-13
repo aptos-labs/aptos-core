@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $WriteTableItem = {
+    description: `Change set to write a table item`,
     properties: {
         state_key_hash: {
             type: 'string',

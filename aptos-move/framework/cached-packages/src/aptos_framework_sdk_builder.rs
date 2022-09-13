@@ -34,12 +34,10 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// Offer rotation capability of this account to another address
-    /// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
-    /// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
-    /// The recipient address refers to the address that the account owner wants to give the rotation capability to.
-    AccountOfferRotationCapabilityEd25519 {
-        rotation_capability_sig_bytes: Vec<u8>,
+    /// Offers the capability to sign on behalf of account to the account at address recipient_address.
+    AccountOfferSignerCapability {
+        signer_capability_sig_bytes: Vec<u8>,
+        account_scheme: u8,
         account_public_key_bytes: Vec<u8>,
         recipient_address: AccountAddress,
     },
@@ -58,18 +56,6 @@ pub enum EntryFunctionCall {
         to_public_key_bytes: Vec<u8>,
         cap_rotate_key: Vec<u8>,
         cap_update_table: Vec<u8>,
-    },
-
-    /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
-    /// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
-    /// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
-    /// in `new_pubkey`, a proof-of-knowledge is given in `new_sig` (i.e., a signature under the new public key on the
-    /// same `RotationProofChallenge` struct).
-    AccountRotateAuthenticationKeyEd25519 {
-        curr_sig_bytes: Vec<u8>,
-        new_sig_bytes: Vec<u8>,
-        curr_pk_bytes: Vec<u8>,
-        new_pk_bytes: Vec<u8>,
     },
 
     /// Basic account creation methods.
@@ -97,6 +83,10 @@ pub enum EntryFunctionCall {
     AptosCoinMint {
         dst_addr: AccountAddress,
         amount: u64,
+    },
+
+    AptosGovernanceAddApprovedScriptHashScript {
+        proposal_id: u64,
     },
 
     /// Create a proposal with the backing `stake_pool`.
@@ -284,12 +274,14 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
-            AccountOfferRotationCapabilityEd25519 {
-                rotation_capability_sig_bytes,
+            AccountOfferSignerCapability {
+                signer_capability_sig_bytes,
+                account_scheme,
                 account_public_key_bytes,
                 recipient_address,
-            } => account_offer_rotation_capability_ed25519(
-                rotation_capability_sig_bytes,
+            } => account_offer_signer_capability(
+                signer_capability_sig_bytes,
+                account_scheme,
                 account_public_key_bytes,
                 recipient_address,
             ),
@@ -308,22 +300,14 @@ impl EntryFunctionCall {
                 cap_rotate_key,
                 cap_update_table,
             ),
-            AccountRotateAuthenticationKeyEd25519 {
-                curr_sig_bytes,
-                new_sig_bytes,
-                curr_pk_bytes,
-                new_pk_bytes,
-            } => account_rotate_authentication_key_ed25519(
-                curr_sig_bytes,
-                new_sig_bytes,
-                curr_pk_bytes,
-                new_pk_bytes,
-            ),
             AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
             AptosAccountTransfer { to, amount } => aptos_account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
+            AptosGovernanceAddApprovedScriptHashScript { proposal_id } => {
+                aptos_governance_add_approved_script_hash_script(proposal_id)
+            }
             AptosGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -450,12 +434,10 @@ impl EntryFunctionCall {
     }
 }
 
-/// Offer rotation capability of this account to another address
-/// To authorize the rotation capability offer, a signature under the current public key on a `RotationCapabilityOfferProofChallenge`
-/// is given in `rotation_capability_sig_bytes`. The current public key is passed into `account_public_key_bytes` to verify proof-of-knowledge.
-/// The recipient address refers to the address that the account owner wants to give the rotation capability to.
-pub fn account_offer_rotation_capability_ed25519(
-    rotation_capability_sig_bytes: Vec<u8>,
+/// Offers the capability to sign on behalf of account to the account at address recipient_address.
+pub fn account_offer_signer_capability(
+    signer_capability_sig_bytes: Vec<u8>,
+    account_scheme: u8,
     account_public_key_bytes: Vec<u8>,
     recipient_address: AccountAddress,
 ) -> TransactionPayload {
@@ -467,10 +449,11 @@ pub fn account_offer_rotation_capability_ed25519(
             ]),
             ident_str!("account").to_owned(),
         ),
-        ident_str!("offer_rotation_capability_ed25519").to_owned(),
+        ident_str!("offer_signer_capability").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&signer_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
@@ -509,36 +492,6 @@ pub fn account_rotate_authentication_key(
             bcs::to_bytes(&to_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_rotate_key).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
-        ],
-    ))
-}
-
-/// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
-/// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
-/// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
-/// in `new_pubkey`, a proof-of-knowledge is given in `new_sig` (i.e., a signature under the new public key on the
-/// same `RotationProofChallenge` struct).
-pub fn account_rotate_authentication_key_ed25519(
-    curr_sig_bytes: Vec<u8>,
-    new_sig_bytes: Vec<u8>,
-    curr_pk_bytes: Vec<u8>,
-    new_pk_bytes: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account").to_owned(),
-        ),
-        ident_str!("rotate_authentication_key_ed25519").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&curr_sig_bytes).unwrap(),
-            bcs::to_bytes(&new_sig_bytes).unwrap(),
-            bcs::to_bytes(&curr_pk_bytes).unwrap(),
-            bcs::to_bytes(&new_pk_bytes).unwrap(),
         ],
     ))
 }
@@ -625,6 +578,21 @@ pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayl
             bcs::to_bytes(&dst_addr).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+pub fn aptos_governance_add_approved_script_hash_script(proposal_id: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("add_approved_script_hash_script").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&proposal_id).unwrap()],
     ))
 }
 
@@ -1165,14 +1133,15 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
-    pub fn account_offer_rotation_capability_ed25519(
+    pub fn account_offer_signer_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountOfferRotationCapabilityEd25519 {
-                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
-                account_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
-                recipient_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+            Some(EntryFunctionCall::AccountOfferSignerCapability {
+                signer_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -1190,21 +1159,6 @@ mod decoder {
                 to_public_key_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
                 cap_rotate_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                 cap_update_table: bcs::from_bytes(script.args().get(5)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn account_rotate_authentication_key_ed25519(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AccountRotateAuthenticationKeyEd25519 {
-                curr_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
-                new_sig_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
-                curr_pk_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
-                new_pk_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -1260,6 +1214,20 @@ mod decoder {
                 dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_add_approved_script_hash_script(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AptosGovernanceAddApprovedScriptHashScript {
+                    proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -1580,16 +1548,12 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "account_offer_rotation_capability_ed25519".to_string(),
-            Box::new(decoder::account_offer_rotation_capability_ed25519),
+            "account_offer_signer_capability".to_string(),
+            Box::new(decoder::account_offer_signer_capability),
         );
         map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
-        );
-        map.insert(
-            "account_rotate_authentication_key_ed25519".to_string(),
-            Box::new(decoder::account_rotate_authentication_key_ed25519),
         );
         map.insert(
             "aptos_account_create_account".to_string(),
@@ -1610,6 +1574,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_coin_mint".to_string(),
             Box::new(decoder::aptos_coin_mint),
+        );
+        map.insert(
+            "aptos_governance_add_approved_script_hash_script".to_string(),
+            Box::new(decoder::aptos_governance_add_approved_script_hash_script),
         );
         map.insert(
             "aptos_governance_create_proposal".to_string(),

@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $EntryFunctionPayload = {
+    description: `Payload which runs a single entry function`,
     properties: {
         function: {
             type: 'EntryFunctionId',

@@ -314,7 +314,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -412,7 +412,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()

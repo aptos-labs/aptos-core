@@ -8,7 +8,7 @@ use crate::{
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, PrunerManager, StaleNodeIndexSchema, ROCKSDB_PROPERTIES,
+    AptosDB, PrunerManager, StaleNodeIndexSchema,
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
@@ -26,7 +26,7 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::collections::HashSet;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
@@ -175,25 +175,6 @@ fn test_get_latest_executed_trees() {
             1,
         ))
     );
-}
-
-#[test]
-fn test_rocksdb_properties_reporter() {
-    fn get_metric() -> i64 {
-        ROCKSDB_PROPERTIES
-            .get_metric_with_label_values(&[
-                "transaction_info",
-                "aptos_rocksdb_is-file-deletions-enabled",
-            ])
-            .unwrap()
-            .get()
-    }
-
-    assert_eq!(get_metric(), 0);
-    let tmp_dir = TempPath::new();
-    let _db = AptosDB::new_for_test(&tmp_dir);
-    std::thread::sleep(Duration::from_secs(1));
-    assert_eq!(get_metric(), 1);
 }
 
 pub fn test_state_merkle_pruning_impl(

@@ -110,10 +110,6 @@ You must stake the required minimum amount to join the validator set. Moreover, 
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
 
-:::tip When the staked amount falls below minimum
-If after joining the validator set, at the start of an epoch your stake drops below the minimum required amount, then you will be removed from the validator set. In the current version of the staking on the Aptos blockchain, there is no possibility of your stake dropping below the required minimum before the lockup period expires. Slashing is not currently supported.
-:::
-
 ### Automatic lockup duration
 
 When you join the validator set, your stake will automatically be locked up for a fixed duration that is set by the Aptos governance. 
@@ -156,12 +152,11 @@ At the start of each epoch, the following key events are triggered:
 
 ## Rewards
 
-Rewards for staking are calculated by using `rewards_rate`, an annual percentage yield (APY), using the below two numbers:
+Rewards for staking are calculated by using:
 
-- Your current total staked amount.
-- Your remaining lock up time.
-
-Rewards accrue as a compound interest on your current staked amount. 
+1. The `rewards_rate`, an annual percentage yield (APY), i.e., rewards accrue as a compound interest on your current staked amount.
+2. Your staked amount, and 
+3. Your voting performance.
 
 :::tip Set by the governance
 
@@ -178,21 +173,8 @@ Rewards are paid every epoch. Any reward you earned at the end of current epoch 
 See below the formula used to calculate rewards:
 
 ```
-Reward = Maximum possible reward * (Remaining lockup / Maximum lockup) * (Number of successful votes / Total number of blocks in the current epoch)
+Reward = staked_amount * rewards_rate * (Number of successful votes / Total number of blocks in the current epoch)
 ```
-
-where: 
-```
-rewards_rate = Maximum possible reward * (Remaining lockup / Maximum lockup)
-```
-
-Hence the `rewards_rate` will increase if you increase the remaining lockup period, eventually reaching the maximum when the remaining lockup period is the same as the maximum lockup period.
-
-### Rewards use the remaining lockup period
-
-As you can see above, the `rewards_rate` calculation formula is based on the remaining lockup period. For example, when you started with two years of lockup period, at the start your remaining lockup period is two years. After three days (`3*24` epochs) your remaining lockup period will be two years minus three days. 
-
-If you do not extend your lock up period, then the remaining lockup period will decrease linearly over time, eventually becoming zero at the end of the two years. In this case, after the two years have elapsed your lockup period is zero and hence you will no longer receive any rewards.
 
 ### Rewards based on the voting performance
 
@@ -210,18 +192,12 @@ Total number of successful votes = Total number of blocks in the epoch - Total n
 Hence:
 
 ```
-Reward = rewards_rate * (Number of successful votes / Total number of blocks in the current epoch)
+Reward = staked_amount * rewards_rate * (Number of successful votes / Total number of blocks in the current epoch)
 ```
 
 :::tip
 A validator’s missed votes count does not affect whether the validator is in the validator set or not. The missed votes count is used only to calculate the rewards, using the above formula.
 :::
-
-### Maintaining high rewards
-
-You can prevent your rewards from gradually declining by regularly extending your lockup period. You can extend or renew your lockup period any time in a permissionless way.
-
-For example, if you locked up for two years. A month from now you will receive a little less reward because your remaining lockup period will then be less (two years minus one month). However, if, before the month has fully elapsed, you extend your lockup period by one month to bring it back up to two years, then your month-end rewards will not decrease as they will be calculated based on the extended lockup period of two years.
 
 :::tip
 All your rewards are also subject to lockup period as they are added to the original staked amount. Hence you cannot withdraw your rewards until your lockup period has entirely expired.

@@ -21,13 +21,13 @@ use aptos_types::{
     transaction::Version,
     waypoint::Waypoint,
 };
+use clap::Parser;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Instant};
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct EpochEndingRestoreOpt {
-    #[structopt(long = "epoch-ending-manifest")]
+    #[clap(long = "epoch-ending-manifest")]
     pub manifest_handle: FileHandle,
 }
 
@@ -317,11 +317,7 @@ impl EpochHistoryRestoreController {
 
     pub async fn run(self) -> Result<EpochHistory> {
         let name = self.name();
-        info!(
-            "{} started. Trying epoch endings starting from epoch 0, {} in total.",
-            name,
-            self.manifest_handles.len(),
-        );
+        info!("{} started.", name,);
         let res = self
             .run_impl()
             .await

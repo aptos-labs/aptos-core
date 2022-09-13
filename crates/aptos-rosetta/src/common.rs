@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{aptos_coin_module_identifier, aptos_coin_resource_identifier};
+use crate::types::{APTOS_COIN_MODULE, APTOS_COIN_RESOURCE};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
@@ -12,6 +12,7 @@ use crate::{
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response};
+use aptos_sdk::move_types::ident_str;
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
@@ -152,8 +153,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: aptos_coin_module_identifier(),
-        name: aptos_coin_resource_identifier(),
+        module: ident_str!(APTOS_COIN_MODULE).into(),
+        name: ident_str!(APTOS_COIN_RESOURCE).into(),
         type_params: vec![],
     })
 }
@@ -278,6 +279,18 @@ impl std::fmt::Display for BlockHash {
 
 pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
     format!("{:x}", obj)
+}
+
+/// Retrieves the currency from the given parameters
+/// TODO: What do do about the type params?
+pub fn parse_currency(address: AccountAddress, module: &str, name: &str) -> ApiResult<Currency> {
+    match (address, module, name) {
+        (AccountAddress::ONE, APTOS_COIN_MODULE, APTOS_COIN_RESOURCE) => Ok(native_coin()),
+        _ => Err(ApiError::TransactionParseError(Some(format!(
+            "Invalid coin for transfer {}::{}::{}",
+            address, module, name
+        )))),
+    }
 }
 
 #[cfg(test)]

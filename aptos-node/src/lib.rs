@@ -56,7 +56,7 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     thread,
@@ -155,7 +155,7 @@ impl AptosNodeArgs {
 
             // Start the node
             println!("Using node config {:?}", &config);
-            start(config, None).expect("Node should start correctly");
+            start(config, None, true).expect("Node should start correctly");
         };
     }
 }
@@ -173,8 +173,19 @@ pub struct AptosHandle {
 }
 
 /// Start an aptos node
-pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()> {
+pub fn start(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
     crash_handler::setup_panic_handler();
+
+    if create_global_rayon_pool {
+        rayon::ThreadPoolBuilder::new()
+            .thread_name(|index| format!("rayon-global-{}", index))
+            .build_global()
+            .expect("Failed to build rayon global thread _pool.");
+    }
 
     let mut logger = aptos_logger::Logger::new();
     logger
@@ -322,7 +333,7 @@ where
         &config.inspection_service.address, &config.inspection_service.port
     );
     println!(
-        "\tFullNode network: {}",
+        "\tAptosnet Fullnode network endpoint: {}",
         &config.full_node_networks[0].listen_address
     );
     if lazy {
@@ -331,7 +342,7 @@ where
 
     println!("\nAptos is running, press ctrl-c to exit\n");
 
-    start(config, Some(log_file))
+    start(config, Some(log_file), false)
 }
 
 // Fetch chain ID from on-chain resource
@@ -424,7 +435,11 @@ fn setup_data_streaming_service(
 
     // Start the data streaming service
     let streaming_service_runtime = Builder::new_multi_thread()
-        .thread_name("data-streaming-service")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stream-serv-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -449,7 +464,11 @@ fn setup_aptos_data_client(
 
     // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
-        .thread_name("aptos-data-client")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("data-client-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -476,7 +495,11 @@ fn setup_state_sync_storage_service(
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
     let storage_service_runtime = Builder::new_multi_thread()
-        .thread_name("storage-service-server")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stor-server-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -545,7 +568,6 @@ pub fn setup_environment(
         instant.elapsed().as_millis()
     );
 
-    let chain_id = fetch_chain_id(&db_rw)?;
     let mut network_runtimes = vec![];
     let mut mempool_network_handles = vec![];
     let mut consensus_network_handles = None;
@@ -570,6 +592,10 @@ pub fn setup_environment(
     // Gather all network configs into a single vector.
     let mut network_configs: Vec<&NetworkConfig> = node_config.full_node_networks.iter().collect();
     if let Some(network_config) = node_config.validator_network.as_ref() {
+        // Ensure that mutual authentication is enabled by default!
+        if !network_config.mutual_authentication {
+            panic!("Validator networks must always have mutual_authentication enabled!");
+        }
         network_configs.push(network_config);
     }
 
@@ -587,14 +613,24 @@ pub fn setup_environment(
         network_ids.insert(network_id);
     });
     let network_ids: Vec<_> = network_ids.into_iter().collect();
-
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
+
+    let chain_id = fetch_chain_id(&db_rw)?;
     for network_config in network_configs.into_iter() {
-        debug!("Creating runtime for {}", network_config.network_id);
+        let network_id = network_config.network_id;
+        debug!("Creating runtime for {}", network_id);
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder
             .disable_lifo_slot()
-            .thread_name(format!("network-{}", network_config.network_id))
+            .thread_name_fn(move || {
+                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                format!(
+                    "network-{}-{}",
+                    network_id.as_str().chars().take(3).collect::<String>(),
+                    id
+                )
+            })
             .enable_all();
         if let Some(runtime_threads) = network_config.runtime_threads {
             runtime_builder.worker_threads(runtime_threads);
@@ -777,4 +813,29 @@ pub fn setup_environment(
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::setup_environment;
+    use aptos_config::config::{NodeConfig, WaypointConfig};
+    use aptos_temppath::TempPath;
+    use aptos_types::waypoint::Waypoint;
+
+    #[test]
+    #[should_panic(expected = "Validator networks must always have mutual_authentication enabled!")]
+    fn test_mutual_authentication_validators() {
+        // Create a default node config for the validator
+        let temp_path = TempPath::new();
+        let mut node_config = NodeConfig::default_for_validator();
+        node_config.set_data_dir(temp_path.path().to_path_buf());
+        node_config.base.waypoint = WaypointConfig::FromConfig(Waypoint::default());
+
+        // Disable mutual authentication for the config
+        let validator_network = node_config.validator_network.as_mut().unwrap();
+        validator_network.mutual_authentication = false;
+
+        // Starting the node should panic
+        setup_environment(node_config, None).unwrap();
+    }
 }

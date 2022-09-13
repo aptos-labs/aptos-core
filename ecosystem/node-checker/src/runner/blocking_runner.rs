@@ -6,10 +6,7 @@ use crate::{
     configuration::NodeAddress,
     evaluator::{EvaluationResult, EvaluationSummary, Evaluator},
     evaluators::{
-        direct::{
-            get_index_response, get_index_response_or_evaluation_result, DirectEvaluatorInput,
-            NodeIdentityEvaluator,
-        },
+        direct::{DirectEvaluatorInput, NodeIdentityEvaluator},
         metrics::{parse_metrics, MetricsEvaluatorInput},
         system_information::SystemInformationEvaluatorInput,
         EvaluatorSet, EvaluatorType,
@@ -66,7 +63,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
         EvaluationResult {
             headline: "Failed to collect metrics from target node".to_string(),
             score: 0,
-            explanation: format!("Failed to collect metrics from your node, make sure your metrics port ({}) is publicly accessible: {}", address.metrics_port, error),
+            explanation: format!("Failed to collect metrics from your node, make sure your metrics port ({}) is publicly accessible: {}", address.get_metrics_port(), error),
             category: "metrics".to_string(),
             evaluator_name: "metrics_port".to_string(),
             links: vec![],
@@ -212,26 +209,24 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
 
         let api_client_timeout = Duration::from_secs(self.args.api_client_timeout_secs);
 
-        let baseline_index_response = get_index_response(
-            &self.baseline_node_information.node_address,
-            api_client_timeout,
-        )
-        .await
-        .context(format!(
+        let baseline_index_response = self
+            .baseline_node_information
+            .node_address
+            .get_index_response(api_client_timeout)
+            .await
+            .context(format!(
             "Failed to read index response from baseline node. Make sure its API is open (port {})",
-            self.baseline_node_information.node_address.api_port
+            self.baseline_node_information.node_address.get_api_port()
         ))
-        .map_err(RunnerError::BaselineMissingDataError)?;
+            .map_err(RunnerError::BaselineMissingDataError)?;
 
-        let target_index_response =
-            match get_index_response_or_evaluation_result(target_node_address, api_client_timeout)
-                .await
-            {
-                Ok(response) => response,
-                Err(evaluation_result) => {
-                    return Ok(EvaluationSummary::from(vec![evaluation_result]))
-                }
-            };
+        let target_index_response = match target_node_address
+            .get_index_response_or_evaluation_result(api_client_timeout)
+            .await
+        {
+            Ok(response) => response,
+            Err(evaluation_result) => return Ok(EvaluationSummary::from(vec![evaluation_result])),
+        };
 
         let direct_evaluator_input = DirectEvaluatorInput {
             baseline_node_information: self.baseline_node_information.clone(),

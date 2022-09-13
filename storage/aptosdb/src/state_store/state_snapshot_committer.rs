@@ -3,17 +3,21 @@
 
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
-use crate::state_store::buffered_state::CommitMessage;
-use crate::state_store::state_merkle_batch_committer::{
-    StateMerkleBatch, StateMerkleBatchCommitter,
+use crate::state_store::{
+    buffered_state::CommitMessage,
+    state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
+    StateDb,
 };
-use crate::state_store::StateDb;
 use aptos_logger::trace;
-use std::sync::mpsc::{Receiver, SyncSender};
-use std::sync::{mpsc, Arc};
-use std::thread::JoinHandle;
-use storage_interface::state_delta::StateDelta;
-use storage_interface::{jmt_update_refs, jmt_updates};
+use std::{
+    sync::{
+        mpsc,
+        mpsc::{Receiver, SyncSender},
+        Arc,
+    },
+    thread::JoinHandle,
+};
+use storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
@@ -32,7 +36,7 @@ impl StateSnapshotCommitter {
             mpsc::sync_channel(0);
         let arc_state_db = Arc::clone(&state_db);
         let join_handle = std::thread::Builder::new()
-            .name("state_merkle_batch_committer".to_string())
+            .name("state_batch_committer".to_string())
             .spawn(move || {
                 let committer = StateMerkleBatchCommitter::new(
                     arc_state_db,

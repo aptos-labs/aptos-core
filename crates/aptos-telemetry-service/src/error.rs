@@ -35,6 +35,10 @@ impl ServiceError {
         Self::new(StatusCode::UNAUTHORIZED, msg.to_string())
     }
 
+    pub fn forbidden<S: Display>(msg: S) -> Self {
+        Self::new(StatusCode::FORBIDDEN, msg.to_string())
+    }
+
     pub fn internal(err: anyhow::Error) -> Self {
         Self::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, err)
     }

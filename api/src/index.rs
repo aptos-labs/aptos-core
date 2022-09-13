@@ -10,6 +10,7 @@ use crate::ApiTags;
 use aptos_api_types::IndexResponse;
 use poem_openapi::OpenApi;
 
+/// API for the index, to retrieve the ledger information
 pub struct IndexApi {
     pub context: Arc<Context>,
 }

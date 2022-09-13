@@ -45,7 +45,7 @@ locals {
     }
     fullnode = {
       instance_type = var.fullnode_instance_type
-      size          = var.num_fullnodes
+      size          = var.num_fullnodes + var.num_extra_instance
       taint         = false
     }
   }

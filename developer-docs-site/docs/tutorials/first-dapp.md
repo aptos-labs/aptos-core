@@ -5,9 +5,9 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos Blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move Modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move modules.
 
-For this tutorial, we will use the Move Module `HelloBlockchain` described in [Your first Move Module](first-move-module.md) and focus on building the user interface.
+For this tutorial, we will use the Move module `HelloBlockchain` described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
 
 We will use:
 
@@ -15,7 +15,7 @@ We will use:
 - The [Aptos Wallet][building_wallet], and
 - The [Aptos CLI][installing_cli] to interact with blockchain.
 
-The end result is a dapp that lets users publish and share snippets of text on the Aptos Blockchain.
+The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
 The full source code for this tutorial is available [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript/dapp-example).
 
@@ -196,9 +196,9 @@ Now, in addition to displaying the account address, the app will also display th
 
 ## Step 4: Publish a Move Module
 
-Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move Module to our account.
+Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move module to our account.
 
-The Move Module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your first Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
+The Move module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
 ### Publish the `HelloBlockchain` module with the Aptos CLI
 
@@ -483,7 +483,7 @@ function App() {
   const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
-    client.getAccountResources(address).then(setResourdces);
+    client.getAccountResources(address).then(setResources);
   }, [address]);
   const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);

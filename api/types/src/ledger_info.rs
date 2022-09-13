@@ -8,8 +8,10 @@ use poem_openapi::Object as PoemObject;
 
 use serde::{Deserialize, Serialize};
 
+/// The Ledger information representing the current state of the chain
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PoemObject)]
 pub struct LedgerInfo {
+    /// Chain ID of the current chain
     pub chain_id: u8,
     pub epoch: U64,
     pub ledger_version: U64,

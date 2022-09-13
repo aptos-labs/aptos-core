@@ -7,6 +7,7 @@ export const $IndexResponse = {
     properties: {
         chain_id: {
             type: 'number',
+            description: `Chain ID of the current chain`,
             isRequired: true,
             format: 'uint8',
         },

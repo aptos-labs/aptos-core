@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+/// A hex encoded 32-byte hash value
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct HashValue(pub aptos_crypto::hash::HashValue);
 

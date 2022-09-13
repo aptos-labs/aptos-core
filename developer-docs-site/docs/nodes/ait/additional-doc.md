@@ -11,7 +11,7 @@ Follow these instructions when you need to take down the validator node and clea
 Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch).
 
 ```bash
-aptos node leave-validator-set --profile ait3-operator
+aptos node leave-validator-set --profile ait3-operator --pool-address <owner-address>
 ```
 
 ### Using source code

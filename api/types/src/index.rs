@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// index endpoint (i.e., GET "/").
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PoemObject, Serialize)]
 pub struct IndexResponse {
+    /// Chain ID of the current chain
     pub chain_id: u8,
     pub epoch: U64,
     pub ledger_version: U64,

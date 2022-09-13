@@ -170,6 +170,11 @@ variable "utility_instance_max_num" {
   default     = 0
 }
 
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint the instances in the utility nodegroup"
+  default     = false
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   default     = "c6i.4xlarge"
@@ -188,6 +193,11 @@ variable "validator_instance_min_num" {
 variable "validator_instance_max_num" {
   description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.validator_instance_num"
   default     = 0
+}
+
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  default     = false
 }
 
 variable "workspace_name_override" {
@@ -211,16 +221,6 @@ variable "logger_helm_values" {
   default     = {}
 }
 
-variable "enable_vector_daemonset_logger" {
-  description = "Enable vector daemonset logger helm chart"
-  default     = false
-}
-
-variable "vector_daemonset_helm_values" {
-  description = "Map of helm values to pass to vector-daemonset chart"
-  type        = list(string)
-  default     = []
-}
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
@@ -231,6 +231,16 @@ variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring Helm"
   type        = any
   default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  default     = false
 }
 
 variable "helm_release_name_override" {

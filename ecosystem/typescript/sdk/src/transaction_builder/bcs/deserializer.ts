@@ -153,7 +153,7 @@ export class Deserializer {
    * BCS use uleb128 encoding in two cases: (1) lengths of variable-length sequences and (2) tags of enum values
    */
   deserializeUleb128AsU32(): Uint32 {
-    let value: bigint = 0n;
+    let value: bigint = BigInt(0);
     let shift = 0;
 
     while (value < MAX_U32_NUMBER) {

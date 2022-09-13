@@ -25,15 +25,27 @@ use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_types::chain_id::ChainId;
+use aptos_types::network_address::NetworkAddress;
+use aptos_types::on_chain_config::{ConsensusScheme, ValidatorSet};
+use aptos_types::validator_config::ValidatorConfig;
+use aptos_types::validator_info::ValidatorInfo;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
+use backup_cli::coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt};
+use backup_cli::metadata::cache::MetadataCacheOpt;
+use backup_cli::storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter};
+use backup_cli::utils::{
+    ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt,
+};
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
+use serde::Serialize;
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
@@ -55,6 +67,7 @@ pub enum NodeTool {
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
     AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
+    BootstrapDbFromBackup(BootstrapDbFromBackup),
 }
 
 impl NodeTool {
@@ -71,6 +84,7 @@ impl NodeTool {
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
             AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
+            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -411,20 +425,23 @@ pub struct ShowValidatorConfig {
 }
 
 #[async_trait]
-impl CliCommand<serde_json::Value> for ShowValidatorConfig {
+impl CliCommand<ValidatorConfigSummary> for ShowValidatorConfig {
     fn command_name(&self) -> &'static str {
         "ShowValidatorConfig"
     }
 
-    async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
+    async fn execute(mut self) -> CliTypedResult<ValidatorConfigSummary> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let address = self
             .operator_args
             .address_fallback_to_profile(&self.profile_options)?;
-        let response = client
-            .get_resource(address, "0x1::stake::ValidatorConfig")
-            .await?;
-        Ok(response.into_inner())
+        let validator_config: ValidatorConfig = client
+            .get_account_resource_bcs(address, "0x1::stake::ValidatorConfig")
+            .await?
+            .into_inner();
+        Ok((&validator_config)
+            .try_into()
+            .map_err(|err| CliError::BCS("Validator config", err))?)
     }
 }
 
@@ -438,17 +455,152 @@ pub struct ShowValidatorSet {
 }
 
 #[async_trait]
-impl CliCommand<serde_json::Value> for ShowValidatorSet {
+impl CliCommand<ValidatorSetSummary> for ShowValidatorSet {
     fn command_name(&self) -> &'static str {
         "ShowValidatorSet"
     }
 
-    async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
+    async fn execute(mut self) -> CliTypedResult<ValidatorSetSummary> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let response = client
-            .get_resource(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
-            .await?;
-        Ok(response.into_inner())
+        let validator_set: ValidatorSet = client
+            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+            .await?
+            .into_inner();
+
+        ValidatorSetSummary::try_from(&validator_set)
+            .map_err(|err| CliError::BCS("Validator Set", err))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ValidatorSetSummary {
+    pub scheme: ConsensusScheme,
+    pub active_validators: Vec<ValidatorInfoSummary>,
+    pub pending_inactive: Vec<ValidatorInfoSummary>,
+    pub pending_active: Vec<ValidatorInfoSummary>,
+    pub total_voting_power: u128,
+    pub total_joining_power: u128,
+}
+
+impl TryFrom<&ValidatorSet> for ValidatorSetSummary {
+    type Error = bcs::Error;
+
+    fn try_from(set: &ValidatorSet) -> Result<Self, Self::Error> {
+        Ok(ValidatorSetSummary {
+            scheme: set.scheme,
+            active_validators: set
+                .active_validators
+                .iter()
+                .filter_map(|validator| validator.try_into().ok())
+                .collect(),
+            pending_inactive: set
+                .pending_inactive
+                .iter()
+                .filter_map(|validator| validator.try_into().ok())
+                .collect(),
+            pending_active: set
+                .pending_active
+                .iter()
+                .filter_map(|validator| validator.try_into().ok())
+                .collect(),
+            total_voting_power: set.total_voting_power,
+            total_joining_power: set.total_joining_power,
+        })
+    }
+}
+
+impl From<&ValidatorSetSummary> for ValidatorSet {
+    fn from(summary: &ValidatorSetSummary) -> Self {
+        ValidatorSet {
+            scheme: summary.scheme,
+            active_validators: summary
+                .active_validators
+                .iter()
+                .map(|validator| validator.into())
+                .collect(),
+            pending_inactive: summary
+                .pending_inactive
+                .iter()
+                .map(|validator| validator.into())
+                .collect(),
+            pending_active: summary
+                .pending_active
+                .iter()
+                .map(|validator| validator.into())
+                .collect(),
+            total_voting_power: summary.total_voting_power,
+            total_joining_power: summary.total_joining_power,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ValidatorInfoSummary {
+    // The validator's account address. AccountAddresses are initially derived from the account
+    // auth pubkey; however, the auth key can be rotated, so one should not rely on this
+    // initial property.
+    pub account_address: AccountAddress,
+    // Voting power of this validator
+    consensus_voting_power: u64,
+    // Validator config
+    config: ValidatorConfigSummary,
+}
+
+impl TryFrom<&ValidatorInfo> for ValidatorInfoSummary {
+    type Error = bcs::Error;
+
+    fn try_from(info: &ValidatorInfo) -> Result<Self, Self::Error> {
+        Ok(ValidatorInfoSummary {
+            account_address: info.account_address,
+            consensus_voting_power: info.consensus_voting_power(),
+            config: info.config().try_into()?,
+        })
+    }
+}
+
+impl From<&ValidatorInfoSummary> for ValidatorInfo {
+    fn from(summary: &ValidatorInfoSummary) -> Self {
+        ValidatorInfo::new(
+            summary.account_address,
+            summary.consensus_voting_power,
+            (&summary.config).into(),
+        )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ValidatorConfigSummary {
+    pub consensus_public_key: bls12381::PublicKey,
+    /// This is an bcs serialized Vec<NetworkAddress>
+    pub validator_network_addresses: Vec<NetworkAddress>,
+    /// This is an bcs serialized Vec<NetworkAddress>
+    pub fullnode_network_addresses: Vec<NetworkAddress>,
+    pub validator_index: u64,
+}
+
+impl TryFrom<&ValidatorConfig> for ValidatorConfigSummary {
+    type Error = bcs::Error;
+
+    fn try_from(config: &ValidatorConfig) -> Result<Self, Self::Error> {
+        Ok(ValidatorConfigSummary {
+            consensus_public_key: config.consensus_public_key.clone(),
+            // TODO: We should handle if some of these are not parsable
+            validator_network_addresses: config.validator_network_addresses()?,
+            fullnode_network_addresses: config.fullnode_network_addresses()?,
+            validator_index: config.validator_index,
+        })
+    }
+}
+
+impl From<&ValidatorConfigSummary> for ValidatorConfig {
+    fn from(summary: &ValidatorConfigSummary) -> Self {
+        ValidatorConfig {
+            consensus_public_key: summary.consensus_public_key.clone(),
+            validator_network_addresses: bcs::to_bytes(&summary.validator_network_addresses)
+                .unwrap(),
+            fullnode_network_addresses: bcs::to_bytes(&summary.fullnode_network_addresses).unwrap(),
+            validator_index: summary.validator_index,
+        }
     }
 }
 
@@ -840,6 +992,76 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             );
             AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
         }
+        Ok(())
+    }
+}
+
+/// Tool to bootstrap DB from backup
+#[derive(Parser)]
+pub struct BootstrapDbFromBackup {
+    #[clap(
+        long,
+        help = "Config file for the source backup, pointing to local files or cloud storage and \
+        commands needed to access them.",
+        parse(from_os_str)
+    )]
+    config_path: PathBuf,
+
+    #[clap(
+        long = "target-db-dir",
+        help = "Target dir where the tool recreates a AptosDB with snapshots and transactions provided \
+        in the backup. The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db",
+        parse(from_os_str)
+    )]
+    pub db_dir: PathBuf,
+
+    #[clap(flatten)]
+    pub metadata_cache_opt: MetadataCacheOpt,
+
+    #[clap(flatten)]
+    pub concurrent_downloads: ConcurrentDownloadsOpt,
+
+    #[clap(flatten)]
+    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+}
+
+#[async_trait]
+impl CliCommand<()> for BootstrapDbFromBackup {
+    fn command_name(&self) -> &'static str {
+        "BootstrapDbFromBackup"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let opt = RestoreCoordinatorOpt {
+            metadata_cache_opt: self.metadata_cache_opt,
+            replay_all: false,
+            ledger_history_start_version: None,
+            skip_epoch_endings: false,
+        };
+        let global_opt = GlobalRestoreOpt {
+            dry_run: false,
+            db_dir: Some(self.db_dir),
+            target_version: None,
+            trusted_waypoints: Default::default(),
+            rocksdb_opt: RocksdbOpt::default(),
+            concurrent_downloads: self.concurrent_downloads,
+            replay_concurrency_level: self.replay_concurrency_level,
+        }
+        .try_into()?;
+        let storage = Arc::new(CommandAdapter::new(
+            CommandAdapterConfig::load_from_file(&self.config_path).await?,
+        ));
+
+        // hack: get around this error, related to use of `async_trait`:
+        //   error: higher-ranked lifetime error
+        //   ...
+        //   = note: could not prove for<'r, 's> Pin<Box<impl futures::Future<Output = std::result::Result<(), CliError>>>>: CoerceUnsized<Pin<Box<(dyn futures::Future<Output = std::result::Result<(), CliError>> + std::marker::Send + 's)>>>
+        tokio::task::spawn_blocking(|| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(RestoreCoordinator::new(opt, global_opt, storage).run())
+        })
+        .await
+        .unwrap()?;
         Ok(())
     }
 }

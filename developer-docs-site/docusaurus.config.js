@@ -141,7 +141,7 @@ const config = {
               {
                 label: "Node Health Checker",
                 type: "doc",
-                docId: "nodes/node-health-checker",
+                docId: "nodes/node-health-checker/index",
               },
             ],
           },

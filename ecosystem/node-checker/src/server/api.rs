@@ -17,9 +17,7 @@ use anyhow::anyhow;
 use aptos_crypto::x25519;
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use poem::{http::StatusCode, Error as PoemError, Result as PoemResult};
-use poem_openapi::{
-    param::Query, payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService,
-};
+use poem_openapi::{param::Query, payload::Json, Object as PoemObject, OpenApi, OpenApiService};
 use url::Url;
 
 pub struct PreconfiguredNode<M: MetricCollector> {
@@ -107,13 +105,23 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             None => None,
         };
 
-        let target_node_address = NodeAddress {
-            url: node_url.0,
-            metrics_port: metrics_port.0,
-            api_port: api_port.0,
-            noise_port: noise_port.0,
-            public_key,
-        };
+        // Within a single NHC run we want to use the same client so that cookies
+        // can be collected and used. This is important because the nodes we're
+        // talking to might be a behind a LB that does cookie based sticky routing.
+        // If we don't do this, we can get read inconsistency, e.g. where we read
+        // that the node has transaction version X, but then we fail to retrieve the
+        // transaction at the version because the LB routes us to a different node.
+        // In this function, which comprises a single NHC run, we build a NodeAddress
+        // for the baseline and target and use that throughout the request. Further
+        // functions deeper down might clone these structs, but that is fine, because
+        // the important part, the CookieStore (Jar) is in an Arc, so each time we
+        // clone the struct we're just cloning the reference to the same jar.
+
+        let target_node_address = NodeAddress::new(node_url.0)
+            .metrics_port(metrics_port.0)
+            .api_port(api_port.0)
+            .noise_port(noise_port.0)
+            .public_key(public_key);
 
         let baseline_node_configuration =
             self.get_baseline_node_configuration(&baseline_configuration_name.0)?;
@@ -132,10 +140,6 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             }
         }
 
-        let request = CheckNodeRequest {
-            baseline_configuration_name: baseline_configuration_name.0,
-            target_node: target_node_address.clone(),
-        };
         if self.allow_preconfigured_test_node_only {
             return Err(PoemError::from((
                 StatusCode::METHOD_NOT_ALLOWED,
@@ -144,10 +148,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             )));
         }
 
-        let target_metric_collector = ReqwestMetricCollector::new(
-            request.target_node.url.clone(),
-            request.target_node.metrics_port,
-        );
+        let target_metric_collector = ReqwestMetricCollector::new(target_node_address.clone());
 
         let complete_evaluation_result = baseline_node_configuration
             .runner
@@ -233,22 +234,6 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
                 })
                 .collect(),
         )
-    }
-}
-
-#[derive(Clone, Debug, PoemObject)]
-#[oai(example)]
-struct CheckNodeRequest {
-    target_node: NodeAddress,
-    baseline_configuration_name: Option<String>,
-}
-
-impl Example for CheckNodeRequest {
-    fn example() -> Self {
-        Self {
-            baseline_configuration_name: Some("devnet_fullnode".to_string()),
-            target_node: NodeAddress::example(),
-        }
     }
 }
 

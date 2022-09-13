@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::transaction::{
         backup::{TransactionBackupController, TransactionBackupOpt},
@@ -82,7 +83,8 @@ fn end_to_end() {
                 target_version: Some(target_version),
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
-                concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                concurrent_downloads: ConcurrentDownloadsOpt::default(),
+                replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
             }
             .try_into()
             .unwrap(),

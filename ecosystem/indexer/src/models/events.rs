@@ -25,9 +25,10 @@ pub struct Event {
 
 impl Event {
     pub fn from_event(transaction_hash: String, event: &APIEvent) -> Self {
+        let event_key: aptos_types::event::EventKey = event.guid.into();
         Event {
             transaction_hash,
-            key: event.key.to_string(),
+            key: event_key.to_string(),
             sequence_number: BigDecimal::from_u64(event.sequence_number.0)
                 .expect("Should be able to convert U64 to big decimal"),
             type_: event.typ.to_string(),

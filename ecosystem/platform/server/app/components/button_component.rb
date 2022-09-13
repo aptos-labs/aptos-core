@@ -13,7 +13,8 @@ class ButtonComponent < ViewComponent::Base
                'uppercase font-normal uppercase font-mono active:brightness-95 font-normal ' \
                'hover:subpixel-antialiased ring-inset',
     tertiary: 'whitespace-nowrap text-teal-300 hover:brightness-105 active:brightness-95 uppercase ' \
-              'font-normal font-mono'
+              'font-normal font-mono',
+    blank: '!p-0 hover:brightness-110'
   }.freeze
 
   SIZE_CLASSES = {

@@ -1,0 +1,23 @@
+image:
+  repository: timberio/vector
+  pullPolicy: IfNotPresent
+  tag: "0.24.X-distroless-libc"
+
+
+# -- Choose any (you can choose multiple) logging sinks supported by vector as found here https://vector.dev/docs/reference/configuration/sinks/
+loggingSinks: {}
+# E.g.:
+# loggingSinks:
+#   stdout:
+#     type: console
+#     inputs: [kubernetes_logs]
+#     encoding:
+#       codec: json
+
+# -- secret environment variables to pass to the deployment
+secretVars: {}
+#   my-custom-secret:
+#     MY_SECRET_ENV_VAR: <some_secret_value>
+
+# -- human readible name of the kubernetes cluster this is being deployed to. This will be added as field `k8s.cluster=<cluster_name>` into each log event
+k8sCluster: my_blockchain_cluster

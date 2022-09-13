@@ -61,7 +61,7 @@ fn stream_blocks(
     };
 
     // Back off exponentially whenever we encounter a connection error or a stream with bad data
-    let mut backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(45));
+    let mut backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(5));
 
     // This attribute is needed because `try_stream!` seems to break detection of `skip_backoff` assignments
     #[allow(unused_assignments)]

@@ -23,8 +23,8 @@ use serde_json::json;
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper,
-    MoveModuleId, MoveStructTag, MoveType, U128, U64,
+    Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
+    MoveStructTag, MoveType, U128, U64,
 };
 use indoc::indoc;
 
@@ -36,29 +36,13 @@ impl_poem_type!(
             "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
-        description = Some("Hex encoded 32 byte Aptos account address")
-    )
-);
-
-impl_poem_type!(
-    EventKey,
-    "string",
-    (
-        example = Some(serde_json::Value::String(
-            "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
-                .to_string()
-        )),
-        format = Some("hex"),
         description = Some(indoc! {"
-            Event key is a global index for an event stream.
+            A hex encoded 32 byte Aptos account address.
 
-            It is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is
-            a combination of a `uint64` creation number and account address (without
-            trimming leading zeros).
+            This is represented in a string as a 64 character hex string, sometimes
+            shortened by stripping leading 0s, and adding a 0x.
 
-            For example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:
-              1. `0000000000000000`: `uint64` representation of `0`.
-              2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.
+            For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
         "})
     )
 );
@@ -254,7 +238,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 64-bit unsigned integer.
 
-        We represent u64 values as a string to ensure compatability with languages such
+        We represent u64 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )
@@ -271,7 +255,7 @@ impl_poem_type!(
         description = Some(indoc! {"
         A string containing a 128-bit unsigned integer.
 
-        We represent u128 values as a string to ensure compatability with languages such
+        We represent u128 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
     "})
     )
@@ -279,7 +263,6 @@ impl_poem_type!(
 
 impl_poem_parameter!(
     Address,
-    EventKey,
     HashValue,
     IdentifierWrapper,
     HexEncodedBytes,

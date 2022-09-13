@@ -7,12 +7,13 @@ use crate::{
     evaluators::{
         direct::{
             ApiEvaluatorError, DirectEvaluatorInput, HandshakeEvaluator, LatencyEvaluator,
-            NoiseEvaluatorError, TpsEvaluator, TpsEvaluatorError, TransactionAvailabilityEvaluator,
+            NoiseEvaluatorError, StateSyncVersionEvaluator, TpsEvaluator, TpsEvaluatorError,
+            TransactionAvailabilityEvaluator,
         },
         metrics::{
             ConsensusProposalsEvaluator, ConsensusRoundEvaluator, ConsensusTimeoutsEvaluator,
             MetricsEvaluatorError, MetricsEvaluatorInput, NetworkMinimumPeersEvaluator,
-            NetworkPeersWithinToleranceEvaluator, StateSyncVersionEvaluator,
+            NetworkPeersWithinToleranceEvaluator, StateSyncVersionMetricsEvaluator,
         },
         system_information::{
             BuildVersionEvaluator, HardwareEvaluator, SystemInformationEvaluatorError,
@@ -182,6 +183,11 @@ pub fn build_evaluators(
         evaluator_args,
     )?;
     StateSyncVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    StateSyncVersionMetricsEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,

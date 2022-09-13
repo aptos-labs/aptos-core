@@ -165,6 +165,7 @@ impl TransactionStore {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
                         self.index_remove(&txn);
+                        self.remove_account_if_empty(&txn.get_sender());
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
@@ -190,14 +191,14 @@ impl TransactionStore {
             ));
         }
 
-        self.transactions
-            .entry(address)
-            .or_insert_with(AccountTransactions::new);
-
         self.clean_committed_transactions(
             &address,
             sequence_number.account_sequence_number_type.min_seq(),
         );
+
+        self.transactions
+            .entry(address)
+            .or_insert_with(AccountTransactions::new);
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -281,6 +282,7 @@ impl TransactionStore {
                         ))
                     );
                     self.index_remove(&txn);
+                    self.remove_account_if_empty(&address);
                 }
             }
         }
@@ -318,37 +320,19 @@ impl TransactionStore {
     }
 
     /// Maintains the following invariants:
-    /// - All transactions of a given non-CRSN account that are sequential to the current sequence number
+    /// - All transactions of a given account that are sequential to the current sequence number
     ///   should be included in both the PriorityIndex (ordering for Consensus) and
     ///   TimelineIndex (txns for SharedMempool).
-    /// - All transactions of a given CRSN account that are greater than the account's min_nonce
-    ///   should be included in both the PriorityIndex and TimelineIndex.
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(
         &mut self,
         address: &AccountAddress,
-        crsn_or_seqno: AccountSequenceInfo,
+        sequence_info: AccountSequenceInfo,
     ) {
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut min_seq = crsn_or_seqno.min_seq();
+            let mut min_seq = sequence_info.min_seq();
 
-            match crsn_or_seqno {
-                AccountSequenceInfo::CRSN { min_nonce, size } => {
-                    for i in min_nonce..size {
-                        if let Some(txn) = txns.get_mut(&i) {
-                            self.priority_index.insert(txn);
-
-                            if txn.timeline_state == TimelineState::NotReady {
-                                self.timeline_index.insert(txn);
-                            }
-
-                            // Remove txn from parking lot after it has been promoted to
-                            // priority_index / timeline_index, i.e., txn status is ready.
-                            self.parking_lot_index.remove(txn);
-                            min_seq = i;
-                        }
-                    }
-                }
+            match sequence_info {
                 AccountSequenceInfo::Sequential(_) => {
                     while let Some(txn) = txns.get_mut(&min_seq) {
                         self.priority_index.insert(txn);
@@ -377,7 +361,7 @@ impl TransactionStore {
             }
             trace!(
                 LogSchema::new(LogEntry::ProcessReadyTxns).account(*address),
-                first_ready_seq_num = crsn_or_seqno.min_seq(),
+                first_ready_seq_num = sequence_info.min_seq(),
                 last_ready_seq_num = min_seq,
                 num_parked_txns = parking_lot_txns,
             );
@@ -410,6 +394,7 @@ impl TransactionStore {
                 address,
                 sequence_number
             );
+            self.remove_account_if_empty(address);
         }
     }
 
@@ -436,6 +421,7 @@ impl TransactionStore {
                 self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
+            self.remove_account_if_empty(account);
         }
     }
 
@@ -450,6 +436,15 @@ impl TransactionStore {
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
         self.track_indices();
+    }
+
+    /// Removes account datastructures if there are no more transactions for the account
+    fn remove_account_if_empty(&mut self, address: &AccountAddress) {
+        if let Some(txns) = self.transactions.get(address) {
+            if txns.is_empty() {
+                self.transactions.remove(address);
+            }
+        }
     }
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
@@ -558,10 +553,13 @@ impl TransactionStore {
                         Bound::Excluded(next_key.sequence_number)
                     });
                 // mark all following txns as non-ready, i.e. park them
-                for (_, t) in txns.range((park_range_start, park_range_end)) {
+                for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
+                    if let TimelineState::Ready(_) = t.timeline_state {
+                        t.timeline_state = TimelineState::NotReady;
+                    }
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
                     let is_active = self.priority_index.contains(&txn);
@@ -585,6 +583,7 @@ impl TransactionStore {
                     // remove txn
                     self.index_remove(&txn);
                 }
+                self.remove_account_if_empty(&key.address);
             }
         }
 
@@ -618,5 +617,10 @@ impl TransactionStore {
     #[cfg(test)]
     pub(crate) fn get_parking_lot_size(&self) -> usize {
         self.parking_lot_index.size()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
+        &self.transactions
     }
 }

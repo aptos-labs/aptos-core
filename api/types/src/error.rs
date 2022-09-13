@@ -12,10 +12,8 @@ use std::fmt::Formatter;
 pub struct AptosError {
     /// A message describing the error
     pub message: String,
-    /// A code providing more granular error information beyond the HTTP status code
     pub error_code: AptosErrorCode,
     /// A code providing VM error details when submitting transactions to the VM
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_error_code: Option<u64>,
 }
 
@@ -115,4 +113,21 @@ impl AptosErrorCode {
     pub fn as_u32(&self) -> u32 {
         *self as u32
     }
+}
+
+#[test]
+fn test_serialize_deserialize() {
+    let with_code = AptosError::new_with_vm_status(
+        "Invalid transaction",
+        AptosErrorCode::VmError,
+        aptos_types::vm_status::StatusCode::UNKNOWN_MODULE,
+    );
+    let _: AptosError = bcs::from_bytes(&bcs::to_bytes(&with_code).unwrap()).unwrap();
+    let _: AptosError = serde_json::from_str(&serde_json::to_string(&with_code).unwrap()).unwrap();
+
+    let without_code =
+        AptosError::new_with_error_code("some message", AptosErrorCode::MempoolIsFull);
+    let _: AptosError = bcs::from_bytes(&bcs::to_bytes(&without_code).unwrap()).unwrap();
+    let _: AptosError =
+        serde_json::from_str(&serde_json::to_string(&without_code).unwrap()).unwrap();
 }

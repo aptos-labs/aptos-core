@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.58"
@@ -17,6 +17,7 @@ fail = "0.5.0"
 futures = "0.3.21"
 hex = "0.4.3"
 rand = "0.7.3"
+rayon = "1.5.2"
 tokio = { version = "1.21.0", features = ["full"] }
 tokio-stream = "0.1.8"
 

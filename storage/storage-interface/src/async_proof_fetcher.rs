@@ -4,7 +4,7 @@
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 
 use crate::metrics::TIMER;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -77,7 +77,13 @@ impl AsyncProofFetcher {
     }
 
     // Schedules proof reading work in a background running thread pool.
-    fn schedule_proof_read(&self, state_key: StateKey, version: Version) {
+    fn schedule_proof_read(
+        &self,
+        state_key: StateKey,
+        version: Version,
+        root_hash: Option<HashValue>,
+        value_hash: Option<HashValue>,
+    ) {
         let _timer = TIMER
             .with_label_values(&["schedule_async_proof_read"])
             .start_timer();
@@ -88,6 +94,19 @@ impl AsyncProofFetcher {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
+            if let Some(root_hash) = root_hash {
+                proof
+                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
+                    .map_err(|err| {
+                        anyhow!(
+                            "Proof is invalid for key {:?} with state root hash {:?}: {}.",
+                            state_key,
+                            root_hash,
+                            err
+                        )
+                    })
+                    .expect("Failed to verify proof.");
+            }
             data_sender
                 .send(Proof {
                     state_key_hash: state_key.hash(),
@@ -103,12 +122,18 @@ impl ProofFetcher for AsyncProofFetcher {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_hash: Option<HashValue>,
     ) -> Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
         let _timer = TIMER
             .with_label_values(&["async_proof_fetcher_fetch"])
             .start_timer();
-        self.schedule_proof_read(state_key.clone(), version);
         let value = self.reader.get_state_value_by_version(state_key, version)?;
+        self.schedule_proof_read(
+            state_key.clone(),
+            version,
+            root_hash,
+            value.as_ref().map(|v| v.hash()),
+        );
         Ok((value, None))
     }
 
@@ -131,7 +156,7 @@ mod tests {
             let state_key = StateKey::Raw(format!("test_key_{}", i).into_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
-                .fetch_state_value_and_proof(&state_key, 0)
+                .fetch_state_value_and_proof(&state_key, 0, None)
                 .expect("Should not fail.");
             let expected_value = StateValue::from(match state_key {
                 StateKey::Raw(key) => key,

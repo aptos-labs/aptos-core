@@ -12,6 +12,7 @@ use aptos_protos::{
         account_signature::Signature as AccountSignature,
         signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
+        transaction_payload::Payload::EntryFunctionPayload,
         write_set_change::{Change as ChangeInput, Type as WriteSetChangeType},
         BlockMetadataTransaction, Ed25519Signature, Event, GenesisTransaction, MultiAgentSignature,
         MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
@@ -71,6 +72,17 @@ pub fn get_user_transaction_output(
                 signatures = get_signature_outputs(signature, user_request, info)?;
             }
         }
+        let mut entry_function_id_str = String::default();
+        if let Some(payload) = &user_request.payload {
+            if let Some(EntryFunctionPayload(entry_fn_payload)) = &payload.payload {
+                let entry_function = entry_fn_payload.function.as_ref().unwrap();
+                let module = entry_function.module.as_ref().unwrap();
+                entry_function_id_str = format!(
+                    "{}::{}::{}",
+                    &module.address, &module.name, entry_function.name
+                );
+            }
+        }
         let user_txn_output = UserTransactionOutput {
             version: info.version,
             sender: user_request.sender.clone(),
@@ -82,6 +94,7 @@ pub fn get_user_transaction_output(
             parent_signature_type: signature_type,
             signatures,
             payload: serde_json::to_string(&user_request.payload).unwrap_or_default(),
+            entry_function_id_str,
         };
         Ok(user_txn_output)
     } else {

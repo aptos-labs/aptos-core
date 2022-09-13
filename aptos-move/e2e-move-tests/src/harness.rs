@@ -5,6 +5,8 @@ use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
+use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_types::on_chain_config::GasSchedule;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -12,12 +14,14 @@ use aptos_types::{
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_packages::aptos_stdlib;
+use framework::natives::code::PackageMetadata;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_core_types::value::MoveValue;
 use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use rand::{
@@ -55,21 +59,31 @@ impl MoveHarness {
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
-            executor: FakeExecutor::from_fresh_genesis(),
+            executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
+    }
+
+    pub fn new_testnet() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        Self {
+            executor: FakeExecutor::from_testnet_genesis(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
+    pub fn new_with_features(features: Vec<u64>) -> Self {
+        let mut h = Self::new();
+        if !features.is_empty() {
+            h.enable_features(features);
+        }
+        h
     }
 
     pub fn new_mainnet() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_mainnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-        }
-    }
-
-    pub fn new_no_parallel() -> Self {
-        Self {
-            executor: FakeExecutor::from_fresh_genesis().set_not_parallel(),
             txn_seq_no: BTreeMap::default(),
         }
     }
@@ -192,18 +206,22 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
     pub fn create_publish_package(
         &mut self,
         account: &Account,
         path: &Path,
         options: Option<BuildOptions>,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
-        let metadata = package
+        let mut metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -215,7 +233,7 @@ impl MoveHarness {
 
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, None);
+        let txn = self.create_publish_package(account, path, None, |_| {});
         self.run(txn)
     }
 
@@ -226,7 +244,18 @@ impl MoveHarness {
         path: &Path,
         options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, Some(options));
+        let txn = self.create_publish_package(account, path, Some(options), |_| {});
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package, and alllows to patch the metadata
+    pub fn publish_package_with_patcher(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        metadata_patcher: impl FnMut(&mut PackageMetadata),
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None, metadata_patcher);
         self.run(txn)
     }
 
@@ -287,6 +316,56 @@ impl MoveHarness {
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
+    }
+
+    /// Enables features
+    pub fn enable_features(&mut self, features: Vec<u64>) {
+        let acc = self.aptos_framework_account();
+        self.executor.exec(
+            "features",
+            "change_feature_flags",
+            vec![],
+            vec![
+                MoveValue::Signer(*acc.address())
+                    .simple_serialize()
+                    .unwrap(),
+                bcs::to_bytes(&features).unwrap(),
+                bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
+            ],
+        );
+    }
+
+    /// Increase maximal transaction size.
+    pub fn increase_transaction_size(&mut self) {
+        // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
+        // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
+        // do this differently then below, so perhaps improve this...
+        let entries = AptosGasParameters::initial().to_on_chain_gas_schedule();
+        let entries = entries
+            .into_iter()
+            .map(|(name, val)| {
+                if name == "txn.max_transaction_size_in_bytes" {
+                    (name, 1000 * 1024)
+                } else {
+                    (name, val)
+                }
+            })
+            .collect::<Vec<_>>();
+        let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
+        // set_gas_schedule is not a transaction, so directly call as function
+        self.executor.exec(
+            "gas_schedule",
+            "set_gas_schedule",
+            vec![],
+            vec![
+                MoveValue::Signer(AccountAddress::ONE)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::vector_u8(schedule_bytes)
+                    .simple_serialize()
+                    .unwrap(),
+            ],
+        );
     }
 }
 

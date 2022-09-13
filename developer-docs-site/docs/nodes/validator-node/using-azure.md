@@ -148,7 +148,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
   ```
   aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-  Edit the `layout.yaml`, add the `root_key`, the Validator node username, and `chain_id`:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
   root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
@@ -192,7 +192,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).
     - `username` folder, which includes: 
       - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 11).
-      - `operator.yaml`: Node information that will be used for both the Validator and the FullNode (from step 11). 
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 11). 
     - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 12).
     - `framework.mrb`: The AptosFramework Move package (from step 13).
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 14).

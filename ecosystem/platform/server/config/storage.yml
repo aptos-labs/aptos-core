@@ -15,20 +15,19 @@ local:
 #   bucket: your_own_bucket-<%= Rails.env %>
 
 # Remember not to checkin your GCS keyfile to a repository
-# google:
-#   service: GCS
-#   project: your_project
-#   credentials: <%= Rails.root.join("path/to/gcs.keyfile") %>
-#   bucket: your_own_bucket-<%= Rails.env %>
+google:
+  service: GCS
+  project: aptos-community-<%= ENV['STORAGE_ENV'] %>
+  bucket: aptos-community-assets-<%= ENV['STORAGE_ENV'] %>
+  gsa_email: community-app@aptos-community-staging.iam.gserviceaccount.com
+  iam: true
 
-# Use bin/rails credentials:edit to set the Azure Storage secret (as azure_storage:storage_access_key)
-# microsoft:
-#   service: AzureStorage
-#   storage_account_name: your_account_name
-#   storage_access_key: <%= Rails.application.credentials.dig(:azure_storage, :storage_access_key) %>
-#   container: your_container_name-<%= Rails.env %>
-
+google_keybased:
+  service: GCS
+  project: aptos-community-<%= ENV['STORAGE_ENV'] %>
+  bucket: aptos-community-assets-<%= ENV['STORAGE_ENV'] %>
+  credentials: <%= Rails.root.join("aptos-community-sa-keys.json") %>
 # mirror:
 #   service: Mirror
 #   primary: local
-#   mirrors: [ amazon, google, microsoft ]
+#   mirrors: [ amazon, google ]

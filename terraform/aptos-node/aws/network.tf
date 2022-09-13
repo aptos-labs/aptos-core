@@ -6,9 +6,9 @@ locals {
   # varies, but with c5.4xlarge gets us ~600 validators. See https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt
   # The other way to increase the cluster capacity is to allocate a new CIDR block to the VPC and associate
   # it via configuring CNI, which is more complex: https://aws.amazon.com/premiumsupport/knowledge-center/eks-multiple-cidr-ranges/
-  num_other_subnets = local.num_azs * 2 - 1
-  max_subnet_cidr_ranges = cidrsubnets(var.vpc_cidr_block, 1, [for x in range(local.num_other_subnets): 1 + ceil(pow(local.num_other_subnets, 0.5))]...)
-  
+  num_other_subnets      = local.num_azs * 2 - 1
+  max_subnet_cidr_ranges = cidrsubnets(var.vpc_cidr_block, 1, [for x in range(local.num_other_subnets) : 1 + ceil(pow(local.num_other_subnets, 0.5))]...)
+
   # The subnet CIDR ranges in the case we want a maximally large one
   max_private_subnet_cidr_ranges = slice(local.max_subnet_cidr_ranges, 0, local.num_azs)
   max_public_subnet_cidr_ranges  = slice(local.max_subnet_cidr_ranges, local.num_azs, local.num_azs * 2)

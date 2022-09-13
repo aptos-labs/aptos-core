@@ -1015,8 +1015,6 @@ async fn test_create_signing_message_rejects_invalid_json() {
     context.check_golden_output(resp);
 }
 
-// TODO: Unignore this pending https://github.com/poem-web/poem/pull/348.
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_signing_message_rejects_no_content_length_request() {
     let mut context = new_test_context(current_function_name!());

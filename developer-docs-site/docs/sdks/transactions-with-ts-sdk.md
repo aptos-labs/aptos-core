@@ -15,7 +15,7 @@ This tutorial shows the steps of creating, signing and submitting a transaction 
 
 :::tip
 
-We strongly recommend that you use the BCS format for submitting transactions to the Aptos Blockchain.
+We strongly recommend that you use the BCS format for submitting transactions to the Aptos blockchain.
 
 :::
 

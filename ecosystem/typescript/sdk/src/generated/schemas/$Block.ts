@@ -2,6 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $Block = {
+    description: `A Block with or without transactions
+
+    This contains the information about a transactions along with
+    associated transactions if requested`,
     properties: {
         block_height: {
             type: 'U64',

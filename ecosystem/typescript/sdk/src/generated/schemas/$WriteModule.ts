@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $WriteModule = {
+    description: `Write a new module or update an existing one`,
     properties: {
         address: {
             type: 'Address',
@@ -9,6 +10,7 @@ export const $WriteModule = {
         },
         state_key_hash: {
             type: 'string',
+            description: `State key hash`,
             isRequired: true,
         },
         data: {

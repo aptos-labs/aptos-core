@@ -26,7 +26,8 @@ This guide will overview the following topics for integrating with Aptos:
 There are two well-supported approaches for integrating with the Aptos blockchain:
 
 1. Local development using our standalone testnet
-2. Devnet -- a shared resource for the community
+2. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
+3. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 
 ### Local Testnet
 
@@ -40,6 +41,11 @@ This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet s
 
 Faucet service: https://faucet.devnet.aptoslabs.com
 REST API service: https://fullnode.devnet.aptoslabs.com/v1
+
+### Access Testnet
+
+Faucet service: https://faucet.testnet.aptoslabs.com
+REST API service: https://fullnode.testnet.aptoslabs.com/v1
 
 ### SDKs
 
@@ -242,7 +248,7 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
       "guid": {
         "id": {
           "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-          "creation_num": "1"
+          "creation_num": "2"
         }
       }
     },
@@ -251,7 +257,7 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
       "guid": {
         "id": {
           "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
-          "creation_num": "2"
+          "creation_num": "3"
         }
       }
     }
@@ -284,6 +290,8 @@ A transfer transaction would appear as follows:
             "counter": "1",
             "guid": {
               "id": {
+                "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+                "creaton_num": "2",
               }
             }
           },

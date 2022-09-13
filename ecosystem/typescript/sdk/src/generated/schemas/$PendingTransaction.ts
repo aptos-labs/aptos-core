@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $PendingTransaction = {
+    description: `A transaction waiting in mempool`,
     properties: {
         hash: {
             type: 'HashValue',

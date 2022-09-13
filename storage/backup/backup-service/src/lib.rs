@@ -6,7 +6,13 @@ mod handlers;
 use crate::handlers::get_routes;
 use aptos_logger::prelude::*;
 use aptosdb::AptosDB;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use tokio::runtime::{Builder, Runtime};
 
 pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
@@ -14,7 +20,11 @@ pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
     let routes = get_routes(backup_handler);
 
     let runtime = Builder::new_multi_thread()
-        .thread_name("backup")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("backup-{}", id)
+        })
         .disable_lifo_slot()
         .enable_all()
         .build()
@@ -85,14 +95,13 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(resp.status(), 500);
-        let resp = get(&format!("http://127.0.0.1:{}/state_root_proof/0", port,)).unwrap();
+        let resp = get(&format!("http://127.0.0.1:{}/state_root_proof/0", port)).unwrap();
         assert_eq!(resp.status(), 500);
 
-        // an endpoint handled by `reply_with_async_channel_writer' always returns 200,
-        // connection terminates prematurely when the channel writer errors.
-        let resp = get(&format!("http://127.0.0.1:{}/state_snapshot/1", port,)).unwrap();
-        assert_eq!(resp.status(), 200);
-        assert_eq!(resp.content_length(), None);
-        assert!(resp.bytes().is_err());
+        // In an endpoint handled by `reply_with_async_channel_writer', connection terminates
+        // prematurely when the channel writer errors. However a 200 is either returned or not
+        // before the termination of the connection, resulting in slightly different behavior:
+        let res = get(&format!("http://127.0.0.1:{}/state_snapshot/1", port));
+        assert!(res.is_err() || res.unwrap().bytes().is_err());
     }
 }

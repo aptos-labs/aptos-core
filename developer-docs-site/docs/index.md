@@ -8,7 +8,7 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos Blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
+Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
 :::tip Looking for the AIT-3 docs?
   Click [here for Aptos Incentivized Testnet-3 docs](/nodes/ait/ait-3).
@@ -41,19 +41,19 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
     <a href="concepts/aptos-concepts" class="card-title card-link stretched-link"> <h2>Concepts</h2></a>
-    <p class="card-text">Learn the key concepts of the Aptos Blockchain, including transactions, accounts, gas and transaction fees, nodes, and more. </p>
+    <p class="card-text">Learn the key concepts of the Aptos blockchain, including transactions, accounts, gas and transaction fees, nodes, and more. </p>
 </div>
 </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
     <a href="guides/aptos-guides" class="card-title card-link stretched-link"> <h2>How it works</h2></a>
-    <p class="card-text">How does interacting with the Aptos Blockchain work, how Move works on Aptos, how to create a signed transaction, and more.</p>
+    <p class="card-text">How does interacting with the Aptos blockchain work, how Move works on Aptos, how to create a signed transaction, and more.</p>
 </div>
   </div>
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
     <a href="guides/move-guides/move-on-aptos" class="card-title card-link stretched-link"> <h2>Move on Aptos</h2></a>
-    <p class="card-text">Learn how Move works on the Aptos Blockchain.</p>
+    <p class="card-text">Learn how Move works on the Aptos blockchain.</p>
 </div>
 </div>
 </div>
@@ -65,8 +65,8 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
 <div class="row row-cols-1 row-cols-md-3a g-4">
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
-    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a Validator or a FullNode</h2></a>
-    <p class="card-text">Install and run a Validator or a FullNode.</p>
+    <a href="nodes/nodes-index" class="card-title card-link stretched-link"> <h2>Run a validator or a fullnode</h2></a>
+    <p class="card-text">Install and run a Validator or a Fullnode.</p>
 </div>
 </div>
   <div class="col">
@@ -87,7 +87,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
     <a href="https://aptos-labs.github.io/ts-sdk-doc/" class="card-title card-link stretched-link"> <h2>Typescript SDK</h2></a>
-    <p class="card-text">API reference for transacting with the Aptos Blockchain.</p>
+    <p class="card-text">API reference for transacting with the Aptos blockchain.</p>
 </div>
 </div>
 </div>
@@ -95,7 +95,7 @@ Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentatio
   <div class="card h-100" >
     <div class="card-body d-flex flex-column"  >
     <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
-    <p class="card-text">Reference for the REST API to interact with the Aptos Blockchain.</p>
+    <p class="card-text">Reference for the REST API to interact with the Aptos blockchain.</p>
 </div>
 </div>
 </div>

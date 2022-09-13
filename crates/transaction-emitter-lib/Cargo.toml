@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 again = "0.1.2"
@@ -20,7 +20,6 @@ rand = "0.7.3"
 rand_core = "0.5.1"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 serde = { version = "1.0.137", features = ["derive"] }
-termion = "1.5.6"
 tokio = { version = "1.21.0", features = ["full"] }
 url = { version = "2.2.2", features = ["serde"] }
 

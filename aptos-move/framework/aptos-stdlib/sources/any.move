@@ -8,7 +8,7 @@ module aptos_std::any {
     friend aptos_std::copyable_any;
 
     /// The type provided for `unpack` is not the same as was given for `pack`.
-    const ETYPE_MISMATCH: u64 = 0;
+    const ETYPE_MISMATCH: u64 = 1;
 
     /// A type which can represent a value of any type. This allows for representation of 'unknown' future
     /// values. For example, to define a resource such that it can be later be extended without breaking
