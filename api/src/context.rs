@@ -65,6 +65,14 @@ impl Context {
         }
     }
 
+    pub fn max_transactions_page_size(&self) -> u16 {
+        self.node_config.api.max_transactions_page_size
+    }
+
+    pub fn max_events_page_size(&self) -> u16 {
+        self.node_config.api.max_events_page_size
+    }
+
     pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
         self.db
             .latest_state_checkpoint_view()
