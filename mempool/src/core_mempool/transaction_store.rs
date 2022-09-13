@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
-use aptos_logger::prelude::*;
+use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
@@ -380,7 +380,10 @@ impl TransactionStore {
             txns.clear();
             txns.append(&mut active);
 
-            let mut rm_txns = TxnsLog::new();
+            let mut rm_txns = match aptos_logger::enabled!(Level::Trace) {
+                true => TxnsLog::new(),
+                false => TxnsLog::new_with_max(10),
+            };
             for transaction in txns_for_removal.values() {
                 rm_txns.add(
                     transaction.get_sender(),
@@ -412,7 +415,10 @@ impl TransactionStore {
 
     pub(crate) fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
         if let Some(txns) = self.transactions.remove(account) {
-            let mut txns_log = TxnsLog::new();
+            let mut txns_log = match aptos_logger::enabled!(Level::Trace) {
+                true => TxnsLog::new(),
+                false => TxnsLog::new_with_max(10),
+            };
             for transaction in txns.values() {
                 txns_log.add(
                     transaction.get_sender(),
@@ -542,7 +548,10 @@ impl TransactionStore {
         gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
         let mut gc_iter = gc_txns.iter().peekable();
 
-        let mut gc_txns_log = TxnsLog::new();
+        let mut gc_txns_log = match aptos_logger::enabled!(Level::Trace) {
+            true => TxnsLog::new(),
+            false => TxnsLog::new_with_max(10),
+        };
         while let Some(key) = gc_iter.next() {
             if let Some(txns) = self.transactions.get_mut(&key.address) {
                 let park_range_start = Bound::Excluded(key.sequence_number);
