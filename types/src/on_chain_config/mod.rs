@@ -32,7 +32,7 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
-    gas_schedule::GasSchedule,
+    gas_schedule::{GasFeatureVersion, GasSchedule},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 

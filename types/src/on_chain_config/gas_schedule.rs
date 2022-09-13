@@ -6,6 +6,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct GasFeatureVersion {
+    pub major: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct GasSchedule {
     pub entries: Vec<(String, u64)>,
 }
@@ -20,4 +25,9 @@ impl GasSchedule {
 impl OnChainConfig for GasSchedule {
     const MODULE_IDENTIFIER: &'static str = "gas_schedule";
     const TYPE_IDENTIFIER: &'static str = "GasSchedule";
+}
+
+impl OnChainConfig for GasFeatureVersion {
+    const MODULE_IDENTIFIER: &'static str = "gas_schedule";
+    const TYPE_IDENTIFIER: &'static str = "GasFeatureVersion";
 }

@@ -20,7 +20,9 @@ use aptos_state_view::StateView;
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
-    on_chain_config::{ApprovedExecutionHashes, GasSchedule, OnChainConfig, Version},
+    on_chain_config::{
+        ApprovedExecutionHashes, GasFeatureVersion, GasSchedule, OnChainConfig, Version,
+    },
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
@@ -44,6 +46,7 @@ use std::sync::Arc;
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
+    gas_feature_version: Option<u64>,
     gas_params: Option<AptosGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
@@ -55,13 +58,19 @@ impl AptosVMImpl {
     pub fn new<S: StateView>(state: &S) -> Self {
         let storage = StorageAdapter::new(state);
 
-        // TODO(Gas): this should not panic
         let gas_params = GasSchedule::fetch_config(&storage).and_then(|gas_schedule| {
             let gas_schedule = gas_schedule.to_btree_map();
             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
         });
 
-        // TODO(Gas): this doesn't look right.
+        let gas_feature_version = GasFeatureVersion::fetch_config(&storage)
+            .map(|version| version.major)
+            .unwrap_or(0);
+
+        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+        //            This only happens in a edge case that is probably related to write set transactions or genesis,
+        //            which logically speaking, shouldn't be handled by the VM at all.
+        //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
             Some(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
             None => (
@@ -75,6 +84,7 @@ impl AptosVMImpl {
 
         let mut vm = Self {
             move_vm: Arc::new(inner),
+            gas_feature_version: Some(gas_feature_version),
             gas_params,
             version: None,
             transaction_validation: None,
@@ -83,24 +93,6 @@ impl AptosVMImpl {
         vm.version = Version::fetch_config(&storage);
         vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
         vm
-    }
-
-    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
-        // TODO(Gas): this should not panic
-        let gas_params =
-            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
-                .expect("failed to get gas parameters");
-
-        let inner = MoveVmExt::new(gas_params.natives.clone(), gas_params.misc.abs_val.clone())
-            .expect("should be able to create Move VM; check if there are duplicated natives");
-
-        Self {
-            move_vm: Arc::new(inner),
-            gas_params: Some(gas_params),
-            version: Some(version),
-            transaction_validation: None,
-            metadata_cache: Default::default(),
-        }
     }
 
     /// Provides access to some internal APIs of the VM.
@@ -134,6 +126,17 @@ impl AptosVMImpl {
         self.gas_params.as_ref().ok_or_else(|| {
             log_context.alert();
             error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+        })
+    }
+
+    pub fn get_gas_feature_version(&self, log_context: &AdapterLogSchema) -> Result<u64, VMStatus> {
+        self.gas_feature_version.ok_or_else(|| {
+            log_context.alert();
+            error!(
+                *log_context,
+                "VM Startup Failed. Gas Feature Version Not Found"
+            );
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
         })
     }
