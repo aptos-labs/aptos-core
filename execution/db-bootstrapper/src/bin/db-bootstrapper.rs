@@ -64,6 +64,7 @@ fn main() -> Result<()> {
         // When not committing, we open the DB as secondary so the tool is usable along side a
         // running node on the same DB. Using a TempPath since it won't run for long.
         tmpdir = TempPath::new();
+        tmpdir.create_as_dir()?;
         AptosDB::open_as_secondary(
             opt.db_dir.as_path(),
             tmpdir.as_ref(),

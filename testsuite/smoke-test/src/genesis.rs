@@ -171,6 +171,9 @@ async fn test_genesis_transaction_flow() {
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;
         update_node_config(node, node_config);
+        node.wait_until_healthy(Instant::now() + Duration::from_secs(5))
+            .await
+            .unwrap();
     }
 
     println!("8. verify it's able to mint after the waypoint");
