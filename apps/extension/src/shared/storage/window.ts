@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Storage } from 'webextension-polyfill';
+import { StorageChanges } from './shared';
 
 const windowStorageSimulatedAccessTimeMs = 50;
 
@@ -38,5 +39,26 @@ export default class WindowStorage<TState> {
         this.storage.removeItem(key);
       }
     });
+  }
+
+  onChange(callback: (changes: StorageChanges<TState>) => void) {
+    const onStorageChange = (event: StorageEvent) => {
+      if (event.storageArea !== this.storage && event.key !== null) {
+        return;
+      }
+
+      const key = event.key as any;
+      const newValue = event.newValue !== null
+        ? JSON.parse(event.newValue) as any
+        : undefined;
+      const oldValue = event.oldValue !== null
+        ? JSON.parse(event.oldValue) as any
+        : undefined;
+
+      callback({ [key]: { newValue, oldValue } });
+    };
+
+    window.addEventListener('storage', onStorageChange);
+    return () => window.removeEventListener('storage', onStorageChange);
   }
 }
