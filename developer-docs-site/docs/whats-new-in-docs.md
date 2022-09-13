@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 13 September 2022
 
-
+- A new guide describing [how to deploy multiple validator nodes and validator fullnodes](/docs/guides/running-a-local-multi-node-network.md) is posted.
 
 ## 12 September 2022
 
