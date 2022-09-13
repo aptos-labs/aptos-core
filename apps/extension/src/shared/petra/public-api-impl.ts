@@ -1,41 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import {
   AptosAccount,
   AptosClient,
   HexString,
   Types,
 } from 'aptos';
-import axios from 'axios';
-import { Permission, warningPrompt } from 'core/types/dappTypes';
 import { DappErrorType, makeTransactionError } from 'core/types/errors';
 import { PublicAccount } from 'core/types/stateTypes';
 import Permissions from 'core/utils/permissions';
-import PromptPresenter from 'core/utils/promptPresenter';
 import { triggerDisconnect } from 'core/utils/providerEvents';
 import { PersistentStorage, SessionStorage } from 'shared/storage';
 import { defaultCustomNetworks, defaultNetworkName, defaultNetworks } from 'shared/types';
+import {
+  DappInfo,
+  PermissionHandler,
+  SignAndSubmitTransactionPermissionApproval,
+  SignTransactionPermissionApproval,
+} from 'shared/permissions';
 import { PetraPublicApi, SignMessagePayload } from './public-api';
 
-// The fetch adapter is necessary to use axios from a service worker
-// TODO: maybe move this under background.ts
-axios.defaults.adapter = fetchAdapter;
-
 // region Utils
-
-/**
- * Get the domain of the active tab of the current window
- */
-async function getCurrentDomain() {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs[0]?.url === undefined) {
-    throw new Error("Couldn't retrieve tab URL");
-  }
-  const url = new URL(tabs[0].url);
-  return url.hostname;
-}
 
 /**
  * Get the active public account from persistent storage
@@ -67,29 +53,13 @@ async function getActiveNetwork() {
 }
 
 /**
- * Return the active account, or throw if not available
- * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
- */
-async function ensureActiveAccount(promptIfNoAccount = false) {
-  const activeAccount = await getActiveAccount();
-  if (activeAccount === undefined) {
-    if (promptIfNoAccount) {
-      await PromptPresenter.promptUser(warningPrompt());
-    }
-    throw DappErrorType.NO_ACCOUNTS;
-  }
-  return activeAccount;
-}
-
-/**
  * Return the active account, or throw if not connected to dapp
- * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
  * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
  */
-async function ensureAccountConnected() {
-  const account = await ensureActiveAccount();
-  const domain = await getCurrentDomain();
-  const isAllowed = await Permissions.isDomainAllowed(domain, account.address);
+async function ensureAccountConnected(domain: string) {
+  const account = await getActiveAccount();
+  const isAllowed = account !== undefined
+    && await Permissions.isDomainAllowed(domain, account.address);
   if (!isAllowed) {
     throw DappErrorType.UNAUTHORIZED;
   }
@@ -117,105 +87,113 @@ async function getAptosAccount(address: string) {
  * @param client
  * @param signerAddress
  * @param payload
+ * @param maxGasFee
  */
 async function signTransaction(
   client: AptosClient,
   signerAddress: string,
   payload: Types.EntryFunctionPayload,
+  maxGasFee?: number,
 ) {
   const signer = await getAptosAccount(signerAddress);
-  const txn = await client.generateTransaction(signerAddress, payload);
+  const txn = await client.generateTransaction(signerAddress, payload, {
+    max_gas_amount: maxGasFee !== undefined ? `${maxGasFee}` : undefined,
+  });
   return client.signTransaction(signer, txn);
 }
 
 // endregion
 
-export const PetraPublicApiImpl: PetraPublicApi = {
+export const PetraPublicApiImpl = {
 
   /**
    * Get the active public account
-   * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
    */
-  async account() {
-    return ensureAccountConnected();
+  async account({ domain }: DappInfo) {
+    return ensureAccountConnected(domain);
   },
 
   /**
    * Request the user to connect the active account to the dapp
    * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
+   * @throws {DappErrorType.USER_REJECTION} when user rejects prompt
+   * @throws {DappErrorType.TIME_OUT} when prompt times out
    */
-  async connect() {
-    const activeAccount = await ensureActiveAccount(true);
-    const domain = await getCurrentDomain();
-    const allowed = await Permissions.requestPermissions(
-      Permission.CONNECT,
-      domain,
-      activeAccount.address,
+  async connect(dappInfo: DappInfo) {
+    const account = await getActiveAccount();
+
+    const connectRequest = PermissionHandler.requestPermission(
+      dappInfo,
+      { type: 'connect' },
     );
 
-    if (!allowed) {
-      throw DappErrorType.USER_REJECTION;
+    // Check for backward compatibility, ideally should be removed
+    if (account === undefined) {
+      throw DappErrorType.NO_ACCOUNTS;
     }
 
-    return activeAccount;
+    // TODO: should get account from here
+    await connectRequest;
+    await Permissions.addDomain(dappInfo.domain, account!.address);
+    return account;
   },
 
   /**
    * Disconnect the active account from the dapp
-   * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
    */
-  async disconnect() {
-    const { address } = await ensureAccountConnected();
-    const domain = await getCurrentDomain();
+  async disconnect({ domain }: DappInfo) {
+    const { address } = await ensureAccountConnected(domain);
     triggerDisconnect();
     await Permissions.removeDomain(domain, address);
   },
 
   /**
    * Check if the active account is connected to the dapp
-   * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    */
-  async isConnected() {
-    const { address } = await ensureActiveAccount();
-    const domain = await getCurrentDomain();
-    return Permissions.isDomainAllowed(domain, address);
+  async isConnected({ domain }: DappInfo) {
+    const account = await getActiveAccount();
+    return account !== undefined
+      && Permissions.isDomainAllowed(domain, account.address);
   },
 
   /**
    * Get the active network name
+   * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
    */
-  async network() {
-    await ensureAccountConnected();
+  async network({ domain }: DappInfo) {
+    await ensureAccountConnected(domain);
     const { name } = await getActiveNetwork();
     return name;
   },
 
   /**
    * Create and submit a signed transaction from a payload
-   * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
    * @throws {DappErrorType.USER_REJECTION} if the request was rejected
+   * @throws {DappErrorType.TIME_OUT} if the request timed out
    * @throws {DappError} if the transaction fails
    */
-  async signAndSubmitTransaction(payload: Types.EntryFunctionPayload) {
-    const { address } = await ensureAccountConnected();
-    const domain = await getCurrentDomain();
-    const permission = await Permissions.requestPermissions(
-      Permission.SIGN_AND_SUBMIT_TRANSACTION,
-      domain,
-      address,
-    );
+  async signAndSubmitTransaction(dappInfo: DappInfo, payload: Types.EntryFunctionPayload) {
+    const { address } = await ensureAccountConnected(dappInfo.domain);
 
-    if (!permission) {
-      throw DappErrorType.USER_REJECTION;
-    }
+    const { maxGasFee } = await PermissionHandler.requestPermission(
+      dappInfo,
+      { payload, type: 'signAndSubmitTransaction' },
+    ) as SignAndSubmitTransactionPermissionApproval;
+
+    // handle rejection and timeout
 
     const { nodeUrl } = await getActiveNetwork();
     const aptosClient = new AptosClient(nodeUrl);
     try {
-      const signedTxn = await signTransaction(aptosClient, address, payload);
+      const signedTxn = await signTransaction(
+        aptosClient,
+        address,
+        payload,
+        maxGasFee,
+      );
       return await aptosClient.submitTransaction(signedTxn);
     } catch (err) {
       // Trace original error without rethrowing (this is a dapp error)
@@ -225,27 +203,23 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     }
   },
 
-  async signMessage({
+  async signMessage(dappInfo: DappInfo, {
     address = false,
     application = false,
     chainId = false,
     message,
     nonce,
   }: SignMessagePayload) {
+    const { address: accountAddress } = await ensureAccountConnected(dappInfo.domain);
+
+    await PermissionHandler.requestPermission(
+      dappInfo,
+      { message, type: 'signMessage' },
+    );
+
     const { nodeUrl } = await getActiveNetwork();
     const aptosClient = new AptosClient(nodeUrl);
     const clientChainId = await aptosClient.getChainId();
-    const { address: accountAddress } = await ensureAccountConnected();
-    const domain = await getCurrentDomain();
-    const permission = await Permissions.requestPermissions(
-      Permission.SIGN_MESSAGE,
-      domain,
-      accountAddress,
-    );
-
-    if (!permission) {
-      throw DappErrorType.USER_REJECTION;
-    }
 
     const signer = await getAptosAccount(accountAddress);
     const encoder = new TextEncoder();
@@ -257,7 +231,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     }
 
     if (application) {
-      messageToBeSigned += `\napplication: ${domain}`;
+      messageToBeSigned += `\napplication: ${dappInfo.domain}`;
     }
 
     if (chainId) {
@@ -272,7 +246,7 @@ export const PetraPublicApiImpl: PetraPublicApi = {
     const signatureString = signature.noPrefix();
     return {
       address: accountAddress,
-      application: domain,
+      application: dappInfo.domain,
       chainId: clientChainId,
       fullMessage: messageToBeSigned,
       message,
@@ -284,28 +258,22 @@ export const PetraPublicApiImpl: PetraPublicApi = {
 
   /**
    * Create a signed transaction from a payload
-   * @throws {DappErrorType.NO_ACCOUNTS} if no active account is available
    * @throws {DappErrorType.UNAUTHORIZED} if the active account is not connected to the dapp
    * @throws {DappErrorType.USER_REJECTION} if the request was rejected
+   * @throws {DappErrorType.TIME_OUT} if the request timed out
    * @throws {DappError} if the transaction fails
    */
-  async signTransaction(payload: Types.EntryFunctionPayload) {
-    const { address } = await ensureAccountConnected();
-    const domain = await getCurrentDomain();
-    const allowed = await Permissions.requestPermissions(
-      Permission.SIGN_TRANSACTION,
-      domain,
-      address,
-    );
-
-    if (!allowed) {
-      throw DappErrorType.USER_REJECTION;
-    }
+  async signTransaction(dappInfo: DappInfo, payload: Types.EntryFunctionPayload) {
+    const { address } = await ensureAccountConnected(dappInfo.domain);
+    const { maxGasFee } = await PermissionHandler.requestPermission(
+      dappInfo,
+      { payload, type: 'signTransaction' },
+    ) as SignTransactionPermissionApproval;
 
     const { nodeUrl } = await getActiveNetwork();
     const aptosClient = new AptosClient(nodeUrl);
     try {
-      return await signTransaction(aptosClient, address, payload);
+      return await signTransaction(aptosClient, address, payload, maxGasFee);
     } catch (err) {
       // Trace original error without rethrowing (this is a dapp error)
       // eslint-disable-next-line no-console

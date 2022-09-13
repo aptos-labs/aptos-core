@@ -1,12 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { PetraPublicApiImpl, isAllowedMethodName } from 'shared/petra';
-import { isProxiedRequest, makeProxiedResponse, ProxiedResponse } from 'shared/types';
+import fetchAdapter from '@vespaiach/axios-fetch-adapter';
+import axios from 'axios';
 import { DappError, DappErrorType } from 'core/types/errors';
+import {
+  DappInfo,
+  PermissionResponseError,
+  PermissionResponseStatus,
+} from 'shared/permissions';
+import { isAllowedMethodName, PetraPublicApiImpl } from 'shared/petra';
 import { SessionStorage, PersistentStorage } from 'shared/storage';
+import { isProxiedRequest, makeProxiedResponse, ProxiedResponse } from 'shared/types';
 
 type SendProxiedResult = (result: ProxiedResponse) => void;
+
+// The fetch adapter is necessary to use axios from a service worker
+axios.defaults.adapter = fetchAdapter;
 
 chrome.runtime.onMessage.addListener((
   request,
@@ -29,8 +39,14 @@ chrome.runtime.onMessage.addListener((
     return false;
   }
 
+  const dappInfo = {
+    domain: sender.origin,
+    imageURI: sender.tab?.favIconUrl,
+    name: sender.tab?.title,
+  } as DappInfo;
+
   const methodBody = PetraPublicApiImpl[request.method] as (...args: any[]) => Promise<any>;
-  methodBody(...request.args)
+  methodBody(dappInfo, ...request.args)
     .then((result) => {
       sendResponse(makeProxiedResponse(request.id, result));
     })
@@ -38,6 +54,11 @@ chrome.runtime.onMessage.addListener((
       // Unmanaged errors are obfuscated before being sent back to the dapp
       if (error instanceof DappError) {
         sendResponse(makeProxiedResponse(request.id, error));
+      } else if (error instanceof PermissionResponseError) {
+        const dappError = error.status === PermissionResponseStatus.Rejected
+          ? DappErrorType.USER_REJECTION
+          : DappErrorType.TIME_OUT;
+        sendResponse(makeProxiedResponse(request.id, dappError));
       } else {
         sendResponse(makeProxiedResponse(request.id, DappErrorType.INTERNAL_ERROR));
         // Internal unexpected error, rethrow so we can inspect

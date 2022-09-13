@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { PermissionRequest } from 'shared/permissions';
 import { Accounts, EncryptedAccounts } from './account';
 import { Networks } from './network';
 
@@ -9,9 +10,11 @@ export interface PersistentState {
   activeAccountPublicKey: string | undefined,
   activeNetworkName: string | undefined,
   autolockTimer: number | undefined,
+  // permissions: Permissions | undefined,
   customNetworks: Networks | undefined,
   encryptedAccounts: EncryptedAccounts | undefined,
   encryptedStateVersion: number,
+  permissionRequest?: PermissionRequest | undefined,
   salt: string | undefined,
 }
 

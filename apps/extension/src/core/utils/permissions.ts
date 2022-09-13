@@ -2,39 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Browser from 'core/utils/browser';
-import { Permission, permissionPrompt } from 'core/types/dappTypes';
-import PromptPresenter from 'core/utils/promptPresenter';
 
 const PERMISSIONS_STORAGE_KEY = 'aptosWalletPermissions';
 
 export default class Permissions {
-  public static async requestPermissions(
-    permission: Permission,
-    domain: string,
-    address: string,
-  ): Promise<boolean> {
-    switch (permission) {
-      case Permission.CONNECT:
-        if (await this.isDomainAllowed(domain, address)) {
-          return true;
-        }
-        if (await PromptPresenter.promptUser(permissionPrompt(permission))) {
-          await this.addDomain(domain, address);
-          return true;
-        }
-        return false;
-      case Permission.SIGN_AND_SUBMIT_TRANSACTION:
-      case Permission.SIGN_TRANSACTION:
-      case Permission.SIGN_MESSAGE:
-        if (!await this.isDomainAllowed(domain, address)) {
-          return false;
-        }
-        return PromptPresenter.promptUser(permissionPrompt(permission));
-      default:
-        return false;
-    }
-  }
-
   static async addDomain(domain: string, address: string): Promise<void> {
     const domains = await this.getDomains(address);
     domains.add(domain);
