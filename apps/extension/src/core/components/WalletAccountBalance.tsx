@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Heading, Spinner, Text, useColorMode, VStack, Wrap,
+  Heading, Spinner, Text, VStack, Wrap,
 } from '@chakra-ui/react';
 import React from 'react';
 import { useAccountOctaCoinBalance } from 'core/queries/account';
-import { secondaryAddressFontColor } from 'core/colors';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { APTOS_UNIT, formatCoin, OCTA_UNIT } from 'core/utils/coin';
 
 function WalletAccountBalance() {
-  const { colorMode } = useColorMode();
   const { activeAccountAddress } = useActiveAccount();
 
   const {
@@ -28,8 +26,7 @@ function WalletAccountBalance() {
   });
 
   return (
-    <VStack px={4} alignItems="left">
-      <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Account balance</Text>
+    <VStack alignItems="left">
       <Wrap alignItems="baseline">
         <span>
           {

@@ -56,8 +56,15 @@ export default function Faucet() {
       leftIcon={<FontAwesomeIcon icon={faFaucet} />}
       onClick={onClick}
       isDisabled={isFunding}
-      colorScheme="teal"
-      variant="outline"
+      backgroundColor="whiteAlpha.200"
+      _hover={{
+        backgroundColor: 'whiteAlpha.300',
+      }}
+      _active={{
+        backgroundColor: 'whiteAlpha.400',
+      }}
+      color="white"
+      variant="solid"
     >
       Faucet
     </Button>

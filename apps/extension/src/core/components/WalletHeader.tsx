@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   HStack,
@@ -12,8 +12,10 @@ import {
 } from '@chakra-ui/react';
 import { Routes } from 'core/routes';
 import { ArrowBackIcon } from '@chakra-ui/icons';
-import { secondaryBackButtonBgColor, secondaryBorderColor } from 'core/colors';
-import { useNavigate } from 'react-router-dom';
+import {
+  secondaryBackButtonBgColor, secondaryBorderColor, walletBgColor, walletTextColor,
+} from 'core/colors';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AccountCircle from 'core/components/AccountCircle';
 
 interface WalletHeaderProps {
@@ -29,8 +31,21 @@ export default function WalletHeader({
   showBackButton,
   title,
 }: WalletHeaderProps) {
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
+
+  const borderBottomColor = useMemo(() => {
+    switch (pathname) {
+      case '/wallet':
+        return 'transparent';
+      default:
+        return secondaryBorderColor[colorMode];
+    }
+  }, [colorMode, pathname]);
+
+  const bgColor = useMemo(() => walletBgColor(pathname), [pathname]);
+  const textColor = useMemo(() => walletTextColor(pathname), [pathname]);
 
   const backOnClick = () => {
     navigate(-1);
@@ -43,10 +58,12 @@ export default function WalletHeader({
         width="100%"
         py={4}
         height="70px"
-        borderBottomColor={secondaryBorderColor[colorMode]}
+        borderBottomColor={borderBottomColor}
         borderBottomWidth="1px"
         justifyContent="space-between"
         padding={4}
+        bgColor={bgColor}
+        color={textColor}
       >
         <HStack spacing={4}>
           {

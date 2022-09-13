@@ -8,20 +8,20 @@ import {
   Button,
   Flex,
   HStack,
-  useColorMode,
   VStack,
   Text,
   Tooltip,
   IconButton,
   useClipboard,
+  SimpleGrid,
 } from '@chakra-ui/react';
-import React from 'react';
+import React, { useMemo } from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import WalletAccountBalance from 'core/components/WalletAccountBalance';
 import Faucet from 'core/components/Faucet';
 import Routes from 'core/routes';
 import { useNetworks } from 'core/hooks/useNetworks';
-import { secondaryWalletHomeCardBgColor } from 'core/colors';
+import { walletBgColor, walletTextColor } from 'core/colors';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import ChakraLink from 'core/components/ChakraLink';
 import { useNodeStatus } from 'core/queries/network';
@@ -29,6 +29,7 @@ import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import WalletAccountStake from 'core/components/WalletAccountStake';
 import TransferFlow from 'core/components/TransferFlow';
+import { useLocation } from 'react-router-dom';
 
 function CopyAddressButton() {
   const { activeAccountAddress } = useActiveAccount();
@@ -46,41 +47,44 @@ function CopyAddressButton() {
           transform: 'scale(0.90)',
         }}
         onClick={onCopy}
-        variant="ghost"
+        variant="none"
       />
     </Tooltip>
   );
 }
 
 function Wallet() {
-  const { colorMode } = useColorMode();
   const { activeNetwork, faucetClient } = useNetworks();
+  const { pathname } = useLocation();
 
   const { isNodeAvailable } = useNodeStatus(activeNetwork.nodeUrl, {
     refetchInterval: 5000,
   });
 
+  const bgColor = useMemo(() => walletBgColor(pathname), [pathname]);
+  const textColor = useMemo(() => walletTextColor(pathname), [pathname]);
+
   return (
     <WalletLayout accessoryButton={<CopyAddressButton />} title="Home">
-      <VStack width="100%" p={4}>
+      <VStack width="100%" pb={4} spacing={4}>
         <Flex
           py={4}
+          px={4}
           width="100%"
           flexDir="column"
-          borderRadius=".5rem"
-          bgColor={secondaryWalletHomeCardBgColor[colorMode]}
+          bgColor={bgColor}
         >
-          <HStack spacing={0} alignItems="flex-end">
+          <HStack color={textColor} spacing={0} alignItems="flex-end">
             <WalletAccountBalance />
           </HStack>
-          <Flex width="100%" flexDir="column" px={4}>
-            <HStack spacing={4} pt={4}>
+          <Flex width="100%" flexDir="column">
+            <SimpleGrid columns={2} spacing={2} pt={4}>
               { faucetClient && <Faucet /> }
               <TransferFlow />
-            </HStack>
+            </SimpleGrid>
           </Flex>
         </Flex>
-        <ChakraLink width="100%" to={Routes.stake.path}>
+        <ChakraLink px={4} width="100%" to={Routes.stake.path}>
           <Button
             py={10}
             width="100%"
@@ -90,7 +94,7 @@ function Wallet() {
             <WalletAccountStake />
           </Button>
         </ChakraLink>
-        <ChakraLink width="100%" to={Routes.activity.path}>
+        <ChakraLink px={4} width="100%" to={Routes.activity.path}>
           <Button
             py={6}
             width="100%"

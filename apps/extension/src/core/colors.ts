@@ -131,3 +131,23 @@ export const iconColor = {
   dark: 'white',
   light: 'gray.600',
 };
+
+// Wallet
+
+export const walletBgColor = (pathname: string) => {
+  switch (pathname) {
+    case '/wallet':
+      return 'navy.800';
+    default:
+      return undefined;
+  }
+};
+
+export const walletTextColor = (pathname: string) => {
+  switch (pathname) {
+    case '/wallet':
+      return 'white';
+    default:
+      return undefined;
+  }
+};

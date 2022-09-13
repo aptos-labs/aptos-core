@@ -24,15 +24,12 @@ const { ToastContainer } = createStandaloneToast();
 
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
-// todo: fix for extension
-// ReactGA.initialize('G-VFLV1PF59M');
-// ReactGA.send({
-//   hitType: 'pageview',
-//   network: getLocalStorageNetworkState(),
-//   page: window.location.pathname + window.location.search,
-// });
-
 const theme: ThemeConfig = extendTheme({
+  colors: {
+    navy: {
+      800: '#172B45',
+    },
+  },
   initialColorMode: 'light',
   styles: {
     global: {

@@ -21,7 +21,14 @@ function TransferButton() {
       disabled={!coinBalanceOcta}
       leftIcon={<IoIosSend />}
       onClick={openDrawer}
-      colorScheme="teal"
+      backgroundColor="whiteAlpha.200"
+      _hover={{
+        backgroundColor: 'whiteAlpha.300',
+      }}
+      _active={{
+        backgroundColor: 'whiteAlpha.400',
+      }}
+      color="white"
     >
       Send
     </Button>
