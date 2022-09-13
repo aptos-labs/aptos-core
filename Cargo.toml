@@ -159,7 +159,7 @@ overflow-checks = true
 inherits = "release"
 opt-level = 3
 debug = true
-overflow-checks = false
+overflow-checks = true
 lto = true
 codegen-units = 1
 
