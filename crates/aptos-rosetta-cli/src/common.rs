@@ -91,6 +91,9 @@ pub struct BlockArgs {
     /// The hash of the block to request
     #[clap(long)]
     block_hash: Option<String>,
+
+    #[clap(long)]
+    pub keep_all_transactions: Option<bool>,
 }
 
 impl From<BlockArgs> for Option<PartialBlockIdentifier> {
