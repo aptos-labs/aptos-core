@@ -204,8 +204,8 @@ export class TokenClient {
    * Directly transfer the specified amount of tokens from account to receiver
    * using a single multi signature transaction.
    *
-   * @param account AptosAccount where token from which tokens will be transfered
-   * @param receiver  Hex-encoded 32 byte Aptos account address to which tokens will be transfered
+   * @param sender AptosAccount where token from which tokens will be transfered
+   * @param receiver Hex-encoded 32 byte Aptos account address to which tokens will be transfered
    * @param creator Hex-encoded 32 byte Aptos account address to which created tokens
    * @param collectionName Name of collection where token is stored
    * @param name Token name
