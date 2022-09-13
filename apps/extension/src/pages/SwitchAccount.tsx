@@ -10,7 +10,7 @@ import SwitchAccountBody from 'core/components/SwitchAccountBody';
 
 function SwitchAccount() {
   return (
-    <WalletLayout title="Accounts" showBackButton showAccountCircle={false}>
+    <WalletLayout title="Accounts" showBackButton showAccountCircle={false} hasWalletFooter={false}>
       <Box width="100%" height="100%">
         <SwitchAccountBody />
       </Box>
