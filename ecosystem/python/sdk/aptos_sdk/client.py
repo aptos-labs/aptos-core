@@ -29,11 +29,15 @@ class RestClient:
     chain_id: int
     client: httpx.Client
     base_url: str
+    txn_backoff: float
+    txn_timeout: float
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, txn_backoff: float = 1.0, txn_timeout: float = 60.0):
         self.base_url = base_url
         self.client = httpx.Client()
         self.chain_id = int(self.info()["chain_id"])
+        self.txn_backoff = txn_backoff # wait txn time in unit/second
+        self.txn_timeout = txn_timeout
 
     def close(self):
         self.client.close()
@@ -162,11 +166,16 @@ class RestClient:
     def wait_for_transaction(self, txn_hash: str) -> None:
         """Waits up to 10 seconds for a transaction to move past pending state."""
 
-        count = 0
+        wait_interval = self.txn_backoff
+        count_start = time.time()
+        prev_time = round(time.time() / wait_interval) if wait_interval else 0.0
         while self.transaction_pending(txn_hash):
-            assert count < 10, f"transaction {txn_hash} timed out"
-            time.sleep(1)
-            count += 1
+            t = round(time.time() / wait_interval) if wait_interval else -1.0
+            if prev_time == t: # To reduce the rest server load and polite access rest server.
+                time.sleep(wait_interval)
+            else:
+                prev_time = t
+            assert count_start + self.txn_timeout > time.time(), f"transaction {txn_hash} timed out"
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
