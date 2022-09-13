@@ -75,7 +75,8 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
                 Some(peer) => {
                     let remote_public_key = &remote_public_key;
                     if !peer.keys.contains(remote_public_key) {
-                        return Err(reject::custom(ServiceError::bad_request(
+                        warn!("peer found in peer set but public_key is not found. request body: {}, role_type: {}, peer_id: {}, received public_key: {}", body.chain_id, body.role_type, body.peer_id, remote_public_key);
+                        return Err(reject::custom(ServiceError::forbidden(
                             "public key not found in peer keys",
                         )));
                     }
@@ -86,7 +87,7 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
                     let derived_remote_peer_id =
                         aptos_types::account_address::from_identity_public_key(remote_public_key);
                     if derived_remote_peer_id != body.peer_id {
-                        return Err(reject::custom(ServiceError::bad_request(
+                        return Err(reject::custom(ServiceError::forbidden(
                             "public key does not match identity",
                         )));
                     } else {
