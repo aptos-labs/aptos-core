@@ -1187,7 +1187,7 @@ async fn test_invalid_transaction_gas_charged() {
         .get(txn_version.saturating_sub(block_info.first_version.0) as usize)
         .unwrap();
 
-    assert_transfer_transaction(
+    assert_failed_transfer_transaction(
         sender,
         AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
         TRANSFER_AMOUNT,
@@ -1196,7 +1196,7 @@ async fn test_invalid_transaction_gas_charged() {
     );
 }
 
-fn assert_transfer_transaction(
+fn assert_failed_transfer_transaction(
     sender: AccountAddress,
     receiver: AccountAddress,
     transfer_amount: u64,
@@ -1212,6 +1212,7 @@ fn assert_transfer_transaction(
     let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
+    // This should have 3, the deposit, withdraw, and fee
     assert_eq!(rosetta_txn.operations.len(), 3);
 
     // Check the operations

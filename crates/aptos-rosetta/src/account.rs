@@ -213,6 +213,11 @@ impl CoinCache {
     }
 
     pub fn get_currency_from_cache(&self, coin: &TypeTag) -> Option<Currency> {
+        // Short circuit for the default coin
+        if coin == &native_coin_tag() {
+            return Some(native_coin());
+        }
+
         let currencies = self.currencies.read().unwrap();
         if let Some(currency) = currencies.get(coin) {
             currency.clone()
