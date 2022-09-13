@@ -5,7 +5,7 @@ import { Deserializer } from "./deserializer";
 import { Serializer } from "./serializer";
 import { AnyNumber, Bytes, Seq, Uint16, Uint32, Uint8 } from "./types";
 
-interface Serializable {
+export interface Serializable {
   serialize(serializer: Serializer): void;
 }
 

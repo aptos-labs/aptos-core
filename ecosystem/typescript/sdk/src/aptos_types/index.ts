@@ -10,5 +10,6 @@ export * from "./ed25519";
 export * from "./multi_ed25519";
 export * from "./authentication_key";
 export * from "./rotation_proof_challenge";
+export * from "./package_metadata";
 
 export type SigningMessage = Uint8Array;
