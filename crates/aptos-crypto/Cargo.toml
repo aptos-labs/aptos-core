@@ -1,6 +1,6 @@
 [package]
 name = "aptos-crypto"
-version = "0.0.3"
+version = "0.6.8"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos crypto"
 repository = "https://github.com/aptos-labs/aptos-core"

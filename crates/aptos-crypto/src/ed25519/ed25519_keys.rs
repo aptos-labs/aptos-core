@@ -19,7 +19,7 @@ use crate::test_utils::{self, KeyPair};
 use proptest::prelude::*;
 
 /// An Ed25519 private key
-#[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
+#[derive(DeserializeKey, SerializeKey)]
 pub struct Ed25519PrivateKey(pub(crate) ed25519_dalek::SecretKey);
 
 #[cfg(feature = "assert-private-keys-not-cloneable")]
@@ -199,6 +199,18 @@ impl Genesis for Ed25519PrivateKey {
         let mut buf = [0u8; ED25519_PRIVATE_KEY_LENGTH];
         buf[ED25519_PRIVATE_KEY_LENGTH - 1] = 1;
         Self::try_from(buf.as_ref()).unwrap()
+    }
+}
+
+impl fmt::Display for Ed25519PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0.as_bytes()))
+    }
+}
+
+impl fmt::Debug for Ed25519PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Ed25519PrivateKey({})", self)
     }
 }
 

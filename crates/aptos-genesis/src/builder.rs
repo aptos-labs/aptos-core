@@ -85,7 +85,14 @@ impl ValidatorNodeConfig {
     fn init_keys(&mut self, seed: Option<[u8; 32]>) -> anyhow::Result<()> {
         let (validator_identity, _, _, _) = self.get_key_objects(seed)?;
         self.account_private_key = validator_identity.account_private_key.map(ConfigKey::new);
-
+        println!(
+            "Validator-Key: {:?}",
+            self.account_private_key
+                .clone()
+                .as_ref()
+                .unwrap()
+                .private_key()
+        );
         // Init network identity
         let validator_network = self.config.validator_network.as_mut().unwrap();
         let validator_identity_file = self.dir.join(VALIDATOR_IDENTITY);
@@ -502,7 +509,8 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 1;
+        // let mut genesis_stake_amount = 1;
+        let mut genesis_stake_amount = 100000000000000;
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut config, &mut genesis_stake_amount);
         }

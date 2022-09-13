@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "0.3.3"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
@@ -413,7 +413,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-crypto"
-version = "0.0.3"
+version = "0.6.8"
 dependencies = [
  "anyhow",
  "aptos-crypto-derive",
@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-genesis"
-version = "0.1.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "aptos-config",
@@ -10249,7 +10249,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vm-genesis"
-version = "0.1.0"
+version = "0.6.8"
 dependencies = [
  "anyhow",
  "aptos-config",
