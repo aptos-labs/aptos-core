@@ -9,6 +9,7 @@ module aptos_framework::account {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
+    use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
@@ -428,6 +429,35 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
+    /// Create a resource account using the vectorized Unix timestamp
+    /// as a seed.
+    ///
+    /// Simplifies resource account creation, since callers do not need
+    /// to specify a seed.
+    ///
+    /// In practice the Unix timestamp is effectively non-deterministic,
+    /// or more specifically, just as difficult to front run in a miner
+    /// extractable value (MEV)-style attack as a seed provided via a
+    /// `public entry` function argument. That is, if a malicious
+    /// block producer wanted to prevent the creation of a resource
+    /// account, they would have to construct a block with a
+    /// carefully-selected timestamp that allows them to insert an
+    /// account creation transaction ahead of the legitimate account
+    /// creation transaction. This is comparable in difficulty to the
+    /// effort required for front-running resource account creation when
+    /// the seed is supplied via a `public entry` function, and both
+    /// such attacks are more difficult still than front-running the
+    /// creation of a resource account via a hard-coded seed.
+    public fun create_resource_account_using_timestamp(
+        source: &signer
+    ): (
+        signer,
+        SignerCapability
+    ) {
+        create_resource_account(source,
+            timestamp::now_microseconds_vectorized())
+    }
+
     /// create the account for system reserved addresses
     public(friend) fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         assert!(
@@ -499,6 +529,40 @@ module aptos_framework::account {
         let resource_addr = signer::address_of(&resource_account);
         assert!(resource_addr != signer::address_of(&user), 0);
         assert!(resource_addr == get_signer_capability_address(&resource_account_cap), 1);
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        user = @0xff
+    )]
+    /// Verify successful account creation using timestamp seed
+    fun test_create_resource_account_using_timestamp(
+        aptos_framework: &signer,
+        user: &signer
+    ) {
+        // Initialize timetamp resource
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        // Update time to easily-inspected value
+        timestamp::update_global_time_for_test(0x0123456789abcdef);
+        // Create resource account using timestamp
+        let (resource_account, resource_account_cap) =
+            create_resource_account_using_timestamp(user);
+        // Get resource account address
+        let resource_addr = signer::address_of(&resource_account);
+        // Assert resource account address is not user address
+        assert!(resource_addr != signer::address_of(user), 0);
+        // Assert resource account address matches that from capability
+        assert!(resource_addr ==
+            get_signer_capability_address(&resource_account_cap), 0);
+        // Get byte representation of user address
+        let bytes = bcs::to_bytes(&signer::address_of(user));
+        // Append to it little-endian vectorized timestamp
+        vector::append(&mut bytes, b"\xef\xcd\xab\x89\x67\x45\x23\x01");
+        // Convert the hash of the result to an address
+        let expected_resource_account_address = from_bcs::to_address(
+            hash::sha3_256(bytes));
+        // Assert resource account has resultant expected address
+        assert!(resource_addr == expected_resource_account_address, 0);
     }
 
     #[test_only]
