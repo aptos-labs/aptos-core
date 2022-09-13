@@ -34,7 +34,7 @@ use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
-    on_chain_config::{new_epoch_event_key, GasSchedule, Version},
+    on_chain_config::new_epoch_event_key,
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -96,11 +96,6 @@ impl AptosVM {
             "Adapter created for Validation"
         );
         Self::new(state)
-    }
-
-    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
-        info!("Adapter restarted for Validation");
-        AptosVM(AptosVMImpl::init_with_config(version, gas_schedule))
     }
 
     /// Sets execution concurrency level when invoked the first time.
