@@ -18,7 +18,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   test 'view all projects' do
     3.times do
-      FactoryBot.create(:project, user: @user)
+      FactoryBot.create(:project, user: @user, verified: true)
     end
     sign_out @user
     get projects_path
@@ -27,15 +27,21 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   test 'view project' do
     sign_out @user
-    project = FactoryBot.create(:project, user: @user)
+    project = FactoryBot.create(:project, user: @user, verified: true)
     get project_path(project)
     assert_response :success
   end
 
   test 'view private project fails if current user is not the creator' do
-    project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: false)
+    project = FactoryBot.create(:project, public: false, verified: true)
     get project_path(project)
     assert_response :forbidden
+  end
+
+  test 'view public, unverified project fails' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: true, verified: false)
+    get project_path(project)
+    assert_response :not_found
   end
 
   test 'new project page' do
@@ -44,12 +50,14 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'edit project page' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: @user)
     get edit_project_path(project)
     assert_response :success
   end
 
   test 'edit project page fails if current user is not the creator' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: FactoryBot.create(:user))
     get edit_project_path(project)
     assert_response :forbidden
@@ -85,6 +93,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update existing project' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: @user)
     assert_equal true, project.public
 
@@ -98,6 +107,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update existing project fails if current user is not the creator' do
+    skip('project editing disabled')
     project = FactoryBot.create(:project, user: FactoryBot.create(:user))
     patch project_path(project), params: { project: {
       public: true

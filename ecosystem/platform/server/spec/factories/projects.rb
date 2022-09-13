@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :project do
-    user { build :user }
+    user
     title { Faker::Company.name }
     short_description { Faker::Company.catch_phrase }
     full_description { Faker::Lorem.paragraphs(number: 3).join("\n\n") }
