@@ -612,4 +612,14 @@ module aptos_framework::aptos_governance {
         initialize(&account, 1, 2, 3);
         update_governance_config(&account, 10, 20, 30);
     }
+
+    #[verify_only]
+    public fun initialize_for_verification(
+        aptos_framework: &signer,
+        min_voting_threshold: u128,
+        required_proposer_stake: u64,
+        voting_duration_secs: u64,
+    ) {
+        initialize(aptos_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
+    }
 }
