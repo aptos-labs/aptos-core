@@ -5,8 +5,7 @@ use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
-use std::time::Duration;
-use std::{convert::TryInto, num::NonZeroUsize};
+use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
 
 pub mod chaos;
 mod cluster_helper;
@@ -99,6 +98,7 @@ impl Factory for K8sFactory {
         cleanup_duration: Duration,
         genesis_config_fn: Option<GenesisConfigFn>,
         node_config_fn: Option<NodeConfigFn>,
+        existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
@@ -127,10 +127,26 @@ impl Factory for K8sFactory {
             }
         } else {
             // clear the cluster of resources
-            delete_k8s_resources(kube_client, &self.kube_namespace).await?;
+            delete_k8s_resources(kube_client.clone(), &self.kube_namespace).await?;
             // create the forge-management configmap before installing anything
             create_management_configmap(self.kube_namespace.clone(), self.keep, cleanup_duration)
                 .await?;
+            if let Some(existing_db_tag) = existing_db_tag {
+                // TODO(prod-eng): For now we are managing PVs out of forge, and bind them manually
+                // with the volume. Going forward we should consider automate this process.
+
+                // The previously claimed PVs are in Released stage once the corresponding PVC is
+                // gone. We reset its status to Available so they can be reused later.
+                reset_persistent_volumes(&kube_client).await?;
+
+                // We return early here if there are not enough PVs to claim.
+                check_persistent_volumes(
+                    kube_client,
+                    num_validators.get() + num_fullnodes,
+                    existing_db_tag,
+                )
+                .await?;
+            }
             // try installing testnet resources, but clean up if it fails
             match install_testnet_resources(
                 self.kube_namespace.clone(),

@@ -54,6 +54,11 @@ spec:
       resources:
         requests:
           storage: {{ $.Values.fullnode.storage.size }}
+      {{- if $.Values.fullnode.storage.labels }}
+      selector:
+        matchLabels:
+          {{- toYaml $.Values.fullnode.storage.labels | nindent 10}}
+      {{- end }}
   template:
     metadata:
       labels:

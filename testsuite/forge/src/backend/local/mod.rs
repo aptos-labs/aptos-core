@@ -8,12 +8,12 @@ use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_infallible::Mutex;
 use framework::ReleaseBundle;
 use rand::rngs::StdRng;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 mod cargo;
@@ -177,6 +177,7 @@ impl Factory for LocalFactory {
         _cleanup_duration: Duration,
         _genesis_config_fn: Option<GenesisConfigFn>,
         _node_config_fn: Option<NodeConfigFn>,
+        _existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
         let framework = match genesis_config {
             Some(config) => match config {

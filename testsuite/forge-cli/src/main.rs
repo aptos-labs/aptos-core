@@ -5,28 +5,40 @@ use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::{StateProgressThreshold, SuccessCriteria};
-use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
-use forge::{ForgeConfig, Options, *};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::{env, num::NonZeroUsize, process, thread, time::Duration};
+use forge::{
+    success_criteria::{StateProgressThreshold, SuccessCriteria},
+    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+    ForgeConfig, Options, *,
+};
+use std::{
+    env,
+    num::NonZeroUsize,
+    process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 use structopt::StructOpt;
-use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
-use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
-use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
-use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_loss_test::NetworkLossTest;
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
-use testcases::state_sync_performance::StateSyncValidatorPerformance;
-use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
-use testcases::twin_validator_test::TwinValidatorTest;
-use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
-    compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
-    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
+    compatibility_test::SimpleValidatorUpgrade,
+    consensus_reliability_tests::ChangingWorkingQuorumTest,
+    forge_setup_test::ForgeSetupTest,
+    fullnode_reboot_stress_test::FullNodeRebootStressTest,
+    generate_traffic,
+    load_vs_perf_benchmark::LoadVsPerfBenchmark,
+    network_bandwidth_test::NetworkBandwidthTest,
+    network_loss_test::NetworkLossTest,
+    network_partition_test::NetworkPartitionTest,
+    performance_test::PerformanceBenchmark,
+    performance_with_fullnode_test::PerformanceBenchmarkWithFN,
     reconfiguration_test::ReconfigurationTest,
-    state_sync_performance::StateSyncFullnodePerformance,
+    state_sync_performance::{StateSyncFullnodePerformance, StateSyncValidatorPerformance},
+    three_region_simulation_test::ThreeRegionSimulationTest,
+    twin_validator_test::TwinValidatorTest,
+    validator_reboot_stress_test::ValidatorRebootStressTest,
 };
 use tokio::runtime::Runtime;
 use url::Url;
@@ -709,6 +721,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     max_round_gap: 4,
                 }),
             )),
+        "large_db_simple_test" => large_db_test(10, 500, 300, "10-validators".to_string()),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -911,6 +924,48 @@ fn changing_working_quorum_test(
                     // to get the quorum back.
                     30.0
                 },
+                max_round_gap: 6,
+            }),
+        ))
+}
+
+fn large_db_test(
+    num_validators: usize,
+    target_tps: usize,
+    min_avg_tps: usize,
+    existing_db_tag: String,
+) -> ForgeConfig<'static> {
+    let config = ForgeConfig::default();
+    config
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(std::cmp::max(2, target_tps / 1000))
+        .with_network_tests(vec![&PerformanceBenchmark])
+        .with_existing_db(existing_db_tag.clone())
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["storage"]["labels"]["tag"] = existing_db_tag.clone().into();
+            helm_values["fullnode"]["storage"]["labels"]["tag"] = existing_db_tag.clone().into();
+            helm_values["validator"]["config"]["base"]["working_dir"] =
+                "/opt/aptos/data/checkpoint".into();
+            helm_values["fullnode"]["config"]["base"]["working_dir"] =
+                "/opt/aptos/data/checkpoint".into();
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: target_tps })
+                .transaction_mix(vec![
+                    (TransactionType::P2P, 75),
+                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::NftMint, 5),
+                ]),
+        )
+        .with_success_criteria(SuccessCriteria::new(
+            min_avg_tps,
+            10000,
+            true,
+            Some(Duration::from_secs(30)),
+            None,
+            Some(StateProgressThreshold {
+                max_no_progress_secs: 20.0,
                 max_round_gap: 6,
             }),
         ))
