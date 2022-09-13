@@ -858,7 +858,7 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
-    pub async fn get_new_block_events(
+    pub async fn get_new_block_events_bcs(
         &self,
         start: Option<u64>,
         limit: Option<u16>,
@@ -881,7 +881,7 @@ impl Client {
         }
 
         let response = self
-            .get_account_events(
+            .get_account_events_bcs(
                 CORE_CODE_ADDRESS,
                 "0x1::block::BlockResource",
                 "new_block_events",
@@ -894,32 +894,14 @@ impl Client {
             let new_events: Result<Vec<_>> = events
                 .into_iter()
                 .map(|event| {
-                    let version = event.version.into();
-                    let sequence_number = event.sequence_number.into();
-                    serde_json::from_value::<NewBlockEventResponse>(event.data)
-                        .map_err(|e| anyhow!(e))
-                        .and_then(|e| {
-                            assert_eq!(e.height, sequence_number);
-                            Ok(VersionedNewBlockEvent {
-                                event: NewBlockEvent::new(
-                                    AccountAddress::from_hex_literal(&e.hash)
-                                        .map_err(|e| anyhow!(e))?,
-                                    e.epoch,
-                                    e.round,
-                                    e.height,
-                                    e.previous_block_votes_bitvec.0,
-                                    AccountAddress::from_hex_literal(&e.proposer)
-                                        .map_err(|e| anyhow!(e))?,
-                                    e.failed_proposer_indices
-                                        .iter()
-                                        .map(|v| v.parse())
-                                        .collect::<Result<Vec<_>, _>>()?,
-                                    e.time_microseconds,
-                                ),
-                                version,
-                                sequence_number,
-                            })
-                        })
+                    let version = event.transaction_version;
+                    let sequence_number = event.event.sequence_number();
+
+                    Ok(VersionedNewBlockEvent {
+                        event: bcs::from_bytes(event.event.event_data())?,
+                        version,
+                        sequence_number,
+                    })
                 })
                 .collect();
             new_events
