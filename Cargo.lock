@@ -1076,6 +1076,7 @@ dependencies = [
  "futures",
  "hex",
  "move-deps",
+ "once_cell",
  "percent-encoding",
  "reqwest",
  "serde 1.0.144",
