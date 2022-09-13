@@ -23,13 +23,14 @@ use aptos_types::{
 };
 
 use poem_openapi::{Object, Union};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     boxed::Box,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
 };
+use serde::de::Error;
 
 // Warning: Do not add a docstring to a field that uses a type in `derives.rs`,
 // it will result in a change to the type representation. Read more about this
@@ -477,10 +478,11 @@ pub struct BlockMetadataTransaction {
 }
 
 /// An event from a transaction
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Object)]
 pub struct Event {
     pub key: EventKey,
     // The globally unique identifer of this event stream.
+    #[serde(default)]
     pub guid: EventGuid,
     // The sequence number of the event
     pub sequence_number: U64,
@@ -489,6 +491,41 @@ pub struct Event {
     pub typ: MoveType,
     /// The JSON representation of the event
     pub data: serde_json::Value,
+}
+
+impl<'de> Deserialize<'de> for Event {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Convert old format where EventGuid isn't shown
+        #[derive(Deserialize)]
+        pub struct EventParser {
+            pub key: Option<EventKey>,
+            pub guid: Option<EventGuid>,
+            // The sequence number of the event
+            pub sequence_number: U64,
+            #[serde(rename = "type")]
+            pub typ: MoveType,
+            /// The JSON representation of the event
+            pub data: serde_json::Value,
+        }
+        let event = EventParser::deserialize(deserializer)?;
+        let (key, guid) = match (event.key, event.guid) {
+            (Some(key), Some(guid)) => (key, guid),
+            (Some(key), _) => (key, EventGuid::from(key)),
+            (_, Some(guid)) => (guid.into(), guid),
+            _ => return Err(D::Error::missing_field("key and guid")),
+        };
+
+        Ok(Event {
+            key,
+            guid,
+            sequence_number: event.sequence_number,
+            typ: event.typ,
+            data: event.data,
+        })
+    }
 }
 
 impl From<(&ContractEvent, serde_json::Value)> for Event {

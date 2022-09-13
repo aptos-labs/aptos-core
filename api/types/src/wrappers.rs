@@ -89,11 +89,30 @@ impl From<EventKey> for EventGuid {
     }
 }
 
+impl From<crate::EventKey> for EventGuid {
+    fn from(event_key: crate::EventKey) -> Self {
+        Self {
+            creation_number: U64(event_key.0.get_creation_number()),
+            account_address: Address::from(event_key.0.get_creator_address()),
+        }
+    }
+}
+
 impl From<EventGuid> for EventKey {
     fn from(event_key_wrapper: EventGuid) -> EventKey {
         EventKey::new(
             event_key_wrapper.creation_number.0,
             event_key_wrapper.account_address.into(),
         )
+    }
+}
+
+impl From<EventGuid> for crate::EventKey {
+    fn from(event_key_wrapper: EventGuid) -> crate::EventKey {
+        EventKey::new(
+            event_key_wrapper.creation_number.0,
+            event_key_wrapper.account_address.into(),
+        )
+        .into()
     }
 }
