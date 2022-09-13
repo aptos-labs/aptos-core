@@ -252,14 +252,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [AptosDB::get_latest_account_state].
-    ///
-    /// [AptosDB::get_latest_account_state]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_latest_account_state
-    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
-        unimplemented!()
-    }
-
     /// Gets the latest epoch state currently held in storage.
     fn get_latest_epoch_state(&self) -> Result<EpochState> {
         unimplemented!()
