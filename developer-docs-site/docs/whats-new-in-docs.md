@@ -13,7 +13,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 12 September 2022
 
-- A new set of documents on Aptos [Coin and Token](/docs/concept) are posted. 
+- A new set of documents on Aptos [Coin and Token](/concepts/coin-and-token/index.md) are posted. 
 - A new document describing how to [bootstrap a new fullnode using data restore](/nodes/full-node/bootstrap-fullnode.md) is posted.
 
 ## 06 September 2022
