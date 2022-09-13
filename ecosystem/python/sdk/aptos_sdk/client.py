@@ -162,11 +162,9 @@ class RestClient:
     def wait_for_transaction(self, txn_hash: str) -> None:
         """Waits up to 10 seconds for a transaction to move past pending state."""
 
-        count = 0
+        count_start = time.time()
         while self.transaction_pending(txn_hash):
-            assert count < 10, f"transaction {txn_hash} timed out"
-            time.sleep(1)
-            count += 1
+            assert count_start + 10 > time.time(), f"transaction {txn_hash} timed out"
         response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
