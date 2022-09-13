@@ -59,21 +59,19 @@ function CreateAccount() {
   };
 
   return (
-    <>
-      <CreateAccountLayout
-        headerValue="Create account"
-        backPage={Routes.addAccount.path}
-        defaultValues={{
-          mnemonic: newMnemonic.split(' '),
-          mnemonicString: newMnemonic,
-        }}
-        onSubmit={onSubmit}
-      >
-        <CreateAccountBody
-          isLoading={isLoading}
-          mnemonic={newMnemonic}
-        />
-      </CreateAccountLayout>
+    <CreateAccountLayout
+      headerValue="Create account"
+      backPage={Routes.addAccount.path}
+      defaultValues={{
+        mnemonic: newMnemonic.split(' '),
+        mnemonicString: newMnemonic,
+      }}
+      onSubmit={onSubmit}
+    >
+      <CreateAccountBody
+        isLoading={isLoading}
+        mnemonic={newMnemonic}
+      />
       <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>
         {(state: TransitionStatus) => (
           <SecretPhraseConfirmationPopup
@@ -91,7 +89,7 @@ function CreateAccount() {
           />
         )}
       </Transition>
-    </>
+    </CreateAccountLayout>
   );
 }
 
