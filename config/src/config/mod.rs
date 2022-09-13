@@ -281,7 +281,9 @@ impl NodeConfig {
         let input_dir = RootPath::new(input_path);
         config.execution.load(&input_dir)?;
 
-        let mut config = config.validate_network_configs()?;
+        let mut config = config
+            .validate_indexer_configs()?
+            .validate_network_configs()?;
         config.set_data_dir(config.data_dir().to_path_buf());
         Ok(config)
     }
@@ -309,6 +311,53 @@ impl NodeConfig {
                 .find(|config| config.network_id == NetworkId::Public)
                 .map(NetworkConfig::identity_key),
         }
+    }
+
+    /// Validate `IndexerConfig`, ensuring that it's set up correctly
+    /// Additionally, handles any strange missing default cases
+    fn validate_indexer_configs(mut self) -> Result<NodeConfig, Error> {
+        if !self.indexer.enabled {
+            return Ok(self);
+        }
+
+        self.indexer.postgres_uri = env_or_default(
+            "INDEXER_DATABASE_URL",
+            self.indexer.postgres_uri,
+            must_be_set("postgres_uri", "INDEXER_DATABASE_URL"),
+        );
+
+        self.indexer.processor = env_or_default(
+            "PROCESSOR_NAME",
+            self.indexer
+                .processor
+                .or_else(|| Some("default_processor".to_string())),
+            None,
+        );
+
+        self.indexer.starting_version = env_or_default(
+            "STARTING_VERSION",
+            self.indexer.starting_version.or(Some(0)),
+            None,
+        );
+
+        self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
+        self.indexer.index_token_uri_data = self.indexer.index_token_uri_data.or(Some(false));
+        self.indexer.check_chain_id = self.indexer.check_chain_id.or(Some(true));
+        self.indexer.batch_size = default_if_zero(
+            self.indexer.batch_size.map(|v| v as u64),
+            DEFAULT_BATCH_SIZE as u64,
+        )
+        .map(|v| v as u16);
+        self.indexer.fetch_tasks = default_if_zero(
+            self.indexer.fetch_tasks.map(|v| v as u64),
+            DEFAULT_FETCH_TASKS as u64,
+        )
+        .map(|v| v as u8);
+        self.indexer.processor_tasks =
+            default_if_zero_u8(self.indexer.processor_tasks, DEFAULT_PROCESSOR_TASKS);
+        self.indexer.emit_every = self.indexer.emit_every.or(Some(0));
+
+        Ok(self)
     }
 
     /// Checks `NetworkConfig` setups so that they exist on proper networks
@@ -417,6 +466,8 @@ impl NodeConfig {
     fn default_config(serialized: &str, path: &'static str) -> Self {
         let config = Self::parse(serialized).unwrap_or_else(|e| panic!("Error in {}: {}", path, e));
         config
+            .validate_indexer_configs()
+            .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
             .validate_network_configs()
             .unwrap_or_else(|e| panic!("Error in {}: {}", path, e))
     }

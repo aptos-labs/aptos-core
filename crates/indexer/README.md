@@ -11,11 +11,7 @@ result in an error if some or all of the processing had previously been complete
 Example invocation:
 
 ```bash
-cargo run -- --pg-uri "postgresql://postgres@localhost:5432/postgres" \
-             --node-url "https://fullnode.devnet.aptoslabs.com/v1" \
-             --emit-every 10  \
-             --processor default_processor \
-             --check_chain_id
+cargo run --bin aptos-node --features "indexer"  -- --config some_path/fullnode.yaml
  ```
 
 Try running the indexer with `--help` to get more details
@@ -38,18 +34,7 @@ Try running the indexer with `--help` to get more details
 7. `diesel migration run --database-url postgresql://localhost/postgres`
 8. Start indexer
 ```bash
-cargo run -- --pg-uri "postgresql://postgres@localhost:5432/postgres" \
-             --node-url "https://fullnode.devnet.aptoslabs.com/v1" \
-             --emit-every 10  \
-             --processor default_processor \
-             --check_chain_id
-# or
-cargo run -- --pg-uri "postgresql://postgres@localhost:5432/indexer_v2" \
-             --node-url "https://fullnode.devnet.aptoslabs.com/v1" \
-             --emit-every 10 \
-             --processor token_processor \
-             --check-chain-id \
-             --index-token-uri-data
+cargo run --bin aptos-node --features "indexer"  -- --config some_path/fullnode.yaml
 ```
 
 

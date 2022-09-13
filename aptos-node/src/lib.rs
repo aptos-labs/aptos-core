@@ -18,7 +18,6 @@ use aptos_config::{
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_fh_stream::runtime::bootstrap as bootstrap_fh_stream;
-use aptos_indexer::runtime::bootstrap as bootstrap_indexer_stream;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -63,12 +62,14 @@ use std::{
     thread,
     time::Instant,
 };
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
 };
 use tokio::runtime::{Builder, Runtime};
+
+use aptos_mempool::MempoolClientSender;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -523,6 +524,31 @@ fn setup_state_sync_storage_service(
     Ok(storage_service_runtime)
 }
 
+#[cfg(feature = "indexer")]
+fn bootstrap_indexer(
+    node_config: &NodeConfig,
+    chain_id: ChainId,
+    aptos_db: Arc<dyn DbReader>,
+    mp_client_sender: MempoolClientSender,
+) -> Result<Option<Runtime>, anyhow::Error> {
+    use aptos_indexer::runtime::bootstrap as bootstrap_indexer_stream;
+
+    match bootstrap_indexer_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+        None => Ok(None),
+        Some(res) => res.map(Some),
+    }
+}
+
+#[cfg(not(feature = "indexer"))]
+fn bootstrap_indexer(
+    _node_config: &NodeConfig,
+    _chain_id: ChainId,
+    _aptos_db: Arc<dyn DbReader>,
+    _mp_client_sender: MempoolClientSender,
+) -> Result<Option<Runtime>, anyhow::Error> {
+    Ok(None)
+}
+
 pub fn setup_environment(
     node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
@@ -746,11 +772,7 @@ pub fn setup_environment(
         Some(res) => Some(res?),
     };
 
-    let index_runtime =
-        match bootstrap_indexer_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
-            None => None,
-            Some(res) => Some(res?),
-        };
+    let index_runtime = bootstrap_indexer(&node_config, chain_id, aptos_db, mp_client_sender)?;
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =

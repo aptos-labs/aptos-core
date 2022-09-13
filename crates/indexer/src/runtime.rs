@@ -104,11 +104,19 @@ pub fn bootstrap(
 }
 
 pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
-    let processor_name = config.processor.clone();
+    // All of these options should be filled already with defaults
+    let processor_name = config.processor.clone().unwrap();
+    let check_chain_id = config.check_chain_id.unwrap();
+    let skip_migrations = config.skip_migrations.unwrap();
+    let fetch_tasks = config.fetch_tasks.unwrap();
+    let processor_tasks = config.processor_tasks.unwrap();
+    let emit_every = config.emit_every.unwrap();
+    let batch_size = config.batch_size.unwrap();
 
     info!(processor_name = processor_name, "Starting indexer...");
 
-    let conn_pool = new_db_pool(&config.postgres_uri).expect("Failed to create connection pool");
+    let conn_pool =
+        new_db_pool(&config.postgres_uri.unwrap()).expect("Failed to create connection pool");
     info!(
         processor_name = processor_name,
         "Created the connection pool... "
@@ -123,22 +131,17 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         }
         Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
             conn_pool.clone(),
-            config.index_token_uri_data,
+            config.index_token_uri_data.unwrap(),
         )),
     };
 
-    let options = TransactionFetcherOptions::new(
-        None,
-        None,
-        Some(config.batch_size),
-        None,
-        config.fetch_tasks as usize,
-    );
+    let options =
+        TransactionFetcherOptions::new(None, None, Some(batch_size), None, fetch_tasks as usize);
 
     let tailer = Tailer::new(context, conn_pool.clone(), processor, options)
         .expect("Failed to instantiate tailer");
 
-    if !config.skip_migrations {
+    if !skip_migrations {
         info!(processor_name = processor_name, "Running migrations...");
         tailer.run_migrations();
     }
@@ -177,7 +180,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let mut version_to_check_chain_id: u64 = 0;
 
     // Check once here to avoid a boolean check every iteration
-    if config.check_chain_id {
+    if check_chain_id {
         tailer
             .check_or_update_chain_id()
             .await
@@ -187,7 +190,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     let (tx, mut receiver) = tokio::sync::mpsc::channel(100);
     let mut tasks = vec![];
-    for _ in 0..config.processor_tasks {
+    for _ in 0..processor_tasks {
         let other_tx = tx.clone();
         let other_tailer = tailer.clone();
         let task = tokio::task::spawn(async move {
@@ -199,12 +202,10 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         tasks.push(task);
     }
 
-    let emit_every = config.emit_every as u64;
-
     let mut ma = MovingAverage::new(10_000);
 
     loop {
-        if config.check_chain_id && version_to_check_chain_id < versions_processed {
+        if check_chain_id && version_to_check_chain_id < versions_processed {
             tailer
                 .check_or_update_chain_id()
                 .await

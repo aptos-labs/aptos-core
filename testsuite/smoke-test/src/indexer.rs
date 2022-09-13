@@ -29,7 +29,7 @@ pub fn wipe_database(conn: &PgPoolConnection) {
         "__diesel_schema_migrations",
     ] {
         conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-            .unwrap();
+            .unwrap_or_else(|_| panic!("Could not drop table '{}'", table));
     }
 }
 
@@ -115,9 +115,9 @@ async fn test_old_indexer() {
             config.storage.enable_indexer = true;
 
             config.indexer.enabled = true;
-            config.indexer.postgres_uri = get_database_url();
+            config.indexer.postgres_uri = Some(get_database_url());
             config.indexer.processor =
-                aptos_indexer::processors::default_processor::NAME.to_string();
+                Some(aptos_indexer::processors::default_processor::NAME.to_string());
         }))
         .build()
         .await;
