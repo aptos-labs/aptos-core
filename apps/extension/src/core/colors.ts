@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { Routes } from './routes';
+
 // Text
 
 export const textColor = {
@@ -136,7 +138,7 @@ export const iconColor = {
 
 export const walletBgColor = (pathname: string) => {
   switch (pathname) {
-    case '/wallet':
+    case Routes.wallet.path:
       return 'navy.800';
     default:
       return undefined;
@@ -145,7 +147,7 @@ export const walletBgColor = (pathname: string) => {
 
 export const walletTextColor = (pathname: string) => {
   switch (pathname) {
-    case '/wallet':
+    case Routes.wallet.path:
       return 'white';
     default:
       return undefined;

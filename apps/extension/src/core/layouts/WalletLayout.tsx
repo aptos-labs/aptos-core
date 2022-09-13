@@ -8,7 +8,6 @@ import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/colors';
 
 interface WalletLayoutProps {
-  accessoryButton?: React.ReactNode,
   children: React.ReactNode;
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
@@ -18,7 +17,6 @@ interface WalletLayoutProps {
 }
 
 export default function WalletLayout({
-  accessoryButton,
   children,
   hasWalletFooter = true,
   hasWalletHeader = true,
@@ -30,13 +28,13 @@ export default function WalletLayout({
 
   const templateRows = useMemo(() => {
     if (hasWalletFooter && hasWalletHeader) {
-      return '70px 1fr 60px';
+      return '73px 1fr 60px';
     }
     if (hasWalletFooter) {
       return '1fr 40px';
     }
     if (hasWalletHeader) {
-      return '70px 1fr';
+      return '73px 1fr';
     }
     return '1fr';
   }, [hasWalletHeader, hasWalletFooter]);
@@ -52,7 +50,6 @@ export default function WalletLayout({
       {hasWalletHeader ? (
         <WalletHeader
           showAccountCircle={showAccountCircle}
-          accessoryButton={accessoryButton}
           title={title}
           showBackButton={showBackButton}
         />

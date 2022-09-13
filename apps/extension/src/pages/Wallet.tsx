@@ -10,9 +10,6 @@ import {
   HStack,
   VStack,
   Text,
-  Tooltip,
-  IconButton,
-  useClipboard,
   SimpleGrid,
 } from '@chakra-ui/react';
 import React, { useMemo } from 'react';
@@ -25,33 +22,9 @@ import { walletBgColor, walletTextColor } from 'core/colors';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import ChakraLink from 'core/components/ChakraLink';
 import { useNodeStatus } from 'core/queries/network';
-import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
-import { useActiveAccount } from 'core/hooks/useAccounts';
 import WalletAccountStake from 'core/components/WalletAccountStake';
 import TransferFlow from 'core/components/TransferFlow';
 import { useLocation } from 'react-router-dom';
-
-function CopyAddressButton() {
-  const { activeAccountAddress } = useActiveAccount();
-  const { hasCopied, onCopy } = useClipboard(activeAccountAddress ?? '');
-  return (
-    <Tooltip label={hasCopied ? 'Copied!' : 'Copy Address'} closeDelay={300}>
-      <IconButton
-        fontSize="20px"
-        icon={<BiCopy />}
-        aria-label="Copy Address"
-        bg="clear"
-        _focus={{ boxShadow: 'none' }}
-        _active={{
-          bg: 'none',
-          transform: 'scale(0.90)',
-        }}
-        onClick={onCopy}
-        variant="none"
-      />
-    </Tooltip>
-  );
-}
 
 function Wallet() {
   const { activeNetwork, faucetClient } = useNetworks();
@@ -65,7 +38,7 @@ function Wallet() {
   const textColor = useMemo(() => walletTextColor(pathname), [pathname]);
 
   return (
-    <WalletLayout accessoryButton={<CopyAddressButton />} title="Home">
+    <WalletLayout title="Home">
       <VStack width="100%" pb={4} spacing={4}>
         <Flex
           py={4}
