@@ -65,7 +65,7 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/inspection-service",
-    "crates/node-metrics",
+    "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
     "crates/short-hex-str",

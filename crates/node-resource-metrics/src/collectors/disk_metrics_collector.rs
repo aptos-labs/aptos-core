@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use super::common::NAMESPACE;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
@@ -11,33 +9,49 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
+use std::sync::Arc;
 use sysinfo::{DiskExt, RefreshKind, System, SystemExt};
 
 const DISK_SUBSYSTEM: &str = "disk";
 
+const TOTAL_SPACE: &str = "total_space";
+const AVAILABLE_SPACE: &str = "available_space";
+
+const NAME_LABEL: &str = "name";
+const TYPE_LABEL: &str = "type";
+const FILE_SYSTEM_LABEL: &str = "file_system";
+
 /// A Collector for exposing Disk metrics
-pub(crate) struct DiskCollector {
+pub(crate) struct DiskMetricsCollector {
     system: Arc<Mutex<System>>,
 
     total_space: Desc,
     available_space: Desc,
 }
 
-impl DiskCollector {
+impl DiskMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new_with_specifics(
             RefreshKind::new().with_disks_list().with_disks(),
         )));
-        let total_space = Opts::new("total_space", "Total disk size in bytes")
+        let total_space = Opts::new(TOTAL_SPACE, "Total disk size in bytes")
             .namespace(NAMESPACE)
             .subsystem(DISK_SUBSYSTEM)
-            .variable_labels(vec!["name".into(), "type".into(), "file_system".into()])
+            .variable_labels(vec![
+                NAME_LABEL.into(),
+                TYPE_LABEL.into(),
+                FILE_SYSTEM_LABEL.into(),
+            ])
             .describe()
             .unwrap();
-        let available_space = Opts::new("available_space", "Total available disk size in bytes")
+        let available_space = Opts::new(AVAILABLE_SPACE, "Total available disk size in bytes")
             .namespace(NAMESPACE)
             .subsystem(DISK_SUBSYSTEM)
-            .variable_labels(vec!["name".into(), "type".into(), "file_system".into()])
+            .variable_labels(vec![
+                NAME_LABEL.into(),
+                TYPE_LABEL.into(),
+                FILE_SYSTEM_LABEL.into(),
+            ])
             .describe()
             .unwrap();
 
@@ -49,13 +63,13 @@ impl DiskCollector {
     }
 }
 
-impl Default for DiskCollector {
+impl Default for DiskMetricsCollector {
     fn default() -> Self {
-        DiskCollector::new()
+        DiskMetricsCollector::new()
     }
 }
 
-impl Collector for DiskCollector {
+impl Collector for DiskMetricsCollector {
     fn desc(&self) -> Vec<&Desc> {
         vec![&self.total_space, &self.available_space]
     }
@@ -101,12 +115,12 @@ impl Collector for DiskCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::DiskCollector;
+    use super::DiskMetricsCollector;
     use prometheus::Registry;
 
     #[test]
     fn test_disk_collector_register() {
-        let collector = DiskCollector::default();
+        let collector = DiskMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));

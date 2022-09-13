@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
@@ -10,6 +8,7 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
+use std::sync::Arc;
 use sysinfo::{ProcessExt, System, SystemExt};
 
 use super::common::NAMESPACE;
@@ -17,8 +16,16 @@ use super::common::NAMESPACE;
 const PROCESS_METRICS_COUNT: usize = 3;
 const PROCESS_SUBSYSTEM: &str = "process";
 
+const MEMORY: &str = "memory";
+const VIRTUAL_MEMORY: &str = "virtual_memory";
+const START_TIME: &str = "start_time";
+const RUN_TIME: &str = "run_time";
+const CPU_USAGE: &str = "cpu_usage";
+const TOTAL_READ_BYTES: &str = "disk_total_read_bytes";
+const TOTAL_WRITTEN_BYTES: &str = "disk_total_written_bytes";
+
 /// A Collector for exposing process metrics
-pub(crate) struct ProcessCollector {
+pub(crate) struct ProcessMetricsCollector {
     system: Arc<Mutex<System>>,
 
     memory: Desc,
@@ -30,44 +37,44 @@ pub(crate) struct ProcessCollector {
     total_written_bytes: Desc,
 }
 
-impl ProcessCollector {
+impl ProcessMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new()));
 
-        let memory = Opts::new("memory", "Memory usage in bytes.")
+        let memory = Opts::new(MEMORY, "Memory usage in bytes.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
             .unwrap();
-        let virtual_memory = Opts::new("virtual_memory", "Virtual memory usage in bytes.")
+        let virtual_memory = Opts::new(VIRTUAL_MEMORY, "Virtual memory usage in bytes.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
             .unwrap();
         let start_time = Opts::new(
-            "start_time",
+            START_TIME,
             "Starts time of the process in seconds since epoch.",
         )
         .namespace(NAMESPACE)
         .subsystem(PROCESS_SUBSYSTEM)
         .describe()
         .unwrap();
-        let run_time = Opts::new("run_time", "Run time of the process in seconds.")
+        let run_time = Opts::new(RUN_TIME, "Run time of the process in seconds.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
             .unwrap();
-        let cpu_usage = Opts::new("cpu_usage", "CPU usage.")
+        let cpu_usage = Opts::new(CPU_USAGE, "CPU usage.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
             .unwrap();
-        let total_read_bytes = Opts::new("disk_total_read_bytes", "Total bytes read.")
+        let total_read_bytes = Opts::new(TOTAL_READ_BYTES, "Total bytes read.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
             .unwrap();
-        let total_written_bytes = Opts::new("disk_total_written_bytes", "Total bytes written.")
+        let total_written_bytes = Opts::new(TOTAL_WRITTEN_BYTES, "Total bytes written.")
             .namespace(NAMESPACE)
             .subsystem(PROCESS_SUBSYSTEM)
             .describe()
@@ -86,13 +93,13 @@ impl ProcessCollector {
     }
 }
 
-impl Default for ProcessCollector {
+impl Default for ProcessMetricsCollector {
     fn default() -> Self {
-        ProcessCollector::new()
+        ProcessMetricsCollector::new()
     }
 }
 
-impl Collector for ProcessCollector {
+impl Collector for ProcessMetricsCollector {
     fn desc(&self) -> Vec<&Desc> {
         vec![
             &self.memory,
@@ -172,12 +179,12 @@ impl Collector for ProcessCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::ProcessCollector;
+    use super::ProcessMetricsCollector;
     use prometheus::Registry;
 
     #[test]
     fn test_cpu_collector_register() {
-        let collector = ProcessCollector::default();
+        let collector = ProcessMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));

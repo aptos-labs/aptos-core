@@ -8,10 +8,11 @@ use prometheus::{
 };
 
 /// Provides a metric with one fixed value that cannot be changed. Users of this
-/// package will not have much use for it in regula operations. However, when
+/// package will not have much use for it in regular operations. However, when
 /// implementing custom Collectors, it is useful as a throw-away metric that is
 /// generated on the fly to send it to Prometheus in the Collect method.
 /// Reference: https://github.com/prometheus/client_golang/blob/main/prometheus/value.go#L106
+#[derive(Debug)]
 pub struct ConstMetric {
     desc: Desc,
     metric: Metric,
@@ -116,6 +117,7 @@ fn label_pairs(desc: &Desc, label_values: &[String]) -> Vec<LabelPair> {
 
 #[cfg(test)]
 mod tests {
+    use claims::{assert_err, assert_ok};
     use prometheus::{core::Describer, Opts};
 
     use super::ConstMetric;
@@ -127,12 +129,18 @@ mod tests {
             .describe()
             .unwrap();
 
-        assert!(ConstMetric::new_counter(metric_desc.clone(), 1.0, None).is_err());
-        assert!(ConstMetric::new_gauge(metric_desc.clone(), 1.0, None).is_err());
+        assert_err!(ConstMetric::new_counter(metric_desc.clone(), 1.0, None));
+        assert_err!(ConstMetric::new_gauge(metric_desc.clone(), 1.0, None));
 
-        assert!(
-            ConstMetric::new_counter(metric_desc.clone(), 1.0, Some(&["label".into()])).is_ok()
-        );
-        assert!(ConstMetric::new_gauge(metric_desc, 1.0, Some(&["label".into()])).is_ok());
+        assert_ok!(ConstMetric::new_counter(
+            metric_desc.clone(),
+            1.0,
+            Some(&["label".into()])
+        ));
+        assert_ok!(ConstMetric::new_gauge(
+            metric_desc,
+            1.0,
+            Some(&["label".into()])
+        ));
     }
 }

@@ -15,8 +15,16 @@ use super::common::NAMESPACE;
 
 const MEM_METRICS_COUNT: usize = 6;
 
+const SYSTEM_MEM_TOTAL: &str = "system_mem_total";
+const SYSTEM_MEM_USED: &str = "system_mem_used";
+const SYSTEM_MEM_FREE: &str = "system_mem_free";
+
+const SYSTEM_SWAP_TOTAL: &str = "system_swap_total";
+const SYSTEM_SWAP_USED: &str = "system_swap_used";
+const SYSTEM_SWAP_FREE: &str = "system_swap_free";
+
 /// A Collector for exposing system memory metrics
-pub(crate) struct MemoryCollector {
+pub(crate) struct MemoryMetricsCollector {
     system: Arc<Mutex<System>>,
 
     mem_total: Desc,
@@ -28,34 +36,34 @@ pub(crate) struct MemoryCollector {
     swap_free: Desc,
 }
 
-impl MemoryCollector {
+impl MemoryMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new_with_specifics(
             RefreshKind::new().with_memory(),
         )));
 
-        let mem_total = Opts::new("system_mem_total", "Memory total.")
+        let mem_total = Opts::new(SYSTEM_MEM_TOTAL, "Memory total.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
-        let mem_used = Opts::new("system_mem_used", "Memory used.")
+        let mem_used = Opts::new(SYSTEM_MEM_USED, "Memory used.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
-        let mem_free = Opts::new("system_mem_free", "Memory free.")
+        let mem_free = Opts::new(SYSTEM_MEM_FREE, "Memory free.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
 
-        let swap_used = Opts::new("system_swap_used", "Swap memory used.")
+        let swap_total = Opts::new(SYSTEM_SWAP_TOTAL, "Swap memory total.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
-        let swap_free = Opts::new("system_swap_free", "Swap memory free.")
+        let swap_used = Opts::new(SYSTEM_SWAP_USED, "Swap memory used.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
-        let swap_total = Opts::new("system_swap_total", "Swap memory total.")
+        let swap_free = Opts::new(SYSTEM_SWAP_FREE, "Swap memory free.")
             .namespace(NAMESPACE)
             .describe()
             .unwrap();
@@ -73,13 +81,13 @@ impl MemoryCollector {
     }
 }
 
-impl Default for MemoryCollector {
+impl Default for MemoryMetricsCollector {
     fn default() -> Self {
-        MemoryCollector::new()
+        MemoryMetricsCollector::new()
     }
 }
 
-impl Collector for MemoryCollector {
+impl Collector for MemoryMetricsCollector {
     fn desc(&self) -> Vec<&Desc> {
         vec![
             &self.mem_total,
@@ -129,12 +137,12 @@ impl Collector for MemoryCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::MemoryCollector;
+    use super::MemoryMetricsCollector;
     use prometheus::Registry;
 
     #[test]
     fn test_cpu_collector_register() {
-        let collector = MemoryCollector::default();
+        let collector = MemoryMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));

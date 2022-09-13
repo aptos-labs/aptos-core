@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
+use super::common::NAMESPACE;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
@@ -10,14 +9,22 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
+use std::sync::Arc;
 use sysinfo::{NetworkExt, NetworksExt, RefreshKind, System, SystemExt};
-
-use super::common::NAMESPACE;
 
 const NETWORK_SUBSYSTEM: &str = "network";
 
+const TOTAL_RECEIVED: &str = "total_received";
+const TOTAL_TRANSMITTED: &str = "total_transmitted";
+const TOTAL_PACKETS_RECEIVED: &str = "total_packets_received";
+const TOTAL_PACKETS_TRANSMITTED: &str = "total_packets_transmitted";
+const TOTAL_ERRORS_ON_RECEIVED: &str = "total_errors_on_received";
+const TOTAL_ERRORS_ON_TRANSMITTED: &str = "total_errors_on_transmitted";
+
+const INTERFACE_NAME_LABEL: &str = "interface_name";
+
 /// A Collector for exposing network metrics
-pub(crate) struct NetworkCollector {
+pub(crate) struct NetworkMetricsCollector {
     system: Arc<Mutex<System>>,
 
     total_received: Desc,
@@ -28,56 +35,54 @@ pub(crate) struct NetworkCollector {
     total_errors_on_transmitted: Desc,
 }
 
-impl NetworkCollector {
+impl NetworkMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new_with_specifics(
             RefreshKind::new().with_networks_list().with_networks(),
         )));
 
-        let total_received = Opts::new("total_received", "Total number of received bytes")
+        let total_received = Opts::new(TOTAL_RECEIVED, "Total number of received bytes")
             .namespace(NAMESPACE)
             .subsystem(NETWORK_SUBSYSTEM)
-            .variable_label("interface_name")
+            .variable_label(INTERFACE_NAME_LABEL)
             .describe()
             .unwrap();
-        let total_transmitted = Opts::new("total_transmitted", "Total number of transmitted bytes")
+        let total_transmitted = Opts::new(TOTAL_TRANSMITTED, "Total number of transmitted bytes")
             .namespace(NAMESPACE)
             .subsystem(NETWORK_SUBSYSTEM)
-            .variable_label("interface_name")
+            .variable_label(INTERFACE_NAME_LABEL)
             .describe()
             .unwrap();
         let total_packets_received =
-            Opts::new("total_packets_received", "Total number of incoming packets")
+            Opts::new(TOTAL_PACKETS_RECEIVED, "Total number of incoming packets")
                 .namespace(NAMESPACE)
                 .subsystem(NETWORK_SUBSYSTEM)
-                .variable_label("interface_name")
+                .variable_label(INTERFACE_NAME_LABEL)
                 .describe()
                 .unwrap();
         let total_packets_transmitted = Opts::new(
-            "total_packets_transmitted",
+            TOTAL_PACKETS_TRANSMITTED,
             "Total number of outgoing packets",
         )
         .namespace(NAMESPACE)
         .subsystem(NETWORK_SUBSYSTEM)
-        .variable_label("interface_name")
+        .variable_label(INTERFACE_NAME_LABEL)
         .describe()
         .unwrap();
-        let total_errors_on_received = Opts::new(
-            "total_errors_on_received",
-            "Total number of incoming errors",
-        )
-        .namespace(NAMESPACE)
-        .subsystem(NETWORK_SUBSYSTEM)
-        .variable_label("interface_name")
-        .describe()
-        .unwrap();
+        let total_errors_on_received =
+            Opts::new(TOTAL_ERRORS_ON_RECEIVED, "Total number of incoming errors")
+                .namespace(NAMESPACE)
+                .subsystem(NETWORK_SUBSYSTEM)
+                .variable_label(INTERFACE_NAME_LABEL)
+                .describe()
+                .unwrap();
         let total_errors_on_transmitted = Opts::new(
-            "total_errors_on_transmitted",
+            TOTAL_ERRORS_ON_TRANSMITTED,
             "Total number of transmission errors",
         )
         .namespace(NAMESPACE)
         .subsystem(NETWORK_SUBSYSTEM)
-        .variable_label("interface_name")
+        .variable_label(INTERFACE_NAME_LABEL)
         .describe()
         .unwrap();
 
@@ -93,13 +98,13 @@ impl NetworkCollector {
     }
 }
 
-impl Default for NetworkCollector {
+impl Default for NetworkMetricsCollector {
     fn default() -> Self {
-        NetworkCollector::new()
+        NetworkMetricsCollector::new()
     }
 }
 
-impl Collector for NetworkCollector {
+impl Collector for NetworkMetricsCollector {
     fn desc(&self) -> Vec<&Desc> {
         vec![
             &self.total_received,
@@ -175,12 +180,12 @@ impl Collector for NetworkCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::NetworkCollector;
+    use super::NetworkMetricsCollector;
     use prometheus::Registry;
 
     #[test]
     fn test_cpu_collector_register() {
-        let collector = NetworkCollector::default();
+        let collector = NetworkMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));

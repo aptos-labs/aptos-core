@@ -12,29 +12,36 @@ use prometheus::{
 use std::sync::Arc;
 use sysinfo::{CpuExt, CpuRefreshKind, RefreshKind, System, SystemExt};
 
+const SYSTEM_CPU_USAGE: &str = "system_cpu_usage";
+const SYSTEM_CPU_INFO: &str = "system_cpu_info";
+
+const CPU_ID_LABEL: &str = "cpu_id";
+const CPU_BRAND_LABEL: &str = "brand";
+const CPU_VENDOR_LABEL: &str = "vendor";
+
 /// A Collector for exposing CPU metrics
-pub(crate) struct CpuCollector {
+pub(crate) struct CpuMetricsCollector {
     system: Arc<Mutex<System>>,
 
     cpu: Desc,
     cpu_info: Desc,
 }
 
-impl CpuCollector {
+impl CpuMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new_with_specifics(
             RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
         )));
 
-        let cpu = Opts::new("system_cpu_usage", "CPU usage.")
+        let cpu = Opts::new(SYSTEM_CPU_USAGE, "CPU usage.")
             .namespace(NAMESPACE)
-            .variable_label("cpu_id")
+            .variable_label(CPU_ID_LABEL)
             .describe()
             .unwrap();
-        let cpu_info = Opts::new("system_cpu_info", "CPU information.")
+        let cpu_info = Opts::new(SYSTEM_CPU_INFO, "CPU information.")
             .namespace(NAMESPACE)
-            .variable_label("brand")
-            .variable_label("vendor")
+            .variable_label(CPU_BRAND_LABEL)
+            .variable_label(CPU_VENDOR_LABEL)
             .describe()
             .unwrap();
 
@@ -46,13 +53,13 @@ impl CpuCollector {
     }
 }
 
-impl Default for CpuCollector {
+impl Default for CpuMetricsCollector {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Collector for CpuCollector {
+impl Collector for CpuMetricsCollector {
     fn desc(&self) -> Vec<&Desc> {
         vec![&self.cpu, &self.cpu_info]
     }
@@ -106,12 +113,12 @@ impl Collector for CpuCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::CpuCollector;
+    use super::CpuMetricsCollector;
     use prometheus::Registry;
 
     #[test]
     fn test_cpu_collector_register() {
-        let collector = CpuCollector::default();
+        let collector = CpuMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));

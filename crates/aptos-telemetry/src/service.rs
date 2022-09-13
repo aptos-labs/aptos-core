@@ -157,7 +157,7 @@ async fn spawn_telemetry_service(
 
     if enable_prometheus_push_metrics() {
         if enable_prometheus_node_metrics() {
-            node_metrics::register_node_metrics_collector();
+            node_resource_metrics::register_node_metrics_collector();
         }
 
         let telemetry_sender = telemetry_sender.clone();

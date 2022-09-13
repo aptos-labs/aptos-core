@@ -1,9 +1,9 @@
 [package]
-name = "node-metrics"
+name = "node-resource-metrics"
 version = "0.1.0"
 edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Host system prometheus metrics collector"
+description = "System resource metrics collector"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
