@@ -128,7 +128,7 @@ impl TransactionStore {
         sequence_number: u64,
         is_rejected: bool,
     ) {
-        let current_seq_number = self.sequence_numbers.get(sender).map_or(0, |v| *v);
+        let current_seq_number = self.get_sequence_number(sender).map_or(0, |v| *v);
         if is_rejected {
             if sequence_number >= current_seq_number {
                 self.reject_transaction(sender, sequence_number);
