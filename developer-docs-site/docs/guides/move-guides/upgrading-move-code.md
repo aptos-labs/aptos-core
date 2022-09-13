@@ -49,7 +49,7 @@ Aptos checks compatibility at the time a [Move package](https://move-language.gi
 
 Currently, three different upgrade policies are supported:
 
-- `compatible`: upgrades most be backwards compatible, specifically:
+- `compatible`: upgrades must be backwards compatible, specifically:
   - For storage, all old struct declarations must be the same in
     the new code. This ensures that the existing state of storage is 
     correctly interpreted by the new code. However, new struct declarations 
