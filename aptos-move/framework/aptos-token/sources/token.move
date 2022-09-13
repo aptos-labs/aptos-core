@@ -307,12 +307,12 @@ module aptos_token::token {
         description: String
     ) acquires Collections {
         assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        // validate if the properties is mutable
         assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let collections = borrow_global_mut<Collections>(
             creator
         );
-        let collection_data = check_collection_return_data(collections, collection_name);
+        let collection_data = borrow_collection_data_mut(collections, collection_name);
+        // validate if the data is mutable
         assert!(collection_data.mutability_config.description, EFIELD_NOT_MUTABLE);
         collection_data.description = description;
     }
@@ -324,12 +324,12 @@ module aptos_token::token {
         uri: String
     ) acquires Collections {
         assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        // validate if the properties is mutable
         assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let collections = borrow_global_mut<Collections>(
             creator
         );
-        let collection_data = check_collection_return_data(collections, collection_name);
+        let collection_data = borrow_collection_data_mut(collections, collection_name);
+        // validate if the data is mutable
         assert!(collection_data.mutability_config.uri, EFIELD_NOT_MUTABLE);
         collection_data.uri = uri;
     }
@@ -341,17 +341,17 @@ module aptos_token::token {
         maximum: u64
     ) acquires Collections {
         assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
-        // validate if the properties is mutable
         assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let collections = borrow_global_mut<Collections>(
             creator
         );
-        let collection_data = check_collection_return_data(collections, collection_name);
+        let collection_data = borrow_collection_data_mut(collections, collection_name);
+        // validate if the data is mutable
         assert!(collection_data.mutability_config.maximum, EFIELD_NOT_MUTABLE);
         collection_data.maximum = maximum;
     }
 
-    fun check_collection_return_data(
+    fun borrow_collection_data_mut(
         all_collection_data: &mut Collections,
         collection_name: String
     ): &mut CollectionData {
