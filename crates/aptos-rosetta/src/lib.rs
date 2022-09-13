@@ -55,6 +55,12 @@ pub struct RosettaContext {
     pub coin_cache: Arc<CoinCache>,
     /// Block index cache
     pub block_cache: Option<Arc<BlockRetriever>>,
+
+    /// In the event that block size is not provided, it will use the actual blocks
+    /// if block size is provided, it will make synthetic blocks based on the transaction
+    /// versions.  Each block will be `block_size` transaction versions
+    pub block_size: Option<u16>,
+
     pub accounts: Arc<Mutex<BTreeMap<AccountAddress, SequenceNumber>>>,
 }
 
