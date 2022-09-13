@@ -28,7 +28,6 @@ on:
       FORGE_TEST_SUITE:
         required: false
         type: string
-        default: land_blocking
         description: Test suite to run
       POST_TO_SLACK:
         required: false
