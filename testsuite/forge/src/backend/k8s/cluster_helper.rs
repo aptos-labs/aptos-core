@@ -12,7 +12,7 @@ use crate::{
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
@@ -512,6 +512,7 @@ pub fn construct_node_helm_values(
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
+    warn!("construct_node_helm_values! Printing value: {:?}", value);
     serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
 }
 
@@ -940,7 +941,13 @@ mod tests {
     #[tokio::test]
     async fn test_construct_node_helm_values() {
         let node_helm_values = construct_node_helm_values(
-            None,
+            Some(Arc::new(|helm_values| {
+                helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 73.into();
+                helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            })),
             "{}".to_string(),
             "forge-123".to_string(),
             "era".to_string(),
@@ -962,6 +969,18 @@ haproxy:
 labels:
   forge-namespace: forge-123
   forge-image-tag: image
+validator:
+  config:
+    consensus:
+      max_block_txns: 73
+    state_sync:
+      state_sync_driver:
+        bootstrapping_mode: ExecuteTransactionsFromGenesis
+fullnode:
+  config:
+    state_sync:
+      state_sync_driver:
+        continuous_syncing_mode: ExecuteTransactions
 ";
         assert_eq!(node_helm_values, expected_helm_values);
     }

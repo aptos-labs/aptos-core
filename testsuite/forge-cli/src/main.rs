@@ -694,10 +694,11 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
         .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["config"]["consensus"]["max_block_txns"] = 73.into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         .with_network_tests(vec![&StateSyncValidatorPerformance])
         .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None))
