@@ -479,12 +479,14 @@ module aptos_framework::stake {
         move_from<OwnerCapability>(signer::address_of(account))
     }
 
+    /// Q: seems dangerous, A deposit to B, B can then deposit to C. A has no control of that
     /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
     /// staking pool.
     public fun deposit_owner_cap(account: &signer, owner_cap: OwnerCapability) {
         move_to(account, owner_cap);
     }
 
+    /// Q: why do we provide this function since it is not used anywhere?
     /// Destroy `owner_cap`.
     public fun destroy_owner_cap(owner_cap: OwnerCapability) {
         let OwnerCapability { pool_address: _ } = owner_cap;
@@ -497,6 +499,8 @@ module aptos_framework::stake {
         set_operator_with_cap(ownership_cap, new_operator);
     }
 
+    /// Q: If we expect an account with ownership capability to call this function, passing owner_cap reference is not sufficient to validate this.
+    /// for example, B can return a reference to his ownership cap and give it to C and C is now authorized to call this function
     /// Allows an account with ownership capability to change the operator of the stake pool.
     public fun set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) acquires StakePool {
         let pool_address = owner_cap.pool_address;
@@ -762,6 +766,8 @@ module aptos_framework::stake {
         unlock_with_cap(amount, ownership_cap);
     }
 
+
+    /// Q: should this only take effect in the next epoch? but seems stake_pool.active is already updated immediately.
     /// Unlock `amount` from the active stake. Only possible if the lockup has expired.
     public fun unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) acquires StakePool {
         // Short-circuit if amount to unlock is 0 so we don't emit events.
@@ -868,6 +874,7 @@ module aptos_framework::stake {
             };
 
         } else {
+            // Q: what happens to pending_inactive valiator here? seems we shouldn't expect failure with ENOT_VALIDATOR?
             // Validate that the validator is already part of the validator set.
             let maybe_active_index = find_validator(&validator_set.active_validators, pool_address);
             assert!(option::is_some(&maybe_active_index), error::invalid_argument(ENOT_VALIDATOR));
