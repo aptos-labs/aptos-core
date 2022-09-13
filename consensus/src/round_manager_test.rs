@@ -230,6 +230,7 @@ impl NodeSetup {
             false,
             OnChainConsensusConfig::default(),
             round_manager_tx,
+            2000,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

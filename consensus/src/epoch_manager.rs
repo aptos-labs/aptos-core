@@ -647,6 +647,7 @@ impl EpochManager {
             self.config.sync_only,
             onchain_config,
             round_manager_tx,
+            self.config.round_initial_timeout_ms,
         );
 
         round_manager.init(last_vote).await;

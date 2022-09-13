@@ -61,7 +61,6 @@ pub enum UnverifiedEvent {
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
-pub const BACK_PRESSURE_PROPOSAL_TIMEOUT_MS: u64 = 2000;
 
 impl UnverifiedEvent {
     pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
@@ -150,6 +149,7 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     round_manager_tx:
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    back_pressure_proposal_timeout_ms: u64,
 }
 
 impl RoundManager {
@@ -168,6 +168,7 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
+        back_pressure_proposal_timeout_ms: u64,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -189,6 +190,7 @@ impl RoundManager {
             sync_only,
             onchain_config,
             round_manager_tx,
+            back_pressure_proposal_timeout_ms,
         }
     }
 
@@ -323,7 +325,7 @@ impl RoundManager {
         }
     }
 
-    pub async fn process_verified_self_proposal_msg(&mut self, proposal: Block) -> Result<()> {
+    pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> Result<()> {
         if proposal.round() != self.round_state.current_round() {
             bail!(
                 "Discarding stale self proposal {}, current round {}",
@@ -551,7 +553,7 @@ impl RoundManager {
                 .resend_verified_proposal_to_self(
                     proposal,
                     BACK_PRESSURE_POLLING_INTERVAL_MS,
-                    BACK_PRESSURE_PROPOSAL_TIMEOUT_MS,
+                    self.back_pressure_proposal_timeout_ms,
                 )
                 .await)
         } else {
@@ -824,7 +826,7 @@ impl RoundManager {
                         VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_verified_proposal",
-                                self.process_verified_self_proposal_msg(*proposal_msg).await
+                                self.process_delayed_proposal_msg(*proposal_msg).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
