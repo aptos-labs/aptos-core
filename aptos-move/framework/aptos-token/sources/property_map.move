@@ -1,11 +1,13 @@
 /// PropertyMap is a specialization of SimpleMap for Tokens.
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
 module aptos_token::property_map {
+    use std::bcs;
     use std::vector;
     use std::error;
     use std::string::{Self, String};
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_std::type_info::type_name;
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
     const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;
@@ -58,7 +60,7 @@ module aptos_token::property_map {
 
     public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
         assert!(! simple_map::contains_key(&map.map, &key), error::already_exists(EKEY_AREADY_EXIST_IN_PROPERTY_MAP));
-        assert!(simple_map::length<String, PropertyValue>(&map.map) <= MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(simple_map::length<String, PropertyValue>(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
         simple_map::add(&mut map.map, key, value);
     }
 
@@ -160,6 +162,33 @@ module aptos_token::property_map {
         *property_val = value;
     }
 
+    public fun create_property_value_raw(
+        value: vector<u8>,
+        type: String
+    ): PropertyValue {
+        PropertyValue {
+            value,
+            type,
+        }
+    }
+
+    /// create a property value from generic type data
+    public fun create_property_value<T: copy>(data: &T): PropertyValue {
+        let name = type_name<T>();
+        if (
+            name == string::utf8(b"bool") ||
+            name == string::utf8(b"u8") ||
+            name == string::utf8(b"u64") ||
+            name == string::utf8(b"u128") ||
+            name == string::utf8(b"address") ||
+            name == string::utf8(b"0x1::string::String")
+        ) {
+            create_property_value_raw(bcs::to_bytes<T>(data), name)
+        } else {
+            create_property_value_raw(bcs::to_bytes<T>(data), string::utf8(b"vector<u8>"))
+        }
+    }
+
     #[test_only]
     fun create_property_list(): PropertyMap {
         use std::string::utf8;
@@ -218,12 +247,20 @@ module aptos_token::property_map {
     #[test]
     fun test_read_value_with_type(){
         use std::string::utf8;
-        use std::bcs;
         let keys = vector<String>[ utf8(b"attack"), utf8(b"mutable")];
         let values = vector<vector<u8>>[ bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(&false) ];
         let types = vector<String>[ utf8(b"u8"), utf8(b"bool")];
         let plist = new(keys, values, types);
         assert!(!read_bool(&plist, &utf8(b"mutable")), 1);
         assert!(read_u8(&plist, &utf8(b"attack")) == 10, 1);
+    }
+
+    #[test]
+    fun test_generate_property_value_convert_back() {
+        let data: address = @0xcafe;
+        let pv = create_property_value(&data);
+        let pm = create_property_list();
+        add(&mut pm, string::utf8(b"addr"), pv);
+        assert!(read_address(&pm, &string::utf8(b"addr")) == data, 1)
     }
 }
