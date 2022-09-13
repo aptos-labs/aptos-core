@@ -5,7 +5,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::SuccessCriteria;
+use forge::success_criteria::{StateProgressThreshold, SuccessCriteria};
 use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use forge::{ForgeConfig, Options, *};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -446,6 +446,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 false,
                 Some(Duration::from_secs(240)),
                 None,
+                None,
             ))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 30.into();
@@ -460,10 +461,11 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(240)),
                 None,
+                None,
             )),
         "network_latency" => config
             .with_network_tests(vec![&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
+            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None, None)),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),
@@ -480,6 +482,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(240)),
                 None,
+                None,
             )),
         "validator_reboot_stress_test" => config
             .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
@@ -490,6 +493,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
+                None,
                 None,
             ))
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -505,6 +509,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 50000,
                 false,
                 Some(Duration::from_secs(600)),
+                None,
                 None,
             )),
         "account_creation_state_sync" => config
@@ -527,6 +532,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(240)),
                 None,
+                None,
             )),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => config
@@ -547,6 +553,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(60)),
+                None,
                 None,
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
@@ -573,6 +580,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(30)),
                 None,
+                Some(StateProgressThreshold {
+                    max_no_progress_secs: 3.0,
+                    max_round_gap: 4,
+                }),
             )),
         "changing_working_quorum_test" => changing_working_quorum_test(
             20,
@@ -673,7 +684,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None, None))
+        .with_success_criteria(SuccessCriteria::new(10000, 10000, false, None, None, None))
 }
 
 /// The config for running a state sync performance test when executing
@@ -691,7 +702,7 @@ fn state_sync_perf_fullnodes_execute_transactions(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None))
+        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
 }
 
 /// The config for running a state sync performance test when applying
@@ -709,7 +720,7 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
         .with_network_tests(vec![&StateSyncValidatorPerformance])
-        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None))
+        .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
 }
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
@@ -740,6 +751,10 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 // Check that we don't use more than 5 GB of memory for 30% of the time.
                 MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
             )),
+            Some(StateProgressThreshold {
+                max_no_progress_secs: 10.0,
+                max_round_gap: 4,
+            }),
         ))
 }
 
@@ -772,6 +787,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
                 // Check that we don't use more than 5 GB of memory for 30% of the time.
                 MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
             )),
+            None,
         ))
 }
 
@@ -825,6 +841,10 @@ fn changing_working_quorum_test(
             true,
             Some(Duration::from_secs(30)),
             None,
+            Some(StateProgressThreshold {
+                max_no_progress_secs: 20.0,
+                max_round_gap: 6,
+            }),
         ))
 }
 

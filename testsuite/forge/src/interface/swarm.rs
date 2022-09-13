@@ -252,6 +252,13 @@ pub trait SwarmExt: Swarm {
         wait_for_all_nodes_to_catchup(&self.get_all_nodes_clients_with_names(), timeout).await
     }
 
+    async fn wait_for_all_nodes_to_catchup_to_next(&self, timeout: Duration) -> Result<()> {
+        let clients = self.get_all_nodes_clients_with_names();
+        let highest_synced_version = get_highest_synced_version(&clients).await?;
+        wait_for_all_nodes_to_catchup_to_version(&clients, highest_synced_version + 1, timeout)
+            .await
+    }
+
     fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {
         self.validators()
             .map(|node| (node.name().to_string(), node.rest_client()))
