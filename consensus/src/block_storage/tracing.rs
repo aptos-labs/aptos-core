@@ -9,7 +9,10 @@ pub struct BlockStage;
 
 impl BlockStage {
     pub const SIGNED: &'static str = "signed";
-    pub const RECEIVED: &'static str = "received";
+    pub const NETWORK_RECEIVED: &'static str = "network_received";
+    pub const EPOCH_MANAGER_RECEIVED: &'static str = "epoch_manager_received";
+    pub const EPOCH_MANAGER_VERIFIED: &'static str = "epoch_manager_verified";
+    pub const ROUND_MANAGER_RECEIVED: &'static str = "round_manager_received";
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";

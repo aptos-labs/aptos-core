@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
     counters,
     logging::LogEvent,
@@ -302,6 +303,12 @@ impl NetworkTask {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
+                    if let ConsensusMsg::ProposalMsg(proposal) = &msg {
+                        observe_block(
+                            proposal.proposal().timestamp_usecs(),
+                            BlockStage::NETWORK_RECEIVED,
+                        );
+                    }
                     if let Err(e) = self
                         .consensus_messages_tx
                         .push((peer_id, discriminant(&msg)), (peer_id, msg))
