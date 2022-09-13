@@ -75,7 +75,6 @@ module aptos_framework::genesis {
             i = i + 1;
         };
 
-
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
