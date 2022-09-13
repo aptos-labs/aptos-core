@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount, AptosAccountObject } from "./aptos_account";
+import { HexString } from "./hex_string";
 
 const aptosAccountObject: AptosAccountObject = {
   address: "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",
@@ -68,9 +69,8 @@ test("Signs Strings", () => {
 
 test("Gets the resource account address", () => {
   const sourceAddress = "9db1d65a321e4a86f8098cb04e76fce098890b84211fa06d65f24dc644bf0fec";
-  const seed = "3031" // hexadecimal form of "01" which is 3031
+  const seedInHex = "3031" // hexadecimal form of "01" which is 3031
+  const seed = new HexString(seedInHex).toUint8Array();
 
-  const a1 = new AptosAccount();
-
-  expect(a1.getResourceAccountAddress(sourceAddress, seed).hex()).toBe("0x915e47f986471a5faba9cb2f726611cd554344419ddd6d5b3e9f00bcafd30169");
+  expect(AptosAccount.getResourceAccountAddress(sourceAddress, seed).hex()).toBe("0x915e47f986471a5faba9cb2f726611cd554344419ddd6d5b3e9f00bcafd30169");
 })

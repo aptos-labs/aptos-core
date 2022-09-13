@@ -149,18 +149,16 @@ export class AptosAccount {
    * @returns The resource account address
    */
 
-  getResourceAccountAddress(sourceAddress: MaybeHexString, seeds: string): HexString {
+  static getResourceAccountAddress(sourceAddress: MaybeHexString, seed: Uint8Array): HexString {
     const source = bcsToBytes(AccountAddress.fromHex(sourceAddress));
-    const seed = new HexString(seeds).toUint8Array();
 
     const originBytes = new Uint8Array(source.length + seed.length);
-    this.address();
 
     originBytes.set(source);
     originBytes.set(seed, source.length);
 
     const hash = SHA3.sha3_256.create();
-    hash.update(Buffer.from(originBytes));
+    hash.update(originBytes);
 
     return new HexString(hash.hex());
   }
