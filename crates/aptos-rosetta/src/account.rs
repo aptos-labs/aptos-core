@@ -22,6 +22,7 @@ use aptos_logger::{debug, trace};
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
+use once_cell::sync::Lazy;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::collections::BTreeMap;
 use std::{
@@ -191,6 +192,11 @@ async fn get_balances(
     }
 }
 
+/// Only coins supported by Rosetta
+///
+/// TODO: Allow passing in known supported coins in some sort of config file
+pub static SUPPORTED_COINS: Lazy<Vec<TypeTag>> = Lazy::new(|| vec![native_coin_tag()]);
+
 /// A cache for currencies, so we don't have to keep looking up the status of it
 #[derive(Debug)]
 pub struct CoinCache {
@@ -224,6 +230,11 @@ impl CoinCache {
         // Short circuit for the default coin
         if coin == native_coin_tag() {
             return Ok(Some(native_coin()));
+        }
+
+        // Unsupported coins should be ignored, as symbol may be used as an identifier
+        if !SUPPORTED_COINS.contains(&coin) {
+            return Ok(None);
         }
 
         {
