@@ -132,6 +132,12 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        let one_client = ctx.swarm().aptos_public_info().client().clone();
+        let start_version = ctx
+            .runtime
+            .block_on(one_client.get_ledger_information())?
+            .into_inner()
+            .version;
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
@@ -150,6 +156,11 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        let end_version = ctx
+            .runtime
+            .block_on(one_client.get_ledger_information())?
+            .into_inner()
+            .version;
 
         self.finish(ctx.swarm())?;
 
@@ -158,6 +169,8 @@ impl NetworkTest for dyn NetworkLoadTest {
             &actual_test_duration,
             start_timestamp as i64,
             end_timestamp as i64,
+            start_version,
+            end_version,
         )?;
 
         Ok(())
