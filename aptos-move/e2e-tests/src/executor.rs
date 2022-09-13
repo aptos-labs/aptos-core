@@ -200,7 +200,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts, true);
         Self::from_genesis(genesis.0.write_set())
     }
 

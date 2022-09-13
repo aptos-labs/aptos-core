@@ -352,6 +352,7 @@ impl MoveHarness {
                 }
             })
             .collect::<Vec<_>>();
+        // TODO(Gas): use GasScheduleV2 for the next testnet release
         let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
         // set_gas_schedule is not a transaction, so directly call as function
         self.executor.exec(

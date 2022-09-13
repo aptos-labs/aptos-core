@@ -21,7 +21,9 @@ use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},
+    on_chain_config::{
+        ConsensusConfigV1, GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION,
+    },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
@@ -93,6 +95,7 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
+        true,
     )))
 }
 
@@ -103,6 +106,7 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
+    use_gas_schedule_v2: bool,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -122,7 +126,13 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
-    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    initialize(
+        &mut session,
+        consensus_config,
+        chain_id,
+        genesis_config,
+        use_gas_schedule_v2,
+    );
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -246,10 +256,22 @@ fn initialize(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
+    use_gas_schedule_v2: bool,
 ) {
     let genesis_gas_params = AptosGasParameters::initial();
-    let gas_schedule_blob = bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
-        .expect("Failure serializing genesis gas schedule");
+    // TODO(Gas): The `use_gas_schedule_v2` flag is a hack to get tests working for the previous
+    //            testnet release.
+    //            We should get rid of it after we make another testnet release.
+    let gas_schedule_blob = if use_gas_schedule_v2 {
+        let gas_schedule = GasScheduleV2 {
+            feature_version: 0,
+            entries: genesis_gas_params.to_on_chain_gas_schedule(),
+        };
+        bcs::to_bytes(&gas_schedule).expect("Failure serializing genesis gas schedule")
+    } else {
+        bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
+            .expect("Failure serializing genesis gas schedule")
+    };
 
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
@@ -462,16 +484,16 @@ pub enum GenesisOptions {
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => framework::testnet_release_bundle(),
+    let (framework, use_gas_schedule_v2) = match genesis_options {
+        GenesisOptions::Head => (cached_packages::head_release_bundle(), true),
+        GenesisOptions::Testnet => (framework::testnet_release_bundle(), false),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
-            framework::testnet_release_bundle()
+            (framework::testnet_release_bundle(), false)
         }
     };
 
-    generate_test_genesis(framework, Some(1)).0
+    generate_test_genesis(framework, Some(1), use_gas_schedule_v2).0
 }
 
 /// Generate a genesis `ChangeSet` for mainnet
@@ -496,7 +518,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(cached_packages::head_release_bundle(), count)
+    generate_test_genesis(cached_packages::head_release_bundle(), count, true)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -572,6 +594,7 @@ impl TestValidator {
 pub fn generate_test_genesis(
     framework: &ReleaseBundle,
     count: Option<usize>,
+    use_gas_schedule_v2: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -597,6 +620,7 @@ pub fn generate_test_genesis(
             voting_duration_secs: 3600,
             voting_power_increase_limit: 50,
         },
+        use_gas_schedule_v2,
     );
     (genesis, test_validators)
 }
@@ -631,6 +655,7 @@ pub fn generate_mainnet_genesis(
             voting_duration_secs: 7 * 24 * 3600, // 7 days
             voting_power_increase_limit: 30,
         },
+        true,
     );
     (genesis, test_validators)
 }
