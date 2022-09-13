@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::{get_latest_block_height, get_oldest_block_height};
 use crate::{
     common::{check_network, handle_request, with_context, with_empty_request},
     error::ApiError,
@@ -147,15 +148,18 @@ async fn network_status(
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
+    let oldest_block_height = get_oldest_block_height(&server_context, state);
+    let latest_block_height = get_latest_block_height(&server_context, state);
+
     // Get the oldest block
     let oldest_block_identifier = block_cache
-        .get_block_info_by_height(state.oldest_block_height, chain_id)
+        .get_block_info_by_height(oldest_block_height, chain_id)
         .await?
         .block_id;
 
     // Get the latest block
     let current_block = block_cache
-        .get_block_info_by_height(state.block_height, chain_id)
+        .get_block_info_by_height(latest_block_height, chain_id)
         .await?;
     let current_block_identifier = current_block.block_id;
 

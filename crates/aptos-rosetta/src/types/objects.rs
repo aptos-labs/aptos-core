@@ -111,6 +111,15 @@ pub struct Block {
     pub timestamp: u64,
     /// Transactions associated with the version.  In aptos there should only be one transaction
     pub transactions: Vec<Transaction>,
+    /// Metadata for the block
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BlockMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BlockMetadata {
+    pub first_version: U64,
+    pub last_version: U64,
 }
 
 /// A combination of a transaction and the block associated.  In Aptos, this is just the same
