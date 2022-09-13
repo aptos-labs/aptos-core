@@ -313,7 +313,8 @@ async fn construction_metadata(
         let signed_transaction = SignedTransaction::new(
             unsigned_transaction,
             public_key,
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            Ed25519Signature::try_from([0u8; 64].as_ref())
+                .expect("Zero signature should always work"),
         );
 
         let request = rest_client
@@ -682,7 +683,10 @@ async fn construction_preprocess(
         .as_ref()
         .and_then(|inner| inner.max_gas_amount)
         .is_none()
-        && (public_keys.is_none() || public_keys.unwrap().is_empty())
+        && public_keys
+            .as_ref()
+            .map(|inner| inner.is_empty())
+            .unwrap_or(false)
     {
         return Err(ApiError::InvalidInput(Some(
             "Must provide either max gas amount or public keys to estimate max gas amount"

@@ -501,6 +501,7 @@ impl Transaction {
                 operation_index += ops.len() as u64;
                 operations.append(&mut ops);
             }
+            println!("Failed transaction: {:?}", operations)
         };
 
         // Reorder operations by type so that there's no invalid ordering
@@ -571,25 +572,36 @@ fn parse_operations_from_txn_payload(
                     parse_transfer_from_txn_payload(inner, native_coin(), sender, operation_index)
             }
             (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
-                // TODO: Fix unwrap
-                let address: AccountAddress =
-                    bcs::from_bytes(inner.args().first().unwrap()).unwrap();
-                operations.push(Operation::create_account(
-                    operation_index,
-                    Some(OperationStatusType::Failure),
-                    address,
-                    sender,
-                ));
+                if let Some(Ok(address)) = inner
+                    .args()
+                    .get(0)
+                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+                {
+                    operations.push(Operation::create_account(
+                        operation_index,
+                        Some(OperationStatusType::Failure),
+                        address,
+                        sender,
+                    ));
+                } else {
+                    warn!("Failed to parse create account {:?}", inner);
+                }
             }
             (AccountAddress::ONE, STAKE_MODULE, SET_OPERATOR_FUNCTION) => {
-                let operator: AccountAddress =
-                    bcs::from_bytes(inner.args().first().unwrap()).unwrap();
-                operations.push(Operation::set_operator(
-                    operation_index,
-                    Some(OperationStatusType::Failure),
-                    operator,
-                    sender,
-                ));
+                if let Some(Ok(operator)) = inner
+                    .args()
+                    .get(0)
+                    .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
+                {
+                    operations.push(Operation::set_operator(
+                        operation_index,
+                        Some(OperationStatusType::Failure),
+                        operator,
+                        sender,
+                    ));
+                } else {
+                    warn!("Failed to parse set operator {:?}", inner);
+                }
             }
             _ => {
                 // If we don't recognize the transaction payload, then we can't parse operations
@@ -606,22 +618,34 @@ fn parse_transfer_from_txn_payload(
     operation_index: u64,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    let receiver: AccountAddress = bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-    let amount: u64 = bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
-    operations.push(Operation::withdraw(
-        operation_index,
-        Some(OperationStatusType::Failure),
-        sender,
-        currency.clone(),
-        amount,
-    ));
-    operations.push(Operation::deposit(
-        operation_index + 1,
-        Some(OperationStatusType::Failure),
-        receiver,
-        currency,
-        amount,
-    ));
+
+    let args = payload.args();
+    let maybe_receiver = args
+        .get(0)
+        .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
+    let maybe_amount = args.get(1).map(|encoded| bcs::from_bytes::<u64>(encoded));
+
+    if let (Some(Ok(receiver)), Some(Ok(amount))) = (maybe_receiver, maybe_amount) {
+        operations.push(Operation::withdraw(
+            operation_index,
+            Some(OperationStatusType::Failure),
+            sender,
+            currency.clone(),
+            amount,
+        ));
+        operations.push(Operation::deposit(
+            operation_index + 1,
+            Some(OperationStatusType::Failure),
+            receiver,
+            currency,
+            amount,
+        ));
+    } else {
+        warn!(
+            "Failed to parse account's {} transfer {:?}",
+            sender, payload
+        );
+    }
 
     operations
 }
@@ -675,16 +699,21 @@ async fn parse_operations_from_write_set(
             parse_stakepool_changes(version, address, data, events, operation_index)
         }
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
-            parse_coinstore_changes(
-                coin_cache,
-                struct_tag.type_params.first().unwrap().clone(),
-                version,
-                address,
-                data,
-                events,
-                operation_index,
-            )
-            .await
+            if let Some(type_tag) = struct_tag.type_params.first() {
+                parse_coinstore_changes(
+                    coin_cache,
+                    type_tag.clone(),
+                    version,
+                    address,
+                    data,
+                    events,
+                    operation_index,
+                )
+                .await
+            } else {
+                warn!("Failed to parse coinstore {}", struct_tag);
+                Ok(operations)
+            }
         }
         _ => {
             // Any unknown type will just skip the operations
@@ -762,7 +791,8 @@ async fn parse_coinstore_changes(
     events: &[ContractEvent],
     mut operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let coin_store: CoinStoreResource = bcs::from_bytes(data).unwrap();
+    let coin_store: CoinStoreResource =
+        bcs::from_bytes(data).expect("Must be able to parse coin store");
     let mut operations = vec![];
 
     // Retrieve the coin type
