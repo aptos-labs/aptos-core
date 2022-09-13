@@ -627,6 +627,14 @@ impl EpochManager {
             onchain_config.max_failed_authors_to_store(),
         );
 
+        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+
+        self.round_manager_tx = Some(round_manager_tx.clone());
+
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),
@@ -638,15 +646,12 @@ impl EpochManager {
             self.storage.clone(),
             self.config.sync_only,
             onchain_config,
+            round_manager_tx,
+            self.config.round_initial_timeout_ms,
         );
 
         round_manager.init(last_vote).await;
-        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            1,
-            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
-        );
-        self.round_manager_tx = Some(round_manager_tx);
+
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
         tokio::spawn(round_manager.start(round_manager_rx, close_rx));
