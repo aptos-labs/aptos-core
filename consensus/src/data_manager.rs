@@ -166,58 +166,65 @@ impl DataManager for QuorumStoreDataManager {
             }
             Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
             Payload::InQuorumStore(proofs) => {
-                let (_, data_status) = self.digest_status.remove(&block.id()).expect("No status in Data Manager");
-                match data_status {
-                    DataStatus::Cached(data) => {
-                        return Ok(data.clone());
-                    }
-                    DataStatus::Requested(receivers) => {
-                        let mut vec_ret = Vec::new();
-                        debug!("QSE: waiting for data on {} receivers", receivers.len());
-                        for rx in receivers {
-                            match rx
-                                .await
-                                .expect("Oneshot channel to get a batch was dropped")
-                            {
-                                Ok(data) => {
-                                    debug!("QSE: got data, len {}", data.len());
-                                    vec_ret.push(data);
-                                }
-                                Err(e) => {
-                                    debug!("QS: got error from receiver {:?}", e);
-                                    let rec = self
-                                        .request_data(
-                                            proofs.clone(),
-                                            LogicalTime::new(block.epoch(), block.round()),
-                                        )
-                                        .await;
-                                    self.digest_status
-                                        .insert(block.id(), DataStatus::Requested(rec));
-                                    return Err(e);
+                // let data_status = self.digest_status.entry(block.id());
+                match self.digest_status.entry(block.id()) {
+                    dashmap::mapref::entry::Entry::Occupied(mut entry) => match entry.get_mut() {
+                        DataStatus::Cached(data) => {
+                            return Ok(data.clone());
+                        }
+                        DataStatus::Requested(receivers) => {
+                            let mut vec_ret = Vec::new();
+                            debug!("QSE: waiting for data on {} receivers", receivers.len());
+                            for rx in receivers {
+                                match rx.await {
+                                    Err(_) => {
+                                        debug!("Oneshot channel to get a batch was dropped");
+                                    }
+                                    Ok(result) => match result {
+                                        Ok(data) => {
+                                            debug!("QSE: got data, len {}", data.len());
+                                            vec_ret.push(data);
+                                        }
+                                        Err(e) => {
+                                            debug!("QS: got error from receiver {:?}", e);
+                                            let new_receivers = self
+                                                .request_data(
+                                                    proofs.clone(),
+                                                    LogicalTime::new(block.epoch(), block.round()),
+                                                )
+                                                .await;
+                                            entry.replace_entry(DataStatus::Requested(
+                                                new_receivers,
+                                            ));
+                                            return Err(e);
+                                        }
+                                    },
                                 }
                             }
+                            let ret: Vec<SignedTransaction> =
+                                vec_ret.into_iter().flatten().collect();
+                            entry.replace_entry(DataStatus::Cached(ret.clone()));
+                            Ok(ret)
                         }
-                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-                        self.digest_status
-                            .insert(block.id(), DataStatus::Cached(ret.clone()));
-                        Ok(ret)
+                    },
+                    dashmap::mapref::entry::Entry::Vacant(_) => {
+                        unreachable!("digest_status entry must exist!");
                     }
                 }
             }
         }
     }
 
-
-fn new_epoch(
-    &self,
-    data_reader: Arc<BatchReader>,
-    quorum_store_wrapper_tx: Sender<WrapperCommand>,
-) {
-    // TODO: check race here.
-    self.data_reader.swap(Some(data_reader));
-    self.quorum_store_wrapper_tx
-        .swap(Some(Arc::from(quorum_store_wrapper_tx)));
-}
+    fn new_epoch(
+        &self,
+        data_reader: Arc<BatchReader>,
+        quorum_store_wrapper_tx: Sender<WrapperCommand>,
+    ) {
+        // TODO: check race here.
+        self.data_reader.swap(Some(data_reader));
+        self.quorum_store_wrapper_tx
+            .swap(Some(Arc::from(quorum_store_wrapper_tx)));
+    }
 }
 
 pub struct DummyDataManager {}

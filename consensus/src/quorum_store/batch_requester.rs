@@ -62,9 +62,9 @@ impl BatchRequesterState {
                 .expect("Receiver of requested batch not available");
         } else {
             debug!("QS: batch timed out, digest {}", digest);
-            self.ret_tx
-                .send(Err(Error::CouldNotGetData))
-                .expect("Receiver of requested batch not available");
+            if self.ret_tx.send(Err(Error::CouldNotGetData)).is_err() {
+                debug!("Receiver of requested batch not available");
+            }
         }
     }
 }

@@ -26,7 +26,7 @@ pub(crate) struct NetworkListener {
     batch_store_tx: Sender<BatchStoreCommand>,
     batch_reader_tx: Sender<BatchReaderCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
-    max_batch_size: usize,
+    max_batch_bytes: usize,
 }
 
 impl NetworkListener {
@@ -36,7 +36,7 @@ impl NetworkListener {
         batch_store_tx: Sender<BatchStoreCommand>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         proof_builder_tx: Sender<ProofBuilderCommand>,
-        max_batch_size: usize,
+        max_batch_bytes: usize,
     ) -> Self {
         Self {
             epoch,
@@ -45,7 +45,7 @@ impl NetworkListener {
             batch_store_tx,
             batch_reader_tx,
             proof_builder_tx,
-            max_batch_size,
+            max_batch_bytes,
         }
     }
 
@@ -54,7 +54,7 @@ impl NetworkListener {
         let entry = self
             .batch_aggregators
             .entry(source)
-            .or_insert(BatchAggregator::new(self.max_batch_size));
+            .or_insert(BatchAggregator::new(self.max_batch_bytes));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             // end batch message
             debug!(

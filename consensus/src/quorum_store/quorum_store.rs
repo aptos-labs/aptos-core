@@ -61,7 +61,7 @@ pub struct QuorumStoreConfig {
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
     pub end_batch_ms: u128,
-    pub max_batch_bytes: u64,
+    pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
     /// Batches may have expiry set for max_batch_expiry_rounds_gap rounds after the
     /// latest committed round, and it will not be cleared from storage for another
@@ -69,7 +69,6 @@ pub struct QuorumStoreConfig {
     /// can still fetch the data they fall behind (later, they would have to state-sync).
     pub max_batch_expiry_round_gap: Round,
     pub batch_expiry_grace_rounds: Round,
-    pub max_batch_size: usize,
     pub memory_quota: usize,
     pub db_quota: usize,
     pub mempool_txn_pull_max_count: u64,
@@ -107,7 +106,7 @@ impl QuorumStore {
             batch_store_tx.clone(),
             batch_reader_tx.clone(),
             proof_builder_tx.clone(),
-            config.max_batch_size,
+            config.max_batch_bytes,
         );
         let proof_builder = ProofBuilder::new(config.proof_timeout_ms, my_peer_id);
         let (batch_store, batch_reader) = BatchStore::new(
@@ -141,7 +140,7 @@ impl QuorumStore {
                 network_sender,
                 command_rx: wrapper_command_rx,
                 fragment_id: 0,
-                batch_aggregator: BatchAggregator::new(config.max_batch_size),
+                batch_aggregator: BatchAggregator::new(config.max_batch_bytes),
                 batch_store_tx,
                 proof_builder_tx,
             },

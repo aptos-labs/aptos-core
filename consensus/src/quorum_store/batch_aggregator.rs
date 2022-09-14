@@ -89,11 +89,11 @@ pub(crate) struct BatchAggregator {
 }
 
 impl BatchAggregator {
-    pub(crate) fn new(max_batch_size: usize) -> Self {
+    pub(crate) fn new(max_batch_bytes: usize) -> Self {
         Self {
             batch_id: None,
             batch_state: None,
-            max_batch_bytes: max_batch_size,
+            max_batch_bytes,
         }
     }
 

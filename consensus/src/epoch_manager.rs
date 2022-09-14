@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::quorum_store::{
     batch_reader::BatchReader,
     quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
     quorum_store_db::QuorumStoreDB,
     quorum_store_wrapper::QuorumStoreWrapper,
 };
-use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
     block_storage::BlockStore,
     counters,
@@ -551,7 +551,7 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
             qs_config.mempool_txn_pull_max_count,
             qs_config.mempool_txn_pull_max_bytes,
-            qs_config.max_batch_bytes,
+            qs_config.max_batch_bytes as u64,
             qs_config.max_batch_expiry_round_gap,
             qs_config.end_batch_ms,
         );
@@ -732,7 +732,6 @@ impl EpochManager {
                 batch_request_timeout_ms: 1000,
                 max_batch_expiry_round_gap: 20,
                 batch_expiry_grace_rounds: 5,
-                max_batch_size: 200000,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,

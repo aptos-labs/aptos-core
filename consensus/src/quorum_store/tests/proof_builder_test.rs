@@ -8,7 +8,7 @@ use crate::quorum_store::tests::utils::{
 };
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::random_validator_verifier;
-use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
+use consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
 use futures::channel::oneshot;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
@@ -16,25 +16,25 @@ use tokio::sync::mpsc::channel;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_proof_builder_basic() {
     let (signers, verifier) = random_validator_verifier(4, None, true);
-    let arc_signers: Vec<Arc<ValidatorSigner>> = signers.into_iter().map(|s| Arc::new(s)).collect();
-    let proof_builder = ProofBuilder::new(100);
+    let arc_signers: Vec<Arc<ValidatorSigner>> =
+        signers.clone().into_iter().map(|s| Arc::new(s)).collect();
+    let proof_builder = ProofBuilder::new(100, signers[0].author());
     let (proof_builder_tx, proof_builder_rx) = channel(100);
     tokio::spawn(proof_builder.start(proof_builder_rx, verifier.clone()));
 
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
-    let signed_digest =
-        SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[0].clone());
+    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20));
     let (proof_tx, proof_rx) = oneshot::channel();
 
     assert!(proof_builder_tx
         .send(ProofBuilderCommand::InitProof(
-            signed_digest.clone(),
+            signed_digest_info.clone(),
             0,
             proof_tx
         ))
         .await
         .is_ok());
-    for i in 1..arc_signers.len() {
+    for i in 0..arc_signers.len() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone());
         assert!(proof_builder_tx
@@ -53,7 +53,7 @@ async fn test_proof_builder_basic() {
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
         .send(ProofBuilderCommand::InitProof(
-            signed_digest.clone(),
+            signed_digest_info.clone(),
             4,
             proof_tx
         ))
@@ -68,13 +68,13 @@ async fn test_proof_builder_basic() {
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
         .send(ProofBuilderCommand::InitProof(
-            signed_digest.clone(),
+            signed_digest_info.clone(),
             4,
             proof_tx
         ))
         .await
         .is_ok());
-    for i in 1..arc_signers.len() {
+    for i in 0..arc_signers.len() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone());
         assert!(proof_builder_tx
@@ -90,10 +90,14 @@ async fn test_proof_builder_basic() {
     // check wrong signatures
     let (proof_tx, proof_rx) = oneshot::channel();
     assert!(proof_builder_tx
-        .send(ProofBuilderCommand::InitProof(signed_digest, 10, proof_tx))
+        .send(ProofBuilderCommand::InitProof(
+            signed_digest_info,
+            10,
+            proof_tx
+        ))
         .await
         .is_ok());
-    for _ in 1..arc_signers.len() {
+    for _ in 0..arc_signers.len() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone());
         assert!(proof_builder_tx

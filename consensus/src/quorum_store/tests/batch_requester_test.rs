@@ -9,7 +9,7 @@ use crate::quorum_store::tests::utils::{
 use crate::quorum_store::types::Batch;
 use crate::test_utils::mock_quorum_store_sender::MockQuorumStoreSender;
 use aptos_types::account_address::AccountAddress;
-use claim::{assert_err, assert_some};
+use claims::{assert_err, assert_some};
 use tokio::sync::mpsc::channel;
 use tokio::sync::oneshot;
 
