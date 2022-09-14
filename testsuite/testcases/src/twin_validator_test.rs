@@ -28,7 +28,7 @@ impl NetworkTest for TwinValidatorTest {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
         let validator_count = all_validators_ids.len();
-        let twin_count = validator_count / 5;
+        let twin_count = 2;
         runtime.block_on(async {
             for i in 0..twin_count {
                 let main_id = all_validators_ids[i];
