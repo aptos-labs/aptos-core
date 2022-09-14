@@ -1,6 +1,6 @@
 /// This module is an example of how one can create a NFT collection from a resource account
 /// and allow users to mint from the NFT collection.
-/// Check aptos/move-e2e-tests/src/tests /mint.nft.rs for an e2e example.
+/// Check aptos/move-e2e-tests/src/tests/mint_nft.rs for an e2e example.
 ///
 /// - Initialization of this module
 /// Let's say we have an original account at address `0xcafe`. We can use it to call

@@ -19,8 +19,8 @@ use move_deps::move_core_types::parser::parse_struct_tag;
 fn rotate_auth_key_ed25519_to_ed25519() {
     let mut harness = MoveHarness::new();
     let account1 = harness.new_account_with_key_pair();
-
     let account2 = harness.new_account_with_key_pair();
+
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_payload_key_rotation(
         0,
@@ -28,7 +28,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         account2.privkey.clone(),
         account2.pubkey.clone(),
     );
@@ -53,7 +53,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         private_key,
         public_key,
     );
@@ -66,8 +66,8 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
     let mut account1 = harness.new_account_with_key_pair();
-
     let account2 = harness.new_account_with_key_pair();
+
     // assert that the payload is successfully processed (the signatures are correct)
     assert_successful_payload_key_rotation(
         0,
@@ -75,7 +75,7 @@ fn rotate_auth_key_twice() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         account2.privkey.clone(),
         account2.pubkey.clone(),
     );
@@ -91,7 +91,7 @@ fn rotate_auth_key_twice() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        11,
+        1,
         account3.privkey.clone(),
         account3.pubkey.clone(),
     );
