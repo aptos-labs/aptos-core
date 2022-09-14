@@ -184,12 +184,16 @@ impl BufferManager {
             callback,
         } = ordered_blocks;
 
-        info!(
+        warn!(
             "Receive ordered block {}, the queue size is {}",
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
         counters::NUM_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
+        warn!(
+            "Number of blocks in pipeline is {:?}",
+            counters::NUM_BLOCKS_IN_PIPELINE.get()
+        );
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -203,7 +207,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_ordered()
             });
-        info!(
+        warn!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -212,8 +216,13 @@ impl BufferManager {
             let request = self.create_new_request(ExecutionRequest { ordered_blocks });
             if cursor == self.execution_root {
                 let sender = self.execution_phase_tx.clone();
+                warn!("retrying execution after 100 ms");
                 Self::spawn_retry_request(sender, request, Duration::from_millis(100));
             } else {
+                warn!(
+                    "Sending execution through the channel from {:?} to {:?}",
+                    cursor, self.execution_root
+                );
                 self.execution_phase_tx
                     .send(request)
                     .await
