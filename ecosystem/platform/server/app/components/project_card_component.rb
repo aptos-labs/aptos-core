@@ -12,5 +12,7 @@ class ProjectCardComponent < ViewComponent::Base
       @rest[:class]
     ]
     @rest[:onclick] = 'this.querySelector("a").click()'
+    @rest[:data] ||= {}
+    @rest[:data][:project_id] = project.id
   end
 end

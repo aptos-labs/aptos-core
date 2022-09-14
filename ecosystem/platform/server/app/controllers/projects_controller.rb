@@ -12,9 +12,10 @@ class ProjectsController < ApplicationController
   # GET /projects
   def index
     @categories = Category.all.index_by(&:id)
-    @projects = Project.where(public: true, verified: true)
-                       .includes(:project_categories)
-                       .with_attached_thumbnail
+    @projects = params[:s] ? Project.search(params[:s]) : Project
+    @projects = @projects.where(public: true, verified: true)
+                         .includes(:project_categories)
+                         .with_attached_thumbnail
 
     selected_category = params[:category]&.to_i
     @projects = @projects.filter_by_category(selected_category) if selected_category
