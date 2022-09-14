@@ -384,7 +384,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'s
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
         "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test),
+        single_test => single_test_suite(single_test, duration),
     }
 }
 
@@ -416,7 +416,7 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         ])
 }
 
-fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
+fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
@@ -585,23 +585,27 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 // Have single epoch change in land blocking
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
-            .with_success_criteria(SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    5000
-                } else {
-                    6000
-                },
-                10000,
-                true,
-                Some(Duration::from_secs(if duration.as_secs() > 1200 {
-                    240
-                } else {
-                    60
-                })),
-            )),
+            .with_success_criteria(get_land_blocking_success_criteria(duration)),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
+}
+
+fn get_land_blocking_success_criteria(duration: Duration) -> SuccessCriteria {
+    SuccessCriteria::new(
+        if duration.as_secs() > 1200 {
+            5000
+        } else {
+            6000
+        },
+        10000,
+        true,
+        Some(Duration::from_secs(if duration.as_secs() > 1200 {
+            240
+        } else {
+            60
+        })),
+    )
 }
 
 /// A default config for running various state sync performance tests
@@ -669,20 +673,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
-        .with_success_criteria(SuccessCriteria::new(
-            if duration.as_secs() > 1200 {
-                5000
-            } else {
-                6000
-            },
-            10000,
-            true,
-            Some(Duration::from_secs(if duration.as_secs() > 1200 {
-                240
-            } else {
-                60
-            })),
-        ))
+        .with_success_criteria(get_land_blocking_success_criteria(duration))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
