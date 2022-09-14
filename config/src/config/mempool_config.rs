@@ -23,6 +23,7 @@ pub struct MempoolConfig {
     pub system_transaction_timeout_secs: u64,
     pub system_transaction_gc_interval_ms: u64,
     pub shared_mempool_validator_broadcast: bool,
+    pub shared_mempool_early_expiry_secs: u64,
 }
 
 impl Default for MempoolConfig {
@@ -43,6 +44,7 @@ impl Default for MempoolConfig {
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             shared_mempool_validator_broadcast: true,
+            shared_mempool_early_expiry_secs: 20,
         }
     }
 }

@@ -63,6 +63,8 @@ pub enum MempoolStatusCode {
     // transaction didn't pass vm_validation
     VmError = 5,
     UnknownStatus = 6,
+    // Transaction expiration time rejected
+    InvalidExpirationTime = 7,
 }
 
 impl TryFrom<u64> for MempoolStatusCode {
@@ -77,6 +79,7 @@ impl TryFrom<u64> for MempoolStatusCode {
             4 => Ok(MempoolStatusCode::InvalidUpdate),
             5 => Ok(MempoolStatusCode::VmError),
             6 => Ok(MempoolStatusCode::UnknownStatus),
+            7 => Ok(MempoolStatusCode::InvalidExpirationTime),
             _ => Err("invalid StatusCode"),
         }
     }

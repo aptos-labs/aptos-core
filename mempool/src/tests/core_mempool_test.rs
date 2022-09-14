@@ -8,7 +8,7 @@ use crate::{
         TestTransaction,
     },
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{MempoolConfig, NodeConfig};
 use aptos_crypto::HashValue;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
@@ -174,6 +174,7 @@ fn test_system_ttl() {
     // All transactions are supposed to be evicted on next gc run.
     let mut config = NodeConfig::random();
     config.mempool.system_transaction_timeout_secs = 0;
+    config.mempool.shared_mempool_early_expiry_secs = 0;
     let mut mempool = CoreMempool::new(&config);
 
     add_txn(&mut mempool, TestTransaction::new(0, 0, 10)).unwrap();
@@ -428,18 +429,37 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 }
 
 #[test]
+fn test_reject_txn_expiring_soon() {
+    let mut pool = setup_mempool().0;
+    // Insert in the middle transaction that's going to be expired.
+    let txn = TestTransaction::new(1, 0, 1).make_signed_transaction_with_expiration_time(
+        aptos_infallible::duration_since_epoch().as_secs()
+            + MempoolConfig::default().shared_mempool_early_expiry_secs
+            - 1,
+    );
+    assert_eq!(
+        MempoolStatusCode::InvalidExpirationTime,
+        pool.add_txn(
+            txn,
+            1,
+            AccountSequenceInfo::Sequential(0),
+            TimelineState::NotReady,
+        )
+        .code
+    );
+}
+
+#[test]
 fn test_gc_ready_transaction() {
     let mut pool = setup_mempool().0;
     add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
 
+    let cur_time = aptos_infallible::duration_since_epoch();
     // Insert in the middle transaction that's going to be expired.
-    let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
-    pool.add_txn(
-        txn,
-        1,
-        AccountSequenceInfo::Sequential(0),
-        TimelineState::NotReady,
+    let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(
+        cur_time.as_secs() + 1 + MempoolConfig::default().shared_mempool_early_expiry_secs,
     );
+    add_signed_txn(&mut pool, txn).unwrap();
 
     // Insert few transactions after it.
     // They are supposed to be ready because there's a sequential path from 0 to them.
@@ -451,7 +471,7 @@ fn test_gc_ready_transaction() {
     assert_eq!(timeline.len(), 4);
 
     // GC expired transaction.
-    pool.gc_by_expiration_time(Duration::from_secs(1));
+    pool.gc_by_expiration_time(cur_time + Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
     let block = pool.get_batch(1, 1024, HashSet::new());

@@ -67,6 +67,7 @@ pub struct TransactionStore {
     capacity_bytes: usize,
     capacity_per_user: usize,
     max_batch_bytes: u64,
+    early_expiry_secs: u64,
 }
 
 impl TransactionStore {
@@ -93,6 +94,7 @@ impl TransactionStore {
             capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
             max_batch_bytes: config.shared_mempool_max_batch_bytes,
+            early_expiry_secs: config.shared_mempool_early_expiry_secs,
         }
     }
 
@@ -178,6 +180,20 @@ impl TransactionStore {
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }
+        }
+
+        if txn.txn.expiration_timestamp_secs()
+            < aptos_infallible::duration_since_epoch().as_secs() + self.early_expiry_secs
+        {
+            return MempoolStatus::new(MempoolStatusCode::InvalidExpirationTime).with_message(
+                format!(
+                    "Transaction will expire too soon, in {}, minimum {}",
+                    txn.txn
+                        .expiration_timestamp_secs()
+                        .saturating_sub(aptos_infallible::duration_since_epoch().as_secs()),
+                    self.early_expiry_secs,
+                ),
+            );
         }
 
         if self.check_is_full_after_eviction(
@@ -537,7 +553,9 @@ impl TransactionStore {
             .with_label_values(&[metric_label])
             .inc();
 
-        let mut gc_txns = index.gc(now);
+        let expiry = now + Duration::from_secs(self.early_expiry_secs);
+
+        let mut gc_txns = index.gc(expiry);
         // sort the expired txns by order of sequence number per account
         gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
         let mut gc_iter = gc_txns.iter().peekable();
@@ -573,11 +591,16 @@ impl TransactionStore {
                     gc_txns_log.add_with_status(account, txn_sequence_number, status);
                     if let Some(&creation_time) = metrics_cache.get(&(account, txn_sequence_number))
                     {
-                        if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
-                            counters::CORE_MEMPOOL_GC_LATENCY
-                                .with_label_values(&[metric_label, status])
-                                .observe(time_delta.as_secs_f64());
-                        }
+                        let time_delta_secs = if let Ok(time_delta) =
+                            SystemTime::now().duration_since(creation_time)
+                        {
+                            time_delta.as_secs_f64()
+                        } else {
+                            0.0
+                        };
+                        counters::CORE_MEMPOOL_GC_LATENCY
+                            .with_label_values(&[metric_label, status])
+                            .observe(time_delta_secs);
                     }
 
                     // remove txn

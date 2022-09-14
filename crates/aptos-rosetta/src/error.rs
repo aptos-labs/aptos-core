@@ -48,6 +48,7 @@ pub enum ApiError {
     InvalidTransactionUpdate(Option<String>),
     SequenceNumberTooOld(Option<String>),
     VmError(Option<String>),
+    InvalidExpirationTime(Option<String>),
     MempoolIsFull(Option<String>),
 }
 
@@ -95,6 +96,7 @@ impl ApiError {
             InvalidTransactionUpdate(None),
             SequenceNumberTooOld(None),
             VmError(None),
+            InvalidExpirationTime(None),
             MempoolIsFull(None),
         ]
     }
@@ -135,6 +137,7 @@ impl ApiError {
             VmError(_) => 31,
             MempoolIsFull(_) => 32,
             CoinTypeFailedToBeFetched(_) => 33,
+            InvalidExpirationTime(_) => 34,
         }
     }
 
@@ -189,6 +192,7 @@ impl ApiError {
             ApiError::InvalidTransactionUpdate(_) => "Invalid transaction update.  Can only update gas unit price",
             ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
+            ApiError::InvalidExpirationTime(_) => "Expiration time is not valid.  Please create a new transaction with an updated expiration time",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
             ApiError::GasEstimationFailed(_) => "Gas estimation failed",
         }
@@ -218,6 +222,7 @@ impl ApiError {
             ApiError::InvalidTransactionUpdate(inner) => inner,
             ApiError::SequenceNumberTooOld(inner) => inner,
             ApiError::VmError(inner) => inner,
+            ApiError::InvalidExpirationTime(inner) => inner,
             ApiError::MempoolIsFull(inner) => inner,
             ApiError::GasEstimationFailed(inner) => inner,
             _ => None,
@@ -283,6 +288,9 @@ impl From<RestError> for ApiError {
                     ApiError::SequenceNumberTooOld(Some(err.error.message))
                 }
                 AptosErrorCode::VmError => ApiError::VmError(Some(err.error.message)),
+                AptosErrorCode::InvalidExpirationTime => {
+                    ApiError::InvalidExpirationTime(Some(err.error.message))
+                }
                 AptosErrorCode::HealthCheckFailed => {
                     ApiError::InternalError(Some(err.error.message))
                 }

@@ -123,17 +123,19 @@ pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> R
 }
 
 pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransaction) -> Result<()> {
-    match pool
-        .add_txn(
-            transaction.clone(),
-            transaction.gas_unit_price(),
-            AccountSequenceInfo::Sequential(0),
-            TimelineState::NotReady,
-        )
-        .code
-    {
+    let result = pool.add_txn(
+        transaction.clone(),
+        transaction.gas_unit_price(),
+        AccountSequenceInfo::Sequential(0),
+        TimelineState::NotReady,
+    );
+    match &result.code {
         MempoolStatusCode::Accepted => Ok(()),
-        _ => Err(format_err!("insertion failure")),
+        other => Err(format_err!(
+            "insertion failure: {:?}, {}",
+            other,
+            result.message
+        )),
     }
 }
 

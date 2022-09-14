@@ -93,6 +93,8 @@ pub enum AptosErrorCode {
     SequenceNumberTooOld = 402,
     /// The submitted transaction failed VM checks.
     VmError = 403,
+    /// The submitted transaction doesn't have a valid expiration time.
+    InvalidExpirationTime = 404,
 
     /// Health check failed.
     HealthCheckFailed = 500,

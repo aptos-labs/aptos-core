@@ -775,6 +775,10 @@ impl TransactionsApi {
                 mempool_status.message,
                 AptosErrorCode::SequenceNumberTooOld,
             )),
+            MempoolStatusCode::InvalidExpirationTime => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::InvalidExpirationTime,
+            )),
             MempoolStatusCode::InvalidUpdate => Err(AptosError::new_with_error_code(
                 mempool_status.message,
                 AptosErrorCode::InvalidTransactionUpdate,

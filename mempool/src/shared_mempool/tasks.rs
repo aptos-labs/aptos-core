@@ -403,6 +403,29 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 mempool.gc_by_expiration_time(curr_time);
                 let max_txns = cmp::max(max_txns, 1);
                 txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
+
+                if !txns.is_empty() {
+                    let mut sum = 0_u64;
+                    let mut min = u64::MAX;
+                    for txn in &txns {
+                        let expiry_time = txn.expiration_timestamp_secs();
+                        if expiry_time < curr_time.as_secs() + 20 {
+                            error!(
+                                "Low expiration returned after GC: {} , curr time: {}",
+                                expiry_time,
+                                curr_time.as_secs()
+                            );
+                        }
+                        sum += expiry_time - curr_time.as_secs();
+                        min = min.min(expiry_time - curr_time.as_secs());
+                    }
+                    warn!(
+                        "Average expiration time from mempool batch is: {}, minimum is: {}. Num txns: {}",
+                        sum / txns.len() as u64,
+                        min,
+                        txns.len(),
+                    );
+                }
             }
             counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
 
