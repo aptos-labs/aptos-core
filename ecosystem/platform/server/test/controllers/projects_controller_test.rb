@@ -25,6 +25,21 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test 'search for projects' do
+    ActiveRecord.verbose_query_logs = true
+    a = FactoryBot.create(:project, user: @user, verified: true, title: 'Revenge of the Fnords')
+    b = FactoryBot.create(:project, user: @user, verified: true, short_description: 'chronicles a group of fnords')
+    c = FactoryBot.create(:project, user: @user, verified: true,
+                                    full_description: 'The fnords decide to seek membership on the Greek Council ' * 10)
+    d = FactoryBot.create(:project, user: @user, verified: true, title: 'Episode V')
+    get projects_path(s: 'fnord')
+    assert_response :success
+    assert_select "[data-project-id=#{a.id}]"
+    assert_select "[data-project-id=#{b.id}]"
+    assert_select "[data-project-id=#{c.id}]"
+    assert_select "[data-project-id=#{d.id}]", false
+  end
+
   test 'view project' do
     sign_out @user
     project = FactoryBot.create(:project, user: @user, verified: true)
