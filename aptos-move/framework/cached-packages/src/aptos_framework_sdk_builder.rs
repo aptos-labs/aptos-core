@@ -34,6 +34,32 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its rotation capability to only one other address at one time. If the account
+    /// has an existing rotation capability offer, calling this function will update the rotation capabilituy offer with
+    /// the new `recipient_address`.
+    /// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
+    /// and prevents the classic "time-of-check time-of-use" attack.
+    /// For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
+    /// (based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
+    /// incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
+    /// the execution path triggers the account key rotation.
+    /// We prevent such attacks by asking for this extra signature authorizing the key rotation.
+    ///
+    /// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
+    /// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
+    /// @param account_public_key_bytes is the public key of the account owner.
+    /// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing
+    /// @param recipient_address in the account owner's `RotationCapabilityOffer`, calling this function will replace the
+    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+    /// to the account owner's rotation capability).
+    AccountOfferRotationCapability {
+        rotation_capability_sig_bytes: Vec<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
     /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
@@ -50,6 +76,11 @@ pub enum EntryFunctionCall {
         recipient_address: AccountAddress,
     },
 
+    /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
+    AccountRevokeRotationCapability {
+        to_be_revoked_address: AccountAddress,
+    },
+
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
     /// has a signer capability offer from `account` but will be revoked in this function).
     AccountRevokeSignerCapability {
@@ -63,16 +94,40 @@ pub enum EntryFunctionCall {
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
     /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
     /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
-    /// To verify signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
+    /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
     /// `originating address` refers to an account's original/first address.
+    ///
+    /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
+    /// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
+    /// OriginatingAddress[new_addr_a] -> addr_a
+    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+    ///
+    /// But Bob likes to mess with Alice.
+    /// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+    /// Bob can easily do this.
+    ///
+    /// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
+    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
+    /// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+    ///
+    /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
+    /// to rotate his address to Alice's address in the first place.
     AccountRotateAuthenticationKey {
         from_scheme: u8,
         from_public_key_bytes: Vec<u8>,
         to_scheme: u8,
         to_public_key_bytes: Vec<u8>,
         cap_rotate_key: Vec<u8>,
+        cap_update_table: Vec<u8>,
+    },
+
+    AccountRotateAuthenticationKeyWithRotationCapability {
+        rotation_cap_offerer_address: AccountAddress,
+        new_scheme: u8,
+        new_public_key_bytes: Vec<u8>,
         cap_update_table: Vec<u8>,
     },
 
@@ -506,6 +561,17 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountOfferRotationCapability {
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_rotation_capability(
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountOfferSignerCapability {
                 signer_capability_sig_bytes,
                 account_scheme,
@@ -517,6 +583,9 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountRevokeRotationCapability {
+                to_be_revoked_address,
+            } => account_revoke_rotation_capability(to_be_revoked_address),
             AccountRevokeSignerCapability {
                 to_be_revoked_address,
             } => account_revoke_signer_capability(to_be_revoked_address),
@@ -533,6 +602,17 @@ impl EntryFunctionCall {
                 to_scheme,
                 to_public_key_bytes,
                 cap_rotate_key,
+                cap_update_table,
+            ),
+            AccountRotateAuthenticationKeyWithRotationCapability {
+                rotation_cap_offerer_address,
+                new_scheme,
+                new_public_key_bytes,
+                cap_update_table,
+            } => account_rotate_authentication_key_with_rotation_capability(
+                rotation_cap_offerer_address,
+                new_scheme,
+                new_public_key_bytes,
                 cap_update_table,
             ),
             AptosAccountBatchTransfer {
@@ -810,6 +890,50 @@ impl EntryFunctionCall {
     }
 }
 
+/// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+/// An account can delegate its rotation capability to only one other address at one time. If the account
+/// has an existing rotation capability offer, calling this function will update the rotation capabilituy offer with
+/// the new `recipient_address`.
+/// Here, `rotation_capability_sig_bytes` signature indicates that this key rotation is authorized by the account owner,
+/// and prevents the classic "time-of-check time-of-use" attack.
+/// For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
+/// (based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
+/// incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
+/// the execution path triggers the account key rotation.
+/// We prevent such attacks by asking for this extra signature authorizing the key rotation.
+///
+/// @param rotation_capability_sig_bytes is the signature by the account owner's key on `RotationCapabilityOfferProofChallengeV2`.
+/// @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
+/// @param account_public_key_bytes is the public key of the account owner.
+/// @param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing
+/// @param recipient_address in the account owner's `RotationCapabilityOffer`, calling this function will replace the
+/// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+/// to the account owner's rotation capability).
+pub fn account_offer_rotation_capability(
+    rotation_capability_sig_bytes: Vec<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
 /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its signer capability to only one other address at one time.
 /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
@@ -844,6 +968,24 @@ pub fn account_offer_signer_capability(
     ))
 }
 
+/// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
+pub fn account_revoke_rotation_capability(
+    to_be_revoked_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_rotation_capability").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&to_be_revoked_address).unwrap()],
+    ))
+}
+
 /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
 /// has a signer capability offer from `account` but will be revoked in this function).
 pub fn account_revoke_signer_capability(
@@ -870,10 +1012,27 @@ pub fn account_revoke_signer_capability(
 /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
 /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
 /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
-/// To verify signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
+/// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
 /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
 /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
 /// `originating address` refers to an account's original/first address.
+///
+/// Here is an example attack if we don't ask for the second signature `cap_update_table`:
+/// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
+/// OriginatingAddress[new_addr_a] -> addr_a
+/// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+/// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+///
+/// But Bob likes to mess with Alice.
+/// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+/// Bob can easily do this.
+///
+/// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
+/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
+/// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+///
+/// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
+/// to rotate his address to Alice's address in the first place.
 pub fn account_rotate_authentication_key(
     from_scheme: u8,
     from_public_key_bytes: Vec<u8>,
@@ -898,6 +1057,31 @@ pub fn account_rotate_authentication_key(
             bcs::to_bytes(&to_scheme).unwrap(),
             bcs::to_bytes(&to_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_rotate_key).unwrap(),
+            bcs::to_bytes(&cap_update_table).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_rotate_authentication_key_with_rotation_capability(
+    rotation_cap_offerer_address: AccountAddress,
+    new_scheme: u8,
+    new_public_key_bytes: Vec<u8>,
+    cap_update_table: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_with_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_cap_offerer_address).unwrap(),
+            bcs::to_bytes(&new_scheme).unwrap(),
+            bcs::to_bytes(&new_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
         ],
     ))
@@ -2276,6 +2460,21 @@ pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
+    pub fn account_offer_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferRotationCapability {
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_signer_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -2285,6 +2484,18 @@ mod decoder {
                 account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
                 account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
                 recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_revoke_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountRevokeRotationCapability {
+                to_be_revoked_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -2315,6 +2526,23 @@ mod decoder {
                 cap_rotate_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                 cap_update_table: bcs::from_bytes(script.args().get(5)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn account_rotate_authentication_key_with_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountRotateAuthenticationKeyWithRotationCapability {
+                    rotation_cap_offerer_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    new_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    cap_update_table: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -3142,8 +3370,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
+            "account_offer_rotation_capability".to_string(),
+            Box::new(decoder::account_offer_rotation_capability),
+        );
+        map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
+        );
+        map.insert(
+            "account_revoke_rotation_capability".to_string(),
+            Box::new(decoder::account_revoke_rotation_capability),
         );
         map.insert(
             "account_revoke_signer_capability".to_string(),
@@ -3152,6 +3388,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
+        );
+        map.insert(
+            "account_rotate_authentication_key_with_rotation_capability".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
             "aptos_account_batch_transfer".to_string(),

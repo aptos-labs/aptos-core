@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, MoveHarness};
+use crate::tests::offer_rotation_capability::{
+    offer_rotation_capability_v2, revoke_rotation_capability,
+};
+use crate::{assert_abort, assert_success, MoveHarness};
 use aptos::common::types::RotationProofChallenge;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -9,6 +12,7 @@ use aptos_crypto::{
     Signature, SigningKey, Uniform, ValidCryptoMaterial,
 };
 use aptos_language_e2e_tests::account::Account;
+use aptos_types::transaction::TransactionStatus;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
@@ -16,6 +20,7 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 use move_core_types::parser::parse_struct_tag;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 
 #[test]
 fn rotate_auth_key_ed25519_to_ed25519() {
@@ -30,7 +35,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         account2.privkey.clone(),
         account2.pubkey.clone(),
     );
@@ -54,7 +59,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         private_key,
         public_key,
     );
@@ -76,7 +81,7 @@ fn rotate_auth_key_twice() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        10,
+        0,
         account2.privkey.clone(),
         account2.pubkey.clone(),
     );
@@ -92,12 +97,82 @@ fn rotate_auth_key_twice() {
         &mut harness,
         account1.clone(),
         *account1.address(),
-        11,
+        1,
         account3.privkey.clone(),
         account3.pubkey.clone(),
     );
     account1.rotate_key(account3.privkey, account3.pubkey);
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address(), 2);
+}
+
+#[test]
+fn rotate_auth_key_with_rotation_capability_e2e() {
+    let mut harness = MoveHarness::new();
+    let delegate_account = harness.new_account_with_key_pair();
+    let mut offerer_account = harness.new_account_with_key_pair();
+
+    offer_rotation_capability_v2(&mut harness, &offerer_account, &delegate_account);
+    let new_private_key = Ed25519PrivateKey::generate_for_testing();
+    let new_public_key = Ed25519PublicKey::from(&new_private_key);
+    assert_success!(run_rotate_auth_key_with_rotation_capability(
+        &mut harness,
+        &mut offerer_account,
+        &delegate_account,
+        &new_private_key,
+        &new_public_key
+    ));
+    offerer_account.rotate_key(new_private_key.clone(), new_public_key.clone());
+    verify_originating_address(
+        &mut harness,
+        offerer_account.auth_key(),
+        *offerer_account.address(),
+        1,
+    );
+
+    revoke_rotation_capability(&mut harness, &offerer_account, *delegate_account.address());
+    assert_abort!(
+        run_rotate_auth_key_with_rotation_capability(
+            &mut harness,
+            &mut offerer_account,
+            &delegate_account,
+            &new_private_key,
+            &new_public_key
+        ),
+        _
+    );
+}
+
+fn run_rotate_auth_key_with_rotation_capability(
+    harness: &mut MoveHarness,
+    offerer_account: &mut Account,
+    delegate_account: &Account,
+    new_private_key: &Ed25519PrivateKey,
+    new_public_key: &Ed25519PublicKey,
+) -> TransactionStatus {
+    let rotation_proof = RotationProofChallenge {
+        account_address: CORE_CODE_ADDRESS,
+        module_name: String::from("account"),
+        struct_name: String::from("RotationProofChallenge"),
+        sequence_number: 0,
+        originator: *offerer_account.address(),
+        current_auth_key: AccountAddress::from_bytes(&offerer_account.auth_key()).unwrap(),
+        new_public_key: new_public_key.to_bytes().to_vec(),
+    };
+
+    let rotation_msg = bcs::to_bytes(&rotation_proof).unwrap();
+
+    // sign the rotation message by the new private key
+    let signature_by_new_privkey = new_private_key.sign_arbitrary_message(&rotation_msg);
+
+    harness.run_transaction_payload(
+        delegate_account,
+        aptos_stdlib::account_rotate_authentication_key_with_rotation_capability(
+            *offerer_account.address(),
+            0,
+            new_public_key.to_bytes().to_vec(),
+            signature_by_new_privkey.to_bytes().to_vec(),
+        ),
+    )
 }
 
 pub fn assert_successful_key_rotation_transaction<
