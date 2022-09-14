@@ -8,4 +8,5 @@ pub use prometheus::{
     HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, TextEncoder,
 };
 
+pub mod const_metric;
 pub mod op_counters;
