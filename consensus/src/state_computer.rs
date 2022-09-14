@@ -77,6 +77,7 @@ impl ExecutionProxy {
         let data_manager_clone = data_manager.clone();
         handle.spawn(async move {
             while let Some((epoch, round, payloads)) = commit_rx.next().await {
+                debug!("notifying commit for round: {}", round);
                 data_manager_clone
                     .notify_commit(LogicalTime::new(epoch, round), payloads)
                     .await;
