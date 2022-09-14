@@ -25,6 +25,13 @@ module aptos_framework::genesis {
         balance: u64,
     }
 
+    struct EmployeeAccountMap has copy, drop {
+        accounts: vector<address>,
+        validator: ValidatorConfigurationWithCommission,
+        vesting_schedule_numerator: vector<u64>,
+        vesting_schedule_denominator: u64,
+    }
+
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
         operator_address: address,
@@ -34,6 +41,11 @@ module aptos_framework::genesis {
         proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         full_node_network_addresses: vector<u8>,
+    }
+
+    struct ValidatorConfigurationWithCommission has copy, drop {
+        validator_config: ValidatorConfiguration,
+        commission_percentage: u64,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -158,6 +170,17 @@ module aptos_framework::genesis {
             aptos_coin::mint(aptos_framework, account_address, balance);
             account
         }
+    }
+
+    fun create_employee_validators(
+        _aptos_framework: &signer,
+        _employees: vector<EmployeeAccountMap>,
+    ) {
+    }
+
+    fun create_initialize_validators_with_commission(
+        _aptos_framework: &signer,
+        _validators: vector<ValidatorConfigurationWithCommission>) {
     }
 
     /// Sets up the initial validator set for the network.

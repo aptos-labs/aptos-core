@@ -166,6 +166,10 @@ impl ChainId {
     pub fn test() -> Self {
         ChainId::new(NamedChain::TESTING.id())
     }
+
+    pub fn mainnet() -> Self {
+        ChainId::new(NamedChain::MAINNET.id())
+    }
 }
 
 #[cfg(test)]
