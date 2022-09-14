@@ -76,7 +76,6 @@ function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
           w={simulatedDimensions[0]}
           h={simulatedDimensions[1]}
           borderRadius=".5rem"
-          overflow="auto"
           boxShadow={isFullScreen ? undefined : boxShadow}
         >
           { children }

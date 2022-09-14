@@ -96,7 +96,6 @@ function NextButton({
   const confirmPassword = watch('confirmPassword');
   const mnemonicString = watch('mnemonicString');
   const mnemonicValues = watch('mnemonicValues');
-  const savedSecretRecoveryPhrase = watch('savedSecretRecoveryPhrase');
 
   const passwordResult = zxcvbn(initialPassword);
   const passwordScore = passwordResult.score;
@@ -168,18 +167,7 @@ function NextButton({
         );
       }
       case OnboardingPage.SecretRecoveryPhrase: {
-        if (savedSecretRecoveryPhrase) {
-          return baseNextButton;
-        }
-        return (
-          <Tooltip
-            label="You must save your Secret Recovery Phrase"
-          >
-            <Box width="100%" height="100%">
-              {disabledNextButton}
-            </Box>
-          </Tooltip>
-        );
+        return baseNextButton;
       }
       case OnboardingPage.EnterSecretRecoveryPhrase: {
         const sortedMnemonicEntries = Object.entries(mnemonicValues)
@@ -212,7 +200,6 @@ function NextButton({
     initialPassword,
     confirmPassword,
     passwordScore,
-    savedSecretRecoveryPhrase,
   ]);
 
   return (isImport && activeStep >= 1) ? null : NextButtonComponent;
