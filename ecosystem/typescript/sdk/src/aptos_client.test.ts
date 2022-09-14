@@ -3,7 +3,6 @@
 
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
-import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import {
@@ -14,6 +13,7 @@ import {
 } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
+import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
 
 const account = "0x1::account::Account";
 
