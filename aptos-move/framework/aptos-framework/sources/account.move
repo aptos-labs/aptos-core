@@ -433,6 +433,8 @@ module aptos_framework::account {
     ///
     /// Simplifies resource account creation, since callers do not need to specify a seed.
     ///
+    /// Will abort if called more than once by a given `source` within a single block.
+    ///
     /// In practice the Unix timestamp is effectively non-deterministic, or more specifically, just
     /// as difficult to front run in a miner extractable value (MEV)-style attack as a seed
     /// provided via a `public entry` function argument. That is, if a malicious block producer
