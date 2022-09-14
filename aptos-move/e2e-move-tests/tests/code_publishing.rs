@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use aptos_types::on_chain_config::CODE_DEPENDENCY_CHECK;
+use aptos_types::on_chain_config::FeatureFlag;
 use e2e_move_tests::package_builder::PackageBuilder;
 use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, MoveHarness};
 use framework::natives::code::{PackageRegistry, UpgradePolicy};
@@ -27,8 +27,8 @@ struct State {
 /// run tests which are expected to make a difference for legacy flag combinations.
 #[rstest]
 #[case(vec![])]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_basic(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_basic(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(
@@ -65,8 +65,8 @@ fn code_publishing_basic(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -84,8 +84,8 @@ fn code_publishing_upgrade_success_no_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_upgrade_success_compat(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_upgrade_success_compat(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -103,8 +103,8 @@ fn code_publishing_upgrade_success_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_upgrade_fail_compat(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_upgrade_fail_compat(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -123,8 +123,8 @@ fn code_publishing_upgrade_fail_compat(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_upgrade_fail_immutable(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_upgrade_fail_immutable(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -143,8 +143,8 @@ fn code_publishing_upgrade_fail_immutable(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_upgrade_fail_overlapping_module(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_upgrade_fail_overlapping_module(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -206,8 +206,8 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_framework_upgrade(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_framework_upgrade(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.aptos_framework_account();
 
@@ -220,8 +220,8 @@ fn code_publishing_framework_upgrade(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_framework_upgrade_fail(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_framework_upgrade_fail(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.aptos_framework_account();
 
@@ -235,8 +235,8 @@ fn code_publishing_framework_upgrade_fail(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_weak_dep_fail(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_weak_dep_fail(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -261,8 +261,8 @@ fn code_publishing_weak_dep_fail(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
@@ -290,8 +290,8 @@ fn code_publishing_arbitray_dep_different_address(#[case] features: Vec<u64>) {
 }
 
 #[rstest]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_using_resource_account(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_using_resource_account(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -323,8 +323,8 @@ fn code_publishing_using_resource_account(#[case] features: Vec<u64>) {
 
 #[rstest]
 #[case(vec![])]
-#[case(vec![CODE_DEPENDENCY_CHECK])]
-fn code_publishing_faked_dependency(#[case] features: Vec<u64>) {
+#[case(vec![FeatureFlag::CODE_DEPENDENCY_CHECK])]
+fn code_publishing_faked_dependency(#[case] features: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(features.clone());
     let acc1 = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let acc2 = h.new_account_at(AccountAddress::from_hex_literal("0xdeaf").unwrap());
@@ -332,7 +332,7 @@ fn code_publishing_faked_dependency(#[case] features: Vec<u64>) {
     let mut pack1 = PackageBuilder::new("Package1").with_policy(UpgradePolicy::compat());
     pack1.add_source("m", "module 0xcafe::m { public fun f() {} }");
     let pack1_dir = pack1.write_to_temp().unwrap();
-    h.publish_package(&acc1, pack1_dir.path());
+    assert_success!(h.publish_package(&acc1, pack1_dir.path()));
 
     // pack2 has a higher policy and should not be able to depend on pack1
     let mut pack2 = PackageBuilder::new("Package2").with_policy(UpgradePolicy::immutable());
@@ -350,10 +350,39 @@ fn code_publishing_faked_dependency(#[case] features: Vec<u64>) {
         // this via checking the actual bytecode module dependencies.
         metadata.deps.clear()
     });
-    if !features.contains(&CODE_DEPENDENCY_CHECK) {
+    if !features.contains(&FeatureFlag::CODE_DEPENDENCY_CHECK) {
         // In the previous version we were not able to detect this problem
         assert_success!(result)
     } else {
         assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED)
+    }
+}
+
+#[rstest]
+#[case(vec![])]
+#[case(vec![FeatureFlag::TREAT_FRIEND_AS_PRIVATE])]
+fn code_publishing_friend_as_private(#[case] features: Vec<FeatureFlag>) {
+    let mut h = MoveHarness::new_with_features(features.clone());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    let mut pack1 = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
+    pack1.add_source(
+        "m",
+        "module 0xcafe::m { public fun f() {}  public(friend) fun g() {} }",
+    );
+    let pack1_dir = pack1.write_to_temp().unwrap();
+    assert_success!(h.publish_package(&acc, pack1_dir.path()));
+
+    let mut pack2 = PackageBuilder::new("Package").with_policy(UpgradePolicy::compat());
+    // Removes friend
+    pack2.add_source("m", "module 0xcafe::m { public fun f() {} }");
+    let pack2_dir = pack2.write_to_temp().unwrap();
+
+    let result = h.publish_package(&acc, pack2_dir.path());
+    if features.contains(&FeatureFlag::TREAT_FRIEND_AS_PRIVATE) {
+        // With this feature we can remove friends
+        assert_success!(result)
+    } else {
+        assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
     }
 }

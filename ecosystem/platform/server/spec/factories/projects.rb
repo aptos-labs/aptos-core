@@ -5,10 +5,10 @@
 
 FactoryBot.define do
   factory :project do
-    user { build :user }
+    user
     title { Faker::Company.name }
     short_description { Faker::Company.catch_phrase }
-    full_description { Faker::Lorem.paragraphs(number: 3).map { |p| "<p>#{p}</p>" }.join }
+    full_description { Faker::Lorem.paragraphs(number: 3).join("\n\n") }
     website_url { Faker::Internet.url }
     github_url { Faker::Internet.url(host: 'github.com') }
     discord_url { Faker::Internet.url(host: 'discord.com') }

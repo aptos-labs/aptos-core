@@ -17,6 +17,7 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
@@ -70,8 +71,13 @@ impl AptosVMImpl {
             ),
         };
 
-        let inner = MoveVmExt::new(native_gas_params, abs_val_size_gas_params)
-            .expect("should be able to create Move VM; check if there are duplicated natives");
+        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let inner = MoveVmExt::new(
+            native_gas_params,
+            abs_val_size_gas_params,
+            features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        )
+        .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
             move_vm: Arc::new(inner),
@@ -85,14 +91,21 @@ impl AptosVMImpl {
         vm
     }
 
-    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
+    pub fn init_with_config(
+        version: Version,
+        gas_schedule: GasSchedule,
+        features: Features,
+    ) -> Self {
         // TODO(Gas): this should not panic
         let gas_params =
             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
                 .expect("failed to get gas parameters");
-
-        let inner = MoveVmExt::new(gas_params.natives.clone(), gas_params.misc.abs_val.clone())
-            .expect("should be able to create Move VM; check if there are duplicated natives");
+        let inner = MoveVmExt::new(
+            gas_params.natives.clone(),
+            gas_params.misc.abs_val.clone(),
+            features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        )
+        .expect("should be able to create Move VM; check if there are duplicated natives");
 
         Self {
             move_vm: Arc::new(inner),

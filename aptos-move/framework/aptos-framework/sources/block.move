@@ -14,6 +14,8 @@ module aptos_framework::block {
 
     friend aptos_framework::genesis;
 
+    const MAX_U64: u64 = 18446744073709551615;
+
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
         /// Height of the current block
@@ -157,7 +159,7 @@ module aptos_framework::block {
         event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
-    /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
+    /// Emit a `NewBlockEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_block_event(vm: signer) acquires BlockResource {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
@@ -174,6 +176,28 @@ module aptos_framework::block {
                 proposer: @vm_reserved,
                 failed_proposer_indices: vector::empty(),
                 time_microseconds: 0,
+            }
+        );
+    }
+
+    ///  Emit a `NewBlockEvent` event. This function will be invoked by write set script directly to generate the
+    ///  new block event for WriteSetPayload.
+    public fun emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) acquires BlockResource {
+        system_addresses::assert_vm(vm_signer);
+        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
+        block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
+
+        event::emit_event<NewBlockEvent>(
+            &mut block_metadata_ref.new_block_events,
+            NewBlockEvent {
+                hash: fake_block_hash,
+                epoch: reconfiguration::current_epoch(),
+                round: MAX_U64,
+                height: block_metadata_ref.height,
+                previous_block_votes_bitvec: vector::empty(),
+                proposer: @vm_reserved,
+                failed_proposer_indices: vector::empty(),
+                time_microseconds: timestamp::now_microseconds(),
             }
         );
     }

@@ -9,7 +9,7 @@ use move_deps::move_core_types::account_address::AccountAddress;
 mod common;
 
 #[test]
-fn can_upgrade_framework() {
+fn can_upgrade_framework_on_testnet() {
     let mut h = MoveHarness::new_testnet();
     h.increase_transaction_size();
 

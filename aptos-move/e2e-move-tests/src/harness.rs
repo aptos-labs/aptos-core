@@ -6,7 +6,7 @@ use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
-use aptos_types::on_chain_config::GasSchedule;
+use aptos_types::on_chain_config::{FeatureFlag, GasSchedule};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -72,7 +72,7 @@ impl MoveHarness {
         }
     }
 
-    pub fn new_with_features(features: Vec<u64>) -> Self {
+    pub fn new_with_features(features: Vec<FeatureFlag>) -> Self {
         let mut h = Self::new();
         if !features.is_empty() {
             h.enable_features(features);
@@ -319,8 +319,9 @@ impl MoveHarness {
     }
 
     /// Enables features
-    pub fn enable_features(&mut self, features: Vec<u64>) {
+    pub fn enable_features(&mut self, features: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
+        let enable = features.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor.exec(
             "features",
             "change_feature_flags",
@@ -329,7 +330,7 @@ impl MoveHarness {
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
-                bcs::to_bytes(&features).unwrap(),
+                bcs::to_bytes(&enable).unwrap(),
                 bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
             ],
         );

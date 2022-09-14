@@ -10,11 +10,11 @@ publish = false
 edition = "2021"
 
 [dependencies]
-move-binary-format = { git = "https://github.com/move-language/move", rev = "51d4aa15e082efafb99e5158ed2bbc8b6daecac6" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "51d4aa15e082efafb99e5158ed2bbc8b6daecac6" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "51d4aa15e082efafb99e5158ed2bbc8b6daecac6" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "51d4aa15e082efafb99e5158ed2bbc8b6daecac6" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "51d4aa15e082efafb99e5158ed2bbc8b6daecac6" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "59265662d0a44ba53b09ba3c4b2248efdf08c622" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "59265662d0a44ba53b09ba3c4b2248efdf08c622" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "59265662d0a44ba53b09ba3c4b2248efdf08c622" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "59265662d0a44ba53b09ba3c4b2248efdf08c622" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "59265662d0a44ba53b09ba3c4b2248efdf08c622" }
 
 aptos-types = { path = "../../types" }
 framework = { path = "../framework" }
