@@ -13,7 +13,11 @@ import {
 } from '@chakra-ui/react';
 
 import AccountCircle from 'core/components/AccountCircle';
-import { secondaryBorderColor } from 'core/colors';
+import {
+  permissionRequestBgColor,
+  permissionRequestLayoutBgColor,
+  secondaryBorderColor,
+} from 'core/colors';
 import { usePermissionRequestContext } from '../hooks';
 import { DappInfoTile } from './DappInfoTile';
 
@@ -24,11 +28,6 @@ const FooterButton = styled(Button)`
 `;
 
 const hiddenScrollbarCss = { '&::-webkit-scrollbar': { display: 'none' } };
-
-const permissionRequestBgColor = {
-  dark: 'rgb(247, 247, 247)',
-  light: 'rgb(247, 247, 247)',
-};
 
 interface PermissionRequestHeaderProps {
   title: string,
@@ -45,7 +44,7 @@ function PermissionRequestHeader({ title }: PermissionRequestHeaderProps) {
       borderBottomWidth="1px"
       justifyContent="space-between"
       padding={6}
-      bgColor="white"
+      bgColor={permissionRequestLayoutBgColor[colorMode]}
     >
       <Text fontSize={20} fontWeight="bold">
         {title}
@@ -75,7 +74,7 @@ function PermissionRequestFooter() {
     <HStack
       height="75px"
       minHeight="75px"
-      bgColor="white"
+      bgColor={permissionRequestLayoutBgColor[colorMode]}
       px="24px"
       spacing="8px"
       borderTopColor={secondaryBorderColor[colorMode]}

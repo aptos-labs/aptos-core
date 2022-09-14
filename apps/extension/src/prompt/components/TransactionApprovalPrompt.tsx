@@ -20,7 +20,7 @@ import React, { useEffect, useState } from 'react';
 import { useQueryClient } from 'react-query';
 import { HexString, Types } from 'aptos';
 import SyntaxHighlighter from 'react-syntax-highlighter';
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { darcula, docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import { secondaryErrorMessageColor } from 'core/colors';
 import { aptosCoinStoreStructTag } from 'core/constants';
@@ -35,6 +35,12 @@ import { Tile } from './Tile';
 const ChakraSyntaxHighlighter = chakra(SyntaxHighlighter);
 
 const simulationQueryKey = 'promptSimulation';
+
+const headingProps = {
+  lineHeight: '24px',
+  mb: '4px',
+  size: 'sm',
+};
 
 // region Utils
 
@@ -133,7 +139,7 @@ interface TransactionCoinBalanceChangeProps {
 function TransactionCoinBalanceChange({ coinStore }: TransactionCoinBalanceChangeProps) {
   return (
     <Box>
-      <Heading size="sm" lineHeight="24px" mb="4px">
+      <Heading {...headingProps}>
         Estimated Balance Changes
       </Heading>
       <Text fontSize="sm" lineHeight="20px">
@@ -158,11 +164,13 @@ interface TransactionWritesetProps {
 
 function TransactionWriteset({ txn }: TransactionWritesetProps) {
   const { isOpen, onToggle } = useDisclosure();
+  const { colorMode } = useColorMode();
+  const style = colorMode === 'light' ? docco : darcula;
 
   return (
     <Box>
       <Button size="xs" variant="unstyled" onClick={onToggle}>
-        <Heading size="sm" lineHeight="24px">
+        <Heading {...headingProps}>
           Raw writeset
           { isOpen ? <ChevronDownIcon ml={1} /> : <ChevronUpIcon ml={1} /> }
         </Heading>
@@ -173,7 +181,7 @@ function TransactionWriteset({ txn }: TransactionWritesetProps) {
           h="300px"
           mt={1}
           language="json"
-          style={docco}
+          style={style}
         >
           { JSON.stringify(txn.changes, null, 4) }
         </ChakraSyntaxHighlighter>
@@ -225,7 +233,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
         <LoadableContent isLoading={simulation.isLoading}>
           <VStack spacing="21px" alignItems="stretch">
             <Box>
-              <Heading size="sm" lineHeight="24px" mb="4px">
+              <Heading {...headingProps}>
                 Payload
               </Heading>
               <Text fontSize="sm" lineHeight="20px">
@@ -237,7 +245,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
               simulationError
                 ? (
                   <Box color={secondaryErrorMessageColor[colorMode]}>
-                    <Heading size="sm" lineHeight="24px" mb="4px">
+                    <Heading {...headingProps}>
                       Simulation error
                     </Heading>
                     <Text fontSize="sm" lineHeight="20px">
@@ -251,7 +259,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
               details?.networkFee !== undefined
                 ? (
                   <Box>
-                    <Heading size="sm" lineHeight="24px" mb="4px">
+                    <Heading {...headingProps}>
                       Network Fee
                     </Heading>
                     <Text fontSize="sm" lineHeight="20px">

@@ -134,6 +134,26 @@ export const iconColor = {
   light: 'gray.600',
 };
 
+export const permissionRequestLayoutBgColor = {
+  dark: 'gray.900',
+  light: 'white',
+};
+
+export const permissionRequestBgColor = {
+  dark: 'gray.900',
+  light: 'rgb(247, 247, 247)',
+};
+
+export const permissionRequestTileBgColor = {
+  dark: '#2e3038',
+  light: 'white',
+};
+
+export const permissionRequestLoadingOverlayColor = {
+  dark: '#2e3038b5',
+  light: '#ffffffb5',
+};
+
 // Wallet
 
 export const walletBgColor = (pathname: string) => {

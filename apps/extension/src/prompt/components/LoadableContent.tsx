@@ -4,9 +4,10 @@
 import {
   Box,
   Center,
-  Spinner,
+  Spinner, useColorMode,
 } from '@chakra-ui/react';
 import React from 'react';
+import { permissionRequestLoadingOverlayColor } from 'core/colors';
 
 export interface LoadableContentProps {
   children: JSX.Element | JSX.Element[],
@@ -14,13 +15,14 @@ export interface LoadableContentProps {
 }
 
 export function LoadableContent({ children, isLoading }: LoadableContentProps) {
+  const { colorMode } = useColorMode();
   return (
     <Box position="relative">
       {
         isLoading
           ? (
             <Center
-              bgColor="#ffffffb5"
+              bgColor={permissionRequestLoadingOverlayColor[colorMode]}
               w="100%"
               h="100%"
               position="absolute"

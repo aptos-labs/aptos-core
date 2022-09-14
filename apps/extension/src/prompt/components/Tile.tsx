@@ -1,13 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Box } from '@chakra-ui/react';
-import styled from '@emotion/styled';
+import { Box, BoxProps, useColorMode } from '@chakra-ui/react';
+import React from 'react';
+import { permissionRequestTileBgColor } from 'core/colors';
 
-export const Tile = styled(Box)`
-  background-color: white;
-  border-radius: 8px;
-  padding: 21px;
-`;
+export function Tile({ children, ...rest }: BoxProps) {
+  const { colorMode } = useColorMode();
+  return (
+    <Box
+      bgColor={permissionRequestTileBgColor[colorMode]}
+      p="21px"
+      borderRadius="8px"
+      {...rest}
+    >
+      { children }
+    </Box>
+  );
+}
 
 export default Tile;
