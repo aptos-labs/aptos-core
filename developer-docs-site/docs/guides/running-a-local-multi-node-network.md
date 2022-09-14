@@ -1,14 +1,14 @@
 ---
-title: "Running a Local Mult-node Network"
+title: "Running a Local Multi-node Network"
 slug: "running-a-local-multi-node-network"
 ---
 
-# Running a Local Mult-node Network
+# Running a Local Multi-node Network
 
-This guide describes how to run a local network with multiple validator nodes and validator fullnodes. You will use the [Aptos Forge CLI](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/forge-cli) for this.
+This guide describes how to run a local network with multiple validator nodes and validator fullnodes. You will use the [Aptos Forge CLI](https://github.com/aptos-labs/aptos-core/tree/main/testsuite/forge-cli/src) for this.
 
 :::tip Use only for test deployments
-The method described in this guide should be used only for test deployments of multi-node local network. Do not use this guide for deploying in production environments. Currently this is the only guide for multi-node deployments. 
+The method described in this guide should be used only for test deployments of multi-node local networks. Do not use this guide for deploying in production environments. Currently this is the only guide for multi-node deployments. 
 
 For deploying a local network with a single node, see [Running Local Testnet](/nodes/local-testnet/index.md) and [Local testnet development flow](/guides/local-testnet-dev-flow.md).
 :::
