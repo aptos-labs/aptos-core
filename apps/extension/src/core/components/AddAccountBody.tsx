@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Button, VStack } from '@chakra-ui/react';
+import { Button, VStack, Text } from '@chakra-ui/react';
 import { FaKey } from '@react-icons/all-files/fa/FaKey';
 import { BsLayoutTextSidebar } from '@react-icons/all-files/bs/BsLayoutTextSidebar';
 import React from 'react';
@@ -76,26 +76,26 @@ export function NoWalletAddAccountBody({
   };
 
   return (
-    <VStack px={px} spacing={4} width="100%" pt={4}>
+    <VStack px={px} spacing={4} width="100%" pt={4} alignContent="center" height="100%" justifyContent="center">
       <Button
         width="100%"
-        height={16}
-        leftIcon={<FaKey />}
+        height={20}
+        leftIcon={<FaKey size={20} />}
         justifyContent="flex-start"
         onClick={importPrivateKeyOnClick}
         colorScheme={isImportTypePrivateKey ? 'teal' : undefined}
       >
-        Import private key
+        <Text fontSize={18}>Import private key</Text>
       </Button>
       <Button
         width="100%"
-        height={16}
-        leftIcon={<BsLayoutTextSidebar />}
+        height={20}
+        leftIcon={<BsLayoutTextSidebar size={20} />}
         justifyContent="flex-start"
         onClick={importMnemonicOnClick}
         colorScheme={isImportTypeMnemonic ? 'teal' : undefined}
       >
-        Import mnemonic
+        <Text fontSize={18}>Import mnemonic</Text>
       </Button>
     </VStack>
   );

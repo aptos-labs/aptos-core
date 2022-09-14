@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  Box,
   Button,
-  Input,
-  InputGroup,
-  InputLeftAddon,
-  SimpleGrid,
+  useColorMode,
   VStack,
 } from '@chakra-ui/react';
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { type MnemonicFormValues } from 'core/layouts/AddAccountLayout';
+import MnemonicInput from 'core/components/MnemonicInput';
+import { buttonBorderColor } from 'core/colors';
 
 interface ImportAccountMnemonicBodyProps {
   hasSubmit?: boolean;
@@ -19,76 +19,27 @@ interface ImportAccountMnemonicBodyProps {
 }
 
 export default function ImportAccountMnemonicBody({
-  hasSubmit = true,
+  hasSubmit,
   px = 4,
 }: ImportAccountMnemonicBodyProps) {
   const {
     register,
+    setValue,
   } = useFormContext<MnemonicFormValues>();
+  const { colorMode } = useColorMode();
 
   return (
-    <VStack spacing={4} px={px} pt={4}>
-      <VStack width="100%">
-        <SimpleGrid columns={2} gap={4}>
-          <VStack>
-            <InputGroup size="sm">
-              <InputLeftAddon>1</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-a')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>2</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-b')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>3</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-c')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>4</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-d')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>5</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-e')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>6</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-f')} isRequired variant="outline" />
-            </InputGroup>
-          </VStack>
-          <VStack>
-            <InputGroup size="sm">
-              <InputLeftAddon>7</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-g')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>8</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-h')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>9</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-i')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>10</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-j')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>11</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-k')} isRequired variant="outline" />
-            </InputGroup>
-            <InputGroup size="sm">
-              <InputLeftAddon>12</InputLeftAddon>
-              <Input autoComplete="off" minLength={1} {...register('mnemonic-l')} isRequired variant="outline" />
-            </InputGroup>
-          </VStack>
-        </SimpleGrid>
+    <VStack spacing={4} px={px} pt={4} height="100%">
+      <VStack pt={2} width="100%" spacing={2} flex="1">
+        <MnemonicInput register={register} setValue={setValue} />
       </VStack>
       {
         hasSubmit ? (
-          <Button colorScheme="teal" width="100%" type="submit">
-            Submit
-          </Button>
+          <Box py={2} width="100%" borderTop="1px" pt={2} borderColor={buttonBorderColor[colorMode]}>
+            <Button colorScheme="teal" width="100%" type="submit">
+              Submit
+            </Button>
+          </Box>
         ) : null
       }
     </VStack>

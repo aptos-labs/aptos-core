@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box, Button, Flex, Grid, Tooltip, useColorMode, HStack,
+  Box, Button, Flex, Grid, Tooltip, useColorMode, HStack, IconButton,
 } from '@chakra-ui/react';
-import { secondaryBgColor } from 'core/colors';
+import { secondaryBgColor, secondaryBackButtonBgColor } from 'core/colors';
 import { useImportOnboardingState } from 'core/hooks/useImportOnboardingState';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FormProvider, useForm, useFormContext } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
+import { ArrowBackIcon } from '@chakra-ui/icons';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
 import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
@@ -19,24 +20,49 @@ import {
 } from 'core/components/Toast';
 import { useAccounts } from 'core/hooks/useAccounts';
 import { useNetworks } from 'core/hooks/useNetworks';
-import { passwordStrength } from 'core/constants';
+import { passwordStrength, mnemonicValues } from 'core/constants';
 import Step from 'core/components/Step';
+import { MNEMONIC } from 'core/enums';
 import { MnemonicFormValues } from './AddAccountLayout';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
+// These enum are like this so that it will work with the Step component
+// to show correct active/complete state
 export enum ImportOnboardingPage {
-  CreatePassword,
-  AddAccount,
-  EnterMnemonic,
-  EnterPrivateKey,
-  Done,
+  ImportType = 0,
+  ImportMnemonicOrPrivateKey = 1,
+  ImportMnemonic = 0.25,
+  ImportPrivateKey = 0.75,
+  CreatePassword = 2,
+  Done = 3,
 }
 
 const createViaImportSteps = [
-  { content: null, label: 'Password' },
-  { content: null, label: 'Import type' },
-  { content: null, label: 'Secret key' },
+  {
+    label: 'Import type',
+    name: ImportOnboardingPage.ImportType,
+    substeps: [],
+  },
+  {
+    label: 'Enter mnemonic/private key',
+    name: ImportOnboardingPage.ImportMnemonicOrPrivateKey,
+    substeps: [
+      {
+        label: 'Enter mnemonic',
+        name: ImportOnboardingPage.ImportMnemonic,
+      },
+      {
+        label: 'Enter private key',
+        name: ImportOnboardingPage.ImportPrivateKey,
+      },
+    ],
+  },
+  {
+    label: 'Create password',
+    name: ImportOnboardingPage.CreatePassword,
+    substeps: [],
+  },
 ];
 
 export interface CreateWalletViaImportFormValues {
@@ -47,14 +73,20 @@ export interface CreateWalletViaImportFormValues {
   mnemonicString: string;
   privateKey: string;
   secretRecoveryPhrase: boolean;
+  showPrivateKey: boolean;
   termsOfService: boolean;
 }
 
 export type CreateWalletViaImportGeneralFormValues =
 CreateWalletViaImportFormValues & MnemonicFormValues;
 
+const buttonBorderColor = {
+  dark: 'gray.700',
+  light: 'gray.200',
+};
+
 function NextButton() {
-  const { watch } = useFormContext<CreateWalletViaImportGeneralFormValues>();
+  const { setValue, watch } = useFormContext<CreateWalletViaImportGeneralFormValues>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { activeNetwork } = useNetworks();
 
@@ -74,103 +106,109 @@ function NextButton() {
   const importType = watch('importType');
   const allFields = watch();
 
-  const mnemonicArray = useMemo(() => [
-    allFields['mnemonic-a'].trim(),
-    allFields['mnemonic-b'].trim(),
-    allFields['mnemonic-c'].trim(),
-    allFields['mnemonic-d'].trim(),
-    allFields['mnemonic-e'].trim(),
-    allFields['mnemonic-f'].trim(),
-    allFields['mnemonic-g'].trim(),
-    allFields['mnemonic-h'].trim(),
-    allFields['mnemonic-i'].trim(),
-    allFields['mnemonic-j'].trim(),
-    allFields['mnemonic-k'].trim(),
-    allFields['mnemonic-l'].trim(),
-  ], [allFields]);
-
+  const mnemonicArray = useMemo(() => mnemonicValues.map((m) => allFields[m].trim()), [allFields]);
   const passwordResult = zxcvbn(initialPassword);
   const passwordScore = passwordResult.score;
 
+  const initAccountWithMnemonic = useCallback(async () => {
+    try {
+      const nodeUrl = activeNetwork?.nodeUrl;
+      if (!nodeUrl) {
+        networkDoesNotExistToast();
+        return;
+      }
+      setIsLoading(true);
+      let mnemonicString = '';
+      mnemonicArray.forEach((value) => {
+        mnemonicString = `${mnemonicString + value} `;
+      });
+      mnemonicString = mnemonicString.trim();
+      const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
+      const aptosAccount = new AptosAccount(seed);
+
+      // initialize password and wallet
+      const firstAccount = {
+        mnemonic,
+        ...keysFromAptosAccount(aptosAccount),
+      };
+
+      await initAccounts(confirmPassword, {
+        [firstAccount.address]: firstAccount,
+      });
+
+      setIsLoading(false);
+      importAccountToast();
+    } catch (err) {
+      setIsLoading(false);
+      importAccountErrorToast();
+    }
+  }, [
+    activeNetwork,
+    confirmPassword,
+    initAccounts,
+    mnemonicArray,
+  ]);
+
+  const intiAccountWithPrivateKey = useCallback(async () => {
+    try {
+      const nodeUrl = activeNetwork?.nodeUrl;
+      if (!nodeUrl) {
+        networkDoesNotExistToast();
+        return;
+      }
+      setIsLoading(true);
+      const nonHexKey = (privateKey.startsWith('0x')) ? privateKey.substring(2) : privateKey;
+      const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
+      const aptosAccount = new AptosAccount(encodedKey);
+
+      // initialize password and wallet
+      const firstAccount = keysFromAptosAccount(aptosAccount);
+
+      await initAccounts(confirmPassword, {
+        [firstAccount.address]: firstAccount,
+      });
+
+      setIsLoading(false);
+      importAccountToast();
+      nextStep();
+    } catch (err) {
+      setIsLoading(false);
+      importAccountErrorToast();
+    }
+  }, [
+    activeNetwork,
+    confirmPassword,
+    initAccounts,
+    nextStep,
+    privateKey]);
+
   const nextOnClick = useCallback(async () => {
     switch (activeStep) {
+      case ImportOnboardingPage.ImportType: {
+        setActiveStep(importType === 'mnemonic' ? ImportOnboardingPage.ImportMnemonic : ImportOnboardingPage.ImportPrivateKey);
+        return;
+      }
+      case ImportOnboardingPage.ImportPrivateKey:
+      case ImportOnboardingPage.ImportMnemonic: {
+        nextStep();
+
+        return;
+      }
       case ImportOnboardingPage.CreatePassword:
+        if (importType === 'mnemonic') {
+          await initAccountWithMnemonic();
+        } else if (importType === 'privateKey') {
+          await intiAccountWithPrivateKey();
+        }
+        // clear out privateKey and mnemonicValues after init account
+        // for security purposes
+        setValue('privateKey', '');
+        mnemonicValues.forEach((v) => {
+          setValue(v, '');
+        });
+
         nextStep();
         return;
-      case ImportOnboardingPage.AddAccount: {
-        if (allFields.importType === 'mnemonic') {
-          setActiveStep(ImportOnboardingPage.EnterMnemonic);
-        } else if (allFields.importType === 'privateKey') {
-          setActiveStep(ImportOnboardingPage.EnterPrivateKey);
-        }
-
-        return;
-      }
-      case ImportOnboardingPage.EnterMnemonic: {
-        try {
-          const nodeUrl = activeNetwork?.nodeUrl;
-          if (!nodeUrl) {
-            networkDoesNotExistToast();
-            return;
-          }
-          setIsLoading(true);
-          let mnemonicString = '';
-          mnemonicArray.forEach((value) => {
-            mnemonicString = `${mnemonicString + value} `;
-          });
-          mnemonicString = mnemonicString.trim();
-          const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
-          const aptosAccount = new AptosAccount(seed);
-
-          // initialize password and wallet
-          const firstAccount = {
-            mnemonic,
-            ...keysFromAptosAccount(aptosAccount),
-          };
-
-          await initAccounts(confirmPassword, {
-            [firstAccount.address]: firstAccount,
-          });
-
-          setIsLoading(false);
-          importAccountToast();
-          nextStep();
-        } catch (err) {
-          setIsLoading(false);
-          importAccountErrorToast();
-        }
-
-        return;
-      }
-      case ImportOnboardingPage.EnterPrivateKey: {
-        try {
-          const nodeUrl = activeNetwork?.nodeUrl;
-          if (!nodeUrl) {
-            networkDoesNotExistToast();
-            return;
-          }
-          setIsLoading(true);
-          const nonHexKey = (privateKey.startsWith('0x')) ? privateKey.substring(2) : privateKey;
-          const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
-          const aptosAccount = new AptosAccount(encodedKey);
-
-          // initialize password and wallet
-          const firstAccount = keysFromAptosAccount(aptosAccount);
-
-          await initAccounts(confirmPassword, {
-            [firstAccount.address]: firstAccount,
-          });
-
-          setIsLoading(false);
-          importAccountToast();
-          nextStep();
-        } catch (err) {
-          setIsLoading(false);
-          importAccountErrorToast();
-        }
-
-        return;
-      }
       case ImportOnboardingPage.Done:
         navigate(Routes.wallet.path);
         return;
@@ -178,31 +216,35 @@ function NextButton() {
         throw new Error('Undefined next step');
     }
   }, [
-    activeNetwork?.nodeUrl,
+    setValue,
     activeStep,
-    allFields.importType,
-    confirmPassword,
-    initAccounts,
-    mnemonicArray,
+    importType,
     navigate,
     nextStep,
-    privateKey,
     setActiveStep,
+    initAccountWithMnemonic,
+    intiAccountWithPrivateKey,
   ]);
+
+  const buttonText = useMemo(() => {
+    if (activeStep === ImportOnboardingPage.ImportPrivateKey) {
+      return 'Import';
+    }
+
+    return 'Continue';
+  }, [activeStep]);
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (
-      <Button isLoading={isLoading} size="md" onClick={nextOnClick} colorScheme="teal">
-        {activeStep === ImportOnboardingPage.Done ? 'Finish' : 'Next'}
+      <Button width="100%" isLoading={isLoading} size="lg" onClick={nextOnClick} colorScheme="teal">
+        {buttonText}
       </Button>
     );
 
     const disabledNextButton = (
-      <Box>
-        <Button isLoading={isLoading} isDisabled size="md" onClick={nextOnClick} colorScheme="teal">
-          {activeStep === ImportOnboardingPage.Done ? 'Finish' : 'Next'}
-        </Button>
-      </Box>
+      <Button width="100%" isLoading={isLoading} isDisabled size="lg" onClick={nextOnClick} colorScheme="teal">
+        {buttonText}
+      </Button>
     );
 
     switch (activeStep) {
@@ -238,7 +280,7 @@ function NextButton() {
           </Tooltip>
         );
       }
-      case ImportOnboardingPage.AddAccount: {
+      case ImportOnboardingPage.ImportType: {
         if (importType) {
           return baseNextButton;
         }
@@ -248,7 +290,7 @@ function NextButton() {
           </Tooltip>
         );
       }
-      case ImportOnboardingPage.EnterMnemonic: {
+      case ImportOnboardingPage.ImportMnemonic: {
         let allIsFilledIn = true;
         mnemonicArray.forEach((word) => {
           if (word.length === 0) {
@@ -264,7 +306,7 @@ function NextButton() {
           </Tooltip>
         );
       }
-      case ImportOnboardingPage.EnterPrivateKey: {
+      case ImportOnboardingPage.ImportPrivateKey: {
         if (!(privateKey.length >= 64 && privateKey.length <= 68)) {
           return (
             <Tooltip label="Please enter a valid private key">
@@ -291,13 +333,105 @@ function NextButton() {
     passwordScore,
     importType,
     mnemonicArray,
+    buttonText,
     privateKey.length,
   ]);
 
   return NextButtonComponent;
 }
 
-function PrevButton() {
+interface CreateWalletLayoutProps {
+  children: React.ReactElement;
+}
+
+function CreateWalletViaImportLayoutFC({
+  children,
+  prevOnClick,
+}: CreateWalletLayoutProps & { prevOnClick: () => void }) {
+  const { colorMode } = useColorMode();
+  const { setValue } = useFormContext<CreateWalletViaImportGeneralFormValues>();
+  const {
+    activeStep,
+  } = useImportOnboardingState();
+
+  const handleClickPrev = () => {
+    // clear out private key and mnemonic valuesfor security purposes
+    setValue('privateKey', '');
+    mnemonicValues.forEach((v) => {
+      setValue(v, '');
+    });
+
+    prevOnClick();
+  };
+
+  return (
+    <Grid
+      height="100%"
+      width="100%"
+      maxW="100%"
+      templateRows="60px 1fr 72px"
+      bgColor={secondaryBgColor[colorMode]}
+    >
+      <HStack width="100%" px={4}>
+        <IconButton
+          position="absolute"
+          size="md"
+          aria-label="back"
+          colorScheme="teal"
+          icon={<ArrowBackIcon fontSize={20} />}
+          variant="filled"
+          onClick={handleClickPrev}
+          bgColor={secondaryBackButtonBgColor[colorMode]}
+          borderRadius="1rem"
+        />
+        <Flex justifyContent="center" width="100%">
+          <HStack spacing="0" justify="space-evenly" width="40%">
+            {createViaImportSteps.map(({ label, name, substeps }, id) => (
+              (
+                <Step
+                  key={label}
+                  cursor="pointer"
+                  isActive={activeStep === name
+                      || substeps?.findIndex((s) => s.name === activeStep) !== -1}
+                  isCompleted={activeStep > id}
+                  isLastStep={id === createViaImportSteps.length - 1}
+                />
+              )
+            ))}
+          </HStack>
+        </Flex>
+      </HStack>
+      <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
+        <form style={{ height: '100%' }}>
+          {children}
+        </form>
+      </Box>
+      <Flex width="100%" px={4} pt={3} borderTop="1px" borderColor={buttonBorderColor[colorMode]}>
+        <NextButton />
+      </Flex>
+    </Grid>
+  );
+}
+
+export function CreateWalletViaImportLayout(props: CreateWalletLayoutProps) {
+  const mnemonic = generateMnemonic();
+  const mnemonicHash = mnemonicValues.reduce((acc, v: MNEMONIC) => ({
+    ...acc,
+    [v]: '',
+  }), {});
+
+  const methods = useForm<CreateWalletViaImportGeneralFormValues>({
+    defaultValues: {
+      confirmPassword: '',
+      initialPassword: '',
+      mnemonic: mnemonic.split(' '),
+      mnemonicString: mnemonic,
+      privateKey: '',
+      showPrivateKey: false,
+      ...mnemonicHash,
+    },
+  });
+
   const {
     activeStep, prevStep,
   } = useImportOnboardingState();
@@ -310,90 +444,9 @@ function PrevButton() {
     prevStep();
   }, [activeStep, navigate, prevStep]);
 
-  const PrevButtonComponent = useMemo(() => {
-    const basePrevButton = (
-      <Button
-        mr={4}
-        onClick={prevOnClick}
-        size="md"
-        variant="ghost"
-      >
-        Prev
-      </Button>
-    );
-
-    return basePrevButton;
-  }, [prevOnClick]);
-
-  return (activeStep !== ImportOnboardingPage.Done) ? PrevButtonComponent : null;
-}
-
-interface CreateWalletLayoutProps {
-  children: React.ReactElement;
-}
-
-export function CreateWalletViaImportLayout({
-  children,
-}: CreateWalletLayoutProps) {
-  const { colorMode } = useColorMode();
-  const {
-    activeStep,
-  } = useImportOnboardingState();
-  const mnemonic = generateMnemonic();
-  const methods = useForm<CreateWalletViaImportGeneralFormValues>({
-    defaultValues: {
-      confirmPassword: '',
-      initialPassword: '',
-      mnemonic: mnemonic.split(' '),
-      'mnemonic-a': '',
-      'mnemonic-b': '',
-      'mnemonic-c': '',
-      'mnemonic-d': '',
-      'mnemonic-e': '',
-      'mnemonic-f': '',
-      'mnemonic-g': '',
-      'mnemonic-h': '',
-      'mnemonic-i': '',
-      'mnemonic-j': '',
-      'mnemonic-k': '',
-      'mnemonic-l': '',
-      mnemonicString: mnemonic,
-      privateKey: '',
-    },
-  });
-
   return (
     <FormProvider {...methods}>
-      <Grid
-        height="100%"
-        width="100%"
-        maxW="100%"
-        templateRows="60px 1fr 55px"
-        bgColor={secondaryBgColor[colorMode]}
-      >
-        <Flex justifyContent="center" width="100%">
-          <HStack spacing="0" justify="space-evenly" width="40%">
-            {createViaImportSteps.map(({ label }, id) => (
-              <Step
-                key={label}
-                cursor="pointer"
-                isActive={activeStep === id}
-                isCompleted={activeStep > id}
-                isLastStep={id === createViaImportSteps.length - 1}
-              />
-            ))}
-          </HStack>
-        </Flex>
-        <Box px={4} height="100%" width="100%" maxH="100%" overflowY="auto">
-          <form>
-            {children}
-          </form>
-        </Box>
-        <Flex width="100%" justify="flex-end" px={4} pb={4}>
-          <PrevButton />
-          <NextButton />
-        </Flex>
-      </Grid>
+      <CreateWalletViaImportLayoutFC {...props} prevOnClick={prevOnClick} />
     </FormProvider>
   );
 }

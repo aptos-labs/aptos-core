@@ -10,6 +10,7 @@ import React from 'react';
 import {
   DeepPartial, FormProvider, useForm,
 } from 'react-hook-form';
+import { MNEMONIC } from 'core/enums';
 
 export interface AddAccountLayoutProps<T> {
   backPage?: string;
@@ -61,21 +62,22 @@ export interface CreateAccountFormValues {
 
 export interface PrivateKeyFormValues {
   privateKey: string;
+  showPrivateKey: boolean
 }
 
 export interface MnemonicFormValues {
-  'mnemonic-a': string;
-  'mnemonic-b': string;
-  'mnemonic-c': string;
-  'mnemonic-d': string;
-  'mnemonic-e': string;
-  'mnemonic-f': string;
-  'mnemonic-g': string;
-  'mnemonic-h': string;
-  'mnemonic-i': string;
-  'mnemonic-j': string;
-  'mnemonic-k': string;
-  'mnemonic-l': string;
+  [MNEMONIC.A]: string;
+  [MNEMONIC.B]: string;
+  [MNEMONIC.C]: string;
+  [MNEMONIC.D]: string;
+  [MNEMONIC.E]: string;
+  [MNEMONIC.F]: string;
+  [MNEMONIC.G]: string;
+  [MNEMONIC.H]: string;
+  [MNEMONIC.I]: string;
+  [MNEMONIC.J]: string;
+  [MNEMONIC.K]: string;
+  [MNEMONIC.L]: string;
 }
 
 export const CreateAccountLayout = (

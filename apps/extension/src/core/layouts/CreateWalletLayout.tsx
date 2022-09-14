@@ -96,7 +96,6 @@ function NextButton({
   const confirmPassword = watch('confirmPassword');
   const mnemonicString = watch('mnemonicString');
   const mnemonicValues = watch('mnemonicValues');
-
   const passwordResult = zxcvbn(initialPassword);
   const passwordScore = passwordResult.score;
 
@@ -300,7 +299,7 @@ function CreateWalletLayout({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 125 : 64}px`}
+      templateRows={`60px 1fr ${showSecretRecoveryPhrase ? 110 : 64}px`}
       bgColor={secondaryBgColor[colorMode]}
       position="relative"
     >

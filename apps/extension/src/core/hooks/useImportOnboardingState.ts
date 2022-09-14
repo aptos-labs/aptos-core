@@ -11,22 +11,23 @@ export default function useImportOnboardingStateRecorder() {
   const [
     activeStep,
     setActiveStep,
-  ] = useState<ImportOnboardingPage>(ImportOnboardingPage.CreatePassword);
+  ] = useState<ImportOnboardingPage>(ImportOnboardingPage.ImportType);
 
   const navigate = useNavigate();
 
   const nextStep = useCallback(() => {
     switch (activeStep) {
+      case ImportOnboardingPage.ImportType:
+        setActiveStep(ImportOnboardingPage.CreatePassword);
+        break;
       case ImportOnboardingPage.CreatePassword:
-        setActiveStep(ImportOnboardingPage.AddAccount);
-        break;
-      case ImportOnboardingPage.AddAccount:
-        throw new Error('Please decide between import mnemonic and import private key');
-      case ImportOnboardingPage.EnterMnemonic:
         setActiveStep(ImportOnboardingPage.Done);
         break;
-      case ImportOnboardingPage.EnterPrivateKey:
-        setActiveStep(ImportOnboardingPage.Done);
+      case ImportOnboardingPage.ImportMnemonic:
+        setActiveStep(ImportOnboardingPage.CreatePassword);
+        break;
+      case ImportOnboardingPage.ImportPrivateKey:
+        setActiveStep(ImportOnboardingPage.CreatePassword);
         break;
       case ImportOnboardingPage.Done:
         navigate(Routes.wallet.path);
@@ -38,15 +39,14 @@ export default function useImportOnboardingStateRecorder() {
 
   const prevStep = useCallback(() => {
     switch (activeStep) {
-      case ImportOnboardingPage.AddAccount:
-        setActiveStep(ImportOnboardingPage.CreatePassword);
+      case ImportOnboardingPage.ImportMnemonic:
+      case ImportOnboardingPage.ImportMnemonicOrPrivateKey:
+      case ImportOnboardingPage.CreatePassword:
+        setActiveStep(ImportOnboardingPage.ImportType);
         break;
-      case ImportOnboardingPage.EnterMnemonic:
-      case ImportOnboardingPage.EnterPrivateKey:
-        setActiveStep(ImportOnboardingPage.AddAccount);
-        break;
+
       default:
-        setActiveStep(ImportOnboardingPage.CreatePassword);
+        setActiveStep(ImportOnboardingPage.ImportType);
     }
   }, [activeStep]);
 

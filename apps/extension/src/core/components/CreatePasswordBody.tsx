@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Button,
   Box,
@@ -78,6 +78,12 @@ export default function CreatePasswordBody() {
   const result = zxcvbn(initialPassword);
   const passwordScore = result.score;
 
+  useEffect(() => () => {
+    // clear out password when exiting this screen for security purposes
+    setValue('initialPassword', '');
+    setValue('confirmPassword', '');
+  }, [setValue]);
+
   const passwordWarningText = useMemo(() => {
     if (passwordScore <= 1) {
       return 'Password strength must be at least "strong"';
@@ -117,7 +123,7 @@ export default function CreatePasswordBody() {
 
   return (
     <VStack align="left" pt={2}>
-      <Heading fontSize="2xl">Create a password</Heading>
+      <Heading fontSize="xl">Create a password</Heading>
       <Text fontSize="md">You&apos;ll use this to unlock your wallet</Text>
       <VStack pt={8} width="100%" spacing={2} display="flex" alignItems="flex-start">
         <Box width="100%" height="4.5rem">

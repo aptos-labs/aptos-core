@@ -72,6 +72,16 @@ export const secondaryBorderColor = {
   light: 'blackAlpha.200',
 };
 
+export const buttonBorderColor = {
+  dark: 'gray.700',
+  light: 'gray.200',
+};
+
+export const mnemonicBorderColor = {
+  dark: 'gray.700',
+  light: 'white',
+};
+
 export const secondaryHeaderInputBgColor = {
   dark: 'gray.700',
   light: 'gray.100',

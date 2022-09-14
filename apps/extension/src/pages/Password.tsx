@@ -14,15 +14,14 @@ import {
   chakra,
   Heading,
   InputGroup,
-  Icon,
   InputRightElement,
 } from '@chakra-ui/react';
 
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { secondaryBgColor, textColor } from 'core/colors';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
-import { AiFillEyeInvisible } from '@react-icons/all-files/ai/AiFillEyeInvisible';
-import { AiFillEye } from '@react-icons/all-files/ai/AiFillEye';
+import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
+import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
 import ResetPasswordConfirmationModal from '../core/components/ResetPasswordConfirmationModal';
 
@@ -133,18 +132,10 @@ function Password() {
                 {...register('password')}
               />
               <InputRightElement width="3rem">
-                <Button
-                  tabIndex={-3}
-                  borderRadius="100%"
-                  variant="ghost"
-                  h="1.75rem"
-                  size="sm"
-                  onClick={handleClickShowPassword}
-                >
-                  {showPassword
-                    ? <Icon as={AiFillEyeInvisible} />
-                    : <Icon as={AiFillEye} />}
-                </Button>
+
+                {showPassword
+                  ? <AiOutlineEyeInvisible size={24} onClick={handleClickShowPassword} />
+                  : <AiOutlineEye size={24} onClick={handleClickShowPassword} />}
               </InputRightElement>
             </InputGroup>
             {

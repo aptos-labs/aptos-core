@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { MNEMONIC } from 'core/enums';
+
 export const coinStoreResource = 'CoinStore';
 export const coinInfoResource = 'CoinInfo';
 export const accountNamespace = '0x1::aptos_account';
@@ -31,3 +33,18 @@ export const settingsItemLabel = {
   SHOW_CREDENTIALS: 'Show credentials',
   SWITCH_ACCOUNT: 'Switch account',
 };
+
+export const mnemonicValues = [
+  MNEMONIC.A,
+  MNEMONIC.B,
+  MNEMONIC.C,
+  MNEMONIC.D,
+  MNEMONIC.E,
+  MNEMONIC.F,
+  MNEMONIC.G,
+  MNEMONIC.H,
+  MNEMONIC.I,
+  MNEMONIC.J,
+  MNEMONIC.K,
+  MNEMONIC.L,
+];

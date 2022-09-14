@@ -51,7 +51,7 @@ export default function ImportWalletMnemonic() {
       defaultValues={{}}
       onSubmit={onSubmit}
     >
-      <ImportAccountMnemonicBody />
+      <ImportAccountMnemonicBody hasSubmit />
     </ImportAccountMnemonicLayout>
   );
 }
