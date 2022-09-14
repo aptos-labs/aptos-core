@@ -121,6 +121,9 @@ module aptos_framework::reconfiguration {
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
+        spec {
+            assume config_ref.epoch + 1 <= MAX_U64;
+        };
         config_ref.epoch = config_ref.epoch + 1;
 
         event::emit_event<NewEpochEvent>(
