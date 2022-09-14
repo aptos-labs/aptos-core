@@ -579,7 +579,26 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         ),
         "twin_validator_test" => config
             .with_network_tests(vec![&TwinValidatorTest])
-            .with_initial_validator_count(NonZeroUsize::new(10).unwrap()),
+            .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+            .with_initial_fullnode_count(10)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                // Have single epoch change in land blocking
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                if duration.as_secs() > 1200 {
+                    5000
+                } else {
+                    6000
+                },
+                10000,
+                true,
+                Some(Duration::from_secs(if duration.as_secs() > 1200 {
+                    240
+                } else {
+                    60
+                })),
+            )),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
