@@ -34,7 +34,15 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// Offers the capability to sign on behalf of account to the account at address recipient_address.
+    /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its signer capability to only one other address at one time.
+    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+    /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
+    /// `account_public_key_bytes` is the public key of the account owner
+    /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
+    /// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
+    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+    /// to the account owner's signer capability)
     AccountOfferSignerCapability {
         signer_capability_sig_bytes: Vec<u8>,
         account_scheme: u8,
@@ -434,7 +442,15 @@ impl EntryFunctionCall {
     }
 }
 
-/// Offers the capability to sign on behalf of account to the account at address recipient_address.
+/// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
+/// An account can delegate its signer capability to only one other address at one time.
+/// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+/// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
+/// `account_public_key_bytes` is the public key of the account owner
+/// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
+/// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
+/// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+/// to the account owner's signer capability)
 pub fn account_offer_signer_capability(
     signer_capability_sig_bytes: Vec<u8>,
     account_scheme: u8,
