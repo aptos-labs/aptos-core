@@ -108,7 +108,7 @@ impl StateComputer for ExecutionProxy {
             })
         });
         let block_id = block.id();
-        debug!(
+        warn!(
             block = %block,
             parent_id = parent_block_id,
             "Executing block",
@@ -127,6 +127,12 @@ impl StateComputer for ExecutionProxy {
         .expect("spawn_blocking failed")?;
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
+        warn!(
+            block = %block,
+            parent_id = parent_block_id,
+            "Done executing block",
+        );
+
         // notify mempool about failed transaction
         if let Err(e) = self
             .txn_notifier
@@ -137,6 +143,13 @@ impl StateComputer for ExecutionProxy {
                 error = ?e, "Failed to notify mempool of rejected txns",
             );
         }
+
+        warn!(
+            block = %block,
+            parent_id = parent_block_id,
+
+            "Done notifying for failed txns",
+        );
         Ok(compute_result)
     }
 

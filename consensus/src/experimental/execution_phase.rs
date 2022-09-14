@@ -4,6 +4,7 @@
 use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_logger::{info, warn};
 use async_trait::async_trait;
 use consensus_types::executed_block::ExecutedBlock;
 use executor_types::Error as ExecutionError;
@@ -54,10 +55,12 @@ impl StatelessPipeline for ExecutionPhase {
     type Request = ExecutionRequest;
     type Response = ExecutionResponse;
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
+        warn!("processing execution request for {:?}", req);
         let ExecutionRequest { ordered_blocks } = req;
 
         if ordered_blocks.is_empty() {
             // return err when the blocks are empty
+            warn!("returning empty block response");
             return ExecutionResponse {
                 block_id: HashValue::zero(),
                 inner: Err(ExecutionError::EmptyBlocks),
@@ -73,13 +76,16 @@ impl StatelessPipeline for ExecutionPhase {
                     result.push(ExecutedBlock::new(b.block().clone(), compute_result));
                 }
                 Err(e) => {
+                    warn!("returning error block response");
                     return ExecutionResponse {
                         block_id,
                         inner: Err(e),
-                    }
+                    };
                 }
             }
         }
+
+        warn!("returning block response for block_id {:?}", block_id);
 
         ExecutionResponse {
             block_id,
