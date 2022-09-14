@@ -4,7 +4,7 @@
 import { Types, TxnBuilderTypes } from 'aptos';
 import {
   buildRawTransactionFromBCSPayload,
-  buildRawTransactionFromJsonPayload,
+  buildRawTransactionFromJsonPayload, maxGasFeeFromEstimated,
   simulateTransaction as simulateTransactionInternal,
   submitTransaction as submitTransactionInternal,
   TransactionOptions,
@@ -190,7 +190,7 @@ export function useTransactionSubmit<TParams>(
     async (params: TParams) => {
       const payload = payloadFactory(params);
       const txnOptions = options?.estimatedGasFee
-        ? { maxGasAmount: options.estimatedGasFee * 2 }
+        ? { maxGasAmount: maxGasFeeFromEstimated(options.estimatedGasFee) }
         : {};
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {

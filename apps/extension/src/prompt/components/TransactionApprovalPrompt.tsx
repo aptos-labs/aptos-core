@@ -214,7 +214,7 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
   useEffect(() => {
     const isSimulationSuccessful = simulation.data?.success === true;
     const approvalArgs = details?.networkFee !== undefined
-      ? { maxGasFee: 2 * details.networkFee }
+      ? { maxGasFee: maxGasFeeFromEstimated(details.networkFee) }
       : undefined;
     setApprovalState({ args: approvalArgs, canApprove: isSimulationSuccessful });
   }, [simulation.data?.success, details?.networkFee, setApprovalState]);
