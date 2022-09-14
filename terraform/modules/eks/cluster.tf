@@ -45,7 +45,7 @@ locals {
     }
     fullnode = {
       instance_type = var.fullnode_instance_type
-      size          = var.num_fullnodes
+      size          = var.num_fullnodes + var.num_extra_instance
       taint         = false
     }
   }
@@ -55,11 +55,6 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data = base64encode(
-    templatefile("${path.module}/templates/eks_user_data.sh", {
-      taints = each.value.taint ? "aptos/nodepool=${each.key}:NoExecute" : ""
-    })
-  )
 
   block_device_mappings {
     device_name = "/dev/xvda"

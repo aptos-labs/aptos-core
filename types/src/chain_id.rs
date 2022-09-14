@@ -23,15 +23,21 @@ pub enum NamedChain {
     PREMAINNET = 5,
 }
 
+const MAINNET: &str = "mainnet";
+const TESTNET: &str = "testnet";
+const DEVNET: &str = "devnet";
+const TESTING: &str = "testing";
+const PREMAINNET: &str = "premainnet";
+
 impl NamedChain {
     fn str_to_chain_id(s: &str) -> Result<ChainId> {
         // TODO implement custom macro that derives FromStr impl for enum (similar to aptos-core/common/num-variants)
-        let reserved_chain = match s {
-            "MAINNET" => NamedChain::MAINNET,
-            "TESTNET" => NamedChain::TESTNET,
-            "DEVNET" => NamedChain::DEVNET,
-            "TESTING" => NamedChain::TESTING,
-            "PREMAINNET" => NamedChain::PREMAINNET,
+        let reserved_chain = match s.to_lowercase().as_str() {
+            MAINNET => NamedChain::MAINNET,
+            TESTNET => NamedChain::TESTNET,
+            DEVNET => NamedChain::DEVNET,
+            TESTING => NamedChain::TESTING,
+            PREMAINNET => NamedChain::PREMAINNET,
             _ => {
                 return Err(format_err!("Not a reserved chain: {:?}", s));
             }
@@ -118,11 +124,11 @@ impl fmt::Display for NamedChain {
             f,
             "{}",
             match self {
-                NamedChain::DEVNET => "DEVNET",
-                NamedChain::TESTNET => "TESTNET",
-                NamedChain::MAINNET => "MAINNET",
-                NamedChain::TESTING => "TESTING",
-                NamedChain::PREMAINNET => "PREMAINNET",
+                NamedChain::DEVNET => DEVNET,
+                NamedChain::TESTNET => TESTNET,
+                NamedChain::MAINNET => MAINNET,
+                NamedChain::TESTING => TESTING,
+                NamedChain::PREMAINNET => PREMAINNET,
             }
         )
     }

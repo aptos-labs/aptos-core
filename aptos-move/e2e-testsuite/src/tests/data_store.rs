@@ -14,7 +14,7 @@ use move_deps::{
 
 #[test]
 fn move_from_across_blocks() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -93,7 +93,7 @@ fn move_from_across_blocks() {
 
 #[test]
 fn borrow_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -150,7 +150,7 @@ fn borrow_after_move() {
 
 #[test]
 fn change_after_move() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -248,8 +248,9 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         sender.address(),
     );
 
+    let framework_modules = cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules().iter().collect(),
+        deps: framework_modules.iter().collect(),
     };
     let module = compiler
         .into_compiled_module(module_code.as_str())

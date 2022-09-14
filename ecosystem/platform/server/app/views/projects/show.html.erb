@@ -1,0 +1,60 @@
+<div class="bg-neutral-900 text-neutral-100 h-full">
+  <div class="w-fit mx-auto my-24">
+    <%= content_tag :a, href: projects_path, class: 'flex gap-4 leading-none mb-16' do %>
+      <%= render IconComponent.new(:accordion_arrow, size: :small, class: '-rotate-90') %>
+      <span class="font-mono text-neutral-300">Back to all projects</span>
+    <% end %>
+
+    <div class="flex gap-16">
+      <img src="<%= url_for(@project.thumbnail) %>" class="h-32 w-32 border border-neutral-700 rounded-xl">
+
+      <div class="max-w-prose">
+        <h2 class="font-display leading-none text-4xl mb-2"><%= @project.title %></h2>
+        <p class="font-light text-neutral-200 mb-6"><%= @project.short_description %></p>
+        <div class="flex gap-4 mb-12">
+          <% if @project.twitter_url %>
+            <a href="<%= @project.twitter_url %>" title="View on Twitter" class="text-white bg-[#009BEF] rounded px-4 py-1">
+              <%= render IconComponent.new(:twitter, size: :small) %>
+            </a>
+          <% end %>
+          <% if @project.discord_url %>
+            <a href="<%= @project.discord_url %>" title="View on Discord" class="text-white bg-[#5B66F6] rounded px-4 py-1">
+              <%= render IconComponent.new(:discord, size: :small) %>
+            </a>
+          <% end %>
+          <% if @project.github_url %>
+            <a href="<%= @project.github_url %>" title="View on GitHub" class="text-white bg-[#334155] rounded px-4 py-1">
+              <%= render IconComponent.new(:github, size: :small) %>
+            </a>
+          <% end %>
+        </div>
+        <div class="rounded-xl border border-neutral-700 overflow-hidden mb-8">
+          <div class="flex overflow-x-auto snap-x">
+            <% @project.screenshots.each do |screenshot| %>
+              <img src="<%= url_for(screenshot) %>" alt="Project screenshot" class="snap-center">
+            <% end %>
+          </div>
+        </div>
+        <div class="prose text-neutral-100 font-light mb-8">
+          <%= sanitize @project.full_description %>
+        </div>
+        <div class="flex gap-4">
+          <% @project.categories.each do |category| %>
+            <%= content_tag :a, category.title, href: projects_path(category: category.id), class: 'rounded-full px-4 py-2 border border-neutral-500 leading-none' %>
+          <% end %>
+        </div>
+        <div class="flex gap-8">
+          <% [@project.user].concat(@project.members.public).each do |user| %>
+            <%= content_tag :a, user.username, href: user_path(user) %>
+          <% end %>
+        </div>
+      </div>
+
+      <div>
+        <%= render LinkComponent.new(href: @project.website_url) do %>
+          Go to website
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

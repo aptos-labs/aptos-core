@@ -36,7 +36,7 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
         .await;
 
     context
-        .api_execute_script_function(
+        .api_execute_entry_function(
             &mut account,
             "Message",
             "set_message",

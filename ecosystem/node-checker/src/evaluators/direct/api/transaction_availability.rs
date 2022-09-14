@@ -8,13 +8,13 @@ use crate::{
     evaluators::EvaluatorType,
 };
 use anyhow::Result;
-use aptos_rest_client::{aptos_api_types::TransactionInfo, Client as AptosRestClient, Transaction};
+use aptos_rest_client::{aptos_api_types::TransactionData, Client as AptosRestClient};
 use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 
-const TRANSACTIONS_ENDPOINT: &str = "/transactions";
+const TRANSACTIONS_ENDPOINT: &str = "/transactions/by_version";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct TransactionAvailabilityEvaluatorArgs {}
@@ -34,35 +34,38 @@ impl TransactionAvailabilityEvaluator {
     async fn get_transaction_by_version(
         client: &AptosRestClient,
         version: u64,
-    ) -> Result<Transaction, ApiEvaluatorError> {
+        node_name: &str,
+    ) -> Result<TransactionData, ApiEvaluatorError> {
         Ok(client
-            .get_transaction_by_version(version)
+            .get_transaction_by_version_bcs(version)
             .await
             .map_err(|e| {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
-                    e.context(format!(
-                        "The node API failed to return the requested transaction with version: {}",
-                        version
+                    anyhow::Error::from(e).context(format!(
+                        "The {} node API failed to return the requested transaction at version: {}",
+                        node_name, version
                     )),
                 )
             })?
             .into_inner())
     }
 
-    /// Helper to get transaction info from a transaction.
-    fn unwrap_transaction_info(
-        transaction: Transaction,
-    ) -> Result<TransactionInfo, ApiEvaluatorError> {
-        transaction
-            .transaction_info()
-            .map_err(|e| {
-                ApiEvaluatorError::EndpointError(
-                    "/transactions".to_string(),
-                    e.context("The node API returned a transaction with no info".to_string()),
-                )
-            })
-            .map(|info| info.clone())
+    /// Helper to get the accumulator root hash from an on chain transaction
+    /// as returned by the API.
+    fn unwrap_accumulator_root_hash(
+        transaction_data: &TransactionData,
+    ) -> Result<&aptos_crypto::HashValue, ApiEvaluatorError> {
+        match transaction_data {
+            TransactionData::OnChain(on_chain) => Ok(&on_chain.accumulator_root_hash),
+            wildcard => Err(ApiEvaluatorError::EndpointError(
+                TRANSACTIONS_ENDPOINT.to_string(),
+                anyhow::anyhow!(
+                    "The API unexpectedly returned a transaction that was not an on-chain transaction: {:?}",
+                    wildcard
+                ),
+            ))
+        }
     }
 }
 
@@ -75,18 +78,10 @@ impl Evaluator for TransactionAvailabilityEvaluator {
     /// baseline produced after a delay. We confirm that the transactions are
     /// same by looking at the version.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let oldest_baseline_version = input
-            .baseline_index_response
-            .ledger_info
-            .oldest_ledger_version
-            .0;
-        let oldest_target_version = input
-            .target_index_response
-            .ledger_info
-            .oldest_ledger_version
-            .0;
-        let latest_baseline_version = input.baseline_index_response.ledger_info.ledger_version.0;
-        let latest_target_version = input.target_index_response.ledger_info.ledger_version.0;
+        let oldest_baseline_version = input.baseline_index_response.oldest_ledger_version.0;
+        let oldest_target_version = input.target_index_response.oldest_ledger_version.0;
+        let latest_baseline_version = input.baseline_index_response.ledger_version.0;
+        let latest_target_version = input.target_index_response.ledger_version.0;
 
         // Get the oldest ledger version between the two nodes.
         let oldest_shared_version = max(oldest_baseline_version, oldest_target_version);
@@ -119,25 +114,37 @@ impl Evaluator for TransactionAvailabilityEvaluator {
             )]);
         }
 
+        // Select a version in the middle of shared oldest and latest version.
+        let middle_shared_version =
+            (oldest_shared_version.saturating_add(latest_shared_version)) / 2;
+
         // We've asserted that both nodes are sufficiently up to date relative
         // to each other, we should be able to pull the same transaction from
         // both nodes.
 
-        let baseline_client =
-            AptosRestClient::new(input.baseline_node_information.node_address.get_api_url());
+        let baseline_client = input
+            .baseline_node_information
+            .node_address
+            .get_api_client(std::time::Duration::from_secs(4));
 
-        let latest_baseline_transaction_info = Self::unwrap_transaction_info(
-            Self::get_transaction_by_version(&baseline_client, latest_shared_version).await?,
-        )?;
+        let middle_baseline_transaction =
+            Self::get_transaction_by_version(&baseline_client, middle_shared_version, "baseline")
+                .await?;
+        let middle_baseline_accumulator_root_hash =
+            Self::unwrap_accumulator_root_hash(&middle_baseline_transaction)?;
 
-        let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
+        let target_client = input
+            .target_node_address
+            .get_api_client(std::time::Duration::from_secs(5));
         let evaluation =
-            match Self::get_transaction_by_version(&target_client, latest_shared_version).await {
-                Ok(latest_target_transaction) => {
-                    match Self::unwrap_transaction_info(latest_target_transaction) {
-                        Ok(latest_target_transaction_info) => {
-                            if latest_baseline_transaction_info.accumulator_root_hash
-                                == latest_target_transaction_info.accumulator_root_hash
+            match Self::get_transaction_by_version(&target_client, middle_shared_version, "latest")
+                .await
+            {
+                Ok(middle_target_transaction) => {
+                    match Self::unwrap_accumulator_root_hash(&middle_target_transaction) {
+                        Ok(middle_target_accumulator_root_hash) => {
+                            if middle_baseline_accumulator_root_hash
+                                == middle_target_accumulator_root_hash
                             {
                                 self.build_evaluation_result(
                                     "Target node produced valid recent transaction".to_string(),
@@ -145,9 +152,8 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     format!(
                                         "We were able to pull the same transaction (version: {}) \
                                     from both your node and the baseline node. Great! This \
-                                    implies that your node is keeping up with other nodes \
-                                    in the network.",
-                                        latest_shared_version,
+                                    implies that your node is returning valid transaction data.",
+                                        middle_shared_version,
                                     ),
                                 )
                             } else {
@@ -161,9 +167,9 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                                     transaction was invalid compared to the baseline as the \
                                     accumulator root hash of the transaction ({}) was different \
                                     compared to the baseline ({}).",
-                                        latest_shared_version,
-                                        latest_target_transaction_info.accumulator_root_hash,
-                                        latest_baseline_transaction_info.accumulator_root_hash,
+                                        middle_shared_version,
+                                        middle_target_accumulator_root_hash,
+                                        middle_baseline_accumulator_root_hash,
                                     ),
                                 )
                             }
@@ -177,7 +183,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                             from both your node and the baseline node. However, the \
                             the transaction was missing metadata such as the version, \
                             accumulator root hash, etc. Error: {}",
-                                latest_shared_version, error,
+                                middle_shared_version, error,
                             ),
                         ),
                     }
@@ -189,7 +195,7 @@ impl Evaluator for TransactionAvailabilityEvaluator {
                         "The target node claims it has transactions between versions {} and {}, \
                     but it was unable to return the transaction with version {}. This implies \
                     something is wrong with your node's API. Error: {}",
-                        oldest_target_version, latest_target_version, latest_shared_version, error,
+                        oldest_target_version, latest_target_version, middle_shared_version, error,
                     ),
                 ),
             };

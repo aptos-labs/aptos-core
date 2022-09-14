@@ -4,10 +4,12 @@ validator:
   name:
 
 monitoring:
-  fullKubernetesScrape: true
-  useKubeStateMetrics: false
   prometheus:
+    fullKubernetesScrape: false
     deleteWal: false
+    tsdb_retention_time: 15d
+    tsdb_min_block_duration: 30m
+    tsdb_max_block_duration: 1h
     remote_write:
       enabled: false
       url:
@@ -98,3 +100,12 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
   annotations:
+
+kube-state-metrics:
+  enabled: false
+  namespaceOverride: kube-system
+
+prometheus-node-exporter:
+  enabled: false
+  namespaceOverride: kube-system
+

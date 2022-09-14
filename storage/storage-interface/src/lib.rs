@@ -4,6 +4,7 @@
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
@@ -58,7 +59,7 @@ pub trait StateSnapshotReceiver<K, V>: Send {
     fn finish_box(self: Box<Self>) -> Result<()>;
 }
 
-#[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Service error: {:?}", error)]
     ServiceError { error: String },
@@ -121,6 +122,15 @@ pub trait DbReader: Send + Sync {
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<TransactionListWithProof> {
+        unimplemented!()
+    }
+
+    fn get_gas_prices(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<u64>> {
         unimplemented!()
     }
 
@@ -275,13 +285,6 @@ pub trait DbReader: Send + Sync {
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
             .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
-    }
-
-    /// Returns the latest version, None for non-bootstrapped DB.
-    fn get_latest_version_option(&self) -> Result<Option<Version>> {
-        Ok(self
-            .get_latest_ledger_info_option()?
-            .map(|li| li.ledger_info().version()))
     }
 
     /// Returns the latest version, error on on non-bootstrapped DB.
@@ -452,12 +455,7 @@ pub trait DbReader: Send + Sync {
         &self,
         ledger_version: Version,
     ) -> Result<TransactionAccumulatorSummary> {
-        let genesis_consistency_proof =
-            self.get_accumulator_consistency_proof(None, ledger_version)?;
-        TransactionAccumulatorSummary::try_from_genesis_proof(
-            genesis_consistency_proof,
-            ledger_version,
-        )
+        unimplemented!()
     }
 
     /// Returns total number of leaves in state store at given version.
@@ -481,7 +479,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<usize> {
+    fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
         unimplemented!()
     }
 
@@ -504,6 +502,11 @@ pub trait DbReader: Send + Sync {
     fn indexer_enabled(&self) -> bool {
         unimplemented!()
     }
+
+    /// Returns state storage usage at the end of an epoch.
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        unimplemented!()
+    }
 }
 
 impl MoveStorage for &dyn DbReader {
@@ -521,7 +524,7 @@ impl MoveStorage for &dyn DbReader {
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))
-            .map(|value| value.maybe_bytes)
+            .map(|value| value.into_bytes())
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
@@ -533,7 +536,7 @@ impl MoveStorage for &dyn DbReader {
             version,
         )?;
         config_value_option
-            .map(|x| x.maybe_bytes)
+            .map(|x| x.into_bytes())
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
     }
 

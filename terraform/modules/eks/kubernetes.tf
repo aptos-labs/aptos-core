@@ -86,11 +86,25 @@ provider "helm" {
   }
 }
 
+resource "kubernetes_namespace" "tigera-operator" {
+  metadata {
+    annotations = {
+      name = "tigera-operator"
+    }
+
+    name = "tigera-operator"
+  }
+}
+
 resource "helm_release" "calico" {
-  name        = "calico"
-  namespace   = "kube-system"
-  chart       = "${path.module}/aws-calico/"
-  max_history = 10
+  name       = "calico"
+  repository = "https://docs.projectcalico.org/charts"
+  chart      = "tigera-operator"
+  version    = "3.23.3"
+  namespace  = "tigera-operator"
+  depends_on = [
+    kubernetes_namespace.tigera-operator
+  ]
 }
 
 resource "kubernetes_cluster_role" "debug" {

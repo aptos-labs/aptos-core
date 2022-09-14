@@ -46,12 +46,14 @@ impl SafetyRulesConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         if let SecureBackend::OnDiskStorage(backend) = &mut self.backend {
             backend.set_data_dir(data_dir);
+        } else if let SecureBackend::RocksDbStorage(backend) = &mut self.backend {
+            backend.set_data_dir(data_dir);
         }
     }
 }
 
 // TODO: Find a cleaner way so WaypointConfig isn't duplicated
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InitialSafetyRulesConfig {
     FromFile {
@@ -87,7 +89,7 @@ impl InitialSafetyRulesConfig {
 }
 
 /// Defines how safety rules should be executed
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SafetyRulesService {
     /// This runs safety rules in the same thread as event processor
@@ -101,7 +103,7 @@ pub enum SafetyRulesService {
     Thread,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteService {
     pub server_address: NetworkAddress,

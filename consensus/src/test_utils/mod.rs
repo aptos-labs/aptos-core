@@ -202,6 +202,7 @@ pub fn consensus_runtime() -> runtime::Runtime {
 
     runtime::Builder::new_multi_thread()
         .enable_all()
+        .disable_lifo_slot()
         .build()
         .expect("Failed to create Tokio runtime!")
 }

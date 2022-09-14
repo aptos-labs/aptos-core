@@ -24,19 +24,25 @@ module aptos_framework::voting {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
+    use std::string::String;
     use std::vector;
 
     use aptos_std::event::{Self, EventHandle};
+    use aptos_std::simple_map::SimpleMap;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
+    use aptos_framework::account;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
 
-    /// Error codes.
+    /// Current script's execution hash does not match the specified proposal's
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
+    /// Proposal cannot be resolved. Either voting duration has not passed, not enough votes, or fewer yes than no votes
     const EPROPOSAL_CANNOT_BE_RESOLVED: u64 = 2;
+    /// Proposal cannot be resolved more than once
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
+    /// Proposal cannot contain an empty execution script hash
     const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
 
     /// ProposalStateEnum representing proposal state.
@@ -53,6 +59,10 @@ module aptos_framework::voting {
         /// Required. Should contain enough information to execute later, for example the required capability.
         /// This is stored as an option so we can return it to governance when the proposal is resolved.
         execution_content: Option<ProposalType>,
+
+        /// Optional. Extra metadata about the proposal and can be empty.
+        /// Value is serialized value of an attribute.
+        metadata: SimpleMap<String, vector<u8>>,
 
         /// Timestamp when the proposal was created.
         creation_time_secs: u64,
@@ -78,6 +88,8 @@ module aptos_framework::voting {
 
         /// Whether the proposal has been resolved.
         is_resolved: bool,
+        /// Resolution timestamp if the proposal has been resolved. 0 otherwise.
+        resolution_time_secs: u64,
     }
 
     struct VotingForum<ProposalType: store> has key {
@@ -101,6 +113,7 @@ module aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         execution_hash: vector<u8>,
         expiration_secs: u64,
+        metadata: SimpleMap<String, vector<u8>>,
         min_vote_threshold: u128,
     }
 
@@ -126,10 +139,10 @@ module aptos_framework::voting {
             next_proposal_id: 0,
             proposals: table::new<u64, Proposal<ProposalType>>(),
             events: VotingEvents {
-                create_proposal_events: event::new_event_handle<CreateProposalEvent>(account),
-                register_forum_events: event::new_event_handle<RegisterForumEvent>(account),
-                resolve_proposal_events: event::new_event_handle<ResolveProposal>(account),
-                vote_events: event::new_event_handle<VoteEvent>(account),
+                create_proposal_events: account::new_event_handle<CreateProposalEvent>(account),
+                register_forum_events: account::new_event_handle<RegisterForumEvent>(account),
+                resolve_proposal_events: account::new_event_handle<ResolveProposal>(account),
+                vote_events: account::new_event_handle<VoteEvent>(account),
             }
         };
 
@@ -162,6 +175,7 @@ module aptos_framework::voting {
         min_vote_threshold: u128,
         expiration_secs: u64,
         early_resolution_vote_threshold: Option<u128>,
+        metadata: SimpleMap<String, vector<u8>>,
     ): u64 acquires VotingForum {
         // Make sure the execution script's hash is not empty.
         assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
@@ -175,12 +189,14 @@ module aptos_framework::voting {
             creation_time_secs: timestamp::now_seconds(),
             execution_content: option::some<ProposalType>(execution_content),
             execution_hash,
+            metadata,
             min_vote_threshold,
             expiration_secs,
             early_resolution_vote_threshold,
             yes_votes: 0,
             no_votes: 0,
             is_resolved: false,
+            resolution_time_secs: 0,
         });
 
         event::emit_event<CreateProposalEvent>(
@@ -190,6 +206,7 @@ module aptos_framework::voting {
                 early_resolution_vote_threshold,
                 execution_hash,
                 expiration_secs,
+                metadata,
                 min_vote_threshold,
             },
         );
@@ -244,6 +261,7 @@ module aptos_framework::voting {
 
         let resolved_early = can_be_resolved_early(proposal);
         proposal.is_resolved = true;
+        proposal.resolution_time_secs = timestamp::now_seconds();
 
         assert!(
             transaction_context::get_script_hash() == proposal.execution_hash,
@@ -321,13 +339,31 @@ module aptos_framework::voting {
         proposal.expiration_secs
     }
 
-    #[test_only]
-    use std::string::{String, utf8};
+    /// Return the proposal's execution hash.
+    public fun get_execution_hash<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): vector<u8> acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.execution_hash
+    }
+
+    /// Return true if the governance proposal has already been resolved.
+    public fun is_resolved<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): bool acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.is_resolved
+    }
 
     #[test_only]
-    struct TestProposal has store {
-        code_url: String,
-    }
+    use aptos_std::simple_map;
+
+    #[test_only]
+    struct TestProposal has store {}
 
     #[test_only]
     public fun create_test_proposal(
@@ -337,9 +373,7 @@ module aptos_framework::voting {
         // Register voting forum and create a proposal.
         register<TestProposal>(governance);
         let governance_address = signer::address_of(governance);
-        let proposal = TestProposal {
-            code_url: utf8(b"http://mycode.url"),
-        };
+        let proposal = TestProposal {};
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
         let execution_hash = vector::empty<u8>();
@@ -352,6 +386,7 @@ module aptos_framework::voting {
             10,
             100000,
             early_resolution_threshold,
+            simple_map::create<String, vector<u8>>(),
         );
 
         proposal_id
@@ -360,11 +395,11 @@ module aptos_framework::voting {
     #[test(governance = @0x123)]
     #[expected_failure(abort_code = 0x10004)]
     public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
-        register<TestProposal>(governance);
+        account::create_account_for_test(@aptos_framework);
         let governance_address = signer::address_of(governance);
-        let proposal = TestProposal {
-            code_url: utf8(b""),
-        };
+        account::create_account_for_test(governance_address);
+        register<TestProposal>(governance);
+        let proposal = TestProposal {};
 
         // This should fail because execution hash is empty.
         create_proposal<TestProposal>(
@@ -375,22 +410,25 @@ module aptos_framework::voting {
             10,
             100000,
             option::none<u128>(),
+            simple_map::create<String, vector<u8>>(),
         );
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     public entry fun test_voting_passed(aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
-        let proof = TestProposal { code_url: utf8(b"") };
+        let proof = TestProposal {};
         vote<TestProposal>(&proof, governance_address, proposal_id, 10, true);
-        let TestProposal { code_url: _ } = proof;
+        let TestProposal {} = proof;
 
         // Resolve.
         timestamp::update_global_time_for_test(100001000000);
@@ -399,48 +437,51 @@ module aptos_framework::voting {
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
         assert!(table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 2);
 
-        let TestProposal { code_url } = proposal;
-        assert!(code_url == utf8(b"http://mycode.url"), 3);
+        let TestProposal {} = proposal;
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x10003)]
     public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
-        let proof = TestProposal { code_url: utf8(b"") };
+        let proof = TestProposal {};
         vote<TestProposal>(&proof, governance_address, proposal_id, 10, true);
-        let TestProposal { code_url: _ } = proof;
+        let TestProposal {} = proof;
 
         // Resolve.
         timestamp::update_global_time_for_test(100001000000);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
-        let TestProposal { code_url: _ } = resolve<TestProposal>(governance_address, proposal_id);
+        let TestProposal {} = resolve<TestProposal>(governance_address, proposal_id);
 
         // Resolve a second time should fail.
-        let TestProposal { code_url: _ } = resolve<TestProposal>(governance_address, proposal_id);
+        let TestProposal {} = resolve<TestProposal>(governance_address, proposal_id);
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     public entry fun test_voting_passed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::some(100));
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
-        let proof = TestProposal { code_url: utf8(b"") };
+        let proof = TestProposal {};
         vote<TestProposal>(&proof, governance_address, proposal_id, 100, true);
         vote<TestProposal>(&proof, governance_address, proposal_id, 10, false);
-        let TestProposal { code_url: _ } = proof;
+        let TestProposal {} = proof;
 
         // Resolve early.
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
@@ -448,50 +489,54 @@ module aptos_framework::voting {
         let voting_forum = borrow_global<VotingForum<TestProposal>>(governance_address);
         assert!(table::borrow(&voting_forum.proposals, proposal_id).is_resolved, 2);
 
-        let TestProposal { code_url: _ } = proposal;
+        let TestProposal {} = proposal;
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x10002)]
     public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::none<u128>());
 
         // Vote.
-        let proof = TestProposal { code_url: utf8(b"") };
+        let proof = TestProposal {};
         vote<TestProposal>(&proof, governance_address, proposal_id, 10, true);
         vote<TestProposal>(&proof, governance_address, proposal_id, 100, false);
-        let TestProposal { code_url: _ } = proof;
+        let TestProposal {} = proof;
 
         // Resolve.
         timestamp::update_global_time_for_test(100001000000);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_FAILED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
-        let TestProposal { code_url: _ } = proposal;
+        let TestProposal {} = proposal;
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
     #[expected_failure(abort_code = 0x10002)]
     public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+        account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
+        account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::some(100));
 
         // Vote.
-        let proof = TestProposal { code_url: utf8(b"") };
+        let proof = TestProposal {};
         vote<TestProposal>(&proof, governance_address, proposal_id, 100, true);
         vote<TestProposal>(&proof, governance_address, proposal_id, 100, false);
-        let TestProposal { code_url: _ } = proof;
+        let TestProposal {} = proof;
 
         // Resolve.
         timestamp::update_global_time_for_test(100001000000);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_FAILED, 1);
         let proposal = resolve<TestProposal>(governance_address, proposal_id);
-        let TestProposal { code_url: _ } = proposal;
+        let TestProposal {} = proposal;
     }
 }

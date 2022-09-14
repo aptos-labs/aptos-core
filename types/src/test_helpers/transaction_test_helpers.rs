@@ -6,9 +6,8 @@ use crate::{
     chain_id::ChainId,
     transaction::{
         authenticator::AccountAuthenticator, Module, RawTransaction, RawTransactionWithData,
-        Script, SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionPayload,
+        Script, SignedTransaction, Transaction, TransactionPayload,
     },
-    write_set::WriteSet,
 };
 use aptos_crypto::{ed25519::*, traits::*, HashValue};
 
@@ -237,19 +236,6 @@ pub fn get_test_txn_with_chain_id(
     let signature = private_key.sign(&raw_txn);
 
     SignedTransaction::new(raw_txn, public_key, signature)
-}
-
-pub fn get_write_set_txn(
-    sender: AccountAddress,
-    sequence_number: u64,
-    private_key: &Ed25519PrivateKey,
-    public_key: Ed25519PublicKey,
-    write_set: Option<WriteSet>,
-) -> SignatureCheckedTransaction {
-    let write_set = write_set.unwrap_or_default();
-    RawTransaction::new_write_set(sender, sequence_number, write_set, ChainId::test())
-        .sign(private_key, public_key)
-        .unwrap()
 }
 
 pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {

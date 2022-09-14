@@ -22,6 +22,7 @@ use short_hex_str::AsShortHexStr;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    fmt,
     path::PathBuf,
     string::ToString,
     time::Duration,
@@ -35,13 +36,18 @@ pub const HANDSHAKE_VERSION: u8 = 0;
 pub const NETWORK_CHANNEL_SIZE: usize = 1024;
 pub const PING_INTERVAL_MS: u64 = 10_000;
 pub const PING_TIMEOUT_MS: u64 = 20_000;
-pub const PING_FAILURES_TOLERATED: u64 = 5;
+pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
-pub const MAX_INBOUND_CONNECTIONS: usize = 100;
-pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
+pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
+pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
+pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
+pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
+    (MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE) - MESSAGE_PADDING_SIZE; /* The message size that applications should check against */
+pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
+pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
@@ -97,6 +103,8 @@ pub struct NetworkConfig {
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
     // Outbound rate limiting configuration, if not specified, no rate limiting
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
+    // The maximum size of an inbound or outbound message (it may be divided into multiple frame)
+    pub max_message_size: usize,
 }
 
 impl Default for NetworkConfig {
@@ -107,12 +115,13 @@ impl Default for NetworkConfig {
 
 impl NetworkConfig {
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
+        let mutual_authentication = network_id.is_validator_network();
         let mut config = Self {
             discovery_method: DiscoveryMethod::None,
             discovery_methods: Vec::new(),
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
-            mutual_authentication: false,
+            mutual_authentication,
             network_id,
             runtime_threads: None,
             seed_addrs: HashMap::new(),
@@ -131,6 +140,7 @@ impl NetworkConfig {
             max_inbound_connections: MAX_INBOUND_CONNECTIONS,
             inbound_rate_limit_config: None,
             outbound_rate_limit_config: None,
+            max_message_size: MAX_MESSAGE_SIZE,
         };
         config.prepare_identity();
         config
@@ -306,7 +316,7 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PeerMonitoringServiceConfig {
     pub max_concurrent_requests: u64, // Max num of concurrent server tasks
@@ -368,7 +378,7 @@ pub struct IdentityFromConfig {
 }
 
 /// This represents an identity in a secure-storage as defined in NodeConfig::secure.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IdentityFromStorage {
     pub backend: SecureBackend,
@@ -376,7 +386,7 @@ pub struct IdentityFromStorage {
     pub peer_id_name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IdentityFromFile {
     pub path: PathBuf,
@@ -421,7 +431,7 @@ pub type PeerSet = HashMap<PeerId, Peer>;
 /// Downstream -> Downstream, defining a controlled downstream that I always want to connect
 /// Known -> A known peer, but it has no particular role assigned to it
 /// Unknown -> Undiscovered peer, likely due to a non-mutually authenticated connection always downstream
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum PeerRole {
     Validator = 0,
     PreferredUpstream,
@@ -432,6 +442,20 @@ pub enum PeerRole {
     Unknown,
 }
 
+impl PeerRole {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PeerRole::Validator => "validator",
+            PeerRole::PreferredUpstream => "preferred_upstream_peer",
+            PeerRole::Upstream => "upstream_peer",
+            PeerRole::ValidatorFullNode => "validator_fullnode",
+            PeerRole::Downstream => "downstream_peer",
+            PeerRole::Known => "known_peer",
+            PeerRole::Unknown => "unknown_peer",
+        }
+    }
+}
+
 impl Default for PeerRole {
     /// Default to least trusted
     fn default() -> Self {
@@ -439,8 +463,20 @@ impl Default for PeerRole {
     }
 }
 
+impl fmt::Debug for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for PeerRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 /// Represents a single seed configuration for a seed peer
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default)]
 pub struct Peer {
     pub addresses: Vec<NetworkAddress>,

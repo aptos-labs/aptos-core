@@ -3,13 +3,14 @@
 
 use aptos_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
-    default_processor::DefaultTransactionProcessor,
     indexer::tailer::Tailer,
     models::transactions::TransactionModel,
-    token_processor::TokenTransactionProcessor,
+    processors::{
+        default_processor::DefaultTransactionProcessor, token_processor::TokenTransactionProcessor,
+    },
 };
 use aptos_sdk::types::LocalAccount;
-use cached_framework_packages::aptos_stdlib::aptos_token_stdlib;
+use cached_packages::aptos_stdlib::aptos_token_stdlib;
 use diesel::connection::Connection;
 use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
@@ -38,20 +39,27 @@ pub fn wipe_database(conn: &PgPoolConnection) {
     }
 }
 
-pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Tailer)> {
+pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Tailer, Tailer)> {
     let database_url = std::env::var("INDEXER_DATABASE_URL")
         .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
 
     let conn_pool = new_db_pool(database_url.as_str())?;
     wipe_database(&conn_pool.get()?);
-    let mut tailer = Tailer::new(info.url(), conn_pool.clone())?;
-    tailer.run_migrations();
 
-    let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-    let token_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
-    tailer.add_processor(Arc::new(pg_transaction_processor));
-    tailer.add_processor(Arc::new(token_processor));
-    Ok((conn_pool, tailer))
+    let txn_tailer = Tailer::new(
+        info.url(),
+        conn_pool.clone(),
+        Arc::new(DefaultTransactionProcessor::new(conn_pool.clone())),
+    )?;
+    txn_tailer.run_migrations();
+
+    let nft_tailer = Tailer::new(
+        info.url(),
+        conn_pool.clone(),
+        Arc::new(TokenTransactionProcessor::new(conn_pool.clone(), false)),
+    )?;
+
+    Ok((conn_pool, txn_tailer, nft_tailer))
 }
 
 pub async fn execute_nft_txns<'t>(
@@ -113,14 +121,14 @@ pub async fn execute_nft_txns<'t>(
 }
 
 #[tokio::test]
-async fn test_indexer() {
+async fn test_old_indexer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     if aptos_indexer::should_skip_pg_tests() {
         return;
     }
-    let (conn_pool, mut tailer) = setup_indexer(&mut info).unwrap();
+    let (conn_pool, tailer, nft_tailer) = setup_indexer(&mut info).unwrap();
 
     info.client().get_ledger_information().await.unwrap();
 
@@ -132,12 +140,13 @@ async fn test_indexer() {
     let t_tx = info.transfer(&mut account1, &account2, 717).await.unwrap();
     // test NFT creation event indexing
     execute_nft_txns(account1, &mut info).await.unwrap();
+    tailer.transaction_fetcher.lock().await.start().await;
+    nft_tailer.transaction_fetcher.lock().await.start().await;
 
     // Why do this twice? To ensure the idempotency of the tailer :-)
-    let mut version: u64 = 0;
     for _ in 0..2 {
         // Process the next versions
-        version = info
+        let version = info
             .client()
             .get_ledger_information()
             .await
@@ -145,6 +154,7 @@ async fn test_indexer() {
             .into_inner()
             .version;
         tailer.process_next_batch((version + 1) as u8).await;
+        nft_tailer.process_next_batch((version + 1) as u8).await;
 
         // Get them into the array and sort by type in order to prevent ordering from breaking tests
         let mut transactions = vec![];
@@ -185,10 +195,7 @@ async fn test_indexer() {
         assert!(bmt2.is_none());
         assert!(wsc2.len() > 1);
         assert_eq!(events2.len(), 2);
-        assert_eq!(events2.get(0).unwrap().type_, "0x1::coin::WithdrawEvent");
+        assert_eq!(events2.first().unwrap().type_, "0x1::coin::WithdrawEvent");
         assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
     }
-
-    let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
-    assert!(latest_version > version);
 }

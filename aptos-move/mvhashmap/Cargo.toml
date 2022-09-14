@@ -7,11 +7,16 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
+anyhow = "1.0.57"
+bcs = "0.1.3"
 crossbeam = "0.8.1"
 dashmap = "5.2.0"
+
+aptos-aggregator = { path = "../aptos-aggregator" }
+aptos-types = { path = "../../types" }
 
 [dev-dependencies]
 proptest = "1.0.0"

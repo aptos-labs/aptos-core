@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Buffer } from "buffer/";
-
 export * from "./account_address";
 export * from "./authenticator";
 export * from "./transaction";
@@ -11,5 +9,6 @@ export * from "./identifier";
 export * from "./ed25519";
 export * from "./multi_ed25519";
 export * from "./authentication_key";
+export * from "./rotation_proof_challenge";
 
-export type SigningMessage = Buffer;
+export type SigningMessage = Uint8Array;

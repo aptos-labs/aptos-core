@@ -23,7 +23,7 @@ pub enum ConsensusScheme {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorSet {
-    scheme: ConsensusScheme,
+    pub scheme: ConsensusScheme,
     pub active_validators: Vec<ValidatorInfo>,
     pub pending_inactive: Vec<ValidatorInfo>,
     pub pending_active: Vec<ValidatorInfo>,

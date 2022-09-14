@@ -2,6 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $BlockMetadataTransaction = {
+    description: `A block metadata transaction
+
+    This signifies the beginning of a block, and contains information
+    about the specific block`,
     properties: {
         version: {
             type: 'U64',
@@ -11,7 +15,7 @@ export const $BlockMetadataTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
-        state_root_hash: {
+        state_change_hash: {
             type: 'HashValue',
             isRequired: true,
         },
@@ -19,16 +23,21 @@ export const $BlockMetadataTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
+        state_checkpoint_hash: {
+            type: 'HashValue',
+        },
         gas_used: {
             type: 'U64',
             isRequired: true,
         },
         success: {
             type: 'boolean',
+            description: `Whether the transaction was successful`,
             isRequired: true,
         },
         vm_status: {
             type: 'string',
+            description: `The VM status of the transaction, can tell useful information in a failure`,
             isRequired: true,
         },
         accumulator_root_hash: {

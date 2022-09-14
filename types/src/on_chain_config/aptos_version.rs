@@ -17,7 +17,7 @@ impl OnChainConfig for Version {
 
 // NOTE: version number for release 1.2 Aptos
 // Items gated by this version number include:
-//  - the ScriptFunction payload type
+//  - the EntryFunction payload type
 pub const APTOS_VERSION_2: Version = Version { major: 2 };
 
 // NOTE: version number for release 1.3 of Aptos

@@ -4,7 +4,8 @@
 use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::read_from_file;
 use crate::genesis::git::from_yaml;
-use crate::genesis::keys::GenerateLayoutTemplate;
+use crate::genesis::git::FRAMEWORK_NAME;
+use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
         types::{PromptOptions, RngArgs},
@@ -25,7 +26,6 @@ use aptos_genesis::config::{HostAndPort, Layout};
 use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::chain_id::ChainId;
-use move_deps::move_binary_format::access::ModuleAccess;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -111,14 +111,11 @@ async fn setup_git_dir(
     git_options
 }
 
-/// Add framework modules to git directory
+/// Add framework to git directory
 fn add_framework_to_dir(git_dir: &Path) {
-    let framework_dir = git_dir.join("framework");
-    cached_framework_packages::modules_with_blobs().for_each(|(blob, module)| {
-        let module_name = module.name();
-        let file = framework_dir.join(format!("{}.mv", module_name));
-        write_to_file(file.as_path(), module_name.as_str(), blob).unwrap();
-    });
+    cached_packages::head_release_bundle()
+        .write(git_dir.join(FRAMEWORK_NAME))
+        .unwrap()
 }
 
 /// Local git options for testing
@@ -181,10 +178,12 @@ async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &P
     let command = SetValidatorConfiguration {
         username,
         git_options,
-        keys_dir: Some(PathBuf::from(keys_dir)),
+        owner_public_identity_file: Some(PathBuf::from(keys_dir).join(PUBLIC_KEYS_FILE)),
         validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
-        full_node_host: None,
         stake_amount: 100_000_000_000_000,
+        full_node_host: None,
+        operator_public_identity_file: None,
+        voter_public_identity_file: None,
     };
 
     command.execute().await.unwrap()

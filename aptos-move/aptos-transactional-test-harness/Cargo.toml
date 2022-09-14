@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -26,7 +26,7 @@ move-deps = { path = "../move-deps", features = ["address32"] }
 aptos-api-types = { path = "../../api/types" }
 aptos-gas = { path = "../aptos-gas" }
 aptos-vm =  { path = "../aptos-vm" }
-cached-framework-packages =  { path = "../framework/cached-packages" }
+cached-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
 language-e2e-tests = { path = "../e2e-tests" }
 vm-genesis = { path = "../vm-genesis" }
@@ -34,7 +34,6 @@ vm-genesis = { path = "../vm-genesis" }
 # Other Aptos dependencies
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 storage-interface = { path = "../../storage/storage-interface" }
 

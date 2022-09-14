@@ -12,7 +12,6 @@ use consensus_types::{
     quorum_cert::QuorumCert,
 };
 
-use aptos_infallible::Mutex;
 use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use std::sync::Arc;
@@ -46,11 +45,13 @@ pub struct ProposalGenerator {
     // Time service to generate block timestamps
     time_service: Arc<dyn TimeService>,
     // Max number of transactions to be added to a proposed block.
-    max_block_size: u64,
+    max_block_txns: u64,
+    // Max number of bytes to be added to a proposed block.
+    max_block_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
     // Last round that a proposal was generated
-    last_round_generated: Mutex<Round>,
+    last_round_generated: Round,
 }
 
 impl ProposalGenerator {
@@ -59,7 +60,8 @@ impl ProposalGenerator {
         block_store: Arc<dyn BlockReader + Send + Sync>,
         payload_manager: Arc<dyn PayloadManager>,
         time_service: Arc<dyn TimeService>,
-        max_block_size: u64,
+        max_block_txns: u64,
+        max_block_bytes: u64,
         max_failed_authors_to_store: usize,
     ) -> Self {
         Self {
@@ -67,9 +69,10 @@ impl ProposalGenerator {
             block_store,
             payload_manager,
             time_service,
-            max_block_size,
+            max_block_txns,
+            max_block_bytes,
             max_failed_authors_to_store,
-            last_round_generated: Mutex::new(0),
+            last_round_generated: 0,
         }
     }
 
@@ -110,13 +113,10 @@ impl ProposalGenerator {
         proposer_election: &mut UnequivocalProposerElection,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
-        {
-            let mut last_round_generated = self.last_round_generated.lock();
-            if *last_round_generated < round {
-                *last_round_generated = round;
-            } else {
-                bail!("Already proposed in the round {}", round);
-            }
+        if self.last_round_generated < round {
+            self.last_round_generated = round;
+        } else {
+            bail!("Already proposed in the round {}", round);
         }
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
@@ -160,7 +160,8 @@ impl ProposalGenerator {
                 .payload_manager
                 .pull_payload(
                     round,
-                    self.max_block_size,
+                    self.max_block_txns,
+                    self.max_block_bytes,
                     payload_filter,
                     wait_callback,
                     pending_ordering,

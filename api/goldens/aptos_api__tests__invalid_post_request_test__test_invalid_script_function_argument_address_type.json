@@ -1,5 +1,0 @@
-{
-  "message": "The given transaction is invalid: Failed to parse transaction payload: parse arguments[0] failed, expect string<address>, caused by error: invalid type: integer `1`, expected a string",
-  "error_code": null,
-  "aptos_ledger_version": null
-}

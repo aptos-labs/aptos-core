@@ -3,10 +3,8 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, CRSNResource, ChainIdResource, CoinStoreResource},
-    on_chain_config::{
-        access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet, Version,
-    },
+    account_config::{AccountResource, ChainIdResource, CoinStoreResource},
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
@@ -42,7 +40,7 @@ pub trait AccountView {
     }
 
     fn get_on_chain_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
+        self.get_resource_impl(T::access_path().path)
     }
 
     fn get_version(&self) -> anyhow::Result<Option<Version>> {
@@ -55,10 +53,6 @@ pub trait AccountView {
 
     fn get_chain_id_resource(&self) -> anyhow::Result<Option<ChainIdResource>> {
         self.get_resource::<ChainIdResource>()
-    }
-
-    fn get_crsn_resource(&self) -> anyhow::Result<Option<CRSNResource>> {
-        self.get_resource::<CRSNResource>()
     }
 
     fn get_coin_store_resource(&self) -> anyhow::Result<Option<CoinStoreResource>> {
@@ -77,7 +71,7 @@ pub trait AccountView {
     }
 
     fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
+        self.get_resource_impl(T::access_path().path)
     }
 
     fn get_resource_impl<T: DeserializeOwned>(&self, path: Vec<u8>) -> anyhow::Result<Option<T>> {

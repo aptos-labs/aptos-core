@@ -24,8 +24,8 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use channel::{aptos_channel, message_queues::QueueStyle};
-use futures::{stream::FusedStream, Stream};
+use futures::channel::mpsc;
+use futures::{stream::FusedStream, SinkExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     pin::Pin,
@@ -79,7 +79,7 @@ pub struct DataStream<T> {
     notifications_to_responses: BTreeMap<NotificationId, ResponseContext>,
 
     // The channel on which to send data notifications when they are ready.
-    notification_sender: channel::aptos_channel::Sender<(), DataNotification>,
+    notification_sender: mpsc::Sender<DataNotification>,
 
     // A unique notification ID generator
     notification_id_generator: Arc<U64IdGenerator>,
@@ -108,12 +108,9 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         advertised_data: &AdvertisedData,
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
-        let (notification_sender, notification_receiver) = aptos_channel::new(
-            QueueStyle::KLAST,
-            config.max_data_stream_channel_sizes as usize,
-            None,
-        );
-        let data_stream_listener = DataStreamListener::new(notification_receiver);
+        let (notification_sender, notification_receiver) =
+            mpsc::channel(config.max_data_stream_channel_sizes as usize);
+        let data_stream_listener = DataStreamListener::new(data_stream_id, notification_receiver);
 
         // Create a new stream engine
         let stream_engine = StreamEngine::new(stream_request, advertised_data)?;
@@ -199,6 +196,15 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
+    /// Returns the maximum number of concurrent requests that can be executing
+    /// at any given time.
+    fn get_max_concurrent_requests(&self) -> u64 {
+        match self.stream_engine {
+            StreamEngine::StateStreamEngine(_) => self.config.max_concurrent_state_requests,
+            _ => self.config.max_concurrent_requests,
+        }
+    }
+
     /// Creates and sends a batch of aptos data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
@@ -206,9 +212,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
         let num_sent_requests = self.get_sent_data_requests().len() as u64;
-        let max_num_requests_to_send = self
-            .config
-            .max_concurrent_requests
+        let max_concurrent_requests = self.get_max_concurrent_requests();
+        let max_num_requests_to_send = max_concurrent_requests
             .checked_sub(num_sent_requests)
             .ok_or_else(|| {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
@@ -268,8 +273,13 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         pending_client_response
     }
 
-    fn send_data_notification(&mut self, data_notification: DataNotification) -> Result<(), Error> {
-        if let Err(error) = self.notification_sender.push((), data_notification) {
+    // TODO(joshlind): this function shouldn't be blocking when trying to send! If there are
+    // multiple streams, a single blocked stream could cause them all to block.
+    async fn send_data_notification(
+        &mut self,
+        data_notification: DataNotification,
+    ) -> Result<(), Error> {
+        if let Err(error) = self.notification_sender.send(data_notification).await {
             let error = Error::UnexpectedErrorEncountered(error.to_string());
             warn!(
                 (LogSchema::new(LogEntry::StreamNotification)
@@ -285,7 +295,12 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         }
     }
 
-    fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
+    /// Returns true iff there was a send failure
+    pub fn send_failure(&self) -> bool {
+        self.send_failure
+    }
+
+    async fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
         // Create end of stream notification
         let notification_id = self.notification_id_generator.next();
         let data_notification = DataNotification {
@@ -301,12 +316,12 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 .message("Sent the end of stream notification"))
         );
         self.stream_end_notification_id = Some(notification_id);
-        self.send_data_notification(data_notification)
+        self.send_data_notification(data_notification).await
     }
 
     /// Processes any data client responses that have been received. Note: the
     /// responses must be processed in FIFO order.
-    pub fn process_data_responses(
+    pub async fn process_data_responses(
         &mut self,
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
@@ -315,25 +330,26 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             || self.send_failure
         {
             if !self.send_failure && self.stream_end_notification_id.is_none() {
-                self.send_end_of_stream_notification()?;
+                self.send_end_of_stream_notification().await?;
             }
             return Ok(()); // There's nothing left to do
         }
 
         // Process any ready data responses
-        for _ in 0..self.config.max_concurrent_requests {
+        for _ in 0..self.get_max_concurrent_requests() {
             if let Some(pending_response) = self.pop_pending_response_queue() {
-                let mut pending_response = pending_response.lock();
                 let client_response = pending_response
+                    .lock()
                     .client_response
                     .take()
                     .expect("The client response should be ready!");
-                let client_request = &pending_response.client_request;
+                let client_request = &pending_response.lock().client_request.clone();
 
                 match client_response {
                     Ok(client_response) => {
                         if sanity_check_client_response(client_request, &client_response) {
-                            self.send_data_notification_to_client(client_request, client_response)?;
+                            self.send_data_notification_to_client(client_request, client_response)
+                                .await?;
                         } else {
                             self.handle_sanity_check_failure(
                                 client_request,
@@ -444,7 +460,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     }
 
     /// Sends a data notification to the client along the stream
-    fn send_data_notification_to_client(
+    async fn send_data_notification_to_client(
         &mut self,
         data_client_request: &DataClientRequest,
         data_client_response: Response<ResponsePayload>,
@@ -474,7 +490,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                         notification_id
                     )))
             );
-            self.send_data_notification(data_notification)?;
+            self.send_data_notification(data_notification).await?;
 
             // Reset the failure count. We've sent a notification and can move on.
             self.request_failure_count = 0;
@@ -592,7 +608,8 @@ impl<T> Drop for DataStream<T> {
 /// Allows listening to data streams (i.e., streams of data notifications).
 #[derive(Debug)]
 pub struct DataStreamListener {
-    notification_receiver: channel::aptos_channel::Receiver<(), DataNotification>,
+    pub data_stream_id: DataStreamId,
+    notification_receiver: mpsc::Receiver<DataNotification>,
 
     /// Stores the number of consecutive timeouts encountered when listening to this stream
     pub num_consecutive_timeouts: u64,
@@ -600,9 +617,11 @@ pub struct DataStreamListener {
 
 impl DataStreamListener {
     pub fn new(
-        notification_receiver: channel::aptos_channel::Receiver<(), DataNotification>,
+        data_stream_id: DataStreamId,
+        notification_receiver: mpsc::Receiver<DataNotification>,
     ) -> Self {
         Self {
+            data_stream_id,
             notification_receiver,
             num_consecutive_timeouts: 0,
         }
@@ -699,7 +718,7 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     // Update the requests sent counter
     increment_counter(
         &metrics::SENT_DATA_REQUESTS,
-        data_client_request.get_label().into(),
+        data_client_request.get_label(),
     );
 
     // Spawn the request
@@ -740,11 +759,11 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
             Ok(response) => {
                 increment_counter(
                     &metrics::RECEIVED_DATA_RESPONSE,
-                    response.payload.get_label().into(),
+                    response.payload.get_label(),
                 );
             }
             Err(error) => {
-                increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label().into());
+                increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label());
             }
         }
 

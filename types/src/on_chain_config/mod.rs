@@ -10,18 +10,20 @@ use anyhow::{format_err, Result};
 use move_deps::move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::{StructTag, TypeTag},
+    language_storage::StructTag,
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt, sync::Arc};
 
+mod approved_execution_hashes;
 mod aptos_version;
 mod consensus_config;
 mod gas_schedule;
 mod validator_set;
 
 pub use self::{
+    approved_execution_hashes::ApprovedExecutionHashes,
     aptos_version::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
@@ -57,13 +59,14 @@ impl fmt::Display for ConfigID {
 
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
+    ApprovedExecutionHashes::CONFIG_ID,
     GasSchedule::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
 ];
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OnChainConfigPayload {
     epoch: u64,
     configs: Arc<HashMap<ConfigID, Vec<u8>>>,
@@ -146,43 +149,41 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage,
     {
-        let access_path = access_path_for_config(Self::CONFIG_ID);
+        let access_path = Self::access_path();
         match storage.fetch_config(access_path) {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
     }
-}
 
-pub fn new_epoch_event_key() -> EventKey {
-    EventKey::new(1, CORE_CODE_ADDRESS)
-}
+    fn access_path() -> AccessPath {
+        access_path_for_config(Self::CONFIG_ID)
+    }
 
-pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {
-    StructTag {
-        address: CORE_CODE_ADDRESS,
-        module: ConfigurationResource::MODULE_NAME.to_owned(),
-        name: ident_str!("Reconfiguration").to_owned(),
-        type_params: vec![TypeTag::Struct(StructTag {
-            address: CORE_CODE_ADDRESS,
-            module: config_name.clone(),
-            name: config_name,
-            type_params: vec![],
-        })],
+    fn struct_tag() -> StructTag {
+        struct_tag_for_config(Self::CONFIG_ID)
     }
 }
 
+pub fn new_epoch_event_key() -> EventKey {
+    EventKey::new(2, CORE_CODE_ADDRESS)
+}
+
 pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
-    let struct_tag = StructTag {
-        address: CORE_CODE_ADDRESS,
-        module: Identifier::new(config_id.1).expect("fail to make identifier"),
-        name: Identifier::new(config_id.2).expect("fail to make identifier"),
-        type_params: vec![],
-    };
+    let struct_tag = struct_tag_for_config(config_id);
     AccessPath::new(
         CORE_CODE_ADDRESS,
         AccessPath::resource_access_vec(struct_tag),
     )
+}
+
+pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
+    StructTag {
+        address: CORE_CODE_ADDRESS,
+        module: Identifier::new(config_id.1).expect("fail to make identifier"),
+        name: Identifier::new(config_id.2).expect("fail to make identifier"),
+        type_params: vec![],
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

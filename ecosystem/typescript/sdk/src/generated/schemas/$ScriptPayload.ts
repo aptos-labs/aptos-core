@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ScriptPayload = {
+    description: `Payload which runs a script that can run multiple functions`,
     properties: {
         code: {
             type: 'MoveScriptBytecode',

@@ -3,81 +3,25 @@
 
 //! Types and identifiers for parsing Move structs and types
 
-use aptos_sdk::move_types::{ident_str, identifier::Identifier};
+pub const ACCOUNT_MODULE: &str = "account";
+pub const APTOS_ACCOUNT_MODULE: &str = "aptos_account";
+pub const APTOS_COIN_MODULE: &str = "aptos_coin";
+pub const COIN_MODULE: &str = "coin";
+pub const STAKE_MODULE: &str = "stake";
 
-// Module identifiers
-pub fn aptos_coin_module_identifier() -> Identifier {
-    ident_str!("aptos_coin").into()
-}
+pub const ACCOUNT_RESOURCE: &str = "Account";
+pub const APTOS_COIN_RESOURCE: &str = "AptosCoin";
+pub const COIN_INFO_RESOURCE: &str = "CoinInfo";
+pub const COIN_STORE_RESOURCE: &str = "CoinStore";
+pub const STAKE_POOL_RESOURCE: &str = "StakePool";
 
-pub fn account_module_identifier() -> Identifier {
-    ident_str!("account").into()
-}
+pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
+pub const TRANSFER_FUNCTION: &str = "transfer";
+pub const SET_OPERATOR_FUNCTION: &str = "set_operator";
 
-pub fn coin_module_identifier() -> Identifier {
-    ident_str!("coin").into()
-}
-
-pub fn stake_module_identifier() -> Identifier {
-    ident_str!("stake").into()
-}
-
-// Resource Identifiers
-pub fn account_resource_identifier() -> Identifier {
-    ident_str!("Account").into()
-}
-
-pub fn coin_info_resource_identifier() -> Identifier {
-    ident_str!("CoinInfo").into()
-}
-
-pub fn coin_store_resource_identifier() -> Identifier {
-    ident_str!("CoinStore").into()
-}
-
-pub fn aptos_coin_resource_identifier() -> Identifier {
-    ident_str!("AptosCoin").into()
-}
-
-pub fn stake_pool_resource_identifier() -> Identifier {
-    ident_str!("StakePool").into()
-}
-
-// Function identifiers
-// Function identifiers
-pub fn create_account_function_identifier() -> Identifier {
-    ident_str!("create_account").into()
-}
-
-pub fn transfer_function_identifier() -> Identifier {
-    ident_str!("transfer").into()
-}
-
-pub fn set_operator_function_identifier() -> Identifier {
-    ident_str!("set_operator").into()
-}
-
-// Field identifiers
-pub fn decimals_field_identifier() -> Identifier {
-    ident_str!("decimals").into()
-}
-
-pub fn deposit_events_field_identifier() -> Identifier {
-    ident_str!("deposit_events").into()
-}
-
-pub fn withdraw_events_field_identifier() -> Identifier {
-    ident_str!("withdraw_events").into()
-}
-
-pub fn set_operator_events_field_identifier() -> Identifier {
-    ident_str!("set_operator_events").into()
-}
-
-pub fn sequence_number_field_identifier() -> Identifier {
-    ident_str!("sequence_number").into()
-}
-
-pub fn symbol_field_identifier() -> Identifier {
-    ident_str!("symbol").into()
-}
+pub const DECIMALS_FIELD: &str = "decimal";
+pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";
+pub const WITHDRAW_EVENTS_FIELD: &str = "withdraw_events";
+pub const SET_OPERATOR_EVENTS_FIELD: &str = "set_operator_events";
+pub const SEQUENCE_NUMBER_FIELD: &str = "sequence_number";
+pub const SYMBOL_FIELD: &str = "symbol";

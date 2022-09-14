@@ -4,16 +4,14 @@
 use crate::accept_type::AcceptType;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use crate::response::{
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
-};
+use crate::response::{BasicResponse, BasicResponseStatus, BasicResultWith404};
 use crate::ApiTags;
-use anyhow::Context as AnyhowContext;
-use aptos_api_types::Block;
+use aptos_api_types::{BcsBlock, Block, LedgerInfo};
 use poem_openapi::param::{Path, Query};
 use poem_openapi::OpenApi;
 use std::sync::Arc;
 
+/// API for block transactions and information
 pub struct BlocksApi {
     pub context: Arc<Context>,
 }
@@ -24,6 +22,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information.
+    ///
+    /// If the block is pruned, it will return a 410
     #[oai(
         path = "/blocks/by_height/:block_height",
         method = "get",
@@ -33,10 +33,16 @@ impl BlocksApi {
     async fn get_block_by_height(
         &self,
         accept_type: AcceptType,
+        /// Block height to lookup.  Starts at 0
         block_height: Path<u64>,
+        /// If set to true, include all transactions in the block
+        ///
+        /// If not provided, no transactions will be retrieved
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_height")?;
+        self.context
+            .check_api_output_enabled("Get block by height", &accept_type)?;
         self.get_by_height(
             accept_type,
             block_height.0,
@@ -48,6 +54,8 @@ impl BlocksApi {
     ///
     /// This endpoint allows you to get the transactions in a block
     /// and the corresponding block information given a version in the block.
+    ///
+    /// If the block has been pruned, it will return a 410
     #[oai(
         path = "/blocks/by_version/:version",
         method = "get",
@@ -57,10 +65,16 @@ impl BlocksApi {
     async fn get_block_by_version(
         &self,
         accept_type: AcceptType,
+        /// Ledger version to lookup block information for.
         version: Path<u64>,
+        /// If set to true, include all transactions in the block
+        ///
+        /// If not provided, no transactions will be retrieved
         with_transactions: Query<Option<bool>>,
     ) -> BasicResultWith404<Block> {
         fail_point_poem("endpoint_get_block_by_version")?;
+        self.context
+            .check_api_output_enabled("Get block by version", &accept_type)?;
         self.get_by_version(
             accept_type,
             version.0,
@@ -77,19 +91,13 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_height(block_height, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
-
-        BasicResponse::try_from_rust_value((
-            block,
+        let bcs_block = self.context.get_block_by_height(
+            block_height,
             &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+            with_transactions,
+        )?;
+
+        self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
     }
 
     fn get_by_version(
@@ -99,18 +107,46 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_version(version, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
+        let bcs_block =
+            self.context
+                .get_block_by_version(version, &latest_ledger_info, with_transactions)?;
 
-        BasicResponse::try_from_rust_value((
-            block,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+        self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
+    }
+
+    /// Renders a [`BcsBlock`] into a [`Block`] if it's a JSON accept type
+    fn render_bcs_block(
+        &self,
+        accept_type: &AcceptType,
+        latest_ledger_info: LedgerInfo,
+        bcs_block: BcsBlock,
+    ) -> BasicResultWith404<Block> {
+        match accept_type {
+            AcceptType::Json => {
+                let transactions = if let Some(inner) = bcs_block.transactions {
+                    Some(self.context.render_transactions_sequential(
+                        &latest_ledger_info,
+                        inner,
+                        bcs_block.block_timestamp,
+                    )?)
+                } else {
+                    None
+                };
+                let block = Block {
+                    block_height: bcs_block.block_height.into(),
+                    block_hash: bcs_block.block_hash.into(),
+                    block_timestamp: bcs_block.block_timestamp.into(),
+                    first_version: bcs_block.first_version.into(),
+                    last_version: bcs_block.last_version.into(),
+                    transactions,
+                };
+                BasicResponse::try_from_json((block, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                bcs_block,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }

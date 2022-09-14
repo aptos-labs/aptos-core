@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Display, time::Duration};
 use thiserror::Error as ThisError;
 
-use super::{super::DirectEvaluatorInput, get_index_response, API_CATEGORY};
+use super::{super::DirectEvaluatorInput, API_CATEGORY};
 
 /// This function hits the `/` endpoint of the API and returns the chain ID
 /// and role type, extracted from the IndexResponse.
@@ -23,11 +23,19 @@ pub async fn get_node_identity(
     node_address: &NodeAddress,
     timeout: Duration,
 ) -> Result<(ChainId, RoleType)> {
-    let index_response = get_index_response(node_address, timeout)
+    let index_response = node_address
+        .get_index_response(timeout)
         .await
-        .map_err(|e| format_err!("Failed to get response from index (/) of API. Make sure your API port ({}) is open: {}", node_address.api_port, e))?;
+        .map_err(|e| {
+            format_err!(
+                "Failed to get response from index (/) of API. Make sure \
+            your API port ({}) is open: {}",
+                node_address.get_api_port(),
+                e
+            )
+        })?;
     Ok((
-        ChainId::new(index_response.ledger_info.chain_id),
+        ChainId::new(index_response.chain_id),
         index_response.node_role,
     ))
 }
@@ -62,7 +70,7 @@ impl NodeIdentityEvaluator {
                 100,
                 format!(
                     "The node under investigation reported the same {} {} \
-                as is reported by the baseline node",
+                as is reported by the baseline node.",
                     attribute_str, target_value
                 ),
             )
@@ -74,7 +82,7 @@ impl NodeIdentityEvaluator {
                 ),
                 0,
                 format!(
-                    "The node under investigation reported the {} {}  while the \
+                    "The node under investigation reported the {} {} while the \
                 baseline reported {}. These values should match. Confirm that \
                 the baseline you're using is appropriate for the node you're testing.",
                     attribute_str, target_value, baseline_value

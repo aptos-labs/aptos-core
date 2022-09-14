@@ -22,8 +22,6 @@ mod mint;
 mod module_publishing;
 mod on_chain_configs;
 mod peer_to_peer;
-mod rotate_key;
 mod scripts;
 mod transaction_fuzzer;
 mod verify_txn;
-mod writeset_builder;

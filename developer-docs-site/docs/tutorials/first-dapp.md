@@ -5,17 +5,17 @@ slug: "your-first-dapp"
 
 # Your First Dapp
 
-In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos Blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move Modules.
+In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move modules.
 
-For this tutorial, we will use the Move Module `HelloBlockchain` described in [Your first Move Module](first-move-module.md) and focus on building the user interface.
+For this tutorial, we will use the Move module `HelloBlockchain` described in [Your First Move Module](first-move-module.md) and focus on building the user interface.
 
 We will use:
 
-- The [Aptos SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk).
-- The [Aptos Wallet](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/web-wallet), and
-- The [Aptos CLI](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos) to interact with blockchain.
+- The [Aptos Typescript SDK][ts_sdk],
+- The [Aptos Wallet][building_wallet], and
+- The [Aptos CLI][installing_cli] to interact with blockchain.
 
-The end result is a dapp that lets users publish and share snippets of text on the Aptos Blockchain.
+The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
 The full source code for this tutorial is available [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript/dapp-example).
 
@@ -38,7 +38,7 @@ Ensure that your account has sufficient funds to perform transactions by clickin
 
 ### Aptos CLI
 
-1. Install the [Aptos CLI](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos).
+1. Install the [Aptos CLI][install_cli].
 
 2. Run `aptos init`, and when it asks for your private key, paste the private key from the Aptos Wallet that you copied earlier. This will initialize the Aptos CLI to use the same account as used by the Aptos Wallet.
 
@@ -196,9 +196,9 @@ Now, in addition to displaying the account address, the app will also display th
 
 ## Step 4: Publish a Move Module
 
-Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move Module to our account.
+Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move module to our account.
 
-The Move Module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your first Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
+The Move module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your First Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
 ### Publish the `HelloBlockchain` module with the Aptos CLI
 
@@ -221,13 +221,13 @@ $ aptos move publish --package-dir ~/code/aptos-core/aptos-move/move-examples/he
 The `--named-addresses` replaces the named address `HelloBlockchain` in `HelloBlockchain.move` with the specified address. For example, if we specify `--named-addresses HelloBlockchain=0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`, then the following:
 
 ```move
-module HelloBlockchain::Message {
+module HelloBlockchain::message {
 ```
 
 becomes:
 
 ```move
-module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message {
+module 0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message {
 ```
 
 This makes it possible to publish the module for the given account (in this case our wallet account, `0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481`).
@@ -298,7 +298,7 @@ You can also verify that the module was published by going to the [Aptos Explore
         },
         {
           "name": "message_change_events",
-          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
+          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message::MessageChangeEvent>"
         }
       ]
     }
@@ -357,12 +357,12 @@ The signature for `set_message` looks like this:
 public(script) fun set_message(account: signer, message_bytes: vector<u8>)
 ```
 
-To call this function, we need to use the `window.aptos` API provided by the wallet to submit a transaction. Specifically, we will create a `script_function_payload` transaction that looks like this:
+To call this function, we need to use the `window.aptos` API provided by the wallet to submit a transaction. Specifically, we will create a `entry_function_payload` transaction that looks like this:
 
 ```javascript
 {
-  type: "script_function_payload",
-  function: "<address>::Message::set_message",
+  type: "entry_function_payload",
+  function: "<address>::message::set_message",
   arguments: ["<hex encoded utf-8 message>"],
   type_arguments: []
 }
@@ -387,8 +387,8 @@ Using this function, our transaction payload becomes:
 
 ```javascript
 {
-  type: "script_function_payload",
-  function: "<address>::Message::set_message",
+  type: "entry_function_payload",
+  function: "<address>::message::set_message",
   arguments: [stringToHex(message)],
   type_arguments: []
 }
@@ -418,8 +418,8 @@ function App() {
 
     const message = ref.current.value;
     const transaction = {
-      type: "script_function_payload",
-      function: `${address}::Message::set_message`,
+      type: "entry_function_payload",
+      function: `${address}::message::set_message`,
       arguments: [stringToHex(message)],
       type_arguments: [],
     };
@@ -463,12 +463,12 @@ To retrieve the message, we will:
 
 - First use `AptosClient.getAccountResources()` function to fetch the account's resources and store them in state.
 
-- Then we will look for one whose `type` is `MessageHolder`. The full type is `$address::Message::MessageHolder` as it is part of the `$address::Message` module.
+- Then we will look for one whose `type` is `MessageHolder`. The full type is `$address::message::MessageHolder` as it is part of the `$address::message` module.
 
   In our example it is:
 
   ```typescript
-   0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageHolder
+   0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::message::MessageHolder
   ```
 
 - We will use this for the initial value of the `<textarea>`.
@@ -483,9 +483,9 @@ function App() {
   const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
-    client.getAccountResources(address).then(setResourdces);
+    client.getAccountResources(address).then(setResources);
   }, [address]);
-  const resourceType = `${address}::Message::MessageHolder`;
+  const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);
   const data = resource?.data as {message: string} | undefined;
   const message = data?.message;
@@ -548,3 +548,7 @@ function App() {
 ```
 
 That concludes this tutorial.
+
+[building_wallet]: /guides/building-wallet-extension
+[installing_cli]: /cli-tools/aptos-cli-tool/install-aptos-cli
+[ts_sdk]: /sdks/typescript-sdk

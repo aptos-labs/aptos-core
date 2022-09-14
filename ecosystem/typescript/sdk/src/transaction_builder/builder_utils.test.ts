@@ -21,7 +21,14 @@ import {
   TypeTagVector,
 } from "./aptos_types";
 import { Serializer } from "./bcs";
-import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
+import {
+  argToTransactionArgument,
+  TypeTagParser,
+  serializeArg,
+  ensureBoolean,
+  ensureNumber,
+  ensureBigInt,
+} from "./builder_utils";
 
 describe("BuilderUtils", () => {
   it("parses a bool TypeTag", async () => {
@@ -158,23 +165,23 @@ describe("BuilderUtils", () => {
     serializer = new Serializer();
     expect(() => {
       serializeArg("u8", new TypeTagU8(), serializer);
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/Invalid number string/);
   });
 
   it("serializes a u64 arg", async () => {
     let serializer = new Serializer();
-    serializeArg(18446744073709551615n, new TypeTagU64(), serializer);
+    serializeArg(BigInt("18446744073709551615"), new TypeTagU64(), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]));
 
     serializer = new Serializer();
     expect(() => {
       serializeArg("u64", new TypeTagU64(), serializer);
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/^Cannot convert/);
   });
 
   it("serializes a u128 arg", async () => {
     let serializer = new Serializer();
-    serializeArg(340282366920938463463374607431768211455n, new TypeTagU128(), serializer);
+    serializeArg(BigInt("340282366920938463463374607431768211455"), new TypeTagU128(), serializer);
     expect(serializer.getBytes()).toEqual(
       new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
     );
@@ -182,7 +189,7 @@ describe("BuilderUtils", () => {
     serializer = new Serializer();
     expect(() => {
       serializeArg("u128", new TypeTagU128(), serializer);
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/^Cannot convert/);
   });
 
   it("serializes an AccountAddress arg", async () => {
@@ -263,23 +270,23 @@ describe("BuilderUtils", () => {
     expect((res as TransactionArgumentU8).value).toEqual(123);
     expect(() => {
       argToTransactionArgument("u8", new TypeTagBool());
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/Invalid boolean string/);
   });
 
   it("converts a u64 TransactionArgument", async () => {
     const res = argToTransactionArgument(123, new TypeTagU64());
-    expect((res as TransactionArgumentU64).value).toEqual(123);
+    expect((res as TransactionArgumentU64).value).toEqual(BigInt(123));
     expect(() => {
       argToTransactionArgument("u64", new TypeTagU64());
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/Cannot convert/);
   });
 
   it("converts a u128 TransactionArgument", async () => {
     const res = argToTransactionArgument(123, new TypeTagU128());
-    expect((res as TransactionArgumentU128).value).toEqual(123);
+    expect((res as TransactionArgumentU128).value).toEqual(BigInt(123));
     expect(() => {
       argToTransactionArgument("u128", new TypeTagU128());
-    }).toThrow(/Invalid arg/);
+    }).toThrow(/Cannot convert/);
   });
 
   it("converts an AccountAddress TransactionArgument", async () => {
@@ -311,5 +318,25 @@ describe("BuilderUtils", () => {
       // @ts-ignore
       argToTransactionArgument(123456, "unknown_type");
     }).toThrow("Unknown type for TransactionArgument.");
+  });
+
+  it("ensures a boolean", async () => {
+    expect(ensureBoolean(false)).toBe(false);
+    expect(ensureBoolean(true)).toBe(true);
+    expect(ensureBoolean("true")).toBe(true);
+    expect(ensureBoolean("false")).toBe(false);
+    expect(() => ensureBoolean("True")).toThrow("Invalid boolean string.");
+  });
+
+  it("ensures a number", async () => {
+    expect(ensureNumber(10)).toBe(10);
+    expect(ensureNumber("123")).toBe(123);
+    expect(() => ensureNumber("True")).toThrow("Invalid number string.");
+  });
+
+  it("ensures a bigint", async () => {
+    expect(ensureBigInt(10)).toBe(BigInt(10));
+    expect(ensureBigInt("123")).toBe(BigInt(123));
+    expect(() => ensureBigInt("True")).toThrow(/^Cannot convert/);
   });
 });

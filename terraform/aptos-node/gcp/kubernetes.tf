@@ -53,21 +53,21 @@ resource "helm_release" "validator" {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
-          key    = google_container_node_pool.validators.node_config[0].taint[0].key
-          value  = google_container_node_pool.validators.node_config[0].taint[0].value
+          key    = "aptos.org/nodepool"
+          value  = "validators"
           effect = "NoExecute"
         }]
       }
       fullnode = {
         storage = {
-          class = "standard"
+          class = kubernetes_storage_class.ssd.metadata[0].name
         }
         nodeSelector = {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
         }
         tolerations = [{
-          key    = google_container_node_pool.validators.node_config[0].taint[0].key
-          value  = google_container_node_pool.validators.node_config[0].taint[0].value
+          key    = "aptos.org/nodepool"
+          value  = "validators"
           effect = "NoExecute"
         }]
       }
@@ -144,4 +144,20 @@ resource "helm_release" "monitoring" {
     name  = "chart_sha1"
     value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
+}
+
+resource "helm_release" "node_exporter" {
+  count       = var.enable_node_exporter ? 1 : 0
+  name        = "prometheus-node-exporter"
+  repository  = "https://prometheus-community.github.io/helm-charts"
+  chart       = "prometheus-node-exporter"
+  version     = "4.0.0"
+  namespace   = "kube-system"
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({}),
+    jsonencode(var.node_exporter_helm_values),
+  ]
 }

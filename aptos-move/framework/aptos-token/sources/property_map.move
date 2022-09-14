@@ -2,7 +2,9 @@
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
 module aptos_token::property_map {
     use std::vector;
-    use std::string::String;
+    use std::error;
+    use std::string::{Self, String};
+    use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -11,6 +13,7 @@ module aptos_token::property_map {
     const EPROPERTY_NOT_EXIST: u64 = 3;
     const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 = 4;
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
+    const ETYPE_NOT_MATCH: u64 = 6;
 
     struct PropertyMap has copy, drop, store {
         map: SimpleMap<String, PropertyValue>,
@@ -26,8 +29,8 @@ module aptos_token::property_map {
         values: vector<vector<u8>>,
         types: vector<String>
     ): PropertyMap {
-        assert!(vector::length(&keys) == vector::length(&values), EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
-        assert!(vector::length(&keys) == vector::length(&types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
+        assert!(vector::length(&keys) == vector::length(&values), error::invalid_state(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(vector::length(&keys) == vector::length(&types), error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
         let properties = PropertyMap{
             map: simple_map::create<String, PropertyValue>(),
         };
@@ -54,8 +57,8 @@ module aptos_token::property_map {
     }
 
     public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
-        assert!(! simple_map::contains_key(&map.map, &key), EKEY_AREADY_EXIST_IN_PROPERTY_MAP);
-        assert!(simple_map::length<String, PropertyValue>(&map.map) <= MAX_PROPERTY_MAP_SIZE, EPROPERTY_NUMBER_EXCEED_LIMIT);
+        assert!(! simple_map::contains_key(&map.map, &key), error::already_exists(EKEY_AREADY_EXIST_IN_PROPERTY_MAP));
+        assert!(simple_map::length<String, PropertyValue>(&map.map) <= MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
         simple_map::add(&mut map.map, key, value);
     }
 
@@ -67,6 +70,42 @@ module aptos_token::property_map {
         let found = contains_key(map, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         simple_map::borrow(&map.map, key)
+    }
+
+    public fun read_string(map: &PropertyMap, key: &String): String {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"0x1::string::String"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_string(prop.value)
+    }
+
+    public fun read_u8(map: &PropertyMap, key: &String): u8 {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"u8"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_u8(prop.value)
+    }
+
+    public fun read_u64(map: &PropertyMap, key: &String): u64 {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"u64"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_u64(prop.value)
+    }
+
+    public fun read_address(map: &PropertyMap, key: &String): address {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"address"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_address(prop.value)
+    }
+
+    public fun read_u128(map: &PropertyMap, key: &String): u128 {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"u128"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_u128(prop.value)
+    }
+
+    public fun read_bool(map: &PropertyMap, key: &String): bool {
+        let prop = borrow(map, key);
+        assert!(prop.type == string::utf8(b"bool"), error::invalid_state(ETYPE_NOT_MATCH));
+        from_bcs::to_bool(prop.value)
     }
 
     public fun borrow_value(property: &PropertyValue): vector<u8> {
@@ -82,7 +121,7 @@ module aptos_token::property_map {
         key: &String
     ): (String, PropertyValue) {
         let found = contains_key(map, key);
-        assert!(found, EPROPERTY_NOT_EXIST);
+        assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
         simple_map::remove(&mut map.map, key)
     }
 
@@ -96,8 +135,8 @@ module aptos_token::property_map {
         let key_len = vector::length(&keys);
         let val_len = vector::length(&values);
         let typ_len = vector::length(&types);
-        assert!(key_len == val_len, EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
-        assert!(val_len == typ_len, EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
+        assert!(key_len == val_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(val_len == typ_len, error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
 
         let i = 0;
         while ( i < vector::length(&keys)) {
@@ -116,7 +155,7 @@ module aptos_token::property_map {
         value: PropertyValue
     ) {
         let found = contains_key(map, key);
-        assert!(found, EPROPERTY_NOT_EXIST);
+        assert!(found, error::not_found(EPROPERTY_NOT_EXIST));
         let property_val = simple_map::borrow_mut(&mut map.map, key);
         *property_val = value;
     }
@@ -174,5 +213,17 @@ module aptos_token::property_map {
             type,
             value
         }
+    }
+
+    #[test]
+    fun test_read_value_with_type(){
+        use std::string::utf8;
+        use std::bcs;
+        let keys = vector<String>[ utf8(b"attack"), utf8(b"mutable")];
+        let values = vector<vector<u8>>[ bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(&false) ];
+        let types = vector<String>[ utf8(b"u8"), utf8(b"bool")];
+        let plist = new(keys, values, types);
+        assert!(!read_bool(&plist, &utf8(b"mutable")), 1);
+        assert!(read_u8(&plist, &utf8(b"attack")) == 10, 1);
     }
 }

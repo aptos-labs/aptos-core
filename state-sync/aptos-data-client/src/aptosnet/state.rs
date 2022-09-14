@@ -18,7 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::requests::{DataRequest, StorageServiceRequest};
+use storage_service_types::requests::StorageServiceRequest;
 use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
@@ -141,11 +141,8 @@ impl PeerStates {
         // Storage services can always respond to data advertisement requests.
         // We need this outer check, since we need to be able to send data summary
         // requests to new peers (who don't have a peer state yet).
-        // Likewise, we can always send subscription requests to any peers and
-        // all peers should support versioning.
-        if request.data_request.is_get_storage_server_summary()
-            || request.data_request.is_data_subscription_request()
-            || matches!(request.data_request, DataRequest::GetServerProtocolVersion)
+        if request.data_request.is_storage_summary_request()
+            || request.data_request.is_protocol_version_request()
         {
             return true;
         }

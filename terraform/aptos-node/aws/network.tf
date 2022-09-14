@@ -1,24 +1,47 @@
+locals {
+  num_azs = length(local.aws_availability_zones)
+
+  # Maximize the capacity of the nodegroup in a single AZ. Otherwise, the CIDR ranges are divided equally.
+  # This gives us a max of /17 for the first AZ, which supports 32,768 hosts. The number of pods this can support
+  # varies, but with c5.4xlarge gets us ~600 validators. See https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt
+  # The other way to increase the cluster capacity is to allocate a new CIDR block to the VPC and associate
+  # it via configuring CNI, which is more complex: https://aws.amazon.com/premiumsupport/knowledge-center/eks-multiple-cidr-ranges/
+  num_other_subnets      = local.num_azs * 2 - 1
+  max_subnet_cidr_ranges = cidrsubnets(var.vpc_cidr_block, 1, [for x in range(local.num_other_subnets) : 1 + ceil(pow(local.num_other_subnets, 0.5))]...)
+
+  # The subnet CIDR ranges in the case we want a maximally large one
+  max_private_subnet_cidr_ranges = slice(local.max_subnet_cidr_ranges, 0, local.num_azs)
+  max_public_subnet_cidr_ranges  = slice(local.max_subnet_cidr_ranges, local.num_azs, local.num_azs * 2)
+
+  # The subnet CIDR ranges in the case all are equally sized
+  default_public_subnet_cidr_ranges  = [for x in range(local.num_azs) : cidrsubnet(cidrsubnet(aws_vpc.vpc.cidr_block, 1, 0), 2, x)]
+  default_private_subnet_cidr_ranges = [for x in range(local.num_azs) : cidrsubnet(cidrsubnet(aws_vpc.vpc.cidr_block, 1, 1), 2, x)]
+
+  public_subnet_cidr_ranges  = var.maximize_single_az_capacity ? local.max_public_subnet_cidr_ranges : local.default_public_subnet_cidr_ranges
+  private_subnet_cidr_ranges = var.maximize_single_az_capacity ? local.max_private_subnet_cidr_ranges : local.default_private_subnet_cidr_ranges
+}
+
 resource "aws_vpc" "vpc" {
   cidr_block           = var.vpc_cidr_block
   enable_dns_hostnames = true
 
   tags = merge(local.default_tags, {
-    Name                                                 = "aptos-${local.workspace_name}"
+    Name                                                  = "aptos-${local.workspace_name}"
     "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
   })
 }
 
 resource "aws_subnet" "public" {
-  count                   = length(local.aws_availability_zones)
+  count                   = local.num_azs
   vpc_id                  = aws_vpc.vpc.id
-  cidr_block              = cidrsubnet(cidrsubnet(aws_vpc.vpc.cidr_block, 1, 0), 2, count.index)
+  cidr_block              = local.public_subnet_cidr_ranges[count.index]
   availability_zone       = local.aws_availability_zones[count.index]
   map_public_ip_on_launch = true
 
   tags = merge(local.default_tags, {
-    Name                                                 = "aptos-${local.workspace_name}/public-${local.aws_availability_zones[count.index]}"
+    Name                                                  = "aptos-${local.workspace_name}/public-${local.aws_availability_zones[count.index]}"
     "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
-    "kubernetes.io/role/elb"                             = "1"
+    "kubernetes.io/role/elb"                              = "1"
   })
 }
 
@@ -44,21 +67,21 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(local.aws_availability_zones)
+  count          = local.num_azs
   subnet_id      = element(aws_subnet.public.*.id, count.index)
   route_table_id = aws_route_table.public.id
 }
 
 resource "aws_subnet" "private" {
-  count             = length(local.aws_availability_zones)
+  count             = local.num_azs
   vpc_id            = aws_vpc.vpc.id
-  cidr_block        = cidrsubnet(cidrsubnet(aws_vpc.vpc.cidr_block, 1, 1), 2, count.index)
+  cidr_block        = local.private_subnet_cidr_ranges[count.index]
   availability_zone = local.aws_availability_zones[count.index]
 
   tags = merge(local.default_tags, {
-    Name                                                 = "aptos-${local.workspace_name}/private-${local.aws_availability_zones[count.index]}"
+    Name                                                  = "aptos-${local.workspace_name}/private-${local.aws_availability_zones[count.index]}"
     "kubernetes.io/cluster/aptos-${local.workspace_name}" = "shared"
-    "kubernetes.io/role/internal-elb"                    = "1"
+    "kubernetes.io/role/internal-elb"                     = "1"
   })
 }
 
@@ -90,7 +113,7 @@ resource "aws_route_table" "private" {
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(local.aws_availability_zones)
+  count          = local.num_azs
   subnet_id      = element(aws_subnet.private.*.id, count.index)
   route_table_id = aws_route_table.private.id
 }

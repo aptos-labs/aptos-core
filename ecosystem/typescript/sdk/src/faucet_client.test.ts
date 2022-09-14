@@ -38,11 +38,11 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("0");
 
-    const payload: Gen.TransactionPayload_ScriptFunctionPayload = {
-      type: "script_function_payload",
+    const payload: Gen.TransactionPayload_EntryFunctionPayload = {
+      type: "entry_function_payload",
       function: "0x1::coin::transfer",
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [account2.address().hex(), "717"],
+      arguments: [account2.address().hex(), 717],
     };
 
     const txnRequest = await client.generateTransaction(account1.address(), payload, { max_gas_amount: "2000" });
@@ -68,7 +68,10 @@ test(
     });
     expect(eventSubset[0].type).toBe("0x1::coin::WithdrawEvent");
 
-    const events2 = await client.getEventsByEventKey(events[0].key);
+    const events2 = await client.getEventsByCreationNumber(
+      events[0].guid.account_address,
+      events[0].guid.creation_number,
+    );
     expect(events2[0].type).toBe("0x1::coin::WithdrawEvent");
   },
   30 * 1000,

@@ -8,7 +8,7 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::{ArgEnum, Parser};
+use clap::{ArgEnum, ArgGroup, Parser};
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -68,24 +68,22 @@ impl Default for TransactionType {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+#[clap(group(
+    ArgGroup::new("mode")
+        .required(true)
+        .args(&["mempool-backlog", "target-tps"]),
+))]
 pub struct EmitArgs {
-    #[clap(long, default_value = "5000")]
+    #[clap(long)]
     /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
     /// is producing enough load to get the highest TPS in the system. Typically this should be
     /// configured to be ~4x of the max achievable TPS.
-    pub mempool_backlog: u64,
+    /// 0 if target_tps used.
+    pub mempool_backlog: Option<usize>,
 
-    #[clap(long, default_value = "0", requires = "burst")]
-    pub wait_millis: u64,
-
+    /// Target constant TPS, 0 if mempool_backlog used
     #[clap(long)]
-    pub burst: bool,
-
-    /// This can only be set in conjunction with --burst. By default, when burst
-    /// is enabled, we check stats once at the end of the emitter run. If you
-    /// would like to opt out of that, you can use this flag.
-    #[structopt(long, requires = "burst")]
-    pub do_not_check_stats_at_end: bool,
+    pub target_tps: Option<usize>,
 
     #[clap(long, default_value = "30")]
     pub txn_expiration_time_secs: u64,
@@ -97,8 +95,17 @@ pub struct EmitArgs {
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
 
-    #[clap(long, arg_enum, default_value = "p2p", ignore_case = true)]
-    pub transaction_type: TransactionType,
+    #[clap(
+        long,
+        arg_enum,
+        default_value = "p2p",
+        min_values = 1,
+        ignore_case = true
+    )]
+    pub transaction_type: Vec<TransactionType>,
+
+    #[clap(long, min_values = 0)]
+    pub transaction_type_weights: Vec<usize>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

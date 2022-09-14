@@ -1,0 +1,4 @@
+app/assets/builds
+db/schema.rb
+vendor/
+tsconfig.json

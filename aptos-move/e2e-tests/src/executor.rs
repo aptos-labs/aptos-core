@@ -14,35 +14,37 @@ use std::{
 use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
-    data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
+    data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_TESTNET},
     golden_outputs::GoldenOutputs,
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_gas::NativeGasParameters;
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
-        new_block_event_key, AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS,
+        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
+        CORE_CODE_ADDRESS,
     },
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionStatus, VMValidatorResult,
+        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
+        VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
 };
 use aptos_vm::{
-    data_cache::{AsMoveResolver, RemoteStorage},
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
+use framework::ReleaseBundle;
 use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
@@ -94,6 +96,8 @@ impl FakeExecutor {
             no_parallel_exec: false,
         };
         executor.apply_write_set(write_set);
+        // As a set effect, also allow module bundle txns. TODO: Remove
+        aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
     }
 
@@ -103,20 +107,14 @@ impl FakeExecutor {
         self
     }
 
-    /// Create an executor from a saved genesis blob
-    pub fn from_saved_genesis(saved_genesis_blob: &[u8]) -> Self {
-        let change_set = bcs::from_bytes::<ChangeSet>(saved_genesis_blob).unwrap();
-        Self::from_genesis(change_set.write_set())
-    }
-
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
-    pub fn from_genesis_file() -> Self {
-        Self::from_genesis(GENESIS_CHANGE_SET.clone().write_set())
+    pub fn from_head_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_HEAD.clone().write_set())
     }
 
     /// Creates an executor using the standard genesis.
-    pub fn from_fresh_genesis() -> Self {
-        Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
+    pub fn from_testnet_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_TESTNET.clone().write_set())
     }
 
     /// Creates an executor using the mainnet genesis.
@@ -189,19 +187,16 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        let blobs = cached_framework_packages::module_blobs();
-        let modules = cached_framework_packages::modules();
-        assert!(blobs.len() == modules.len());
-        for (module, bytes) in modules.iter().zip(blobs) {
+        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
         genesis
     }
 
-    /// Creates fresh genesis from the stdlib modules passed in.
-    pub fn custom_genesis(genesis_modules: &[Vec<u8>], validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(genesis_modules, validator_accounts);
+    /// Creates fresh genesis from the framework passed in.
+    pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
@@ -227,6 +222,17 @@ impl FakeExecutor {
         accounts
     }
 
+    /// Creates an account for the given static address. This address needs to be static so
+    /// we can load regular Move code to there without need to rewrite code addresses.
+    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        // The below will use the genesis keypair but that should be fine.
+        let acc = Account::new_genesis_account(addr);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
+        self.add_account_data(&data);
+        data.account().clone()
+    }
+
     /// Applies a [`WriteSet`] to this executor's data store.
     pub fn apply_write_set(&mut self, write_set: &WriteSet) {
         self.data_store.add_write_set(write_set);
@@ -235,6 +241,11 @@ impl FakeExecutor {
     /// Adds an account to this executor's data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
         self.data_store.add_account_data(account_data)
+    }
+
+    /// Adds coin info to this executor's data store.
+    pub fn add_coin_info(&mut self) {
+        self.data_store.add_coin_info()
     }
 
     /// Adds a module to this executor's data store.
@@ -269,6 +280,29 @@ impl FakeExecutor {
     /// Reads the CoinStore resource value for an account from this executor's data store.
     pub fn read_coin_store_resource(&self, account: &Account) -> Option<CoinStoreResource> {
         self.read_coin_store_resource_at_address(account.address())
+    }
+
+    /// Reads supply from CoinInfo resource value from this executor's data store.
+    pub fn read_coin_supply(&self) -> Option<u128> {
+        self.read_coin_info_resource()
+            .expect("coin info must exist in data store")
+            .supply()
+            .as_ref()
+            .map(|o| match o.aggregator.as_ref() {
+                Some(aggregator) => {
+                    let state_key = aggregator.state_key();
+                    let value_bytes = self
+                        .read_state_value(&state_key)
+                        .expect("aggregator value must exist in data store");
+                    bcs::from_bytes(&value_bytes).unwrap()
+                }
+                None => o.integer.as_ref().unwrap().value,
+            })
+    }
+
+    /// Reads the CoinInfo resource value from this executor's data store.
+    pub fn read_coin_info_resource(&self) -> Option<CoinInfoResource> {
+        self.read_resource(&AccountAddress::ONE)
     }
 
     /// Reads the CoinStore resource value for an account under the given address from this executor's
@@ -441,12 +475,17 @@ impl FakeExecutor {
 
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
-        self.new_block_with_metadata(None, vec![])
+
+        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+            .expect("Unable to retrieve the validator set from storage");
+        let proposer = *validator_set.payload().next().unwrap().account_address();
+        // when updating time, proposer cannot be ZERO.
+        self.new_block_with_metadata(proposer, vec![])
     }
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
@@ -455,8 +494,7 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            *validator_set.payload().next().unwrap().account_address(),
-            proposer_index,
+            proposer,
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
@@ -502,8 +540,12 @@ impl FakeExecutor {
     ) {
         let write_set = {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
-            let remote_view = RemoteStorage::new(&self.data_store);
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+            )
+            .unwrap();
+            let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
@@ -522,10 +564,12 @@ impl FakeExecutor {
                     )
                 });
             let session_out = session.finish().expect("Failed to generate txn effects");
-            let (write_set, _events) = session_out
+            // TODO: Support deltas in fake executor.
+            let (_, change_set) = session_out
                 .into_change_set(&mut ())
                 .expect("Failed to generate writeset")
                 .into_inner();
+            let (write_set, _events) = change_set.into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -539,8 +583,12 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
-        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
-        let remote_view = RemoteStorage::new(&self.data_store);
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            AbstractValueSizeGasParameters::zeros(),
+        )
+        .unwrap();
+        let remote_view = StorageAdapter::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function_bypass_visibility(
@@ -552,10 +600,12 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");
-        let (writeset, _events) = session_out
+        // TODO: Support deltas in fake executor.
+        let (_, change_set) = session_out
             .into_change_set(&mut ())
             .expect("Failed to generate writeset")
             .into_inner();
+        let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }
 }

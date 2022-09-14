@@ -7,13 +7,17 @@ export const $AptosError = {
     properties: {
         message: {
             type: 'string',
+            description: `A message describing the error`,
             isRequired: true,
         },
         error_code: {
             type: 'AptosErrorCode',
+            isRequired: true,
         },
-        aptos_ledger_version: {
-            type: 'U64',
+        vm_error_code: {
+            type: 'number',
+            description: `A code providing VM error details when submitting transactions to the VM`,
+            format: 'uint64',
         },
     },
 } as const;

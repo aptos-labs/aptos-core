@@ -1,0 +1,16 @@
+[package]
+name = "aptos-push-metrics"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos push metrics"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
+
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }

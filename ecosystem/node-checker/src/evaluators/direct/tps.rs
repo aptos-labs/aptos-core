@@ -39,9 +39,6 @@ pub enum TpsEvaluatorError {
     InsufficientSubmittedTransactionsError(u64, u64),
 }
 
-// TODO: Improve the flags situation here. For example, we always want --burst
-// to be set, there is no reason to accept this as an argument.
-
 // As you can see, we skip most of the fields here in terms of generating
 // the OpenAPI spec. The evaluator args structs are only used for informational
 // purposes (e.g. via `/get_configurations`), which is best effort. It is

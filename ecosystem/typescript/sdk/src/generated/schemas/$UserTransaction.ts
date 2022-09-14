@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $UserTransaction = {
+    description: `A transaction submitted by a user to change the state of the blockchain`,
     properties: {
         version: {
             type: 'U64',
@@ -11,7 +12,7 @@ export const $UserTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
-        state_root_hash: {
+        state_change_hash: {
             type: 'HashValue',
             isRequired: true,
         },
@@ -19,16 +20,21 @@ export const $UserTransaction = {
             type: 'HashValue',
             isRequired: true,
         },
+        state_checkpoint_hash: {
+            type: 'HashValue',
+        },
         gas_used: {
             type: 'U64',
             isRequired: true,
         },
         success: {
             type: 'boolean',
+            description: `Whether the transaction was successful`,
             isRequired: true,
         },
         vm_status: {
             type: 'string',
+            description: `The VM status of the transaction, can tell useful information in a failure`,
             isRequired: true,
         },
         accumulator_root_hash: {

@@ -7,12 +7,10 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bytes = "1.1.0"
-chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 pbjson = "0.4.0"
 prost = "0.10.4"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
-serde_json = { version = "1.0.81", features = ["preserve_order"] }

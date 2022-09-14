@@ -5,11 +5,10 @@
 
 use crate::{
     account::{Account, AccountData},
-    common_transactions::{create_account_txn, peer_to_peer_txn, rotate_key_txn},
+    common_transactions::{create_account_txn, peer_to_peer_txn},
     executor::FakeExecutor,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_types::transaction::{authenticator::AuthenticationKey, SignedTransaction};
+use aptos_types::transaction::SignedTransaction;
 use once_cell::sync::Lazy;
 
 /// The gas each transaction is configured to reserve. If the gas available in the account,
@@ -22,7 +21,7 @@ pub const TXN_RESERVED: u64 = 500_000;
 /// This includes the cost of the event counter creation which makes the transaction more
 /// expensive. All such transactions are expected to cost the same gas.
 pub static CREATE_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
     let receiver = Account::new();
@@ -36,7 +35,7 @@ pub static CREATE_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
 /// This is the cost after the event counter has been created.
 /// All such transactions are expected to cost the same gas.
 pub static CREATE_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
 
@@ -56,7 +55,7 @@ pub static CREATE_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
 /// would be higher and the balance required must be higher.
 /// All such transactions are expected to cost the same gas.
 pub static CREATE_ACCOUNT_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     // The gas amount is the minimum that needs to be reserved, so use a value that's
     // clearly higher than that.
     let balance = TXN_RESERVED + 10_000;
@@ -73,7 +72,7 @@ pub static CREATE_ACCOUNT_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
 /// This is the cost after the event counter has been created.
 /// All such transactions are expected to cost the same gas.
 pub static CREATE_ACCOUNT_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     // The gas amount is the minimum that needs to be reserved, so use a value that's
     // clearly higher than that.
     let balance = (2 * TXN_RESERVED) + 10_000;
@@ -96,7 +95,7 @@ pub static CREATE_ACCOUNT_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
 /// would be higher and the balance required must be higher.
 /// All such transactions are expected to cost the same gas.
 pub static CREATE_EXISTING_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     let receiver = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -111,7 +110,7 @@ pub static CREATE_EXISTING_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
 /// This is the cost after the event counter has been created.
 /// All such transactions are expected to cost the same gas.
 pub static CREATE_EXISTING_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     let receiver = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -132,7 +131,7 @@ pub static CREATE_EXISTING_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER: Lazy<u64> = Lazy::new(|| {
     // Compute gas used by running a placeholder transaction.
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     let receiver = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
@@ -146,7 +145,7 @@ pub static PEER_TO_PEER: Lazy<u64> = Lazy::new(|| {
 ///
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER_TOO_LOW: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     // The gas amount is the minimum that needs to be reserved, so use a value that's clearly
     // higher than that.
     let balance = TXN_RESERVED + 10_000;
@@ -166,7 +165,7 @@ pub static PEER_TO_PEER_TOO_LOW: Lazy<u64> = Lazy::new(|| {
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER_NEW_RECEIVER_FIRST: Lazy<u64> = Lazy::new(|| {
     // Compute gas used by running a placeholder transaction.
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
     let receiver = Account::new();
@@ -181,7 +180,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_FIRST: Lazy<u64> = Lazy::new(|| {
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER_NEW_RECEIVER_NEXT: Lazy<u64> = Lazy::new(|| {
     // Compute gas used by running a placeholder transaction.
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
 
@@ -202,7 +201,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_NEXT: Lazy<u64> = Lazy::new(|| {
 /// would be higher and the balance required must be higher.
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     // The gas amount is the minimum that needs to be reserved, so use a value that's
     // clearly higher than that.
     let balance = TXN_RESERVED + 10_000;
@@ -220,7 +219,7 @@ pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
 /// This is the cost after the event counter has been created.
 /// All such transactions are expected to cost the same gas.
 pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     // The gas amount is the minimum that needs to be reserved, so use a value that's
     // clearly higher than that.
     let balance = (2 * TXN_RESERVED) + 20_000;
@@ -235,20 +234,6 @@ pub static PEER_TO_PEER_NEW_RECEIVER_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
         .execute_block(txns)
         .expect("The VM should not fail to startup");
     output[1].gas_used()
-});
-
-/// The gas cost of a rotate-key transaction.
-///
-/// All such transactions are expected to cost the same gas.
-pub static ROTATE_KEY: Lazy<u64> = Lazy::new(|| {
-    let mut executor = FakeExecutor::from_genesis_file();
-    let sender = AccountData::new(1_000_000, 10);
-    executor.add_account_data(&sender);
-    let pubkey = Ed25519PrivateKey::generate_for_testing().public_key();
-    let new_key_hash = AuthenticationKey::ed25519(&pubkey).to_vec();
-
-    let txn = rotate_key_txn(sender.account(), new_key_hash, 10);
-    compute_gas_used(txn, &mut executor)
 });
 
 fn compute_gas_used(txn: SignedTransaction, executor: &mut FakeExecutor) -> u64 {

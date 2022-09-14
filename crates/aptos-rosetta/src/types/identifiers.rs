@@ -5,11 +5,12 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_identifiers.html)
 
+use crate::common::BlockHash;
 use crate::{
     common::{to_hex_lower, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_rest_client::aptos_api_types::TransactionInfo;
+use aptos_types::transaction::TransactionInfo;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,8 +25,6 @@ use std::{
 pub struct AccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x
     pub address: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sub_account: Option<SubAccountIdentifier>,
 }
 
 impl AccountIdentifier {
@@ -44,7 +43,7 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
             Ok(address)
         } else {
             Ok(AccountAddress::from_str(&account.address)
-                .map_err(|_| ApiError::AptosError(Some("Invalid account address".to_string())))?)
+                .map_err(|_| ApiError::InvalidInput(Some("Invalid account address".to_string())))?)
         }
     }
 }
@@ -53,7 +52,6 @@ impl From<AccountAddress> for AccountIdentifier {
     fn from(address: AccountAddress) -> Self {
         AccountIdentifier {
             address: to_hex_lower(&address),
-            sub_account: None,
         }
     }
 }
@@ -71,10 +69,13 @@ pub struct BlockIdentifier {
 }
 
 impl BlockIdentifier {
-    pub fn from_block(block: &aptos_rest_client::aptos_api_types::Block) -> BlockIdentifier {
+    pub fn from_block(
+        block: &aptos_rest_client::aptos_api_types::BcsBlock,
+        chain_id: ChainId,
+    ) -> BlockIdentifier {
         BlockIdentifier {
-            index: block.block_height.0,
-            hash: to_hex_lower(&block.block_hash),
+            index: block.block_height,
+            hash: BlockHash::new(chain_id, block.block_height).to_string(),
         }
     }
 }
@@ -88,9 +89,6 @@ pub struct NetworkIdentifier {
     pub blockchain: String,
     /// Network name which we use ChainId for it
     pub network: String,
-    /// Can be used in the future for a shard identifier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sub_network_identifier: Option<SubNetworkIdentifier>,
 }
 
 impl NetworkIdentifier {
@@ -104,7 +102,7 @@ impl TryFrom<&NetworkIdentifier> for ChainId {
 
     fn try_from(network_identifier: &NetworkIdentifier) -> Result<Self, Self::Error> {
         ChainId::from_str(network_identifier.network.trim())
-            .map_err(|err| ApiError::AptosError(Some(err.to_string())))
+            .map_err(|err| ApiError::InvalidInput(Some(err.to_string())))
     }
 }
 
@@ -113,7 +111,6 @@ impl From<ChainId> for NetworkIdentifier {
         NetworkIdentifier {
             blockchain: BLOCKCHAIN.to_string(),
             network: chain_id.to_string(),
-            sub_network_identifier: None,
         }
     }
 }
@@ -128,9 +125,6 @@ pub struct OperationIdentifier {
     ///
     /// It must be 0 to n within the transaction.
     pub index: u64,
-    /// Only necessary if operation order is required
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub network_index: Option<u64>,
 }
 
 /// Partial block identifier for querying by version or by hash.  Both should not be
@@ -169,22 +163,6 @@ impl PartialBlockIdentifier {
     }
 }
 
-/// Sub account identifier if there are sub accounts
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/SubAccountIdentifier.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SubAccountIdentifier {
-    pub address: String,
-}
-
-/// Sub network identifier if there are sub networks
-///
-/// [API Spec](https://www.rosetta-api.org/docs/models/SubNetworkIdentifier.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SubNetworkIdentifier {
-    pub network: String,
-}
-
 /// TransactionIdentifier to represent a transaction by hash
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/TransactionIdentifier.html)
@@ -197,7 +175,15 @@ pub struct TransactionIdentifier {
 impl From<&TransactionInfo> for TransactionIdentifier {
     fn from(txn: &TransactionInfo) -> Self {
         TransactionIdentifier {
-            hash: to_hex_lower(&txn.hash),
+            hash: to_hex_lower(&txn.transaction_hash()),
+        }
+    }
+}
+
+impl From<aptos_crypto::HashValue> for TransactionIdentifier {
+    fn from(hash: aptos_crypto::HashValue) -> Self {
+        TransactionIdentifier {
+            hash: to_hex_lower(&hash),
         }
     }
 }

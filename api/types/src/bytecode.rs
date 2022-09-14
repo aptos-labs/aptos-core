@@ -37,7 +37,7 @@ pub trait Bytecode {
 
     fn address_identifier_at(&self, idx: AddressIdentifierIndex) -> &AccountAddress;
 
-    fn find_script_function(&self, name: &IdentStr) -> Option<MoveFunction>;
+    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction>;
 
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
@@ -172,7 +172,7 @@ impl Bytecode for CompiledModule {
         ModuleAccess::address_identifier_at(self, idx)
     }
 
-    fn find_script_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction> {
         self.function_defs
             .iter()
             .filter(|def| def.is_entry)
@@ -209,7 +209,7 @@ impl Bytecode for CompiledScript {
         ScriptAccess::address_identifier_at(self, idx)
     }
 
-    fn find_script_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction> {
         if name.as_str() == "main" {
             Some(MoveFunction::from(self))
         } else {

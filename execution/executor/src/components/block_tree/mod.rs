@@ -46,7 +46,7 @@ impl Block {
         self.output.result_view.txn_accumulator().num_leaves()
     }
 
-    fn ensure_has_child(&self, child_id: HashValue) -> Result<()> {
+    pub fn ensure_has_child(&self, child_id: HashValue) -> Result<()> {
         ensure!(
             self.children.lock().iter().any(|c| c.id == child_id),
             "{:x} doesn't have child {:x}",

@@ -24,10 +24,10 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   console.log(`account2 coins: ${accountResource.data.coin.value}. Should be 0!`);
 
   const payload = {
-    type: "script_function_payload",
+    type: "entry_function_payload",
     function: "0x1::coin::transfer",
     type_arguments: ["0x1::aptos_coin::AptosCoin"],
-    arguments: [account2.address().hex(), "717"],
+    arguments: [account2.address().hex(), 717],
   };
   const txnRequest = await client.generateTransaction(account1.address(), payload);
   const signedTxn = await client.signTransaction(account1, txnRequest);

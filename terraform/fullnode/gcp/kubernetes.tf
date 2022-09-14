@@ -51,7 +51,7 @@ resource "helm_release" "fullnode" {
         tag = var.image_tag
       }
       nodeSelector = {
-        "cloud.google.com/gke-nodepool" = "fullnodes"
+        "cloud.google.com/gke-nodepool"          = "fullnodes"
         "iam.gke.io/gke-metadata-server-enabled" = "true"
       }
       storage = {
@@ -61,6 +61,16 @@ resource "helm_release" "fullnode" {
         type = "LoadBalancer"
       }
       backup = {
+        # only enable backup for fullnode 0
+        enable = count.index == 0 ? var.enable_backup : false
+        config = {
+          location = "gcs"
+          gcs = {
+            bucket = google_storage_bucket.backup.name
+          }
+        }
+      }
+      restore = {
         config = {
           location = "gcs"
           gcs = {

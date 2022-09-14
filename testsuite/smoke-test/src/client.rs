@@ -7,14 +7,13 @@ use crate::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
     },
 };
-use aptos_transaction_builder::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]
 async fn test_create_mint_transfer_block_metadata() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-
     // This script does 4 transactions
     check_create_mint_transfer(&mut swarm).await;
 
@@ -34,6 +33,8 @@ async fn test_create_mint_transfer_block_metadata() {
     );
 }
 
+// TODO: flaky, disabling until fixed.
+#[ignore]
 #[tokio::test]
 async fn test_basic_fault_tolerance() {
     // A configuration with 4 validators should tolerate single node failure.

@@ -5,7 +5,7 @@ use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct GasSchedule {
     pub entries: Vec<(String, u64)>,
 }

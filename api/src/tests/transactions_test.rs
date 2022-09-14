@@ -10,21 +10,18 @@ use aptos_crypto::{
 };
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{
-    access_path::{AccessPath, Path},
     account_address::AccountAddress,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Script, ScriptFunction, SignedTransaction,
+        EntryFunction, Script, SignedTransaction,
     },
     utility_coin::APTOS_COIN_TYPE,
-    write_set::{WriteOp, WriteSetMut},
 };
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::state_store::state_key::StateKey;
 use move_deps::move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, TypeTag},
 };
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -114,7 +111,7 @@ async fn test_get_transactions_param_limit_exceeds_limit() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_script_function_payload() {
+async fn test_get_transactions_output_user_transaction_with_entry_function_payload() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     let txn = context.create_user_account(&account);
@@ -171,54 +168,6 @@ async fn test_get_transactions_output_user_transaction_with_module_payload() {
             ]
         }),
     )
-}
-
-// writeset not supported
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_write_set_payload() {
-    let mut context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context.transaction_factory().change_set(ChangeSet::new(
-            WriteSetMut::new(vec![
-                (
-                    StateKey::AccessPath(AccessPath::new(
-                        code_address,
-                        bcs::to_bytes(&Path::Code(ModuleId::new(
-                            code_address,
-                            Identifier::new("Account").unwrap(),
-                        )))
-                        .unwrap(),
-                    )),
-                    WriteOp::Deletion,
-                ),
-                (
-                    StateKey::AccessPath(AccessPath::new(
-                        context.root_account().address(),
-                        bcs::to_bytes(&Path::Resource(StructTag {
-                            address: code_address,
-                            module: Identifier::new("coin").unwrap(),
-                            name: Identifier::new("CoinStore").unwrap(),
-                            type_params: vec![APTOS_COIN_TYPE.clone()],
-                        }))
-                        .unwrap(),
-                    )),
-                    WriteOp::Deletion,
-                ),
-            ])
-            .freeze()
-            .unwrap(),
-            vec![],
-        )),
-    );
-    context.commit_block(&vec![txn.clone()]).await;
-
-    let txns = context.get("/transactions?start=2").await;
-    assert_eq!(1, txns.as_array().unwrap().len());
-
-    context.check_golden_output(txns);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -512,13 +461,13 @@ async fn test_get_pending_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_script_function_payload() {
+async fn test_signing_message_with_entry_function_payload() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     let txn = context.create_user_account(&account);
     let payload = json!({
-        "type": "script_function_payload",
-        "function": "0x1::account::create_account",
+        "type": "entry_function_payload",
+        "function": "0x1::aptos_account::create_account",
         "type_arguments": [],
         "arguments": [
             account.address().to_hex_literal(), // new_account_address
@@ -547,85 +496,6 @@ async fn test_signing_message_with_module_payload() {
     });
 
     test_signing_message_with_payload(context, txn, payload).await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_write_set_payload() {
-    // This test is created for testing error message for now.
-    // Update test when write_set_payload is supported
-    let context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .change_set(ChangeSet::new(
-                WriteSetMut::new(vec![
-                    (
-                        StateKey::AccessPath(AccessPath::new(
-                            code_address,
-                            bcs::to_bytes(&Path::Code(ModuleId::new(
-                                code_address,
-                                Identifier::new("Account").unwrap(),
-                            )))
-                            .unwrap(),
-                        )),
-                        WriteOp::Deletion,
-                    ),
-                    (
-                        StateKey::AccessPath(AccessPath::new(
-                            context.root_account().address(),
-                            bcs::to_bytes(&Path::Resource(StructTag {
-                                address: code_address,
-                                module: Identifier::new("coin").unwrap(),
-                                name: Identifier::new("CoinStore").unwrap(),
-                                type_params: vec![APTOS_COIN_TYPE.clone()],
-                            }))
-                            .unwrap(),
-                        )),
-                        WriteOp::Deletion,
-                    ),
-                ])
-                .freeze()
-                .unwrap(),
-                vec![],
-            ))
-            .expiration_timestamp_secs(u64::MAX),
-    );
-    let payload = json!({
-        "type": "write_set_payload",
-        "write_set": {
-            "type": "direct_write_set",
-            "changes": [
-                {
-                    "type": "delete_module",
-                    "address": "0x1",
-                    "module": "0x1::account"
-                },
-                {
-                    "type": "delete_resource",
-                    "address": "0xb1e55ed",
-                    "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-                }
-            ],
-            "events": []
-        }
-    });
-
-    let sender = context.root_account();
-    let body = json!({
-        "sender": sender.address().to_hex_literal(),
-        "sequence_number": sender.sequence_number().to_string(),
-        "gas_unit_price": txn.gas_unit_price().to_string(),
-        "max_gas_amount": txn.max_gas_amount().to_string(),
-        "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-        "payload": payload,
-    });
-
-    context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", body)
-        .await;
 }
 
 async fn test_signing_message_with_payload(
@@ -781,6 +651,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
     assert_eq!(txns.as_array().unwrap().len(), 2);
 }
 
+#[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
     let context = new_test_context(current_function_name!());
@@ -809,42 +680,11 @@ async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
     test_transaction_vm_status(context, txn, false).await
 }
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
-    let context = new_test_context(current_function_name!());
-
-    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context.transaction_factory().change_set(ChangeSet::new(
-            WriteSetMut::new(vec![(
-                StateKey::AccessPath(AccessPath::new(
-                    code_address,
-                    bcs::to_bytes(&Path::Code(ModuleId::new(
-                        code_address,
-                        Identifier::new("Account").unwrap(),
-                    )))
-                    .unwrap(),
-                )),
-                WriteOp::Value(invalid_bytecode),
-            )])
-            .freeze()
-            .unwrap(),
-            vec![],
-        )),
-    );
-
-    // should fail, but VM executed successfully, need investigate, but out of API scope
-    test_transaction_vm_status(context, txn, true).await
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1222",
@@ -860,10 +700,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -879,10 +719,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -898,10 +738,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -917,10 +757,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
+async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -936,14 +776,14 @@ async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_script_function_validation() {
+async fn test_get_txn_execute_failed_by_entry_function_validation() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     context
         .commit_block(&vec![context.create_user_account(&account)])
         .await;
 
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -960,7 +800,7 @@ async fn test_get_txn_execute_failed_by_script_function_validation() {
 
 #[ignore] // re-enable after cleaning after compiled code
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
+async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
 
     // address 0xA550C18 {
@@ -973,14 +813,14 @@ async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
     //         }
     //     }
     // }
-    let hello_script_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
+    let hello_entry_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
     let mut root_account = context.root_account();
     let module_txn = root_account
-        .sign_with_transaction_builder(context.transaction_factory().module(hello_script_fun));
+        .sign_with_transaction_builder(context.transaction_factory().module(hello_entry_fun));
 
     context.commit_block(&vec![module_txn]).await;
 
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         root_account,
         "0xA550C18",
@@ -1015,7 +855,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     test_transaction_vm_status(context, txn, false).await
 }
 
-async fn test_get_txn_execute_failed_by_invalid_script_function(
+async fn test_get_txn_execute_failed_by_invalid_entry_function(
     context: TestContext,
     mut account: LocalAccount,
     address: &str,
@@ -1027,7 +867,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function(
     let txn = account.sign_with_transaction_builder(
         context
             .transaction_factory()
-            .script_function(ScriptFunction::new(
+            .entry_function(EntryFunction::new(
                 ModuleId::new(
                     AccountAddress::from_hex_literal(address).unwrap(),
                     Identifier::new(module_id).unwrap(),
@@ -1175,8 +1015,6 @@ async fn test_create_signing_message_rejects_invalid_json() {
     context.check_golden_output(resp);
 }
 
-// TODO: Unignore this pending https://github.com/poem-web/poem/pull/348.
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_signing_message_rejects_no_content_length_request() {
     let mut context = new_test_context(current_function_name!());

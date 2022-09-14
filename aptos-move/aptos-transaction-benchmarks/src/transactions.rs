@@ -134,7 +134,6 @@ impl TransactionBenchState {
             0,
             0,
             *validator_set.payload().next().unwrap().account_address(),
-            Some(0),
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             vec![],
             1,
@@ -164,7 +163,7 @@ impl TransactionBenchState {
             .expect("creating a new value should succeed")
             .current();
 
-        let mut executor = FakeExecutor::from_genesis_file();
+        let mut executor = FakeExecutor::from_head_genesis();
         // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
         // XXX We may want to include new accounts in case they have interesting performance
         // characteristics.

@@ -1,0 +1,146 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.block_output.v1;
+
+option go_package = "github.com/streamingfast/firehose-aptos/types/pb/aptos/block_output/v1;pbaptos";
+
+import "aptos/util/timestamp/timestamp.proto";
+
+
+message BlockOutput {
+  uint64 height = 1;
+  repeated TransactionOutput transactions = 2;
+  uint32 chain_id = 3;
+}
+
+message TransactionOutput {
+  TransactionInfoOutput transaction_info_output = 1;
+  oneof txn_data {
+    BlockMetadataTransactionOutput block_metadata = 2;
+    UserTransactionOutput user = 3;
+    GenesisTransactionOutput genesis = 4;
+  }
+
+  repeated EventOutput events = 5;
+  repeated WriteSetChangeOutput write_set_changes = 6;
+}
+
+message TransactionInfoOutput {
+  bytes hash = 1;
+  string type = 2;
+  uint64 version = 3;
+  bytes state_change_hash = 4;
+  bytes event_root_hash = 5;
+  optional bytes state_checkpoint_hash = 13;
+  uint64 gas_used = 6;
+  bool success = 7;
+  uint64 epoch = 8;
+  uint64 block_height = 9;
+  string vm_status = 10;
+  bytes accumulator_root_hash = 11;
+  aptos.util.timestamp.Timestamp timestamp = 12;
+}
+
+message BlockMetadataTransactionOutput {
+  uint64 version = 1;
+  string id = 2;
+  uint64 round = 3;
+  bytes previous_block_votes_bitvec = 4;
+  string proposer = 5;
+  repeated uint32 failed_proposer_indices = 6;
+  aptos.util.timestamp.Timestamp timestamp = 7;
+  uint64 epoch = 8;
+}
+
+message UserTransactionOutput {
+  uint64 version = 1;
+  string parent_signature_type = 2;
+  string sender = 3;
+  uint64 sequence_number = 4;
+  uint64 max_gas_amount = 5;
+  aptos.util.timestamp.Timestamp expiration_timestamp_secs = 6;
+  uint64 gas_unit_price = 7;
+  aptos.util.timestamp.Timestamp timestamp = 8;
+  repeated SignatureOutput signatures = 9;
+  string payload = 10;
+  string entry_function_id_str = 11;
+}
+
+message GenesisTransactionOutput {
+  string payload = 1;
+}
+
+message SignatureOutput {
+  uint64 version = 1;
+  string signer = 2;
+  bool is_sender_primary = 3;
+  string signature_type = 4;
+  bytes public_key = 5;
+  bytes signature = 6;
+  uint32 threshold = 7;
+  repeated uint32 public_key_indices = 8;
+  uint32 multi_agent_index = 9;
+  uint32 multi_sig_index = 10;
+}
+
+message EventOutput {
+  uint64 version = 1;
+  EventKeyOutput key = 2;
+  uint64 sequence_number = 3;
+  string type = 4;
+  string type_str = 5;
+  string data = 6;
+}
+
+message EventKeyOutput {
+  uint64 creation_number = 1;
+  string account_address = 2;
+}
+
+message WriteSetChangeOutput {
+  uint64 version = 1;
+  bytes hash = 2;
+  string type = 3;
+  oneof change {
+    MoveModuleOutput move_module = 4;
+    MoveResourceOutput move_resource = 5;
+    TableItemOutput table_item = 6;
+  }
+}
+
+message MoveModuleOutput {
+  string name = 1;
+  string address = 2;
+  bytes bytecode = 3;
+  repeated string friends = 4;
+  // this can be better
+  repeated string exposed_functions = 5;
+  repeated string structs = 6;
+  bool is_deleted = 7;
+  uint64 wsc_index = 8;
+}
+
+message MoveResourceOutput {
+  string address = 1;
+  string module = 2;
+  string type_str = 3;
+  string name = 4;
+  repeated string generic_type_params = 5;
+  string data = 6;
+  bool is_deleted = 7;
+  uint64 wsc_index = 8;
+}
+
+message TableItemOutput {
+  string handle = 1;
+  string key = 2;
+  string decoded_key = 3;
+  string key_type = 4;
+  string decoded_value = 5;
+  string value_type = 6;
+  bool is_deleted = 7;
+  uint64 wsc_index = 8;
+}

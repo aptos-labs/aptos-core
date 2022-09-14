@@ -14,16 +14,17 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::Mutex;
-use aptos_types::move_resource::MoveStorage;
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use executor_types::ChunkExecutorTrait;
-use futures::channel::mpsc;
-use futures::executor::block_on;
+use futures::{channel::mpsc, executor::block_on};
 use mempool_notifications::MempoolNotificationSender;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use storage_interface::DbReaderWriter;
 use tokio::runtime::{Builder, Runtime};
 
@@ -83,7 +84,12 @@ impl DriverFactory {
         let driver_runtime = if create_runtime {
             Some(
                 Builder::new_multi_thread()
-                    .thread_name("state-sync-driver")
+                    .thread_name_fn(|| {
+                        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+                        let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+                        format!("sync-driver-{}", id)
+                    })
+                    .disable_lifo_slot()
                     .enable_all()
                     .build()
                     .expect("Failed to create state sync v2 driver runtime!"),

@@ -16,6 +16,11 @@ module CommunityPlatform
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 7.0
 
+    keyfile = Rails.root.join('aptos-community-sa-keys.json')
+    if !Rails.env.test? && ENV['STORAGE_SERVICE_ACCOUNT_KEY'].present? && !keyfile.exist?
+      File.write(keyfile, ENV.fetch('STORAGE_SERVICE_ACCOUNT_KEY'))
+    end
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
@@ -29,5 +34,8 @@ module CommunityPlatform
     # Enable gzip compression for HTTP responses.
     # TODO: Remove when the CDN handles compression.
     config.middleware.insert_before(Rack::Sendfile, Rack::Deflater)
+
+    # View helpers should be scoped to the corresponding controller.
+    config.action_controller.include_all_helpers = false
   end
 end

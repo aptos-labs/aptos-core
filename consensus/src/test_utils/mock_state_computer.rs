@@ -18,7 +18,6 @@ use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlo
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;
 use std::{collections::HashMap, sync::Arc};
-use termion::color::*;
 
 pub struct MockStateComputer {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
@@ -91,9 +90,7 @@ impl StateComputer for MockStateComputer {
 
     async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         debug!(
-            "{}Fake sync{} to block id {}",
-            Fg(Blue),
-            Fg(Reset),
+            "Fake sync to block id {}",
             commit.ledger_info().consensus_block_id()
         );
         self.consensus_db

@@ -15,17 +15,17 @@ variable "zone" {
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
-  default = 1
+  default     = 1
 }
 
 variable "chain_id" {
   description = "Aptos chain ID"
-  default = "TESTING"
+  default     = "TESTING"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
-  default = "testnet"
+  default     = "testnet"
 }
 
 variable "validator_name" {
@@ -90,14 +90,24 @@ variable "utility_instance_num" {
   default     = 1
 }
 
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint the instances in the utility nodegroup"
+  default     = false
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c2-standard-4"
+  default     = "c2-standard-16"
 }
 
 variable "validator_instance_num" {
   description = "Number of instances used for validator and fullnodes"
   default     = 2
+}
+
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  default     = false
 }
 
 variable "enable_logger" {
@@ -118,6 +128,17 @@ variable "enable_monitoring" {
 
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_node_exporter" {
+  description = "Enable Prometheus node exporter helm chart"
+  default     = false
+}
+
+variable "node_exporter_helm_values" {
+  description = "Map of values to pass to node exporter Helm"
   type        = any
   default     = {}
 }

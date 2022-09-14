@@ -52,7 +52,7 @@ async fn main() {
         let total_wait_duration = Duration::from_secs(TOTAL_REST_API_WAIT_DURATION_S);
         let start = Instant::now();
         while start.elapsed() < total_wait_duration {
-            if client.get_index().await.is_ok() {
+            if client.get_index_bcs().await.is_ok() {
                 successful = true;
                 break;
             }
@@ -168,7 +168,7 @@ impl ServerArgs for OfflineArgs {
             tls_cert_path: self.tls_cert_path.clone(),
             tls_key_path: self.tls_key_path.clone(),
             content_length_limit: self.content_length_limit,
-            failpoints_enabled: false,
+            ..Default::default()
         }
     }
 

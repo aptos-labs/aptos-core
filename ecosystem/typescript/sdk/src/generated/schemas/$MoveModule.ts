@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveModule = {
+    description: `A Move module`,
     properties: {
         address: {
             type: 'Address',

@@ -394,6 +394,24 @@ pub static PENDING_WIRE_MESSAGES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter of messages pending in queue to be sent out on the multiplex channel
+pub static PENDING_MULTIPLEX_MESSAGE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_network_pending_multiplex_messages",
+        "Number of pending multiplex messages"
+    )
+    .unwrap()
+});
+
+/// Counter of stream messages pending in queue to be sent out on the multiplex channel
+pub static PENDING_MULTIPLEX_STREAM: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_network_pending_multiplex_stream",
+        "Number of pending multiplex stream messages"
+    )
+    .unwrap()
+});
+
 /// Counter of pending requests in Direct Send
 pub static PENDING_DIRECT_SEND_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

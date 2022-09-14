@@ -6,6 +6,7 @@ members = [
     "api/openapi-spec-generator",
     "api/test-context",
     "api/types",
+    "aptos-move/aptos-aggregator",
     "aptos-move/aptos-gas",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -18,12 +19,11 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
-    "aptos-move/genesis-viewer",
+    "aptos-move/gas-algebra-ext",
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
-    "aptos-move/transaction-replay",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
@@ -34,6 +34,7 @@ members = [
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-bitvec",
+    "crates/aptos-build-info",
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
@@ -46,6 +47,7 @@ members = [
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
+    "crates/aptos-network-checker",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
     "crates/aptos-rate-limiter",
@@ -70,6 +72,9 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/indexer",
     "ecosystem/node-checker",
+    "ecosystem/node-checker/fn-check-client",
+    "ecosystem/sf-indexer/aptos-sf-indexer",
+    "ecosystem/sf-indexer/firehose-stream",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -85,13 +90,10 @@ members = [
     "network/peer-monitoring-service/server",
     "network/peer-monitoring-service/types",
     "sdk",
-    "sdk/transaction-builder",
     "secure/net",
-    "secure/push-metrics",
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
-    "sf-stream",
     "state-sync/aptos-data-client",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
@@ -107,6 +109,7 @@ members = [
     "storage/backup/backup-service",
     "storage/indexer",
     "storage/jellyfish-merkle",
+    "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
     "storage/state-view",
@@ -122,14 +125,17 @@ members = [
     "vm-validator",
 ]
 
+exclude =[
+    "crates/aptos-protos",
+    "ecosystem/sf-indexer/aptos-substreams",
+]
+
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/genesis-viewer",
-    "aptos-move/transaction-replay",
     "aptos-node",
     "consensus/safety-rules",
     "crates/aptos",
@@ -173,7 +179,6 @@ debug = true
 # This will be removed once our pull requests land.
 # https://github.com/rust-rocksdb/rust-rocksdb/issues/666
 [patch.crates-io]
-lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x" }

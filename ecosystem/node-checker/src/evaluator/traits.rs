@@ -1,7 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{configuration::EvaluatorArgs, evaluator::EvaluationResult, evaluators::EvaluatorType};
+use crate::{
+    configuration::{EvaluatorArgs, NodeAddress},
+    evaluator::EvaluationResult,
+    evaluators::EvaluatorType,
+};
 use log::info;
 use std::{collections::HashSet, error::Error, fmt::Debug};
 
@@ -56,6 +60,13 @@ pub trait Evaluator: Debug + Sync + Send {
             Self::get_category_name(),
             Self::get_evaluator_name()
         )
+    }
+
+    /// Before the evaluation is run, this function is called for all evaluators
+    /// configured for the given baseline configuration. This gives those evaluators
+    /// an opportunity to error out early if a necessary argument is not provided.
+    fn validate_check_node_call(&self, _target_node_address: &NodeAddress) -> anyhow::Result<()> {
+        Ok(())
     }
 
     // It would be better to require From<&EvaluatorArgs> on the trait

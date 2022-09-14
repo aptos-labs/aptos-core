@@ -7,7 +7,7 @@ use move_deps::move_core_types::{language_storage::StructTag, parser::parse_stru
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Resource {
     #[serde(rename = "type", deserialize_with = "deserialize_resource_type")]
     pub resource_type: StructTag,
@@ -58,24 +58,24 @@ pub struct Account {
     pub sequence_number: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EventHandle {
     counter: U64,
     guid: EventHandleGUID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EventHandleGUID {
     len_bytes: u8,
     guid: GUID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GUID {
     id: ID,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ID {
     creation_num: U64,
     addr: Address,

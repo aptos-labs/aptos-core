@@ -34,6 +34,7 @@ proptest! {
 
     /// Test with balances small enough to possibly trigger failures.
     #[test]
+    #[ignore]
     fn p2p_low_balance(
         universe in AccountUniverseGen::strategy(2..default_num_accounts(), 0u64..100_000),
         transfers in vec(any_with::<P2PTransferGen>((1, 50_000)), 0..default_num_transactions()),
@@ -44,6 +45,7 @@ proptest! {
     /// Mixed tests with all the different kinds of peer to peer transactions and a large
     /// variety of balances.
     #[test]
+    #[ignore]
     fn p2p_mixed(
         universe in AccountUniverseGen::strategy(
             2..default_num_accounts(),

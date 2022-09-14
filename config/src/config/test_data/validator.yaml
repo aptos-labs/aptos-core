@@ -75,6 +75,6 @@ validator_network:
     #     key: "b0f405a3e75516763c43a2ae1d70423699f34cd68fa9f8c6bb2d67aa87d0af69"
     #     peer_id: "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
     mutual_authentication: true
-    max_frame_size: 8388608 # 8 MiB
+    max_frame_size: 4194304 # 4 MiB
 api:
     enabled: true

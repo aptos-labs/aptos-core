@@ -1,11 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliResult, CliTypedResult, TransactionOptions};
-use aptos_rest_client::Transaction;
-use aptos_transaction_builder::aptos_stdlib;
+use crate::common::types::{
+    CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 /// Tool for manipulating stake
@@ -36,26 +37,33 @@ impl StakeTool {
     }
 }
 
-/// Stake coins for an account to the stake pool
+/// Stake coins to the stake pool
+///
+/// This command allows stake pool owners to add coins to their stake.
 #[derive(Parser)]
 pub struct AddStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Amount of coins to add to stake
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for AddStake {
+impl CliCommand<TransactionSummary> for AddStake {
     fn command_name(&self) -> &'static str {
         "AddStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
+            .submit_transaction(
+                aptos_stdlib::stake_add_stake(self.amount),
+                Some(self.amount),
+            )
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -64,52 +72,59 @@ impl CliCommand<Transaction> for AddStake {
 /// Coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
 pub struct UnlockStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Amount of coins to unlock
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for UnlockStake {
+impl CliCommand<TransactionSummary> for UnlockStake {
     fn command_name(&self) -> &'static str {
         "UnlockStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
+            .submit_transaction(aptos_stdlib::stake_unlock(self.amount), None)
             .await
+            .map(|inner| inner.into())
     }
 }
 
-/// Withdraw all unlocked staked coins
+/// Withdraw unlocked staked coins
 ///
+/// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
 #[derive(Parser)]
 pub struct WithdrawStake {
-    #[clap(flatten)]
-    pub(crate) node_op_options: TransactionOptions,
     /// Amount of coins to withdraw
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) node_op_options: TransactionOptions,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for WithdrawStake {
+impl CliCommand<TransactionSummary> for WithdrawStake {
     fn command_name(&self) -> &'static str {
         "WithdrawStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.node_op_options
-            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
+            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount), None)
             .await
+            .map(|inner| inner.into())
     }
 }
 
-/// Increase lockup of all staked coins in an account
+/// Increase lockup of all staked coins in the stake pool
+///
+/// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
 pub struct IncreaseLockup {
     #[clap(flatten)]
@@ -117,91 +132,123 @@ pub struct IncreaseLockup {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for IncreaseLockup {
+impl CliCommand<TransactionSummary> for IncreaseLockup {
     fn command_name(&self) -> &'static str {
         "IncreaseLockup"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup())
+            .submit_transaction(aptos_stdlib::stake_increase_lockup(), None)
             .await
+            .map(|inner| inner.into())
     }
 }
 
-/// Register stake owner, to gain capability to delegate
-/// operator or voting capability to a different account.
+/// Initialize stake owner
+///
+/// Initializing stake owner adds the capability to delegate the
+/// stake pool to an operator, or delegate voting to a different account.
 #[derive(Parser)]
 pub struct InitializeStakeOwner {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    /// Initial amount of coins to be staked
     #[clap(long)]
     pub initial_stake_amount: u64,
-    #[clap(long)]
+
+    /// Account Address of delegated operator
+    ///
+    /// If not specified, it will be the same as the owner
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: Option<AccountAddress>,
-    #[clap(long)]
+
+    /// Account address of delegated voter
+    ///
+    /// If not specified, it will be the same as the owner
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: Option<AccountAddress>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for InitializeStakeOwner {
+impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     fn command_name(&self) -> &'static str {
         "InitializeStakeOwner"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let owner_address = self.txn_options.sender_address()?;
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_initialize_owner_only(
-                self.initial_stake_amount,
-                self.operator_address.unwrap_or(owner_address),
-                self.voter_address.unwrap_or(owner_address),
-            ))
+            .submit_transaction(
+                aptos_stdlib::stake_initialize_stake_owner(
+                    self.initial_stake_amount,
+                    self.operator_address.unwrap_or(owner_address),
+                    self.voter_address.unwrap_or(owner_address),
+                ),
+                Some(self.initial_stake_amount),
+            )
             .await
+            .map(|inner| inner.into())
     }
 }
 
-/// Delegate operator (running validator node) capability from the stake owner
-/// to the given voter address
+/// Delegate operator capability from the stake owner to another account
 #[derive(Parser)]
 pub struct SetOperator {
+    /// Account Address of delegated operator
+    ///
+    /// If not specified, it will be the same as the owner
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub operator_address: AccountAddress,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    #[clap(long)]
-    pub operator_address: AccountAddress,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SetOperator {
+impl CliCommand<TransactionSummary> for SetOperator {
     fn command_name(&self) -> &'static str {
         "SetOperator"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_operator(self.operator_address))
+            .submit_transaction(
+                aptos_stdlib::stake_set_operator(self.operator_address),
+                None,
+            )
             .await
+            .map(|inner| inner.into())
     }
 }
 
-/// Delegate voting capability from the stake owner to the given voter address
+/// Delegate voting capability from the stake owner to another account
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
+    /// Account Address of delegated voter
+    ///
+    /// If not specified, it will be the same as the owner
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub voter_address: AccountAddress,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    #[clap(long)]
-    pub voter_address: AccountAddress,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SetDelegatedVoter {
+impl CliCommand<TransactionSummary> for SetDelegatedVoter {
     fn command_name(&self) -> &'static str {
         "SetDelegatedVoter"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
+            .submit_transaction(
+                aptos_stdlib::stake_set_delegated_voter(self.voter_address),
+                None,
+            )
             .await
+            .map(|inner| inner.into())
     }
 }

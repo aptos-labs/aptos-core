@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class UserMailer < ApplicationMailer
+  layout 'user_mailer'
+
   def node_upgrade_notification
     @user = params[:recipient]
     @network_operation = params[:network_operation]

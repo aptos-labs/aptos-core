@@ -6,7 +6,6 @@
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -28,6 +27,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
@@ -144,7 +144,7 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::account_create_account(*account)),
+        Some(aptos_stdlib::aptos_account_create_account(*account)),
     )
 }
 
@@ -219,21 +219,21 @@ fn test_new_genesis() {
         WriteSetMut::new(vec![
             (
                 StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     account1,
                     CoinStoreResource::resource_path(),
                 )),
-                WriteOp::Value(
+                WriteOp::Modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
                         false,

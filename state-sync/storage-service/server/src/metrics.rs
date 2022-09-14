@@ -21,6 +21,17 @@ pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the number of times a storage response overflowed the network
+/// frame limit size and had to be retried.
+pub static NETWORK_FRAME_OVERFLOW: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_network_frame_overflow",
+        "Counters for network frame overflows in the storage server",
+        &["response_type"]
+    )
+    .unwrap()
+});
+
 /// Counter for pending network events to the storage service (server-side)
 pub static PENDING_STORAGE_SERVER_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -70,6 +81,13 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     )
     .unwrap()
 });
+
+/// Increments the network frame overflow counter for the given response
+pub fn increment_network_frame_overflow(response_type: &str) {
+    NETWORK_FRAME_OVERFLOW
+        .with_label_values(&[response_type])
+        .inc()
+}
 
 /// Increments the given counter with the provided label values.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, protocol: ProtocolId, label: String) {

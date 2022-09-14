@@ -11,9 +11,9 @@ use futures::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         oneshot,
     },
-    SinkExt, StreamExt,
+    FutureExt, SinkExt, StreamExt,
 };
-use tokio::time::Duration;
+use tokio::time::{Duration, Instant};
 
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -41,7 +41,7 @@ use aptos_types::epoch_change::EpochChangeProof;
 use futures::channel::mpsc::unbounded;
 use once_cell::sync::OnceCell;
 
-pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
 pub type ResetAck = ();
 
@@ -105,6 +105,7 @@ pub struct BufferManager {
     // we replace t5 with t3 (from reconfiguration block) since that's the last timestamp
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
+    previous_commit_time: Instant,
 }
 
 impl BufferManager {
@@ -149,6 +150,7 @@ impl BufferManager {
             verifier,
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
+            previous_commit_time: Instant::now(),
         }
     }
 
@@ -162,7 +164,7 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        tokio::spawn(async move {
+        spawn_named!(&format!("retry request")[..], async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)
@@ -295,6 +297,7 @@ impl BufferManager {
                     .await
                     .expect("Failed to send persist request");
                 info!("Advance head to {:?}", self.buffer.head_cursor());
+                self.previous_commit_time = Instant::now();
                 return;
             }
         }
@@ -308,6 +311,7 @@ impl BufferManager {
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
+        self.previous_commit_time = Instant::now();
         // purge the incoming blocks queue
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
@@ -472,8 +476,14 @@ impl BufferManager {
 
     /// this function retries all the items until the signing root
     /// note that there might be other signed items after the signing root
-    async fn retry_broadcasting_commit_votes(&mut self) {
+    async fn rebroadcast_commit_votes_if_needed(&mut self) {
+        if self.previous_commit_time.elapsed()
+            < Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS)
+        {
+            return;
+        }
         let mut cursor = *self.buffer.head_cursor();
+        let mut count = 0;
         while cursor.is_some() {
             {
                 let item = self.buffer.get(&cursor);
@@ -484,39 +494,41 @@ impl BufferManager {
                 self.commit_msg_tx
                     .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
+                count += 1;
             }
             cursor = self.buffer.get_next(&cursor);
         }
+        info!("Rebroadcasting {} commit votes", count);
     }
 
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let mut interval =
-            tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
+            tokio::time::interval(Duration::from_millis(COMMIT_VOTE_REBROADCAST_INTERVAL_MS));
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
-            tokio::select! {
-                Some(blocks) = self.block_rx.next() => {
+            ::futures::select! {
+                blocks = self.block_rx.select_next_some() => {
                     self.process_ordered_blocks(blocks);
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
                     }
-                }
-                Some(reset_event) = self.reset_rx.next() => {
+                },
+                reset_event = self.reset_rx.select_next_some() => {
                     self.process_reset_request(reset_event).await;
-                }
-                Some(response) = self.execution_phase_rx.next() => {
+                },
+                response = self.execution_phase_rx.select_next_some() => {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
                     }
-                }
-                Some(response) = self.signing_phase_rx.next() => {
+                },
+                response = self.signing_phase_rx.select_next_some() => {
                     self.process_signing_response(response).await;
                     self.advance_signing_root().await;
-                }
-                Some(commit_msg) = self.commit_msg_rx.next() => {
+                },
+                commit_msg = self.commit_msg_rx.select_next_some() => {
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
@@ -526,10 +538,10 @@ impl BufferManager {
                             self.advance_signing_root().await;
                         }
                     }
-                }
-                _ = interval.tick() => {
-                    self.retry_broadcasting_commit_votes().await;
-                }
+                },
+                _ = interval.tick().fuse() => {
+                    self.rebroadcast_commit_votes_if_needed().await;
+                },
                 // no else branch here because interval.tick will always be available
             }
         }

@@ -5,18 +5,52 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
-N/A
+- A new function called `getEventsByCreationNumber` has been added, corresponding to the new endpoint on the API. For more information on this change, see the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for API version 1.1.0.
+- **[Deprecated]** The `getEventsByEventKey` function is now deprecated. In the next release it will be removed entirely. You must migrate to the new function, `getEventsByCreationNumber`, by then.
+- Included in the `Event` struct (which is what the events endpoints return) is a new field called `guid`. This is a more easily interpretable representation of an event identifier than the `key` field. See the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for an example of the new field.
+- **[Deprecated]** The `key` field in the `Event` struct is now deprecated. In the next release it will be removed entirely. You must migrate to using the `guid` field by then.
+
+## 1.3.12 (2022-09-08)
+
+- Feature to rotate auth key for single signature account
+
+## 1.3.11 (2022-08-31)
+
+- Upgraded typescript version from 4.7.4 to 4.8.2, as well as linter package versions.
+- **[Breaking Change]** ModuleBundle transaction support is removed. Instead, SDK users should use `AptosClient.publishPackage` to publish Move packages.
+- Expose detailed API errors.
+- Accept stringified values as transaction payload parameters.
+
+## 1.3.10 (2022-08-26)
+
+- Fix the bug in `waitForTransactionWithResult`. When API returns `404`, the function should continue waiting rather than returning early. The reason is that the txn might not be committed promptly. `waitForTransactionWithResult` should either timeout or get an error in such case.
+
+## 1.3.9 (2022-08-25)
+
+- **[Breaking Change]** Reimplemented the JSON transaction submission interfaces with BCS. This is a breaking change. `createSigningMessage` is removed. Before the changes, the transaction payloads take string aruguments. But now, Typescript payload arguments have to match the smart contract arugment types. e.g. `number` matches `u8`, `number | bigint` matches `u64` and `u128`, etc.
+- **[Breaking Change]** `getTokenBalance` and `getTokenBalanceForAccount` have been renamed to `getToken` and `getTokenForAccount`, since they were never getting just the balance, but the full token.
+- Added `CoinClient` to help working with coins. This contains common operations such as `transfer`, `checkBalance`, etc.
+- Added `generateSignSubmitWaitForTransaction`, a function that provides a simple way to execute the full end to end transaction submission flow. You may also leverage `generateSignSubmit`, a helper that does the same but without waiting, instead returning teh transaction hash.
+- Added `fromDerivePath` to `AptosAccount`. You can use this to create an `AptosAccount` (which is a local representation of an account) using a bip44 path and mnemonics.
+
+## 1.3.7 (2022-08-17)
+
+- Add a transaction builder that is able to serialize transaction arguments with remote ABIs. Remote ABIs are fetchable through REST APIs. With the remote ABI transaction builder, developers can build BCS transactions by only providing the native JS values.
+- Make all functions that accept `BigInt` parameters accept `BigInt | number` instead.
 
 ## 1.3.6 (2022-08-10)
+
 - Switch back to representing certain move types (MoveModuleId, MoveStructTag, ScriptFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
 - Represent certain fields with slightly different snake casing, e.g. `ed25519_signature` now instead of `ed_25519_signature`.
 - Add generated types for healthcheck endpoint.
 - If the given URL is missing `/v1`, the `AptosClient` constructor will add it for you. You can opt out of this behavior by setting `doNotFixNodeUrl` to true when calling the constructor.
 
 ## 1.3.5 (2022-08-08)
+
 - Re-expose BCS and items from `transaction_builder/builder` from the root of the module.
 
 ## 1.3.4 (2022-08-07)
+
 - Downscaled default value for `max_gas`.
 
 ## 1.3.3 (2022-08-05)

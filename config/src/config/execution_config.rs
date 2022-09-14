@@ -12,13 +12,12 @@ use std::{
 
 const GENESIS_DEFAULT: &str = "genesis.blob";
 
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecutionConfig {
     #[serde(skip)]
     pub genesis: Option<Transaction>,
     pub genesis_file_location: PathBuf,
-    pub network_timeout_ms: u64,
     pub concurrency_level: u16,
     pub num_proof_reading_threads: u16,
 }
@@ -44,10 +43,8 @@ impl Default for ExecutionConfig {
         ExecutionConfig {
             genesis: None,
             genesis_file_location: PathBuf::new(),
-            // Default value of 30 seconds for the network timeout.
-            network_timeout_ms: 30_000,
-            // Sequential execution by default.
-            concurrency_level: 1,
+            // Parallel execution by default.
+            concurrency_level: 8,
             num_proof_reading_threads: 32,
         }
     }
@@ -56,13 +53,41 @@ impl Default for ExecutionConfig {
 impl ExecutionConfig {
     pub fn load(&mut self, root_dir: &RootPath) -> Result<(), Error> {
         if !self.genesis_file_location.as_os_str().is_empty() {
-            let path = root_dir.full_path(&self.genesis_file_location);
-            let mut file = File::open(&path).map_err(|e| Error::IO("genesis".into(), e))?;
+            // Ensure the genesis file exists
+            let genesis_path = root_dir.full_path(&self.genesis_file_location);
+            if !genesis_path.exists() {
+                return Err(Error::Unexpected(format!(
+                    "The genesis file could not be found! Ensure the given path is correct: {:?}",
+                    genesis_path.display()
+                )));
+            }
+
+            // Open the genesis file and read the bytes
+            let mut file = File::open(&genesis_path).map_err(|error| {
+                Error::Unexpected(format!(
+                    "Failed to open the genesis file: {:?}. Error: {:?}",
+                    genesis_path.display(),
+                    error
+                ))
+            })?;
             let mut buffer = vec![];
-            file.read_to_end(&mut buffer)
-                .map_err(|e| Error::IO("genesis".into(), e))?;
-            let data = bcs::from_bytes(&buffer).map_err(|e| Error::BCS("genesis", e))?;
-            self.genesis = Some(data);
+            file.read_to_end(&mut buffer).map_err(|error| {
+                Error::Unexpected(format!(
+                    "Failed to read the genesis file into a buffer: {:?}. Error: {:?}",
+                    genesis_path.display(),
+                    error
+                ))
+            })?;
+
+            // Deserialize the genesis file and store it
+            let genesis = bcs::from_bytes(&buffer).map_err(|error| {
+                Error::Unexpected(format!(
+                    "Failed to BCS deserialize the genesis file: {:?}. Error: {:?}",
+                    genesis_path.display(),
+                    error
+                ))
+            })?;
+            self.genesis = Some(genesis);
         }
 
         Ok(())

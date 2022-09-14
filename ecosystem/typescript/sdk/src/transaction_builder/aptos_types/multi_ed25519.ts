@@ -52,8 +52,8 @@ export class MultiEd25519PublicKey {
 
     const keys: Seq<Ed25519PublicKey> = [];
 
-    for (let i = 0; i < bytes.length; i += Ed25519PublicKey.LENGTH) {
-      const begin = i * Ed25519PublicKey.LENGTH;
+    for (let i = 0; i < bytes.length - 1; i += Ed25519PublicKey.LENGTH) {
+      const begin = i;
       keys.push(new Ed25519PublicKey(bytes.subarray(begin, begin + Ed25519PublicKey.LENGTH)));
     }
     return new MultiEd25519PublicKey(keys, threshold);
@@ -149,8 +149,8 @@ export class MultiEd25519Signature {
 
     const sigs: Seq<Ed25519Signature> = [];
 
-    for (let i = 0; i < bytes.length; i += Ed25519Signature.LENGTH) {
-      const begin = i * Ed25519Signature.LENGTH;
+    for (let i = 0; i < bytes.length - bitmap.length; i += Ed25519Signature.LENGTH) {
+      const begin = i;
       sigs.push(new Ed25519Signature(bytes.subarray(begin, begin + Ed25519Signature.LENGTH)));
     }
     return new MultiEd25519Signature(sigs, bitmap);

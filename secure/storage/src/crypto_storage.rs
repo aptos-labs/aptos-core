@@ -64,7 +64,7 @@ pub trait CryptoStorage {
     ) -> Result<Ed25519Signature, Error>;
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(tag = "data")]
 pub struct PublicKeyResponse {
     /// Time since Unix Epoch in seconds.

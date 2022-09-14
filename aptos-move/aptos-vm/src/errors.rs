@@ -3,7 +3,7 @@
 
 use crate::logging::AdapterLogSchema;
 use aptos_logger::prelude::*;
-use aptos_types::account_config::ChainSpecificAccountInfo;
+use aptos_types::account_config::TransactionValidation;
 use move_deps::{
     move_binary_format::errors::VMError,
     move_core_types::vm_status::{StatusCode, VMStatus},
@@ -14,26 +14,25 @@ use move_deps::{
 /// These errors are only expected from the module that is registered as the account module for the system.
 /// The prologue should not emit any other error codes or fail for any reason, doing so will result
 /// in the VM throwing an invariant violation
-pub const EACCOUNT_FROZEN: u64 = 1000; // sending account is frozen
-pub const EBAD_ACCOUNT_AUTHENTICATION_KEY: u64 = 1001; // auth key in transaction is invalid
-pub const ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002; // transaction sequence number is too old
-pub const ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003; // transaction sequence number is too new
-pub const EACCOUNT_DOES_NOT_EXIST: u64 = 1004; // transaction sender's account does not exist
-pub const ECANT_PAY_GAS_DEPOSIT: u64 = 1005; // insufficient balance (to pay for gas deposit)
-pub const ETRANSACTION_EXPIRED: u64 = 1006; // transaction expiration time exceeds block time.
-pub const EBAD_CHAIN_ID: u64 = 1007; // chain_id in transaction doesn't match the one on-chain
-pub const ESCRIPT_NOT_ALLOWED: u64 = 1008;
-pub const EMODULE_NOT_ALLOWED: u64 = 1009;
-pub const EINVALID_WRITESET_SENDER: u64 = 1010; // invalid sender (not aptos root) for write set
-pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
-// This error code has been deprecated and just left here sp future error codes would not
-// accidentally reuse.
-#[allow(dead_code)]
-pub const RESERVED_UNUSED: u64 = 1012;
-pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1013;
-pub const ESEQ_NONCE_NONCE_INVALID: u64 = 1014;
+// Auth key in transaction is invalid.
+pub const EBAD_ACCOUNT_AUTHENTICATION_KEY: u64 = 1001;
+// Transaction sequence number is too old.
+pub const ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
+// Transaction sequence number is too new.
+pub const ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
+// Transaction sender's account does not exist.
+pub const EACCOUNT_DOES_NOT_EXIST: u64 = 1004;
+// Insufficient balance (to pay for gas deposit).
+pub const ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
+// Transaction expiration time exceeds block time.
+pub const ETRANSACTION_EXPIRED: u64 = 1006;
+// chain_id in transaction doesn't match the one on-chain.
+pub const EBAD_CHAIN_ID: u64 = 1007;
+// Transaction sequence number exceeds u64 max.
+pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
+// Counts of secondary keys and addresses don't match.
+pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 
-const INVALID_STATE: u8 = 3;
 const INVALID_ARGUMENT: u8 = 1;
 const LIMIT_EXCEEDED: u8 = 2;
 
@@ -47,7 +46,7 @@ fn error_split(code: u64) -> (u8, u64) {
 /// Any non-abort non-execution code is considered an invariant violation, specifically
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_prologue_error(
-    chain_specific_info: &ChainSpecificAccountInfo,
+    transaction_validation: &TransactionValidation,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
@@ -55,7 +54,7 @@ pub fn convert_prologue_error(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if !chain_specific_info.is_account_module_abort(&location) =>
+            if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();
@@ -68,7 +67,6 @@ pub fn convert_prologue_error(
         }
         VMStatus::MoveAbort(location, code) => {
             let new_major_status = match error_split(code) {
-                (INVALID_STATE, EACCOUNT_FROZEN) => StatusCode::SENDING_ACCOUNT_FROZEN,
                 // Invalid authentication key
                 (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
                 // Sequence number too old
@@ -85,15 +83,11 @@ pub fn convert_prologue_error(
                 }
                 (INVALID_ARGUMENT, ETRANSACTION_EXPIRED) => StatusCode::TRANSACTION_EXPIRED,
                 (INVALID_ARGUMENT, EBAD_CHAIN_ID) => StatusCode::BAD_CHAIN_ID,
-                (INVALID_STATE, ESCRIPT_NOT_ALLOWED) => StatusCode::UNKNOWN_SCRIPT,
-                (INVALID_STATE, EMODULE_NOT_ALLOWED) => StatusCode::INVALID_MODULE_PUBLISHER,
-                (INVALID_ARGUMENT, EINVALID_WRITESET_SENDER) => StatusCode::REJECTED_WRITE_SET,
                 // Sequence number will overflow
                 (LIMIT_EXCEEDED, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
                 (INVALID_ARGUMENT, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH) => {
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 }
-                (INVALID_ARGUMENT, ESEQ_NONCE_NONCE_INVALID) => StatusCode::SEQUENCE_NONCE_INVALID,
                 (category, reason) => {
                     log_context.alert();
                     error!(
@@ -123,7 +117,7 @@ pub fn convert_prologue_error(
 /// Any other errors are mapped to the invariant violation
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_epilogue_error(
-    chain_specific_info: &ChainSpecificAccountInfo,
+    transaction_validation: &TransactionValidation,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
@@ -131,7 +125,7 @@ pub fn convert_epilogue_error(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if !chain_specific_info.is_account_module_abort(&location) =>
+            if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();

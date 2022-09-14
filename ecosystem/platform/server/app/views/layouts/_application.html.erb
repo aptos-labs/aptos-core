@@ -26,9 +26,10 @@
       <meta name="twitter:image" content="https://aptoslabs.com/images/meta/APTOS_meta_twitter_051222.jpg">
     <% end %>
 
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="icon" type="image/image/png" href="/favicon.png">
+    <%= favicon_link_tag image_path('favicon.ico'), sizes: 'any' %>
+    <%= favicon_link_tag image_path('favicon.svg'), type: 'image/svg' %>
+    <%= favicon_link_tag image_path('favicon.png'), type: 'image/png' %>
+    <link rel="apple-touch-icon" type="image/png" href="/apple-touch-icon.png">
 
     <%= stylesheet_link_tag "https://use.typekit.net/#{ENV.fetch('TYPEKIT_CSS_ID')}.css" %>
     <%= stylesheet_link_tag 'application', 'data-turbo-track': 'reload' %>
@@ -39,12 +40,11 @@
   <body class="flex flex-col h-screen justify-between antialiased bg-neutral-900 <%= content_for(:body_class) %>">
     <div class="flex flex-col flex-1">
       <%= render HeaderComponent.new(user: current_user) %>
-
+      <%= render GlobalAnnouncementComponent.new(id: 'global-announcement', class: 'flex') %>
       <main class="flex-1">
         <%= yield %>
       </main>
     </div>
-
     <%= render FooterComponent.new %>
   </body>
 </html>

@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 dashmap = "4.0.2"
@@ -17,7 +17,10 @@ bcs = "0.1.3"
 byteorder = { version = "1.4.3" }
 bytes = "1.1.0"
 fail = "0.5.0"
-futures = "0.3.21"
+# Previously: Pinning futures to 0.3.21, since release v0.3.23 is causing the network_tests to fail because messages are not received in the channel.
+# Now: Some futures crates were using 0.3.23 as well, which is not a good idea. 0.3.23 has a known issues, so moving to 0.3.24.
+futures = "= 0.3.24"
+futures-channel = "= 0.3.24"
 itertools = { version = "0.10.3", default-features = false }
 mirai-annotations = { version = "1.12.0", default-features = false }
 num-derive = { version = "0.3.3", default-features = false }
@@ -26,9 +29,8 @@ once_cell = "1.12.0"
 rand = { version = "0.7.3", default-features = false }
 serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
-termion = { version = "1.5.6", default-features = false }
 thiserror = "1.0.31"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.21.0", features = ["full"] }
 chrono = "0.4.19"
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 arc-swap = "1.5.0"
@@ -37,7 +39,6 @@ aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }
-aptos-keygen = { path = "../crates/aptos-keygen" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-global-constants = { path = "../config/global-constants"}
 aptos-mempool = { path = "../mempool" }
@@ -61,11 +62,12 @@ short-hex-str = { path = "../crates/short-hex-str" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
-claim = "0.5.0"
+claims = "0.7"
 proptest = "1.0.0"
 tempfile = "3.3.0"
 
 aptos-config = { path = "../config", features = ["fuzzing"] }
+aptos-keygen = { path = "../crates/aptos-keygen" }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }

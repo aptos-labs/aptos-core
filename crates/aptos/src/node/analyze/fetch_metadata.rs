@@ -7,13 +7,20 @@ use aptos_rest_client::{
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
 use aptos_types::account_address::AccountAddress;
-use std::convert::TryFrom;
 use std::str::FromStr;
+
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub struct ValidatorInfo {
+    pub address: AccountAddress,
+    pub voting_power: u64,
+    pub validator_index: u64,
+}
 
 pub struct EpochInfo {
     pub epoch: u64,
     pub blocks: Vec<VersionedNewBlockEvent>,
-    pub validators: Vec<AccountAddress>,
+    pub validators: Vec<ValidatorInfo>,
+    pub partial: bool,
 }
 
 pub struct FetchMetadata {}
@@ -22,18 +29,30 @@ impl FetchMetadata {
     fn get_validator_addresses(
         data: &MoveResource,
         field_name: &str,
-    ) -> Result<Vec<AccountAddress>> {
-        fn extract_validator_address(validator: &serde_json::Value) -> Result<AccountAddress> {
-            if let serde_json::Value::Object(value) = validator {
-                if let Some(serde_json::Value::String(address)) = &value.get("addr") {
-                    AccountAddress::from_hex_literal(address)
-                        .map_err(|e| anyhow!("Cannot parse address {:?}", e))
-                } else {
-                    Err(anyhow!("Addr not present or of correct type"))
-                }
-            } else {
-                Err(anyhow!("Validator config not a json object"))
-            }
+    ) -> Result<Vec<ValidatorInfo>> {
+        fn extract_validator_address(validator: &serde_json::Value) -> Result<ValidatorInfo> {
+            Ok(ValidatorInfo {
+                address: AccountAddress::from_hex_literal(
+                    validator.get("addr").unwrap().as_str().unwrap(),
+                )
+                .map_err(|e| anyhow!("Cannot parse address {:?}", e))?,
+                voting_power: validator
+                    .get("voting_power")
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .parse()
+                    .map_err(|e| anyhow!("Cannot parse voting_power {:?}", e))?,
+                validator_index: validator
+                    .get("config")
+                    .unwrap()
+                    .get("validator_index")
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .parse()
+                    .map_err(|e| anyhow!("Cannot parse validator_index {:?}", e))?,
+            })
         }
 
         let validators_json = data
@@ -42,7 +61,7 @@ impl FetchMetadata {
             .get(&IdentifierWrapper::from_str(field_name).unwrap())
             .unwrap();
         if let serde_json::Value::Array(validators_array) = validators_json {
-            let mut validators: Vec<AccountAddress> = vec![];
+            let mut validators: Vec<ValidatorInfo> = vec![];
             for validator in validators_array {
                 validators.push(extract_validator_address(validator)?);
             }
@@ -52,21 +71,40 @@ impl FetchMetadata {
         }
     }
 
-    fn get_validators_from_transaction(transaction: &Transaction) -> Result<Vec<AccountAddress>> {
+    async fn get_transactions(
+        client: &RestClient,
+        start: u64,
+        last: u64,
+    ) -> Result<Vec<Transaction>> {
+        let mut result = Vec::new();
+        let mut cursor = start;
+        while cursor < last {
+            let limit = std::cmp::min(1000, last - cursor);
+            let mut current = client
+                .get_transactions(Some(cursor), Some(limit as u16))
+                .await?
+                .into_inner();
+            result.append(&mut current);
+            cursor += limit
+        }
+        Ok(result)
+    }
+
+    fn get_validators_from_transaction(transaction: &Transaction) -> Result<Vec<ValidatorInfo>> {
         if let Ok(info) = transaction.transaction_info() {
             for change in &info.changes {
                 if let WriteSetChange::WriteResource(resource) = change {
-                    if resource.data.typ.name.0.clone().into_string() == "ValidatorSet" {
+                    if resource.data.typ.name.0.as_str() == "ValidatorSet" {
                         // No pending at epoch change
                         assert_eq!(
-                            Vec::<AccountAddress>::new(),
+                            Vec::<ValidatorInfo>::new(),
                             FetchMetadata::get_validator_addresses(
                                 &resource.data,
                                 "pending_inactive"
                             )?
                         );
                         assert_eq!(
-                            Vec::<AccountAddress>::new(),
+                            Vec::<ValidatorInfo>::new(),
                             FetchMetadata::get_validator_addresses(
                                 &resource.data,
                                 "pending_active"
@@ -85,43 +123,76 @@ impl FetchMetadata {
 
     pub async fn fetch_new_block_events(
         client: &RestClient,
-        start_epoch: Option<u64>,
-        end_epoch: Option<u64>,
+        start_epoch: Option<i64>,
+        end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
-        let mut start_seq_num = 0;
-        let last_seq_num = client
+        let (last_events, state) = client
             .get_new_block_events(None, Some(1))
             .await?
-            .into_inner()
-            .first()
-            .unwrap()
-            .sequence_number;
+            .into_parts();
+        let mut start_seq_num = state.oldest_block_height;
+        assert_eq!(last_events.len(), 1, "{:?}", last_events);
+        let last_event = last_events.first().unwrap();
+        let last_seq_num = last_event.sequence_number;
 
-        if let Some(start_epoch) = start_epoch {
-            if start_epoch > 1 {
-                let mut search_end = last_seq_num;
+        let wanted_start_epoch = {
+            let mut wanted_start_epoch = start_epoch.unwrap_or(2);
+            if wanted_start_epoch < 0 {
+                wanted_start_epoch = last_event.event.epoch() as i64 + wanted_start_epoch + 1;
+            }
 
-                // Stop when search is close enough, and we can then linearly
-                // proceed from there.
-                // Since we are ignoring results we are fetching during binary search
-                // we want to stop when we are close.
-                while start_seq_num + 20 < search_end {
-                    let mid = (start_seq_num + search_end) / 2;
+            let oldest_event = client
+                .get_new_block_events(Some(start_seq_num), Some(1))
+                .await?
+                .into_inner()
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("No blocks at oldest_block_height {}", start_seq_num))?;
+            let oldest_fetchable_epoch = std::cmp::max(oldest_event.event.epoch() + 1, 2);
+            if oldest_fetchable_epoch > wanted_start_epoch as u64 {
+                println!(
+                    "Oldest full epoch that can be retreived is {} ",
+                    oldest_fetchable_epoch
+                );
+                oldest_fetchable_epoch
+            } else {
+                wanted_start_epoch as u64
+            }
+        };
+        let wanted_end_epoch = {
+            let mut wanted_end_epoch = end_epoch.unwrap_or(i64::MAX);
+            if wanted_end_epoch < 0 {
+                wanted_end_epoch = last_event.event.epoch() as i64 + wanted_end_epoch + 1;
+            }
+            std::cmp::min(
+                last_event.event.epoch() + 1,
+                std::cmp::max(2, wanted_end_epoch) as u64,
+            )
+        };
 
-                    let mid_epoch = client
-                        .get_new_block_events(Some(mid), Some(1))
-                        .await?
-                        .into_inner()
-                        .first()
-                        .unwrap()
-                        .event
-                        .epoch();
+        if wanted_start_epoch > 2 {
+            let mut search_end = last_seq_num;
 
-                    if mid_epoch < start_epoch {
-                        start_seq_num = mid;
-                    } else {
-                        search_end = mid;
-                    }
+            // Stop when search is close enough, and we can then linearly
+            // proceed from there.
+            // Since we are ignoring results we are fetching during binary search
+            // we want to stop when we are close.
+            while start_seq_num + 20 < search_end {
+                let mid = (start_seq_num + search_end) / 2;
+
+                let mid_epoch = client
+                    .get_new_block_events(Some(mid), Some(1))
+                    .await?
+                    .into_inner()
+                    .first()
+                    .unwrap()
+                    .event
+                    .epoch();
+
+                if mid_epoch < wanted_start_epoch {
+                    start_seq_num = mid;
+                } else {
+                    search_end = mid;
                 }
             }
         }
@@ -130,18 +201,19 @@ impl FetchMetadata {
         let mut batch_index = 0;
 
         println!(
-            "Fetching {} to {} sequence number",
-            start_seq_num, last_seq_num
+            "Fetching {} to {} sequence number, wanting epochs [{}, {}), last version: {} and epoch: {}",
+            start_seq_num, last_seq_num, wanted_start_epoch, wanted_end_epoch, state.version, state.epoch,
         );
+        let mut result: Vec<EpochInfo> = vec![];
+        if wanted_start_epoch >= wanted_end_epoch {
+            return Ok(result);
+        }
 
-        let mut validators: Vec<AccountAddress> = vec![];
+        let mut validators: Vec<ValidatorInfo> = vec![];
+        let mut current: Vec<VersionedNewBlockEvent> = vec![];
         let mut epoch = 0;
 
-        let mut current: Vec<VersionedNewBlockEvent> = vec![];
-        let mut result: Vec<EpochInfo> = vec![];
-
         let mut cursor = start_seq_num;
-        let start_epoch = start_epoch.unwrap_or(2);
         loop {
             let events = client.get_new_block_events(Some(cursor), Some(batch)).await;
 
@@ -156,6 +228,7 @@ impl FetchMetadata {
                     epoch,
                     blocks: current,
                     validators: validators.clone(),
+                    partial: true,
                 });
                 return Ok(result);
             }
@@ -168,13 +241,12 @@ impl FetchMetadata {
                     } else {
                         let last = current.last().cloned();
                         if let Some(last) = last {
-                            let transactions = client
-                                .get_transactions(
-                                    Some(last.version),
-                                    Some(u16::try_from(event.version - last.version).unwrap()),
-                                )
-                                .await?
-                                .into_inner();
+                            let transactions = FetchMetadata::get_transactions(
+                                client,
+                                last.version,
+                                event.version,
+                            )
+                            .await?;
                             assert_eq!(
                                 transactions.first().unwrap().version().unwrap(),
                                 last.version
@@ -183,21 +255,22 @@ impl FetchMetadata {
                                 if let Ok(new_validators) =
                                     FetchMetadata::get_validators_from_transaction(&transaction)
                                 {
-                                    if epoch >= start_epoch {
+                                    if epoch >= wanted_start_epoch {
                                         assert!(!validators.is_empty());
                                         result.push(EpochInfo {
                                             epoch,
                                             blocks: current,
                                             validators: validators.clone(),
+                                            partial: false,
                                         });
                                     }
                                     current = vec![];
 
                                     validators = new_validators;
-                                    validators.sort();
+                                    validators.sort_by_key(|v| v.validator_index);
                                     assert_eq!(epoch + 1, event.event.epoch());
                                     epoch = event.event.epoch();
-                                    if end_epoch.is_some() && epoch >= end_epoch.unwrap() {
+                                    if epoch >= wanted_end_epoch {
                                         return Ok(result);
                                     }
                                     break;
@@ -220,7 +293,7 @@ impl FetchMetadata {
             batch_index += 1;
             if batch_index % 100 == 0 {
                 println!(
-                    "Fetched {} epochs (in epoch {} with {} blocks) from {} transactions",
+                    "Fetched {} epochs (in epoch {} with {} blocks) from {} NewBlockEvents",
                     result.len(),
                     epoch,
                     current.len(),
@@ -229,6 +302,14 @@ impl FetchMetadata {
             }
 
             if cursor > last_seq_num {
+                if !validators.is_empty() {
+                    result.push(EpochInfo {
+                        epoch,
+                        blocks: current,
+                        validators: validators.clone(),
+                        partial: true,
+                    });
+                }
                 return Ok(result);
             }
         }

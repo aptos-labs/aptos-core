@@ -484,7 +484,7 @@ impl TryFrom<Vec<Protocol>> for NetworkAddress {
 
     fn try_from(value: Vec<Protocol>) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            anyhow::private::Err(ParseError::EmptyProtocolString)
+            Err(ParseError::EmptyProtocolString)
         } else {
             NetworkAddress::from_protocols(value)
         }

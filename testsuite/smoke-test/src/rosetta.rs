@@ -3,14 +3,16 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
+use aptos::common::types::GasOptions;
 use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
-use aptos_crypto::HashValue;
-use aptos_rest_client::aptos_api_types::UserTransaction;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_crypto::{HashValue, PrivateKey};
+use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
 use aptos_rest_client::Transaction;
+use aptos_rosetta::common::BlockHash;
 use aptos_rosetta::types::{
     AccountIdentifier, BlockResponse, Operation, OperationStatusType, OperationType,
     TransactionType,
@@ -24,10 +26,15 @@ use aptos_rosetta::{
     },
     ROSETTA_VERSION,
 };
+use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use forge::{LocalSwarm, Node, NodeExt};
+use cached_packages::aptos_stdlib;
+use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
 
@@ -59,7 +66,7 @@ pub async fn setup_test(
         tls_cert_path: None,
         tls_key_path: None,
         content_length_limit: None,
-        failpoints_enabled: false,
+        ..Default::default()
     };
 
     // Start the server
@@ -113,14 +120,35 @@ async fn test_network() {
     assert_eq!(
         BlockIdentifier {
             index: 0,
-            hash: HashValue::zero().to_hex()
+            hash: BlockHash::new(chain_id, 0).to_string()
         },
         status.genesis_block_identifier
     );
     assert_eq!(
-        Some(status.genesis_block_identifier),
+        status.genesis_block_identifier,
         status.oldest_block_identifier,
     );
+
+    // Wrong blockchain should fail
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier {
+            blockchain: "eth".to_string(),
+            network: chain_id.to_string(),
+        },
+    };
+    rosetta_client
+        .network_status(&request)
+        .await
+        .expect_err("Should not work with wrong blockchain name");
+
+    // Wrong network should fail
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(ChainId::new(22)),
+    };
+    rosetta_client
+        .network_status(&request)
+        .await
+        .expect_err("Should not work with wrong network chain id");
 }
 
 #[tokio::test]
@@ -139,7 +167,7 @@ async fn test_account_balance() {
         response.block_identifier,
         BlockIdentifier {
             index: 0,
-            hash: HashValue::zero().to_hex(),
+            hash: BlockHash::new(chain_id, 0).to_string()
         }
     );
 
@@ -165,15 +193,7 @@ async fn test_account_balance() {
     // Send money, and expect the gas and fees to show up accordingly
     const TRANSFER_AMOUNT: u64 = 5000;
     let response = cli
-        .transfer_coins(
-            0,
-            1,
-            TRANSFER_AMOUNT,
-            Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
-            }),
-        )
+        .transfer_coins(0, 1, TRANSFER_AMOUNT, None)
         .await
         .unwrap();
     account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
@@ -191,8 +211,8 @@ async fn test_account_balance() {
             0,
             TRANSFER_AMOUNT,
             Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
+                gas_unit_price: None,
+                max_gas: Some(1000),
             }),
         )
         .await
@@ -234,7 +254,10 @@ async fn account_has_balance(
     expected_sequence_number: u64,
 ) -> anyhow::Result<u64> {
     let response = get_balance(rosetta_client, chain_id, account, None).await?;
-    assert_eq!(expected_sequence_number, response.metadata.sequence_number);
+    assert_eq!(
+        expected_sequence_number,
+        response.metadata.sequence_number.0
+    );
 
     if response.balances.iter().any(|amount| {
         amount.currency == native_coin() && amount.value == expected_balance.to_string()
@@ -265,6 +288,149 @@ async fn get_balance(
     try_until_ok_default(|| rosetta_client.account_balance(&request)).await
 }
 
+#[tokio::test]
+async fn test_transfer() {
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let chain_id = swarm.chain_id();
+    let public_info = swarm.aptos_public_info();
+    let client = public_info.client();
+    let sender = cli.account_id(0);
+    let receiver = AccountAddress::from_hex_literal("0xBEEF").unwrap();
+    let sender_private_key = cli.private_key(0);
+    let sender_balance = client
+        .get_account_balance(sender)
+        .await
+        .unwrap()
+        .into_inner()
+        .coin
+        .value
+        .0;
+    let network = NetworkIdentifier::from(chain_id);
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: network.clone(),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
+            break;
+        }
+    }
+    // Attempt to transfer all coins to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer all coins");
+
+    // Attempt to transfer more than balance to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance + 200,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer more than balance coins");
+
+    // Attempt to transfer more than balance to another user (should fail)
+    let transaction_factory = TransactionFactory::new(chain_id)
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(500);
+    let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
+    let unsigned_transaction = transaction_factory
+        .payload(txn_payload)
+        .sender(sender)
+        .sequence_number(0)
+        .build();
+    let signed_transaction = SignedTransaction::new(
+        unsigned_transaction,
+        sender_private_key.public_key(),
+        Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+    );
+
+    let simulation_txn = client
+        .simulate_bcs(&signed_transaction)
+        .await
+        .expect("Should succeed getting gas estimate")
+        .into_inner();
+    let gas_usage = simulation_txn.info.gas_used();
+
+    // Attempt to transfer more than balance - gas to another user (should fail)
+    rosetta_client
+        .transfer(
+            &network,
+            sender_private_key,
+            receiver,
+            sender_balance - gas_usage + 1,
+            expiry_time(Duration::from_secs(5)).as_secs(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("Should fail simulation since we can't transfer more than balance + gas coins");
+
+    // Attempt to transfer more than balance - gas to another user (should fail)
+    let transfer = transfer_and_wait(
+        &rosetta_client,
+        client,
+        &network,
+        sender_private_key,
+        receiver,
+        sender_balance - gas_usage,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should succeed transfer");
+    assert_eq!(transfer.info.gas_used.0, gas_usage);
+
+    // Sender balance should be 0
+    assert_eq!(
+        client
+            .get_account_balance(sender)
+            .await
+            .unwrap()
+            .into_inner()
+            .coin
+            .value
+            .0,
+        0
+    );
+    // Receiver should be sent coins
+    assert_eq!(
+        client
+            .get_account_balance(receiver)
+            .await
+            .unwrap()
+            .into_inner()
+            .coin
+            .value
+            .0,
+        sender_balance - gas_usage
+    );
+}
+
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since
 /// it's block based and it needs time to run, we do all the checks in a single test.
 #[tokio::test]
@@ -275,30 +441,229 @@ async fn test_block() {
     let rest_client = validator.rest_client();
 
     // Mapping of account to block and balance mappings
-    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, u64>>::new();
+    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, i128>>::new();
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
+            break;
+        }
+    }
 
     // Do some transfers
-    // TODO: Convert these to operations made by Rosetta
-    cli.transfer_coins(0, 1, 20, None)
+    let account_id_0 = cli.account_id(0);
+    let account_id_1 = cli.account_id(1);
+    let account_id_3 = cli.account_id(3);
+
+    cli.fund_account(0, Some(10000000)).await.unwrap();
+    cli.fund_account(1, Some(650000)).await.unwrap();
+    cli.fund_account(2, Some(50000)).await.unwrap();
+    cli.fund_account(3, Some(20000)).await.unwrap();
+
+    let private_key_0 = cli.private_key(0);
+    let private_key_1 = cli.private_key(1);
+    let private_key_2 = cli.private_key(2);
+    let private_key_3 = cli.private_key(3);
+    let network_identifier = chain_id.into();
+    let seq_no_0 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_1,
+        20,
+        Duration::from_secs(5),
+        Some(0),
+        None,
+        None,
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        Some(seq_no_0 + 1),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    // Create a new account via transfer
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        20,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let seq_no_3 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+        Some(20000),
+        Some(1),
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+
+    // Create another account via command
+    create_account_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::from_hex_literal("0x99").unwrap(),
+        Duration::from_secs(5),
+        Some(seq_no_3 + 1),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_3,
+        20,
+        Duration::from_secs(5),
+        // Test the default behavior
+        None,
+        None,
+        Some(2),
+    )
+    .await
+    .unwrap();
+
+    // This one will fail because expiration is in the past
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(0),
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap_err();
+
+    // This one will fail because gas is too low
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(5),
+        None,
+        Some(1),
+        None,
+    )
+    .await
+    .unwrap_err();
+
+    // Add a ton of coins, and set an operator
+    cli.fund_account(3, Some(10_000_000)).await.unwrap();
+    cli.initialize_stake_owner(3, 1_000_000, None, None)
         .await
-        .expect("Should transfer coins");
-    cli.transfer_coins(1, 0, 20, None)
-        .await
-        .expect("Should transfer coins");
-    cli.transfer_invalid_addr(2, 20, None)
-        .await
-        .expect_err("Should fail transaction");
-    cli.transfer_coins(3, 0, 20, None)
-        .await
-        .expect("Should transfer coins");
-    let summary = cli
-        .transfer_coins(1, 3, 20, None)
-        .await
-        .expect("Should transfer coins");
+        .unwrap();
+    set_operator_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_1,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Set operator should work!");
+
+    // Also fail to set an operator
+    cli.set_operator(1, 3).await.unwrap_err();
+
+    // This one will fail
+    let maybe_final_txn = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(5),
+        None,
+        Some(100000),
+        None,
+    )
+    .await
+    .unwrap_err();
+
+    let final_txn = match maybe_final_txn {
+        ErrorWrapper::BeforeSubmission(err) => {
+            panic!("Failed prior to submission of transaction {:?}", err)
+        }
+        ErrorWrapper::AfterSubmission(txn) => txn,
+    };
+
     let final_block_to_check = rest_client
-        .get_block_info(summary.version)
+        .get_block_by_version(final_txn.info.version.0, false)
         .await
         .expect("Should be able to get block info for completed txns");
+
+    // Check a couple blocks past the final transaction to check more txns
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
 
     // TODO: Track total supply?
@@ -309,19 +674,32 @@ async fn test_block() {
 
     eprintln!("Checking blocks 0..{}", final_block_height);
 
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= final_block_height {
+            break;
+        }
+    }
+
     // Now we have to watch all the changes
     let mut current_version = 0;
     let mut previous_block_index = 0;
-    let mut previous_block_hash = format!("{:x}", HashValue::zero());
     for block_height in 0..final_block_height {
         let request = BlockRequest::by_index(chain_id, block_height);
         let response: BlockResponse = rosetta_client
             .block(&request)
             .await
             .expect("Should be able to get blocks that are already known");
-        let block = response.block.expect("Every response should have a block");
+        let block = response.block;
         let actual_block = rest_client
-            .get_block(block_height, true)
+            .get_block_by_height_bcs(block_height, true)
             .await
             .expect("Should be able to get block for a known block")
             .into_inner();
@@ -332,23 +710,24 @@ async fn test_block() {
         );
         assert_eq!(
             block.block_identifier.hash,
-            format!("{:x}", actual_block.block_hash),
-            "Block hash should match the actual block"
+            BlockHash::new(chain_id, block_height).to_string(),
+            "Block hash should match chain_id-block_height"
         );
         assert_eq!(
             block.parent_block_identifier.index, previous_block_index,
             "Parent block index should be previous block"
         );
         assert_eq!(
-            block.parent_block_identifier.hash, previous_block_hash,
-            "Parent block hash should be previous block"
+            block.parent_block_identifier.hash,
+            BlockHash::new(chain_id, previous_block_index).to_string(),
+            "Parent block hash should be previous block chain_id-block_height"
         );
 
         // It's only greater or equal because microseconds are cut off
         let expected_timestamp = if block_height == 0 {
             Y2K_MS
         } else {
-            actual_block.block_timestamp.0.saturating_div(1000)
+            actual_block.block_timestamp.saturating_div(1000)
         };
         assert_eq!(
             expected_timestamp, block.timestamp,
@@ -357,7 +736,7 @@ async fn test_block() {
 
         // First transaction should be first in block
         assert_eq!(
-            current_version, actual_block.first_version.0,
+            current_version, actual_block.first_version,
             "First transaction in block should be the current version"
         );
 
@@ -368,10 +747,9 @@ async fn test_block() {
         parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
 
         // The full block must have been processed
-        assert_eq!(current_version - 1, actual_block.last_version.0);
+        assert_eq!(current_version - 1, actual_block.last_version);
 
         // Keep track of the previous
-        previous_block_hash = block.block_identifier.hash;
         previous_block_index = block_height;
     }
 
@@ -382,21 +760,16 @@ async fn test_block() {
 /// Parse the transactions in each block
 async fn parse_block_transactions(
     block: &aptos_rosetta::types::Block,
-    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
-    actual_txns: &[Transaction],
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
+    actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
     for (txn_number, transaction) in block.transactions.iter().enumerate() {
         let actual_txn = actual_txns
             .get(txn_number)
             .expect("There should be the same number of transactions in the actual block");
-        let actual_txn_info = actual_txn
-            .transaction_info()
-            .expect("Actual transaction should not be pending and have transaction info");
-        let txn_metadata = transaction
-            .metadata
-            .as_ref()
-            .expect("Metadata must always be present in a block");
+        let actual_txn_info = &actual_txn.info;
+        let txn_metadata = &transaction.metadata;
 
         // Ensure transaction identifier is correct
         assert_eq!(
@@ -404,18 +777,48 @@ async fn parse_block_transactions(
             "There should be no gaps in transaction versions"
         );
         assert_eq!(
-            format!("{:x}", actual_txn_info.hash.0),
+            format!("{:x}", actual_txn_info.transaction_hash()),
             transaction.transaction_identifier.hash,
             "Transaction hash should match the actual hash"
+        );
+
+        // Ensure the status is correct
+        assert_eq!(txn_metadata.failed, !actual_txn_info.status().is_success());
+        assert_eq!(
+            txn_metadata.vm_status,
+            format!("{:?}", actual_txn_info.status())
         );
 
         // Type specific checks
         match txn_metadata.transaction_type {
             TransactionType::Genesis => {
+                // For this test, there should only be one genesis
                 assert_eq!(0, *current_version);
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::GenesisTransaction(_)
+                ));
             }
-            TransactionType::User => {}
-            TransactionType::BlockMetadata | TransactionType::StateCheckpoint => {
+            TransactionType::User => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::UserTransaction(_)
+                ));
+                // Must have a gas fee
+                assert!(!transaction.operations.is_empty());
+            }
+            TransactionType::BlockMetadata => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockMetadata(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            }
+            TransactionType::StateCheckpoint => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::StateCheckpoint(_)
+                ));
                 assert!(transaction.operations.is_empty());
             }
         }
@@ -425,9 +828,14 @@ async fn parse_block_transactions(
             balances,
             transaction,
             actual_txn,
-            txn_metadata.transaction_type == TransactionType::User,
         )
         .await;
+
+        for (_, account_balance) in balances.iter() {
+            if let Some(amount) = account_balance.get(current_version) {
+                assert!(*amount >= 0, "Amount shouldn't be negative!")
+            }
+        }
 
         // Increment to next version
         *current_version += 1;
@@ -437,17 +845,16 @@ async fn parse_block_transactions(
 /// Parse the individual operations in a transaction
 async fn parse_operations(
     block_height: u64,
-    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
     transaction: &aptos_rosetta::types::Transaction,
-    actual_txn: &Transaction,
-    is_user_txn: bool,
+    actual_txn: &TransactionOnChainData,
 ) {
+    // If there are no operations, then there is no gas operation
+    let mut has_gas_op = false;
     for (expected_index, operation) in transaction.operations.iter().enumerate() {
         assert_eq!(expected_index as u64, operation.operation_identifier.index);
 
         // Gas transaction is always last
-        let is_gas_op =
-            expected_index == transaction.operations.len().saturating_sub(1) && is_user_txn;
         let status = OperationStatusType::from_str(
             operation
                 .status
@@ -457,6 +864,7 @@ async fn parse_operations(
         .expect("Operation status should be known");
         let operation_type = OperationType::from_str(&operation.operation_type)
             .expect("Operation type should be known");
+        let actual_successful = actual_txn.info.status().is_success();
 
         // Iterate through every operation, keeping track of balances
         match operation_type {
@@ -469,12 +877,12 @@ async fn parse_operations(
                     .account_address()
                     .expect("Account address should be parsable");
 
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account_balances = balances.entry(account).or_default();
 
                     if account_balances.is_empty() {
-                        account_balances.insert(block_height, 0u64);
+                        account_balances.insert(block_height, 0i128);
                     } else {
                         panic!("Account already has a balance when being created!");
                     }
@@ -494,7 +902,7 @@ async fn parse_operations(
                     .account_address()
                     .expect("Account address should be parsable");
 
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account_balances = balances.entry(account).or_insert_with(|| {
                         let mut map = BTreeMap::new();
@@ -515,7 +923,7 @@ async fn parse_operations(
                         u64::parse(&amount.value).expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
-                    let new_balance = *latest_balance + delta;
+                    let new_balance = *latest_balance + delta as i128;
                     account_balances.insert(block_height, new_balance);
                 } else {
                     assert_eq!(
@@ -527,7 +935,7 @@ async fn parse_operations(
             }
             OperationType::Withdraw => {
                 // Gas is always successful
-                if is_gas_op || actual_txn.success() {
+                if actual_successful {
                     assert_eq!(OperationStatusType::Success, status);
                     let account = operation
                         .account
@@ -560,28 +968,8 @@ async fn parse_operations(
                     .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
-                    let new_balance = *latest_balance - delta;
+                    let new_balance = *latest_balance - delta as i128;
                     account_balances.insert(block_height, new_balance);
-
-                    // Check amount if it's gas
-                    // TODO: Check amount if it's a transfer?
-                    if is_gas_op {
-                        match actual_txn {
-                            Transaction::UserTransaction(txn) => {
-                                assert_eq!(
-                                    txn.info
-                                        .gas_used
-                                        .0
-                                        .saturating_mul(txn.request.gas_unit_price.0),
-                                    delta,
-                                    "Gas operation should always match gas used * gas unit price"
-                                )
-                            }
-                            _ => {
-                                panic!("Gas transactions should be user transactions!")
-                            }
-                        };
-                    }
                 } else {
                     assert_eq!(
                         OperationStatusType::Failure,
@@ -591,12 +979,38 @@ async fn parse_operations(
                 }
             }
             OperationType::SetOperator => {
-                if actual_txn.success() {
+                if actual_successful {
                     assert_eq!(
                         OperationStatusType::Success,
                         status,
                         "Successful transaction should have successful set operator operation"
                     );
+                    // Check that operator was set the same
+                    if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                        actual_txn.transaction
+                    {
+                        if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                            ref payload,
+                        ) = txn.payload()
+                        {
+                            let actual_operator_address: AccountAddress =
+                                bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                            let operator = operation
+                                .metadata
+                                .as_ref()
+                                .unwrap()
+                                .operator
+                                .as_ref()
+                                .unwrap()
+                                .account_address()
+                                .unwrap();
+                            assert_eq!(actual_operator_address, operator)
+                        } else {
+                            panic!("Not an entry function");
+                        }
+                    } else {
+                        panic!("Not a user transaction");
+                    }
                 } else {
                     assert_eq!(
                         OperationStatusType::Failure,
@@ -605,15 +1019,74 @@ async fn parse_operations(
                     );
                 }
             }
+            OperationType::Fee => {
+                has_gas_op = true;
+                assert_eq!(OperationStatusType::Success, status);
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a fee operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                let account_balances = balances.entry(account).or_insert_with(|| {
+                    let mut map = BTreeMap::new();
+                    map.insert(block_height, 0);
+                    map
+                });
+                let (_, latest_balance) = account_balances.iter().last().unwrap();
+                let amount = operation
+                    .amount
+                    .as_ref()
+                    .expect("Should have an amount in a fee operation");
+                assert_eq!(
+                    amount.currency,
+                    native_coin(),
+                    "Balance should be the native coin"
+                );
+                let delta = u64::parse(
+                    amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number"),
+                )
+                .expect("Should be able to parse amount value");
+
+                // Subtract with panic on overflow in case of a negative balance
+                let new_balance = *latest_balance - delta as i128;
+                account_balances.insert(block_height, new_balance);
+                match actual_txn.transaction {
+                    aptos_types::transaction::Transaction::UserTransaction(ref txn) => {
+                        assert_eq!(
+                            actual_txn
+                                .info
+                                .gas_used()
+                                .saturating_mul(txn.gas_unit_price()),
+                            delta,
+                            "Gas operation should always match gas used * gas unit price"
+                        )
+                    }
+                    _ => {
+                        panic!("Gas transactions should be user transactions!")
+                    }
+                };
+            }
         }
     }
+
+    assert!(
+        has_gas_op
+            || transaction.metadata.transaction_type == TransactionType::Genesis
+            || transaction.operations.is_empty(),
+        "Must have a gas operation at least in a transaction except for Genesis",
+    );
 }
 
 /// Check that all balances are correct with the account balance command from the blocks
 async fn check_balances(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
-    balances: BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
+    balances: BTreeMap<AccountAddress, BTreeMap<u64, i128>>,
 ) {
     // TODO: Check some random times that arent on changes?
     for (account, account_balances) in balances {
@@ -645,6 +1118,12 @@ async fn check_balances(
             assert_eq!(
                 expected_balance,
                 u64::parse(&balance.value).expect("Should have a balance from account balance")
+                    as i128,
+                "Expected {} to have a balance of {}, but was {} at block {}",
+                account,
+                expected_balance,
+                balance.value,
+                block_height
             );
         }
     }
@@ -666,8 +1145,8 @@ async fn test_invalid_transaction_gas_charged() {
             0,
             TRANSFER_AMOUNT,
             Some(GasOptions {
-                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
-                max_gas: DEFAULT_MAX_GAS,
+                gas_unit_price: None,
+                max_gas: Some(1000),
             }),
         )
         .await
@@ -692,7 +1171,7 @@ async fn test_invalid_transaction_gas_charged() {
     let txn_version = actual_txn.info.version.0;
 
     let block_info = rest_client
-        .get_block_info(txn_version)
+        .get_block_by_version(txn_version, false)
         .await
         .unwrap()
         .into_inner();
@@ -701,7 +1180,7 @@ async fn test_invalid_transaction_gas_charged() {
         .block(&BlockRequest::by_index(chain_id, block_info.block_height.0))
         .await
         .unwrap();
-    let block_with_transfer = block_with_transfer.block.unwrap();
+    let block_with_transfer = block_with_transfer.block;
     // Verify failed txn
     let rosetta_txn = block_with_transfer
         .transactions
@@ -730,7 +1209,7 @@ fn assert_transfer_transaction(
         rosetta_txn.transaction_identifier.hash
     );
 
-    let rosetta_txn_metadata = rosetta_txn.metadata.as_ref().unwrap();
+    let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
     assert_eq!(rosetta_txn.operations.len(), 3);
@@ -770,7 +1249,7 @@ fn assert_transfer_transaction(
             assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
         } else {
             // Gas is always last
-            assert_withdraw(
+            assert_gas(
                 operation,
                 actual_txn.request.gas_unit_price.0 * actual_txn.info.gas_used.0,
                 sender,
@@ -804,6 +1283,16 @@ fn assert_withdraw(
     assert_transfer(
         operation,
         OperationType::Withdraw,
+        format!("-{}", expected_amount),
+        account,
+        success,
+    );
+}
+
+fn assert_gas(operation: &Operation, expected_amount: u64, account: AccountAddress, success: bool) {
+    assert_transfer(
+        operation,
+        OperationType::Fee,
         format!("-{}", expected_amount),
         account,
         success,
@@ -868,4 +1357,139 @@ where
     }
 
     result
+}
+
+async fn create_account_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_account: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .create_account(
+            network_identifier,
+            sender_key,
+            new_account,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .expect("Expect transfer to successfully submit to mempool")
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+}
+
+async fn transfer_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    receiver: AccountAddress,
+    amount: u64,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .transfer(
+            network_identifier,
+            sender_key,
+            receiver,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn set_operator_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_operator: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .set_operator(
+            network_identifier,
+            sender_key,
+            new_operator,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn wait_for_transaction(
+    rest_client: &aptos_rest_client::Client,
+    expiry_time: Duration,
+    txn_hash: String,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let hash_value = HashValue::from_str(&txn_hash).unwrap();
+    let response = rest_client
+        .wait_for_transaction_by_hash(hash_value, expiry_time.as_secs())
+        .await;
+    match response {
+        Ok(response) => {
+            if let Transaction::UserTransaction(txn) = response.into_inner() {
+                Ok(txn)
+            } else {
+                panic!("Transaction is supposed to be a UserTransaction!")
+            }
+        }
+        Err(_) => {
+            if let Transaction::UserTransaction(txn) = rest_client
+                .get_transaction_by_hash(hash_value)
+                .await
+                .unwrap()
+                .into_inner()
+            {
+                Err(txn)
+            } else {
+                panic!("Failed transaction is supposed to be a UserTransaction!");
+            }
+        }
+    }
+}
+
+fn expiry_time(txn_expiry_duration: Duration) -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .saturating_add(txn_expiry_duration)
+}
+
+#[derive(Debug)]
+pub enum ErrorWrapper {
+    BeforeSubmission(anyhow::Error),
+    AfterSubmission(Box<UserTransaction>),
 }

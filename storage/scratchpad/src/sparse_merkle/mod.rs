@@ -89,6 +89,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
 use std::{
@@ -126,7 +127,7 @@ impl<V> BranchTracker<V> {
         }))
     }
 
-    fn become_oldest(
+    fn set_head(
         &mut self,
         head: &Arc<Inner<V>>,
         next: Option<&Arc<Inner<V>>>,
@@ -147,6 +148,11 @@ impl<V> BranchTracker<V> {
 
     fn head(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Inner<V>>> {
         // if `head.upgrade()` failed, it's that the head is being dropped.
+        //
+        // Notice the starting of the drop a SMT is not protected by the family lock -- but
+        // change of the links between the branch trackers and SMTs are always protected by the
+        // family lock.
+        // see `impl<V> Drop for Inner<V>`
         self.head.upgrade().or_else(|| self.next.upgrade())
     }
 }
@@ -172,6 +178,7 @@ impl<V> InnerLinks<V> {
 #[derive(Debug)]
 struct Inner<V> {
     root: SubTree<V>,
+    usage: StateStorageUsage,
     links: Mutex<InnerLinks<V>>,
     generation: u64,
     family_lock: Arc<Mutex<()>>,
@@ -179,8 +186,8 @@ struct Inner<V> {
 
 impl<V> Drop for Inner<V> {
     fn drop(&mut self) {
-        // to prevent recursively locking the family, buffer all processed descendants outside.
-        let mut processed_decendents = Vec::new();
+        // To prevent recursively locking the family, buffer all descendants outside.
+        let mut processed_descendants = Vec::new();
 
         {
             let locked_family = self.family_lock.lock();
@@ -189,24 +196,37 @@ impl<V> Drop for Inner<V> {
 
             while let Some(descendant) = stack.pop() {
                 if Arc::strong_count(&descendant) == 1 {
-                    // The only ref is the one we are now holding, so the structure will be dropped
-                    // after we free the `Arc`, which results in a chain of such structures being
-                    // dropped recursively and that might trigger a stack overflow. To prevent that we
-                    // follow the chain further to disconnect things beforehand.
+                    // The only ref is the one we are now holding, and there's no weak ref that can
+                    // upgrade because the only `Weak<Inner<V>>`s are held by `BranchTracker`s and
+                    // they try to upgrade only when under the protection of the family lock. So the
+                    // descendant will be dropped after we free the `Arc`, which results in a chain
+                    // of such structures being dropped recursively and that might trigger a stack
+                    // overflow. To prevent that we follow the chain further to disconnect things
+                    // beforehand.
                     stack.extend(descendant.drain_children_for_drop(&locked_family));
+                    // Note: After the above call, there is not even weak refs to `descendant`
+                    // because all relevant `BranchTrackers` now point their heads to one of the
+                    // children.
                 }
-                processed_decendents.push(descendant);
+                // All descendants process must be pushed, because they can become droppable after
+                // the ref count check above, since the family lock doesn't protect de-refs to the
+                // SMTs. -- all drops must NOT be recursive because we will be trying to lock the
+                // family again.
+                processed_descendants.push(descendant);
             }
         };
+        // Now that the lock is released, those in `processed_descendants` will be dropped in turn
+        // if applicable.
     }
 }
 
 impl<V> Inner<V> {
-    fn new(root: SubTree<V>) -> Arc<Self> {
+    fn new(root: SubTree<V>, usage: StateStorageUsage) -> Arc<Self> {
         let family_lock = Arc::new(Mutex::new(()));
         let branch_tracker = BranchTracker::new_head_unknown(None, &family_lock.lock());
         let me = Arc::new(Self {
             root,
+            usage,
             links: InnerLinks::new(branch_tracker.clone()),
             generation: 0,
             family_lock,
@@ -220,9 +240,9 @@ impl<V> Inner<V> {
         {
             let links_locked = self.links.lock();
             let mut branch_tracker_locked = links_locked.branch_tracker.lock();
-            branch_tracker_locked.become_oldest(
-                &self,
-                links_locked.children.first(),
+            branch_tracker_locked.set_head(
+                &self,                         /* head */
+                links_locked.children.first(), /* next */
                 locked_family,
             );
         }
@@ -232,25 +252,32 @@ impl<V> Inner<V> {
     fn spawn_impl(
         &self,
         child_root: SubTree<V>,
+        child_usage: StateStorageUsage,
         branch_tracker: Arc<Mutex<BranchTracker<V>>>,
         family_lock: Arc<Mutex<()>>,
     ) -> Arc<Self> {
         LATEST_GENERATION.set(self.generation as i64 + 1);
         Arc::new(Self {
             root: child_root,
+            usage: child_usage,
             links: InnerLinks::new(branch_tracker),
             generation: self.generation + 1,
             family_lock,
         })
     }
 
-    fn spawn(self: &Arc<Self>, child_root: SubTree<V>) -> Arc<Self> {
+    fn spawn(
+        self: &Arc<Self>,
+        child_root: SubTree<V>,
+        child_usage: StateStorageUsage,
+    ) -> Arc<Self> {
         let locked_family = self.family_lock.lock();
         let mut links_locked = self.links.lock();
 
         let child = if links_locked.children.is_empty() {
             let child = self.spawn_impl(
                 child_root,
+                child_usage,
                 links_locked.branch_tracker.clone(),
                 self.family_lock.clone(),
             );
@@ -265,8 +292,12 @@ impl<V> Inner<V> {
                 Some(links_locked.branch_tracker.clone()),
                 &locked_family,
             );
-            let child =
-                self.spawn_impl(child_root, branch_tracker.clone(), self.family_lock.clone());
+            let child = self.spawn_impl(
+                child_root,
+                child_usage,
+                branch_tracker.clone(),
+                self.family_lock.clone(),
+            );
             branch_tracker.lock().head = Arc::downgrade(&child);
             child
         };
@@ -276,6 +307,8 @@ impl<V> Inner<V> {
     }
 
     fn get_oldest_ancestor(self: &Arc<Self>) -> Arc<Self> {
+        // Under the protection of family_lock, the branching structure won't change,
+        // so we can follow the links and find the head of the oldest branch tracker.
         let locked_family = self.family_lock.lock();
         let (mut ret, mut parent) = {
             let branch_tracker = self.links.lock().branch_tracker.clone();
@@ -288,16 +321,12 @@ impl<V> Inner<V> {
             )
         };
 
-        while let Some(branch_tracker) = parent {
-            let branch_tracker_locked = branch_tracker.lock();
-            if let Some(head) = branch_tracker_locked.head(&locked_family) {
-                // Whenever it forks, the first branch shares the BranchTracker with the parent,
-                // hence this
-                if head.generation < self.generation {
-                    ret = head;
-                    parent = branch_tracker_locked.parent(&locked_family);
-                    continue;
-                }
+        while let Some(parent_bt) = parent {
+            let parent_bt_locked = parent_bt.lock();
+            if let Some(parent_bt_head) = parent_bt_locked.head(&locked_family) {
+                ret = parent_bt_head;
+                parent = parent_bt_locked.parent(&locked_family);
+                continue;
             }
             break;
         }
@@ -329,21 +358,27 @@ where
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
-    pub fn new(root_hash: HashValue) -> Self {
+    pub fn new(root_hash: HashValue, usage: StateStorageUsage) -> Self {
         let root = if root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             SubTree::new_unknown(root_hash)
         } else {
+            assert!(usage.is_untracked() || usage == StateStorageUsage::zero());
             SubTree::new_empty()
         };
 
         Self {
-            inner: Inner::new(root),
+            inner: Inner::new(root, usage),
         }
+    }
+
+    #[cfg(test)]
+    fn new_test(root_hash: HashValue) -> Self {
+        Self::new(root_hash, StateStorageUsage::new_untracked())
     }
 
     pub fn new_empty() -> Self {
         Self {
-            inner: Inner::new(SubTree::new_empty()),
+            inner: Inner::new(SubTree::new_empty(), StateStorageUsage::zero()),
         }
     }
 
@@ -371,7 +406,7 @@ where
     #[cfg(test)]
     fn new_with_root(root: SubTree<V>) -> Self {
         Self {
-            inner: Inner::new(root),
+            inner: Inner::new(root, StateStorageUsage::new_untracked()),
         }
     }
 
@@ -391,6 +426,10 @@ where
     fn is_the_same(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
     }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        self.inner.usage
+    }
 }
 
 /// In tests and benchmark, reference to ancestors are manually managed
@@ -406,7 +445,7 @@ where
     ) -> Result<Self, UpdateError> {
         self.clone()
             .freeze()
-            .batch_update(updates, proof_reader)
+            .batch_update(updates, StateStorageUsage::zero(), proof_reader)
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
@@ -420,7 +459,7 @@ where
     V: Clone + CryptoHash + Send + Sync,
 {
     fn default() -> Self {
-        SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH)
+        SparseMerkleTree::new_empty()
     }
 }
 
@@ -459,12 +498,12 @@ impl<V> FrozenSparseMerkleTree<V>
 where
     V: Clone + CryptoHash + Send + Sync,
 {
-    fn spawn(&self, child_root: SubTree<V>) -> Self {
+    fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
         Self {
             base_smt: self.base_smt.clone(),
             base_generation: self.base_generation,
             smt: SparseMerkleTree {
-                inner: self.smt.inner.spawn(child_root),
+                inner: self.smt.inner.spawn(child_root, child_usage),
             },
         }
     }
@@ -568,6 +607,7 @@ where
     pub fn batch_update(
         &self,
         updates: Vec<(HashValue, Option<&V>)>,
+        usage: StateStorageUsage,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
@@ -580,6 +620,7 @@ where
 
         let current_root = self.smt.root_weak();
         if kvs.is_empty() {
+            assert_eq!(self.smt.inner.usage, usage);
             Ok(self.clone())
         } else {
             let root = SubTreeUpdater::update(
@@ -588,7 +629,7 @@ where
                 proof_reader,
                 self.smt.inner.generation + 1,
             )?;
-            Ok(self.spawn(root))
+            Ok(self.spawn(root, usage))
         }
     }
 
@@ -629,6 +670,10 @@ where
                 } // end SubTree::NonEmpty
             }
         } // end loop
+    }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        self.smt.usage()
     }
 }
 

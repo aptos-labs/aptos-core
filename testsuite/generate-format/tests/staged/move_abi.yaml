@@ -9,6 +9,16 @@ ArgumentABI:
     - name: STR
     - type_tag:
         TYPENAME: TypeTag
+EntryABI:
+  ENUM:
+    0:
+      TransactionScript:
+        NEWTYPE:
+          TYPENAME: TransactionScriptABI
+    1:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: ScriptFunctionABI
 Identifier:
   NEWTYPESTRUCT: STR
 ModuleId:
@@ -17,16 +27,6 @@ ModuleId:
         TYPENAME: AccountAddress
     - name:
         TYPENAME: Identifier
-ScriptABI:
-  ENUM:
-    0:
-      TransactionScript:
-        NEWTYPE:
-          TYPENAME: TransactionScriptABI
-    1:
-      ScriptFunction:
-        NEWTYPE:
-          TYPENAME: ScriptFunctionABI
 ScriptFunctionABI:
   STRUCT:
     - name: STR

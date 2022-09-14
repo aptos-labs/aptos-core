@@ -6,10 +6,14 @@ use std::time::Duration;
 use crate::{
     auth::with_auth,
     context::Context,
-    error,
-    types::{auth::Claims, telemetry::TelemetryDump},
+    error::ServiceError,
+    types::{
+        auth::Claims,
+        common::{EventIdentity, NodeType},
+        telemetry::{BigQueryRow, TelemetryDump},
+    },
 };
-use aptos_config::config::PeerRole;
+use anyhow::anyhow;
 use aptos_logger::{debug, error};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
@@ -21,24 +25,37 @@ pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::Unknown],
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+                NodeType::Unknown,
+            ],
         ))
         .and(warp::body::json())
         .and_then(handle_custom_event)
         .boxed()
 }
 
-pub async fn handle_custom_event(
+pub(crate) async fn handle_custom_event(
     context: Context,
     claims: Claims,
     body: TelemetryDump,
 ) -> anyhow::Result<impl Reply, Rejection> {
-    if body.user_id != claims.peer_id.to_string() {
-        return Err(reject::reject());
+    if !body
+        .user_id
+        .eq_ignore_ascii_case(&claims.peer_id.to_string())
+    {
+        return Err(reject::custom(ServiceError::bad_request(format!(
+            "user_id {} in event does not match peer_id {}",
+            body.user_id, claims.peer_id
+        ))));
     }
 
     if body.events.is_empty() {
-        return Err(reject::custom(error::Error::InvalidCustomEvent));
+        return Err(reject::custom(ServiceError::bad_request(
+            "no events found in payload",
+        )));
     }
 
     let mut insert_request = TableDataInsertAllRequest::new();
@@ -59,18 +76,20 @@ pub async fn handle_custom_event(
         body.timestamp_micros
             .as_str()
             .parse::<u64>()
-            .map_err(|_| reject::reject())?,
+            .map_err(|_| ServiceError::bad_request("unable to parse timestamp"))?,
     );
 
-    let row = json!({
-        "event_name": telemetry_event.name,
-        "event_timestamp": duration.as_secs(),
-        "event_params": event_params,
-    });
+    let row = BigQueryRow {
+        event_identity: EventIdentity::from(claims),
+        event_name: telemetry_event.name.clone(),
+        event_timestamp: duration.as_secs(),
+        event_params,
+    };
 
-    insert_request
-        .add_row(None, &row)
-        .map_err(|_| reject::reject())?;
+    insert_request.add_row(None, &row).map_err(|e| {
+        error!("unable to create row: {}", e);
+        ServiceError::from(anyhow!("unable to insert row into bigquery"))
+    })?;
 
     context
         .gcp_bq_client
@@ -84,11 +103,11 @@ pub async fn handle_custom_event(
         )
         .await
         .map_err(|e| {
-            error!("Error due to {}", e);
-            reject::custom(error::Error::GCPInsertError)
+            error!("unable to insert row into bigquery: {}", e);
+            ServiceError::from(anyhow!("unable to insert row into bigquery"))
         })?;
 
-    debug!("insert succeeded {:?}", &row);
+    debug!("row inserted succeefully: {:?}", &row);
 
     Ok(reply::reply())
 }

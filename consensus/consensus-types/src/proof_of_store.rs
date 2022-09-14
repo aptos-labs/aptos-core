@@ -6,7 +6,7 @@ use anyhow::Context;
 use aptos_crypto::{bls12381, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::account_address::AccountAddress as PeerId;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use rand::{seq::SliceRandom, thread_rng};
@@ -93,12 +93,12 @@ pub enum SignedDigestError {
 #[allow(dead_code)]
 pub struct ProofOfStore {
     info: SignedDigestInfo,
-    multi_signature: MultiSignature,
+    multi_signature: AggregateSignature,
 }
 
 #[allow(dead_code)]
 impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo, multi_signature: MultiSignature) -> Self {
+    pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
         Self {
             info,
             multi_signature,

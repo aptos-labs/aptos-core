@@ -131,8 +131,10 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
-    block_store: Option<Arc<BlockStore>>,
+    block_retrieval_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
     quorum_store_storage: Arc<QuorumStoreDB>,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     wrapper_quorum_store_tx: Option<(
@@ -175,8 +177,9 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            round_manager_close_tx: None,
             epoch_state: None,
-            block_store: None,
+            block_retrieval_tx: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
             quorum_store_msg_tx: None,
             wrapper_quorum_store_tx: None,
@@ -325,7 +328,7 @@ impl EpochManager {
             }
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
-                let default_proposer = proposers.get(0).unwrap();
+                let default_proposer = proposers.first().unwrap();
                 Box::new(RoundProposer::new(
                     round_proposers.clone(),
                     *default_proposer,
@@ -334,7 +337,7 @@ impl EpochManager {
         }
     }
 
-    async fn process_epoch_retrieval(
+    fn process_epoch_retrieval(
         &mut self,
         request: EpochRetrievalRequest,
         peer_id: AccountAddress,
@@ -358,7 +361,7 @@ impl EpochManager {
         ))
     }
 
-    async fn process_different_epoch(
+    fn process_different_epoch(
         &mut self,
         different_epoch: u64,
         peer_id: AccountAddress,
@@ -370,16 +373,34 @@ impl EpochManager {
             remote_epoch = different_epoch,
         );
         match different_epoch.cmp(&self.epoch()) {
-            // We try to help nodes that have lower epoch than us
             Ordering::Less => {
-                self.process_epoch_retrieval(
-                    EpochRetrievalRequest {
-                        start_epoch: different_epoch,
-                        end_epoch: self.epoch(),
-                    },
-                    peer_id,
-                )
-                .await
+                if self
+                    .epoch_state()
+                    .verifier
+                    .get_voting_power(&self.author)
+                    .is_some()
+                {
+                    // Ignore message from lower epoch if we're part of the validator set, the node would eventually see messages from
+                    // higher epoch and request a proof
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        debug!("Discard message from lower epoch {} from {}", different_epoch, peer_id);
+                    );
+                    Ok(())
+                } else {
+                    // reply back the epoch change proof if we're not part of the validator set since we won't broadcast
+                    // timeout in this epoch
+                    monitor!(
+                        "process_epoch_retrieval",
+                        self.process_epoch_retrieval(
+                            EpochRetrievalRequest {
+                                start_epoch: different_epoch,
+                                end_epoch: self.epoch(),
+                            },
+                            peer_id
+                        )
+                    )
+                }
             }
             // We request proof to join higher epoch
             Ordering::Greater => {
@@ -434,7 +455,10 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
         );
         // TODO: do we need to destroy the async thread with explicit shutdown?
-        tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
+        spawn_named!(
+            "Quorum Store",
+            quorum_store.start(consensus_to_quorum_store_rx)
+        );
     }
 
     fn spawn_quorum_store(
@@ -525,6 +549,7 @@ impl EpochManager {
             wrapper_to_quorum_store_tx,
             self.config.mempool_txn_pull_timeout_ms,
             qs_config.mempool_txn_pull_max_count,
+            qs_config.mempool_txn_pull_max_bytes,
             qs_config.max_batch_bytes,
             qs_config.max_batch_expiry_round_gap,
             qs_config.end_batch_ms,
@@ -535,6 +560,28 @@ impl EpochManager {
             wrapper_shutdown_rx,
             wrapper_quorum_store_msg_rx,
         ));
+    }
+
+    fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
+        let (request_tx, mut request_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
+        );
+        let task = async move {
+            info!(epoch = epoch, "Block retrieval task starts");
+            while let Some(request) = request_rx.next().await {
+                if let Err(e) = monitor!(
+                    "process_block_retrieval",
+                    block_store.process_block_retrieval(request).await
+                ) {
+                    error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                }
+            }
+            info!(epoch = epoch, "Block retrieval task stops");
+        };
+        self.block_retrieval_tx = Some(request_tx);
+        tokio::spawn(task);
     }
 
     /// this function spawns the phases and a buffer manager
@@ -585,11 +632,12 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
-        if self.round_manager_tx.is_some() {
+        if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
-            let event = VerifiedEvent::Shutdown(ack_tx);
-            self.forward_to_round_manager(self.author, event);
+            close_tx
+                .send(ack_tx)
+                .expect("[EpochManager] Fail to drop round manager");
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop round manager");
@@ -619,6 +667,9 @@ impl EpochManager {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
+
+        // Shutdown the block retrieval task by dropping the sender
+        self.block_retrieval_tx = None;
     }
 
     async fn start_round_manager(
@@ -684,6 +735,7 @@ impl EpochManager {
                 memory_quota: 100000000,
                 db_quota: 10000000000,
                 mempool_txn_pull_max_count: 100,
+                mempool_txn_pull_max_bytes: 1000000,
             };
 
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
@@ -743,7 +795,8 @@ impl EpochManager {
             block_store.clone(),
             Arc::new(payload_manager),
             self.time_service.clone(),
-            self.config.max_block_size,
+            self.config.max_block_txns,
+            self.config.max_block_bytes,
             onchain_config.max_failed_authors_to_store(),
         );
 
@@ -767,8 +820,11 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
-        self.block_store = Some(block_store);
-        tokio::spawn(round_manager.start(round_manager_rx));
+        let (close_tx, close_rx) = oneshot::channel();
+        self.round_manager_close_tx = Some(close_tx);
+        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
+
+        self.spawn_block_retrieval_task(epoch, block_store);
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
@@ -812,19 +868,22 @@ impl EpochManager {
 
         if let Some(unverified_event) = maybe_unverified_event {
             // same epoch -> run well-formedness + signature check
-            let verified_event = unverified_event
-                .clone()
-                .verify(peer_id, &self.epoch_state().verifier)
-                .context("[EpochManager] Verify event")
-                .map_err(|err| {
-                    error!(
-                        SecurityEvent::ConsensusInvalidMessage,
-                        remote_peer = peer_id,
-                        error = ?err,
-                        unverified_event = unverified_event
-                    );
-                    err
-                })?;
+            let verified_event = monitor!(
+                "verify_message",
+                unverified_event
+                    .clone()
+                    .verify(peer_id, &self.epoch_state().verifier)
+            )
+            .context("[EpochManager] Verify event")
+            .map_err(|err| {
+                error!(
+                    SecurityEvent::ConsensusInvalidMessage,
+                    remote_peer = peer_id,
+                    error = ?err,
+                    unverified_event = unverified_event
+                );
+                err
+            })?;
 
             // process the verified event
             self.process_event(peer_id, verified_event)?;
@@ -853,7 +912,7 @@ impl EpochManager {
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch(), peer_id).await
+                        self.process_different_epoch(event.epoch(), peer_id)
                     )?;
                 }
             }
@@ -882,7 +941,7 @@ impl EpochManager {
                 );
                 monitor!(
                     "process_epoch_retrieval",
-                    self.process_epoch_retrieval(*request, peer_id).await
+                    self.process_epoch_retrieval(*request, peer_id)
                 )?;
             }
             _ => {
@@ -939,15 +998,16 @@ impl EpochManager {
         }
     }
 
-    async fn process_block_retrieval(
+    fn process_block_retrieval(
         &self,
+        peer_id: Author,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
         });
-        if let Some(block_store) = &self.block_store {
-            block_store.process_block_retrieval(request).await
+        if let Some(tx) = &self.block_retrieval_tx {
+            tx.push(peer_id, request)
         } else {
             Err(anyhow::anyhow!("Round manager not started"))
         }
@@ -976,26 +1036,25 @@ impl EpochManager {
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {
-            tokio::select! {
-                // TODO: combine consensus_messages and quorum_store_messages to a stream.
-                Some((peer, msg)) = network_receivers.consensus_messages.next() => {
+            ::futures::select! {
+                (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some((peer, msg)) = network_receivers.quorum_store_messages.next() => {
+                },
+                (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some(request) = network_receivers.block_retrieval.next() => {
-                    if let Err(e) = self.process_block_retrieval(request).await {
+                },
+                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
+                    if let Err(e) = self.process_block_retrieval(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
-                }
-                Some(round) = round_timeout_sender_rx.next() => {
+                },
+                round = round_timeout_sender_rx.select_next_some() => {
                     self.process_local_timeout(round);
-                }
+                },
             }
             // Continually capture the time of consensus process to ensure that clock skew between
             // validators is reasonable and to find any unusual (possibly byzantine) clock behavior.

@@ -7,14 +7,13 @@ module aptos_framework::managed_coin {
     use std::signer;
 
     use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
-    use aptos_framework::coins;
 
     //
     // Errors
     //
 
-    /// When no capabilities (burn/mint) found on an account.
-    const ENO_CAPABILITIES: u64 = 0;
+    /// Account has no capabilities (burn/mint).
+    const ENO_CAPABILITIES: u64 = 1;
 
     //
     // Data structures
@@ -95,7 +94,7 @@ module aptos_framework::managed_coin {
     /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
     /// Required if user wants to start accepting deposits of `CoinType` in his account.
     public entry fun register<CoinType>(account: &signer) {
-        coins::register<CoinType>(account);
+        coin::register<CoinType>(account);
     }
 
     //
@@ -104,6 +103,9 @@ module aptos_framework::managed_coin {
 
     #[test_only]
     use std::option;
+
+    #[test_only]
+    use aptos_framework::aggregator_factory;
 
     #[test_only]
     struct FakeMoney { }
@@ -116,8 +118,10 @@ module aptos_framework::managed_coin {
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
-        aptos_framework::account::create_account(source_addr);
-        aptos_framework::account::create_account(destination_addr);
+        aptos_framework::account::create_account_for_test(source_addr);
+        aptos_framework::account::create_account_for_test(destination_addr);
+        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(
             &mod_account,
@@ -128,7 +132,7 @@ module aptos_framework::managed_coin {
         );
         assert!(coin::is_coin_initialized<FakeMoney>(), 0);
 
-        coin::register_for_test<FakeMoney>(&mod_account);
+        coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
@@ -155,7 +159,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 0x60001)]
     public entry fun fail_mint(
         source: signer,
         destination: signer,
@@ -163,11 +167,13 @@ module aptos_framework::managed_coin {
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
 
-        aptos_framework::account::create_account(source_addr);
-        aptos_framework::account::create_account(signer::address_of(&destination));
+        aptos_framework::account::create_account_for_test(source_addr);
+        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
+        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
-        coin::register_for_test<FakeMoney>(&mod_account);
+        coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
@@ -175,7 +181,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 0x60001)]
     public entry fun fail_burn(
         source: signer,
         destination: signer,
@@ -183,11 +189,13 @@ module aptos_framework::managed_coin {
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
 
-        aptos_framework::account::create_account(source_addr);
-        aptos_framework::account::create_account(signer::address_of(&destination));
+        aptos_framework::account::create_account_for_test(source_addr);
+        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
+        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
-        coin::register_for_test<FakeMoney>(&mod_account);
+        coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 

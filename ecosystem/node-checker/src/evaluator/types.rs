@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use poem_openapi::Object as PoemObject;
+use serde::{Deserialize, Serialize};
 
 // TODO: Should I find a way to have typed actual + expected fields?
-#[derive(Clone, Debug, PoemObject)]
+#[derive(Clone, Debug, Deserialize, PoemObject, Serialize)]
 pub struct EvaluationResult {
     /// Headline of the evaluation, e.g. "Healthy!" or "Metrics missing!".
     pub headline: String,
@@ -25,7 +26,7 @@ pub struct EvaluationResult {
     pub links: Vec<String>,
 }
 
-#[derive(Clone, Debug, PoemObject)]
+#[derive(Clone, Debug, Deserialize, PoemObject, Serialize)]
 pub struct EvaluationSummary {
     /// Results from all the evaluations NHC ran.
     pub evaluation_results: Vec<EvaluationResult>,

@@ -18,7 +18,13 @@ use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::storage::PeerMetadataStorage;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
 use vm_validator::vm_validator::{TransactionValidation, VMValidator};
@@ -100,7 +106,12 @@ pub fn bootstrap(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
     let runtime = Builder::new_multi_thread()
-        .thread_name("shared-mem")
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("shared-mem-{}", id)
+        })
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .expect("[shared mempool] failed to create runtime");

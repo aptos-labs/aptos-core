@@ -19,13 +19,13 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            AccountData, LedgerInfo, ModuleBundlePayload, PendingTransaction,
+            TransactionPayload as TransactionPayloadData,
         },
         FaucetClient,
     };
     use aptos_sdk::{
-        transaction_builder::aptos_stdlib::ScriptFunctionCall,
+        transaction_builder::aptos_stdlib::EntryFunctionCall,
         types::{
             account_address::AccountAddress,
             chain_id::ChainId,
@@ -155,8 +155,9 @@ mod tests {
                 let info = aptos_rest_client::aptos_api_types::TransactionInfo {
                     version: 0.into(),
                     hash: HashValue::zero().into(),
-                    state_root_hash: HashValue::zero().into(),
+                    state_change_hash: HashValue::zero().into(),
                     event_root_hash: HashValue::zero().into(),
+                    state_checkpoint_hash: None,
                     gas_used: 0.into(),
                     success: true,
                     vm_status: "Executed".to_string(),
@@ -187,16 +188,16 @@ mod tests {
         if let Script(script) = txn.payload() {
             panic!("unexpected type of script: {:?}", script.args())
         }
-        if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
-            match script_function {
-                ScriptFunctionCall::AccountCreateAccount {
+        if let Some(entry_function) = EntryFunctionCall::decode(txn.payload()) {
+            match entry_function {
+                EntryFunctionCall::AptosAccountCreateAccount {
                     auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::AptosCoinMint {
+                EntryFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
@@ -210,7 +211,7 @@ mod tests {
                         .expect("account should be created");
                     account.balance += amount;
                 }
-                script => panic!("unexpected type of script function: {:?}", script),
+                script => panic!("unexpected type of entry function: {:?}", script),
             }
         }
 
@@ -237,15 +238,10 @@ mod tests {
     }
 
     fn dummy_payload() -> TransactionPayloadData {
-        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
-            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
-                changes: Vec::new(),
-                events: Vec::new(),
-            }),
-        })
+        TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
-    #[derive(Clone, Debug, Serialize, PartialEq)]
+    #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
     pub struct Error {
         pub code: u16,
         pub message: String,
@@ -472,9 +468,17 @@ mod tests {
             .reply(&filter)
             .await;
 
-        assert_eq!(
-            resp.body(),
-            &format!("faucet account {:?} not found", address)
+        assert!(
+            resp.body().starts_with(
+                format!(
+                    "Faucet account {:?} not found: HTTP error 404 Not Found:",
+                    address
+                )
+                .as_str()
+                .as_bytes()
+            ),
+            "{} did not start with the expected string",
+            std::str::from_utf8(resp.body()).unwrap()
         );
     }
 
@@ -517,7 +521,7 @@ mod tests {
         let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         assert_eq!(
             address.to_string(),
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
+            "9ff98e82355eb13098f3b1157ac018a725c62c0e0820f422000814cdba407835"
         );
         address
     }

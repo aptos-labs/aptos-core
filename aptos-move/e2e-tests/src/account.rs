@@ -14,8 +14,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
-        ScriptFunction, SignedTransaction, TransactionPayload, WriteSetPayload,
+        authenticator::AuthenticationKey, EntryFunction, Module, ModuleBundle, RawTransaction,
+        Script, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -210,18 +210,13 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn script_function(mut self, f: ScriptFunction) -> Self {
-        self.program = Some(TransactionPayload::ScriptFunction(f));
+    pub fn entry_function(mut self, f: EntryFunction) -> Self {
+        self.program = Some(TransactionPayload::EntryFunction(f));
         self
     }
 
     pub fn module(mut self, m: Module) -> Self {
         self.program = Some(TransactionPayload::ModuleBundle(ModuleBundle::from(m)));
-        self
-    }
-
-    pub fn write_set(mut self, w: WriteSetPayload) -> Self {
-        self.program = Some(TransactionPayload::WriteSet(w));
         self
     }
 
@@ -350,6 +345,7 @@ pub struct AccountData {
     account: Account,
     sequence_number: u64,
     coin_register_events: EventHandle,
+    key_rotation_events: EventHandle,
     coin_store: CoinStore,
 }
 
@@ -406,6 +402,7 @@ impl AccountData {
             ),
             sequence_number,
             coin_register_events: new_event_handle(0, addr),
+            key_rotation_events: new_event_handle(1, addr),
         }
     }
 
@@ -420,6 +417,7 @@ impl AccountData {
             self.sequence_number,
             AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
             self.coin_register_events.clone(),
+            self.key_rotation_events.clone(),
         );
         bcs::to_bytes(&account).unwrap()
     }
@@ -444,11 +442,11 @@ impl AccountData {
         let write_set = vec![
             (
                 StateKey::AccessPath(self.make_account_access_path()),
-                WriteOp::Value(self.to_bytes()),
+                WriteOp::Modification(self.to_bytes()),
             ),
             (
                 StateKey::AccessPath(self.make_coin_store_access_path()),
-                WriteOp::Value(self.coin_store.to_bytes()),
+                WriteOp::Modification(self.coin_store.to_bytes()),
             ),
         ];
 

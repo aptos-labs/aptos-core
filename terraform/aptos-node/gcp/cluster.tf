@@ -80,6 +80,16 @@ resource "google_container_node_pool" "utilities" {
     workload_metadata_config {
       mode = "GKE_METADATA"
     }
+
+    # if the NodeGroup should be tainted, then create the below dynamic block
+    dynamic "taint" {
+      for_each = var.utility_instance_enable_taint ? ["utilities"] : []
+      content {
+        key    = "aptos.org/nodepool"
+        value  = each.key
+        effect = "NO_EXECUTE"
+      }
+    }
   }
 }
 
@@ -106,10 +116,14 @@ resource "google_container_node_pool" "validators" {
       mode = "GKE_METADATA"
     }
 
-    taint {
-      key    = "aptos.org/nodepool"
-      value  = "validators"
-      effect = "NO_EXECUTE"
+    # if the NodeGroup should be tainted, then create the below dynamic block
+    dynamic "taint" {
+      for_each = var.validator_instance_enable_taint ? ["validators"] : []
+      content {
+        key    = "aptos.org/nodepool"
+        value  = each.key
+        effect = "NO_EXECUTE"
+      }
     }
   }
 }

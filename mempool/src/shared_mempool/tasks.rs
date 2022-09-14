@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
-use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
-        notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
+        notify_subscribers, BatchId, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
         SubmissionStatusBundle,
     },
+    thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -118,7 +118,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
     let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state);
     log_txn_process_results(&statuses, None);
 
-    if let Some(status) = statuses.get(0) {
+    if let Some(status) = statuses.first() {
         if callback.send(Ok(status.1.clone())).is_err() {
             error!(LogSchema::event_log(
                 LogEntry::JsonRpc,
@@ -155,7 +155,7 @@ pub(crate) async fn process_client_get_transaction<V>(
 pub(crate) async fn process_transaction_broadcast<V>(
     smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
-    request_id: Vec<u8>,
+    request_id: BatchId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
@@ -169,6 +169,10 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
     let ack_response = gen_ack_response(request_id, results, &peer);
     let network_sender = smp.network_interface.sender();
+
+    // Respond to the peer with an ack. Note: ack response messages should be
+    // small enough that they always fit within the maximum network message
+    // size, so there's no need to check them here.
     if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         error!(
@@ -183,7 +187,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: Vec<u8>,
+    request_id: BatchId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
@@ -271,9 +275,9 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, t)| {
-            if let Ok(crsn_or_seqno) = seq_numbers[idx] {
-                if t.sequence_number() >= crsn_or_seqno.min_seq() {
-                    return Some((t, crsn_or_seqno));
+            if let Ok(sequence_info) = seq_numbers[idx] {
+                if t.sequence_number() >= sequence_info.min_seq() {
+                    return Some((t, sequence_info));
                 } else {
                     statuses.push((
                         t,
@@ -308,7 +312,7 @@ where
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, crsn_or_seqno)) in transactions.into_iter().enumerate() {
+        for (idx, (transaction, sequence_info)) in transactions.into_iter().enumerate() {
             if let Ok(validation_result) = &validation_results[idx] {
                 match validation_result.status() {
                     None => {
@@ -316,7 +320,7 @@ where
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
-                            crsn_or_seqno,
+                            sequence_info,
                             timeline_state,
                         );
                         statuses.push((transaction, (mempool_status, None)));
@@ -385,7 +389,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
     // debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
-        QuorumStoreRequest::GetBatchRequest(max_batch_size, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
@@ -397,8 +401,8 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                 let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
-                let batch_size = cmp::max(max_batch_size, 1);
-                txns = mempool.get_batch(batch_size, exclude_transactions);
+                let max_txns = cmp::max(max_txns, 1);
+                txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
             counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
 

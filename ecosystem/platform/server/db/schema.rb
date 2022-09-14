@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
+ActiveRecord::Schema[7.0].define(version: 2022_09_10_032621) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -27,6 +27,34 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["author_type", "author_id"], name: "index_active_admin_comments_on_author"
     t.index ["namespace"], name: "index_active_admin_comments_on_namespace"
     t.index ["resource_type", "resource_id"], name: "index_active_admin_comments_on_resource"
+  end
+
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.string "key", null: false
+    t.string "filename", null: false
+    t.string "content_type"
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.datetime "created_at", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
   create_table "articles", force: :cascade do |t|
@@ -57,6 +85,12 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["provider"], name: "index_authorizations_on_provider"
     t.index ["uid"], name: "index_authorizations_on_uid"
     t.index ["user_id"], name: "index_authorizations_on_user_id"
+  end
+
+  create_table "categories", force: :cascade do |t|
+    t.string "title", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "delayed_jobs", force: :cascade do |t|
@@ -158,15 +192,15 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
 
   create_table "it3_profiles", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "owner_key", null: false
-    t.string "consensus_key", null: false
-    t.string "account_key", null: false
-    t.string "network_key", null: false
+    t.string "owner_key"
+    t.string "consensus_key"
+    t.string "account_key"
+    t.string "network_key"
     t.string "validator_ip"
-    t.string "validator_address", null: false
-    t.integer "validator_port", null: false
-    t.integer "validator_metrics_port", null: false
-    t.integer "validator_api_port", null: false
+    t.string "validator_address"
+    t.integer "validator_port"
+    t.integer "validator_metrics_port"
+    t.integer "validator_api_port"
     t.boolean "validator_verified", default: false, null: false
     t.string "fullnode_address"
     t.integer "fullnode_port"
@@ -177,9 +211,13 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.jsonb "metrics_data"
     t.string "nhc_job_id"
     t.text "nhc_output"
-    t.string "account_address", null: false
+    t.string "account_address"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "consensus_pop"
+    t.string "owner_address"
+    t.integer "fullnode_metrics_port"
+    t.integer "fullnode_api_port"
     t.index ["account_address"], name: "index_it3_profiles_on_account_address", unique: true
     t.index ["account_key"], name: "index_it3_profiles_on_account_key", unique: true
     t.index ["consensus_key"], name: "index_it3_profiles_on_consensus_key", unique: true
@@ -257,25 +295,26 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.text "content", null: false
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.datetime "notified_at", comment: "The time at which a notification was sent for this network operation."
   end
 
-  create_table "nft_offers", force: :cascade do |t|
-    t.string "name", null: false
-    t.datetime "valid_from"
-    t.datetime "valid_until"
+  create_table "nft_images", force: :cascade do |t|
+    t.string "slug", null: false
+    t.integer "image_number"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["name"], name: "index_nft_offers_on_name", unique: true
+    t.index ["slug", "image_number"], name: "index_nft_images_on_slug_and_image_number", unique: true
   end
 
-  create_table "nfts", force: :cascade do |t|
+  create_table "notification_preferences", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.bigint "nft_offer_id", null: false
+    t.integer "delivery_method", default: 0, null: false
+    t.boolean "node_upgrade_notification", default: false, null: false
+    t.boolean "governance_proposal_notification", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "explorer_url"
-    t.index ["nft_offer_id"], name: "index_nfts_on_nft_offer_id"
-    t.index ["user_id"], name: "index_nfts_on_user_id"
+    t.index ["user_id", "delivery_method"], name: "index_notification_preferences_on_user_id_and_delivery_method", unique: true
+    t.index ["user_id"], name: "index_notification_preferences_on_user_id"
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -288,6 +327,47 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.datetime "updated_at", null: false
     t.index ["read_at"], name: "index_notifications_on_read_at"
     t.index ["recipient_type", "recipient_id"], name: "index_notifications_on_recipient"
+  end
+
+  create_table "project_categories", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id", "project_id"], name: "index_project_categories_on_category_id_and_project_id", unique: true
+    t.index ["category_id"], name: "index_project_categories_on_category_id"
+    t.index ["project_id"], name: "index_project_categories_on_project_id"
+  end
+
+  create_table "project_members", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.bigint "user_id", null: false
+    t.string "role", null: false
+    t.boolean "public", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "user_id"], name: "index_project_members_on_project_id_and_user_id", unique: true
+    t.index ["project_id"], name: "index_project_members_on_project_id"
+    t.index ["user_id"], name: "index_project_members_on_user_id"
+  end
+
+  create_table "projects", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "title", null: false
+    t.string "short_description", null: false
+    t.string "full_description", null: false
+    t.string "website_url", null: false
+    t.string "github_url"
+    t.string "discord_url"
+    t.string "twitter_url"
+    t.string "telegram_url"
+    t.string "linkedin_url"
+    t.string "youtube_url"
+    t.string "forum_url"
+    t.boolean "public", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_projects_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -317,6 +397,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.boolean "kyc_exempt", default: false
     t.string "completed_persona_inquiry_id"
     t.integer "discourse_id"
+    t.string "bio"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["current_sign_in_ip"], name: "index_users_on_current_sign_in_ip"
     t.index ["email"], name: "index_users_on_email", unique: true
@@ -326,11 +407,31 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  create_table "wallets", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "network", null: false, comment: "The network that the account exists on (e.g. 'ait3')."
+    t.string "wallet_name", null: false, comment: "The name of the wallet (e.g. 'petra')."
+    t.string "public_key", null: false, comment: "The public key of the account."
+    t.string "address", null: false, comment: "The account address."
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["public_key", "network", "wallet_name"], name: "index_wallets_on_public_key_and_network_and_wallet_name", unique: true
+    t.index ["user_id"], name: "index_wallets_on_user_id"
+    t.check_constraint "public_key::text ~ '^0x[0-9a-f]{64}$'::text"
+  end
+
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "it1_profiles", "users"
   add_foreign_key "it2_profiles", "users"
   add_foreign_key "it2_surveys", "users"
   add_foreign_key "it3_profiles", "users"
   add_foreign_key "it3_surveys", "users"
-  add_foreign_key "nfts", "nft_offers"
-  add_foreign_key "nfts", "users"
+  add_foreign_key "notification_preferences", "users"
+  add_foreign_key "project_categories", "categories"
+  add_foreign_key "project_categories", "projects"
+  add_foreign_key "project_members", "projects"
+  add_foreign_key "project_members", "users"
+  add_foreign_key "projects", "users"
+  add_foreign_key "wallets", "users"
 end

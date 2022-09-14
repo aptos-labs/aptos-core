@@ -32,7 +32,7 @@ mod tests;
 /// Peer monitoring server constants
 pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("Invalid request received: {0}")]
     InvalidRequest(String),

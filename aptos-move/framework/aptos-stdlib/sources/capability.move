@@ -71,13 +71,17 @@
 ///                  is_valid_delegate_for_feature(d);
 /// ```
 ///
-module std::capability {
+module aptos_std::capability {
     use std::error;
     use std::signer;
     use std::vector;
 
-    const ECAP: u64 = 0;
-    const EDELEGATE: u64 = 1;
+    /// Capability resource already exists on the specified account
+    const ECAPABILITY_ALREADY_EXISTS: u64 = 1;
+    /// Capability resource not found
+    const ECAPABILITY_NOT_FOUND: u64 = 2;
+    /// Account does not have delegated permissions
+    const EDELEGATE: u64 = 3;
 
     /// The token representing an acquired capability. Cannot be stored in memory, but copied and dropped freely.
     struct Cap<phantom Feature> has copy, drop {
@@ -104,7 +108,7 @@ module std::capability {
     /// they own the `Feature` type parameter.
     public fun create<Feature>(owner: &signer, _feature_witness: &Feature) {
         let addr = signer::address_of(owner);
-        assert!(!exists<CapState<Feature>>(addr), error::already_exists(ECAP));
+        assert!(!exists<CapState<Feature>>(addr), error::already_exists(ECAPABILITY_ALREADY_EXISTS));
         move_to<CapState<Feature>>(owner, CapState{ delegates: vector::empty() });
     }
 
@@ -135,7 +139,7 @@ module std::capability {
                    error::invalid_state(EDELEGATE));
             root_addr
         } else {
-            assert!(exists<CapState<Feature>>(addr), error::not_found(ECAP));
+            assert!(exists<CapState<Feature>>(addr), error::not_found(ECAPABILITY_NOT_FOUND));
             addr
         }
     }
@@ -185,15 +189,5 @@ module std::capability {
         if (!vector::contains(v, &x)) {
             vector::push_back(v, x)
         }
-    }
-
-    /// Helper specification function to check whether a capability exists at address.
-    spec fun spec_has_cap<Feature>(addr: address): bool {
-        exists<CapState<Feature>>(addr)
-    }
-
-    /// Helper specification function to obtain the delegates of a capability.
-    spec fun spec_delegates<Feature>(addr: address): vector<address> {
-        global<CapState<Feature>>(addr).delegates
     }
 }

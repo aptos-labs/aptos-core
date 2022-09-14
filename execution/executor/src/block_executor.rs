@@ -169,6 +169,7 @@ where
 
         if let Some(b) = block_vec.pop().expect("Must exist") {
             // this is a retry
+            parent_block.ensure_has_child(block_id)?;
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
@@ -220,19 +221,34 @@ where
         sync_commit: bool,
     ) -> Result<(), Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+
+        // Ensure the block ids are not empty
+        if block_ids.is_empty() {
+            return Err(anyhow::anyhow!("Cannot commit 0 blocks!").into());
+        }
+
+        // Check for any potential retries
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
-            // a retry
             return Ok(());
         }
 
+        // Ensure the last block id matches the ledger info block id to commit
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
             "commit_block"
         );
+        let last_block_id = *block_ids.last().unwrap();
+        if last_block_id != block_id_to_commit {
+            // This should not happen. If it does, we need to panic!
+            panic!(
+                "Block id to commit ({:?}) does not match last block id ({:?})!",
+                block_id_to_commit, last_block_id
+            );
+        }
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
         let txns_to_commit: Vec<_> = blocks

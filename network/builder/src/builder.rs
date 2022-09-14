@@ -27,6 +27,7 @@ use event_notifications::{EventSubscriptionService, ReconfigNotificationListener
 use network::{
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
+    constants::MAX_MESSAGE_SIZE,
     logging::NetworkSchema,
     peer_manager::{
         builder::{AuthenticationMode, PeerManagerBuilder},
@@ -82,6 +83,7 @@ impl NetworkBuilder {
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
         max_frame_size: usize,
+        max_message_size: usize,
         enable_proxy_protocol: bool,
         network_channel_size: usize,
         max_concurrent_network_reqs: usize,
@@ -102,6 +104,7 @@ impl NetworkBuilder {
             network_channel_size,
             max_concurrent_network_reqs,
             max_frame_size,
+            max_message_size,
             enable_proxy_protocol,
             inbound_connection_limit,
             inbound_rate_limit_config,
@@ -142,6 +145,7 @@ impl NetworkBuilder {
             listen_address,
             authentication_mode,
             MAX_FRAME_SIZE,
+            MAX_MESSAGE_SIZE,
             false, /* Disable proxy protocol */
             NETWORK_CHANNEL_SIZE,
             MAX_CONCURRENT_NETWORK_REQS,
@@ -196,6 +200,7 @@ impl NetworkBuilder {
             config.listen_address.clone(),
             authentication_mode,
             config.max_frame_size,
+            config.max_message_size,
             config.enable_proxy_protocol,
             config.network_channel_size,
             config.max_concurrent_network_reqs,

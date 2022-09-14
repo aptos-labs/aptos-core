@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
@@ -22,14 +22,13 @@ structopt = "0.3.21"
 textwrap = "0.15.0"
 
 aptos-types = { path = "../../types" }
-
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
+framework = { path = "../framework" }
 tempfile = "3.3.0"
 which = "4.2.5"
-
-cached-framework-packages = { path = "../framework/cached-packages" }
 
 [features]
 default = []

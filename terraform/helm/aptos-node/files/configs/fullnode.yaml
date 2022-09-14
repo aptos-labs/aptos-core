@@ -8,18 +8,12 @@ execution:
 
 storage:
   backup_service_address: "0.0.0.0:6186"
-  storage_pruner_config:
-    enable_state_store_pruner: {{ $.Values.validator.config.enable_state_store_pruner }}
-    enable_ledger_pruner: {{ $.Values.validator.config.enable_ledger_pruner }}
-    ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
-    state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
-    ledger_pruning_batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
-    state_store_pruning_batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
+{{- if $.Values.fullnode.config.storage -}}{{- toYaml $.Values.fullnode.config.storage | nindent 4 }}{{- end }}
 
+{{ if $.Values.fullnode.config.mempool -}}
 mempool:
-  shared_mempool_max_concurrent_inbound_syncs: {{ .Values.fullnode.config.shared_mempool_max_concurrent_inbound_syncs }}
-  max_broadcasts_per_peer: {{ .Values.fullnode.config.max_broadcasts_per_peer }}
-  default_failovers: {{ .Values.fullnode.config.default_failovers }}
+{{- toYaml $.Values.fullnode.config.mempool | nindent 4 }}
+{{- end }}
 
 full_node_networks:
 - network_id:
@@ -30,22 +24,9 @@ full_node_networks:
       addresses:
       - "/dns4/{{ include "aptos-validator.fullname" $ }}-{{$.Values.i}}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
       role: "Validator"
-
-- network_id: "public"
-  discovery_method: "onchain"
-  listen_address: "/ip4/0.0.0.0/tcp/6182"
-  identity:
-    type: "from_file"
-    path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
-  {{- if $.Values.haproxy.config.send_proxy_protocol }}
-  enable_proxy_protocol: true
-  {{- end }}
-  max_inbound_connections: {{ $.Values.fullnode.config.max_inbound_connections }}
-  {{- if $.Values.fullnode.identity }}
-  {{- end }}
-  seeds:
-    {{- $.Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}
+{{- if $.Values.fullnode.config.full_node_networks -}}{{- toYaml $.Values.fullnode.config.full_node_networks | nindent 2 }}{{- end }}
 
 api:
   enabled: true
   address: "0.0.0.0:8080"
+{{- if $.Values.fullnode.config.api -}}{{- toYaml $.Values.fullnode.config.api | nindent 4 }}{{- end }}

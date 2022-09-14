@@ -3,11 +3,13 @@
 /* eslint-disable */
 import type { Address } from '../models/Address';
 import type { EncodeSubmissionRequest } from '../models/EncodeSubmissionRequest';
+import type { GasEstimation } from '../models/GasEstimation';
 import type { HashValue } from '../models/HashValue';
 import type { HexEncodedBytes } from '../models/HexEncodedBytes';
 import type { PendingTransaction } from '../models/PendingTransaction';
 import type { SubmitTransactionRequest } from '../models/SubmitTransactionRequest';
 import type { Transaction } from '../models/Transaction';
+import type { TransactionsBatchSubmissionResult } from '../models/TransactionsBatchSubmissionResult';
 import type { U64 } from '../models/U64';
 import type { UserTransaction } from '../models/UserTransaction';
 
@@ -20,10 +22,16 @@ export class TransactionsService {
 
     /**
      * Get transactions
-     * Get on-chain (meaning, committed) transactions. You may specify from
-     * when you want the transactions and how to include in the response.
-     * @param start
-     * @param limit
+     * Retrieve on-chain committed transactions. The page size and start can be provided to
+     * get a specific sequence of transactions.
+     *
+     * If the version has been pruned, then a 410 will be returned
+     * @param start Ledger version to start list of transactions
+     *
+     * If not provided, defaults to showing the latest transactions
+     * @param limit Max number of transactions to retrieve.
+     *
+     * If not provided, defaults to default page size
      * @returns Transaction
      * @throws ApiError
      */
@@ -58,6 +66,7 @@ export class TransactionsService {
      *
      * To submit a transaction as BCS, you must submit a SignedTransaction
      * encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+     * Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
      * @param requestBody
      * @returns PendingTransaction
      * @throws ApiError
@@ -86,7 +95,7 @@ export class TransactionsService {
      * 1. Hash message bytes: "RawTransaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
      * 2. Apply hash algorithm `SHA3-256` to the hash message bytes.
      * 3. Hex-encode the hash bytes with `0x` prefix.
-     * @param txnHash
+     * @param txnHash Hash of transaction to retrieve
      * @returns Transaction
      * @throws ApiError
      */
@@ -104,8 +113,9 @@ export class TransactionsService {
 
     /**
      * Get transaction by version
-     * todo
-     * @param txnVersion
+     * Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
+     * be returned.
+     * @param txnVersion Version of transaction to retrieve
      * @returns Transaction
      * @throws ApiError
      */
@@ -123,10 +133,17 @@ export class TransactionsService {
 
     /**
      * Get account transactions
-     * todo
-     * @param address
-     * @param start
-     * @param limit
+     * Retrieves transactions from an account.  If the start version is too far in the past
+     * a 410 will be returned.
+     *
+     * If no start version is given, it will start at 0
+     * @param address Address of account with or without a `0x` prefix
+     * @param start Ledger version to start list of transactions
+     *
+     * If not provided, defaults to showing the latest transactions
+     * @param limit Max number of transactions to retrieve.
+     *
+     * If not provided, defaults to default page size
      * @returns Transaction
      * @throws ApiError
      */
@@ -149,8 +166,50 @@ export class TransactionsService {
     }
 
     /**
+     * Submit batch transactions
+     * This allows you to submit multiple transactions.  The response has three outcomes:
+     *
+     * 1. All transactions succeed, and it will return a 202
+     * 2. Some transactions succeed, and it will return the failed transactions and a 206
+     * 3. No transactions succeed, and it will also return the failed transactions and a 206
+     *
+     * To submit a transaction as JSON, you must submit a SubmitTransactionRequest.
+     * To build this request, do the following:
+     *
+     * 1. Encode the transaction as BCS. If you are using a language that has
+     * native BCS support, make sure to use that library. If not, you may take
+     * advantage of /transactions/encode_submission. When using this
+     * endpoint, make sure you trust the node you're talking to, as it is
+     * possible they could manipulate your request.
+     * 2. Sign the encoded transaction and use it to create a TransactionSignature.
+     * 3. Submit the request. Make sure to use the "application/json" Content-Type.
+     *
+     * To submit a transaction as BCS, you must submit a SignedTransaction
+     * encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+     * Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
+     * @param requestBody
+     * @returns TransactionsBatchSubmissionResult
+     * @throws ApiError
+     */
+    public submitBatchTransactions(
+        requestBody: Array<SubmitTransactionRequest>,
+    ): CancelablePromise<TransactionsBatchSubmissionResult> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/transactions/batch',
+            body: requestBody,
+            mediaType: 'application/json',
+        });
+    }
+
+    /**
      * Simulate transaction
-     * Simulate submitting a transaction. To use this, you must:
+     * The output of the transaction will have the exact transaction outputs and events that running
+     * an actual signed transaction would have.  However, it will not have the associated state
+     * hashes, as they are not updated in storage.  This can be used to estimate the maximum gas
+     * units for a submitted transaction.
+     *
+     * To use this, you must:
      * - Create a SignedTransaction with a zero-padded signature.
      * - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
      *
@@ -201,6 +260,24 @@ export class TransactionsService {
             url: '/transactions/encode_submission',
             body: requestBody,
             mediaType: 'application/json',
+        });
+    }
+
+    /**
+     * Estimate gas price
+     * Currently, the gas estimation is handled by taking the median of the last 100,000 transactions
+     * If a user wants to prioritize their transaction and is willing to pay, they can pay more
+     * than the gas price.  If they're willing to wait longer, they can pay less.  Note that the
+     * gas price moves with the fee market, and should only increase when demand outweighs supply.
+     *
+     * If there have been no transactions in the last 100,000 transactions, the price will be 1.
+     * @returns GasEstimation
+     * @throws ApiError
+     */
+    public estimateGasPrice(): CancelablePromise<GasEstimation> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/estimate_gas_price',
         });
     }
 

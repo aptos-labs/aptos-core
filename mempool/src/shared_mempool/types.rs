@@ -82,7 +82,7 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SharedMempoolNotification {
     PeerStateChange,
     NewTransactions,
@@ -154,6 +154,8 @@ pub enum QuorumStoreRequest {
     GetBatchRequest(
         // max batch size
         u64,
+        // max byte size
+        u64,
         // transactions to exclude from the requested batch
         Vec<TransactionSummary>,
         // callback to respond to
@@ -172,10 +174,11 @@ pub enum QuorumStoreRequest {
 impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            QuorumStoreRequest::GetBatchRequest(batch_size, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, excluded_txns, _) => {
                 format!(
-                    "GetBatchRequest [batch_size: {}, excluded_txns_length: {}]",
-                    batch_size,
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, excluded_txns_length: {}]",
+                    max_txns,
+                    max_bytes,
                     excluded_txns.len()
                 )
             }

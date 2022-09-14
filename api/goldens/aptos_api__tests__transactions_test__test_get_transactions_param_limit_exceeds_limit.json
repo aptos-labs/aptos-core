@@ -1,5 +1,5 @@
 {
   "message": "Given limit value (2000) is too large, it must be < 1000",
-  "error_code": "invalid_limit_param",
-  "aptos_ledger_version": null
+  "error_code": "invalid_input",
+  "vm_error_code": null
 }

@@ -18,17 +18,17 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        ExecutionStatus, Module as TransactionModule, RawTransaction, Script as TransactionScript,
-        ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
+        EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
+        RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
         TransactionStatus,
     },
 };
 use aptos_vm::{
-    data_cache::{AsMoveResolver, IntoMoveResolver, RemoteStorageOwned},
+    data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
     AptosVM,
 };
 use clap::StructOpt;
-use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET};
+use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use move_deps::{
     move_binary_format::file_format::{CompiledModule, CompiledScript},
     move_command_line_common::{
@@ -53,13 +53,13 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     fmt,
     path::Path,
     string::String,
+    sync::Arc,
 };
 use vm_genesis::GENESIS_KEYPAIR;
 /**
@@ -74,7 +74,7 @@ use vm_genesis::GENESIS_KEYPAIR;
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: RemoteStorageOwned<FakeDataStore>,
+    storage: StorageAdapterOwned<FakeDataStore>,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
 }
@@ -167,7 +167,7 @@ struct BlockCommand {
 #[derive(StructOpt, Debug)]
 struct ViewTableCommand {
     #[structopt(long = "table_handle")]
-    table_handle: u128,
+    table_handle: AccountAddress,
 
     #[structopt(long = "key_type", parse(try_from_str = parse_type_tag))]
     key_type: TypeTag,
@@ -284,8 +284,8 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: framework::aptos::files(),
-        named_address_map: framework::aptos::named_addresses(),
+        paths: cached_packages::head_release_bundle().files().unwrap(),
+        named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
         deps,
@@ -446,10 +446,13 @@ impl<'a> AptosTestAdapter<'a> {
             Some(max_gas_amount) => max_gas_amount,
             None => {
                 if gas_unit_price == 0 {
-                    max_number_of_gas_units
+                    u64::from(max_number_of_gas_units)
                 } else {
                     let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(max_number_of_gas_units, account_balance / gas_unit_price)
+                    std::cmp::min(
+                        u64::from(max_number_of_gas_units),
+                        account_balance / gas_unit_price,
+                    )
                 }
             }
         };
@@ -498,7 +501,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
+            cached_packages::aptos_stdlib::aptos_account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -514,7 +517,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number + 1,
-            aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
+            cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -557,7 +560,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = framework::aptos::named_addresses();
+        let mut named_address_mapping = framework::named_addresses().clone();
 
         for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {
@@ -568,7 +571,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         // Genesis modules
         let mut storage = FakeDataStore::new(HashMap::new()).into_move_resolver();
-        storage.add_write_set(GENESIS_CHANGE_SET.write_set());
+        storage.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
 
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
@@ -771,7 +774,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
         if extra_args.script {
-            panic!("Script functions are not supported.")
+            panic!("Entry functions are not supported.")
         }
 
         if signers.len() != 1 {
@@ -797,10 +800,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             extra_args.gas_unit_price,
             gas_budget,
         )?;
-        let txn = RawTransaction::new_script_function(
+        let txn = RawTransaction::new_entry_function(
             signer,
             params.sequence_number,
-            TransactionScriptFunction::new(
+            TransactionEntryFunction::new(
                 module.clone(),
                 function.to_owned(),
                 type_args,
@@ -869,7 +872,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     0,
                     block_cmd.time,
                     proposer,
-                    Some(0),
                     vec![],
                     vec![],
                     block_cmd.time,
@@ -945,5 +947,7 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: remove once bundles removed
+    aptos_vm::aptos_vm::allow_module_bundle_for_test();
     run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

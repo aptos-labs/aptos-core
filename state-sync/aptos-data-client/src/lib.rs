@@ -11,10 +11,8 @@ use aptos_types::{
 use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Display;
-use storage_service_types::responses::CompleteDataRange;
-use storage_service_types::Epoch;
+use std::{fmt, fmt::Display};
+use storage_service_types::{responses::CompleteDataRange, Epoch};
 use thiserror::Error;
 
 pub type ResponseId = u64;
@@ -25,7 +23,7 @@ pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
 // TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
 /// An error returned by the Aptos Data Client for failed API calls.
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found! Error: {0}")]
     DataIsUnavailable(String),
@@ -64,14 +62,15 @@ impl From<storage_service_types::responses::Error> for Error {
 /// The API offered by the Aptos Data Client.
 #[async_trait]
 pub trait AptosDataClient {
-    /// Returns a global summary of the data currently available in the network.
+    /// Fetches a global summary of the data currently available in the network.
     ///
     /// This API is intended to be relatively cheap to call, usually returning a
     /// cached view of this data client's available data.
     fn get_global_data_summary(&self) -> GlobalDataSummary;
 
-    /// Returns all epoch ending ledger infos between start and end (inclusive).
-    /// If the data cannot be fetched (e.g., the number of epochs is too large),
+    /// Fetches the epoch ending ledger infos between start and end
+    /// (inclusive). In some cases, fewer ledger infos may be returned (e.g.,
+    /// to tolerate network or chunk limits). If the data cannot be fetched,
     /// an error is returned.
     async fn get_epoch_ending_ledger_infos(
         &self,
@@ -79,7 +78,7 @@ pub trait AptosDataClient {
         expected_end_epoch: Epoch,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
 
-    /// Returns a new transaction output list with proof. Versions start at
+    /// Fetches a new transaction output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
     /// and proof version are specified by the server. If the data cannot be
     /// fetched, an error is returned.
@@ -89,7 +88,7 @@ pub trait AptosDataClient {
         known_epoch: Epoch,
     ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
 
-    /// Returns a new transaction list with proof. Versions start at
+    /// Fetches a new transaction list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
     /// and proof version are specified by the server. If the data cannot be
     /// fetched, an error is returned.
@@ -100,12 +99,14 @@ pub trait AptosDataClient {
         include_events: bool,
     ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
 
-    /// Returns the number of states at the specified version.
+    /// Fetches the number of states at the specified version.
     async fn get_number_of_states(&self, version: Version) -> Result<Response<u64>>;
 
-    /// Returns a single state value chunk with proof, containing the values
+    /// Fetches a single state value chunk with proof, containing the values
     /// from start to end index (inclusive) at the specified version. The proof
-    /// version is the same as the specified version.
+    /// version is the same as the specified version. In some cases, fewer
+    /// state values may be returned (e.g., to tolerate network or chunk
+    /// limits). If the data cannot be fetched, an error is returned.
     async fn get_state_values_with_proof(
         &self,
         version: u64,
@@ -113,10 +114,11 @@ pub trait AptosDataClient {
         end_index: u64,
     ) -> Result<Response<StateValueChunkWithProof>>;
 
-    /// Returns a transaction output list with proof object, with transaction
-    /// outputs from start to end versions (inclusive). The proof is relative to
-    /// the specified `proof_version`. If the data cannot be fetched (e.g., the
-    /// number of transaction outputs is too large), an error is returned.
+    /// Fetches a transaction output list with proof, with transaction
+    /// outputs from start to end versions (inclusive). The proof is relative
+    /// to the specified `proof_version`. In some cases, fewer outputs may be
+    /// returned (e.g., to tolerate network or chunk limits). If the data
+    /// cannot be fetched, an error is returned.
     async fn get_transaction_outputs_with_proof(
         &self,
         proof_version: Version,
@@ -124,11 +126,12 @@ pub trait AptosDataClient {
         end_version: Version,
     ) -> Result<Response<TransactionOutputListWithProof>>;
 
-    /// Returns a transaction list with proof object, with transactions from
-    /// start to end versions (inclusive). The proof is relative to the specified
-    /// `proof_version`. If `include_events` is true, events are included in the
-    /// proof. If the data cannot be fetched (e.g., the number of transactions is
-    /// too large), an error is returned.
+    /// Fetches a transaction list with proof, with transactions from
+    /// start to end versions (inclusive). The proof is relative to the
+    /// specified `proof_version`. If `include_events` is true, events are
+    /// included in the proof. In some cases, fewer transactions may be returned
+    /// (e.g., to tolerate network or chunk limits). If the data cannot
+    /// be fetched, an error is returned.
     async fn get_transactions_with_proof(
         &self,
         proof_version: Version,
@@ -140,7 +143,7 @@ pub trait AptosDataClient {
 
 /// A response error that users of the Aptos Data Client can use to notify
 /// the Data Client about invalid or malformed responses.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ResponseError {
     InvalidData,
     InvalidPayloadDataType,
@@ -158,7 +161,7 @@ pub enum ResponseError {
 /// This trait provides a simple feedback mechanism for users of the Data Client
 /// to alert it to bad responses so that the peers responsible for providing this
 /// data can be penalized.
-pub trait ResponseCallback: fmt::Debug + Send + 'static {
+pub trait ResponseCallback: fmt::Debug + Send + Sync + 'static {
     // TODO(philiphayes): ideally this would take a `self: Box<Self>`, i.e.,
     // consume the callback, which better communicates that you should only report
     // an error once. however, the current state-sync-v2 code makes this difficult...
@@ -207,7 +210,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),

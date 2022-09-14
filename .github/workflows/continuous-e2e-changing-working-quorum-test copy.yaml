@@ -1,0 +1,24 @@
+name: Continuous E2E Changing Working Quorum Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  ### Please remember to use different namespace for different tests
+  # Performance test in an optimal setting
+  run-forge-changing-working-quorum-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-changing-working-quorum-test
+      FORGE_CLUSTER_NAME: aptos-forge-big-1
+      FORGE_RUNNER_DURATION_SECS: 1200
+      FORGE_TEST_SUITE: changing_working_quorum_test
+      POST_TO_SLACK: true
+      FORGE_ENABLE_FAILPOINTS: true

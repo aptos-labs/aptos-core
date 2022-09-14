@@ -48,7 +48,7 @@ pub(crate) async fn create_system_info_telemetry_event() -> TelemetryEvent {
 }
 
 /// Used to expose system information
-fn get_system_information() -> BTreeMap<String, String> {
+pub fn get_system_information() -> BTreeMap<String, String> {
     let mut system_information: BTreeMap<String, String> = BTreeMap::new();
     collect_system_info(&mut system_information);
     system_information

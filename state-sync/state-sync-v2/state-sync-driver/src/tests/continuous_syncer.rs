@@ -20,12 +20,13 @@ use crate::{
 use aptos_config::config::ContinuousSyncingMode;
 use aptos_infallible::Mutex;
 use aptos_types::transaction::{TransactionOutputListWithProof, Version};
-use claim::assert_matches;
+use claims::assert_matches;
 use consensus_notifications::ConsensusSyncNotification;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
-    streaming_client::NotificationFeedback,
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
+use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
 use storage_service_types::Epoch;
@@ -47,6 +48,7 @@ async fn test_critical_timeout() {
     let mut expectation_sequence = Sequence::new();
     let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transaction_outputs()
@@ -59,6 +61,10 @@ async fn test_critical_timeout() {
             .return_once(move |_, _, _| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(eq(data_stream_id_1), eq(None))
+        .return_const(Ok(()));
 
     // Create the continuous syncer
     let mut continuous_syncer = create_continuous_syncer(
@@ -122,8 +128,9 @@ async fn test_data_stream_transactions_with_target() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transactions()
@@ -140,8 +147,11 @@ async fn test_data_stream_transactions_with_target() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::EmptyPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -172,7 +182,7 @@ async fn test_data_stream_transactions_with_target() {
             TransactionOutputListWithProof::new_empty(),
         ),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = continuous_syncer
@@ -203,8 +213,9 @@ async fn test_data_stream_transaction_outputs() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let mut expectation_sequence = Sequence::new();
-    let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transaction_outputs()
@@ -220,8 +231,11 @@ async fn test_data_stream_transaction_outputs() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::InvalidPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -252,7 +266,7 @@ async fn test_data_stream_transaction_outputs() {
             transaction_output_with_proof,
         ),
     };
-    notification_sender_1.push((), data_notification).unwrap();
+    notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
     let error = continuous_syncer

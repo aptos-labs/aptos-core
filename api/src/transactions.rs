@@ -4,47 +4,62 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use crate::accept_type::AcceptType;
+use crate::accounts::Account;
 use crate::bcs_payload::Bcs;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
-    AptosErrorResponse, BadRequestError, BasicError, BasicErrorWith404, BasicResponse,
-    BasicResponseStatus, BasicResult, BasicResultWith404, InsufficientStorageError, InternalError,
-    NotFoundError,
+    api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError,
+    BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
+    BasicResultWith404, InsufficientStorageError, InternalError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
-    LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionOnChainData, UserTransaction, U64,
+    Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
+    HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
+    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserTransaction, U64,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
 };
+use aptos_types::vm_status::StatusCode;
 use aptos_vm::AptosVM;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
 use poem_openapi::{ApiRequest, OpenApi};
+use std::sync::Arc;
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
+
 generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
+    (403, Forbidden),
     (413, PayloadTooLarge),
     (500, Internal),
+    (503, ServiceUnavailable),
     (507, InsufficientStorage)
 );
 
 type SubmitTransactionResult<T> =
     poem::Result<SubmitTransactionResponse<T>, SubmitTransactionError>;
+
+generate_success_response!(
+    SubmitTransactionsBatchResponse,
+    (202, Accepted),
+    (206, AcceptedPartial)
+);
+
+type SubmitTransactionsBatchResult<T> =
+    poem::Result<SubmitTransactionsBatchResponse<T>, SubmitTransactionError>;
 
 type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
 
@@ -66,6 +81,21 @@ pub enum SubmitTransactionPost {
     Bcs(Bcs),
 }
 
+// We need a custom type here because we use different types for each of the
+// content types possible for the POST data.
+#[derive(ApiRequest, Debug)]
+pub enum SubmitTransactionsBatchPost {
+    #[oai(content_type = "application/json")]
+    Json(Json<Vec<SubmitTransactionRequest>>),
+
+    // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
+    // find a way to at least indicate in the spec that it expects a SignedTransaction.
+    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
+    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
+    Bcs(Bcs),
+}
+
+/// API for interacting with transactions
 pub struct TransactionsApi {
     pub context: Arc<Context>,
 }
@@ -74,8 +104,10 @@ pub struct TransactionsApi {
 impl TransactionsApi {
     /// Get transactions
     ///
-    /// Get on-chain (meaning, committed) transactions. You may specify from
-    /// when you want the transactions and how to include in the response.
+    /// Retrieve on-chain committed transactions. The page size and start can be provided to
+    /// get a specific sequence of transactions.
+    ///
+    /// If the version has been pruned, then a 410 will be returned
     #[oai(
         path = "/transactions",
         method = "get",
@@ -85,10 +117,18 @@ impl TransactionsApi {
     async fn get_transactions(
         &self,
         accept_type: AcceptType,
+        /// Ledger version to start list of transactions
+        ///
+        /// If not provided, defaults to showing the latest transactions
         start: Query<Option<U64>>,
+        /// Max number of transactions to retrieve.
+        ///
+        /// If not provided, defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
-        fail_point_poem("endppoint_get_transactions")?;
+        fail_point_poem("endpoint_get_transactions")?;
+        self.context
+            .check_api_output_enabled("Get transactions", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list(&accept_type, page)
     }
@@ -116,17 +156,21 @@ impl TransactionsApi {
     async fn get_transaction_by_hash(
         &self,
         accept_type: AcceptType,
+        /// Hash of transaction to retrieve
         txn_hash: Path<HashValue>,
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_hash")?;
+        self.context
+            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
         self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
             .await
     }
 
     /// Get transaction by version
     ///
-    /// todo
+    /// Retrieves a transaction by a given version.  If the version has been pruned, a 410 will
+    /// be returned.
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -136,31 +180,45 @@ impl TransactionsApi {
     async fn get_transaction_by_version(
         &self,
         accept_type: AcceptType,
+        /// Version of transaction to retrieve
         txn_version: Path<U64>,
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_version")?;
+        self.context
+            .check_api_output_enabled("Get transactions by version", &accept_type)?;
         self.get_transaction_by_version_inner(&accept_type, txn_version.0)
             .await
     }
 
     /// Get account transactions
     ///
-    /// todo
+    /// Retrieves transactions from an account.  If the start version is too far in the past
+    /// a 410 will be returned.
+    ///
+    /// If no start version is given, it will start at 0
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
         operation_id = "get_account_transactions",
         tag = "ApiTags::Transactions"
     )]
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2285
     async fn get_accounts_transactions(
         &self,
         accept_type: AcceptType,
+        /// Address of account with or without a `0x` prefix
         address: Path<Address>,
+        /// Ledger version to start list of transactions
+        ///
+        /// If not provided, defaults to showing the latest transactions
         start: Query<Option<U64>>,
+        /// Max number of transactions to retrieve.
+        ///
+        /// If not provided, defaults to default page size
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_accounts_transactions")?;
+        self.context
+            .check_api_output_enabled("Get account transactions", &accept_type)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list_by_account(&accept_type, page, address.0)
     }
@@ -182,6 +240,7 @@ impl TransactionsApi {
     ///
     /// To submit a transaction as BCS, you must submit a SignedTransaction
     /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
     // TODO: Point to examples of both of these flows, in multiple languages.
     #[oai(
         path = "/transactions",
@@ -195,13 +254,81 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
         fail_point_poem("endpoint_submit_transaction")?;
-        let signed_transaction = self.get_signed_transaction(data)?;
-        self.create(&accept_type, signed_transaction).await
+        self.context
+            .check_api_output_enabled("Submit transaction", &accept_type)?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit transaction"));
+        }
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
+        self.create(&accept_type, &ledger_info, signed_transaction)
+            .await
+    }
+
+    /// Submit batch transactions
+    ///
+    /// This allows you to submit multiple transactions.  The response has three outcomes:
+    ///
+    ///   1. All transactions succeed, and it will return a 202
+    ///   2. Some transactions succeed, and it will return the failed transactions and a 206
+    ///   3. No transactions succeed, and it will also return the failed transactions and a 206
+    ///
+    /// To submit a transaction as JSON, you must submit a SubmitTransactionRequest.
+    /// To build this request, do the following:
+    ///
+    ///   1. Encode the transaction as BCS. If you are using a language that has
+    ///      native BCS support, make sure to use that library. If not, you may take
+    ///      advantage of /transactions/encode_submission. When using this
+    ///      endpoint, make sure you trust the node you're talking to, as it is
+    ///      possible they could manipulate your request.
+    ///   2. Sign the encoded transaction and use it to create a TransactionSignature.
+    ///   3. Submit the request. Make sure to use the "application/json" Content-Type.
+    ///
+    /// To submit a transaction as BCS, you must submit a SignedTransaction
+    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
+    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
+    #[oai(
+        path = "/transactions/batch",
+        method = "post",
+        operation_id = "submit_batch_transactions",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn submit_transactions_batch(
+        &self,
+        accept_type: AcceptType,
+        data: SubmitTransactionsBatchPost,
+    ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        fail_point_poem("endpoint_submit_batch_transactions")?;
+        self.context
+            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
+        if !self.context.node_config.api.transaction_submission_enabled {
+            return Err(api_disabled("Submit batch transaction"));
+        }
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
+        if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
+            return Err(SubmitTransactionError::bad_request_with_code(
+                &format!(
+                    "Submitted too many transactions: {}, while limit is {}",
+                    signed_transactions_batch.len(),
+                    self.context.max_submit_transaction_batch_size(),
+                ),
+                AptosErrorCode::InvalidInput,
+                &ledger_info,
+            ));
+        }
+        self.create_batch(&accept_type, &ledger_info, signed_transactions_batch)
+            .await
     }
 
     /// Simulate transaction
     ///
-    /// Simulate submitting a transaction. To use this, you must:
+    /// The output of the transaction will have the exact transaction outputs and events that running
+    /// an actual signed transaction would have.  However, it will not have the associated state
+    /// hashes, as they are not updated in storage.  This can be used to estimate the maximum gas
+    /// units for a submitted transaction.
+    ///
+    /// To use this, you must:
     /// - Create a SignedTransaction with a zero-padded signature.
     /// - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
     ///
@@ -219,8 +346,15 @@ impl TransactionsApi {
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
-        let signed_transaction = self.get_signed_transaction(data)?;
-        self.simulate(&accept_type, signed_transaction).await
+        self.context
+            .check_api_output_enabled("Simulate transaction", &accept_type)?;
+        if !self.context.node_config.api.transaction_simulation_enabled {
+            return Err(api_disabled("Simulate transaction"));
+        }
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
+        self.simulate(&accept_type, ledger_info, signed_transaction)
+            .await
     }
 
     /// Encode submission
@@ -256,56 +390,94 @@ impl TransactionsApi {
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
+        self.context
+            .check_api_output_enabled("Encode submission", &accept_type)?;
+        if !self.context.node_config.api.encode_submission_enabled {
+            return Err(api_disabled("Encode submission"));
+        }
         self.get_signing_message(&accept_type, data.0)
+    }
+
+    /// Estimate gas price
+    ///
+    /// Currently, the gas estimation is handled by taking the median of the last 100,000 transactions
+    /// If a user wants to prioritize their transaction and is willing to pay, they can pay more
+    /// than the gas price.  If they're willing to wait longer, they can pay less.  Note that the
+    /// gas price moves with the fee market, and should only increase when demand outweighs supply.
+    ///
+    /// If there have been no transactions in the last 100,000 transactions, the price will be 1.
+    #[oai(
+        path = "/estimate_gas_price",
+        method = "get",
+        operation_id = "estimate_gas_price",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+        fail_point_poem("endpoint_encode_submission")?;
+        self.context
+            .check_api_output_enabled("Estimate gas price", &accept_type)?;
+        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+        let estimated_gas_price = self.context.estimate_gas_price(&latest_ledger_info)?;
+
+        // TODO: Do we want to give more than just a single gas price?  Percentiles?
+        let gas_estimation = GasEstimation {
+            gas_estimate: estimated_gas_price,
+        };
+
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                gas_estimation,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }
 
 impl TransactionsApi {
+    /// List all transactions paging by ledger version
     fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
         let ledger_version = latest_ledger_info.version();
 
-        let limit = page.limit()?;
-        // TODO: https://github.com/aptos-labs/aptos-core/issues/2286
-        let start_version = page.compute_start(limit, ledger_version)?;
+        let limit = page.limit(&latest_ledger_info)?;
+        let start_version = page.compute_start(limit, ledger_version, &latest_ledger_info)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
             .context("Failed to read raw transactions from storage")
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &latest_ledger_info,
+                )
+            })?;
 
-        BasicResponse::try_from_rust_value((
-            self.render_transactions(data)?,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
-    }
-
-    fn render_transactions<E: InternalError>(
-        &self,
-        data: Vec<TransactionOnChainData>,
-    ) -> Result<Vec<Transaction>, E> {
-        if data.is_empty() {
-            return Ok(vec![]);
+        match accept_type {
+            AcceptType::Json => {
+                let timestamp = self
+                    .context
+                    .get_block_timestamp(&latest_ledger_info, start_version)?;
+                BasicResponse::try_from_json((
+                    self.context.render_transactions_sequential(
+                        &latest_ledger_info,
+                        data,
+                        timestamp,
+                    )?,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
         }
-
-        let resolver = self.context.move_resolver_poem()?;
-        let converter = resolver.as_converter(self.context.db.clone());
-        let txns: Vec<Transaction> = data
-            .into_iter()
-            .map(|t| {
-                let version = t.version;
-                let timestamp = self.context.get_block_timestamp(version)?;
-                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
-                Ok(txn)
-            })
-            .collect::<Result<_, anyhow::Error>>()
-            .context("Failed to convert transaction data from storage")
-            .map_err(E::internal)?;
-
-        Ok(txns)
     }
 
     async fn get_transaction_by_hash_inner(
@@ -318,9 +490,15 @@ impl TransactionsApi {
             .get_by_hash(hash.into(), &ledger_info)
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
-            .map_err(BasicErrorWith404::not_found)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?
             .context(format!("Failed to find transaction with hash: {}", hash))
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
 
         self.get_transaction_inner(accept_type, txn_data, &ledger_info)
             .await
@@ -335,52 +513,73 @@ impl TransactionsApi {
         let txn_data = self
             .get_by_version(version.0, &ledger_info)
             .context(format!("Failed to get transaction by version {}", version))
-            .map_err(BasicErrorWith404::not_found)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?
             .context(format!(
                 "Failed to find transaction at version: {}",
                 version
             ))
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| transaction_not_found_by_version(version.0, &ledger_info))?;
 
         self.get_transaction_inner(accept_type, txn_data, &ledger_info)
             .await
     }
 
+    /// Converts a transaction into the outgoing type
     async fn get_transaction_inner(
         &self,
         accept_type: &AcceptType,
         transaction_data: TransactionData,
         ledger_info: &LedgerInfo,
     ) -> BasicResultWith404<Transaction> {
-        let resolver = self.context.move_resolver_poem()?;
-        let transaction = match transaction_data {
-            TransactionData::OnChain(txn) => {
-                let timestamp = self
-                    .context
-                    .get_block_timestamp(txn.version)
-                    .context("Failed to get block timestamp from DB")
-                    .map_err(BasicErrorWith404::internal)?;
-                resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_onchain_transaction(timestamp, txn)
-                    .context("Failed to convert on chain transaction to Transaction")
-                    .map_err(BasicErrorWith404::internal)?
-            }
-            TransactionData::Pending(txn) => resolver
-                .as_converter(self.context.db.clone())
-                .try_into_pending_transaction(*txn)
-                .context("Failed to convert on pending transaction to Transaction")
-                .map_err(BasicErrorWith404::internal)?,
-        };
+        match accept_type {
+            AcceptType::Json => {
+                let resolver = self.context.move_resolver_poem(ledger_info)?;
+                let transaction = match transaction_data {
+                    TransactionData::OnChain(txn) => {
+                        let timestamp =
+                            self.context.get_block_timestamp(ledger_info, txn.version)?;
+                        resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_onchain_transaction(timestamp, txn)
+                            .context("Failed to convert on chain transaction to Transaction")
+                            .map_err(|err| {
+                                BasicErrorWith404::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InternalError,
+                                    ledger_info,
+                                )
+                            })?
+                    }
+                    TransactionData::Pending(txn) => resolver
+                        .as_converter(self.context.db.clone())
+                        .try_into_pending_transaction(*txn)
+                        .context("Failed to convert on pending transaction to Transaction")
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            )
+                        })?,
+                };
 
-        BasicResponse::try_from_rust_value((
-            transaction,
-            ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                transaction_data,
+                ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 
+    /// Retrieves a transaction by ledger version
     fn get_by_version(
         &self,
         version: u64,
@@ -396,10 +595,10 @@ impl TransactionsApi {
         ))
     }
 
-    // This function looks for the transaction by hash in database and then mempool,
-    // because the period a transaction stay in the mempool is likely short.
-    // Although the mempool get transation is async, but looking up txn in database is a sync call,
-    // thus we keep it simple and call them in sequence.
+    /// Retrieves a transaction by hash. First the node tries to find the transaction
+    /// in the DB. If the transaction is found there, it means the transaction is
+    /// committed. If it is not found there, it looks in mempool. If it is found there,
+    /// it means the transaction is still pending.
     async fn get_by_hash(
         &self,
         hash: aptos_crypto::HashValue,
@@ -418,136 +617,319 @@ impl TransactionsApi {
         })
     }
 
+    /// List all transactions for an account
     fn list_by_account(
         &self,
         accept_type: &AcceptType,
         page: Page,
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        // TODO: Return more specific errors from within this function.
-        let data = self
-            .context
-            .get_account_transactions(
-                address.into(),
-                page.start(0, u64::MAX)?,
-                page.limit()?,
-                latest_ledger_info.version(),
-            )
-            .context("Failed to get account transactions for the given account")
-            .map_err(BasicErrorWith404::internal)?;
+        // Verify the account exists
+        let account = Account::new(self.context.clone(), address, None)?;
+        account.account_state()?;
 
-        BasicResponse::try_from_rust_value((
-            self.render_transactions(data)?,
+        let latest_ledger_info = account.latest_ledger_info;
+        // TODO: Return more specific errors from within this function.
+        let data = self.context.get_account_transactions(
+            address.into(),
+            page.start(0, u64::MAX, &latest_ledger_info)?,
+            page.limit(&latest_ledger_info)?,
+            latest_ledger_info.version(),
             &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        )?;
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                self.context
+                    .render_transactions_non_sequential(&latest_ledger_info, data)?,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
+    /// Parses a single signed transaction
     fn get_signed_transaction(
         &self,
+        ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction = bcs::from_bytes(&data.0)
                     .context("Failed to deserialize input into SignedTransaction")
-                    .map_err(SubmitTransactionError::bad_request)?;
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
                 Ok(signed_transaction)
             }
             SubmitTransactionPost::Json(data) => self
                 .context
-                .move_resolver_poem()?
+                .move_resolver_poem(ledger_info)?
                 .as_converter(self.context.db.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
-                .map_err(SubmitTransactionError::bad_request),
+                .map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    )
+                }),
         }
     }
 
+    /// Parses a batch of signed transactions
+    fn get_signed_transactions_batch(
+        &self,
+        ledger_info: &LedgerInfo,
+        data: SubmitTransactionsBatchPost,
+    ) -> Result<Vec<SignedTransaction>, SubmitTransactionError> {
+        match data {
+            SubmitTransactionsBatchPost::Bcs(data) => {
+                let signed_transactions = bcs::from_bytes(&data.0)
+                    .context("Failed to deserialize input into SignedTransaction")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+                Ok(signed_transactions)
+            }
+            SubmitTransactionsBatchPost::Json(data) => data
+                .0
+                .into_iter()
+                .enumerate()
+                .map(|(index, txn)| {
+                    self.context
+                        .move_resolver_poem(ledger_info)?
+                        .as_converter(self.context.db.clone())
+                        .try_into_signed_transaction_poem(txn, self.context.chain_id())
+                        .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
+                        .map_err(|err| {
+                            SubmitTransactionError::bad_request_with_code(
+                                err,
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            )
+                        })
+                })
+                .collect(),
+        }
+    }
+
+    /// Submits a single transaction, and converts mempool codes to errors
+    async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
+        let (mempool_status, vm_status_opt) = self
+            .context
+            .submit_transaction(txn)
+            .await
+            .context("Mempool failed to initially evaluate submitted transaction")
+            .map_err(|err| {
+                aptos_api_types::AptosError::new_with_error_code(err, AptosErrorCode::InternalError)
+            })?;
+        match mempool_status.code {
+            MempoolStatusCode::Accepted => Ok(()),
+            MempoolStatusCode::MempoolIsFull | MempoolStatusCode::TooManyTransactions => {
+                Err(AptosError::new_with_error_code(
+                    &mempool_status.message,
+                    AptosErrorCode::MempoolIsFull,
+                ))
+            }
+            MempoolStatusCode::VmError => {
+                if let Some(status) = vm_status_opt {
+                    Err(AptosError::new_with_vm_status(
+                        format!(
+                            "Invalid transaction: Type: {:?} Code: {:?}",
+                            status.status_type(),
+                            status
+                        ),
+                        AptosErrorCode::VmError,
+                        status,
+                    ))
+                } else {
+                    Err(AptosError::new_with_vm_status(
+                        "Invalid transaction: unknown",
+                        AptosErrorCode::VmError,
+                        StatusCode::UNKNOWN_STATUS,
+                    ))
+                }
+            }
+            MempoolStatusCode::InvalidSeqNumber => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::SequenceNumberTooOld,
+            )),
+            MempoolStatusCode::InvalidUpdate => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::InvalidTransactionUpdate,
+            )),
+            MempoolStatusCode::UnknownStatus => Err(AptosError::new_with_error_code(
+                format!("Transaction was rejected with status {}", mempool_status,),
+                AptosErrorCode::InternalError,
+            )),
+        }
+    }
+
+    /// Submits a single transaction
     async fn create(
         &self,
         accept_type: &AcceptType,
+        ledger_info: &LedgerInfo,
         txn: SignedTransaction,
     ) -> SubmitTransactionResult<PendingTransaction> {
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let (mempool_status, vm_status_opt) = self
-            .context
-            .submit_transaction(txn.clone())
-            .await
-            .context("Mempool failed to initially evaluate submitted transaction")
-            .map_err(SubmitTransactionError::internal)?;
-        match mempool_status.code {
-            MempoolStatusCode::Accepted => {
-                let resolver = self.context.move_resolver_poem()?;
-                let pending_txn = resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_pending_transaction_poem(txn)
-                    .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                    .map_err(SubmitTransactionError::internal)?;
-                SubmitTransactionResponse::try_from_rust_value((
-                    pending_txn,
-                    &ledger_info,
+        match self.create_internal(txn.clone()).await {
+            Ok(()) => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self
+                        .context
+                        .move_resolver()
+                        .context("Failed to read latest state checkpoint from DB")
+                        .map_err(|e| {
+                            SubmitTransactionError::internal_with_code(
+                                e,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            )
+                        })?;
+
+                    // We provide the pending transaction so that users have the hash associated
+                    let pending_txn = resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_pending_transaction_poem(txn)
+                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
+                            .map_err(|err| SubmitTransactionError::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            ))?;
+                    SubmitTransactionResponse::try_from_json((
+                        pending_txn,
+                        ledger_info,
+                        SubmitTransactionResponseStatus::Accepted,
+                    ))
+                }
+                // With BCS, we don't return the pending transaction for efficiency, because there
+                // is no new information.  The hash can be retrieved by hashing the original
+                // transaction.
+                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
+                    (),
+                    ledger_info,
                     SubmitTransactionResponseStatus::Accepted,
-                    accept_type,
-                ))
-            }
-            MempoolStatusCode::MempoolIsFull => Err(
-                SubmitTransactionError::insufficient_storage_str(&mempool_status.message),
-            ),
-            MempoolStatusCode::VmError => Err(SubmitTransactionError::bad_request_str(&format!(
-                "invalid transaction: {}",
-                vm_status_opt
-                    .map(|s| format!("{:?}", s))
-                    .unwrap_or_else(|| "UNKNOWN".to_owned())
-            ))),
-            _ => Err(SubmitTransactionError::bad_request_str(&format!(
-                "transaction is rejected: {}",
-                mempool_status,
-            ))),
+                )),
+            },
+            Err(error) => match error.error_code {
+                AptosErrorCode::InternalError => Err(
+                    SubmitTransactionError::internal_from_aptos_error(error, ledger_info),
+                ),
+                AptosErrorCode::VmError
+                | AptosErrorCode::SequenceNumberTooOld
+                | AptosErrorCode::InvalidTransactionUpdate => Err(
+                    SubmitTransactionError::bad_request_from_aptos_error(error, ledger_info),
+                ),
+                AptosErrorCode::MempoolIsFull => Err(
+                    SubmitTransactionError::insufficient_storage_from_aptos_error(
+                        error,
+                        ledger_info,
+                    ),
+                ),
+                _ => Err(SubmitTransactionError::internal_from_aptos_error(
+                    error,
+                    ledger_info,
+                )),
+            },
         }
     }
 
-    // TODO: This returns a Vec<Transaction>, but is it possible for a single
-    // transaction request to result in multiple executed transactions?
+    /// Submits a batch of transactions
+    async fn create_batch(
+        &self,
+        accept_type: &AcceptType,
+        ledger_info: &LedgerInfo,
+        txns: Vec<SignedTransaction>,
+    ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        // Iterate through transactions keeping track of failures
+        let mut txn_failures = Vec::new();
+        for (idx, txn) in txns.iter().enumerate() {
+            if let Err(error) = self.create_internal(txn.clone()).await {
+                txn_failures.push(TransactionsBatchSingleSubmissionFailure {
+                    error,
+                    transaction_index: idx,
+                })
+            }
+        }
+
+        // Return the possible failures, and have a different success code for partial success
+        let response_status = if txn_failures.is_empty() {
+            SubmitTransactionsBatchResponseStatus::Accepted
+        } else {
+            // TODO: This should really throw an error if all fail
+            SubmitTransactionsBatchResponseStatus::AcceptedPartial
+        };
+
+        SubmitTransactionsBatchResponse::try_from_rust_value((
+            TransactionsBatchSubmissionResult {
+                transaction_failures: txn_failures,
+            },
+            ledger_info,
+            response_status,
+            accept_type,
+        ))
+    }
+
     // TODO: This function leverages a lot of types from aptos_types, use the
     // local API types and just return those directly, instead of converting
     // from these types in render_transactions.
+    /// Simulate a transaction in the VM
+    ///
+    /// Note: this returns a `Vec<UserTransaction>`, but for backwards compatibility, this can't
+    /// be removed even though, there is only one possible transaction
     pub async fn simulate(
         &self,
         accept_type: &AcceptType,
+        ledger_info: LedgerInfo,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        if txn.clone().check_signature().is_ok() {
-            return Err(SubmitTransactionError::bad_request_str(
-                "Transaction simulation request has a valid signature, this is not allowed",
+        // Transactions shouldn't have a valid signature or this could be used to attack
+        if txn.signature_is_valid() {
+            return Err(SubmitTransactionError::bad_request_with_code(
+                "Simulated transactions must have a non-valid signature",
+                AptosErrorCode::InvalidInput,
+                &ledger_info,
             ));
         }
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let move_resolver = self.context.move_resolver_poem()?;
+
+        // Simulate transaction
+        let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
         let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
 
-        // Apply deltas.
+        // Apply transaction outputs to build up a transaction
         // TODO: while `into_transaction_output_with_status()` should never fail
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
         let output = output_ext.into_transaction_output(&move_resolver);
-        debug_assert!(
-            matches!(output, Ok(_)),
-            "converting into transaction output failed"
-        );
-        let output = output.unwrap();
 
+        // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
+            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         };
 
+        // Build up a transaction from the outputs
+        // All state hashes are invalid, and will be filled with 0s
+        let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
-            zero_hash,
+            txn.hash(),
             zero_hash,
             zero_hash,
             None,
@@ -556,45 +938,69 @@ impl TransactionsApi {
         );
         let simulated_txn = TransactionOnChainData {
             version,
-            transaction: aptos_types::transaction::Transaction::UserTransaction(txn),
+            transaction: txn,
             info,
             events: output.events().to_vec(),
-            accumulator_root_hash: aptos_crypto::HashValue::default(),
+            accumulator_root_hash: zero_hash,
             changes: output.write_set().clone(),
         };
 
-        let transactions = self.render_transactions(vec![simulated_txn])?;
+        match accept_type {
+            AcceptType::Json => {
+                let transactions = self
+                    .context
+                    .render_transactions_non_sequential(&ledger_info, vec![simulated_txn])?;
 
-        // Users can only make requests to simulate UserTransactions, so unpack
-        // the Vec<Transaction> into Vec<UserTransaction>.
-        let mut user_transactions = Vec::new();
-        for transaction in transactions.into_iter() {
-            match transaction {
-                Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
-                _ => return Err(SubmitTransactionError::internal_str(
-                    "Simulation unexpectedly resulted in something other than a UserTransaction",
-                )),
+                // Users can only make requests to simulate UserTransactions, so unpack
+                // the Vec<Transaction> into Vec<UserTransaction>.
+                let mut user_transactions = Vec::new();
+                for transaction in transactions.into_iter() {
+                    match transaction {
+                        Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
+                        _ => {
+                            return Err(SubmitTransactionError::internal_with_code(
+                                "Simulation transaction resulted in a non-UserTransaction",
+                                AptosErrorCode::InternalError,
+                                &ledger_info,
+                            ))
+                        }
+                    }
+                }
+                BasicResponse::try_from_json((
+                    user_transactions,
+                    &ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             }
         }
-        BasicResponse::try_from_rust_value((
-            user_transactions,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
     }
 
+    /// Encode message as BCS
     pub fn get_signing_message(
         &self,
         accept_type: &AcceptType,
         request: EncodeSubmissionRequest,
     ) -> BasicResult<HexEncodedBytes> {
-        let resolver = self.context.move_resolver_poem()?;
+        // We don't want to encourage people to use this API if they can sign the request directly
+        if accept_type == &AcceptType::Bcs {
+            return Err(BasicError::bad_request_with_code_no_info(
+                "BCS is not supported for encode submission",
+                AptosErrorCode::BcsNotSupported,
+            ));
+        }
+
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let resolver = self.context.move_resolver_poem(&ledger_info)?;
         let raw_txn: RawTransaction = resolver
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
-            .map_err(BasicError::bad_request)?;
+            .map_err(|err| {
+                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+            })?;
 
         let raw_message = match request.secondary_signers {
             Some(secondary_signer_addresses) => {
@@ -609,12 +1015,10 @@ impl TransactionsApi {
             None => raw_txn.signing_message(),
         };
 
-        BasicResponse::try_from_rust_value((
+        BasicResponse::try_from_json((
             HexEncodedBytes::from(raw_message),
-            // TODO: Make a variant that doesn't require ledger info.
-            &self.context.get_latest_ledger_info()?,
+            &ledger_info,
             BasicResponseStatus::Ok,
-            accept_type,
         ))
     }
 }

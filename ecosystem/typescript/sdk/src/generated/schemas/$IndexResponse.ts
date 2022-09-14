@@ -7,6 +7,7 @@ export const $IndexResponse = {
     properties: {
         chain_id: {
             type: 'number',
+            description: `Chain ID of the current chain`,
             isRequired: true,
             format: 'uint8',
         },
@@ -22,20 +23,20 @@ export const $IndexResponse = {
             type: 'U64',
             isRequired: true,
         },
-        block_height: {
-            type: 'U64',
-            isRequired: true,
-        },
-        oldest_block_height: {
-            type: 'U64',
-            isRequired: true,
-        },
         ledger_timestamp: {
             type: 'U64',
             isRequired: true,
         },
         node_role: {
             type: 'RoleType',
+            isRequired: true,
+        },
+        oldest_block_height: {
+            type: 'U64',
+            isRequired: true,
+        },
+        block_height: {
+            type: 'U64',
             isRequired: true,
         },
     },

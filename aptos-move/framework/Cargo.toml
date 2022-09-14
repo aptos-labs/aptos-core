@@ -11,34 +11,49 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.57"
+base64 = "0.13.0"
 bcs = "0.1.3"
 better_any = "0.1.1"
 clap = "3.1.8"
 curve25519-dalek = { version = "3", default-features = false }
+flate2 = "1.0.24"
 include_dir = "0.7.2"
+itertools = "0.10.0"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 once_cell = "1.10.0"
+proptest = { version = "1.0.0", optional = true }
+proptest-derive = { version = "0.3.0", optional = true }
 rayon = "1.5.2"
 serde = { version = "1.0.137", default-features = false }
 serde_bytes = "0.11.6"
 serde_json = "1.0.81"
+serde_yaml = "0.8.24"
 sha2 = "0.9.3"
 siphasher = "0.3.10"
 smallvec = "1.8.0"
-structopt = "0.3.21"
 tempfile = "3.3.0"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
+aptos-aggregator = { path = "../../aptos-move/aptos-aggregator" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
+aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
+gas-algebra-ext =  { path = "../gas-algebra-ext" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
+claims = "0.7"
+
 aptos-gas = { path = "../../aptos-move/aptos-gas" }
-aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["aggregator-extension"] }
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-deps = { path = "../move-deps", features = ["table-extension"] }
 
 [features]
 default = []
-fuzzing = ["aptos-types/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "proptest", "proptest-derive"]
+
+[lib]
+doctest = false

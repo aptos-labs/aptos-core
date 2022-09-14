@@ -207,14 +207,14 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 You can fund an account with the faucet via the CLI with either an account or a profile:
 
 ```bash
-$ aptos account fund --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
+$ aptos account fund-with-faucet --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
 {
   "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
 }
 ```
 
 ```bash
-$ aptos account fund --account default
+$ aptos account fund-with-faucet --account default
 {
   "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
 }
@@ -629,7 +629,7 @@ The below example uses the `HelloBlockchain` in [move-examples](https://github.c
 The named addresses can be either an account address, or a profile name.
 
 ```bash
-$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 
 The above command will generate the below terminal output:
@@ -647,7 +647,7 @@ The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
-$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
+$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=superuser
 ```
 The above command will generate the following terminal output:
 ```bash
@@ -677,6 +677,15 @@ SUCCESS proving 1 modules from package `hello_prover` in 1.649s
   "Result": "Success"
 }
 ```
+
+Move Prover may fail with the following terminal output if the dependencies are not installed and set up properly:
+```bash
+FAILURE proving 1 modules from package `hello_prover` in 0.067s
+{
+  "Error": "Move Prover failed: No boogie executable set.  Please set BOOGIE_EXE"
+}
+```
+In this case, see [Install the dependencies of Move Prover](install-aptos-cli#step-3-optional-install-the-dependencies-of-move-prover).
 
 ### Debug and Print Stacktrace
 
@@ -908,7 +917,7 @@ Completed generating configuration:
         Waypoint: 0:d302c6b10e0fa68bfec9cdb383f24ef1189d8850d50b832365eea21ae52d8101
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/6181
+        Fullnode network: /ip4/0.0.0.0/tcp/6181
 
 Aptos is running, press ctrl-c to exit
 ```
@@ -927,7 +936,7 @@ Completed generating configuration:
         Waypoint: 0:649efc34c813d0db8db6fa5b1ffc9cc62f726bb5168e7f4b8730bb155d6213ea
         ChainId: TESTING
         REST API endpoint: 0.0.0.0:8080
-        FullNode network: /ip4/0.0.0.0/tcp/6181
+        Fullnode network: /ip4/0.0.0.0/tcp/6181
 
 Aptos is running, press ctrl-c to exit
 ```

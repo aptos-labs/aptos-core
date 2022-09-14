@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
     chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
     node::K8sNode,
@@ -62,7 +63,7 @@ impl K8sSwarm {
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::aptos_test_root_address();
-        let sequence_number = query_sequence_numbers(&client, &[address])
+        let sequence_number = query_sequence_numbers(&client, [address].iter())
             .await
             .map_err(|e| {
                 format_err!(
@@ -82,7 +83,7 @@ impl K8sSwarm {
         let prom_client = match prometheus::get_prometheus_client() {
             Ok(p) => Some(p),
             Err(e) => {
-                info!("Could not build prometheus client: {}", e);
+                error!("Could not build prometheus client: {}", e);
                 None
             }
         };
@@ -129,15 +130,23 @@ impl Swarm for K8sSwarm {
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {
-        Box::new(self.validators.values().map(|v| v as &'a dyn Validator))
+        let mut validators: Vec<_> = self
+            .validators
+            .values()
+            .map(|v| v as &'a dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        Box::new(
-            self.validators
-                .values_mut()
-                .map(|v| v as &'a mut dyn Validator),
-        )
+        let mut validators: Vec<_> = self
+            .validators
+            .values_mut()
+            .map(|v| v as &'a mut dyn Validator)
+            .collect();
+        validators.sort_by_key(|v| v.index());
+        Box::new(validators.into_iter())
     }
 
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
@@ -161,6 +170,9 @@ impl Swarm for K8sSwarm {
             .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
+        // stop the validator first so there is no race on the upgrade
+        validator.stop().await?;
+        // set the image tag of the StatefulSet spec while there are 0 replicas
         set_stateful_set_image_tag(
             validator.stateful_set_name().to_string(),
             // the container name for the validator in its StatefulSet is "validator"
@@ -252,7 +264,7 @@ impl Swarm for K8sSwarm {
         Ok(())
     }
 
-    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+    async fn ensure_no_validator_restart(&self) -> Result<()> {
         for validator in &self.validators {
             if let Err(e) = check_for_container_restart(
                 &self.kube_client,
@@ -267,7 +279,7 @@ impl Swarm for K8sSwarm {
         Ok(())
     }
 
-    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+    async fn ensure_no_fullnode_restart(&self) -> Result<()> {
         for fullnode in &self.fullnodes {
             if let Err(e) = check_for_container_restart(
                 &self.kube_client,
@@ -294,6 +306,28 @@ impl Swarm for K8sSwarm {
             return query_with_metadata(c, query, time, timeout, labels_map).await;
         }
         bail!("No prom client");
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
+        if let Some(c) = &self.prom_client {
+            let system_metrics = query_prometheus_system_metrics(
+                c,
+                start_time,
+                end_time,
+                30.0,
+                &self.kube_namespace,
+            )
+            .await?;
+            threshold.ensure_threshold(&system_metrics)?;
+            Ok(())
+        } else {
+            bail!("No prom client");
+        }
     }
 }
 
@@ -477,9 +511,10 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                             node.name()
                         );
                     }
-                    Err(x) => {
-                        info!("Node {} unhealthy: {}", node.name(), &x);
-                        Err(x)
+                    Err(err) => {
+                        let err = anyhow::Error::from(err);
+                        info!("Node {} unhealthy: {}", node.name(), &err);
+                        Err(err)
                     }
                 }
             })

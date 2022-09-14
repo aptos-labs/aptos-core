@@ -13,8 +13,8 @@ use crate::{
     transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    NodeConfig, PrunerConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
@@ -37,6 +37,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
             RocksdbConfigs::default(),
             false,
             config.storage.target_snapshot_size,
+            config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .expect("DB should open."),
     );
@@ -60,6 +61,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
         RocksdbConfigs::default(),
         false,
         TARGET_SNAPSHOT_SIZE,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref())
@@ -73,7 +75,7 @@ pub fn run_benchmark(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
 ) {
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
@@ -108,7 +110,7 @@ pub fn add_accounts(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
 ) {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
@@ -130,7 +132,7 @@ fn add_accounts_impl(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     output_dir: impl AsRef<Path>,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
 ) {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();

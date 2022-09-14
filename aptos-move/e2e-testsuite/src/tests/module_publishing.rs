@@ -8,10 +8,13 @@ use language_e2e_tests::{
 };
 use move_deps::move_core_types::vm_status::StatusCode;
 
+// TODO: ignoring most tests for now as bundle publishing is no longer available. Want to resurrect
+// or rewrite for new publishin approach
+
 // A module with an address different from the sender's address should be rejected
 #[test]
 fn bad_module_address() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -66,7 +69,7 @@ macro_rules! module_republish_test {
     ($name:ident, $prog1:literal, $prog2:literal) => {
         #[test]
         fn $name() {
-            let mut executor = FakeExecutor::from_genesis_file();
+            let mut executor = FakeExecutor::from_head_genesis();
             executor.set_golden_file(current_function_name!());
 
             let sequence_number = 2;
@@ -260,7 +263,7 @@ module_republish_test!(
 #[test]
 pub fn test_publishing_modules_proper_sender() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -290,7 +293,7 @@ pub fn test_publishing_modules_proper_sender() {
 #[test]
 pub fn test_publishing_modules_invalid_sender() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -323,7 +326,7 @@ pub fn test_publishing_modules_invalid_sender() {
 #[test]
 pub fn test_publishing_allow_modules() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.

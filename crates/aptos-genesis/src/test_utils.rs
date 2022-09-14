@@ -9,13 +9,11 @@ use rand::{rngs::StdRng, SeedableRng};
 pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let path = TempPath::new();
     path.create_as_dir().unwrap();
-    let (root_key, _genesis, _genesis_waypoint, validators) = crate::builder::Builder::new(
-        path.path(),
-        cached_framework_packages::module_blobs().to_vec(),
-    )
-    .unwrap()
-    .build(StdRng::from_seed([0; 32]))
-    .unwrap();
+    let (root_key, _genesis, _genesis_waypoint, validators) =
+        crate::builder::Builder::new(path.path(), cached_packages::head_release_bundle().clone())
+            .unwrap()
+            .build(StdRng::from_seed([0; 32]))
+            .unwrap();
     let (
         IdentityBlob {
             account_address,
@@ -23,6 +21,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
             consensus_private_key,
             ..
         },
+        _,
         _,
         _,
     ) = validators[0].get_key_objects(None).unwrap();

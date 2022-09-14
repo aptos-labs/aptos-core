@@ -21,7 +21,7 @@ fn test_timestamp_time_has_started() {
         vec![],
         serialize_values(&vec![MoveValue::Signer(account_address)]),
     );
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(327682));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(327683));
 
     executor.exec(
         "timestamp",
@@ -29,20 +29,18 @@ fn test_timestamp_time_has_started() {
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
-
-    let output = executor.try_exec(
-        "timestamp",
-        "set_time_has_started",
-        vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
-    );
-
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(196609));
 }
 
 #[test]
 fn test_block_double_init() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
+
+    executor.exec(
+        "account",
+        "create_account_unchecked",
+        vec![],
+        serialize_values(&vec![MoveValue::Address(CORE_CODE_ADDRESS)]),
+    );
 
     executor.exec(
         "block",

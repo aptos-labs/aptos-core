@@ -5,7 +5,7 @@ slug: "run-validator-node-using-aws"
 
 # On AWS
 
-This is a step-by-step guide to install an Aptos node on AWS. These steps will configure a Validator node and a FullNode on separate machines. 
+This is a step-by-step guide to install an Aptos node on AWS. These steps will configure a validator node and a fullnode on separate machines. 
 
 ## Before you proceed
 
@@ -14,12 +14,16 @@ Make sure you complete these pre-requisite steps before you proceed:
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
 
-   * **Aptos CLI 0.2.0**: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
+   * **Aptos CLI 0.3.1**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
    * **Terraform 1.2.4**: https://www.terraform.io/downloads.html
    * **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
    * **AWS CLI**: https://aws.amazon.com/cli/
 
 ## Install
+
+:::tip One validator node + one validator fullnode
+When you follow all the below instructions, you will run one validator node and one validator fullnode in the cluster. 
+:::
 
 1. Create a working directory for your node configuration.
 
@@ -33,6 +37,12 @@ Make sure you complete these pre-requisite steps before you proceed:
 
       ```
       mkdir -p ~/$WORKSPACE
+      ```
+    
+    * Choose a username for your node, for example `alice`.
+
+      ```
+      export USERNAME=alice
       ```
 
 2. Create an S3 storage bucket for storing the Terraform state on AWS. You can do this on the AWS UI or by the below command: 
@@ -48,7 +58,7 @@ Make sure you complete these pre-requisite steps before you proceed:
     vi main.tf
     ```
 
-4. Modify the `main.tf` file to configure Terraform and to create Aptos FullNode from the Terraform module. See below example content for `main.tf`:
+4. Modify the `main.tf` file to configure Terraform and to create Aptos fullnode from the Terraform module. See below example content for `main.tf`:
 
     ```
     terraform {
@@ -70,7 +80,7 @@ Make sure you complete these pre-requisite steps before you proceed:
       region        = <aws region>  # Specify the region
       # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
       era           = 1              # bump era number to wipe the chain
-      chain_id      = 40
+      chain_id      = 43
       image_tag     = "testnet" # Specify the image tag to use
       validator_name = "<Name of your Validator>"
     }
@@ -117,84 +127,69 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
     ```
 
-10. Generate the key pairs (node owner key, consensus key and networking key) in your working directory.
+10. Generate the key pairs (node owner, voter, operator key, consensus key and networking key) in your working directory.
 
     ```
-    aptos genesis generate-keys --output-dir ~/$WORKSPACE
+    aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys
     ```
 
-    This will create three key files: 
+    This will create 4 key files under `~/$WORKSPACE/keys` directory: 
+      - `public-keys.yaml`
       - `private-keys.yaml`
       - `validator-identity.yaml`, and
       - `validator-full-node-identity.yaml`.
       
       :::caution IMPORTANT
 
-       Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. **Never share these keys with anyone.**
+       Backup your private key files somewhere safe. These key files are important for you to establish ownership of your node. **Never share private keys with anyone.**
       :::
 
 11. Configure the Validator information. This is all the information you need to register on Aptos community website later.
 
     ```
-    aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <select a username for your node> --validator-host $VALIDATOR_ADDRESS:6180 --full-node-host $FULLNODE_ADDRESS:6182
+    aptos genesis set-validator-configuration \
+      --local-repository-dir ~/$WORKSPACE \
+      --username $USERNAME \
+      --owner-public-identity-file ~/$WORKSPACE/keys/public-keys.yaml \
+      --validator-host $VALIDATOR_ADDRESS:6180 \
+      --full-node-host $FULLNODE_ADDRESS:6182 \
+      --stake-amount 100000000000000
 
     ```
 
-    This will create a YAML file in your working directory with your username. For example, for a username `aptosbot` the file will be `aptosbot.yaml`, and the file contents will look like below:
+    This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-    ```
-    ---
-    account_address: 7410973313fd0b5c69560fd8cd9c4aaeef873f869d292d1bb94b1872e737d64f
-    consensus_public_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
-    account_public_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
-    validator_network_public_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
-    validator_host:
-      host: 30247cc34f270cb8.elb.us-west-2.amazonaws.com
-      port: 6180
-    full_node_network_public_key: "0xd66c403cae9f2939ade811e2f582ce8ad24122f0d961aa76be032ada68124f19"
-    full_node_host:
-      host: abc5b9734d4cc418.elb.us-west-2.amazonaws.com
-      port: 6182
-    stake_amount: 1
-    ```
-
-12. Create a layout YAML file, which defines the node in the Aptos `validatorSet`. 
-For the test mode, it is sufficient to create a genesis blob containing only one node.
+12. Create a layout template file, which defines the node in the Aptos `validatorSet`. 
 
   ```
-  vi layout.yaml
+  aptos genesis generate-layout-template --output-file ~/$WORKSPACE/layout.yaml
   ```
-
-  Add the `root_key`, the Validator node username, and `chain_id` in the `layout.yaml` file. For example:
+  Edit the `layout.yaml`, add the `root_key`, the validator node username, and `chain_id`:
 
   ```
-  ---
-  root_key: "F22409A93D1CD12D2FC92B5F8EB84CDCD24C348E32B3E7A720F3D2E288E63394"
-  users:
-    - "<username you specified from previous step>"
-  chain_id: 40
-  min_stake: 0
-  max_stake: 100000
-  min_lockup_duration_secs: 0
-  max_lockup_duration_secs: 2592000
-  epoch_duration_secs: 86400
-  initial_lockup_timestamp: 1656615600
-  min_price_per_gas_unit: 1
-  allow_new_validators: true
+  root_key: "D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E"
+  users: ["<username you specified from previous step>"]
+  chain_id: 43
+  allow_new_validators: false
+  epoch_duration_secs: 7200
+  is_test: true
+  min_stake: 100000000000000
+  min_voting_threshold: 100000000000000
+  max_stake: 100000000000000000
+  recurring_lockup_duration_secs: 86400
+  required_proposer_stake: 100000000000000
+  rewards_apy_percentage: 10
+  voting_duration_secs: 43200
+  voting_power_increase_limit: 20
   ```
 
   Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
-13. Download the AptosFramework Move bytecode into a folder named `framework`.
-
-    Download the Aptos Framework zip file from the Aptos release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.2.0 and unzip it.
+13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.2.0/framework.zip
-    unzip framework.zip
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
-
-    You will now have a folder called `framework`, which contains the Move bytecode with the format `.mv`.
 
 14. Compile the genesis blob and waypoint.
 
@@ -206,12 +201,16 @@ For the test mode, it is sufficient to create a genesis blob containing only one
 
 15. To summarize, in your working directory you should have a list of files:
     - `main.tf`: The Terraform files to install the `aptos-node` module (from steps 3 and 4).
-    - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
-    - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
-    - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).
-    - `<username>.yaml`: Node information that will be used for both the Validator and the FullNode (from step 11). 
+    - `keys` folder, which includes:
+      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 10).
+      - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 10).
+      - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 10).
+      - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 10).
+    - `username` folder, which includes: 
+      - `owner.yaml`: define owner, operator, and voter mapping. They are all the same account in test mode (from step 11).
+      - `operator.yaml`: Node information that will be used for both the Validator and the fullnode (from step 11). 
     - `layout.yaml`: The layout file containing the key values for root key, validator user, and chain ID (from step 12).
-    - `framework`: The folder that contains all the Move bytecode you downloaded and unzipped (from step 13).
+    - `framework.mrb`: The AptosFramework Move package (from step 13).
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 14).
     - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 14).
 
@@ -221,8 +220,8 @@ For the test mode, it is sufficient to create a genesis blob containing only one
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
-        --from-file=validator-identity.yaml=validator-identity.yaml \
-        --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
+        --from-file=validator-identity.yaml=keys/validator-identity.yaml \
+        --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
     ```
 
     :::note

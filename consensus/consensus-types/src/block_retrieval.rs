@@ -15,6 +15,8 @@ use std::fmt;
 // TODO: add a test
 pub const MAX_BLOCKS_PER_REQUEST: u64 = 10;
 
+pub const MAX_FAILED_ATTEMPTS: u32 = 4;
+
 /// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct BlockRetrievalRequest {

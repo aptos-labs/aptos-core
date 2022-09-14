@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveResource = {
+    description: `A parsed Move resource`,
     properties: {
         type: {
             type: 'MoveStructTag',

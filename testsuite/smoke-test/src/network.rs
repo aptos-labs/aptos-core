@@ -10,6 +10,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};
+use aptos_genesis::config::HostAndPort;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
 use forge::{FullNode, NodeExt, Swarm};
@@ -20,8 +21,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-// Flaky test, no longer works after removing operational tool
-#[ignore]
 #[tokio::test]
 async fn test_connection_limiting() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -30,7 +29,9 @@ async fn test_connection_limiting() {
 
     // Only allow file based discovery, disallow other nodes
     let cli = CliTestFramework::local_new(0);
-    let (private_key, peer_set) = generate_private_key_and_peer(&cli, [1u8; 32]).await;
+    let host = HostAndPort::local(swarm.validators().next().unwrap().port()).unwrap();
+    let (private_key, peer_set) =
+        generate_private_key_and_peer(&cli, host.clone(), [1u8; 32]).await;
     let discovery_file = create_discovery_file(peer_set.clone());
     let mut full_node_config = NodeConfig::default_for_validator_full_node();
     modify_network_config(&mut full_node_config, &NetworkId::Public, |network| {
@@ -96,7 +97,8 @@ async fn test_connection_limiting() {
     // And not be able to connect with an arbitrary one, limit is 0
     // TODO: Improve network checker to keep connection alive so we can test connection limits without nodes
     let cli = CliTestFramework::local_new(0);
-    let (private_key, peer_set) = generate_private_key_and_peer(&cli, [2u8; 32]).await;
+    let (private_key, peer_set) =
+        generate_private_key_and_peer(&cli, host.clone(), [2u8; 32]).await;
     let pfn_peer_id_fail = swarm
         .add_full_node(
             &version,
@@ -134,7 +136,9 @@ async fn test_connection_limiting() {
 #[tokio::test]
 async fn test_file_discovery() {
     let cli = CliTestFramework::local_new(0);
-    let (_, peer_set) = generate_private_key_and_peer(&cli, [0u8; 32]).await;
+    // TODO: This host needs to be set properly
+    let host = HostAndPort::local(6180).unwrap();
+    let (_, peer_set) = generate_private_key_and_peer(&cli, host, [0u8; 32]).await;
     let discovery_file = Arc::new(create_discovery_file(peer_set));
     let discovery_file_for_closure = discovery_file.clone();
     let swarm = SwarmBuilder::new_local(1)
@@ -177,6 +181,7 @@ fn create_discovery_file(peer_set: PeerSet) -> TempPath {
 /// Generates `PrivateKey` and `Peer` information for a client / node
 async fn generate_private_key_and_peer(
     cli: &CliTestFramework,
+    host: HostAndPort,
     seed: [u8; 32],
 ) -> (x25519::PrivateKey, HashMap<AccountAddress, Peer>) {
     let temp_folder = TempPath::new();
@@ -187,14 +192,31 @@ async fn generate_private_key_and_peer(
         .await
         .unwrap();
 
-    let private_key = EncodingType::Hex
+    let private_key: x25519::PrivateKey = EncodingType::Hex
         .load_key("test-key", private_key_path.as_path())
         .unwrap();
     let peer_set = cli
-        .extract_peer(private_key_path, extract_peer_path)
+        .extract_peer(host, private_key_path, extract_peer_path)
         .await
         .unwrap();
-
+    // Check that public key matches peer
+    assert_eq!(
+        peer_set
+            .iter()
+            .next()
+            .unwrap()
+            .1
+            .keys
+            .iter()
+            .next()
+            .unwrap(),
+        &private_key.public_key()
+    );
+    // Check that peer id matches public key
+    assert_eq!(
+        private_key.public_key().as_slice(),
+        peer_set.iter().next().unwrap().0.as_slice()
+    );
     (private_key, peer_set)
 }
 

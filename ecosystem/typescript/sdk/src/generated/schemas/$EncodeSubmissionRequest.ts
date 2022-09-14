@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $EncodeSubmissionRequest = {
+    description: `Request to encode a submission`,
     properties: {
         sender: {
             type: 'Address',

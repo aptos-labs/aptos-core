@@ -5,9 +5,8 @@ slug: "aptos-move-guides"
 
 # Move Guides
 
-Start here to learn how the Move language works on the Aptos Blockchain. 
+Start here to learn how the Move language works on the Aptos blockchain. 
 
 - ### [Move on Aptos](move-on-aptos.md)
-
-- ### [Guide for Move Transactional Testing](./guide-move-transactional-testing.md)
-
+- ### [Upgrading Move Code](upgrading-move-code)
+- ### [Guide for Move Transactional Testing](guide-move-transactional-testing.md)

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::database::get_chunks;
 use crate::util::bigdecimal_to_u64;
 use crate::{
     counters::{
@@ -14,9 +15,11 @@ use crate::{
 };
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
+use diesel::pg::upsert::excluded;
 use diesel::{prelude::*, RunQueryDsl};
+use field_count::FieldCount;
 use schema::processor_statuses::{self, dsl};
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 /// The `TransactionProcessor` is used by an instance of a `Tailer` to process transactions
 #[async_trait]
@@ -25,12 +28,13 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     /// This will get stored in the database for each (`TransactionProcessor`, transaction_version) pair
     fn name(&self) -> &'static str;
 
-    /// Accepts a transaction, and processes it. This method will be called from `process_transaction_with_status`
-    /// In case a transaction cannot be processed, returns an error: the `Tailer` will mark it as failed in the database,
-    /// and it will be retried next time the indexer is started.
-    async fn process_transaction(
+    /// Process all transactions within a block and processes it. This method will be called from `process_transaction_with_status`
+    /// In case a transaction cannot be processed, we will fail the entire block.
+    async fn process_transactions(
         &self,
-        transaction: Arc<Transaction>,
+        transactions: Vec<Transaction>,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError>;
 
     /// Gets a reference to the connection pool
@@ -62,17 +66,26 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     }
 
     /// This is a helper method, tying together the other helper methods to allow tracking status in the DB
-    async fn process_transaction_with_status(
+    async fn process_transactions_with_status(
         &self,
-        transaction: Arc<Transaction>,
+        txns: Vec<Transaction>,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        assert!(
+            !txns.is_empty(),
+            "Must provide at least one transaction to this function"
+        );
         PROCESSOR_INVOCATIONS
             .with_label_values(&[self.name()])
             .inc();
 
-        self.mark_version_started(transaction.version().unwrap());
-        let res = self.process_transaction(transaction).await;
-        // Handle version success/failure
+        let start_version = txns.first().unwrap().version().unwrap();
+        let end_version = txns.last().unwrap().version().unwrap();
+
+        self.mark_versions_started(start_version, end_version);
+        let res = self
+            .process_transactions(txns, start_version, end_version)
+            .await;
+        // Handle block success/failure
         match res.as_ref() {
             Ok(processing_result) => self.update_status_success(processing_result),
             Err(tpe) => self.update_status_err(tpe),
@@ -81,26 +94,40 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     }
 
     /// Writes that a version has been started for this `TransactionProcessor` to the DB
-    fn mark_version_started(&self, version: u64) {
+    fn mark_versions_started(&self, start_version: u64, end_version: u64) {
         aptos_logger::debug!(
-            "[{}] Marking processing version started: {}",
+            "[{}] Marking processing versions started from versions {} to {}",
             self.name(),
-            version
+            start_version,
+            end_version
         );
-        let psm = ProcessorStatusModel::for_mark_started(self.name(), version);
-        self.apply_processor_status(&psm);
+        let psms = ProcessorStatusModel::from_versions(
+            self.name(),
+            start_version,
+            end_version,
+            false,
+            None,
+        );
+        self.apply_processor_status(&psms);
     }
 
     /// Writes that a version has been completed successfully for this `TransactionProcessor` to the DB
     fn update_status_success(&self, processing_result: &ProcessingResult) {
         aptos_logger::debug!(
-            "[{}] Marking processing version OK: {}",
+            "[{}] Marking processing version OK from versions {} to {}",
             self.name(),
-            processing_result.version
+            processing_result.start_version,
+            processing_result.end_version
         );
         PROCESSOR_SUCCESSES.with_label_values(&[self.name()]).inc();
-        let psm = ProcessorStatusModel::from_processing_result_ok(processing_result);
-        self.apply_processor_status(&psm);
+        let psms = ProcessorStatusModel::from_versions(
+            self.name(),
+            processing_result.start_version,
+            processing_result.end_version,
+            true,
+            None,
+        );
+        self.apply_processor_status(&psms);
     }
 
     /// Writes that a version has errored for this `TransactionProcessor` to the DB
@@ -116,17 +143,24 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     }
 
     /// Actually performs the write for a `ProcessorStatusModel` changeset
-    fn apply_processor_status(&self, psm: &ProcessorStatusModel) {
+    fn apply_processor_status(&self, psms: &[ProcessorStatusModel]) {
         let conn = self.get_conn();
-        execute_with_better_error(
-            &conn,
-            diesel::insert_into(processor_statuses::table)
-                .values(psm)
-                .on_conflict((dsl::name, dsl::version))
-                .do_update()
-                .set(psm),
-        )
-        .expect("Error updating Processor Status!");
+        let chunks = get_chunks(psms.len(), ProcessorStatusModel::field_count());
+        for (start_ind, end_ind) in chunks {
+            execute_with_better_error(
+                &conn,
+                diesel::insert_into(processor_statuses::table)
+                    .values(&psms[start_ind..end_ind])
+                    .on_conflict((dsl::name, dsl::version))
+                    .do_update()
+                    .set((
+                        dsl::success.eq(excluded(dsl::success)),
+                        dsl::details.eq(excluded(dsl::details)),
+                        dsl::last_updated.eq(excluded(dsl::last_updated)),
+                    )),
+            )
+            .expect("Error updating Processor Status!");
+        }
     }
 
     /// Gets all versions which were not successfully processed for this `TransactionProcessor` from the DB

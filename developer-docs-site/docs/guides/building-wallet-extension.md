@@ -7,21 +7,17 @@ import TabItem from '@theme/TabItem';
 
 # Building the Wallet Extension
 
-*Note: Wallet is very early in development and not secure or production ready*
-
-This tutorial goes through how to build the wallet extension and how to use it with your dApp 
-1. Install the wallet on Chrome
+We will be using "Petra Aptos Wallet" for this tutorial. This tutorial goes through how to install the Petra extension and how to use it with your dApp
+1. Install Petra on Chrome
 2. Wallet functionality
 3. dApp Integration
 
 ## Step 1) Install the wallet on Chrome
 
-1. Download the latest [wallet release](https://github.com/aptos-labs/aptos-core/releases/) and unzip
-2. Open a Chrome window and navigate to [chrome://extensions](chrome://extensions)
-3. Enable **Developer mode** in the top right of the extension page
-4. Hit **Load unpacked** and point it to the folder you just downloaded
+1. Visit the [Petra Wallet extension page](https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci).
+2. Click the **Add to Chrome** button.
 
-Now you should see the Aptos wallet in your chrome extensions!
+Now you should see "Petra Aptos Wallet" in your chrome extensions!
 
 *Hint: Open your downloaded extensions by clicking the puzzle piece icon in your Chrome toolbar*
 
@@ -59,16 +55,12 @@ const status = await (window as any).aptos.isConnected()
 const accountAddress = await (window as any).aptos.account()
 
 // Create a transaction
-// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
-        "0x1::coin",
-        "transfer",
-        [token],
-        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
-    ),
-);
+const transaction = {
+    arguments: [address, '717'],
+    function: '0x1::coin::transfer',
+    type: 'entry_function_payload',
+    type_arguments: ['0x1::aptos_coin::AptosCoin'],
+};
 
 // Send transaction to the extension to be signed and submitted to chain
 const response = await (window as any).aptos.signAndSubmitTransaction(transaction)

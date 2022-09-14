@@ -16,6 +16,8 @@ pub enum WrapperCommand {
         Round,
         // max block size
         u64,
+        // max byte size
+        u64,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
@@ -27,11 +29,11 @@ pub enum WrapperCommand {
 impl fmt::Display for WrapperCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            WrapperCommand::GetBlockRequest(round, block_size, excluded, _) => {
+            WrapperCommand::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
                 write!(
                     f,
-                    "GetBlockRequest [round: {}, block_size: {}, excluded: {}]",
-                    round, block_size, excluded
+                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
+                    round, max_txns, max_bytes, excluded
                 )
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {

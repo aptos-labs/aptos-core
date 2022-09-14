@@ -96,6 +96,7 @@ impl ReplayVerifyCoordinator {
                 restore_handler: self.restore_handler,
             }),
             concurrent_downloads: self.concurrent_downloads,
+            replay_concurrency_level: 0, // won't replay, doesn't matter
         };
 
         if let Some(backup) = state_snapshot {

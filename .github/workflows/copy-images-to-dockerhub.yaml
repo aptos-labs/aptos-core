@@ -5,29 +5,40 @@ on:
         required: true
         type: string
         description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
+  workflow_dispatch:
+    inputs:
+      image_tag_prefix:
+        required: true
+        type: string
+        default: adhoc
+        description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
 
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation
 
 jobs:
-  copy-images:
-    strategy:
-      fail-fast: false
-      matrix:
-        IMAGE_NAME: [validator, forge, tools, faucet, indexer, node-checker]
-
+  wait-for-images-to-have-been-built:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
       - name: Wait for images to have been built
-        timeout-minutes: 20
+        timeout-minutes: 30
         uses: lewagon/wait-on-check-action@v1.0.0
         with:
           ref: ${{ github.ref }}
           check-regexp: "rust-images.*"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30 # wait 30 seconds between making polling API calls, default is 10 but we ran in the past into rate-limiting issues with too frequent polling
+
+  copy-images:
+    needs: wait-for-images-to-have-been-built
+    strategy:
+      fail-fast: false
+      matrix:
+        IMAGE_NAME: [validator, forge, tools, faucet, indexer, node-checker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
       - uses: ./.github/actions/gar-auth
         with:

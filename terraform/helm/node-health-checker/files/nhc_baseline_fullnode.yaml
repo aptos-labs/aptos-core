@@ -1,0 +1,59 @@
+# Based on config from https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/node-checker/configuration_examples/single_node_validator.yaml
+---
+node_address:
+  url: {{ .Values.node_health_checker.baseline_node_url }}
+  metrics_port: 9101
+  api_port: 8080
+  noise_port: 6180
+configuration_name: ait3_registration
+configuration_name_pretty: AIT3 Registration
+chain_id: ~
+role_type: ~
+evaluators:
+  - consensus_proposals
+  - performance_tps
+  - api_latency
+  - consensus_round
+  - consensus_timeouts
+  - state_sync_version
+  - api_transaction_availability
+evaluator_args:
+  build_version_args: {}
+  consensus_proposals_args: {}
+  consensus_round_args: {}
+  consensus_timeouts_args:
+    allowed_consensus_timeouts: 0
+  latency_args:
+    num_samples: 5
+    delay_between_samples_ms: 20
+    num_allowed_errors: 1
+    max_api_latency_ms: 1000
+  network_minimum_peers_args:
+    minimum_peers_inbound: 0
+    minimum_peers_outbound: 1
+  network_peers_tolerance_args:
+    inbound_peers_tolerance: 10
+    outbound_peers_tolerance: 10
+  node_identity_args: {}
+  state_sync_version_args:
+    version_delta_tolerance: 5000
+  tps_args:
+    emit_args:
+      mempool_backlog: 5000
+      target_tps: 0
+      txn_expiration_time_secs: 30
+      duration: 10
+      invalid_tx: 0
+      transaction_type: P2P
+    mint_args:
+      mint_key:
+        key: {{ .Values.node_health_checker.mint_key }}
+      mint_file: ~
+    minimum_tps: 1000
+    repeat_target_count: 1
+  transaction_availability_args:
+    transaction_fetch_delay_secs: 5
+runner_args:
+  blocking_runner_args:
+    metrics_fetch_delay_secs: 5
+    api_client_timeout_secs: 4

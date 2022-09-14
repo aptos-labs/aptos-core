@@ -12,6 +12,7 @@ use schemadb::{
 pub(crate) const BATCH_CF_NAME: ColumnFamilyName = "batch";
 pub(crate) const BATCH_ID_CF_NAME: ColumnFamilyName = "batch_ID";
 
+#[derive(Debug)]
 pub(crate) struct BatchSchema;
 
 impl Schema for BatchSchema {
@@ -40,6 +41,7 @@ impl ValueCodec<BatchSchema> for PersistedValue {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct BatchIdSchema;
 
 impl Schema for BatchIdSchema {

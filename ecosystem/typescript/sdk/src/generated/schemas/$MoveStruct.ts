@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveStruct = {
+    description: `A move struct`,
     properties: {
         name: {
             type: 'IdentifierWrapper',
@@ -9,6 +10,7 @@ export const $MoveStruct = {
         },
         is_native: {
             type: 'boolean',
+            description: `Whether the struct is a native struct of Move`,
             isRequired: true,
         },
         abilities: {

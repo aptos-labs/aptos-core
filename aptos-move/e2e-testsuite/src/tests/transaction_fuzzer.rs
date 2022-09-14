@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib::ScriptFunctionCall;
+use cached_packages::aptos_stdlib::EntryFunctionCall;
 use language_e2e_tests::{account::Account, executor::FakeExecutor};
 use proptest::{collection::vec, prelude::*};
 
@@ -9,9 +9,9 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
     #[test]
     fn fuzz_scripts_genesis_state(
-        txns in vec(any::<ScriptFunctionCall>(), 0..10),
+        txns in vec(any::<EntryFunctionCall>(), 0..10),
     ) {
-        let executor = FakeExecutor::from_genesis_file();
+        let executor = FakeExecutor::from_head_genesis();
         let accounts = vec![
             (Account::new_aptos_root(), 0),
         ];

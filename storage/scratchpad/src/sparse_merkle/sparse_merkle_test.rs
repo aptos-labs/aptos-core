@@ -111,7 +111,7 @@ fn test_replace_persisted_leaf() {
     let proof = SparseMerkleProofExt::new(Some(leaf), Vec::new());
     let proof_reader = ProofReader::new(vec![(key, proof)]);
 
-    let smt = SparseMerkleTree::new(leaf.hash());
+    let smt = SparseMerkleTree::new_test(leaf.hash());
     let new_value: StateValue = vec![1, 2, 3].into();
     let root_hash = hash_leaf(key, new_value.hash());
     let updated = smt
@@ -128,7 +128,7 @@ fn test_delete_persisted_leaf() {
     let proof = SparseMerkleProofExt::new(Some(leaf), Vec::new());
     let proof_reader = ProofReader::new(vec![(key, proof)]);
 
-    let smt = SparseMerkleTree::new(leaf.hash());
+    let smt = SparseMerkleTree::new_test(leaf.hash());
     let updated = smt.batch_update(vec![(key, None)], &proof_reader).unwrap();
     assert_eq!(updated.root_hash(), *SPARSE_MERKLE_PLACEHOLDER_HASH);
 }
@@ -139,7 +139,7 @@ fn test_split_persisted_leaf_and_then_delete() {
     let value_hash1 = b"hello".test_only_hash();
     let leaf1 = SparseMerkleLeafNode::new(key1, value_hash1);
 
-    let smt = SparseMerkleTree::new(leaf1.hash());
+    let smt = SparseMerkleTree::new_test(leaf1.hash());
 
     let key2 = HashValue::from_slice(&[0xff; 32]).unwrap();
     let value2: StateValue = vec![1, 2, 3].into();
@@ -172,7 +172,7 @@ fn test_insert_at_persisted_empty() {
     let proof = SparseMerkleProofExt::new(None, vec![NodeInProof::Other(sibling_hash)]);
     let proof_reader = ProofReader::new(vec![(key3, proof)]);
     let old_root_hash = hash_internal(sibling_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
-    let smt = SparseMerkleTree::new(old_root_hash);
+    let smt = SparseMerkleTree::new_test(old_root_hash);
 
     let root_hash = hash_internal(sibling_hash, hash_leaf(key3, value3.hash()));
     let updated = smt
@@ -228,7 +228,7 @@ fn test_update_256_siblings_in_proof() {
 
     let new_value1 = StateValue::from(String::from("test_val1111").into_bytes());
     let proof_reader = ProofReader::new(vec![(key1, proof_of_key1)]);
-    let smt = SparseMerkleTree::new(old_root_hash);
+    let smt = SparseMerkleTree::new_test(old_root_hash);
     let new_smt = smt
         .batch_update(vec![(key1, Some(&new_value1))], &proof_reader)
         .unwrap();
@@ -252,7 +252,7 @@ fn test_update_256_siblings_in_proof() {
 #[test]
 fn test_new_unknown() {
     let root_hash = HashValue::new([1; HashValue::LENGTH]);
-    let smt = SparseMerkleTree::new(root_hash);
+    let smt = SparseMerkleTree::new_test(root_hash);
     assert!(smt.root_weak().is_unknown());
     assert_eq!(smt.root_hash(), root_hash);
 }
@@ -260,7 +260,7 @@ fn test_new_unknown() {
 #[test]
 fn test_new_empty() {
     let root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-    let smt = SparseMerkleTree::new(root_hash);
+    let smt = SparseMerkleTree::new_test(root_hash);
     assert!(smt.root_weak().is_empty());
     assert_eq!(smt.root_hash(), root_hash);
 }
@@ -309,7 +309,7 @@ fn test_update() {
 
     // Create the old tree and update the tree with new value and proof.
     let proof_reader = ProofReader::new(vec![(key4, proof)]);
-    let smt1 = SparseMerkleTree::new(old_root_hash)
+    let smt1 = SparseMerkleTree::new_test(old_root_hash)
         .batch_update(vec![(key4, Some(&value4))], &proof_reader)
         .unwrap();
 
@@ -452,7 +452,7 @@ fn test_get_oldest_ancestor() {
     //              \
     //                smt002
 
-    let smt0 = SparseMerkleTree::new(LEAF.hash());
+    let smt0 = SparseMerkleTree::new_test(LEAF.hash());
     let smt00 = update(&smt0);
     let smt000 = update(&smt00);
     let smt0000 = update(&smt000);
@@ -534,7 +534,7 @@ fn assert_eq_pointee(left: &SparseMerkleTree, right: &SparseMerkleTree) {
 /// branching and dropping
 #[test]
 fn test_multithread_branching() {
-    let t1 = SparseMerkleTree::new(LEAF.hash());
+    let t1 = SparseMerkleTree::new_test(LEAF.hash());
     let q = Arc::new(Mutex::new(VecDeque::from(vec![t1])));
 
     let work = |q: &Arc<Mutex<VecDeque<SparseMerkleTree>>>| {
@@ -566,7 +566,7 @@ fn test_multithread_branching() {
 
 #[test]
 fn test_multithread_get_oldest_ancestor() {
-    let current_tree = Arc::new(Mutex::new(SparseMerkleTree::new(LEAF.hash())));
+    let current_tree = Arc::new(Mutex::new(SparseMerkleTree::new_test(LEAF.hash())));
 
     let update_fn = || {
         let current_tree = current_tree.clone();
@@ -602,7 +602,7 @@ fn test_multithread_get_oldest_ancestor() {
 #[test]
 fn test_drop() {
     let proof_reader = ProofReader::default();
-    let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
+    let root_smt = SparseMerkleTree::new_test(*SPARSE_MERKLE_PLACEHOLDER_HASH);
     let mut smt = root_smt.clone();
     for _ in 0..100000 {
         smt = smt

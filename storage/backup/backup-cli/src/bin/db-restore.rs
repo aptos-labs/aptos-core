@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use aptos_logger::{prelude::*, Level, Logger};
-use aptos_secure_push_metrics::MetricsPusher;
+use aptos_push_metrics::MetricsPusher;
 use backup_cli::{
     backup_types::{
         epoch_ending::restore::{EpochEndingRestoreController, EpochEndingRestoreOpt},
@@ -14,42 +14,42 @@ use backup_cli::{
     storage::StorageOpt,
     utils::{GlobalRestoreOpt, GlobalRestoreOptions},
 };
+use clap::Parser;
 use std::convert::TryInto;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     global: GlobalRestoreOpt,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     restore_type: RestoreType,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum RestoreType {
     EpochEnding {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: EpochEndingRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     StateSnapshot {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: StateSnapshotRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     Transaction {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: TransactionRestoreOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
     Auto {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         opt: RestoreCoordinatorOpt,
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         storage: StorageOpt,
     },
 }
@@ -64,6 +64,7 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).read_env().init();
+    #[allow(deprecated)]
     let _mp = MetricsPusher::start();
 
     let opt = Opt::from_args();

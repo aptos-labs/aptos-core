@@ -3,7 +3,8 @@
 
 use crate::config::Error;
 use aptos_secure_storage::{
-    GitHubStorage, InMemoryStorage, Namespaced, OnDiskStorage, Storage, VaultStorage,
+    GitHubStorage, InMemoryStorage, Namespaced, OnDiskStorage, RocksDbStorage, Storage,
+    VaultStorage, SECURE_STORAGE_DB_NAME,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -12,13 +13,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SecureBackend {
     GitHub(GitHubConfig),
     InMemoryStorage,
     Vault(VaultConfig),
     OnDiskStorage(OnDiskStorageConfig),
+    RocksDbStorage(RocksDbStorageConfig),
 }
 
 impl SecureBackend {
@@ -26,7 +28,8 @@ impl SecureBackend {
         match self {
             SecureBackend::GitHub(GitHubConfig { namespace, .. })
             | SecureBackend::Vault(VaultConfig { namespace, .. })
-            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. }) => {
+            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
+            | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
                 namespace.as_deref()
             }
             SecureBackend::InMemoryStorage => None,
@@ -37,7 +40,8 @@ impl SecureBackend {
         match self {
             SecureBackend::GitHub(GitHubConfig { namespace, .. })
             | SecureBackend::Vault(VaultConfig { namespace, .. })
-            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. }) => {
+            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
+            | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
                 *namespace = None;
             }
             SecureBackend::InMemoryStorage => {}
@@ -45,7 +49,7 @@ impl SecureBackend {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GitHubConfig {
     /// The owner or account that hosts a repository
@@ -62,7 +66,7 @@ pub struct GitHubConfig {
     pub namespace: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct VaultConfig {
     /// Optional SSL Certificate for the vault host, this is expected to be a full path.
@@ -97,7 +101,7 @@ impl VaultConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OnDiskStorageConfig {
     // Required path for on disk storage
@@ -111,7 +115,7 @@ pub struct OnDiskStorageConfig {
 }
 
 /// Tokens can either be directly within this config or stored somewhere on disk.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Token {
     FromConfig(String),
@@ -128,13 +132,13 @@ impl Token {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TokenFromConfig {
     token: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TokenFromDisk {
     path: PathBuf,
@@ -151,6 +155,43 @@ impl Default for OnDiskStorageConfig {
 }
 
 impl OnDiskStorageConfig {
+    pub fn path(&self) -> PathBuf {
+        if self.path.is_relative() {
+            self.data_dir.join(&self.path)
+        } else {
+            self.path.clone()
+        }
+    }
+
+    pub fn set_data_dir(&mut self, data_dir: PathBuf) {
+        self.data_dir = data_dir;
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RocksDbStorageConfig {
+    // Required path for on disk storage
+    pub path: PathBuf,
+    /// A namespace is an optional portion of the path to a key stored within OnDiskStorage. For
+    /// example, a key, S, without a namespace would be available in S, with a namespace, N, it
+    /// would be in N/S.
+    pub namespace: Option<String>,
+    #[serde(skip)]
+    data_dir: PathBuf,
+}
+
+impl Default for RocksDbStorageConfig {
+    fn default() -> Self {
+        Self {
+            namespace: None,
+            path: PathBuf::from(SECURE_STORAGE_DB_NAME),
+            data_dir: PathBuf::from("/opt/aptos/data"),
+        }
+    }
+}
+
+impl RocksDbStorageConfig {
     pub fn path(&self) -> PathBuf {
         if self.path.is_relative() {
             self.data_dir.join(&self.path)
@@ -202,6 +243,14 @@ impl From<&SecureBackend> for Storage {
                     storage
                 }
             }
+            SecureBackend::RocksDbStorage(config) => {
+                let storage = Storage::from(RocksDbStorage::new(config.path()));
+                if let Some(namespace) = &config.namespace {
+                    Storage::from(Namespaced::new(namespace, Box::new(storage)))
+                } else {
+                    storage
+                }
+            }
             SecureBackend::Vault(config) => {
                 let storage = Storage::from(VaultStorage::new(
                     config.server.clone(),
@@ -229,7 +278,7 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    #[derive(Debug, Deserialize, PartialEq, Serialize)]
+    #[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
     struct Config {
         vault: VaultConfig,
     }

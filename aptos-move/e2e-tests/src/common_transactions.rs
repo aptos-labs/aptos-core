@@ -4,8 +4,8 @@
 //! Support for encoding transactions for common situations.
 
 use crate::account::Account;
-use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::transaction::{RawTransaction, Script, SignedTransaction};
+use aptos_types::transaction::{Script, SignedTransaction};
+use cached_packages::aptos_stdlib;
 use move_deps::move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
@@ -16,9 +16,9 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
       return;
     }
 ";
-
+    let modules = cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules().iter().collect(),
+        deps: modules.iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -46,7 +46,9 @@ pub fn create_account_txn(
 ) -> SignedTransaction {
     sender
         .transaction()
-        .payload(aptos_stdlib::account_create_account(*new_account.address()))
+        .payload(aptos_stdlib::aptos_account_create_account(
+            *new_account.address(),
+        ))
         .sequence_number(seq_num)
         .sign()
 }
@@ -68,26 +70,4 @@ pub fn peer_to_peer_txn(
         ))
         .sequence_number(seq_num)
         .sign()
-}
-
-/// Returns a transaction to change the keys for the given account.
-pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> SignedTransaction {
-    sender
-        .transaction()
-        .payload(aptos_stdlib::account_rotate_authentication_key(
-            new_key_hash,
-        ))
-        .sequence_number(seq_num)
-        .sign()
-}
-
-/// Returns a transaction to change the keys for the given account.
-pub fn raw_rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> RawTransaction {
-    sender
-        .transaction()
-        .payload(aptos_stdlib::account_rotate_authentication_key(
-            new_key_hash,
-        ))
-        .sequence_number(seq_num)
-        .raw()
 }

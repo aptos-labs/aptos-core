@@ -10,6 +10,7 @@ use crate::ApiTags;
 use aptos_api_types::IndexResponse;
 use poem_openapi::OpenApi;
 
+/// API for the index, to retrieve the ledger information
 pub struct IndexApi {
     pub context: Arc<Context>,
 }
@@ -27,6 +28,8 @@ impl IndexApi {
         tag = "ApiTags::General"
     )]
     async fn get_ledger_info(&self, accept_type: AcceptType) -> BasicResult<IndexResponse> {
+        self.context
+            .check_api_output_enabled("Get ledger info", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
 
         let node_role = self.context.node_role();

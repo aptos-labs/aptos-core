@@ -1,0 +1,26 @@
+coredns:
+  maxReplicas: 2
+  minReplicas: 2
+
+metrics-server:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+autoscaler:
+  enabled:
+  clusterName:
+  # How long a node should be unneeded before it is eligible for scale down
+  scaleDownUnneededTime: 30m
+  # How long after scale up that scale down evaluation resumes
+  scaleDownDelayAfterAdd: 5m
+  image:
+    repo: k8s.gcr.io/autoscaling/cluster-autoscaler
+    tag: v1.21.0
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+  serviceAccount:
+    annotations:

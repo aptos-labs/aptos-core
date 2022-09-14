@@ -100,8 +100,6 @@
 //!             +-----------------------------+
 //! ```
 
-#[macro_use]
-extern crate mirai_annotations;
 mod access_path_cache;
 #[macro_use]
 mod counters;
@@ -113,7 +111,7 @@ pub mod foreign_contracts;
 mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
-pub mod delta_ext;
+mod delta_state_view;
 mod errors;
 pub mod logging;
 pub mod move_vm_ext;

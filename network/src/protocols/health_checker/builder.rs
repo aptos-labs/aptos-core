@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use aptos_config::network_id::NetworkContext;
+use aptos_logger::prelude::*;
 use aptos_time_service::TimeService;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
@@ -43,7 +44,7 @@ impl HealthCheckerBuilder {
 
     pub fn start(&mut self, executor: &Handle) {
         if let Some(service) = self.service.take() {
-            executor.spawn(service.start());
+            spawn_named!("[Network] HC", executor, service.start());
         }
     }
 }

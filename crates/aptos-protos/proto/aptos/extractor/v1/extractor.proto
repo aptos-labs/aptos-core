@@ -27,8 +27,11 @@ message Block {
   uint64 height = 2;
 
   // Transactions holds all transactions that happened in the Block, which is transactions that happened starting with (and including)
-  // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`
+  // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`.
   repeated Transaction transactions = 3;
+
+  // Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline.
+  uint32 chain_id = 4;
 }
 
 // Transaction as it happened on the chain, there are 4 types of transactions:
@@ -93,18 +96,20 @@ message Event {
   EventKey key = 1;
   uint64 sequence_number = 2;
   MoveType type = 3;
+  string type_str = 5;
   string data = 4;
 }
 
 message TransactionInfo {
   bytes hash = 1;
-  bytes state_root_hash = 2;
+  bytes state_change_hash = 2;
   bytes event_root_hash = 3;
-  uint64 gas_used = 4;
-  bool success = 5;
-  string vm_status = 6;
-  bytes accumulator_root_hash = 7;
-  repeated WriteSetChange changes = 8;
+  optional bytes state_checkpoint_hash = 4;
+  uint64 gas_used = 5;
+  bool success = 6;
+  string vm_status = 7;
+  bytes accumulator_root_hash = 8;
+  repeated WriteSetChange changes = 9;
 }
 
 message EventKey {
@@ -178,7 +183,8 @@ message DeleteModule {
 message DeleteResource {
   string address = 1;
   bytes state_key_hash = 2;
-  MoveStructTag resource = 3;
+  MoveStructTag type = 3;
+  string type_str = 4;
 }
 
 message DeleteTableItem {
@@ -202,7 +208,9 @@ message WriteModule {
 message WriteResource {
   string address = 1;
   bytes state_key_hash = 2;
-  MoveResource data = 3;
+  MoveStructTag type = 3;
+  string type_str = 4;
+  string data = 5;
 }
 
 message WriteTableData {
@@ -221,24 +229,23 @@ message WriteTableItem {
 
 message TransactionPayload {
   enum Type {
-    SCRIPT_FUNCTION_PAYLOAD = 0;
+    ENTRY_FUNCTION_PAYLOAD = 0;
     SCRIPT_PAYLOAD = 1;
     MODULE_BUNDLE_PAYLOAD = 2;
-    WRITE_SET_PAYLOAD = 3;
   }
 
   Type type = 1;
 
   oneof payload {
-    ScriptFunctionPayload script_function_payload = 2;
+    EntryFunctionPayload entry_function_payload = 2;
     ScriptPayload script_payload = 3;
     ModuleBundlePayload module_bundle_payload = 4;
     WriteSetPayload write_set_payload = 5;
   }
 }
 
-message ScriptFunctionPayload {
-  ScriptFunctionId function = 1;
+message EntryFunctionPayload {
+  EntryFunctionId function = 1;
   repeated MoveType type_arguments = 2;
   repeated string arguments = 3;
 }
@@ -348,14 +355,9 @@ message WriteSetPayload {
   WriteSet write_set = 1;
 }
 
-message ScriptFunctionId {
+message EntryFunctionId {
   MoveModuleId module = 1;
   string name = 2;
-}
-
-message MoveResource {
-  MoveStructTag type = 1;
-  string data = 2;
 }
 
 message MoveModuleId {
@@ -395,7 +397,7 @@ message MultiEd25519Signature {
   repeated bytes public_keys = 1;
   repeated bytes signatures = 2;
   uint32 threshold = 3;
-  bytes bitmap = 4;
+  repeated uint32 public_key_indices = 4;
 }
 
 message MultiAgentSignature {

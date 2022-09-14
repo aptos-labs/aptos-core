@@ -2,6 +2,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $MoveScriptBytecode = {
+    description: `Move script bytecode`,
     properties: {
         bytecode: {
             type: 'HexEncodedBytes',

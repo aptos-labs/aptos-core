@@ -18,8 +18,65 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
 use executor_types::ProofReader;
+use proptest::sample::Index;
 use proptest::{collection::vec, prelude::*};
 use scratchpad::SparseMerkleTree;
+
+prop_compose! {
+    pub fn arb_state_kv_sets(
+        key_universe_size: usize,
+        max_update_set_size: usize,
+        max_versions: usize
+    )
+    (
+        keys in vec(any::<StateKey>(), key_universe_size),
+        input in vec(vec((any::<Index>(), any::<Option<StateValue>>()), 1..max_update_set_size), 1..max_versions)
+    ) -> Vec<Vec<(StateKey, Option<StateValue>)>> {
+            input
+            .into_iter()
+            .map(|kvs|
+                kvs
+                .into_iter()
+                .map(|(idx, value)| (idx.get(&keys).clone(), value))
+                .collect::<Vec<_>>()
+            )
+            .collect::<Vec<_>>()
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn update_store(
+    store: &StateStore,
+    input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
+    first_version: Version,
+) -> HashValue {
+    use storage_interface::{jmt_update_refs, jmt_updates};
+    let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
+    for (i, (key, value)) in input.enumerate() {
+        let value_state_set = vec![(key, value)].into_iter().collect();
+        let jmt_updates = jmt_updates(&value_state_set);
+        let version = first_version + i as Version;
+        root_hash = store
+            .merklize_value_set(
+                jmt_update_refs(&jmt_updates),
+                None,
+                version,
+                version.checked_sub(1),
+            )
+            .unwrap();
+        let mut batch = SchemaBatch::new();
+        store
+            .put_value_sets(
+                vec![&value_state_set],
+                version,
+                StateStorageUsage::new_untracked(),
+                &mut batch,
+            )
+            .unwrap();
+        store.ledger_db.write_schemas(batch).unwrap();
+    }
+    root_hash
+}
 
 pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
@@ -42,6 +99,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                         .iter()
                         .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
+                    StateStorageUsage::new_untracked(),
                     &ProofReader::new_empty(),
                 )
                 .unwrap()
@@ -52,6 +110,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             state.updates_since_base.clear();
         }
     }
+
     if next_version.checked_sub(1) != state.current_version {
         state.current = state
             .current
@@ -63,6 +122,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .iter()
                     .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
+                StateStorageUsage::new_untracked(),
                 &ProofReader::new_empty(),
             )
             .unwrap()
@@ -708,11 +768,11 @@ pub fn verify_committed_transactions(
 }
 
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
+        .put_transaction_infos(version, &[txn_info.clone()], &mut batch)
         .unwrap();
-    db.ledger_db.write_schemas(cs.batch).unwrap();
+    db.ledger_db.write_schemas(batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {

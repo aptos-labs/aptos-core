@@ -5,21 +5,22 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_build_info::build_information;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::Client;
-use aptos_telemetry::collect_build_information;
-use aptos_types::chain_id::ChainId;
+use aptos_rest_client::{Account, Client};
+use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::BTreeMap,
     env,
     fs::OpenOptions,
     io::Write,
-    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -77,6 +78,10 @@ pub async fn to_common_result<T: Serialize>(
     }
 }
 
+pub fn cli_build_information() -> BTreeMap<String, String> {
+    build_information!()
+}
+
 /// Sends a telemetry event about the CLI build, command and result
 async fn send_telemetry_event(
     command: &str,
@@ -85,7 +90,7 @@ async fn send_telemetry_event(
     error: Option<String>,
 ) {
     // Collect the build information
-    let build_information = collect_build_information!();
+    let build_information = cli_build_information();
 
     // Send the event
     aptos_telemetry::cli_metrics::send_cli_telemetry_event(
@@ -200,17 +205,33 @@ pub fn append_file_extension(
     }
 }
 
-/// Retrieves sequence number from the rest client
-pub async fn get_sequence_number(
+/// Retrieves account resource from the rest client
+pub async fn get_account(
     client: &aptos_rest_client::Client,
     address: AccountAddress,
-) -> CliTypedResult<u64> {
+) -> CliTypedResult<Account> {
     let account_response = client
         .get_account(address)
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;
     let account = account_response.inner();
-    Ok(account.sequence_number)
+    Ok(account.clone())
+}
+
+/// Retrieves sequence number from the rest client
+pub async fn get_sequence_number(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<u64> {
+    Ok(get_account(client, address).await?.sequence_number)
+}
+
+/// Retrieves the auth key from the rest client
+pub async fn get_auth_key(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<AuthenticationKey> {
+    Ok(get_account(client, address).await?.authentication_key)
 }
 
 /// Retrieves the chain id from the rest client

@@ -7,18 +7,18 @@ description = "The notification interface between state sync and mempool"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-trait = "0.1.53"
 futures = "0.3.21"
 serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
-tokio = { version = "1.18.2" }
+tokio = { version = "1.21.0" }
 
 aptos-types = { path = "../../../types" }
 
 [dev-dependencies]
-claim = "0.5.0"
+claims = "0.7"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }

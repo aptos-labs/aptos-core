@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::any::Any;
 use anyhow::bail;
 use aptos_types::transaction::ModuleBundle;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::move_binary_format::errors::PartialVMError;
+use move_deps::move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_deps::move_vm_types::pop_arg;
 use move_deps::move_vm_types::values::Struct;
 use move_deps::{
@@ -23,52 +25,82 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
+/// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
+/// TODO: move this elsewhere for reuse?
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct MoveOption<T> {
+    pub value: Vec<T>,
+}
+
+impl<T> Default for MoveOption<T> {
+    fn default() -> Self {
+        MoveOption::none()
+    }
+}
+
+impl<T> MoveOption<T> {
+    pub fn none() -> Self {
+        Self { value: vec![] }
+    }
+
+    pub fn some(x: T) -> Self {
+        Self { value: vec![x] }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.value.is_empty()
+    }
+
+    pub fn is_some(&self) -> bool {
+        !self.value.is_empty()
+    }
+}
+
 /// The package registry at the given address.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageRegistry {
     /// Packages installed at this address.
     pub packages: Vec<PackageMetadata>,
 }
 
-/// The PackageMetadata type.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
+/// also found there.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
-    /// Name of this package.
     pub name: String,
-    /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
-    /// Build info, in BuildInfo.yaml format
-    pub build_info: String,
-    /// The package manifest, in the Move.toml format.
-    pub manifest: String,
-    /// The list of modules installed by this package.
-    pub modules: Vec<ModuleMetadata>,
-    /// Error map, in internal encoding
+    pub upgrade_number: u64,
+    pub source_digest: String,
     #[serde(with = "serde_bytes")]
-    pub error_map: Vec<u8>,
+    pub manifest: Vec<u8>,
+    pub modules: Vec<ModuleMetadata>,
+    pub deps: Vec<PackageDep>,
+    pub extension: MoveOption<Any>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct PackageDep {
+    pub account: AccountAddress,
+    pub package_name: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
-    /// Name of the module.
     pub name: String,
-    /// Source text if available.
-    pub source: String,
-    /// Source map, in internal encoding.
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
-    /// ABI, in JSON byte encoding.
-    #[serde(with = "serde_bytes")]
-    pub abi: Vec<u8>,
+    pub extension: MoveOption<Any>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpgradePolicy {
     pub policy: u8,
 }
 
 impl UpgradePolicy {
-    pub fn no_compat() -> Self {
+    pub fn arbitrary() -> Self {
         UpgradePolicy { policy: 0 }
     }
     pub fn compat() -> Self {
@@ -83,7 +115,7 @@ impl FromStr for UpgradePolicy {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "arbitrary" => Ok(UpgradePolicy::no_compat()),
+            "arbitrary" => Ok(UpgradePolicy::arbitrary()),
             "compatible" => Ok(UpgradePolicy::compat()),
             "immutable" => Ok(UpgradePolicy::immutable()),
             _ => bail!("unknown policy"),
@@ -150,8 +182,8 @@ fn get_move_string(v: Value) -> PartialVMResult<String> {
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct RequestPublishGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
 }
 
 fn native_request_publish(
@@ -174,15 +206,15 @@ fn native_request_publish(
     }
 
     // TODO(Gas): fine tune the gas formula
-    let cost = gas_params.base_cost
-        + gas_params.unit_cost
-            * code
-                .iter()
-                .fold(0, |acc, module_code| acc + module_code.len()) as u64
-        + gas_params.unit_cost
-            * expected_modules
-                .iter()
-                .fold(0, |acc, name| acc + name.len()) as u64;
+    let cost = gas_params.base
+        + gas_params.per_byte
+            * code.iter().fold(NumBytes::new(0), |acc, module_code| {
+                acc + NumBytes::new(module_code.len() as u64)
+            })
+        + gas_params.per_byte
+            * expected_modules.iter().fold(NumBytes::new(0), |acc, name| {
+                acc + NumBytes::new(name.len() as u64)
+            });
 
     let destination = pop_arg!(args, AccountAddress);
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();

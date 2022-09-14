@@ -2,6 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $SubmitTransactionRequest = {
+    description: `A request to submit a transaction
+
+    This requires a transaction and a signature of it`,
     properties: {
         sender: {
             type: 'Address',

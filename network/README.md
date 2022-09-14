@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/network/READ
 
 ## Overview
 
-For more detailed info, see the [AptosNet Specification](../specifications/network/README.md).
+For more detailed info, see the [AptosNet Specification](../documentation/specifications/network/README.md).
 
 AptosNet is the primary protocol for communication between any two nodes in the
 Aptos ecosystem. It is specifically designed to facilitate the consensus, shared

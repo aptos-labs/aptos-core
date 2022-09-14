@@ -15,7 +15,6 @@ Here is the set of currently published packages that make up the aptos-sdk:
 * aptos-crypto-derive
 * aptos-crypto
 * aptos-types
-* aptos-transaction-builder
 * aptos-json-rpc-types
 * aptos-client
 * aptos-sdk

@@ -4,15 +4,12 @@
 //! This module implements the functionality to restore a `JellyfishMerkleTree` from small chunks
 //! of accounts.
 
-#[cfg(test)]
-mod restore_test;
-
 use crate::{
     node_type::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    NibbleExt, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, TreeReader, TreeWriter, IO_POOL, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{
@@ -29,9 +26,8 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
-use mirai_annotations::*;
-use std::{cmp::Eq, collections::HashMap, hash::Hash, sync::Arc};
-use storage_interface::StateSnapshotReceiver;
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::{cmp::Eq, collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<K> {
@@ -89,7 +85,6 @@ where
     }
 
     fn set_child(&mut self, index: usize, child_info: ChildInfo<K>) {
-        precondition!(index < 16);
         self.children[index] = Some(child_info);
     }
 
@@ -110,7 +105,7 @@ where
     }
 }
 
-struct JellyfishMerkleRestore<K> {
+pub struct JellyfishMerkleRestore<K> {
     /// The underlying storage.
     store: Arc<dyn TreeWriter<K>>,
 
@@ -161,34 +156,60 @@ struct JellyfishMerkleRestore<K> {
 
     /// When the restoration process finishes, we expect the tree to have this root hash.
     expected_root_hash: HashValue,
+
+    /// Already finished, deem all chunks overlap.
+    finished: bool,
+
+    /// Optionally, do DB commit asynchronously, only wait for previous commit when the next is ready.
+    async_commit_channel: Option<(SyncSender<Result<()>>, Receiver<Result<()>>)>,
 }
 
 impl<K> JellyfishMerkleRestore<K>
 where
-    K: crate::Key + CryptoHash,
+    K: crate::Key + CryptoHash + 'static,
 {
     pub fn new<D: 'static + TreeReader<K> + TreeWriter<K>>(
         store: Arc<D>,
         version: Version,
         expected_root_hash: HashValue,
+        async_commit: bool,
     ) -> Result<Self> {
         let tree_reader = Arc::clone(&store);
-        let (partial_nodes, previous_leaf) =
-            if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf()? {
-                // TODO: confirm rightmost leaf is at the desired version
-                // If the system crashed in the middle of the previous restoration attempt, we need
-                // to recover the partial nodes to the state right before the crash.
-                (
-                    Self::recover_partial_nodes(tree_reader.as_ref(), version, node_key)?,
-                    Some(leaf_node),
-                )
-            } else {
-                (
-                    vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
-                    None,
-                )
-            };
+        let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
+            tree_reader.get_node_option(&NodeKey::new_empty_path(version))?
+        {
+            info!("Previous restore is complete, checking root hash.");
+            ensure!(
+                root_node.hash() == expected_root_hash,
+                "Previous completed restore has root hash {}, expecting {}",
+                root_node.hash(),
+                expected_root_hash,
+            );
+            (true, vec![], None)
+        } else if let Some((node_key, leaf_node)) = tree_reader.get_rightmost_leaf()? {
+            // If the system crashed in the middle of the previous restoration attempt, we need
+            // to recover the partial nodes to the state right before the crash.
+            (
+                false,
+                Self::recover_partial_nodes(tree_reader.as_ref(), version, node_key)?,
+                Some(leaf_node),
+            )
+        } else {
+            (
+                false,
+                vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
+                None,
+            )
+        };
 
+        let async_commit_channel = if async_commit {
+            let (tx, rx) = sync_channel(1);
+            // Put in one Ok to the channel for the first add_chunk() call to wait on.
+            tx.try_send(Ok(())).unwrap();
+            Some((tx, rx))
+        } else {
+            None
+        };
         Ok(Self {
             store,
             version,
@@ -197,6 +218,8 @@ where
             previous_leaf,
             num_keys_received: 0,
             expected_root_hash,
+            finished,
+            async_commit_channel,
         })
     }
 
@@ -213,7 +236,18 @@ where
             previous_leaf: None,
             num_keys_received: 0,
             expected_root_hash,
+            finished: false,
+            async_commit_channel: None,
         })
+    }
+
+    pub fn previous_key_hash(&self) -> Option<HashValue> {
+        if self.finished {
+            // Hack: prevent any chunk to be added.
+            Some(HashValue::new([0xff; HashValue::LENGTH]))
+        } else {
+            self.previous_leaf.as_ref().map(|leaf| leaf.account_key())
+        }
     }
 
     /// Recovers partial nodes from storage. We do this by looking at all the ancestors of the
@@ -258,6 +292,7 @@ where
                             leaf_count: Some(internal_node.leaf_count()),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf(leaf_node),
+                        Node::Null => unreachable!("Child cannot be Null"),
                     };
                     internal_info.set_child(i, child_info);
                 }
@@ -292,11 +327,16 @@ where
     /// Restores a chunk of accounts. This function will verify that the given chunk is correct
     /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
     /// error will be returned and nothing will be written to storage.
-    fn add_chunk_impl(
+    pub fn add_chunk_impl(
         &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
+        if self.finished {
+            info!("State snapshot restore already finished, ignoring entire chunk.");
+            return Ok(());
+        }
+
         if let Some(prev_leaf) = &self.previous_leaf {
             let skip_until = chunk
                 .iter()
@@ -342,8 +382,25 @@ where
         self.verify(proof)?;
 
         // Write the frozen nodes to storage.
-        self.store.write_node_batch(&self.frozen_nodes)?;
-        self.frozen_nodes.clear();
+        if let Some((tx, rx)) = &self.async_commit_channel {
+            // Wait for previous commit to conclude.
+            rx.recv()??;
+
+            let mut frozen_nodes = HashMap::new();
+            std::mem::swap(&mut frozen_nodes, &mut self.frozen_nodes);
+            let store = self.store.clone();
+            let sender = tx.clone();
+
+            IO_POOL.spawn(move || {
+                let res = store.write_node_batch(&frozen_nodes);
+                sender
+                    .try_send(res)
+                    .expect("Always only one commit can be scheduled.");
+            });
+        } else {
+            self.store.write_node_batch(&self.frozen_nodes)?;
+            self.frozen_nodes.clear();
+        }
         Ok(())
     }
 
@@ -676,8 +733,16 @@ where
 
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
-    fn finish_impl(mut self) -> Result<()> {
-        // Deal with the special case when the entire tree has a single leaf.
+    pub fn finish_impl(mut self) -> Result<()> {
+        if let Some((tx, rx)) = &self.async_commit_channel {
+            // wait for the last commit to complete
+            rx.recv()??;
+            // Drop will receive once to make sure there's no in flight committing, adding this so
+            // it's not a dead lock waiting there.
+            tx.try_send(Ok(()))
+                .expect("Always only one commit can be scheduled.");
+        }
+        // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
             let mut leaf = None;
@@ -690,14 +755,24 @@ where
                 }
             }
 
-            if num_children == 1 {
-                if let Some(node) = leaf {
+            match num_children {
+                0 => {
                     let node_key = NodeKey::new_empty_path(self.version);
                     assert!(self.frozen_nodes.is_empty());
-                    self.frozen_nodes.insert(node_key, node.into());
+                    self.frozen_nodes.insert(node_key, Node::Null);
                     self.store.write_node_batch(&self.frozen_nodes)?;
                     return Ok(());
                 }
+                1 => {
+                    if let Some(node) = leaf {
+                        let node_key = NodeKey::new_empty_path(self.version);
+                        assert!(self.frozen_nodes.is_empty());
+                        self.frozen_nodes.insert(node_key, node.into());
+                        self.store.write_node_batch(&self.frozen_nodes)?;
+                        return Ok(());
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -707,81 +782,10 @@ where
     }
 }
 
-struct StateValueRestore<K, V> {
-    version: Version,
-    db: Arc<dyn StateValueWriter<K, V>>,
-}
-
-impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
-    pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self { version, db }
-    }
-
-    pub fn add_chunk(&mut self, chunk: Vec<(K, V)>) -> Result<()> {
-        let kv_batch = chunk
-            .into_iter()
-            .map(|(k, v)| ((k, self.version), Some(v)))
-            .collect();
-        self.db.write_kv_batch(&kv_batch)
-    }
-}
-
-pub struct StateSnapshotRestore<K, V> {
-    tree_restore: JellyfishMerkleRestore<K>,
-    kv_restore: StateValueRestore<K, V>,
-}
-
-impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRestore<K, V> {
-    pub fn new<T: 'static + TreeReader<K> + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Self> {
-        Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new(
-                Arc::clone(tree_store),
-                version,
-                expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
-        })
-    }
-
-    pub fn new_overwrite<T: 'static + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Self> {
-        Ok(Self {
-            tree_restore: JellyfishMerkleRestore::new_overwrite(
-                Arc::clone(tree_store),
-                version,
-                expected_root_hash,
-            )?,
-            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
-        })
-    }
-}
-
-impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotReceiver<K, V>
-    for StateSnapshotRestore<K, V>
-{
-    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
-        // Write KV out first because we are likely to resume according to the rightmost key in the
-        // tree after crashing.
-        self.kv_restore.add_chunk(chunk.clone())?;
-        self.tree_restore
-            .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
-        Ok(())
-    }
-
-    fn finish(self) -> Result<()> {
-        self.tree_restore.finish_impl()
-    }
-
-    fn finish_box(self: Box<Self>) -> Result<()> {
-        self.tree_restore.finish_impl()
+impl<K> Drop for JellyfishMerkleRestore<K> {
+    fn drop(&mut self) {
+        if let Some((_tx, rx)) = &self.async_commit_channel {
+            rx.recv().unwrap().unwrap();
+        }
     }
 }

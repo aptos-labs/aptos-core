@@ -160,7 +160,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         if receiver_seq.is_none() {
             let builder = service
                 .transaction_factory
-                .payload(aptos_stdlib::account_create_account(receiver_address));
+                .payload(aptos_stdlib::aptos_account_create_account(receiver_address));
 
             let txn = faucet_account.sign_with_transaction_builder(builder);
             txns.push(txn)
@@ -215,7 +215,7 @@ async fn sequences(service: &Service, receiver: AccountAddress) -> Result<(u64, 
         .map(|account| account.inner().sequence_number);
     let faucet_seq_num = responses
         .remove(0)
-        .map_err(|_| anyhow::format_err!("faucet account {} not found", faucet_address))?
+        .map_err(|e| anyhow::format_err!("Faucet account {} not found: {:#}", faucet_address, e))?
         .inner()
         .sequence_number;
 

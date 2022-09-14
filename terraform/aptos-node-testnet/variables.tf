@@ -4,6 +4,11 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "maximize_single_az_capacity" {
+  description = "TEST ONLY: Whether to maximize the capacity of the cluster by allocating a large CIDR block to the first AZ"
+  default     = false
+}
+
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
   default     = ""
@@ -102,17 +107,6 @@ variable "logger_helm_values" {
   default     = {}
 }
 
-variable "enable_vector_daemonset_logger" {
-  description = "Enable vector-daemonset logger"
-  default     = false
-}
-
-variable "vector_daemonset_helm_values" {
-  description = "Map of helm values to pass to vector-daemonset chart"
-  type        = list(string)
-  default     = []
-}
-
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring helm chart"
   type        = any
@@ -125,6 +119,16 @@ variable "testnet_addons_helm_values" {
   default     = {}
 }
 
+variable "enable_node_health_checker" {
+  description = "Enable node-health-checker"
+  default     = false
+}
+
+variable "node_health_checker_helm_values" {
+  description = "Map of values to pass to node-health-checker helm chart"
+  type        = any
+  default     = {}
+}
 
 ### EKS nodegroups
 
@@ -145,6 +149,16 @@ variable "num_utility_instance" {
 
 variable "num_validator_instance" {
   description = "Number of instances for validator node pool, when it's 0, it will be set to 2 * var.num_validators"
+  default     = 0
+}
+
+variable "utility_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
+  default     = 0
+}
+
+variable "validator_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
   default     = 0
 }
 

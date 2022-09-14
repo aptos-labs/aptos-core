@@ -34,8 +34,8 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
-mod sf_streamer_config;
-pub use sf_streamer_config::*;
+mod firehose_streamer_config;
+pub use firehose_streamer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -49,7 +49,7 @@ use aptos_types::account_address::AccountAddress;
 use poem_openapi::Enum as PoemEnum;
 
 /// Represents a deprecated config that provides no field verification.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DeprecatedConfig {}
 
 /// Config pulls in configuration information from the config file.
@@ -82,7 +82,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]
-    pub sf_stream: SfStreamerConfig,
+    pub firehose_stream: FirehoseStreamerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
@@ -93,7 +93,7 @@ pub struct NodeConfig {
     pub failpoints: Option<HashMap<String, String>>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BaseConfig {
     pub data_dir: PathBuf,
@@ -111,7 +111,7 @@ impl Default for BaseConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WaypointConfig {
     FromConfig(Waypoint),
@@ -132,13 +132,27 @@ impl WaypointConfig {
     pub fn waypoint(&self) -> Waypoint {
         let waypoint = match &self {
             WaypointConfig::FromConfig(waypoint) => Some(*waypoint),
-            WaypointConfig::FromFile(path) => {
-                let content = fs::read_to_string(path)
-                    .unwrap_or_else(|_| panic!("Failed to read waypoint file {}", path.display()));
-                Some(
-                    Waypoint::from_str(content.trim())
-                        .unwrap_or_else(|_| panic!("Failed to parse waypoint: {}", content.trim())),
-                )
+            WaypointConfig::FromFile(waypoint_path) => {
+                if !waypoint_path.exists() {
+                    panic!(
+                        "Waypoint file not found! Ensure the given path is correct: {:?}",
+                        waypoint_path.display()
+                    );
+                }
+                let content = fs::read_to_string(waypoint_path).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to read waypoint file {:?}. Error: {:?}",
+                        waypoint_path.display(),
+                        error
+                    )
+                });
+                Some(Waypoint::from_str(content.trim()).unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to parse waypoint: {:?}. Error: {:?}",
+                        content.trim(),
+                        error
+                    )
+                }))
             }
             WaypointConfig::FromStorage(backend) => {
                 let storage: Storage = backend.into();
@@ -255,8 +269,8 @@ impl NodeConfig {
     }
 
     /// Reads the config file and returns the configuration object in addition to doing some
-    /// post-processing of the config
-    /// Paths used in the config are either absolute or relative to the config location
+    /// post-processing of the config.
+    /// Paths used in the config are either absolute or relative to the config location.
     pub fn load<P: AsRef<Path>>(input_path: P) -> Result<Self, Error> {
         let mut config = Self::load_config(&input_path)?;
 
@@ -311,6 +325,7 @@ impl NodeConfig {
         let mut network_ids = HashSet::new();
         if let Some(network) = &mut self.validator_network {
             network.load_validator_network()?;
+            network.mutual_authentication = true; // This should always be the default for validators
             network_ids.insert(network.network_id);
         }
         for network in &mut self.full_node_networks {
@@ -420,11 +435,23 @@ impl NodeConfig {
 
 pub trait PersistableConfig: Serialize + DeserializeOwned {
     fn load_config<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let mut file = File::open(&path)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        // Open the file and read it into a string
+        let config_path_string = path.as_ref().to_str().unwrap().to_string();
+        let mut file = File::open(&path).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to open config file: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| Error::IO(path.as_ref().to_str().unwrap().to_string(), e))?;
+        file.read_to_string(&mut contents).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to read the config file into a string: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })?;
+
+        // Parse the file string
         Self::parse(&contents)
     }
 

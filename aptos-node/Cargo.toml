@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0.58"
@@ -16,21 +16,22 @@ clap = "3.1.8"
 fail = "0.5.0"
 futures = "0.3.21"
 hex = "0.4.3"
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 rand = "0.7.3"
-tokio = { version = "1.18.2", features = ["full"] }
+rayon = "1.5.2"
+tokio = { version = "1.21.0", features = ["full"] }
 tokio-stream = "0.1.8"
 
 aptos-api = { path = "../api" }
+aptos-build-info = { path = "../crates/aptos-build-info" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
+aptos-fh-stream = { path = "../ecosystem/sf-indexer/firehose-stream" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
 aptos-secure-storage = { path = "../secure/storage" }
-aptos-sf-stream = { path = "../sf-stream" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-telemetry = { path = "../crates/aptos-telemetry" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
@@ -40,7 +41,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 
 aptosdb = { path = "../storage/aptosdb" }
 backup-service = { path = "../storage/backup/backup-service" }
-cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
+cached-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }
@@ -57,6 +58,9 @@ state-sync-driver = { path = "../state-sync/state-sync-v2/state-sync-driver" }
 storage-interface = { path = "../storage/storage-interface" }
 storage-service-client = { path = "../state-sync/storage-service/client" }
 storage-service-server = { path = "../state-sync/storage-service/server" }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 
 [features]
 default = []

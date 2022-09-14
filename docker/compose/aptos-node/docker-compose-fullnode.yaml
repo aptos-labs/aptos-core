@@ -21,7 +21,7 @@ services:
         source: ./waypoint.txt
         target: /opt/aptos/genesis/waypoint.txt
       - type: bind
-        source: ./validator-full-node-identity.yaml
+        source: ./keys/validator-full-node-identity.yaml
         target: /opt/aptos/genesis/validator-full-node-identity.yaml
     command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
     restart: unless-stopped

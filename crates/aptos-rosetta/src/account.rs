@@ -7,8 +7,7 @@
 //!
 
 use crate::types::{
-    account_module_identifier, account_resource_identifier, coin_module_identifier,
-    AccountBalanceMetadata,
+    AccountBalanceMetadata, ACCOUNT_MODULE, ACCOUNT_RESOURCE, COIN_MODULE, COIN_STORE_RESOURCE,
 };
 use crate::{
     common::{
@@ -16,22 +15,14 @@ use crate::{
         with_context,
     },
     error::{ApiError, ApiResult},
-    types::{
-        coin_store_resource_identifier, AccountBalanceRequest, AccountBalanceResponse, Amount,
-        Currency, CurrencyMetadata,
-    },
+    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, CurrencyMetadata},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
-use aptos_rest_client::aptos_api_types::AccountData;
-use aptos_rest_client::{
-    aptos::{AptosCoin, Balance},
-    aptos_api_types::U64,
-};
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
@@ -77,7 +68,7 @@ async fn account_balance(
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_info = server_context
         .block_cache()?
-        .get_block_info_by_height(block_height)
+        .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
 
@@ -100,7 +91,9 @@ async fn account_balance(
     Ok(AccountBalanceResponse {
         block_identifier: block_info.block_id,
         balances: amounts,
-        metadata: AccountBalanceMetadata { sequence_number },
+        metadata: AccountBalanceMetadata {
+            sequence_number: sequence_number.into(),
+        },
     })
 }
 
@@ -109,7 +102,7 @@ async fn convert_balances_to_amounts(
     rest_client: &aptos_rest_client::Client,
     coin_cache: Arc<CoinCache>,
     maybe_filter_currencies: Option<Vec<Currency>>,
-    balances: HashMap<TypeTag, Balance>,
+    balances: HashMap<TypeTag, u64>,
     balance_version: u64,
 ) -> ApiResult<Vec<Amount>> {
     let mut amounts = Vec::new();
@@ -121,7 +114,7 @@ async fn convert_balances_to_amounts(
             .await?
         {
             amounts.push(Amount {
-                value: balance.coin.value.0.to_string(),
+                value: balance.to_string(),
                 currency,
             });
         }
@@ -156,69 +149,48 @@ async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
     version: u64,
-) -> ApiResult<(u64, HashMap<TypeTag, Balance>)> {
+) -> ApiResult<(u64, HashMap<TypeTag, u64>)> {
     if let Ok(response) = rest_client
-        .get_account_resources_at_version(address, version)
+        .get_account_resources_at_version_bcs(address, version)
         .await
     {
-        let response = response.into_inner();
+        let resources = response.into_inner();
+        let mut maybe_sequence_number = None;
+        let mut balances = HashMap::new();
 
-        let maybe_sequence_number = if let Some(account_resource) =
-            response.iter().find(|resource| {
-                resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == account_module_identifier()
-                    && resource.resource_type.name == account_resource_identifier()
-            }) {
-            if let Ok(resource) =
-                serde_json::from_value::<AccountData>(account_resource.data.clone())
-            {
-                Some(resource.sequence_number.0)
-            } else {
-                None
+        for (struct_tag, bytes) in resources {
+            match (
+                struct_tag.address,
+                struct_tag.module.as_str(),
+                struct_tag.name.as_str(),
+            ) {
+                (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE) => {
+                    let account: AccountResource = bcs::from_bytes(&bytes)?;
+                    maybe_sequence_number = Some(account.sequence_number())
+                }
+                (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
+                    let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
+                    if let Some(coin_type) = struct_tag.type_params.first() {
+                        balances.insert(coin_type.clone(), coin_store.coin());
+                    }
+                }
+                _ => {}
             }
-        } else {
-            None
-        };
+        }
 
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
         } else {
-            return Err(ApiError::AptosError(Some(
+            return Err(ApiError::InternalError(Some(
                 "Failed to retrieve account sequence number".to_string(),
             )));
         };
-
-        let balances = response
-            .iter()
-            .filter(|resource| {
-                resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == coin_module_identifier()
-                    && resource.resource_type.name == coin_store_resource_identifier()
-            })
-            .filter_map(|resource| {
-                // Currency must have a type
-                if let Some(coin_type) = resource.resource_type.type_params.first() {
-                    match serde_json::from_value::<Balance>(resource.data.clone()) {
-                        Ok(resource) => Some((coin_type.clone(), resource)),
-                        Err(_) => None,
-                    }
-                } else {
-                    // Skip currencies that don't match
-                    None
-                }
-            })
-            .collect();
 
         // Retrieve balances
         Ok((sequence_number, balances))
     } else {
         let mut currency_map = HashMap::new();
-        currency_map.insert(
-            native_coin_tag(),
-            Balance {
-                coin: AptosCoin { value: U64(0) },
-            },
-        );
+        currency_map.insert(native_coin_tag(), 0);
         Ok((0, currency_map))
     }
 }
@@ -272,14 +244,6 @@ impl CoinCache {
         coin: TypeTag,
         version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
-        /// Type for deserializing coin info
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        struct CoinInfo {
-            name: String,
-            symbol: String,
-            decimals: U64,
-        }
-
         let struct_tag = match coin {
             TypeTag::Struct(ref tag) => tag,
             // This is a poorly formed coin, and we'll just skip over it
@@ -299,35 +263,30 @@ impl CoinCache {
 
         let response = if let Some(version) = version {
             rest_client
-                .get_account_resource_at_version(address, &encoded_resource_tag, version)
-                .await?
+                .get_account_resource_at_version_bcs::<CoinInfoResource>(
+                    address,
+                    &encoded_resource_tag,
+                    version,
+                )
+                .await
         } else {
             rest_client
-                .get_account_resource(address, &encoded_resource_tag)
-                .await?
+                .get_account_resource_bcs::<CoinInfoResource>(address, &encoded_resource_tag)
+                .await
         };
 
         // At this point if we've retrieved it and it's bad, we error out
-        if let Some(resource) = response.into_inner() {
-            let coin_info = serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| {
-                ApiError::DeserializationFailed(Some(format!(
-                    "CoinInfo failed to deserialize for {}",
-                    coin
-                )))
-            })?;
+        let coin_info = response?.into_inner();
 
-            Ok(Some(Currency {
-                symbol: coin_info.symbol,
-                decimals: coin_info.decimals.0,
-                metadata: Some(CurrencyMetadata {
-                    move_type: struct_tag.to_string(),
-                }),
-            }))
-        } else {
-            Err(ApiError::DeserializationFailed(Some(format!(
-                "Currency {} not found",
-                coin
-            ))))
-        }
+        // TODO: The symbol has to come from a trusted list, as the move type is the real indicator
+        Ok(Some(Currency {
+            symbol: coin_info
+                .symbol()
+                .unwrap_or_else(|err| format!("Invalid Symbol: {}", err)),
+            decimals: coin_info.decimals(),
+            metadata: Some(CurrencyMetadata {
+                move_type: struct_tag.to_string(),
+            }),
+        }))
     }
 }

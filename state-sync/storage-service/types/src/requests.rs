@@ -60,13 +60,17 @@ impl DataRequest {
         }
     }
 
-    pub fn is_get_storage_server_summary(&self) -> bool {
+    pub fn is_storage_summary_request(&self) -> bool {
         matches!(self, &Self::GetStorageServerSummary)
     }
 
     pub fn is_data_subscription_request(&self) -> bool {
         matches!(self, &Self::GetNewTransactionOutputsWithProof(_))
             || matches!(self, &Self::GetNewTransactionsWithProof(_))
+    }
+
+    pub fn is_protocol_version_request(&self) -> bool {
+        matches!(self, &Self::GetServerProtocolVersion)
     }
 }
 

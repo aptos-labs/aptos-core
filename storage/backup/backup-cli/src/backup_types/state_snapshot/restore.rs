@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::OTHER_TIMERS_SECONDS;
+use crate::utils::stream::StreamX;
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory, state_snapshot::manifest::StateSnapshotBackup,
@@ -21,6 +23,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -28,15 +31,17 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
+use clap::Parser;
+use futures::{stream, TryStreamExt};
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
-use structopt::StructOpt;
+use tokio::time::Instant;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct StateSnapshotRestoreOpt {
-    #[structopt(long = "state-manifest")]
+    #[clap(long = "state-manifest")]
     pub manifest_handle: FileHandle,
-    #[structopt(long = "state-into-version")]
+    #[clap(long = "state-into-version")]
     pub version: Version,
 }
 
@@ -50,6 +55,7 @@ pub struct StateSnapshotRestoreController {
     /// nothing will be done, otherwise, this has no effect.
     target_version: Version,
     epoch_history: Option<Arc<EpochHistory>>,
+    concurrent_downloads: usize,
 }
 
 impl StateSnapshotRestoreController {
@@ -66,16 +72,18 @@ impl StateSnapshotRestoreController {
             manifest_handle: opt.manifest_handle,
             target_version: global_opt.target_version,
             epoch_history,
+            concurrent_downloads: global_opt.concurrent_downloads,
         }
     }
 
     pub async fn run(self) -> Result<()> {
         let name = self.name();
+        let start = Instant::now();
         info!("{} started. Manifest: {}", name, self.manifest_handle);
         self.run_impl()
             .await
             .map_err(|e| anyhow!("{} failed: {}", name, e))?;
-        info!("{} succeeded.", name);
+        info!(time = start.elapsed().as_secs(), "{} succeeded.", name);
         Ok(())
     }
 }
@@ -113,9 +121,10 @@ impl StateSnapshotRestoreController {
             epoch_history.verify_ledger_info(&li)?;
         }
 
-        let mut receiver = self
-            .run_mode
-            .get_state_restore_receiver(self.version, manifest.root_hash)?;
+        let receiver = Arc::new(Mutex::new(Some(
+            self.run_mode
+                .get_state_restore_receiver(self.version, manifest.root_hash)?,
+        )));
 
         let (ver_gauge, tgt_leaf_idx, leaf_idx) = if self.run_mode.is_verify() {
             (
@@ -131,27 +140,78 @@ impl StateSnapshotRestoreController {
             )
         };
 
-        // FIXME update counters
         ver_gauge.set(self.version as i64);
         tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
-        for chunk in manifest.chunks {
-            let blobs = self.read_state_value(chunk.blobs).await?;
-            let proof = self.storage.load_bcs_file(&chunk.proof).await?;
-            receiver.add_chunk(blobs, proof)?;
+        let total_chunks = manifest.chunks.len();
 
+        let resume_point_opt = receiver.lock().as_mut().unwrap().previous_key_hash()?;
+        let chunks = if let Some(resume_point) = resume_point_opt {
+            manifest
+                .chunks
+                .into_iter()
+                .skip_while(|chunk| chunk.last_key <= resume_point)
+                .collect()
+        } else {
+            manifest.chunks
+        };
+        if chunks.len() < total_chunks {
+            info!(
+                chunks_to_add = chunks.len(),
+                total_chunks = total_chunks,
+                "Resumed state snapshot restore."
+            )
+        };
+        let chunks_to_add = chunks.len();
+
+        let start_idx = chunks.first().map_or(0, |chunk| chunk.first_idx);
+
+        let storage = self.storage.clone();
+        let futs_iter = chunks.into_iter().enumerate().map(|(chunk_idx, chunk)| {
+            let storage = storage.clone();
+            async move {
+                tokio::spawn(async move {
+                    let blobs = Self::read_state_value(&storage, chunk.blobs.clone()).await?;
+                    let proof = storage.load_bcs_file(&chunk.proof).await?;
+                    Result::<_>::Ok((chunk_idx, chunk, blobs, proof))
+                })
+                .await?
+            }
+        });
+        let con = self.concurrent_downloads;
+        let mut futs_stream = stream::iter(futs_iter).buffered_x(con * 2, con);
+        let mut start = None;
+        while let Some((chunk_idx, chunk, blobs, proof)) = futs_stream.try_next().await? {
+            start = start.or_else(|| Some(Instant::now()));
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["add_state_chunk"])
+                .start_timer();
+            let receiver = receiver.clone();
+            tokio::task::spawn_blocking(move || {
+                receiver.lock().as_mut().unwrap().add_chunk(blobs, proof)
+            })
+            .await??;
             leaf_idx.set(chunk.last_idx as i64);
+            info!(
+                chunk = chunk_idx,
+                chunks_to_add = chunks_to_add,
+                last_idx = chunk.last_idx,
+                values_per_second = ((chunk.last_idx + 1 - start_idx) as f64
+                    / start.as_ref().unwrap().elapsed().as_secs_f64())
+                    as u64,
+                "State chunk added.",
+            );
         }
 
-        receiver.finish()?;
+        tokio::task::spawn_blocking(move || receiver.lock().take().unwrap().finish()).await??;
         self.run_mode.finish();
         Ok(())
     }
 
     async fn read_state_value(
-        &self,
+        storage: &Arc<dyn BackupStorage>,
         file_handle: FileHandle,
     ) -> Result<Vec<(StateKey, StateValue)>> {
-        let mut file = self.storage.open_for_read(&file_handle).await?;
+        let mut file = storage.open_for_read(&file_handle).await?;
 
         let mut chunk = vec![];
 

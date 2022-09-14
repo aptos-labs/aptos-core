@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache, delta_ext::TransactionOutputExt};
+use crate::{counters::*, data_cache::StateViewCache};
 use anyhow::Result;
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
@@ -17,9 +18,7 @@ use crate::{
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_metadata::BlockMetadata,
-    transaction::{
-        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
     write_set::WriteSet,
 };
 use rayon::prelude::*;
@@ -47,6 +46,7 @@ pub trait VMAdapter {
     fn run_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
+        storage: &S,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -87,8 +87,14 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     let resolver = remote_cache.as_move_resolver();
     let mut session = adapter.new_session(&resolver, SessionId::txn(&txn));
 
-    let validation_result =
-        validate_signature_checked_transaction(adapter, &mut session, &txn, true, &log_context);
+    let validation_result = validate_signature_checked_transaction(
+        adapter,
+        &mut session,
+        &resolver,
+        &txn,
+        true,
+        &log_context,
+    );
 
     // Increment the counter for transactions verified.
     let (counter_label, result) = match validation_result {
@@ -111,13 +117,14 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAdapter>(
     adapter: &A,
     session: &mut SessionExt<S>,
+    storage: &S,
     transaction: &SignatureCheckedTransaction,
     allow_too_new: bool,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     adapter.check_transaction_format(transaction)?;
 
-    let prologue_status = adapter.run_prologue(session, transaction, log_context);
+    let prologue_status = adapter.run_prologue(session, storage, transaction, log_context);
     match prologue_status {
         Err(err) if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => {
             Err(err)
@@ -167,7 +174,7 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
         )?;
 
         // Apply deltas.
-        let output = output_ext.into_transaction_output(&data_cache)?;
+        let output = output_ext.into_transaction_output(&data_cache);
 
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
@@ -191,9 +198,6 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             should_restart = true;
         }
 
-        // `result` is initially empty, a single element is pushed per loop iteration and
-        // the number of iterations is bound to the max size of `signature_verified_block`
-        assume!(result.len() < usize::max_value());
         result.push((vm_status, output))
     }
     Ok(result)
@@ -207,7 +211,6 @@ pub enum PreprocessedTransaction {
     UserTransaction(Box<SignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),
     BlockMetadata(BlockMetadata),
-    WriteSet(Box<SignatureCheckedTransaction>),
     InvalidSignature,
     StateCheckpoint,
 }
@@ -227,12 +230,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                     return PreprocessedTransaction::InvalidSignature;
                 }
             };
-            match checked_txn.payload() {
-                TransactionPayload::WriteSet(_) => {
-                    PreprocessedTransaction::WriteSet(Box::new(checked_txn))
-                }
-                _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
-            }
+            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
         }
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }

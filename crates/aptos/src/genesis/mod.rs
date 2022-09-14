@@ -7,6 +7,7 @@ pub mod keys;
 mod tests;
 
 use crate::common::utils::dir_default_to_current;
+use crate::genesis::git::{OPERATOR_FILE, OWNER_FILE};
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
@@ -17,14 +18,14 @@ use crate::{
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::builder::GenesisConfiguration;
+use aptos_genesis::config::{StringOperatorConfiguration, StringOwnerConfiguration};
 use aptos_genesis::{
-    config::{HostAndPort, Layout, ValidatorConfiguration},
+    config::{Layout, ValidatorConfiguration},
     GenesisInfo,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
 
@@ -59,13 +60,14 @@ impl GenesisTool {
 /// Generate genesis from a git repository
 #[derive(Parser)]
 pub struct GenerateGenesis {
+    /// Output directory for Genesis file and waypoint
+    #[clap(long, parse(from_os_str))]
+    output_dir: Option<PathBuf>,
+
     #[clap(flatten)]
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
-    /// Output directory for Genesis file and waypoint
-    #[clap(long, parse(from_os_str))]
-    output_dir: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -142,13 +144,13 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
-    let modules = client.get_modules("framework")?;
+    let framework = client.get_framework()?;
 
     Ok(GenesisInfo::new(
         layout.chain_id,
         layout.root_key.unwrap(),
         validators,
-        modules,
+        framework,
         &GenesisConfiguration {
             allow_new_validators: layout.allow_new_validators,
             epoch_duration_secs: layout.epoch_duration_secs,
@@ -167,67 +169,183 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
 /// Do proper parsing so more information is known about failures
 fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfiguration> {
-    let file = PathBuf::from(format!("{}.yaml", user));
-    let config = client.get::<StringValidatorConfiguration>(file.as_path())?;
+    // Load a user's configuration files
+    let dir = PathBuf::from(user);
+    let owner_file = dir.join(OWNER_FILE);
+    let owner_file = owner_file.as_path();
+    let owner_config = client.get::<StringOwnerConfiguration>(owner_file)?;
 
-    // Convert each individually
-    let account_address = AccountAddress::from_str(&config.account_address)
-        .map_err(|_| CliError::UnexpectedError("account_address invalid".to_string()))?;
-    let account_key = Ed25519PublicKey::from_encoded_string(&config.account_public_key)
-        .map_err(|_| CliError::UnexpectedError("account_key invalid".to_string()))?;
-    let consensus_key = bls12381::PublicKey::from_encoded_string(&config.consensus_public_key)
-        .map_err(|_| CliError::UnexpectedError("consensus_key invalid".to_string()))?;
-    let proof_of_possession =
-        bls12381::ProofOfPossession::from_encoded_string(&config.proof_of_possession)
-            .map_err(|_| CliError::UnexpectedError("proof_of_possession invalid".to_string()))?;
-    let validator_network_key =
-        x25519::PublicKey::from_encoded_string(&config.validator_network_public_key)
-            .map_err(|_| CliError::UnexpectedError("validator_network_key invalid".to_string()))?;
-    let validator_host = config.validator_host.clone();
-    let full_node_network_key =
-        if let Some(ref full_node_network_key) = config.full_node_network_public_key {
-            Some(
-                x25519::PublicKey::from_encoded_string(full_node_network_key).map_err(|_| {
-                    CliError::UnexpectedError("full_node_network_key invalid".to_string())
-                })?,
-            )
-        } else {
-            None
-        };
-    let full_node_host = config.full_node_host;
+    let operator_file = dir.join(OPERATOR_FILE);
+    let operator_file = operator_file.as_path();
+    let operator_config = client.get::<StringOperatorConfiguration>(operator_file)?;
 
+    // Check and convert fields in owner file
+    let owner_account_address = parse_required_option(
+        &owner_config.owner_account_address,
+        owner_file,
+        "owner_account_address",
+        AccountAddress::from_str,
+    )?;
+    let owner_account_public_key = parse_required_option(
+        &owner_config.owner_account_public_key,
+        owner_file,
+        "owner_account_public_key",
+        Ed25519PublicKey::from_encoded_string,
+    )?;
+
+    let operator_account_address = parse_required_option(
+        &owner_config.operator_account_address,
+        owner_file,
+        "operator_account_address",
+        AccountAddress::from_str,
+    )?;
+    let operator_account_public_key = parse_required_option(
+        &owner_config.operator_account_public_key,
+        owner_file,
+        "operator_account_public_key",
+        Ed25519PublicKey::from_encoded_string,
+    )?;
+
+    let voter_account_address = parse_required_option(
+        &owner_config.voter_account_address,
+        owner_file,
+        "voter_account_address",
+        AccountAddress::from_str,
+    )?;
+    let voter_account_public_key = parse_required_option(
+        &owner_config.voter_account_public_key,
+        owner_file,
+        "voter_account_public_key",
+        Ed25519PublicKey::from_encoded_string,
+    )?;
+
+    let stake_amount = parse_required_option(
+        &owner_config.stake_amount,
+        owner_file,
+        "stake_amount",
+        u64::from_str,
+    )?;
+
+    // Check and convert fields in operator file
+    let operator_account_address_from_file = parse_required_option(
+        &operator_config.operator_account_address,
+        operator_file,
+        "operator_account_address",
+        AccountAddress::from_str,
+    )?;
+    let operator_account_public_key_from_file = parse_required_option(
+        &operator_config.operator_account_public_key,
+        operator_file,
+        "operator_account_public_key",
+        Ed25519PublicKey::from_encoded_string,
+    )?;
+    let consensus_public_key = parse_required_option(
+        &operator_config.consensus_public_key,
+        operator_file,
+        "consensus_public_key",
+        bls12381::PublicKey::from_encoded_string,
+    )?;
+    let consensus_proof_of_possession = parse_required_option(
+        &operator_config.consensus_proof_of_possession,
+        operator_file,
+        "consensus_proof_of_possesion",
+        bls12381::ProofOfPossession::from_encoded_string,
+    )?;
+    let validator_network_public_key = parse_required_option(
+        &operator_config.validator_network_public_key,
+        operator_file,
+        "validator_network_public_key",
+        x25519::PublicKey::from_encoded_string,
+    )?;
+    let full_node_network_public_key = parse_optional_option(
+        &operator_config.full_node_network_public_key,
+        operator_file,
+        "full_node_network_public_key",
+        x25519::PublicKey::from_encoded_string,
+    )?;
+
+    // Verify owner & operator agree on operator
+    if operator_account_address != operator_account_address_from_file {
+        return Err(
+            CliError::CommandArgumentError(
+                format!("Operator account {} in owner file {} does not match operator account {} in operator file {}",
+                        operator_account_address,
+                        owner_file.display(),
+                        operator_account_address_from_file,
+                        operator_file.display()
+                )));
+    }
+    if operator_account_public_key != operator_account_public_key_from_file {
+        return Err(
+            CliError::CommandArgumentError(
+                format!("Operator public key {} in owner file {} does not match operator public key {} in operator file {}",
+                        operator_account_public_key,
+                        owner_file.display(),
+                        operator_account_public_key_from_file,
+                        operator_file.display()
+                )));
+    }
+
+    // Build Validator configuration
     Ok(ValidatorConfiguration {
-        account_address,
-        consensus_public_key: consensus_key,
-        proof_of_possession,
-        account_public_key: account_key,
-        validator_network_public_key: validator_network_key,
-        validator_host,
-        full_node_network_public_key: full_node_network_key,
-        full_node_host,
-        stake_amount: config.stake_amount,
+        owner_account_address,
+        owner_account_public_key,
+        operator_account_address,
+        operator_account_public_key,
+        voter_account_address,
+        voter_account_public_key,
+        consensus_public_key,
+        proof_of_possession: consensus_proof_of_possession,
+        validator_network_public_key,
+        validator_host: operator_config.validator_host,
+        full_node_network_public_key,
+        full_node_host: operator_config.full_node_host,
+        stake_amount,
     })
 }
 
-/// For better parsing error messages
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StringValidatorConfiguration {
-    /// Account address
-    pub account_address: String,
-    /// Key used for signing in consensus
-    pub consensus_public_key: String,
-    /// Proof of possession of the consensus key
-    pub proof_of_possession: String,
-    /// Key used for signing transactions with the account
-    pub account_public_key: String,
-    /// Public key used for validator network identity (same as account address)
-    pub validator_network_public_key: String,
-    /// Host for validator which can be an IP or a DNS name
-    pub validator_host: HostAndPort,
-    /// Public key used for full node network identity (same as account address)
-    pub full_node_network_public_key: Option<String>,
-    /// Host for full node which can be an IP or a DNS name and is optional
-    pub full_node_host: Option<HostAndPort>,
-    /// Stake amount for consensus
-    pub stake_amount: u64,
+fn parse_required_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
+    option: &Option<String>,
+    file: &Path,
+    field_name: &'static str,
+    parse: F,
+) -> Result<T, CliError> {
+    if let Some(ref field) = option {
+        parse(field).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Field {} is invalid in file {}.  Err: {}",
+                field_name,
+                file.display(),
+                err
+            ))
+        })
+    } else {
+        Err(CliError::CommandArgumentError(format!(
+            "File {} is missing {}",
+            file.display(),
+            field_name
+        )))
+    }
+}
+
+fn parse_optional_option<F: Fn(&str) -> Result<T, E>, T, E: std::fmt::Display>(
+    option: &Option<String>,
+    file: &Path,
+    field_name: &'static str,
+    parse: F,
+) -> Result<Option<T>, CliError> {
+    if let Some(ref field) = option {
+        parse(field)
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!(
+                    "Field {} is invalid in file {}.  Err: {}",
+                    field_name,
+                    file.display(),
+                    err
+                ))
+            })
+            .map(Some)
+    } else {
+        Ok(None)
+    }
 }

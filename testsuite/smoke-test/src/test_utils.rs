@@ -6,19 +6,13 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_transaction_builder::aptos_stdlib;
-use forge::{LocalSwarm, NodeExt, Swarm};
+use cached_packages::aptos_stdlib;
+use forge::{reconfig, LocalSwarm, NodeExt, Swarm};
 use rand::random;
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
-    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    let mut chain_info = swarm.chain_info().into_aptos_public_info();
-    chain_info
-        .create_user_account(account.public_key())
-        .await
-        .unwrap();
-    chain_info.mint(account.address(), amount).await.unwrap();
-    account
+    let mut info = swarm.aptos_public_info();
+    info.create_and_fund_user_account(amount).await.unwrap()
 }
 
 pub async fn transfer_coins_non_blocking(
@@ -49,30 +43,6 @@ pub async fn transfer_coins(
     client.wait_for_signed_transaction(&txn).await.unwrap();
 
     txn
-}
-
-pub async fn reconfig(
-    client: &RestClient,
-    transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
-) {
-    let aptos_version = client.get_aptos_version().await.unwrap();
-    let current_version = *aptos_version.into_inner().major.inner();
-    let txn = root_account.sign_with_transaction_builder(
-        transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
-    );
-    client
-        .submit_and_wait(&txn)
-        .await
-        .map_err(|e| {
-            panic!(
-                "Couldn't execute {:?}, for account {:?}, error {:?}",
-                txn, root_account, e
-            )
-        })
-        .unwrap();
-
-    println!("Changing aptos version to {}", current_version + 1,);
 }
 
 pub async fn transfer_and_reconfig(

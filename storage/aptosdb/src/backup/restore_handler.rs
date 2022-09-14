@@ -1,13 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::db_metadata::{DbMetadataKey, DbMetadataSchema};
+use crate::state_restore::StateSnapshotRestore;
 use crate::{
     backup::restore_utils, event_store::EventStore, ledger_store::LedgerStore,
     state_store::StateStore, transaction_store::TransactionStore, AptosDB,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -54,11 +55,12 @@ impl RestoreHandler {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
-        StateSnapshotRestore::new_overwrite(
+        StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
             &self.state_store,
             version,
             expected_root_hash,
+            true, /* async_commit */
         )
     }
 
@@ -113,5 +115,19 @@ impl RestoreHandler {
             .aptosdb
             .get_latest_transaction_info_option()?
             .map_or(0, |(ver, _txn_info)| ver + 1))
+    }
+
+    pub fn get_in_progress_state_snapshot_version(&self) -> Result<Option<Version>> {
+        let mut iter = self
+            .aptosdb
+            .ledger_db
+            .iter::<DbMetadataSchema>(Default::default())?;
+        iter.seek_to_first();
+        while let Some((k, _v)) = iter.next().transpose()? {
+            if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {
+                return Ok(Some(version));
+            }
+        }
+        Ok(None)
     }
 }

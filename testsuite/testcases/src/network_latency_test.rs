@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, SwarmChaos, SwarmNetworkDelay, Test};
+use crate::{LoadDestination, NetworkLoadTest};
+use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkDelay, Test};
 
 pub struct NetworkLatencyTest;
 
@@ -17,38 +17,34 @@ impl Test for NetworkLatencyTest {
     }
 }
 
-impl NetworkTest for NetworkLatencyTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_job.duration;
-        let delay = SwarmChaos::Delay(SwarmNetworkDelay {
-            latency_ms: LATENCY_MS,
-            jitter_ms: JITTER_MS,
-            correlation_percentage: CORRELATION_PERCENTAGE,
-        });
-        // emit to all validator
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        // INJECT DELAY AND EMIT TXNS
-        ctx.swarm().inject_chaos(delay.clone())?;
+impl NetworkLoadTest for NetworkLatencyTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::Delay(SwarmNetworkDelay {
+                latency_ms: LATENCY_MS,
+                jitter_ms: JITTER_MS,
+                correlation_percentage: CORRELATION_PERCENTAGE,
+            }))?;
         let msg = format!(
             "Injected {}ms +- {}ms with {}% correlation latency to namespace",
             LATENCY_MS, JITTER_MS, CORRELATION_PERCENTAGE
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
-        ctx.report
-            .report_txn_stats(format!("{}:delay", self.name()), &txn_stat, duration);
-        ctx.swarm().remove_chaos(delay)?;
+        Ok(LoadDestination::AllNodes)
+    }
 
-        // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        swarm.remove_chaos(SwarmChaos::Delay(SwarmNetworkDelay {
+            latency_ms: LATENCY_MS,
+            jitter_ms: JITTER_MS,
+            correlation_percentage: CORRELATION_PERCENTAGE,
+        }))
+    }
+}
 
-        Ok(())
+impl NetworkTest for NetworkLatencyTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

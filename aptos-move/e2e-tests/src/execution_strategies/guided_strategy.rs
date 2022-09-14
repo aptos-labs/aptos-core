@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnnotatedTransaction {
     Block,
     Txn(Box<SignedTransaction>),
@@ -60,7 +60,7 @@ impl<Strategy: PartitionStrategy> GuidedExecutor<Strategy> {
     pub fn new(strategy: Strategy) -> Self {
         Self {
             strategy,
-            executor: FakeExecutor::from_genesis_file(),
+            executor: FakeExecutor::from_head_genesis(),
         }
     }
 }

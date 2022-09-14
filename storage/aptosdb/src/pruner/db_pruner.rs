@@ -1,46 +1,35 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::{error, info};
+use anyhow::{Context, Result};
+use aptos_logger::info;
 use aptos_types::transaction::Version;
-use std::{cmp::min, thread::sleep, time::Duration};
+use std::cmp::min;
 
 /// Defines the trait for pruner for different DB
 pub trait DBPruner: Send + Sync {
     /// Find out the first undeleted item in the stale node index.
-    ///
-    /// Seeking from the beginning (version 0) is potentially costly, we do it once upon worker
-    /// thread start, record the progress and seek from that position afterwards.
     fn initialize(&self) {
-        loop {
-            match self.initialize_min_readable_version() {
-                Ok(min_readable_version) => {
-                    info!(
-                        min_readable_version = min_readable_version,
-                        "{} initialized.",
-                        self.name()
-                    );
-                    self.record_progress(min_readable_version);
-                    return;
-                }
-                Err(e) => {
-                    error!(
-                        error = ?e,
-                        "{} Error on first seek. Retrying in 1 second.", self.name()
-                    );
-                    sleep(Duration::from_secs(1));
-                }
-            }
-        }
+        let min_readable_version = self
+            .initialize_min_readable_version()
+            .context(self.name())
+            .expect("Pruner failed to initialize.");
+        info!(
+            min_readable_version = min_readable_version,
+            "{} initialized.",
+            self.name()
+        );
+        self.record_progress(min_readable_version);
     }
+
     fn name(&self) -> &'static str;
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
-    fn prune(&self, batch_size: usize) -> anyhow::Result<Version>;
+    fn prune(&self, batch_size: usize) -> Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version>;
+    fn initialize_min_readable_version(&self) -> Result<Version>;
 
     /// Returns the least readable version stores in the DB pruner
     fn min_readable_version(&self) -> Version;

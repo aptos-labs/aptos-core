@@ -14,9 +14,9 @@ use aptos_bitvec::BitVec;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
-    multi_signature::PartialSignatures,
     on_chain_config::ValidatorSet,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
@@ -115,7 +115,7 @@ fn test_block_relation() {
 #[test]
 fn test_same_qc_different_authors() {
     let (signers, validators) = random_validator_verifier(1, None, false);
-    let signer = signers.get(0).unwrap();
+    let signer = signers.first().unwrap();
     let genesis_qc = certificate_for_genesis();
     let round = 1;
     let payload = Payload::empty();

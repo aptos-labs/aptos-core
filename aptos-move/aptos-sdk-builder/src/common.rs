@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::CamelCase;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
@@ -57,7 +57,7 @@ fn quote_parameter_as_field(arg: &ArgumentABI) -> Named<Format> {
     }
 }
 
-pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
+pub(crate) fn make_abi_enum_container(abis: &[EntryABI]) -> ContainerFormat {
     let mut variants = BTreeMap::new();
     for (index, abi) in abis.iter().enumerate() {
         let mut fields = Vec::new();
@@ -69,7 +69,7 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
         }
 
         let name = match abi {
-            ScriptABI::ScriptFunction(sf) => {
+            EntryABI::EntryFunction(sf) => {
                 format!(
                     "{}{}",
                     sf.module_name().name().to_string().to_camel_case(),
@@ -136,7 +136,7 @@ pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::Ext
         .collect()
 }
 
-pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag> {
+pub(crate) fn get_required_helper_types(abis: &[EntryABI]) -> BTreeSet<&TypeTag> {
     let mut required_types = BTreeSet::new();
     for abi in abis {
         for arg in abi.args() {
@@ -147,29 +147,29 @@ pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag
     required_types
 }
 
-pub(crate) fn filter_transaction_scripts(abis: &[ScriptABI]) -> Vec<ScriptABI> {
+pub(crate) fn filter_transaction_scripts(abis: &[EntryABI]) -> Vec<EntryABI> {
     abis.iter()
         .cloned()
         .filter(|abi| abi.is_transaction_script_abi())
         .collect()
 }
 
-pub(crate) fn transaction_script_abis(abis: &[ScriptABI]) -> Vec<TransactionScriptABI> {
+pub(crate) fn transaction_script_abis(abis: &[EntryABI]) -> Vec<TransactionScriptABI> {
     abis.iter()
         .cloned()
         .filter_map(|abi| match abi {
-            ScriptABI::TransactionScript(abi) => Some(abi),
-            ScriptABI::ScriptFunction(_) => None,
+            EntryABI::TransactionScript(abi) => Some(abi),
+            EntryABI::EntryFunction(_) => None,
         })
         .collect::<Vec<_>>()
 }
 
-pub(crate) fn script_function_abis(abis: &[ScriptABI]) -> Vec<ScriptFunctionABI> {
+pub(crate) fn entry_function_abis(abis: &[EntryABI]) -> Vec<EntryFunctionABI> {
     abis.iter()
         .cloned()
         .filter_map(|abi| match abi {
-            ScriptABI::ScriptFunction(abi) => Some(abi),
-            ScriptABI::TransactionScript(_) => None,
+            EntryABI::EntryFunction(abi) => Some(abi),
+            EntryABI::TransactionScript(_) => None,
         })
         .collect::<Vec<_>>()
 }

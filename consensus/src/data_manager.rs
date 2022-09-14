@@ -134,18 +134,19 @@ impl DataManager for QuorumStoreDataManager {
         if block.payload().is_some() {
             match block.payload().unwrap() {
                 Payload::InQuorumStore(proofs) => {
-                    let receivers = self
-                        .request_data(
-                            proofs.clone(),
-                            LogicalTime::new(block.epoch(), block.round()),
-                        )
-                        .await;
-                    assert!(!self.digest_status.contains_key(&block.id()));
-                    self.digest_status
-                        .insert(block.id(), DataStatus::Requested(receivers));
-                    self.expiration_status
-                        .lock()
-                        .add_item(block.id(), block.round());
+                    if !self.digest_status.contains_key(&block.id()) {
+                        let receivers = self
+                            .request_data(
+                                proofs.clone(),
+                                LogicalTime::new(block.epoch(), block.round()),
+                            )
+                            .await;
+                        self.digest_status
+                            .insert(block.id(), DataStatus::Requested(receivers));
+                        self.expiration_status
+                            .lock()
+                            .add_item(block.id(), block.round());
+                    }
                 }
                 Payload::Empty => {}
                 Payload::DirectMempool(_) => {

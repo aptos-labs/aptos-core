@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     error::Error,
+    metadata_storage::PersistentMetadataStorage,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
         ErrorNotificationListener, MempoolNotificationHandler,
@@ -24,11 +24,12 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+    transaction::{TransactionOutputListWithProof, Version},
 };
-use claim::assert_matches;
+use claims::assert_matches;
 use data_streaming_service::data_notification::NotificationId;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkCommitNotification;
@@ -78,6 +79,7 @@ async fn test_apply_transaction_outputs() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get a mempool and event notification. Also verify that there's no pending data.
@@ -113,6 +115,7 @@ async fn test_apply_transaction_outputs_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data
@@ -145,6 +148,7 @@ async fn test_commit_chunk_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data
@@ -191,6 +195,7 @@ async fn test_execute_transactions() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get a mempool and event notification. Also verify that there's no pending data.
@@ -226,6 +231,7 @@ async fn test_execute_transactions_error() {
             create_epoch_ending_ledger_info(),
             None,
         )
+        .await
         .unwrap();
 
     // Verify we get an error notification and that there's no pending data
