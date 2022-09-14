@@ -20,11 +20,9 @@ export default class extends Controller<HTMLElement> {
 
   static values = {
     requiredNetwork: String,
-    walletPersisted: Boolean,
   };
 
   declare readonly requiredNetworkValue: string | null;
-  declare readonly walletPersistedValue: boolean;
 
   get walletName() {
     return this.getInput(FIELD_NAMES.walletName).value;
@@ -37,13 +35,6 @@ export default class extends Controller<HTMLElement> {
     this.element.querySelector("dialog")?.close();
     this.getInput(FIELD_NAMES.walletName).value = walletName;
     this.formTarget.requestSubmit();
-  }
-
-  onPageLoad() {
-    const urlParams = new URLSearchParams(location.search);
-    if (urlParams.get("wallet") && !this.walletPersistedValue) {
-      this.formTarget.requestSubmit();
-    }
   }
 
   async renderErrors(errors: string[]) {
