@@ -218,7 +218,11 @@ impl CoinCache {
             return Some(native_coin());
         }
 
-        let currencies = self.currencies.read().unwrap();
+        let currencies = self
+            .currencies
+            .read()
+            .expect("Can't recover from poisoned lock on coin cache");
+
         if let Some(currency) = currencies.get(coin) {
             currency.clone()
         } else {
@@ -243,7 +247,10 @@ impl CoinCache {
         }
 
         {
-            let currencies = self.currencies.read().unwrap();
+            let currencies = self
+                .currencies
+                .read()
+                .expect("Can't recover from poisoned lock on coin cache");
             if let Some(currency) = currencies.get(&coin) {
                 return Ok(currency.clone());
             }
@@ -260,7 +267,7 @@ impl CoinCache {
             })?;
         self.currencies
             .write()
-            .unwrap()
+            .expect("Can't recover from poisoned lock on coin cache")
             .insert(coin, currency.clone());
         Ok(currency)
     }
