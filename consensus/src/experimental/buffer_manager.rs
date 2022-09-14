@@ -125,6 +125,7 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
     ) -> Self {
         counters::NUM_BLOCKS_IN_PIPELINE.set(0);
+        counters::NUM_ORDERED_BLOCKS_IN_PIPELINE.set(0);
         let buffer = Buffer::<BufferItem>::new();
 
         Self {
@@ -190,6 +191,7 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
         counters::NUM_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
+        counters::NUM_ORDERED_BLOCKS_IN_PIPELINE.add(ordered_blocks.len() as i64);
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -209,6 +211,7 @@ impl BufferManager {
         );
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
+            counters::NUM_ORDERED_BLOCKS_IN_PIPELINE.sub(ordered_blocks.len() as i64);
             let request = self.create_new_request(ExecutionRequest { ordered_blocks });
             if cursor == self.execution_root {
                 let sender = self.execution_phase_tx.clone();
@@ -219,6 +222,8 @@ impl BufferManager {
                     .await
                     .expect("Failed to send execution request")
             }
+        } else {
+            counters::NUM_ORDERED_BLOCKS_IN_PIPELINE.set(0);
         }
     }
 
