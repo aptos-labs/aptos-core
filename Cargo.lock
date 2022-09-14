@@ -1376,6 +1376,7 @@ dependencies = [
  "aptos-crypto-derive",
  "bcs",
  "chrono",
+ "claims",
  "hex",
  "itertools",
  "move-deps",
