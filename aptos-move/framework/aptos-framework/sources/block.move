@@ -182,8 +182,8 @@ module aptos_framework::block {
 
     ///  Emit a `NewBlockEvent` event. This function will be invoked by write set script directly to generate the
     ///  new block event for WriteSetPayload.
-    public fun emit_writeset_block_event(framework_signer: &signer, fake_block_hash: address) acquires BlockResource {
-        system_addresses::assert_aptos_framework(framework_signer);
+    public fun emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) acquires BlockResource {
+        system_addresses::assert_vm(vm_signer);
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
