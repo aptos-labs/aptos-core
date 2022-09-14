@@ -17,16 +17,11 @@ fn main() -> Result<()> {
         .with_initial_version(InitialVersion::Newest)
         .with_network_tests(vec![&PerformanceBenchmark, &NonZeroGasPrice])
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 30 }))
-        .with_success_criteria(SuccessCriteria::new(
-            20,
-            60000,
-            false,
-            None,
-            None,
-            Some(StateProgressThreshold {
+        .with_success_criteria(SuccessCriteria::new(20).add_chain_progress(
+            StateProgressThreshold {
                 max_no_progress_secs: 0.0,
                 max_round_gap: 0,
-            }),
+            },
         ));
 
     let options = Options::from_args();

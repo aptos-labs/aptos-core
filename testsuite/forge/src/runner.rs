@@ -239,21 +239,16 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
         let forge_run_mode =
             std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
         let success_criteria = if forge_run_mode.eq("local") {
-            SuccessCriteria::new(600, 60000, true, None, None, None)
+            SuccessCriteria::new(600).add_no_restarts()
         } else {
-            SuccessCriteria::new(
-                3500,
-                10000,
-                true,
-                None,
-                Some(SystemMetricsThreshold::new(
+            SuccessCriteria::new(3500)
+                .add_no_restarts()
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
                     MetricsThreshold::new(12, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                )),
-                None,
-            )
+                ))
         };
         Self {
             aptos_tests: vec![],

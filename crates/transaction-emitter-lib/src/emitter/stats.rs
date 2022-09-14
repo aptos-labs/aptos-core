@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    collections::HashMap,
     fmt,
     ops::Sub,
     sync::{
@@ -10,6 +11,8 @@ use std::{
     },
     time::Duration,
 };
+
+use crate::TransactionType;
 
 #[derive(Debug, Default)]
 pub struct TxnStats {
@@ -20,29 +23,6 @@ pub struct TxnStats {
     pub latency: u64,
     pub latency_samples: u64,
     pub latency_buckets: AtomicHistogramSnapshot,
-}
-
-#[derive(Debug, Default)]
-pub struct TxnStatsRate {
-    pub submitted: u64,
-    pub committed: u64,
-    pub expired: u64,
-    pub failed_submission: u64,
-    pub latency: u64,
-    pub latency_samples: u64,
-    pub p50_latency: u64,
-    pub p90_latency: u64,
-    pub p99_latency: u64,
-}
-
-impl fmt::Display for TxnStatsRate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, failed submission: {} tnx/s, latency: {} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
-            self.submitted, self.committed, self.expired, self.failed_submission, self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
-        )
-    }
 }
 
 impl TxnStats {
@@ -96,17 +76,61 @@ impl Sub for &TxnStats {
 }
 
 #[derive(Debug, Default)]
-pub struct StatsAccumulator {
-    pub submitted: AtomicU64,
-    pub committed: AtomicU64,
-    pub expired: AtomicU64,
-    pub failed_submission: AtomicU64,
-    pub latency: AtomicU64,
-    pub latency_samples: AtomicU64,
-    pub latencies: Arc<AtomicHistogramAccumulator>,
+pub struct TxnStatsRate {
+    pub submitted: u64,
+    pub committed: u64,
+    pub expired: u64,
+    pub failed_submission: u64,
+    pub latency: u64,
+    pub latency_samples: u64,
+    pub p50_latency: u64,
+    pub p90_latency: u64,
+    pub p99_latency: u64,
 }
 
-impl StatsAccumulator {
+impl fmt::Display for TxnStatsRate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, failed submission: {} tnx/s, latency: {} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
+            self.submitted, self.committed, self.expired, self.failed_submission, self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct DetailedTxnStats {
+    pub total: TxnStats,
+    pub per_type: HashMap<TransactionType, TxnStats>,
+}
+
+impl Sub for &DetailedTxnStats {
+    type Output = DetailedTxnStats;
+
+    fn sub(self, other: &DetailedTxnStats) -> DetailedTxnStats {
+        DetailedTxnStats {
+            total: &self.total - &other.total,
+            per_type: self
+                .per_type
+                .iter()
+                .map(|(k, v)| (*k, v - &other.per_type[k]))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct StatsAccumulatorFields {
+    submitted: AtomicU64,
+    committed: AtomicU64,
+    expired: AtomicU64,
+    failed_submission: AtomicU64,
+    latency: AtomicU64,
+    latency_samples: AtomicU64,
+    latencies: Arc<AtomicHistogramAccumulator>,
+}
+
+impl StatsAccumulatorFields {
     pub fn accumulate(&self) -> TxnStats {
         TxnStats {
             submitted: self.submitted.load(Ordering::Relaxed),
@@ -117,6 +141,94 @@ impl StatsAccumulator {
             latency_samples: self.latency_samples.load(Ordering::Relaxed),
             latency_buckets: self.latencies.snapshot(),
         }
+    }
+
+    fn observe_latency(&self, sum_latency: u128, num_committed: usize) {
+        let avg_latency = (sum_latency / num_committed as u128) as u64;
+
+        self.latency
+            .fetch_add(sum_latency as u64, Ordering::Relaxed);
+        self.latency_samples
+            .fetch_add(num_committed as u64, Ordering::Relaxed);
+        self.latencies
+            .record_data_point(avg_latency, num_committed as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct StatsAccumulator {
+    total: StatsAccumulatorFields,
+    per_type: HashMap<TransactionType, StatsAccumulatorFields>,
+}
+
+impl StatsAccumulator {
+    pub fn for_type(&self, txn_type: &TransactionType) -> StatsAccumulatorUpdater {
+        StatsAccumulatorUpdater {
+            total: &self.total,
+            per_type: &self.per_type[txn_type],
+        }
+    }
+
+    pub fn accumulate(&self) -> DetailedTxnStats {
+        DetailedTxnStats {
+            total: self.total.accumulate(),
+            per_type: self
+                .per_type
+                .iter()
+                .map(|(k, v)| (*k, v.accumulate()))
+                .collect(),
+        }
+    }
+}
+
+pub struct StatsAccumulatorUpdater<'a> {
+    total: &'a StatsAccumulatorFields,
+    per_type: &'a StatsAccumulatorFields,
+}
+
+impl StatsAccumulatorUpdater<'_> {
+    pub fn submitted(&self, count: usize) {
+        self.total
+            .submitted
+            .fetch_add(count as u64, Ordering::Relaxed);
+        self.per_type
+            .submitted
+            .fetch_add(count as u64, Ordering::Relaxed);
+    }
+
+    pub fn failed_submission(&self, count: usize) {
+        self.total
+            .failed_submission
+            .fetch_add(count as u64, Ordering::Relaxed);
+        self.per_type
+            .failed_submission
+            .fetch_add(count as u64, Ordering::Relaxed);
+    }
+
+    pub fn expired(&self, count: usize) {
+        self.total
+            .expired
+            .fetch_add(count as u64, Ordering::Relaxed);
+        self.per_type
+            .expired
+            .fetch_add(count as u64, Ordering::Relaxed);
+    }
+
+    pub fn committed(&self, count: usize) {
+        self.total
+            .committed
+            .fetch_add(count as u64, Ordering::Relaxed);
+        self.per_type
+            .committed
+            .fetch_add(count as u64, Ordering::Relaxed);
+    }
+
+    pub fn total_latency(&self, sum_latency: u128, num_committed: usize) {
+        self.total.observe_latency(sum_latency, num_committed);
+    }
+
+    pub fn type_latency(&self, sum_latency: u128, num_committed: usize) {
+        self.per_type.observe_latency(sum_latency, num_committed);
     }
 }
 
@@ -236,13 +348,19 @@ pub struct DynamicStatsTracking {
 }
 
 impl DynamicStatsTracking {
-    pub fn new(num_phases: usize) -> DynamicStatsTracking {
+    pub fn new(num_phases: usize, txn_types: Vec<TransactionType>) -> DynamicStatsTracking {
         assert!(num_phases >= 1);
         Self {
             num_phases,
             cur_phase: AtomicUsize::new(0),
             stats: (0..num_phases)
-                .map(|_| StatsAccumulator::default())
+                .map(|_| StatsAccumulator {
+                    total: StatsAccumulatorFields::default(),
+                    per_type: txn_types
+                        .iter()
+                        .map(|t| (*t, StatsAccumulatorFields::default()))
+                        .collect(),
+                })
                 .collect(),
         }
     }
@@ -259,7 +377,7 @@ impl DynamicStatsTracking {
         self.stats.get(self.get_cur_phase()).unwrap()
     }
 
-    pub fn accumulate(&self) -> Vec<TxnStats> {
+    pub fn accumulate(&self) -> Vec<DetailedTxnStats> {
         self.stats.iter().map(|s| s.accumulate()).collect()
     }
 }

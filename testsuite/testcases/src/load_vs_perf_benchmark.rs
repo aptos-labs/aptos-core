@@ -48,7 +48,7 @@ impl LoadVsPerfBenchmark {
 
         Ok(SingleRunStats {
             tps,
-            stats,
+            stats: stats.total,
             ledger_transactions,
             actual_duration,
         })

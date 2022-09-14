@@ -36,7 +36,7 @@ use crate::{
     args::TransactionType,
     emitter::{
         account_minter::AccountMinter,
-        stats::{DynamicStatsTracking, TxnStats},
+        stats::{DetailedTxnStats, DynamicStatsTracking, TxnStats},
         submission_worker::SubmissionWorker,
     },
     transaction_generator::{
@@ -393,24 +393,43 @@ impl TxnEmitter {
         let all_addresses = Arc::new(RwLock::new(all_addresses));
         let mut all_accounts = all_accounts.into_iter();
         let stop = Arc::new(AtomicBool::new(false));
-        let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
         let txn_factory = self
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs);
-        let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
-            Vec::new();
+        let mut txn_generator_creator_mix: Vec<(
+            TransactionType,
+            Box<dyn TransactionGeneratorCreator>,
+            usize,
+        )> = Vec::new();
+        let stats = Arc::new(DynamicStatsTracking::new(
+            stats_tracking_phases,
+            req.transaction_mix
+                .iter()
+                .map(|(txn_type, _)| *txn_type)
+                .collect(),
+        ));
         for (transaction_type, weight) in req.transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
-                TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
+                TransactionType::P2P | TransactionType::Transfer => {
+                    Box::new(P2PTransactionGeneratorCreator::new(
+                        self.from_rng(),
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        all_addresses.clone(),
+                        req.invalid_transaction_ratio,
+                        req.gas_price,
+                    ))
+                }
+                TransactionType::TransferHighPri => Box::new(P2PTransactionGeneratorCreator::new(
                     self.from_rng(),
-                    txn_factory.clone(),
+                    txn_factory.clone().with_max_gas_amount(10_000_000),
                     SEND_AMOUNT,
                     all_addresses.clone(),
                     req.invalid_transaction_ratio,
-                    req.gas_price,
+                    std::cmp::max(req.gas_price, 1) * 10,
                 )),
                 TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
@@ -429,14 +448,10 @@ impl TxnEmitter {
                     .await,
                 ),
             };
-            txn_generator_creator_mix.push((txn_generator_creator, weight));
+            txn_generator_creator_mix.push((transaction_type, txn_generator_creator, weight));
         }
-        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> =
-            if txn_generator_creator_mix.len() > 1 {
-                Box::new(TxnMixGeneratorCreator::new(txn_generator_creator_mix))
-            } else {
-                txn_generator_creator_mix.into_iter().next().unwrap().0
-            };
+        let txn_generator_creator: TxnMixGeneratorCreator =
+            TxnMixGeneratorCreator::new(txn_generator_creator_mix);
 
         let total_workers = req.rest_clients.len() * workers_per_endpoint;
 
@@ -470,9 +485,10 @@ impl TxnEmitter {
                     stop,
                     mode_params.clone(),
                     stats,
-                    txn_generator_creator.create_transaction_generator(),
+                    txn_generator_creator.create_transaction_mix_generator(),
                     workers.len(),
                     check_account_sequence_only_once_for.contains(&workers.len()),
+                    HashSet::from([TransactionType::TransferHighPri]),
                     self.from_rng(),
                 );
                 let join_handle = tokio_handle.spawn(worker.run().boxed());
@@ -487,7 +503,7 @@ impl TxnEmitter {
         })
     }
 
-    pub async fn stop_job(&mut self, job: EmitJob) -> Vec<TxnStats> {
+    pub async fn stop_job(&mut self, job: EmitJob) -> Vec<DetailedTxnStats> {
         job.stop.store(true, Ordering::Relaxed);
         for worker in job.workers {
             let mut accounts = worker
@@ -500,26 +516,25 @@ impl TxnEmitter {
         job.stats.accumulate()
     }
 
-    pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
+    pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<DetailedTxnStats> {
         job.stats.accumulate()
     }
 
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
-        let mut prev_stats: Option<Vec<TxnStats>> = None;
-        let default_stats = TxnStats::default();
+        let mut prev_stats: Option<Vec<DetailedTxnStats>> = None;
         let window = Duration::from_secs(max(interval_secs, 1));
         while Instant::now() < deadline {
             tokio::time::sleep(window).await;
             let cur_phase = job.stats.get_cur_phase();
             let stats = self.peek_job_stats(job);
-            let delta = &stats[cur_phase]
-                - prev_stats
-                    .as_ref()
-                    .map(|p| &p[cur_phase])
-                    .unwrap_or(&default_stats);
+            let cur_rate = if let Some(prev) = prev_stats {
+                (&stats[cur_phase] - &prev[cur_phase]).total.rate(window)
+            } else {
+                stats[cur_phase].total.rate(window)
+            };
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate(window));
+            info!("phase {}: {}", cur_phase, cur_rate);
         }
     }
 
@@ -535,7 +550,7 @@ impl TxnEmitter {
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
         info!("Stopped job");
-        Ok(stats.into_iter().next().unwrap())
+        Ok(stats.into_iter().next().unwrap().total)
     }
 
     pub async fn emit_txn_for_with_stats(
@@ -551,7 +566,7 @@ impl TxnEmitter {
         info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
         info!("Stopped job");
-        Ok(stats.into_iter().next().unwrap())
+        Ok(stats.into_iter().next().unwrap().total)
     }
 
     pub async fn submit_single_transaction(
