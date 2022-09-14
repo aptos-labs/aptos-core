@@ -60,7 +60,7 @@ export default function WalletHeader({
           <Tooltip label={hasCopied ? 'Copied!' : 'Copy Address'} closeDelay={300}>
             <HStack spacing={0} width="100%" cursor="pointer" onClick={onCopy}>
               <Text as="span" fontSize="sm" fontWeight={400}>
-                {`${activeAccount.name} (${collapseHexString(activeAccount.address, 8, true)})`}
+                {`${activeAccount.name?.toString() || 'Account'} (${collapseHexString(activeAccount.address, 8, true)})`}
               </Text>
               <Box>
                 <IconButton
