@@ -429,33 +429,22 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
-    /// Create a resource account using the vectorized Unix timestamp
-    /// as a seed.
+    /// Create a resource account using the vectorized Unix timestamp as a seed.
     ///
-    /// Simplifies resource account creation, since callers do not need
-    /// to specify a seed.
+    /// Simplifies resource account creation, since callers do not need to specify a seed.
     ///
-    /// In practice the Unix timestamp is effectively non-deterministic,
-    /// or more specifically, just as difficult to front run in a miner
-    /// extractable value (MEV)-style attack as a seed provided via a
-    /// `public entry` function argument. That is, if a malicious
-    /// block producer wanted to prevent the creation of a resource
-    /// account, they would have to construct a block with a
-    /// carefully-selected timestamp that allows them to insert an
-    /// account creation transaction ahead of the legitimate account
-    /// creation transaction. This is comparable in difficulty to the
-    /// effort required for front-running resource account creation when
-    /// the seed is supplied via a `public entry` function, and both
-    /// such attacks are more difficult still than front-running the
-    /// creation of a resource account via a hard-coded seed.
-    public fun create_resource_account_using_timestamp(
-        source: &signer
-    ): (
-        signer,
-        SignerCapability
-    ) {
-        create_resource_account(source,
-            timestamp::now_microseconds_vectorized())
+    /// In practice the Unix timestamp is effectively non-deterministic, or more specifically, just
+    /// as difficult to front run in a miner extractable value (MEV)-style attack as a seed
+    /// provided via a `public entry` function argument. That is, if a malicious block producer
+    /// wanted to prevent the creation of a resource account, they would have to construct a block
+    /// with a carefully-selected timestamp that allows them to insert an account creation
+    /// transaction ahead of the legitimate account creation transaction. This is comparable in
+    /// difficulty to the effort required for front-running resource account creation when the seed
+    /// is supplied via a `public entry` function, and both such attacks are more difficult still
+    /// than front-running the creation of a resource account via a hard-coded seed.
+    public fun create_resource_account_using_timestamp(source: &signer): (signer, SignerCapability)
+    {
+        create_resource_account(source, bcs::to_bytes(&timestamp::now_microseconds()))
     }
 
     /// create the account for system reserved addresses
@@ -540,7 +529,7 @@ module aptos_framework::account {
         aptos_framework: &signer,
         user: &signer
     ) {
-        // Initialize timetamp resource
+        // Initialize timestamp resource
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Update time to easily-inspected value
         timestamp::update_global_time_for_test(0x0123456789abcdef);
@@ -556,7 +545,7 @@ module aptos_framework::account {
             get_signer_capability_address(&resource_account_cap), 0);
         // Get byte representation of user address
         let bytes = bcs::to_bytes(&signer::address_of(user));
-        // Append to it little-endian vectorized timestamp
+        // Append vectorized timestamp
         vector::append(&mut bytes, b"\xef\xcd\xab\x89\x67\x45\x23\x01");
         // Convert the hash of the result to an address
         let expected_resource_account_address = from_bcs::to_address(
