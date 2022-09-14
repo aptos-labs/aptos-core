@@ -31,8 +31,17 @@ module aptos_framework::features {
     /// available. This is needed because of introduction of a new native function.
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
-    public fun code_dependency_check_enabled(): bool acquires Features {
+    public(friend) fun code_dependency_check_enabled(): bool acquires Features {
         is_enabled(CODE_DEPENDENCY_CHECK)
+    }
+    friend aptos_framework::code;
+
+    /// Whether during upgrade compatibility checking, friend functions should be treated similar like
+    /// private functions.
+    /// Lifetime: ephemeral
+    const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
+    public(friend) fun treat_friend_as_private(): bool acquires Features {
+        is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
     // ============================================================================================
