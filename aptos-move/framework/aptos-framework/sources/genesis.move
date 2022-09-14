@@ -194,6 +194,8 @@ module aptos_framework::genesis {
         chain_status::set_genesis_end(aptos_framework);
     }
 
+    native fun create_signer(addr: address): signer;
+
     #[verify_only]
     fun initialize_for_verification(
         gas_schedule: vector<u8>,
