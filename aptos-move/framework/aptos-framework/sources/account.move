@@ -292,6 +292,51 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
+    public entry fun offer_rotation_capability(
+        account: &signer,
+        rotation_capability_sig_bytes: vector<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: vector<u8>,
+        recipient_address: address,
+    ) acquires Account {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr) && exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+
+        let account_resource = borrow_global_mut<Account>(addr);
+
+        // proof that this account intends to delegate its rotation capability to another account
+        let proof_challenge = RotationCapabilityOfferProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            recipient_address,
+        };
+
+        // verify that the `SignerCapabilityOfferProofChallenge` is correct and signed by the account owner's private key
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+            assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
+            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+
+            let rotation_capability_sig = multi_ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
+            assert!(multi_ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        };
+
+        // update the existing rotation capability offer or put in a new rotation capability offer for the current account
+        if (option::is_some(&account_resource.rotation_capability_offer.for)) {
+            option::swap(&mut account_resource.rotation_capability_offer.for, recipient_address);
+        } else {
+            option::fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
+        };
+    }
+
     /// Offers the capability to sign on behalf of account to the account at address recipient_address.
     public entry fun offer_signer_capability(
         account: &signer,
@@ -531,8 +576,17 @@ module aptos_framework::account {
         alice
     }
 
-/*
-TODO bring back with generic rotation capability
+    #[test(bob = @0x345)]
+    #[expected_failure(abort_code = 65544)]
+    public entry fun test_valid_offer_rotation_capability(bob: signer) acquires Account {
+        let pk = x"f66bf0ce5ceb582b93d6780820c2025b9967aedaa259bdbb9f3d0297eced0e18";
+        let alice = create_account_from_ed25519_public_key(pk);
+        create_account(signer::address_of(&bob));
+
+        let valid_signature = x"cd181d65eb31193dcf1627fc0cc04208f66e7f243facc840830eaa458b176de570f73b661c127d98bc276c5a07ab242734b4d656163a86803561c0b9d9d01d0c";
+        offer_rotation_capability(&alice, valid_signature, 0, pk, signer::address_of(&bob));
+    }
+
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
     public entry fun test_invalid_offer_rotation_capability(bob: signer) acquires Account {
@@ -541,9 +595,8 @@ TODO bring back with generic rotation capability
         create_account(signer::address_of(&bob));
 
         let invalid_signature = x"78f7d09ef7a9d8d7450d600b10231e6512610f919a63bd71bea1c907f7e101ed333bff360eeda97a8637a53fd622d597c03a0d6fd1315c6fa23719983ff7de0c";
-        offer_rotation_capability_ed25519(&alice, invalid_signature, pk, signer::address_of(&bob));
+        offer_rotation_capability(&alice, invalid_signature, 0, pk, signer::address_of(&bob));
     }
-*/
 
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544)]
