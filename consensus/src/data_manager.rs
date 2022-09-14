@@ -16,7 +16,7 @@ use consensus_types::{
 use dashmap::DashMap;
 use executor_types::*;
 use futures::channel::mpsc::Sender;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
@@ -39,7 +39,6 @@ pub trait DataManager: Send + Sync {
 enum DataStatus {
     Cached(Vec<SignedTransaction>),
     Requested(Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>>),
-    Remote,
 }
 
 /// Execution -> QuorumStore notification of commits.
@@ -167,60 +166,58 @@ impl DataManager for QuorumStoreDataManager {
             }
             Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
             Payload::InQuorumStore(proofs) => {
-                match self.digest_status.get(&block.id()) {
-                    None => unreachable!("No status in Data Manager for digest {}", block.id()),
-                    Some(data_status) => {
-                        if let DataStatus::Cached(data) = data_status.deref() {
-                            return Ok(data.clone());
+                let (_, data_status) = self.digest_status.remove(&block.id()).expect("No status in Data Manager");
+                match data_status {
+                    DataStatus::Cached(data) => {
+                        return Ok(data.clone());
+                    }
+                    DataStatus::Requested(receivers) => {
+                        let mut vec_ret = Vec::new();
+                        debug!("QSE: waiting for data on {} receivers", receivers.len());
+                        for rx in receivers {
+                            match rx
+                                .await
+                                .expect("Oneshot channel to get a batch was dropped")
+                            {
+                                Ok(data) => {
+                                    debug!("QSE: got data, len {}", data.len());
+                                    vec_ret.push(data);
+                                }
+                                Err(e) => {
+                                    debug!("QS: got error from receiver {:?}", e);
+                                    let rec = self
+                                        .request_data(
+                                            proofs.clone(),
+                                            LogicalTime::new(block.epoch(), block.round()),
+                                        )
+                                        .await;
+                                    self.digest_status
+                                        .insert(block.id(), DataStatus::Requested(rec));
+                                    return Err(e);
+                                }
+                            }
                         }
+                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+                        self.digest_status
+                            .insert(block.id(), DataStatus::Cached(ret.clone()));
+                        Ok(ret)
                     }
                 }
-                let (_, data_status) = self.digest_status.remove(&block.id()).unwrap();
-                let receivers = if let DataStatus::Requested(rec) = data_status {
-                    rec
-                } else {
-                    self.request_data(
-                        proofs.clone(),
-                        LogicalTime::new(block.epoch(), block.round()),
-                    )
-                    .await
-                };
-                let mut vec_ret = Vec::new();
-                debug!("QSE: waiting for data on {} receivers", receivers.len());
-                for rx in receivers {
-                    match rx
-                        .await
-                        .expect("Oneshot channel to get a batch was dropped")
-                    {
-                        Ok(data) => {
-                            debug!("QSE: got data, len {}", data.len());
-                            vec_ret.push(data);
-                        }
-                        Err(e) => {
-                            debug!("QS: got error from receiver {:?}", e);
-                            self.digest_status.insert(block.id(), DataStatus::Remote);
-                            return Err(e);
-                        }
-                    }
-                }
-                let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-                self.digest_status
-                    .insert(block.id(), DataStatus::Cached(ret.clone()));
-                Ok(ret)
             }
         }
     }
 
-    fn new_epoch(
-        &self,
-        data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<WrapperCommand>,
-    ) {
-        // TODO: check race here.
-        self.data_reader.swap(Some(data_reader));
-        self.quorum_store_wrapper_tx
-            .swap(Some(Arc::from(quorum_store_wrapper_tx)));
-    }
+
+fn new_epoch(
+    &self,
+    data_reader: Arc<BatchReader>,
+    quorum_store_wrapper_tx: Sender<WrapperCommand>,
+) {
+    // TODO: check race here.
+    self.data_reader.swap(Some(data_reader));
+    self.quorum_store_wrapper_tx
+        .swap(Some(Arc::from(quorum_store_wrapper_tx)));
+}
 }
 
 pub struct DummyDataManager {}
