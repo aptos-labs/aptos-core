@@ -6,7 +6,7 @@ import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { TokenClient } from "./token_client";
 
-import { NODE_URL, FAUCET_URL } from "./util.test";
+import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
 
 test(
   "full tutorial nft token flow",
