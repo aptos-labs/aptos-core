@@ -5,10 +5,10 @@ import nacl from "tweetnacl";
 import sha3 from "js-sha3";
 import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
-import { Memoize } from "typescript-memoize";
 import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+import { Memoize } from "./utils";
 
 const { sha3_256: sha3Hash } = sha3;
 
