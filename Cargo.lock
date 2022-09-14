@@ -1075,6 +1075,7 @@ dependencies = [
  "clap 3.2.17",
  "futures",
  "hex",
+ "itertools",
  "move-deps",
  "once_cell",
  "percent-encoding",
