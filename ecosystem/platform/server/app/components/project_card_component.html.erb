@@ -1,0 +1,17 @@
+<%= content_tag :div, @rest do %>
+  <div class="bg-neutral-700 flex gap-4 p-4">
+    <%= image_tag @project.thumbnail, class: 'w-12 h-12' %>
+    <div>
+      <h4 class="text-lg font-medium">
+        <%= link_to @project.title, project_path(@project) %>
+      </h4>
+      <p class="text-neutral-300">
+        <%= @project.short_description %>
+      </p>
+    </div>
+  </div>
+
+  <div class="bg-neutral-800 p-4 text-neutral-300">
+    <%= truncate(@project.full_description, length: 160) %>
+  </div>
+<% end %>
