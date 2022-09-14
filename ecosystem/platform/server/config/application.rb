@@ -37,5 +37,8 @@ module CommunityPlatform
 
     # View helpers should be scoped to the corresponding controller.
     config.action_controller.include_all_helpers = false
+
+    # Image analysis is not needed.
+    config.active_storage.analyzers = []
   end
 end
