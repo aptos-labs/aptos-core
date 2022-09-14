@@ -45,9 +45,10 @@ export class FaucetClient extends AptosClient {
    * coins into that account
    * @param address Hex-encoded 16 bytes Aptos account address wich mints tokens
    * @param amount Amount of tokens to mint
+   * @param timeoutSecs
    * @returns Hashes of submitted transactions
    */
-  async fundAccount(address: MaybeHexString, amount: number): Promise<string[]> {
+  async fundAccount(address: MaybeHexString, amount: number, timeoutSecs = 20): Promise<string[]> {
     const tnxHashes = await this.faucetRequester.request<Array<string>>({
       method: "POST",
       url: "/mint",
@@ -60,7 +61,7 @@ export class FaucetClient extends AptosClient {
     const promises: Promise<void>[] = [];
     for (let i = 0; i < tnxHashes.length; i += 1) {
       const tnxHash = tnxHashes[i];
-      promises.push(this.waitForTransaction(tnxHash));
+      promises.push(this.waitForTransaction(tnxHash, { timeoutSecs }));
     }
     await Promise.all(promises);
     return tnxHashes;
