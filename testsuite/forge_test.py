@@ -1,20 +1,30 @@
-from cgitb import enable
 from contextlib import ExitStack
-from importlib.metadata import files
 import json
 import os
 import unittest
 import tempfile
 from collections import OrderedDict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Union
+)
 from unittest.mock import patch
 
 import forge
 from forge import (
-    FakeTime,
+    Filesystem,
     ForgeCluster,
+    ForgeContext,
     ForgeFormatter,
     ForgeJob,
     ForgeResult,
@@ -26,11 +36,17 @@ from forge import (
     Git,
     K8sForgeRunner,
     ListClusterResult,
+    LocalForgeRunner,
+    Process,
+    Processes,
+    RunResult,
+    Shell,
     SystemContext,
+    Time,
+    assert_provided_image_tags_has_profile_or_features,
     create_forge_command,
     find_recent_images,
     find_recent_images_by_profile_or_features,
-    assert_provided_image_tags_has_profile_or_features,
     format_comment,
     format_pre_comment,
     format_report,
@@ -41,16 +57,12 @@ from forge import (
     get_validator_logs_link,
     list_eks_clusters,
     main,
-    ForgeContext,
-    LocalForgeRunner,
-    FakeShell,
-    FakeFilesystem,
-    RunResult,
-    FakeProcesses,
     sanitize_forge_resource_name,
 )
 
 from click.testing import CliRunner
+
+from testsuite.forge import ForgeConfigBackend, ensure_forge_config, validate_forge_config
 
 
 class HasAssertMultiLineEqual(Protocol):
@@ -87,6 +99,92 @@ class AssertFixtureMixin:
             f"Wrote to {str(temp)} for comparison"
             "\nRerun with FORGE_WRITE_FIXTURES=true to update the fixtures",
         )
+
+
+class FakeShell(Shell):
+    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        return RunResult(0, b"output")
+
+    async def gen_run(
+        self, command: Sequence[str], stream_output: bool = False
+    ) -> RunResult:
+        return RunResult(0, b"async output")
+
+
+class FakeFilesystem(Filesystem):
+    def write(self, filename: str, contents: bytes) -> None:
+        print(f"Wrote {contents} to {filename}")
+
+    def read(self, filename: str) -> bytes:
+        return b"fake"
+
+    def mkstemp(self) -> str:
+        return "temp"
+
+    def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
+        return
+
+    def unlink(self, filename: str) -> None:
+        return
+
+
+@dataclass
+class FakeProcess(Process):
+    _name: str
+    _ppid: int
+
+    def name(self) -> str:
+        return self._name
+
+    def kill(self) -> None:
+        print(f"killing {self._name}")
+
+    def ppid(self) -> int:
+        return self._ppid
+
+
+class FakeProcesses(Processes):
+    def __init__(self) -> None:
+        self.exit_callbacks = []
+
+    def processes(self) -> Generator[Process, None, None]:
+        yield FakeProcess("concensus", 1)
+
+    def get_pid(self) -> int:
+        return 2
+
+    def spawn(self, target: Callable[[], None]) -> Process:
+        return FakeProcess("child", 2)
+
+    def atexit(self, callback: Callable[[], None]) -> None:
+        return self.exit_callbacks.append(callback)
+
+    def user(self) -> str:
+        return "perry"
+
+
+class FakeTime(Time):
+    _now: int = 1659078000
+
+    def now(self) -> datetime:
+        return datetime.fromtimestamp(self._now, timezone.utc)
+
+    def epoch(self) -> str:
+        return str(self._now)
+
+
+class FakeConfigBackend(ForgeConfigBackend):
+    def __init__(self, store: object) -> None:
+        self.store = store
+
+    def create(self) -> None:
+        pass
+
+    def write(self, config: object) -> None:
+        self.store = config
+
+    def read(self) -> object:
+        return self.store
 
 
 class SpyShell(FakeShell):
@@ -428,19 +526,19 @@ class TestFindRecentImage(unittest.TestCase):
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
     maxDiff = None
 
-    def testTestsuiteImages(self) -> None:
+    def testTestsuiteImagesSameImage(self) -> None:
         context = fake_context()
-        # set the image tag and upgrade image tag to the same value
-        upgrade_img = context.upgrade_image_tag
         context.upgrade_image_tag = context.image_tag
-        # do not expect an upgrade
         txt = get_testsuite_images(context)
-        self.assertEqual(txt, f"`{context.image_tag}`")
+        self.assertEqual(txt, f"`asdf`")
 
-        # upgrade
-        context.upgrade_image_tag = upgrade_img
+    def testTestsuiteImagesUpgrade(self) -> None:
+        context = fake_context()
         txt = get_testsuite_images(context)
-        self.assertEqual(txt, f"`{context.image_tag}` ==> `{context.upgrade_image_tag}`")
+        self.assertEqual(
+            txt,
+            f"`asdf` ==> `upgrade_asdf`",
+        )
 
     def testReport(self) -> None:
         filesystem = SpyFilesystem({"test": b"banana"}, {})
@@ -451,7 +549,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem.assert_writes(self)
 
     def testHumioLogLink(self) -> None:
-        link = get_humio_logs_link("forge-pr-2983")
+        link = get_humio_logs_link("forge-pr-2983", True)
         self.assertFixture(link, "testHumioLogLink.fixture")
         self.assertIn("forge-pr-2983", link)
 
@@ -575,15 +673,43 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
             )
         ]))
         filesystem = SpyFilesystem({
-            "temp-comment": get_fixture_path("testMainComment.fixture").read_bytes(),
-            "temp-step-summary": get_fixture_path("testMainComment.fixture").read_bytes(),
-            "temp-pre-comment": get_fixture_path("testMainPreComment.fixture").read_bytes(),
-            "temp-report": get_fixture_path("testMainReport.fixture").read_bytes(),
+            "temp-comment": get_fixture_path(
+                "testMainComment.fixture"
+            ).read_bytes(),
+            "temp-step-summary": get_fixture_path(
+                "testMainComment.fixture"
+            ).read_bytes(),
+            "temp-pre-comment": get_fixture_path(
+                "testMainPreComment.fixture"
+            ).read_bytes(),
+            "temp-report": get_fixture_path(
+                "testMainReport.fixture"
+            ).read_bytes(),
         }, {})
         with ExitStack() as stack:
             stack.enter_context(runner.isolated_filesystem())
-            stack.enter_context(patch.object(forge, "FakeFilesystem", lambda: filesystem))
-            stack.enter_context(patch.object(forge, "FakeShell", lambda: shell))
+            stack.enter_context(
+                patch.object(forge, "LocalFilesystem", lambda: filesystem)
+            )
+            stack.enter_context(
+                patch.object(forge, "LocalShell", lambda *_: shell)
+            )
+            stack.enter_context(
+                patch.object(forge, "SystemTime", lambda: FakeTime())
+            )
+            stack.enter_context(
+                patch.object(forge, "SystemProcesses", lambda: FakeProcesses())
+            )
+            stack.enter_context(
+                patch.object(
+                    forge,
+                    "S3ForgeConfigBackend",
+                    lambda *_: FakeConfigBackend({
+                        "enabled_clusters": ["forge-big-1"],
+                        "all_clusters": ["forge-big-1", "banana"],
+                    })
+                )
+            )
 
             os.mkdir(".git")
             os.mkdir("testsuite")
@@ -595,7 +721,6 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 main,
                 [
                     "test",
-                    "--dry-run",
                     "--forge-cluster-name", "forge-big-1",
                     "--forge-report", "temp-report",
                     "--forge-pre-comment", "temp-pre-comment",
@@ -657,12 +782,10 @@ def fake_pod_item(name: str, phase: str) -> GetPodsItem:
 
 
 class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
+    maxDiff = None
+
     async def testGetAllForgeJobs(self) -> None:
-        fake_clusters = json.dumps(
-            ListClusterResult(
-                clusters=["aptos-forge-banana", "banana-1", "aptos-forge-apple-2"]
-            )
-        ).encode()
+        fake_clusters=["aptos-forge-banana", "aptos-forge-apple-2"]
         fake_first_pods = GetPodsResult(
             items=[
                 fake_pod_item("forge-first", "Running"),
@@ -680,7 +803,6 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         shell = SpyShell(
             OrderedDict(
                 [
-                    ("aws eks list-clusters", RunResult(0, fake_clusters)),
                     (
                         "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
                         RunResult(0, b""),
@@ -704,7 +826,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         filesystem = SpyFilesystem({}, {}, ["temp1", "temp2"])
         processes = SpyProcesses()
         context = SystemContext(shell, filesystem, processes)
-        jobs = await get_all_forge_jobs(context)
+        jobs = await get_all_forge_jobs(context, fake_clusters)
         expected_jobs = [
             ForgeJob(
                 name="forge-first",
@@ -742,3 +864,48 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(jobs, expected_jobs)
         processes.run_atexit()
         filesystem.assert_unlinks(self)
+
+
+class ForgeConfigTests(unittest.TestCase):
+    maxDiff = None
+
+    def testCreate(self) -> None:
+        runner = CliRunner()
+        shell = SpyShell(OrderedDict([
+            ('aws s3 mb s3://forge-wrapper-config', RunResult(0, b'')),
+        ]))
+        with patch.object(forge, "LocalShell", lambda: shell):
+            result = runner.invoke(
+                main,
+                ["config", "create"],
+                catch_exceptions=False,
+            )
+            shell.assert_commands(self)
+            self.assertEqual(result.exit_code, 0)
+
+    def testValidateInvalidConfig(self) -> None:
+        self.assertEqual(
+            validate_forge_config({}),
+            [
+                "Missing required field enabled_clusters",
+                "Missing required field all_clusters",
+            ],
+        )
+
+    def testValidateValidConfig(self) -> None:
+        self.assertEqual(
+            validate_forge_config({
+                "enabled_clusters": ["banana"],
+                "all_clusters": ["banana", "apple"],
+            }),
+            [],
+        )
+
+    def testValidateMissingClusterConfig(self) -> None:
+        self.assertEqual(
+            validate_forge_config({
+                "enabled_clusters": ["apple"],
+                "all_clusters": ["banana", "potato"],
+            }),
+            [],
+        )

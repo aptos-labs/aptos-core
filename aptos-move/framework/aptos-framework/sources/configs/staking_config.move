@@ -6,14 +6,17 @@ module aptos_framework::staking_config {
 
     friend aptos_framework::genesis;
 
-    /// Stake lockup duration cannot be zero
+    /// Stake lockup duration cannot be zero.
     const EZERO_LOCKUP_DURATION: u64 = 1;
-    /// Reward rate denominator cannot be zero
+    /// Reward rate denominator cannot be zero.
     const EZERO_REWARDS_RATE_DENOMINATOR: u64 = 2;
-    /// Specified stake range is invalid. Max must be greater than min
+    /// Specified stake range is invalid. Max must be greater than min.
     const EINVALID_STAKE_RANGE: u64 = 3;
-    /// The voting power increase limit percentage must be within (0, 50]
+    /// The voting power increase limit percentage must be within (0, 50].
     const EINVALID_VOTING_POWER_INCREASE_LIMIT: u64 = 4;
+    /// Specified rewards rate is invalid, which must be within [0, 100).
+    const EINVALID_REWARDS_RATE: u64 = 5;
+
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
     struct StakingConfig has copy, drop, key {
@@ -146,7 +149,6 @@ module aptos_framework::staking_config {
             new_rewards_rate_denominator > 0,
             error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
-
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
         staking_config.rewards_rate = new_rewards_rate;
         staking_config.rewards_rate_denominator = new_rewards_rate_denominator;

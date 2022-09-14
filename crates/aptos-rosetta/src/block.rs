@@ -52,13 +52,20 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     )
     .await?;
 
-    let block = build_block(parent_transaction, block, server_context.chain_id).await?;
+    let block = build_block(
+        &server_context,
+        parent_transaction,
+        block,
+        server_context.chain_id,
+    )
+    .await?;
 
     Ok(BlockResponse { block })
 }
 
 /// Build up the transaction, which should contain the `operations` as the change set
 async fn build_block(
+    server_context: &RosettaContext,
     parent_block_identifier: BlockIdentifier,
     block: aptos_rest_client::aptos_api_types::BcsBlock,
     chain_id: ChainId,
@@ -69,11 +76,16 @@ async fn build_block(
 
     // Convert the transactions and build the block
     let mut transactions: Vec<Transaction> = Vec::new();
+    // TODO: Parallelize these and then sort at end
     if let Some(txns) = block.transactions {
         for txn in txns {
-            transactions.push(Transaction::from_transaction(txn).await?)
+            transactions
+                .push(Transaction::from_transaction(server_context.coin_cache.clone(), txn).await?)
         }
     }
+
+    // Ensure the transactions are sorted in order
+    transactions.sort_by(|first, second| first.metadata.version.0.cmp(&second.metadata.version.0));
 
     Ok(Block {
         block_identifier,

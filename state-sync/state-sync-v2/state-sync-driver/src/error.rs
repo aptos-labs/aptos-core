@@ -16,7 +16,7 @@ pub enum Error {
     BootstrapNotComplete(String),
     #[error("Failed to send callback: {0}")]
     CallbackSendFailed(String),
-    #[error("Timed-out waiting for a data stream too many times.")]
+    #[error("Timed-out waiting for a data stream too many times. Times: {0}")]
     CriticalDataStreamTimeout(String),
     #[error("Timed-out waiting for a notification from the data stream. Timeout: {0}")]
     DataStreamNotificationTimeout(String),

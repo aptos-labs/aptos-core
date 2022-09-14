@@ -1,0 +1,51 @@
+name: "Check Minimum Revision"
+
+on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+
+env:
+  GIT_SHA: ${{ inputs.GIT_SHA }}
+  MINIMUM_REVISION: ${{ secrets.MINIMUM_REVISION }}
+
+jobs:
+  check-minimum-revision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+          fetch-depth: 1000
+      - name: Check merge base is new enough
+        id: check-merge-base
+        run: |
+          set -ex
+
+          if [ -z "$MINIMUM_REVISION" ]; then
+            echo "Skipping check"
+            exit 0
+          fi
+
+          git fetch origin main
+
+          set +e
+          git merge-base \
+            --is-ancestor "$MINIMUM_REVISION" "${{ env.GIT_SHA }}"
+          FAILED=$?
+          set -e
+
+          echo "::set-output name=FAIL_MERGE_BASE::$FAILED"
+          MERGE_BASE="$(git merge-base origin/main ${{ env.GIT_SHA }})"
+
+          if [[ $FAILED == 1 ]]; then
+            echo "Your merge base $MERGE_BASE is too old" | tee fail-merge-base.txt
+            echo "Please rebase on or past $MINIMUM_REVISION" | tee -a fail-merge-base.txt
+          fi

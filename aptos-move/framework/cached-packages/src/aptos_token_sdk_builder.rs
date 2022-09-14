@@ -87,8 +87,8 @@ pub enum EntryFunctionCall {
     },
 
     /// mutate the token property and save the new property in TokenStore
-    /// if the token property_version is 0, we will create a new property_version per token and store the properties
-    /// if the token property_version is not 0, we will just update the propertyMap
+    /// if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
+    /// if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
     TokenMutateTokenProperties {
         token_owner: AccountAddress,
         creator: AccountAddress,
@@ -475,8 +475,8 @@ pub fn token_mint_script(
 }
 
 /// mutate the token property and save the new property in TokenStore
-/// if the token property_version is 0, we will create a new property_version per token and store the properties
-/// if the token property_version is not 0, we will just update the propertyMap
+/// if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
+/// if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
 pub fn token_mutate_token_properties(
     token_owner: AccountAddress,
     creator: AccountAddress,
