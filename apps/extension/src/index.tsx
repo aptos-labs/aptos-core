@@ -16,7 +16,6 @@ import { AppStateProvider, useAppState } from 'core/hooks/useAppState';
 import { AccountsProvider } from 'core/hooks/useAccounts';
 import { NetworksProvider } from 'core/hooks/useNetworks';
 import { createStandaloneToast } from '@chakra-ui/toast';
-import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 import { routes } from 'core/routes';
 import { AnalyticsProvider } from 'core/hooks/useAnalytics';
 
@@ -67,21 +66,31 @@ function App() {
 
 const root = createRoot(document.getElementById('root') as Element);
 
-root.render(
-  <StrictMode>
-    <AppStateProvider>
-      <QueryClientProvider client={queryClient}>
-        <ChakraProvider theme={theme}>
-          <SimulatedExtensionContainer>
-            <MemoryRouter>
-              <AnalyticsProvider>
-                <App />
-              </AnalyticsProvider>
-            </MemoryRouter>
-          </SimulatedExtensionContainer>
-        </ChakraProvider>
-      </QueryClientProvider>
-    </AppStateProvider>
-    <ToastContainer />
-  </StrictMode>,
-);
+// Async load development container only in development mode
+const isDevelopment = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development');
+const devContainerPromise = isDevelopment
+  ? import('core/layouts/DevelopmentContainer')
+  : Promise.resolve(undefined);
+
+devContainerPromise.then((devModule) => {
+  const MaybeDevelopmentContainer = devModule?.default ?? (({ children }) => children);
+
+  root.render(
+    <StrictMode>
+      <AppStateProvider>
+        <QueryClientProvider client={queryClient}>
+          <ChakraProvider theme={theme}>
+            <MaybeDevelopmentContainer>
+              <MemoryRouter>
+                <AnalyticsProvider>
+                  <App />
+                </AnalyticsProvider>
+              </MemoryRouter>
+            </MaybeDevelopmentContainer>
+          </ChakraProvider>
+        </QueryClientProvider>
+      </AppStateProvider>
+      <ToastContainer />
+    </StrictMode>,
+  );
+});

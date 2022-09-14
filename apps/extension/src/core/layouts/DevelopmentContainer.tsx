@@ -41,7 +41,11 @@ const localDappInfo = {
   name: 'Petra Dev',
 } as DappInfo;
 
-function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
+/**
+ * This container is used to wrap the extension app and provide useful development functionalities
+ * @param children the wrapped app
+ */
+export default function DevelopmentContainer({ children }: SimulatedExtensionContainerProps) {
   const { colorMode, setColorMode } = useColorMode();
   const [
     simulatedDimensions,
@@ -136,13 +140,4 @@ function DesktopComponent({ children }: SimulatedExtensionContainerProps) {
       </Center>
     </VStack>
   );
-}
-
-export default function SimulatedExtensionContainer({
-  children,
-}: SimulatedExtensionContainerProps) {
-  const isDevelopment = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development');
-  return isDevelopment
-    ? <DesktopComponent>{ children }</DesktopComponent>
-    : children;
 }
