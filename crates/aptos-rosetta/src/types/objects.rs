@@ -33,6 +33,7 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use aptos_types::write_set::WriteOp;
 use aptos_types::{account_address::AccountAddress, event::EventKey};
 use cached_packages::aptos_stdlib;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -501,7 +502,6 @@ impl Transaction {
                 operation_index += ops.len() as u64;
                 operations.append(&mut ops);
             }
-            println!("Failed transaction: {:?}", operations)
         };
 
         // Reorder operations by type so that there's no invalid ordering
@@ -711,7 +711,10 @@ async fn parse_operations_from_write_set(
                 )
                 .await
             } else {
-                warn!("Failed to parse coinstore {}", struct_tag);
+                warn!(
+                    "Failed to parse coinstore {} at version {}",
+                    struct_tag, version
+                );
                 Ok(operations)
             }
         }
@@ -757,20 +760,21 @@ fn parse_stakepool_changes(
     address: AccountAddress,
     data: &[u8],
     events: &[ContractEvent],
-    operation_index: u64,
+    mut operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
     let mut operations = Vec::new();
     if let Ok(stakepool) = bcs::from_bytes::<StakePool>(data) {
         stakepool.set_operator_events.key();
-        if let Some(operator) =
-            get_set_operator_from_event(events, stakepool.set_operator_events.key())
-        {
+
+        let addresses = get_set_operator_from_event(events, stakepool.set_operator_events.key());
+        for operator in addresses {
             operations.push(Operation::set_operator(
                 operation_index,
                 Some(OperationStatusType::Success),
                 address,
                 operator,
             ));
+            operation_index += 1;
         }
     } else {
         warn!(
@@ -801,14 +805,15 @@ async fn parse_coinstore_changes(
         .await
         .map_err(|err| {
             ApiError::CoinTypeFailedToBeFetched(Some(format!(
-                "Failed to retrieve coin type {} {}",
-                coin_type, err
+                "Failed to retrieve coin type {} for {} at version {}: {}",
+                coin_type, address, version, err
             )))
         })?;
 
     // Skip if there is no currency that can be found
-    if let Some(currency) = currency {
-        if let Some(amount) = get_amount_from_event(events, coin_store.withdraw_events().key()) {
+    if let Some(currency) = currency.as_ref() {
+        let withdraw_amounts = get_amount_from_event(events, coin_store.withdraw_events().key());
+        for amount in withdraw_amounts {
             operations.push(Operation::withdraw(
                 operation_index,
                 Some(OperationStatusType::Success),
@@ -819,25 +824,39 @@ async fn parse_coinstore_changes(
             operation_index += 1;
         }
 
-        if let Some(amount) = get_amount_from_event(events, coin_store.deposit_events().key()) {
+        let deposit_amounts = get_amount_from_event(events, coin_store.deposit_events().key());
+        for amount in deposit_amounts {
             operations.push(Operation::deposit(
                 operation_index,
                 Some(OperationStatusType::Success),
                 address,
-                currency,
+                currency.clone(),
                 amount,
             ));
+            operation_index += 1;
+        }
+
+        if operations.is_empty() {
+            warn!(
+                "No transfer operations found for {} coinstore for {} at version {}",
+                currency.metadata.as_ref().unwrap().move_type,
+                address,
+                version
+            );
         }
     } else {
-        warn!("Currency {} is invalid", coin_type);
+        warn!(
+            "Currency {} is invalid for {} at version {}",
+            coin_type, address, version
+        );
     }
 
     Ok(operations)
 }
 
 /// Pulls the balance change from a withdraw or deposit event
-fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Option<u64> {
-    if let Some(event) = events.iter().find(|event| event.key() == event_key) {
+fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Vec<u64> {
+    filter_events(events, event_key, |event| {
         if let Ok(event) = bcs::from_bytes::<WithdrawEvent>(event.event_data()) {
             Some(event.amount())
         } else {
@@ -849,16 +868,14 @@ fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Opti
             );
             None
         }
-    } else {
-        None
-    }
+    })
 }
 
 fn get_set_operator_from_event(
     events: &[ContractEvent],
     event_key: &EventKey,
-) -> Option<AccountAddress> {
-    if let Some(event) = events.iter().find(|event| event.key() == event_key) {
+) -> Vec<AccountAddress> {
+    filter_events(events, event_key, |event| {
         if let Ok(event) = bcs::from_bytes::<SetOperatorEvent>(event.event_data()) {
             Some(event.new_operator)
         } else {
@@ -869,11 +886,21 @@ fn get_set_operator_from_event(
             );
             None
         }
-    } else {
-        None
-    }
+    })
 }
 
+fn filter_events<F: FnMut(&ContractEvent) -> Option<T>, T>(
+    events: &[ContractEvent],
+    event_key: &EventKey,
+    parser: F,
+) -> Vec<T> {
+    events
+        .iter()
+        .filter(|event| event.key() == event_key)
+        .sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number()))
+        .filter_map(parser)
+        .collect()
+}
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
