@@ -19,8 +19,26 @@ use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAl
 use serde_json::json;
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
-pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
+pub fn custom_event_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("custom_event")
+        .and(warp::post())
+        .and(context.clone().filter())
+        .and(with_auth(
+            context,
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+                NodeType::Unknown,
+            ],
+        ))
+        .and(warp::body::json())
+        .and_then(handle_custom_event)
+        .boxed()
+}
+
+pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("ingest" / "custom-event")
         .and(warp::post())
         .and(context.clone().filter())
         .and(with_auth(

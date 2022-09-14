@@ -3,6 +3,7 @@
 
 use crate::{
     auth, context::Context, custom_event, error::ServiceError, log_ingest, prometheus_push_metrics,
+    types::index::IndexResponse,
 };
 use aptos_logger::debug;
 use std::convert::Infallible;
@@ -13,14 +14,37 @@ use warp::{
     reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
+
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    index(context.clone())
+    let v1_api_prefix = warp::path!("api" / "v1" / ..);
+
+    let v1_api = v1_api_prefix.and(
+        index(context.clone())
+            .or(auth::check_chain_access(context.clone()))
+            .or(auth::auth(context.clone()))
+            .or(custom_event::custom_event_ingest(context.clone()))
+            .or(prometheus_push_metrics::metrics_ingest(context.clone()))
+            .or(log_ingest::log_ingest(context.clone())),
+    );
+
+    let legacy_api = index_legacy(context.clone())
         .or(auth::check_chain_access(context.clone()))
         .or(auth::auth(context.clone()))
-        .or(custom_event::custom_event(context.clone()))
-        .or(prometheus_push_metrics::metrics_ingest(context.clone()))
-        .or(log_ingest::log_ingest(context))
-        .recover(handle_rejection)
+        .or(custom_event::custom_event_legacy(context.clone()))
+        .or(prometheus_push_metrics::metrics_ingest_legacy(
+            context.clone(),
+        ))
+        .or(log_ingest::log_ingest_legacy(context.clone()));
+
+    legacy_api.or(v1_api).recover(handle_rejection)
+}
+
+fn index_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path::end()
+        .and(warp::get())
+        .and(context.filter())
+        .and_then(handle_index_legacy)
+        .boxed()
 }
 
 fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -31,9 +55,16 @@ fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
-async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection> {
+async fn handle_index_legacy(context: Context) -> anyhow::Result<impl Reply, Rejection> {
     let resp = reply::json(&context.noise_config().public_key());
     Ok(resp)
+}
+
+async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection> {
+    let resp_payload = IndexResponse {
+        public_key: context.noise_config().public_key(),
+    };
+    Ok(reply::json(&resp_payload))
 }
 
 pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply, Infallible> {

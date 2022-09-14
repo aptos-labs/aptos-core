@@ -65,6 +65,16 @@ pub mod common {
     }
 }
 
+pub mod index {
+    use aptos_crypto::x25519;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    pub struct IndexResponse {
+        pub public_key: x25519::PublicKey,
+    }
+}
+
 pub mod humio {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
