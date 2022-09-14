@@ -5,7 +5,7 @@
 use crate::{
     block::Block,
     block_data::BlockData,
-    common::{Payload, Round},
+    common::{Payload, Round, TransactionBatch},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -260,9 +260,9 @@ pub fn random_payload(count: usize) -> Payload {
     let address = AccountAddress::random();
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
-    Payload::DirectMempool(
+    Payload::DirectMempool(TransactionBatch::new_from_txns(
         (0..count)
             .map(|i| get_test_signed_txn(address, i as u64, &private_key, public_key.clone(), None))
             .collect(),
-    )
+    ))
 }

@@ -4,7 +4,7 @@
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use consensus_types::{
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, TransactionBatch},
     request_response::{ConsensusRequest, ConsensusResponse},
 };
 use futures::{
@@ -50,7 +50,12 @@ async fn test_block_request_no_txns() {
     .unwrap()
     {
         callback
-            .send(Ok(QuorumStoreResponse::GetBatchResponse(vec![])))
+            .send(Ok(QuorumStoreResponse::GetBatchResponse(
+                TransactionBatch {
+                    txns: vec![],
+                    total_bytes: 0,
+                },
+            )))
             .unwrap();
     } else {
         panic!("Unexpected variant")
@@ -65,7 +70,7 @@ async fn test_block_request_no_txns() {
         ConsensusResponse::GetBlockResponse(payload) => {
             assert!(payload.is_empty());
             match payload {
-                Payload::DirectMempool(txns) => assert!(txns.is_empty()),
+                Payload::DirectMempool(txns) => assert!(txns.txns.is_empty()),
                 _ => panic!("Unexpected payload {:?}", payload),
             }
         }

@@ -402,7 +402,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
                 .collect();
-            let txns;
+            let batch;
             {
                 let mut mempool = smp.mempool.lock();
                 // gc before pulling block as extra protection against txns that may expire in consensus
@@ -410,12 +410,12 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
                 let max_txns = cmp::max(max_txns, 1);
-                txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
+                batch = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
             }
-            counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
+            counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, batch.txns.len());
 
             (
-                QuorumStoreResponse::GetBatchResponse(txns),
+                QuorumStoreResponse::GetBatchResponse(batch),
                 callback,
                 counters::GET_BLOCK_LABEL,
             )

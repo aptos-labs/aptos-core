@@ -24,28 +24,51 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct TransactionBatch {
+    pub txns: Vec<SignedTransaction>,
+    pub total_bytes: u64,
+}
+
+impl TransactionBatch {
+    pub fn new_from_txns(txns: Vec<SignedTransaction>) -> Self {
+        let total_bytes = txns.iter().map(|t| t.raw_txn_bytes_len() as u64).sum();
+        Self { txns, total_bytes }
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
-    DirectMempool(Vec<SignedTransaction>),
+    DirectMempool(TransactionBatch),
     InQuorumStore(Vec<ProofOfStore>),
 }
 
 impl Payload {
     pub fn empty() -> Self {
-        Payload::DirectMempool(Vec::new())
+        Payload::DirectMempool(TransactionBatch {
+            txns: Vec::new(),
+            total_bytes: 0,
+        })
     }
 
     pub fn len(&self) -> usize {
         match self {
-            Payload::DirectMempool(txns) => txns.len(),
+            Payload::DirectMempool(batch) => batch.txns.len(),
+            Payload::InQuorumStore(_poavs) => todo!(),
+        }
+    }
+
+    pub fn bytes(&self) -> u64 {
+        match self {
+            Payload::DirectMempool(batch) => batch.total_bytes,
             Payload::InQuorumStore(_poavs) => todo!(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
-            Payload::DirectMempool(txns) => txns.is_empty(),
+            Payload::DirectMempool(batch) => batch.txns.is_empty(),
             Payload::InQuorumStore(_poavs) => todo!(),
         }
     }
@@ -58,7 +81,7 @@ impl IntoIterator for Payload {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            Payload::DirectMempool(txns) => txns.into_iter(),
+            Payload::DirectMempool(batch) => batch.txns.into_iter(),
             Payload::InQuorumStore(_poavs) => todo!(),
         }
     }
@@ -67,8 +90,13 @@ impl IntoIterator for Payload {
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Payload::DirectMempool(txns) => {
-                write!(f, "InMemory txns: {}", txns.len())
+            Payload::DirectMempool(batch) => {
+                write!(
+                    f,
+                    "InMemory txns: {}, bytes: {}",
+                    batch.txns.len(),
+                    batch.total_bytes
+                )
             }
             Payload::InQuorumStore(_poavs) => todo!(),
         }
@@ -91,8 +119,8 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             Payload::DirectMempool(_) => {
                 let mut exclude_txns = vec![];
                 for payload in exclude_payloads {
-                    if let Payload::DirectMempool(txns) = payload {
-                        for txn in txns {
+                    if let Payload::DirectMempool(batch) = payload {
+                        for txn in &batch.txns {
                             exclude_txns.push(TransactionSummary {
                                 sender: txn.sender(),
                                 sequence_number: txn.sequence_number(),

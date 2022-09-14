@@ -383,11 +383,11 @@ impl TestHarness {
 
                         // Verify transaction was inserted into Mempool
                         if check_txns_in_mempool {
-                            let block = self.node(sender_id).mempool().get_batch(
-                                100,
-                                102400,
-                                HashSet::new(),
-                            );
+                            let block = self
+                                .node(sender_id)
+                                .mempool()
+                                .get_batch(100, 102400, HashSet::new())
+                                .txns;
                             for txn in transactions.iter() {
                                 assert!(block.contains(txn));
                             }

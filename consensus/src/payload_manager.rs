@@ -94,26 +94,36 @@ impl PayloadManager for QuorumStoreClient {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
         });
         let mut callback_wrapper = Some(wait_callback);
-        // keep polling QuorumStore until there's payloads available or there's still pending payloads
+        // keep polling QuorumStore until we can make large enough payload, from available or still pending payloads
         let mut count = self.poll_count;
-        let payload = loop {
+        loop {
             count -= 1;
             let payload = self
                 .pull_internal(max_items, max_bytes, exclude_payloads.clone())
                 .await?;
-            if payload.is_empty() && !pending_ordering && count > 0 {
+
+            if (payload.len() as u64) < max_items
+                && payload.bytes() < max_bytes
+                && !pending_ordering
+                && count > 0
+            {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
                 sleep(Duration::from_millis(NO_TXN_DELAY)).await;
                 continue;
             }
-            break payload;
-        };
-        debug!(
-            poll_count = self.poll_count - count,
-            "Pull payloads from QuorumStore"
-        );
-        Ok(payload)
+
+            debug!(
+                poll_count = self.poll_count - count,
+                payload_len = payload.len(),
+                payload_bytes = payload.bytes(),
+                max_items = max_items,
+                max_bytes = max_bytes,
+                pending_ordering = pending_ordering,
+                "Pull payloads from QuorumStore",
+            );
+            return Ok(payload);
+        }
     }
 }

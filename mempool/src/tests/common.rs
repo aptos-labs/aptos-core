@@ -168,13 +168,14 @@ impl ConsensusMock {
             .0
             .union(
                 &block
+                    .txns
                     .iter()
                     .map(|t| (t.sender(), t.sequence_number()))
                     .collect(),
             )
             .cloned()
             .collect();
-        block
+        block.txns
     }
 }
 

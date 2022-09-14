@@ -22,6 +22,7 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
+use consensus_types::common::TransactionBatch;
 use std::{
     cmp::max,
     collections::HashSet,
@@ -181,7 +182,7 @@ impl Mempool {
         max_txns: u64,
         max_bytes: u64,
         mut seen: HashSet<TxnPointer>,
-    ) -> Vec<SignedTransaction> {
+    ) -> TransactionBatch {
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
         // with increasing gas price (e.g. user submits transactions with sequence number 1, 2
@@ -231,8 +232,8 @@ impl Mempool {
         let mut block = Vec::with_capacity(result_size);
         for (address, seq) in result {
             if let Some(txn) = self.transactions.get(&address, seq) {
-                let txn_size = txn.raw_txn_bytes_len();
-                if total_bytes + txn_size > max_bytes as usize {
+                let txn_size = txn.raw_txn_bytes_len() as u64;
+                if total_bytes + txn_size > max_bytes {
                     break;
                 }
                 total_bytes += txn_size;
@@ -256,7 +257,10 @@ impl Mempool {
                 counters::GET_BLOCK_STAGE_LABEL,
             );
         }
-        block
+        TransactionBatch {
+            txns: block,
+            total_bytes,
+        }
     }
 
     /// Periodic core mempool garbage collection.

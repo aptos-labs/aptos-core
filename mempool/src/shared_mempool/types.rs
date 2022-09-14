@@ -16,7 +16,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::{TransactionBatch, TransactionSummary};
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -195,8 +195,8 @@ impl fmt::Display for QuorumStoreRequest {
 /// Response sent from mempool to consensus.
 #[derive(Debug)]
 pub enum QuorumStoreResponse {
-    /// Block to submit to consensus
-    GetBatchResponse(Vec<SignedTransaction>),
+    /// Block to submit to consensus, with its size in bytes
+    GetBatchResponse(TransactionBatch),
     CommitResponse(),
 }
 

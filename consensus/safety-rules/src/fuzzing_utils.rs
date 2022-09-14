@@ -22,7 +22,7 @@ use aptos_types::{
 use consensus_types::block::Block;
 use consensus_types::{
     block_data::{BlockData, BlockType},
-    common::Payload,
+    common::{Payload, TransactionBatch},
     quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeout,
     vote_data::VoteData,
@@ -97,7 +97,7 @@ prop_compose! {
         txns in prop::collection::vec(any::<SignedTransaction>(), 0..MAX_PROPOSAL_TRANSACTIONS),
     ) -> BlockType {
         BlockType::Proposal{
-            payload: Payload::DirectMempool(txns),
+            payload: Payload::DirectMempool(TransactionBatch::new_from_txns(txns)),
             author,
             failed_authors: Vec::new(),
         }
