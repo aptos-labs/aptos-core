@@ -13,6 +13,7 @@
 /aptos-move/framework/ @davidiw @movekevin @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
+/aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
 
 # Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
 /aptos-move/framework/aptos-token @areshand

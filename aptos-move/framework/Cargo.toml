@@ -25,11 +25,13 @@ once_cell = "1.10.0"
 proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 rayon = "1.5.2"
+ripemd = "0.1.1"
 serde = { version = "1.0.137", default-features = false }
 serde_bytes = "0.11.6"
 serde_json = "1.0.81"
 serde_yaml = "0.8.24"
 sha2 = "0.9.3"
+sha3 = "0.9.1"
 siphasher = "0.3.10"
 smallvec = "1.8.0"
 tempfile = "3.3.0"
