@@ -21,6 +21,11 @@ module aptos_framework::genesis {
     use aptos_framework::chain_status;
     use aptos_framework::storage_gas;
 
+    struct AccountMap has drop {
+        account_address: address,
+        balance: u64,
+    }
+
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
         operator_address: address,
@@ -127,6 +132,35 @@ module aptos_framework::genesis {
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
+    fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
+        let i = 0;
+        let num_accounts = vector::length(&accounts);
+
+        while (i < num_accounts) {
+            let account_map = vector::borrow(&accounts, i);
+            create_account(
+                aptos_framework,
+                account_map.account_address,
+                account_map.balance,
+            );
+
+            i = i + 1;
+        };
+    }
+
+    /// This creates an funds an account if it doesn't exist.
+    /// If it exists, it just returns the signer.
+    fun create_account(aptos_framework: &signer, account_address: address, balance: u64): signer {
+        if (account::exists_at(account_address)) {
+            create_signer(account_address)
+        } else {
+            let account = account::create_account(account_address);
+            coin::register<AptosCoin>(&account);
+            aptos_coin::mint(aptos_framework, account_address, balance);
+            account
+        }
+    }
+
     /// Sets up the initial validator set for the network.
     /// The validator "owner" accounts, and their authentication
     /// Addresses (and keys) are encoded in the `owners`
@@ -142,21 +176,10 @@ module aptos_framework::genesis {
         let num_validators = vector::length(&validators);
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-            let owner = &account::create_account(validator.owner_address);
-            let operator = owner;
-            // Create the operator account if it's different from owner.
-            if (validator.operator_address != validator.owner_address) {
-                operator = &account::create_account(validator.operator_address);
-            };
-            // Create the voter account if it's different from owner and operator.
-            if (validator.voter_address != validator.owner_address &&
-                validator.voter_address != validator.operator_address) {
-                account::create_account(validator.voter_address);
-            };
 
-            // Mint the initial staking amount to the validator.
-            coin::register<AptosCoin>(owner);
-            aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
+            let owner = &create_account(aptos_framework, validator.owner_address, validator.stake_amount);
+            let operator = &create_account(aptos_framework, validator.operator_address, 0);
+            create_account(aptos_framework, validator.voter_address, 0);
 
             // Initialize the stake pool and join the validator set.
             stake::initialize_stake_owner(
@@ -278,5 +301,45 @@ module aptos_framework::genesis {
         assert!(account::exists_at(@0x8), 1);
         assert!(account::exists_at(@0x9), 1);
         assert!(account::exists_at(@0xa), 1);
+    }
+
+    #[test(aptos_framework = @0x1)]
+    fun test_create_account(aptos_framework: &signer) {
+        setup();
+        initialize_aptos_coin(aptos_framework);
+
+        let addr = @0x121341; // 01 -> 0a are taken
+        let test_signer_before = create_account(aptos_framework, addr, 15);
+        let test_signer_after = create_account(aptos_framework, addr, 500);
+        assert!(test_signer_before == test_signer_after, 0);
+        assert!(coin::balance<AptosCoin>(addr) == 15, 1);
+    }
+
+    #[test(aptos_framework = @0x1)]
+    fun test_create_accounts(aptos_framework: &signer) {
+        setup();
+        initialize_aptos_coin(aptos_framework);
+
+        // 01 -> 0a are taken
+        let addr0 = @0x121341;
+        let addr1 = @0x121345;
+
+        let accounts = vector[
+            AccountMap {
+                account_address: addr0,
+                balance: 12345,
+            },
+            AccountMap {
+                account_address: addr1,
+                balance: 67890,
+            },
+        ];
+
+        create_accounts(aptos_framework, accounts);
+        assert!(coin::balance<AptosCoin>(addr0) == 12345, 0);
+        assert!(coin::balance<AptosCoin>(addr1) == 67890, 1);
+
+        create_account(aptos_framework, addr0, 23456);
+        assert!(coin::balance<AptosCoin>(addr0) == 12345, 2);
     }
 }
