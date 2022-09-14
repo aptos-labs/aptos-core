@@ -54,16 +54,19 @@ pub struct ClusterArgs {
     pub mint_args: MintArgs,
 }
 
-#[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize)]
+#[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize, PartialEq, Eq, Hash)]
 pub enum TransactionType {
+    // Deprecate P2P name
     P2P,
+    Transfer,
+    TransferHighPri,
     AccountGeneration,
     NftMint,
 }
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionType::P2P
+        TransactionType::Transfer
     }
 }
 

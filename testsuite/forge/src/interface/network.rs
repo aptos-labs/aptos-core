@@ -4,10 +4,11 @@
 use std::time::Duration;
 
 use super::Test;
-use crate::success_criteria::SuccessCriteria;
+use crate::success_criteria::{SuccessCriteria, SuccessCriteriaChecker};
 use crate::{CoreContext, Result, Swarm, TestReport};
 use tokio::runtime::Runtime;
-use transaction_emitter_lib::{EmitJobRequest, TxnStats};
+use transaction_emitter_lib::emitter::stats::DetailedTxnStats;
+use transaction_emitter_lib::EmitJobRequest;
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -57,18 +58,19 @@ impl<'t> NetworkContext<'t> {
 
     pub fn check_for_success(
         &mut self,
-        stats: &TxnStats,
-        window: &Duration,
+        stats: &DetailedTxnStats,
+        window: Duration,
         start_time: i64,
         end_time: i64,
         start_version: u64,
         end_version: u64,
     ) -> Result<()> {
         self.runtime
-            .block_on(self.success_criteria.check_for_success(
+            .block_on(SuccessCriteriaChecker::check_for_success(
+                &self.success_criteria,
+                self.swarm,
                 stats,
                 window,
-                self.swarm,
                 start_time,
                 end_time,
                 start_version,

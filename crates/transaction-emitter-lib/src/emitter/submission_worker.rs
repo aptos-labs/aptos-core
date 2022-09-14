@@ -3,11 +3,11 @@
 
 use crate::{
     emitter::{
-        stats::{DynamicStatsTracking, StatsAccumulator},
+        stats::{DynamicStatsTracking, StatsAccumulatorUpdater},
         wait_for_accounts_sequence,
     },
-    transaction_generator::TransactionGenerator,
-    EmitModeParams,
+    transaction_generator::transaction_mix_generator::TxnMixGenerator,
+    EmitModeParams, TransactionType,
 };
 use aptos_logger::sample::Sampling;
 use aptos_logger::{sample, sample::SampleRate, warn};
@@ -23,7 +23,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use rand::Rng;
-use std::sync::atomic::AtomicU64;
+use std::{collections::HashSet, sync::atomic::AtomicU64};
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
 
@@ -33,9 +33,10 @@ pub struct SubmissionWorker {
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
     stats: Arc<DynamicStatsTracking>,
-    txn_generator: Box<dyn TransactionGenerator>,
+    txn_generator: TxnMixGenerator,
     worker_index: usize,
     skip_latency_stats: bool,
+    track_latency_types: HashSet<TransactionType>,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -46,9 +47,10 @@ impl SubmissionWorker {
         stop: Arc<AtomicBool>,
         params: EmitModeParams,
         stats: Arc<DynamicStatsTracking>,
-        txn_generator: Box<dyn TransactionGenerator>,
+        txn_generator: TxnMixGenerator,
         worker_index: usize,
         skip_latency_stats: bool,
+        track_latency_types: HashSet<TransactionType>,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
         Self {
@@ -60,6 +62,7 @@ impl SubmissionWorker {
             txn_generator,
             worker_index,
             skip_latency_stats,
+            track_latency_types,
             rng,
         }
     }
@@ -97,7 +100,7 @@ impl SubmissionWorker {
             // always add expected cycle duration, to not drift from expected pace.
             wait_until += wait_duration;
 
-            let requests = self.gen_requests();
+            let (txn_type, requests) = self.gen_requests();
 
             let txn_expiration_time = requests
                 .iter()
@@ -105,8 +108,14 @@ impl SubmissionWorker {
                 .max()
                 .unwrap_or(0);
 
+            let skip_type_latency_stats =
+                self.skip_latency_stats && !self.track_latency_types.contains(&txn_type);
+
+            let cur_skip_latency_stats = self.skip_latency_stats && skip_type_latency_stats;
+
             let num_requests = requests.len();
             let txn_offset_time = Arc::new(AtomicU64::new(0));
+            let loop_type_stats = loop_stats.for_type(&txn_type);
 
             join_all(
                 requests
@@ -117,13 +126,13 @@ impl SubmissionWorker {
                             reqs,
                             loop_start_time.clone(),
                             txn_offset_time.clone(),
-                            loop_stats,
+                            &loop_type_stats,
                         )
                     }),
             )
             .await;
 
-            if self.skip_latency_stats {
+            if cur_skip_latency_stats {
                 // we also don't want to be stuck waiting for txn_expiration_time_secs
                 // after stop is called, so we sleep until time or stop is set.
                 self.sleep_check_done(Duration::from_secs(
@@ -139,16 +148,17 @@ impl SubmissionWorker {
                 // skip latency if asked to check seq_num only once
                 // even if we check more often due to stop (to not affect sampling)
                 self.skip_latency_stats,
+                skip_type_latency_stats,
                 txn_expiration_time,
                 // if we don't care about latency, we can recheck less often.
                 // generally, we should never need to recheck, as we wait enough time
                 // before calling here, but in case of shutdown/or client we are talking
                 // to being stale (having stale transaction_version), we might need to wait.
                 Duration::from_millis(
-                    if self.skip_latency_stats { 10 } else { 1 }
+                    if cur_skip_latency_stats { 10 } else { 1 }
                         * self.params.check_account_sequence_sleep_millis,
                 ),
-                loop_stats,
+                &loop_type_stats,
             )
             .await;
 
@@ -199,10 +209,11 @@ impl SubmissionWorker {
         start_time: Instant,
         txn_offset_time: u64,
         num_requests: usize,
-        skip_latency_stats: bool,
+        skip_total_latency_stats: bool,
+        skip_type_latency_stats: bool,
         txn_expiration_ts_secs: u64,
         check_account_sleep_duration: Duration,
-        loop_stats: &StatsAccumulator,
+        loop_stats: &StatsAccumulatorUpdater<'_>,
     ) {
         assert_eq!(
             num_requests,
@@ -221,9 +232,7 @@ impl SubmissionWorker {
         let num_committed = num_requests - num_expired;
 
         if num_expired > 0 {
-            loop_stats
-                .expired
-                .fetch_add(num_expired as u64, Ordering::Relaxed);
+            loop_stats.expired(num_expired);
             sample!(
                 SampleRate::Duration(Duration::from_secs(120)),
                 warn!(
@@ -241,26 +250,18 @@ impl SubmissionWorker {
         if num_committed > 0 {
             let sum_latency = sum_of_completion_timestamps_millis
                 - (txn_offset_time as u128 * num_committed as u128) / num_requests as u128;
-            let avg_latency = (sum_latency / num_committed as u128) as u64;
-            loop_stats
-                .committed
-                .fetch_add(num_committed as u64, Ordering::Relaxed);
+            loop_stats.committed(num_committed);
 
-            if !skip_latency_stats {
-                loop_stats
-                    .latency
-                    .fetch_add(sum_latency as u64, Ordering::Relaxed);
-                loop_stats
-                    .latency_samples
-                    .fetch_add(num_committed as u64, Ordering::Relaxed);
-                loop_stats
-                    .latencies
-                    .record_data_point(avg_latency, num_committed as u64);
+            if !skip_total_latency_stats {
+                loop_stats.total_latency(sum_latency, num_committed);
+            }
+            if !skip_type_latency_stats {
+                loop_stats.type_latency(sum_latency, num_committed);
             }
         }
     }
 
-    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
+    fn gen_requests(&mut self) -> (TransactionType, Vec<SignedTransaction>) {
         let batch_size = max(
             1,
             min(
@@ -282,7 +283,7 @@ pub async fn submit_transactions(
     txns: &[SignedTransaction],
     loop_start_time: Arc<Instant>,
     txn_offset_time: Arc<AtomicU64>,
-    stats: &StatsAccumulator,
+    stats: &StatsAccumulatorUpdater<'_>,
 ) {
     let cur_time = Instant::now();
     let offset = cur_time - *loop_start_time;
@@ -290,15 +291,11 @@ pub async fn submit_transactions(
         txns.len() as u64 * offset.as_millis() as u64,
         Ordering::Relaxed,
     );
-    stats
-        .submitted
-        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+    stats.submitted(txns.len());
 
     match client.submit_batch_bcs(txns).await {
         Err(e) => {
-            stats
-                .failed_submission
-                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+            stats.failed_submission(txns.len());
             sample!(
                 SampleRate::Duration(Duration::from_secs(120)),
                 warn!(
@@ -311,9 +308,7 @@ pub async fn submit_transactions(
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
 
-            stats
-                .failed_submission
-                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+            stats.failed_submission(failures.len());
 
             sample!(SampleRate::Duration(Duration::from_secs(60)), {
                 let by_error = failures

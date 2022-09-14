@@ -5,23 +5,35 @@ use anyhow::bail;
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use futures::future::join_all;
-use serde::Serialize;
 use std::time::Duration;
-use transaction_emitter_lib::emitter::stats::TxnStats;
+use transaction_emitter_lib::emitter::stats::DetailedTxnStats;
+use transaction_emitter_lib::TransactionType;
 
 use crate::system_metrics::SystemMetricsThreshold;
 use crate::{Swarm, SwarmExt};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
     pub max_no_progress_secs: f32,
     pub max_round_gap: u64,
 }
 
-#[derive(Default, Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
+pub enum LatencyType {
+    Average,
+    P50,
+    P90,
+    P99,
+}
+
+pub struct LatencyThreshold {
+    pub latency_thresholds: Vec<(u64, Option<TransactionType>, LatencyType)>,
+}
+
+#[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
     pub avg_tps: usize,
-    pub max_latency_ms: usize,
+    latency_thresholds: Vec<(u64, Option<TransactionType>, LatencyType)>,
     check_no_restarts: bool,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
@@ -30,57 +42,93 @@ pub struct SuccessCriteria {
 }
 
 impl SuccessCriteria {
-    pub fn new(
-        tps: usize,
-        max_latency_ms: usize,
-        check_no_restarts: bool,
-        wait_for_all_nodes_to_catchup: Option<Duration>,
-        system_metrics_threshold: Option<SystemMetricsThreshold>,
-        chain_progress_check: Option<StateProgressThreshold>,
-    ) -> Self {
+    pub fn new(tps: usize) -> Self {
         Self {
             avg_tps: tps,
-            max_latency_ms,
-            check_no_restarts,
-            wait_for_all_nodes_to_catchup,
-            system_metrics_threshold,
-            chain_progress_check,
+            latency_thresholds: Vec::new(),
+            check_no_restarts: false,
+            wait_for_all_nodes_to_catchup: None,
+            system_metrics_threshold: None,
+            chain_progress_check: None,
         }
     }
 
+    pub fn add_no_restarts(mut self) -> Self {
+        self.check_no_restarts = true;
+        self
+    }
+
+    pub fn add_wait_for_catchup_s(mut self, duration_secs: u64) -> Self {
+        self.wait_for_all_nodes_to_catchup = Some(Duration::from_secs(duration_secs));
+        self
+    }
+
+    pub fn add_system_metrics_threshold(mut self, threshold: SystemMetricsThreshold) -> Self {
+        self.system_metrics_threshold = Some(threshold);
+        self
+    }
+
+    pub fn add_chain_progress(mut self, threshold: StateProgressThreshold) -> Self {
+        self.chain_progress_check = Some(threshold);
+        self
+    }
+
+    pub fn add_latency_threshold(mut self, threshold: u64, latency_type: LatencyType) -> Self {
+        self.latency_thresholds
+            .push((threshold, None, latency_type));
+        self
+    }
+
+    pub fn add_latency_threshold_for_type(
+        mut self,
+        threshold: u64,
+        transaction_type: TransactionType,
+        latency_type: LatencyType,
+    ) -> Self {
+        self.latency_thresholds
+            .push((threshold, Some(transaction_type), latency_type));
+        self
+    }
+}
+
+pub struct SuccessCriteriaChecker {}
+
+impl SuccessCriteriaChecker {
     pub async fn check_for_success(
-        &self,
-        stats: &TxnStats,
-        window: &Duration,
+        success_criteria: &SuccessCriteria,
         swarm: &mut dyn Swarm,
+        stats: &DetailedTxnStats,
+        window: Duration,
         start_time: i64,
         end_time: i64,
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
-        let avg_tps = stats.committed / window.as_secs();
-        if avg_tps < self.avg_tps as u64 {
+        let avg_tps = stats.total.committed / window.as_secs();
+        if avg_tps < success_criteria.avg_tps as u64 {
             bail!(
                 "TPS requirement failed. Average TPS {}, minimum TPS requirement {}",
                 avg_tps,
-                self.avg_tps,
+                success_criteria.avg_tps,
             )
         }
 
-        if let Some(timeout) = self.wait_for_all_nodes_to_catchup {
+        Self::check_latency(&success_criteria.latency_thresholds, stats, window)?;
+
+        if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm.wait_for_all_nodes_to_catchup_to_next(timeout).await?;
         }
 
-        if self.check_no_restarts {
+        if success_criteria.check_no_restarts {
             swarm.ensure_no_validator_restart().await?;
             swarm.ensure_no_fullnode_restart().await?;
         }
 
-        // TODO(skedia) Add latency success criteria after we have support for querying prometheus
-        // latency
+        // TODO(skedia) Add end-to-end latency from counters after we have support for querying prometheus
+        // latency (in addition to checking latency from txn-emitter)
 
-        if let Some(system_metrics_threshold) = self.system_metrics_threshold.clone() {
+        if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
             swarm
                 .ensure_healthy_system_metrics(
                     start_time as i64,
@@ -90,8 +138,8 @@ impl SuccessCriteria {
                 .await?;
         }
 
-        if let Some(chain_progress_threshold) = &self.chain_progress_check {
-            self.check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
+        if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
+            Self::check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
                 .await?;
         }
 
@@ -99,7 +147,6 @@ impl SuccessCriteria {
     }
 
     async fn check_chain_progress(
-        &self,
         swarm: &mut dyn Swarm,
         chain_progress_threshold: &StateProgressThreshold,
         start_version: u64,
@@ -206,5 +253,46 @@ impl SuccessCriteria {
         }
 
         Ok(())
+    }
+
+    fn check_latency(
+        latency_thresholds: &Vec<(u64, Option<TransactionType>, LatencyType)>,
+        stats: &DetailedTxnStats,
+        window: Duration,
+    ) -> anyhow::Result<()> {
+        let mut failures = Vec::new();
+        for (latency_threshold, transaction_type, latency_type) in latency_thresholds {
+            let type_stats = if let Some(ttype) = transaction_type {
+                stats.per_type.get(ttype).unwrap()
+            } else {
+                &stats.total
+            };
+
+            let rate = type_stats.rate(window);
+            let latency = match latency_type {
+                LatencyType::Average => rate.latency,
+                LatencyType::P50 => rate.p50_latency,
+                LatencyType::P90 => rate.p90_latency,
+                LatencyType::P99 => rate.p99_latency,
+            };
+
+            if latency > *latency_threshold {
+                failures.push(
+                    format!(
+                        "{:?} latency for {} txns is {} and exceeds limit of {}",
+                        latency_type,
+                        transaction_type.map_or("all".to_string(), |t| format!("{:?}", t)),
+                        latency,
+                        latency_threshold
+                    )
+                    .to_string(),
+                );
+            }
+        }
+        if !failures.is_empty() {
+            bail!("Failed latency check, for {:?}", failures);
+        } else {
+            Ok(())
+        }
     }
 }

@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{
+    transaction_generator::{TransactionGenerator, TransactionGeneratorCreator},
+    TransactionType,
+};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 use rand::prelude::StdRng;
 use rand::Rng;
@@ -8,31 +11,35 @@ use rand_core::{OsRng, SeedableRng};
 
 pub struct TxnMixGenerator {
     rng: StdRng,
-    txn_mix: Vec<(Box<dyn TransactionGenerator>, usize)>,
+    txn_mix: Vec<(TransactionType, Box<dyn TransactionGenerator>, usize)>,
     total_weight: usize,
 }
 
 impl TxnMixGenerator {
-    pub fn new(rng: StdRng, txn_mix: Vec<(Box<dyn TransactionGenerator>, usize)>) -> Self {
-        let total_weight = txn_mix.iter().map(|(_, weight)| weight).sum();
+    pub fn new(
+        rng: StdRng,
+        txn_mix: Vec<(TransactionType, Box<dyn TransactionGenerator>, usize)>,
+    ) -> Self {
+        let total_weight = txn_mix.iter().map(|(_, _, weight)| weight).sum();
         Self {
             rng,
             txn_mix,
             total_weight,
         }
     }
-}
 
-impl TransactionGenerator for TxnMixGenerator {
-    fn generate_transactions(
+    pub fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
-    ) -> Vec<SignedTransaction> {
+    ) -> (TransactionType, Vec<SignedTransaction>) {
         let mut picked = self.rng.gen_range(0, self.total_weight);
-        for (gen, weight) in &mut self.txn_mix {
+        for (txn_type, gen, weight) in &mut self.txn_mix {
             if picked < *weight {
-                return gen.generate_transactions(accounts, transactions_per_account);
+                return (
+                    *txn_type,
+                    gen.generate_transactions(accounts, transactions_per_account),
+                );
             }
             picked -= *weight;
         }
@@ -44,25 +51,29 @@ impl TransactionGenerator for TxnMixGenerator {
 }
 
 pub struct TxnMixGeneratorCreator {
-    txn_mix_creators: Vec<(Box<dyn TransactionGeneratorCreator>, usize)>,
+    txn_mix_creators: Vec<(TransactionType, Box<dyn TransactionGeneratorCreator>, usize)>,
 }
 
 impl TxnMixGeneratorCreator {
-    pub fn new(txn_mix_creators: Vec<(Box<dyn TransactionGeneratorCreator>, usize)>) -> Self {
+    pub fn new(
+        txn_mix_creators: Vec<(TransactionType, Box<dyn TransactionGeneratorCreator>, usize)>,
+    ) -> Self {
         Self { txn_mix_creators }
     }
-}
 
-impl TransactionGeneratorCreator for TxnMixGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
-        Box::new(TxnMixGenerator::new(
+    pub fn create_transaction_mix_generator(&self) -> TxnMixGenerator {
+        TxnMixGenerator::new(
             StdRng::from_seed(OsRng.gen()),
             self.txn_mix_creators
                 .iter()
-                .map(|(generator_creator, weight)| {
-                    (generator_creator.create_transaction_generator(), *weight)
+                .map(|(txn_type, generator_creator, weight)| {
+                    (
+                        *txn_type,
+                        generator_creator.create_transaction_generator(),
+                        *weight,
+                    )
                 })
                 .collect(),
-        ))
+        )
     }
 }

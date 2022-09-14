@@ -23,8 +23,8 @@ use anyhow::{anyhow, ensure};
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{
-    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TxnEmitter, TxnStats, Version,
+    emitter::stats::DetailedTxnStats, EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result,
+    Swarm, SwarmExt, Test, TxnEmitter, TxnStats, Version,
 };
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
@@ -152,8 +152,11 @@ impl NetworkTest for dyn NetworkLoadTest {
             COOLDOWN_DURATION_FRACTION,
             rng,
         )?;
-        ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
+        ctx.report.report_txn_stats(
+            self.name().to_string(),
+            &txn_stat.total,
+            actual_test_duration,
+        );
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -169,7 +172,7 @@ impl NetworkTest for dyn NetworkLoadTest {
 
         ctx.check_for_success(
             &txn_stat,
-            &actual_test_duration,
+            actual_test_duration,
             start_timestamp as i64,
             end_timestamp as i64,
             start_version,
@@ -189,7 +192,7 @@ impl dyn NetworkLoadTest {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
-    ) -> Result<(TxnStats, Duration, u64)> {
+    ) -> Result<(DetailedTxnStats, Duration, u64)> {
         let all_validators = ctx
             .swarm()
             .validators()
@@ -302,9 +305,22 @@ impl dyn NetworkLoadTest {
         let txn_stats = rt.block_on(emitter.stop_job(job));
 
         info!("Stopped job");
-        info!("Warmup stats: {}", txn_stats[0].rate(warmup_duration));
-        info!("Test stats: {}", txn_stats[1].rate(actual_test_duration));
-        info!("Cooldown stats: {}", txn_stats[2].rate(cooldown_duration));
+        info!("Warmup stats: {}", txn_stats[0].total.rate(warmup_duration));
+        info!(
+            "Test stats: {}",
+            txn_stats[1].total.rate(actual_test_duration)
+        );
+        info!(
+            "Cooldown stats: {}",
+            txn_stats[2].total.rate(cooldown_duration)
+        );
+        for (ttype, stats) in txn_stats[1].per_type.iter() {
+            info!(
+                "Test stats for type {:?}: {}",
+                ttype,
+                stats.rate(actual_test_duration)
+            );
+        }
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
             if let Some(start_t) = max_start_ledger_transactions {
