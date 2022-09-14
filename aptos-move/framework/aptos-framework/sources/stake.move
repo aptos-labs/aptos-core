@@ -25,6 +25,7 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
+    use aptos_std::math64::min;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
@@ -37,46 +38,40 @@ module aptos_framework::stake {
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
 
-    /// Lockup period is shorter than required.
-    const ELOCK_TIME_TOO_SHORT: u64 = 1;
-    /// Withdraw not allowed, the stake is still locked.
-    const EWITHDRAW_NOT_ALLOWED: u64 = 2;
     /// Validator Config not published.
-    const EVALIDATOR_CONFIG: u64 = 3;
+    const EVALIDATOR_CONFIG: u64 = 1;
     /// Not enough stake to join validator set.
-    const ESTAKE_TOO_LOW: u64 = 4;
+    const ESTAKE_TOO_LOW: u64 = 2;
     /// Too much stake to join validator set.
-    const ESTAKE_TOO_HIGH: u64 = 5;
+    const ESTAKE_TOO_HIGH: u64 = 3;
     /// Account is already a validator or pending validator.
-    const EALREADY_ACTIVE_VALIDATOR: u64 = 6;
+    const EALREADY_ACTIVE_VALIDATOR: u64 = 4;
     /// Account is not a validator.
-    const ENOT_VALIDATOR: u64 = 7;
+    const ENOT_VALIDATOR: u64 = 5;
     /// Can't remove last validator.
-    const ELAST_VALIDATOR: u64 = 8;
+    const ELAST_VALIDATOR: u64 = 6;
     /// Total stake exceeds maximum allowed.
-    const ESTAKE_EXCEEDS_MAX: u64 = 9;
+    const ESTAKE_EXCEEDS_MAX: u64 = 7;
     /// Account is already registered as a validator candidate.
-    const EALREADY_REGISTERED: u64 = 10;
-    /// No coins in inactive state to withdraw from specified pool.
-    const ENO_COINS_TO_WITHDRAW: u64 = 11;
+    const EALREADY_REGISTERED: u64 = 8;
     /// Account does not have the right operator capability.
-    const ENOT_OPERATOR: u64 = 12;
-    /// Lockup period is longer than allowed.
-    const ELOCK_TIME_TOO_LONG: u64 = 13;
+    const ENOT_OPERATOR: u64 = 9;
     /// Validators cannot join or leave post genesis on this test network.
-    const ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED: u64 = 14;
+    const ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED: u64 = 10;
     /// Invalid consensus public key
-    const EINVALID_PUBLIC_KEY: u64 = 15;
-    /// Invalid stake amount (usuaully 0).
-    const EINVALID_STAKE_AMOUNT: u64 = 16;
+    const EINVALID_PUBLIC_KEY: u64 = 11;
     /// Validator set exceeds the limit
-    const EVALIDATOR_SET_TOO_LARGE: u64 = 18;
+    const EVALIDATOR_SET_TOO_LARGE: u64 = 12;
     /// Voting power increase has exceeded the limit for this current epoch.
-    const EVOTING_POWER_INCREASE_EXCEEDS_LIMIT: u64 = 19;
+    const EVOTING_POWER_INCREASE_EXCEEDS_LIMIT: u64 = 13;
     /// Stake pool does not exist at the provided pool address.
-    const ESTAKE_POOL_DOES_NOT_EXIST: u64 = 20;
+    const ESTAKE_POOL_DOES_NOT_EXIST: u64 = 14;
+    /// Owner capability does not exist at the provided account.
+    const EOWNER_CAP_NOT_FOUND: u64 = 15;
+    /// An account cannot own more than one owner capability.
+    const EOWNER_CAP_ALREADY_EXISTS: u64 = 16;
     /// Validator is not defined in the ACL of entities allowed to be validators
-    const EINELIGIBLE_VALIDATOR: u64 = 21;
+    const EINELIGIBLE_VALIDATOR: u64 = 17;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -257,12 +252,14 @@ module aptos_framework::stake {
     /// Return the lockup expiration of the stake pool at `pool_address`.
     /// This will throw an error if there's no stake pool at `pool_address`.
     public fun get_lockup_secs(pool_address: address): u64 acquires StakePool {
+        assert_stake_pool_exists(pool_address);
         borrow_global<StakePool>(pool_address).locked_until_secs
     }
 
     /// Return the remaining lockup of the stake pool at `pool_address`.
     /// This will throw an error if there's no stake pool at `pool_address`.
     public fun get_remaining_lockup_secs(pool_address: address): u64 acquires StakePool {
+        assert_stake_pool_exists(pool_address);
         let lockup_time = borrow_global<StakePool>(pool_address).locked_until_secs;
         if (lockup_time <= timestamp::now_seconds()) {
             0
@@ -274,12 +271,13 @@ module aptos_framework::stake {
     /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
     /// The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
     public fun get_stake(pool_address: address): (u64, u64, u64, u64) acquires StakePool {
+        assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global<StakePool>(pool_address);
         (
-            coin::value<AptosCoin>(&stake_pool.active),
-            coin::value<AptosCoin>(&stake_pool.inactive),
-            coin::value<AptosCoin>(&stake_pool.pending_active),
-            coin::value<AptosCoin>(&stake_pool.pending_inactive),
+            coin::value(&stake_pool.active),
+            coin::value(&stake_pool.inactive),
+            coin::value(&stake_pool.pending_active),
+            coin::value(&stake_pool.pending_inactive),
         )
     }
 
@@ -300,11 +298,12 @@ module aptos_framework::stake {
     /// Return the voting power of the validator in the current epoch.
     /// This is the same as the validator's total active and pending_inactive stake.
     public fun get_current_epoch_voting_power(pool_address: address): u64 acquires StakePool, ValidatorSet {
+        assert_stake_pool_exists(pool_address);
         let validator_state = get_validator_state(pool_address);
         // Both active and pending inactive validators can still vote in the current epoch.
         if (validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE) {
-            let active_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).active);
-            let pending_inactive_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).pending_inactive);
+            let active_stake = coin::value(&borrow_global<StakePool>(pool_address).active);
+            let pending_inactive_stake = coin::value(&borrow_global<StakePool>(pool_address).pending_inactive);
             active_stake + pending_inactive_stake
         } else {
             0
@@ -313,11 +312,13 @@ module aptos_framework::stake {
 
     /// Return the delegated voter of the validator at `pool_address`.
     public fun get_delegated_voter(pool_address: address): address acquires StakePool {
+        assert_stake_pool_exists(pool_address);
         borrow_global<StakePool>(pool_address).delegated_voter
     }
 
     /// Return the operator of the validator at `pool_address`.
     public fun get_operator(pool_address: address): address acquires StakePool {
+        assert_stake_pool_exists(pool_address);
         borrow_global<StakePool>(pool_address).operator_address
     }
 
@@ -328,6 +329,7 @@ module aptos_framework::stake {
 
     /// Return the validator index for `pool_address`.
     public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
+        assert_stake_pool_exists(pool_address);
         borrow_global<ValidatorConfig>(pool_address).validator_index
     }
 
@@ -340,6 +342,7 @@ module aptos_framework::stake {
 
     /// Return the validator's config.
     public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
+        assert_stake_pool_exists(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
     }
@@ -445,10 +448,11 @@ module aptos_framework::stake {
         fullnode_addresses: vector<u8>,
     ) acquires AllowedValidators {
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        assert!(option::is_some(
-            &mut bls12381::public_key_from_bytes_with_pop(consensus_pubkey,
-                &proof_of_possession_from_bytes(proof_of_possession))
-        ), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+            consensus_pubkey,
+            &proof_of_possession_from_bytes(proof_of_possession)
+        );
+        assert!(option::is_some(pubkey_from_pop), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         initialize_owner(account);
         move_to(account, ValidatorConfig {
@@ -462,7 +466,7 @@ module aptos_framework::stake {
     fun initialize_owner(owner: &signer) acquires AllowedValidators {
         let owner_address = signer::address_of(owner);
         assert!(is_allowed(owner_address), error::not_found(EINELIGIBLE_VALIDATOR));
-        assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
+        assert!(!exists<StakePool>(owner_address), error::already_exists(EALREADY_REGISTERED));
 
         move_to(owner, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -492,14 +496,17 @@ module aptos_framework::stake {
     }
 
     /// Extract and return owner capability from the signing account.
-    public fun extract_owner_cap(account: &signer): OwnerCapability acquires OwnerCapability {
-        move_from<OwnerCapability>(signer::address_of(account))
+    public fun extract_owner_cap(owner: &signer): OwnerCapability acquires OwnerCapability {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        move_from<OwnerCapability>(owner_address)
     }
 
     /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
     /// staking pool.
-    public fun deposit_owner_cap(account: &signer, owner_cap: OwnerCapability) {
-        move_to(account, owner_cap);
+    public fun deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
+        assert!(!exists<OwnerCapability>(signer::address_of(owner)), error::not_found(EOWNER_CAP_ALREADY_EXISTS));
+        move_to(owner, owner_cap);
     }
 
     /// Destroy `owner_cap`.
@@ -508,20 +515,22 @@ module aptos_framework::stake {
     }
 
     /// Allows an owner to change the operator of the stake pool.
-    public entry fun set_operator(account: &signer, new_operator: address) acquires OwnerCapability, StakePool {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+    public entry fun set_operator(owner: &signer, new_operator: address) acquires OwnerCapability, StakePool {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         set_operator_with_cap(ownership_cap, new_operator);
     }
 
     /// Allows an account with ownership capability to change the operator of the stake pool.
     public fun set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) acquires StakePool {
         let pool_address = owner_cap.pool_address;
+        assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let old_operator = stake_pool.operator_address;
         stake_pool.operator_address = new_operator;
 
-        event::emit_event<SetOperatorEvent>(
+        event::emit_event(
             &mut stake_pool.set_operator_events,
             SetOperatorEvent {
                 pool_address,
@@ -532,35 +541,39 @@ module aptos_framework::stake {
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    public entry fun set_delegated_voter(
-        account: &signer, new_delegated_voter: address) acquires OwnerCapability, StakePool {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
-        set_delegated_voter_with_cap(ownership_cap, new_delegated_voter);
+    public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires OwnerCapability, StakePool {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
+        set_delegated_voter_with_cap(ownership_cap, new_voter);
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    public fun set_delegated_voter_with_cap(
-        owner_cap: &OwnerCapability, new_delegated_voter: address) acquires StakePool {
-        let stake_pool = borrow_global_mut<StakePool>(owner_cap.pool_address);
-        stake_pool.delegated_voter = new_delegated_voter;
+    public fun set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) acquires StakePool {
+        let pool_address = owner_cap.pool_address;
+        assert_stake_pool_exists(pool_address);
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        stake_pool.delegated_voter = new_voter;
     }
 
     /// Add `amount` of coins from the `account` owning the StakePool.
-    public entry fun add_stake(account: &signer, amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
-        add_stake_with_cap(ownership_cap, coin::withdraw<AptosCoin>(account, amount));
+    public entry fun add_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
+        add_stake_with_cap(ownership_cap, coin::withdraw<AptosCoin>(owner, amount));
     }
 
     /// Add `coins` into `pool_address`. this requires the corresponding `owner_cap` to be passed in.
-    public fun add_stake_with_cap(
-        owner_cap: &OwnerCapability, coins: Coin<AptosCoin>) acquires StakePool, ValidatorSet {
+    public fun add_stake_with_cap(owner_cap: &OwnerCapability, coins: Coin<AptosCoin>) acquires StakePool, ValidatorSet {
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
-        let amount = coin::value<AptosCoin>(&coins);
-        assert!(amount > 0, error::invalid_argument(EINVALID_STAKE_AMOUNT));
+        let amount = coin::value(&coins);
+        if (amount == 0) {
+            coin::destroy_zero(coins);
+            return
+        };
 
         // Only track and validate voting power increase for active and pending_active validator.
         // Pending_inactive validator will be removed from the validator set in the next epoch.
@@ -585,7 +598,7 @@ module aptos_framework::stake {
         let voting_power = get_next_epoch_voting_power(stake_pool);
         assert!(voting_power <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX));
 
-        event::emit_event<AddStakeEvent>(
+        event::emit_event(
             &mut stake_pool.add_stake_events,
             AddStakeEvent {
                 pool_address,
@@ -595,24 +608,21 @@ module aptos_framework::stake {
     }
 
     /// Move `amount` of coins from pending_inactive to active.
-    public entry fun reactivate_stake(account: &signer, amount: u64) acquires OwnerCapability, StakePool {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+    public entry fun reactivate_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         reactivate_stake_with_cap(ownership_cap, amount);
     }
 
-    public fun reactivate_stake_with_cap(
-        owner_cap: &OwnerCapability, amount: u64
-    ) acquires StakePool {
+    public fun reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) acquires StakePool {
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
-        // Ensure that caller is not trying to reactive more than they have in pending_inactive.
+        // Cap the amount to reactivate by the amount in pending_inactive.
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(
-            amount <= coin::value<AptosCoin>(&stake_pool.pending_inactive),
-            error::invalid_argument(EINVALID_STAKE_AMOUNT),
-        );
+        let total_pending_inactive = coin::value(&stake_pool.pending_inactive);
+        amount = min(amount, total_pending_inactive);
 
         // Since this does not count as a voting power change (pending inactive still counts as voting power in the
         // current epoch), stake can be immediately moved from pending inactive to active.
@@ -620,7 +630,7 @@ module aptos_framework::stake {
         let reactivated_coins = coin::extract(&mut stake_pool.pending_inactive, amount);
         coin::merge(&mut stake_pool.active, reactivated_coins);
 
-        event::emit_event<ReactivateStakeEvent>(
+        event::emit_event(
             &mut stake_pool.reactivate_stake_events,
             ReactivateStakeEvent {
                 pool_address,
@@ -631,26 +641,27 @@ module aptos_framework::stake {
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
     public entry fun rotate_consensus_key(
-        account: &signer,
+        operator: &signer,
         pool_address: address,
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        assert!(option::is_some(
-            &mut bls12381::public_key_from_bytes_with_pop(new_consensus_pubkey,
-            &proof_of_possession_from_bytes(proof_of_possession))
-        ), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+            new_consensus_pubkey,
+            &proof_of_possession_from_bytes(proof_of_possession)
+        );
+        assert!(option::is_some(pubkey_from_pop), error::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
-        event::emit_event<RotateConsensusKeyEvent>(
+        event::emit_event(
             &mut stake_pool.rotate_consensus_key_events,
             RotateConsensusKeyEvent {
                 pool_address,
@@ -662,14 +673,14 @@ module aptos_framework::stake {
 
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
     public entry fun update_network_and_fullnode_addresses(
-        account: &signer,
+        operator: &signer,
         pool_address: address,
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
@@ -678,7 +689,7 @@ module aptos_framework::stake {
         let old_fullnode_addresses = validator_info.fullnode_addresses;
         validator_info.fullnode_addresses = new_fullnode_addresses;
 
-        event::emit_event<UpdateNetworkAndFullnodeAddressesEvent>(
+        event::emit_event(
             &mut stake_pool.update_network_and_fullnode_addresses_events,
             UpdateNetworkAndFullnodeAddressesEvent {
                 pool_address,
@@ -691,9 +702,10 @@ module aptos_framework::stake {
     }
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
-    public entry fun increase_lockup(account: &signer) acquires OwnerCapability, StakePool {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+    public entry fun increase_lockup(owner: &signer) acquires OwnerCapability, StakePool {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         increase_lockup_with_cap(ownership_cap);
     }
 
@@ -708,7 +720,7 @@ module aptos_framework::stake {
         let old_locked_until_secs = stake_pool.locked_until_secs;
         stake_pool.locked_until_secs = timestamp::now_seconds() + staking_config::get_recurring_lockup_duration(&config);
 
-        event::emit_event<IncreaseLockupEvent>(
+        event::emit_event(
             &mut stake_pool.increase_lockup_events,
             IncreaseLockupEvent {
                 pool_address,
@@ -720,7 +732,7 @@ module aptos_framework::stake {
 
     /// This can only called by the operator of the validator/staking pool.
     public entry fun join_validator_set(
-        account: &signer,
+        operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         assert!(
@@ -728,7 +740,7 @@ module aptos_framework::stake {
             error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
 
-        join_validator_set_internal(account, pool_address);
+        join_validator_set_internal(operator, pool_address);
     }
 
     /// Request to have `pool_address` join the validator set. Can only be called after calling `initialize_validator`.
@@ -738,18 +750,15 @@ module aptos_framework::stake {
     ///
     /// This internal version can only be called by the Genesis module during Genesis.
     public(friend) fun join_validator_set_internal(
-        account: &signer,
+        operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        // Account has to be the operator.
-        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
-
-        // Throw an error is the validator is already active.
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
         assert!(
             get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE,
-            error::invalid_argument(EALREADY_ACTIVE_VALIDATOR),
+            error::invalid_state(EALREADY_ACTIVE_VALIDATOR),
         );
 
         let config = staking_config::get();
@@ -771,16 +780,17 @@ module aptos_framework::stake {
         assert!(validator_set_size <= MAX_VALIDATOR_SET_SIZE, error::invalid_argument(EVALIDATOR_SET_TOO_LARGE));
         vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
 
-        event::emit_event<JoinValidatorSetEvent>(
+        event::emit_event(
             &mut stake_pool.join_validator_set_events,
             JoinValidatorSetEvent { pool_address },
         );
     }
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
-    public entry fun unlock(account: &signer, amount: u64) acquires OwnerCapability, StakePool {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+    public entry fun unlock(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         unlock_with_cap(amount, ownership_cap);
     }
 
@@ -796,10 +806,12 @@ module aptos_framework::stake {
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        let unlocked_stake = coin::extract<AptosCoin>(&mut stake_pool.active, amount);
+        // Cap amount to unlock by maximum active stake.
+        let amount = min(amount, coin::value(&stake_pool.active));
+        let unlocked_stake = coin::extract(&mut stake_pool.active, amount);
         coin::merge<AptosCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
 
-        event::emit_event<UnlockStakeEvent>(
+        event::emit_event(
             &mut stake_pool.unlock_stake_events,
             UnlockStakeEvent {
                 pool_address,
@@ -810,13 +822,14 @@ module aptos_framework::stake {
 
     /// Withdraw from `account`'s inactive stake.
     public entry fun withdraw(
-        account: &signer,
+        owner: &signer,
         withdraw_amount: u64
     ) acquires OwnerCapability, StakePool, ValidatorSet {
-        let account_addr = signer::address_of(account);
-        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        let owner_address = signer::address_of(owner);
+        assert_owner_cap_exists(owner_address);
+        let ownership_cap = borrow_global<OwnerCapability>(owner_address);
         let coins = withdraw_with_cap(ownership_cap, withdraw_amount);
-        coin::deposit<AptosCoin>(account_addr, coins);
+        coin::deposit<AptosCoin>(owner_address, coins);
     }
 
     /// Withdraw from `pool_address`'s inactive stake with the corresponding `owner_cap`.
@@ -836,14 +849,11 @@ module aptos_framework::stake {
             coin::merge(&mut stake_pool.inactive, pending_inactive_stake);
         };
 
-        let total_withdrawable_amount = coin::value<AptosCoin>(&stake_pool.inactive);
-        // Cap withdraw amount by total withdrawable.
-        if (withdraw_amount > total_withdrawable_amount) {
-            withdraw_amount = total_withdrawable_amount;
-        };
-        assert!(withdraw_amount > 0, error::invalid_argument(ENO_COINS_TO_WITHDRAW));
+        // Cap withdraw amount by total ianctive coins.
+        withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
+        if (withdraw_amount == 0) return coin::zero<AptosCoin>();
 
-        event::emit_event<WithdrawStakeEvent>(
+        event::emit_event(
             &mut stake_pool.withdraw_stake_events,
             WithdrawStakeEvent {
                 pool_address,
@@ -851,7 +861,7 @@ module aptos_framework::stake {
             },
         );
 
-        coin::extract<AptosCoin>(&mut stake_pool.inactive, withdraw_amount)
+        coin::extract(&mut stake_pool.inactive, withdraw_amount)
     }
 
     /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
@@ -861,7 +871,7 @@ module aptos_framework::stake {
     ///
     /// Can only be called by the operator of the validator/staking pool.
     public entry fun leave_validator_set(
-        account: &signer,
+        operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorSet {
         let config = staking_config::get();
@@ -873,7 +883,7 @@ module aptos_framework::stake {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         // Account has to be the operator.
-        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         // If the validator is still pending_active, directly kick the validator out.
@@ -898,13 +908,13 @@ module aptos_framework::stake {
         } else {
             // Validate that the validator is already part of the validator set.
             let maybe_active_index = find_validator(&validator_set.active_validators, pool_address);
-            assert!(option::is_some(&maybe_active_index), error::invalid_argument(ENOT_VALIDATOR));
+            assert!(option::is_some(&maybe_active_index), error::invalid_state(ENOT_VALIDATOR));
             let validator_info = vector::swap_remove(
                 &mut validator_set.active_validators, option::extract(&mut maybe_active_index));
-            assert!(vector::length(&validator_set.active_validators) > 0, error::invalid_argument(ELAST_VALIDATOR));
+            assert!(vector::length(&validator_set.active_validators) > 0, error::invalid_state(ELAST_VALIDATOR));
             vector::push_back(&mut validator_set.pending_inactive, validator_info);
 
-            event::emit_event<LeaveValidatorSetEvent>(
+            event::emit_event(
                 &mut stake_pool.leave_validator_set_events,
                 LeaveValidatorSetEvent {
                     pool_address,
@@ -917,6 +927,7 @@ module aptos_framework::stake {
     /// This includes validators that requested to leave but are still in the pending_inactive queue and will be removed
     /// when the epoch starts.
     public fun is_current_epoch_validator(pool_address: address): bool acquires ValidatorSet {
+        assert_stake_pool_exists(pool_address);
         let validator_state = get_validator_state(pool_address);
         validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE
     }
@@ -1119,18 +1130,18 @@ module aptos_framework::stake {
         };
         let rewards_amount = rewards_active + rewards_pending_inactive;
         // Pending active stake can now be active.
-        coin::merge<AptosCoin>(&mut stake_pool.active, coin::extract_all<AptosCoin>(&mut stake_pool.pending_active));
+        coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
         if (timestamp::now_seconds() >= current_lockup_expiration) {
-            coin::merge<AptosCoin>(
+            coin::merge(
                 &mut stake_pool.inactive,
-                coin::extract_all<AptosCoin>(&mut stake_pool.pending_inactive),
+                coin::extract_all(&mut stake_pool.pending_inactive),
             );
         };
 
-        event::emit_event<DistributeRewardsEvent>(
+        event::emit_event(
             &mut stake_pool.distribute_rewards_events,
             DistributeRewardsEvent {
                 pool_address,
@@ -1166,7 +1177,7 @@ module aptos_framework::stake {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ): u64 acquires AptosCoinCapabilities {
-        let stake_amount = coin::value<AptosCoin>(stake);
+        let stake_amount = coin::value(stake);
         let rewards_amount = if (stake_amount > 0) {
             calculate_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
         } else {
@@ -1174,7 +1185,7 @@ module aptos_framework::stake {
         };
         if (rewards_amount > 0) {
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-            let rewards = coin::mint<AptosCoin>(rewards_amount, mint_cap);
+            let rewards = coin::mint(rewards_amount, mint_cap);
             coin::merge(stake, rewards);
         };
         rewards_amount
@@ -1214,9 +1225,9 @@ module aptos_framework::stake {
 
     /// Returns validator's next epoch voting power, including pending_active, active, and pending_inactive stake.
     fun get_next_epoch_voting_power(stake_pool: &StakePool): u64 {
-        let value_pending_active = coin::value<AptosCoin>(&stake_pool.pending_active);
-        let value_active = coin::value<AptosCoin>(&stake_pool.active);
-        let value_pending_inactive = coin::value<AptosCoin>(&stake_pool.pending_inactive);
+        let value_pending_active = coin::value(&stake_pool.pending_active);
+        let value_active = coin::value(&stake_pool.active);
+        let value_pending_inactive = coin::value(&stake_pool.pending_inactive);
         spec {
             assume value_pending_active + value_active + value_pending_inactive <= MAX_U64;
         };
@@ -1264,6 +1275,10 @@ module aptos_framework::stake {
             let allowed = borrow_global<AllowedValidators>(@aptos_framework);
             vector::contains(&allowed.accounts, &account)
         }
+    }
+
+    fun assert_owner_cap_exists(owner: address) {
+        assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
     }
 
     #[test_only]
@@ -1431,7 +1446,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x10007)]
     public entry fun test_inactive_validator_can_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1444,7 +1459,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x10007)]
     public entry fun test_pending_active_validator_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1462,7 +1477,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x10007)]
     public entry fun test_active_validator_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1476,7 +1491,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x10007)]
     public entry fun test_active_validator_with_pending_inactive_stake_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator: &signer,
@@ -1494,7 +1509,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x10007)]
     public entry fun test_pending_inactive_cannot_add_stake_if_exceeding_max_allowed(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1592,7 +1607,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10013)]
+    #[expected_failure(abort_code = 0x1000D)]
     public entry fun test_inactive_validator_cannot_join_if_exceed_increase_limit(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1632,7 +1647,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x10013)]
+    #[expected_failure(abort_code = 0x1000D)]
     public entry fun test_pending_active_validator_cannot_add_more_stake_than_limit(
         aptos_framework: &signer,
         validator_1: &signer,
@@ -1674,7 +1689,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10013)]
+    #[expected_failure(abort_code = 0x1000D)]
     public entry fun test_active_validator_cannot_add_more_stake_than_limit_in_multiple_epochs(
         aptos_framework: &signer,
         validator: &signer,
@@ -1695,7 +1710,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10013)]
+    #[expected_failure(abort_code = 0x1000D)]
     public entry fun test_active_validator_cannot_add_more_stake_than_limit(
         aptos_framework: &signer,
         validator: &signer,
@@ -1770,16 +1785,16 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10006)]
-    public entry fun test_active_validator_unlocking_more_than_available_stake_should_error_out(
+    public entry fun test_active_validator_unlocking_more_than_available_stake_should_cap(
         aptos_framework: &signer,
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test(aptos_framework);
-        initialize_test_validator(validator, 100, true, true);
+        initialize_test_validator(validator, 100, false, false);
 
-        // Validator unlocks more stake than they have active. This should error out.
+        // Validator unlocks more stake than they have active. This should limit the unlock to 100.
         unlock(validator, 200);
+        assert_validator_state(signer::address_of(validator), 0, 0, 0, 100, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -1825,17 +1840,19 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10010)]
-    public entry fun test_active_validator_reactivate_more_than_available_pending_inactive_stake_should_error(
+    public entry fun test_active_validator_reactivate_more_than_available_pending_inactive_stake_should_cap(
         aptos_framework: &signer,
         validator: &signer,
     ) acquires AllowedValidators, OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         initialize_for_test(aptos_framework);
         initialize_test_validator(validator, 100, true, true);
 
-        // Validator tries to reactivate more than available pending_inactive stake, which should error out.
+        // Validator tries to reactivate more than available pending_inactive stake, which should limit to 50.
         unlock(validator, 50);
+        let validator_address = signer::address_of(validator);
+        assert_validator_state(validator_address, 50, 0, 0, 50, 0);
         reactivate_stake(validator, 51);
+        assert_validator_state(validator_address, 100, 0, 0, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -2047,7 +2064,7 @@ module aptos_framework::stake {
         // Withdraw stake + rewards.
         assert_validator_state(pool_address, 0, 101, 0, 0, 0);
         let coins = withdraw_with_cap(&owner_cap, 101);
-        assert!(coin::value<AptosCoin>(&coins) == 101, 1);
+        assert!(coin::value(&coins) == 101, 1);
         assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
         // Operator can separately rotate consensus key.
@@ -2063,12 +2080,12 @@ module aptos_framework::stake {
 
         // Cleanups.
         coin::register<AptosCoin>(validator);
-        coin::deposit<AptosCoin>(pool_address, coins);
+        coin::deposit(pool_address, coins);
         deposit_owner_cap(validator, owner_cap);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000E)]
+    #[expected_failure(abort_code = 0x1000A)]
     public entry fun test_validator_cannot_join_post_genesis(
         aptos_framework: &signer,
         validator: &signer,
@@ -2080,7 +2097,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10014)]
+    #[expected_failure(abort_code = 0x1000E)]
     public entry fun test_invalid_pool_address(
         aptos_framework: &signer,
         validator: &signer,
@@ -2092,7 +2109,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000E)]
+    #[expected_failure(abort_code = 0x1000A)]
     public entry fun test_validator_cannot_leave_post_genesis(
         aptos_framework: &signer,
         validator: &signer,
@@ -2252,7 +2269,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000F)]
+    #[expected_failure(abort_code = 0x1000B)]
     public entry fun test_invalid_config(
         aptos_framework: &signer,
         validator: &signer,
@@ -2376,13 +2393,13 @@ module aptos_framework::stake {
         pending_inactive_stake: u64,
     ) acquires StakePool {
         let stake_pool = borrow_global<StakePool>(pool_address);
-        let actual_active_stake = coin::value<AptosCoin>(&stake_pool.active);
+        let actual_active_stake = coin::value(&stake_pool.active);
         assert!(actual_active_stake == active_stake, actual_active_stake);
-        let actual_inactive_stake = coin::value<AptosCoin>(&stake_pool.inactive);
+        let actual_inactive_stake = coin::value(&stake_pool.inactive);
         assert!(actual_inactive_stake == inactive_stake, actual_inactive_stake);
-        let actual_pending_active_stake = coin::value<AptosCoin>(&stake_pool.pending_active);
+        let actual_pending_active_stake = coin::value(&stake_pool.pending_active);
         assert!(actual_pending_active_stake == pending_active_stake, actual_pending_active_stake);
-        let actual_pending_inactive_stake = coin::value<AptosCoin>(&stake_pool.pending_inactive);
+        let actual_pending_inactive_stake = coin::value(&stake_pool.pending_inactive);
         assert!(actual_pending_inactive_stake == pending_inactive_stake, actual_pending_inactive_stake);
     }
 
@@ -2414,7 +2431,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator = @0x123)]
-    #[expected_failure(abort_code = 0x60015)]
+    #[expected_failure(abort_code = 0x60011)]
     public entry fun test_not_allowed_validators(
         aptos_framework: &signer,
         validator: &signer,
