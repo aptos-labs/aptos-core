@@ -34,15 +34,31 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its rotation capability to only one other address at one time.
+    /// `rotation_capability_sig_bytes` is the `RotationCapabilityOfferProofChallenge` signed by the account owner's key.
+    /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519).
+    /// `account_public_key_bytes` is the public key of the account owner.
+    /// `recipient_address` is the address of the recipient of the rotation capability - note that if there's an existing
+    /// `recipient_address` in the account owner's `RotationCapabilityOffer`, this will replace the
+    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+    /// to the account owner's rotation capability).
+    AccountOfferRotationCapability {
+        rotation_capability_sig_bytes: Vec<u8>,
+        account_scheme: u8,
+        account_public_key_bytes: Vec<u8>,
+        recipient_address: AccountAddress,
+    },
+
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
     /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
-    /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
-    /// `account_public_key_bytes` is the public key of the account owner
+    /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519).
+    /// `account_public_key_bytes` is the public key of the account owner.
     /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
     /// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
     /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
-    /// to the account owner's signer capability)
+    /// to the account owner's signer capability).
     AccountOfferSignerCapability {
         signer_capability_sig_bytes: Vec<u8>,
         account_scheme: u8,
@@ -461,6 +477,17 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountOfferRotationCapability {
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            } => account_offer_rotation_capability(
+                rotation_capability_sig_bytes,
+                account_scheme,
+                account_public_key_bytes,
+                recipient_address,
+            ),
             AccountOfferSignerCapability {
                 signer_capability_sig_bytes,
                 account_scheme,
@@ -735,15 +762,49 @@ impl EntryFunctionCall {
     }
 }
 
+/// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
+/// An account can delegate its rotation capability to only one other address at one time.
+/// `rotation_capability_sig_bytes` is the `RotationCapabilityOfferProofChallenge` signed by the account owner's key.
+/// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519).
+/// `account_public_key_bytes` is the public key of the account owner.
+/// `recipient_address` is the address of the recipient of the rotation capability - note that if there's an existing
+/// `recipient_address` in the account owner's `RotationCapabilityOffer`, this will replace the
+/// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+/// to the account owner's rotation capability).
+pub fn account_offer_rotation_capability(
+    rotation_capability_sig_bytes: Vec<u8>,
+    account_scheme: u8,
+    account_public_key_bytes: Vec<u8>,
+    recipient_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_sig_bytes).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
+            bcs::to_bytes(&account_public_key_bytes).unwrap(),
+            bcs::to_bytes(&recipient_address).unwrap(),
+        ],
+    ))
+}
+
 /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
 /// An account can delegate its signer capability to only one other address at one time.
 /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
-/// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
-/// `account_public_key_bytes` is the public key of the account owner
+/// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519).
+/// `account_public_key_bytes` is the public key of the account owner.
 /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
 /// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
 /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
-/// to the account owner's signer capability)
+/// to the account owner's signer capability).
 pub fn account_offer_signer_capability(
     signer_capability_sig_bytes: Vec<u8>,
     account_scheme: u8,
@@ -2081,6 +2142,21 @@ pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
+    pub fn account_offer_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountOfferRotationCapability {
+                rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
+                account_public_key_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                recipient_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_signer_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -2881,6 +2957,10 @@ type EntryFunctionDecoderMap = std::collections::HashMap<
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
+        map.insert(
+            "account_offer_rotation_capability".to_string(),
+            Box::new(decoder::account_offer_rotation_capability),
+        );
         map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
