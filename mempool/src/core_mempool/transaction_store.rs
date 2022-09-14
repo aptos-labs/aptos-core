@@ -40,6 +40,8 @@ pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::inde
 pub struct TransactionStore {
     // main DS
     transactions: HashMap<AccountAddress, AccountTransactions>,
+
+    // Sequence numbers for accounts with transactions
     sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
@@ -180,7 +182,6 @@ impl TransactionStore {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
                         self.index_remove(&txn);
-                        self.remove_account_if_empty(&txn.get_sender());
                     };
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
@@ -299,7 +300,6 @@ impl TransactionStore {
                         ))
                     );
                     self.index_remove(&txn);
-                    self.remove_account_if_empty(&address);
                 }
             }
         }
@@ -411,14 +411,13 @@ impl TransactionStore {
                 address,
                 sequence_number
             );
-            self.remove_account_if_empty(address);
         }
     }
 
     /// Handles transaction commit.
     /// It includes deletion of all transactions with sequence number <= `account_sequence_number`
     /// and potential promotion of sequential txns to PriorityIndex/TimelineIndex.
-    pub(crate) fn commit_transaction(
+    fn commit_transaction(
         &mut self,
         account: &AccountAddress,
         account_sequence_number: AccountSequenceInfo,
@@ -427,7 +426,7 @@ impl TransactionStore {
         self.process_ready_transactions(account, account_sequence_number);
     }
 
-    pub(crate) fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
+    fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
         if let Some(txns) = self.transactions.remove(account) {
             let mut txns_log = TxnsLog::new();
             for transaction in txns.values() {
@@ -438,11 +437,10 @@ impl TransactionStore {
                 self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
-            self.remove_account_if_empty(account);
         }
     }
 
-    /// Removes transaction from all indexes.
+    /// Removes transaction from all indexes. Only call after removing from main transactions DS.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
         self.system_ttl_index.remove(txn);
@@ -452,17 +450,17 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
-        self.track_indices();
-    }
 
-    /// Removes account datastructures if there are no more transactions for the account
-    fn remove_account_if_empty(&mut self, address: &AccountAddress) {
+        // Remove account datastructures if there are no more transactions for the account.
+        let address = &txn.get_sender();
         if let Some(txns) = self.transactions.get(address) {
             if txns.is_empty() {
                 self.transactions.remove(address);
                 self.sequence_numbers.remove(address);
             }
         }
+
+        self.track_indices();
     }
 
     /// Read at most `count` transactions from timeline since `timeline_id`.
@@ -600,7 +598,6 @@ impl TransactionStore {
                     // remove txn
                     self.index_remove(&txn);
                 }
-                self.remove_account_if_empty(&key.address);
             }
         }
 
