@@ -132,10 +132,11 @@ export default class extends Controller<HTMLAnchorElement> {
         if (error.name === "Unauthorized") {
           // if unauthorized, we need to connect to wallet
           const url = new URL(location.href);
-          url.search = `connect-wallet`;
+          url.search = ``;
           location.href = url.toString();
+        } else {
+          Sentry.captureException(error);
         }
-        Sentry.captureException(error);
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {

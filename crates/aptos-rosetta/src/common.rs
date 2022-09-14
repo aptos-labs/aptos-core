@@ -70,10 +70,7 @@ where
         let fut = async move {
             match handler(request, options).await {
                 Ok(response) => {
-                    debug!(
-                        "Response: {}",
-                        serde_json::to_string_pretty(&response).unwrap()
-                    );
+                    debug!("Response: {:?}", serde_json::to_string_pretty(&response));
                     Ok(warp::reply::with_status(
                         warp::reply::json(&response),
                         warp::http::StatusCode::OK,

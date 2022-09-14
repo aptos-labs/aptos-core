@@ -53,7 +53,11 @@ impl EventsApi {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         self.context
             .check_api_output_enabled("Get events by event key", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_events_page_size(),
+        );
 
         // Ensure that account exists
         let account = Account::new(
@@ -105,7 +109,11 @@ impl EventsApi {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         self.context
             .check_api_output_enabled("Get events by event key", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_events_page_size(),
+        );
 
         // Ensure that account exists
         let account = Account::new(self.context.clone(), address.0, None)?;
@@ -153,7 +161,11 @@ impl EventsApi {
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         self.context
             .check_api_output_enabled("Get events by event handle", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_events_page_size(),
+        );
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account.find_event_key(event_handle.0, field_name.0.into())?;
         self.list(account.latest_ledger_info, accept_type, page, key)

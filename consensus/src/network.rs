@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
     counters,
     logging::LogEvent,
@@ -234,6 +235,12 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    pub async fn send_commit_vote(&mut self, commit_vote: CommitVote, recipient: Author) {
+        fail_point!("consensus::send::commit_vote", |_| ());
+        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
+        self.send(msg, vec![recipient]).await
+    }
+
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -277,6 +284,16 @@ impl NetworkSender {
         // this requires re-verification of the ledger info we can probably optimize it later
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.send(msg, vec![self.author]).await
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
+
+    pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
+        fail_point!("consensus::send::broadcast_commit_proof", |_| ());
+        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
+        self.broadcast(msg).await
     }
 }
 
@@ -367,6 +384,12 @@ impl NetworkTask {
                             }
                         }
                         consensus_msg => {
+                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                                observe_block(
+                                    proposal.proposal().timestamp_usecs(),
+                                    BlockStage::NETWORK_RECEIVED,
+                                );
+                            }
                             if let Err(e) = self.consensus_messages_tx.push(
                                 (peer_id, discriminant(&consensus_msg)),
                                 (peer_id, consensus_msg),

@@ -32,7 +32,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
                 10,
             )
             .await
-            .map_err(|e| format_err!("Failed to submit txn through {}: {}", instance, e))?;
+            .map_err(|e| format_err!("Failed to submit txn through {}: {:?}", instance, e))?;
         println!("seq={}", faucet_account.sequence_number());
         println!(
             "Waiting all full nodes to get to seq {}",
@@ -51,7 +51,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
             let mut all_good = true;
             for (instance, result) in zip(instances.iter(), results) {
                 let seq = result.map_err(|e| {
-                    format_err!("Failed to query sequence number from {}: {}", instance, e)
+                    format_err!("Failed to query sequence number from {}: {:?}", instance, e)
                 })?[0];
                 let host = instance.api_url().host().unwrap().to_string();
                 let status = if seq != faucet_account.sequence_number() {

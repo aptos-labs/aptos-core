@@ -111,7 +111,7 @@ pub struct EmitArgs {
 fn parse_target(target: &str) -> Result<Url> {
     let mut url = Url::try_from(target).map_err(|e| {
         format_err!(
-            "Failed to parse listen address, try adding a scheme, e.g. http://: {}",
+            "Failed to parse listen address, try adding a scheme, e.g. http://: {:?}",
             e
         )
     })?;

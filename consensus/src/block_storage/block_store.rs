@@ -27,9 +27,12 @@ use consensus_types::{
 };
 use executor_types::{Error, StateComputeResult};
 use futures::executor::block_on;
+use std::{sync::Arc, time::Duration};
+
 #[cfg(test)]
 use std::collections::VecDeque;
-use std::{sync::Arc, time::Duration};
+#[cfg(any(test, feature = "fuzzing"))]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -102,6 +105,8 @@ pub struct BlockStore {
     // consistent with round type
     back_pressure_limit: Round,
     data_manager: Arc<dyn DataManager>,
+    #[cfg(any(test, feature = "fuzzing"))]
+    back_pressure_for_test: AtomicBool,
 }
 
 impl BlockStore {
@@ -225,7 +230,10 @@ impl BlockStore {
             time_service,
             back_pressure_limit,
             data_manager,
+            #[cfg(any(test, feature = "fuzzing"))]
+            back_pressure_for_test: AtomicBool::new(false),
         };
+
         for block in blocks {
             block_store
                 .execute_and_insert_block(block)
@@ -485,6 +493,27 @@ impl BlockStore {
         wlock.update_commit_root(next_root_id);
         wlock.process_pruned_blocks(id_to_remove.clone());
         id_to_remove
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_back_pressure_for_test(&self, back_pressure: bool) {
+        self.back_pressure_for_test
+            .store(back_pressure, Ordering::Relaxed)
+    }
+
+    pub fn back_pressure(&self) -> bool {
+        #[cfg(any(test, feature = "fuzzing"))]
+        {
+            if self.back_pressure_for_test.load(Ordering::Relaxed) {
+                return true;
+            }
+        }
+        let commit_round = self.commit_root().round();
+        let ordered_round = self.ordered_root().round();
+        counters::OP_COUNTERS
+            .gauge("back_pressure")
+            .set((ordered_round - commit_round) as i64);
+        ordered_round > self.back_pressure_limit + commit_round
     }
 }
 

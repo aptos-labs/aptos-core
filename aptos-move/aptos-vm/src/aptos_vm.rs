@@ -45,6 +45,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
+use move_deps::move_binary_format::errors::VMError;
 use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::{
     move_binary_format::{
@@ -62,7 +63,7 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
@@ -435,7 +436,7 @@ impl AptosVM {
                         gas_meter,
                     )?;
                 } else {
-                    return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
                         .finish(Location::Undefined));
                 }
             }
@@ -519,6 +520,7 @@ impl AptosVM {
             destination,
             bundle,
             expected_modules,
+            allowed_deps,
             check_compat,
         }) = session.extract_publish_request()
         {
@@ -529,7 +531,7 @@ impl AptosVM {
             let modules = self.deserialize_module_bundle(&bundle)?;
 
             // Validate the module bundle
-            self.validate_publish_request(&modules, expected_modules)?;
+            self.validate_publish_request(&modules, expected_modules, allowed_deps)?;
 
             // Check what modules exist before publishing.
             let mut exists = BTreeSet::new();
@@ -562,19 +564,45 @@ impl AptosVM {
     fn validate_publish_request(
         &self,
         modules: &[CompiledModule],
-        expected_names: BTreeSet<String>,
+        mut expected_modules: BTreeSet<String>,
+        allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        let given_names = modules
-            .iter()
-            .map(|m| m.self_id().name().as_str().to_string())
-            .collect::<BTreeSet<_>>();
-        if given_names != expected_names {
-            Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                .with_message("metadata and code bundle mismatch".to_owned())
-                .finish(Location::Undefined))
-        } else {
-            Ok(())
+        for m in modules {
+            if !expected_modules.remove(m.self_id().name().as_str()) {
+                return Err(Self::metadata_validation_error(&format!(
+                    "unregistered module: '{}'",
+                    m.self_id().name()
+                )));
+            }
+            if let Some(allowed) = &allowed_deps {
+                for dep in m.immediate_dependencies() {
+                    if !allowed
+                        .get(dep.address())
+                        .map(|modules| {
+                            modules.contains("") || modules.contains(dep.name().as_str())
+                        })
+                        .unwrap_or(false)
+                    {
+                        return Err(Self::metadata_validation_error(&format!(
+                            "unregistered dependency: '{}'",
+                            dep
+                        )));
+                    }
+                }
+            }
         }
+        if !expected_modules.is_empty() {
+            return Err(Self::metadata_validation_error(
+                "not all registered modules published",
+            ));
+        }
+        Ok(())
+    }
+
+    fn metadata_validation_error(msg: &str) -> VMError {
+        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+            .with_message(format!("metadata and code bundle mismatch: {}", msg))
+            .finish(Location::Undefined)
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
@@ -861,6 +889,9 @@ impl AptosVM {
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
             TransactionPayload::ModuleBundle(_module) => {
+                if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
+                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+                }
                 self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
             }

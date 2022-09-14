@@ -208,6 +208,15 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the number of blocks in the pipeline.
+pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_num_blocks_in_pipeline",
+        "Counter for the number of blocks in the pipeline"
+    )
+    .unwrap()
+});
+
 //////////////////////
 // PERFORMANCE COUNTERS
 //////////////////////

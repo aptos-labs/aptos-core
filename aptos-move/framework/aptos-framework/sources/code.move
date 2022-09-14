@@ -5,10 +5,12 @@ module aptos_framework::code {
     use std::signer;
     use std::vector;
 
+    use aptos_framework::features;
     use aptos_framework::util;
     use aptos_framework::system_addresses;
     use aptos_std::copyable_any::Any;
     use std::option::Option;
+    use std::string;
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -131,7 +133,7 @@ module aptos_framework::code {
         };
 
         // Checks for valid dependencies to other packages
-        check_dependencies(addr, &pack);
+        let allowed_deps = check_dependencies(addr, &pack);
 
         // Check package against conflicts
         let module_names = get_module_names(&pack);
@@ -164,7 +166,12 @@ module aptos_framework::code {
         };
 
         // Request publish
-        request_publish(addr, module_names, code, policy.policy)
+        if (features::code_dependency_check_enabled())
+            request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
+        else
+            // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
+            // compatible code.
+            request_publish(addr, module_names, code, policy.policy)
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
@@ -211,8 +218,12 @@ module aptos_framework::code {
         }
     }
 
-    /// Check that the upgrade policies of all packages are equal or higher quality than this package.
-    fun check_dependencies(publish_address: address, pack: &PackageMetadata) acquires PackageRegistry {
+    /// Check that the upgrade policies of all packages are equal or higher quality than this package. Also
+    /// compute the list of module dependencies which are allowed by the package metadata. The later
+    /// is passed on to the native layer to verify that bytecode dependencies are actually what is pretended here.
+    fun check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep>
+    acquires PackageRegistry {
+        let allowed_module_deps = vector::empty();
         let deps = &pack.deps;
         let i = 0;
         let n = vector::length(deps);
@@ -220,6 +231,10 @@ module aptos_framework::code {
             let dep = vector::borrow(deps, i);
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
             if (is_policy_exempted_address(dep.account)) {
+                // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
+                let account = dep.account;
+                let module_name = string::utf8(b"");
+                vector::push_back(&mut allowed_module_deps, AllowedDep{account, module_name});
                 i = i + 1;
                 continue
             };
@@ -230,7 +245,8 @@ module aptos_framework::code {
             while (j < m) {
                 let dep_pack = vector::borrow(&registry.packages, j);
                 if (dep_pack.name == dep.package_name) {
-                    // Found the package in the registry, now check policy
+                    found = true;
+                    // Check policy
                     assert!(
                         dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
                         error::invalid_argument(EDEP_WEAKER_POLICY)
@@ -241,7 +257,15 @@ module aptos_framework::code {
                             error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
                         )
                     };
-                    found = true;
+                    // Add allowed deps
+                    let k = 0;
+                    let r = vector::length(&dep_pack.modules);
+                    while (k < r) {
+                        let account = dep.account;
+                        let module_name = vector::borrow(&dep_pack.modules, k).name;
+                        vector::push_back(&mut allowed_module_deps, AllowedDep{account, module_name});
+                        k = k + 1;
+                    };
                     break
                 };
                 j = j + 1;
@@ -249,6 +273,7 @@ module aptos_framework::code {
             assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
             i = i + 1;
         };
+        allowed_module_deps
     }
 
     /// Core addresses which are exempted from the check that their policy matches the referring package. Without
@@ -274,6 +299,25 @@ module aptos_framework::code {
     native fun request_publish(
         owner: address,
         expected_modules: vector<String>,
+        bundle: vector<vector<u8>>,
+        policy: u8
+    );
+
+    /// A helper type for request_publish_with_allowed_deps
+    struct AllowedDep has drop {
+        /// Address of the module.
+        account: address,
+        /// Name of the module. If this is the empty string, then this serves as a wildcard for
+        /// all modules from this address. This is used for speeding up dependency checking for packages from
+        /// well-known framework addresses, where we can assume that there are no malicious packages.
+        module_name: String
+    }
+
+    /// Native function to initiate module loading, including a list of allowed dependencies.
+    native fun request_publish_with_allowed_deps(
+        owner: address,
+        expected_modules: vector<String>,
+        allowed_deps: vector<AllowedDep>,
         bundle: vector<vector<u8>>,
         policy: u8
     );
