@@ -7,7 +7,7 @@ import { AptosAccount } from "./aptos_account";
 import { HexString } from "./hex_string";
 import * as Gen from "./generated/index";
 
-import { NODE_URL, FAUCET_URL } from "./util.test";
+import { NODE_URL, FAUCET_URL } from "./utils/test_helper.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
