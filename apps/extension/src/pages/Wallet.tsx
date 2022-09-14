@@ -5,7 +5,6 @@ import {
   Alert,
   AlertDescription,
   AlertIcon,
-  Button,
   Flex,
   HStack,
   VStack,
@@ -16,15 +15,12 @@ import React, { useMemo } from 'react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import WalletAccountBalance from 'core/components/WalletAccountBalance';
 import Faucet from 'core/components/Faucet';
-import Routes from 'core/routes';
 import { useNetworks } from 'core/hooks/useNetworks';
 import { walletBgColor, walletTextColor } from 'core/colors';
-import { ChevronRightIcon } from '@chakra-ui/icons';
-import ChakraLink from 'core/components/ChakraLink';
 import { useNodeStatus } from 'core/queries/network';
-import WalletAccountStake from 'core/components/WalletAccountStake';
 import TransferFlow from 'core/components/TransferFlow';
 import { useLocation } from 'react-router-dom';
+import WalletAssets from 'core/components/WalletAssets';
 
 function Wallet() {
   const { activeNetwork, faucetClient } = useNetworks();
@@ -57,26 +53,7 @@ function Wallet() {
             </SimpleGrid>
           </Flex>
         </Flex>
-        <ChakraLink px={4} width="100%" to={Routes.stake.path}>
-          <Button
-            py={10}
-            width="100%"
-            rightIcon={<ChevronRightIcon />}
-            justifyContent="space-between"
-          >
-            <WalletAccountStake />
-          </Button>
-        </ChakraLink>
-        <ChakraLink px={4} width="100%" to={Routes.activity.path}>
-          <Button
-            py={6}
-            width="100%"
-            rightIcon={<ChevronRightIcon />}
-            justifyContent="space-between"
-          >
-            View your activity
-          </Button>
-        </ChakraLink>
+        <WalletAssets />
         {
           isNodeAvailable === false ? (
             <Alert status="error" borderRadius=".5rem">

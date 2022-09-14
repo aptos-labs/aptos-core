@@ -3,13 +3,14 @@
 
 import { ApiError, AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { aptosCoinStoreStructTag, aptosStakePoolStructTag } from 'core/constants';
+import { aptosCoinStoreStructTag, aptosStakePoolStructTag, coinStoreStructTag } from 'core/constants';
 import { useNetworks } from 'core/hooks/useNetworks';
 
 /**
  * QUERY KEYS
  */
 export const accountQueryKeys = Object.freeze({
+  getAccountCoinResources: 'getAccountCoinResources',
   getAccountExists: 'getAccountExists',
   getAccountOctaCoinBalance: 'getAccountOctaCoinBalance',
   getAccountStakeBalance: 'getAccountStakeBalance',
@@ -85,6 +86,49 @@ export function useAccountOctaCoinBalance(
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
           return 0;
+        }
+        throw err;
+      }),
+    {
+      enabled: Boolean(address),
+      retry: 0,
+      ...options,
+    },
+  );
+}
+
+type AccountCoinResource = { type: string; value: number; };
+
+/**
+ * Query for all the coins in the user's account
+ * @param address account address of the balance to be queried
+ * @param options? query options
+ */
+export function useAccountCoinResources(
+  address: string | undefined,
+  options?: UseQueryOptions<AccountCoinResource[]>,
+) {
+  const { aptosClient } = useNetworks();
+
+  return useQuery<AccountCoinResource[]>(
+    [accountQueryKeys.getAccountCoinResources, address],
+    async () => aptosClient.getAccountResources(address!)
+      .then((res: any[]) => {
+        const result: AccountCoinResource[] = [];
+        res.forEach((item) => {
+          if (item.type.includes(coinStoreStructTag)) {
+            result.push({
+              type: item.type,
+              value: Number(item.data.coin.value),
+            });
+          }
+        });
+        return result;
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          const emptyArray: AccountCoinResource[] = [];
+          return emptyArray;
         }
         throw err;
       }),

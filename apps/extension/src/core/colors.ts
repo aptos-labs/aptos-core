@@ -156,6 +156,11 @@ export const permissionRequestLoadingOverlayColor = {
 
 // Wallet
 
+export const assetSecondaryBgColor = {
+  dark: 'gray.800',
+  light: 'gray.100',
+};
+
 export const walletBgColor = (pathname: string) => {
   switch (pathname) {
     case Routes.wallet.path:
