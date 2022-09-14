@@ -1,29 +1,39 @@
 module aptos_framework::genesis {
+    use std::error;
     use std::vector;
 
+    use aptos_framework::account;
     use aptos_framework::aggregator_factory;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
+    use aptos_framework::chain_status;
     use aptos_framework::coin;
-    use aptos_framework::account;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::staking_config;
+    use aptos_framework::state_storage;
+    use aptos_framework::storage_gas;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::transaction_validation;
-    use aptos_framework::state_storage;
     use aptos_framework::version;
-    use aptos_framework::chain_status;
-    use aptos_framework::storage_gas;
+
+    const EDUPLICATE_ACCOUNT: u64 = 1;
 
     struct AccountMap has drop {
         account_address: address,
         balance: u64,
+    }
+
+    struct EmployeeAccountMap has copy, drop {
+        accounts: vector<address>,
+        validator: ValidatorConfigurationWithCommission,
+        vesting_schedule_numerator: vector<u64>,
+        vesting_schedule_denominator: u64,
     }
 
     struct ValidatorConfiguration has copy, drop {
@@ -35,6 +45,11 @@ module aptos_framework::genesis {
         proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         full_node_network_addresses: vector<u8>,
+    }
+
+    struct ValidatorConfigurationWithCommission has copy, drop {
+        validator_config: ValidatorConfiguration,
+        commission_percentage: u64,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -79,6 +94,7 @@ module aptos_framework::genesis {
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
             i = i + 1;
         };
+
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
@@ -135,9 +151,16 @@ module aptos_framework::genesis {
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let i = 0;
         let num_accounts = vector::length(&accounts);
+        let unique_accounts = vector::empty();
 
         while (i < num_accounts) {
             let account_map = vector::borrow(&accounts, i);
+            assert!(
+                !vector::contains(&unique_accounts, &account_map.account_address),
+                error::already_exists(EDUPLICATE_ACCOUNT),
+            );
+            vector::push_back(&mut unique_accounts, account_map.account_address);
+
             create_account(
                 aptos_framework,
                 account_map.account_address,
@@ -161,6 +184,17 @@ module aptos_framework::genesis {
         }
     }
 
+    fun create_employee_validators(
+        _aptos_framework: &signer,
+        _employees: vector<EmployeeAccountMap>,
+    ) {
+    }
+
+    fun create_initialize_validators_with_commission(
+        _aptos_framework: &signer,
+        _validators: vector<ValidatorConfigurationWithCommission>) {
+    }
+
     /// Sets up the initial validator set for the network.
     /// The validator "owner" accounts, and their authentication
     /// Addresses (and keys) are encoded in the `owners`
@@ -174,8 +208,16 @@ module aptos_framework::genesis {
     fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
         let i = 0;
         let num_validators = vector::length(&validators);
+        let unique_accounts = vector::empty();
+
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
+
+            assert!(
+                !vector::contains(&unique_accounts, &validator.owner_address),
+                error::already_exists(EDUPLICATE_ACCOUNT),
+            );
+            vector::push_back(&mut unique_accounts, validator.owner_address);
 
             let owner = &create_account(aptos_framework, validator.owner_address, validator.stake_amount);
             let operator = &create_account(aptos_framework, validator.operator_address, 0);
