@@ -63,12 +63,15 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
-use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     cmp::min,
     convert::{AsMut, AsRef},
     sync::Arc,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::Duration,
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
@@ -1031,9 +1034,37 @@ impl VMAdapter for AptosVM {
                 let (vm_status, output) =
                     self.execute_user_transaction(data_cache, txn, log_context);
 
+                if let TransactionStatus::Discard(status) = output.txn_output().status() {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(5)),
+                        warn!(
+                            "AptosVM: Transaction discarded: {:?}, {:?} {:?}",
+                            status, vm_status, txn,
+                        )
+                    );
+                }
+
+                if let TransactionStatus::Keep(status) = output.txn_output().status() {
+                    if !status.is_success() {
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(5)),
+                            warn!(
+                                "AptosVM: Transaction onchain error: {:?}, {:?} {:?}",
+                                status, vm_status, txn,
+                            )
+                        );
+                    }
+                }
+
                 // Increment the counter for user transactions executed.
                 let counter_label = match output.txn_output().status() {
-                    TransactionStatus::Keep(_) => Some("success"),
+                    TransactionStatus::Keep(status) => {
+                        if status.is_success() {
+                            Some("success")
+                        } else {
+                            Some("onchain_error")
+                        }
+                    }
                     TransactionStatus::Discard(_) => Some("discarded"),
                     TransactionStatus::Retry => None,
                 };

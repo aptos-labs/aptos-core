@@ -5,16 +5,20 @@ use crate::{
     block_storage::BlockReader, state_replication::PayloadManager, util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_logger::warn;
 use consensus_types::{
     block::Block,
     block_data::BlockData,
-    common::{Author, Round},
+    common::{Author, Round, TransactionBatch},
     quorum_cert::QuorumCert,
 };
 
 use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
@@ -168,7 +172,28 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (payload, timestamp.as_micros() as u64)
+            if let Payload::DirectMempool(batch) = &payload {
+                let block_timestamp = timestamp.as_micros() as u64;
+                let expired_txns = batch
+                    .txns
+                    .iter()
+                    .map(|txn| txn.expiration_timestamp_secs() * 1_000_000)
+                    .filter(|ts| *ts <= block_timestamp)
+                    .collect::<Vec<_>>();
+                if expired_txns.is_empty() {
+                    warn!("No expired txns {}", batch.txns.len());
+                } else {
+                    warn!(
+                        "Expired txns: {} out of {}, block ts: {}, txn ts: {:?}",
+                        expired_txns.len(),
+                        batch.txns.len(),
+                        block_timestamp,
+                        &expired_txns[..std::cmp::min(expired_txns.len(), 10)]
+                    );
+                }
+            }
+
+            (optimize_payload(payload), timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -225,5 +250,40 @@ impl ProposalGenerator {
         }
 
         failed_authors
+    }
+}
+
+fn optimize_payload(payload: Payload) -> Payload {
+    if let Payload::DirectMempool(payload) = payload {
+        let total_bytes = payload.total_bytes;
+        let mut senders = HashMap::new();
+        let mut txns_by_sender = Vec::new();
+
+        for txn in payload.txns.into_iter() {
+            let index = *senders.entry(txn.sender()).or_insert_with(|| {
+                let index = txns_by_sender.len();
+                txns_by_sender.push(VecDeque::new());
+                index
+            });
+            txns_by_sender[index].push_back(txn);
+        }
+
+        let mut optimized_txns = Vec::new();
+        while !txns_by_sender.is_empty() {
+            let mut new_txns_by_sender = Vec::new();
+            for mut txns in txns_by_sender.into_iter() {
+                optimized_txns.push(txns.pop_front().unwrap());
+                if !txns.is_empty() {
+                    new_txns_by_sender.push(txns);
+                }
+            }
+            txns_by_sender = new_txns_by_sender;
+        }
+        Payload::DirectMempool(TransactionBatch {
+            txns: optimized_txns,
+            total_bytes,
+        })
+    } else {
+        payload
     }
 }

@@ -12,14 +12,14 @@ use crate::{
 use aptos_logger::sample::Sampling;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use futures::future::try_join_all;
+use futures::future::join_all;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 use std::sync::atomic::AtomicU64;
@@ -102,28 +102,20 @@ impl SubmissionWorker {
             let num_requests = requests.len();
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
-            if let Err(e) = try_join_all(requests.chunks(self.params.max_submit_batch_size).map(
-                |reqs| {
-                    submit_transactions(
-                        &self.client,
-                        reqs,
-                        loop_start_time.clone(),
-                        txn_offset_time.clone(),
-                        loop_stats,
-                    )
-                },
-            ))
-            .await
-            {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
-                    warn!(
-                        "[{:?}] Failed to submit request: {:?}",
-                        self.client.path_prefix_string(),
-                        e
-                    )
-                );
-            }
+            join_all(
+                requests
+                    .chunks(self.params.max_submit_batch_size)
+                    .map(|reqs| {
+                        submit_transactions(
+                            &self.client,
+                            reqs,
+                            loop_start_time.clone(),
+                            txn_offset_time.clone(),
+                            loop_stats,
+                        )
+                    }),
+            )
+            .await;
 
             let early_return_due_to_stop = if self.check_account_sequence_only_once {
                 // we also don't want to be stuck waiting for txn_expiration_time_secs
@@ -277,7 +269,7 @@ pub async fn submit_transactions(
     loop_start_time: Arc<Instant>,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
-) -> anyhow::Result<()> {
+) {
     let cur_time = Instant::now();
     let offset = cur_time - *loop_start_time;
     txn_offset_time.fetch_add(
@@ -307,6 +299,29 @@ pub async fn submit_transactions(
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
+
+            let too_old_failures = failures
+                .iter()
+                .filter(|f| {
+                    Some(u64::from(StatusCode::SEQUENCE_NUMBER_TOO_OLD)) == f.error.vm_error_code
+                })
+                .collect::<Vec<_>>();
+            if let Some(f) = too_old_failures.first() {
+                let txn = &txns[f.transaction_index];
+                if let Ok(account) = client.get_account(txn.sender()).await {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(15)),
+                        warn!(
+                            "[{:?}] Failed to submit due to SEQUENCE_NUMBER_TOO_OLD, current: {}, first asked: {}, failed: {:?}",
+                            client.path_prefix_string(),
+                            account.into_inner().sequence_number,
+                            txns[0].sequence_number(),
+                            too_old_failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
+                        )
+                    );
+                }
+            }
+
             for f in failures {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(120)),
@@ -319,5 +334,4 @@ pub async fn submit_transactions(
             }
         }
     };
-    Ok(())
 }

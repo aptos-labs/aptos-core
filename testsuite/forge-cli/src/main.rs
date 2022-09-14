@@ -185,6 +185,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    if suite_name == "compat" {
+        panic!("{}", suite_name);
+    }
+
+    let duration = Duration::from_secs(900);
+    let suite_name = "graceful_overload";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -387,7 +394,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'s
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
         "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test),
+        single_test => single_test_suite(single_test, duration),
     }
 }
 
@@ -419,7 +426,7 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         ])
 }
 
-fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
+fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
@@ -539,6 +546,22 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 true,
                 Some(Duration::from_secs(60)),
                 None,
+            )),
+        // same as land_blocking, except for higher TPS and slightly lower expected TPS
+        // TODO: Add tracing latency of high-gas-fee transactions
+        "graceful_overload" => land_blocking_test_suite(duration)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 12000 }))
+            .with_success_criteria(SuccessCriteria::new(
+                5500,
+                50000,
+                true,
+                Some(Duration::from_secs(120)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                )),
             )),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
