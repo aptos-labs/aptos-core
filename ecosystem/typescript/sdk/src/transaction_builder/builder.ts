@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import sha3 from "js-sha3";
-import { MemoizeExpiring } from "typescript-memoize";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
@@ -30,6 +29,7 @@ import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArg
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
+import { MemoizeExpiring } from "../utils";
 
 export { TypeTagParser } from "./builder_utils.js";
 
