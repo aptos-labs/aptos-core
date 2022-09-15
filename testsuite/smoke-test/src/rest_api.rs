@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
+use aptos_types::on_chain_config::GasSchedule;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::transaction::{SignedTransaction, Transaction};
 use cached_packages::aptos_stdlib;
@@ -65,9 +67,18 @@ async fn test_gas_estimation() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut public_info = swarm.aptos_public_info();
 
+    let gas_schedule: GasSchedule = public_info
+        .client()
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::gas_schedule::GasSchedule")
+        .await
+        .unwrap()
+        .into_inner();
+    let gas_params =
+        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+
     // No transactions should always return 1 as the estimated gas
     assert_eq!(
-        1,
+        u64::from(gas_params.txn.min_price_per_gas_unit),
         public_info
             .client()
             .estimate_gas_price()
