@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, MempoolTransaction, TimelineState, TtlCache},
-    tests::common::{
-        add_signed_txn, add_txn, add_txns_to_mempool, exist_in_metrics_cache, setup_mempool,
-        TestTransaction,
-    },
+    core_mempool::{CoreMempool, MempoolTransaction, TimelineState},
+    tests::common::{add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool, TestTransaction},
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
+use std::time::SystemTime;
 use std::{collections::HashSet, time::Duration};
 
 #[test]
@@ -62,18 +60,6 @@ fn test_transaction_ordering_only_seqnos() {
             vec![transaction.clone()]
         );
     }
-}
-
-#[test]
-fn test_metric_cache_add_local_txns() {
-    let (mut mempool, _) = setup_mempool();
-    let txns = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(1, 0, 2)],
-    );
-    // Check txns' timestamps exist in metrics_cache.
-    assert_eq!(exist_in_metrics_cache(&mempool, &txns[0]), true);
-    assert_eq!(exist_in_metrics_cache(&mempool, &txns[1]), true);
 }
 
 #[test]
@@ -185,9 +171,6 @@ fn test_system_ttl() {
     mempool.gc();
     let batch = mempool.get_batch(1, 1024, HashSet::new());
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
-
-    // TTL cache sizes should match the size of transaction store.
-    assert_eq!(mempool.metrics_cache.size(), 1);
 }
 
 #[test]
@@ -352,6 +335,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         1,
         TimelineState::NotReady,
         AccountSequenceInfo::Sequential(0),
+        SystemTime::now(),
     )
 }
 
@@ -473,28 +457,6 @@ fn test_clean_stuck_transactions() {
     let block = pool.get_batch(1, 1024, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
-}
-
-#[test]
-fn test_ttl_cache() {
-    let mut cache = TtlCache::new(2);
-    // Test basic insertion.
-    cache.insert(1, 1, Duration::from_millis(1));
-    cache.insert(1, 2, Duration::from_millis(2));
-    cache.insert(2, 2, Duration::from_millis(3));
-    cache.insert(1, 3, Duration::from_millis(4));
-    assert_eq!(cache.get(&1), Some(&3));
-    assert_eq!(cache.get(&2), Some(&2));
-    assert_eq!(cache.size(), 2);
-    // Test reaching max capacity.
-    cache.insert(3, 3, Duration::from_millis(5));
-    assert_eq!(cache.size(), 2);
-    assert_eq!(cache.get(&1), Some(&3));
-    assert_eq!(cache.get(&3), Some(&3));
-    assert_eq!(cache.get(&2), None);
-    // Test ttl functionality.
-    cache.gc(Duration::from_secs(1));
-    assert_eq!(cache.size(), 0);
 }
 
 #[test]
