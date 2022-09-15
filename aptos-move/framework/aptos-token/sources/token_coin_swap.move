@@ -87,6 +87,7 @@ module aptos_token::token_coin_swap {
         // valide listing existing and coin owner has sufficient balance
         let coin_address = signer::address_of(coin_owner);
         let token_listing = borrow_global_mut<TokenListings<CoinType>>(token_owner);
+        // TODO: Wrap error codes
         assert!(table::contains(&token_listing.listings, token_id), ETOKEN_LISTING_NOT_EXIST);
         assert!(coin::balance<CoinType>(coin_address) >= coin_amount, ENOT_ENOUGH_COIN);
         // validate min price and amount
@@ -108,6 +109,7 @@ module aptos_token::token_coin_swap {
         let royalty_fee = if (royalty_denominator == 0) {
             0
         } else {
+            // TODO: The multiplication here can overflow.
             total_cost * token::get_royalty_numerator(&royalty) / token::get_royalty_denominator(&royalty)
         };
         let remaining = total_cost - royalty_fee;
@@ -164,6 +166,7 @@ module aptos_token::token_coin_swap {
             min_price_per_token: min_coin_per_token
         };
         let listing = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listings;
+        // TODO: Wrap error code
         assert!(!table::contains(listing, token_id), ETOKEN_ALREADY_LISTED);
         table::add(listing, token_id, swap);
 
@@ -183,7 +186,7 @@ module aptos_token::token_coin_swap {
     /// Initalize the token listing for a token owner
     fun initialize_token_listing<CoinType>(token_owner: &signer) {
         let addr = signer::address_of(token_owner);
-        if ( !exists<TokenListings<CoinType>>(addr) ) {
+        if (!exists<TokenListings<CoinType>>(addr) ) {
             let token_listing = TokenListings<CoinType>{
                 listings: table::new<TokenId, TokenCoinSwap<CoinType>>(),
                 listing_events: account::new_event_handle<TokenListingEvent>(token_owner),
@@ -196,7 +199,7 @@ module aptos_token::token_coin_swap {
     /// Intialize the token escrow
     fun initialize_token_store_escrow(token_owner: &signer) {
         let addr = signer::address_of(token_owner);
-        if ( !exists<TokenStoreEscrow>(addr) ) {
+        if (!exists<TokenStoreEscrow>(addr) ) {
             let token_store_escrow = TokenStoreEscrow{
                 token_escrows: table::new<TokenId, TokenEscrow>()
             };
@@ -265,6 +268,7 @@ module aptos_token::token_coin_swap {
         let token_owner_addr = signer::address_of(token_owner);
         let listing = &mut borrow_global_mut<TokenListings<CoinType>>(token_owner_addr).listings;
         // remove the listing entry
+        // TODO: Wrap error code
         assert!(table::contains(listing, token_id), ETOKEN_LISTING_NOT_EXIST);
         table::remove(listing, token_id);
         // get token out of escrow and deposit back to owner token store

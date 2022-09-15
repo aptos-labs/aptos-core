@@ -38,7 +38,6 @@ module aptos_token::token {
     // Constants
     //
 
-    // TODO: Add comments for each error code so huam nreadable errors are displayed to users.
     const EALREADY_HAS_BALANCE: u64 = 0;
     const EBALANCE_NOT_PUBLISHED: u64 = 1;
     const ECOLLECTIONS_NOT_PUBLISHED: u64 = 2;
