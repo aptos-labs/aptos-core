@@ -73,7 +73,13 @@ pub fn env_or_default<T: std::str::FromStr>(
 ) -> Option<T> {
     let partial = std::env::var(env_var).ok().map(|s| s.parse().ok());
     match default {
-        None => partial.unwrap_or_else(|| panic!("{}", expected_message.unwrap())),
+        None => partial.unwrap_or_else(|| {
+            panic!(
+                "{}",
+                expected_message
+                    .unwrap_or_else(|| { format!("Expected env var {} to be set", env_var) })
+            )
+        }),
         Some(default_value) => partial.unwrap_or(Some(default_value)),
     }
 }
