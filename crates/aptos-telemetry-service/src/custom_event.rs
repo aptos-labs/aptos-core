@@ -14,9 +14,9 @@ use crate::{
     },
 };
 use anyhow::anyhow;
-use aptos_logger::{debug, error};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
 pub fn custom_event_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {

@@ -2,16 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    auth, context::Context, custom_event, error::ServiceError, log_ingest, prometheus_push_metrics,
+    auth,
+    constants::{GCP_CLOUD_TRACE_CONTEXT_HEADER, LOG_TRACE_FIELD},
+    context::Context,
+    custom_event,
+    error::ServiceError,
+    log_ingest, prometheus_push_metrics,
     types::index::IndexResponse,
 };
-use aptos_logger::debug;
 use std::convert::Infallible;
+use tracing::debug;
 use warp::{
     body::BodyDeserializeError,
     filters::BoxedFilter,
     http::StatusCode,
-    reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
+    reject::{
+        InvalidHeader, LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType,
+    },
     reply, Filter, Rejection, Reply,
 };
 
@@ -36,7 +43,16 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         ))
         .or(log_ingest::log_ingest_legacy(context.clone()));
 
-    legacy_api.or(v1_api).recover(handle_rejection)
+    legacy_api
+        .or(v1_api)
+        .with(warp::trace::trace(|info| {
+            let span = tracing::debug_span!("request", method=%info.method(), path=%info.path());
+            if let Some(header_value) = info.request_headers().get(GCP_CLOUD_TRACE_CONTEXT_HEADER) {
+                span.record(LOG_TRACE_FIELD, header_value.to_str().unwrap_or_default());
+            }
+            span
+        }))
+        .recover(handle_rejection)
 }
 
 fn index_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -78,6 +94,9 @@ pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply,
         code = error.status_code();
         body = reply::json(error);
     } else if let Some(cause) = err.find::<BodyDeserializeError>() {
+        code = StatusCode::BAD_REQUEST;
+        body = reply::json(&ServiceError::new(code, cause.to_string()));
+    } else if let Some(cause) = err.find::<InvalidHeader>() {
         code = StatusCode::BAD_REQUEST;
         body = reply::json(&ServiceError::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<LengthRequired>() {

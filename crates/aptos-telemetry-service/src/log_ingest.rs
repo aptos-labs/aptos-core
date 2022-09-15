@@ -9,10 +9,10 @@ use crate::{
     error::ServiceError,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
-use aptos_logger::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::collections::HashMap;
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
 pub fn log_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {

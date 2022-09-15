@@ -9,15 +9,12 @@ use crate::types::common::NodeType;
 use anyhow::{anyhow, Result};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_crypto::{noise, x25519};
-use aptos_logger::{debug, error, warn};
 use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
+use reqwest::header::AUTHORIZATION;
+use tracing::{debug, error, warn};
 use warp::filters::BoxedFilter;
-use warp::{
-    filters::header::headers_cloned,
-    http::header::{HeaderMap, HeaderValue},
-    reject, Filter, Rejection,
-};
+use warp::{reject, Filter, Rejection};
 use warp::{reply, Reply};
 
 pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -163,8 +160,7 @@ pub fn with_auth(
     context: Context,
     roles: Vec<NodeType>,
 ) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
-    headers_cloned()
-        .map(move |headers: HeaderMap<HeaderValue>| headers)
+    warp::header::optional(AUTHORIZATION.as_str())
         .and_then(jwt_from_header)
         .and(warp::any().map(move || (context.clone(), roles.clone())))
         .and_then(authorize_jwt)

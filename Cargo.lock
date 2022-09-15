@@ -1309,6 +1309,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "thiserror",
  "tokio",
+ "tracing",
  "url",
  "warp",
 ]
