@@ -1,28 +1,28 @@
 import nacl from "tweetnacl";
-import { hmac, sha512 } from "hash.js";
-import { bytesToHex } from "../bytes_to_hex";
+import { hmac } from "@noble/hashes/hmac";
+import { sha512 } from "@noble/hashes/sha512";
+import { hexToBytes } from "@noble/hashes/utils";
 
 type Hex = string;
 type Path = string;
 
 type Keys = {
-  key: Hex;
-  chainCode: Hex;
+  key: Uint8Array;
+  chainCode: Uint8Array;
 };
 
 const pathRegex = /^m(\/[0-9]+')+$/;
 
 const replaceDerive = (val: string): string => val.replace("'", "");
 
-const HMAC_KEY = "656432353531392073656564"; // ed25519 seed
+const HMAC_KEY = "ed25519 seed";
 const HARDENED_OFFSET = 0x80000000;
 
 export const getMasterKeyFromSeed = (seed: Hex): Keys => {
-  // @ts-ignore
-  const h = hmac(sha512, HMAC_KEY, "hex");
-  const I = h.update(seed, "hex").digest("hex");
-  const IL = I.slice(0, 64);
-  const IR = I.slice(64);
+  const h = hmac.create(sha512, HMAC_KEY);
+  const I = h.update(hexToBytes(seed)).digest();
+  const IL = I.slice(0, 32);
+  const IR = I.slice(32);
   return {
     key: IL,
     chainCode: IR,
@@ -30,19 +30,15 @@ export const getMasterKeyFromSeed = (seed: Hex): Keys => {
 };
 
 export const CKDPriv = ({ key, chainCode }: Keys, index: number): Keys => {
-  const indexBuffer = Buffer.allocUnsafe(4);
-  indexBuffer.writeUInt32BE(index, 0);
-
   const buffer = new ArrayBuffer(4);
   new DataView(buffer).setUint32(0, index);
   const indexBytes = new Uint8Array(buffer);
   const zero = new Uint8Array([0]);
-  const data = bytesToHex(zero) + key + bytesToHex(indexBytes);
+  const data = new Uint8Array([...zero, ...key, ...indexBytes]);
 
-  // @ts-ignore
-  const I = hmac(sha512, chainCode, "hex").update(data, "hex").digest("hex");
-  const IL = I.slice(0, 64);
-  const IR = I.slice(64);
+  const I = hmac.create(sha512, chainCode).update(data).digest();
+  const IL = I.slice(0, 32);
+  const IR = I.slice(32);
   return {
     key: IL,
     chainCode: IR,
