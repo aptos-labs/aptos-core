@@ -172,4 +172,17 @@ module aptos_framework::reconfiguration {
     public fun reconfigure_for_test() acquires Configuration {
         reconfigure();
     }
+
+    // This is used together with stake::end_epoch() for testing with last_reconfiguration_time
+    // It must be called each time an epoch changes
+    #[test_only]
+    public fun reconfigure_for_test_custom() acquires Configuration {
+        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+        let current_time = timestamp::now_microseconds();
+        if (current_time == config_ref.last_reconfiguration_time) {
+            return
+        };
+        config_ref.last_reconfiguration_time = current_time;
+        config_ref.epoch = config_ref.epoch + 1;
+    }
 }
