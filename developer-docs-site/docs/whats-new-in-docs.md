@@ -5,6 +5,27 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
+This page shows the key updates to the developer documentation on this site. 
+
+## 13 September 2022
+
+- A new guide describing [how to deploy multiple validator nodes and validator fullnodes](/docs/guides/running-a-local-multi-node-network.md) is posted.
+
+## 12 September 2022
+
+- A new set of documents on Aptos [Coin and Token](/concepts/coin-and-token/index.md) are posted. 
+- A new document describing how to [bootstrap a new fullnode using data restore](/nodes/full-node/bootstrap-fullnode.md) is posted.
+
+## 06 September 2022
+
+- A new concept document explaining the [State Synchronization](/concepts/state-sync.md) is posted.
+
+- The [Staking](/concepts/staking.md) document is updated.
+
+## 29 August 2022
+
+- A new guide, [AIT-3 Leaderboard Metrics](/nodes/ait/ait3-leaderboard-metrics.md), describing the [AIT-3 Validator Status](https://aptoslabs.com/leaderboard/it3) page is released.
+
 ## 25 August 2022
 
 - A new guide describing [Upgrading the Move Code](/guides/move-guides/upgrading-move-code.md) is posted.
