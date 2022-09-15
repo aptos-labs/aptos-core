@@ -11,19 +11,24 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.57"
+aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
+
+aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
+aptos-global-constants = { path = "../../config/global-constants" }
+aptos-keygen = { path = "../../crates/aptos-keygen" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client" }
+aptos-sdk = { path = "../../sdk" }
+aptos-types = { path = "../../types" }
+
+forge = { path = "../forge" }
 futures = "0.3.21"
+hex = "0.4.3"
+move-examples = { path = "../../aptos-move/move-examples" }
 rand = "0.7.3"
 reqwest = { version = "0.11.10", features = ["json", "cookies", "blocking"] }
 serde_json = "1.0.81"
 tokio = { version = "1.21.0", features = ["full"] }
-
-aptos = { path = "../../crates/aptos" }
-aptos-global-constants = { path = "../../config/global-constants" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-sdk = { path = "../../sdk" }
-
-forge = { path = "../forge" }
 
 [[test]]
 name = "forge-local-compatibility"

@@ -67,6 +67,7 @@ storage-interface = { path = "../../storage/storage-interface" }
 default = []
 fuzzing = []
 no-upload-proposal = []
+cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = "0.16.2"
