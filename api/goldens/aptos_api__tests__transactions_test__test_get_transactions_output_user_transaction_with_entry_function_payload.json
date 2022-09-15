@@ -115,7 +115,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "50",
+    "gas_used": "669",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",

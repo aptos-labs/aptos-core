@@ -20,7 +20,7 @@ crate::params::define_gas_parameters!(
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
-            600
+            1_500_000
         ],
         // Any transaction over this size will be charged an additional amount per byte.
         [
@@ -33,7 +33,7 @@ crate::params::define_gas_parameters!(
         [
             intrinsic_gas_per_byte: InternalGasPerByte,
             "intrinsic_gas_per_byte",
-            8
+            2_000
         ],
         // ~5 microseconds should equal one unit of computational gas. We bound the maximum
         // computational time of any given transaction at roughly 20 seconds. We want this number and
@@ -65,36 +65,36 @@ crate::params::define_gas_parameters!(
         [
             gas_unit_scaling_factor: GasScalingFactor,
             "gas_unit_scaling_factor",
-            1000
+            10_000
         ],
         // Gas Parameters for reading data from storage.
-        [load_data_base: InternalGas, "load_data.base", 1],
+        [load_data_base: InternalGas, "load_data.base", 16_000],
         [
             load_data_per_byte: InternalGasPerByte,
             "load_data.per_byte",
-            1
+            1_000
         ],
-        [load_data_failure: InternalGas, "load_data.failure", 1],
+        [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
             write_data_per_op: InternalGasPerArg,
             "write_data.per_op",
-            100
+            160_000
         ],
         [
             write_data_per_new_item: InternalGasPerArg,
             "write_data.new_item",
-            1000
+            1_280_000
         ],
         [
             write_data_per_byte_in_key: InternalGasPerByte,
             "write_data.per_byte_in_key",
-            100
+            10_000
         ],
         [
             write_data_per_byte_in_val: InternalGasPerByte,
             "write_data.per_byte_in_val",
-            100
+            10_000
         ],
     ]
 );
