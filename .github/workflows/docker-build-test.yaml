@@ -23,7 +23,8 @@ name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  # no-commit
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -106,6 +107,16 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
+
+  rust-images-indexer:
+    needs: [permission-check, determine-docker-build-metadata]
+    uses: ./.github/workflows/docker-rust-build.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      PROFILE: release
+      FEATURES: indexer
 
   rust-images-testing:
     needs: [permission-check, determine-docker-build-metadata]

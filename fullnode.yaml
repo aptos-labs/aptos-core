@@ -1,0 +1,41 @@
+base:
+    # Update this value to the location you want the node to store its database
+    data_dir: "../aptos-indexer-node"
+    role: "full_node"
+    waypoint:
+        # Update this value to that which the blockchain publicly provides. Please regard the directions
+        # below on how to safely manage your genesis_file_location with respect to the waypoint.
+        from_file: "./waypoint.txt"
+
+execution:
+    # Update this to the location to where the genesis.blob is stored, prefer fullpaths
+    # Note, this must be paired with a waypoint. If you update your waypoint without a
+    # corresponding genesis, the file location should be an empty path.
+    genesis_file_location: "./genesis.blob"
+
+full_node_networks:
+    - discovery_method: "onchain"
+      # The network must have a listen address to specify protocols. This runs it locally to
+      # prevent remote, incoming connections.
+      listen_address: "/ip4/127.0.0.1/tcp/6180"
+      network_id: "public"
+      # Define the upstream peers to connect to
+      seeds:
+        {}
+
+storage:
+    enable_indexer: true
+
+indexer:
+    enabled: true
+    fetch_tasks: 10
+    processor_tasks: 10
+    check_chain_id: true
+    emit_every: 1000
+    postgres_uri: "postgres://postgres@localhost:5432/indexer_v25"
+    processor: "default_processor"
+    starting_version: 0
+    
+api:
+    enabled: true
+    address: 127.0.0.1:8080

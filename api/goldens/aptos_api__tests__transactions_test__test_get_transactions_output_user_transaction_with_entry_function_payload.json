@@ -77,6 +77,7 @@
         "type": "write_resource"
       }
     ],
+    "block_height": null,
     "id": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121",
     "epoch": "0",
     "round": "1",
@@ -235,6 +236,7 @@
         "type": "write_resource"
       }
     ],
+    "block_height": null,
     "sender": "0xa550c18",
     "sequence_number": "0",
     "max_gas_amount": "2000",
@@ -285,6 +287,7 @@
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
     "changes": [],
+    "block_height": null,
     "timestamp": "500000",
     "type": "state_checkpoint_transaction"
   }

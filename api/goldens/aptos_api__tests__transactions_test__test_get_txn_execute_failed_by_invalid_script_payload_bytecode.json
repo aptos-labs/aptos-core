@@ -51,6 +51,7 @@
       "type": "write_resource"
     }
   ],
+  "block_height": null,
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "2000",
