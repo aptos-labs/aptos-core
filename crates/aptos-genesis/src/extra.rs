@@ -7,6 +7,7 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use vm_genesis::APTOS_COINS_BASE_WITH_DECIMALS;
 
@@ -53,13 +54,13 @@ pub struct Validator {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct FoundationOperator {
+pub struct Operator {
     operator: AccountAddress,
     amount: u64,
     commission: u64,
 }
 
-impl Serialize for FoundationOperator {
+impl Serialize for Operator {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -73,7 +74,7 @@ impl Serialize for FoundationOperator {
     }
 }
 
-impl<'de> Deserialize<'de> for FoundationOperator {
+impl<'de> Deserialize<'de> for Operator {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -95,7 +96,7 @@ impl<'de> Deserialize<'de> for FoundationOperator {
         let commission = u64::from_str(vec.get(2).unwrap())
             .map_err(|err| D::Error::custom(format!("Invalid commission field {}", err)))?;
 
-        Ok(FoundationOperator {
+        Ok(Operator {
             operator,
             amount,
             commission,
@@ -104,10 +105,10 @@ impl<'de> Deserialize<'de> for FoundationOperator {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
-pub struct Foundation {
+pub struct Organization {
     admin: AccountAddress,
     #[serde(default)]
-    operators: Vec<FoundationOperator>,
+    operators: Vec<Operator>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -127,8 +128,32 @@ pub struct Recovery {
     accounts: Vec<AccountAddress>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AccountAmounts {
+    amounts: Vec<BTreeMap<AccountAddress, AptosCoin>>,
+}
+
+impl Serialize for AccountAmounts {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.amounts.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AccountAmounts {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let amounts = <Vec<BTreeMap<AccountAddress, AptosCoin>>>::deserialize(deserializer)?;
+        Ok(AccountAmounts { amounts })
+    }
+}
+
 /// A fixed point representation for APT
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AptosCoin(pub u64);
 
 impl From<AptosCoin> for u64 {
@@ -163,7 +188,7 @@ impl FromStr for AptosCoin {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pieces: Vec<&str> = s.trim().split('.').collect();
 
-        let amount = match (pieces.len(), pieces.get(0), pieces.get(1)) {
+        let amount = match (pieces.len(), pieces.first(), pieces.get(1)) {
             // If there is no decimal, it's a full APT
             (1, Some(apt), None) => {
                 if let Some(amount) =
@@ -192,7 +217,7 @@ impl FromStr for AptosCoin {
                     // Fill in the missing zeros to the right of the subunit
                     let offset: u64 = 10u64.pow(8 - subunit.len() as u32);
 
-                    if let Some(amount) = u64::from_str(&subunit)?.checked_mul(offset) {
+                    if let Some(amount) = u64::from_str(subunit)?.checked_mul(offset) {
                         amount
                     } else {
                         bail!("Failed to parse subunit decimal {}", s)
@@ -217,14 +242,17 @@ mod test {
     #[test]
     fn test_fixed_point() {
         let tests = [
-            ("1", 1 * APTOS_COINS_BASE_WITH_DECIMALS),
+            ("1", APTOS_COINS_BASE_WITH_DECIMALS),
             ("0.00000001", 1),
-            ("0.1", 1 * APTOS_COINS_BASE_WITH_DECIMALS / 10),
+            ("0.1", APTOS_COINS_BASE_WITH_DECIMALS / 10),
             ("10000", 10000 * APTOS_COINS_BASE_WITH_DECIMALS),
-            ("10000.01", 10000 * APTOS_COINS_BASE_WITH_DECIMALS + 1000000),
-            (".1", 1 * APTOS_COINS_BASE_WITH_DECIMALS / 10),
-            ("1.0", 1 * APTOS_COINS_BASE_WITH_DECIMALS),
-            ("1.", 1 * APTOS_COINS_BASE_WITH_DECIMALS),
+            (
+                "10000.01",
+                10000 * APTOS_COINS_BASE_WITH_DECIMALS + APTOS_COINS_BASE_WITH_DECIMALS / 100,
+            ),
+            (".1", APTOS_COINS_BASE_WITH_DECIMALS / 10),
+            ("1.0", APTOS_COINS_BASE_WITH_DECIMALS),
+            ("1.", APTOS_COINS_BASE_WITH_DECIMALS),
         ];
 
         for (str, expected) in tests {
@@ -249,6 +277,32 @@ mod test {
     }
 
     #[test]
+    fn test_initial_split() {
+        let yaml = "---
+- 0x123: 500.1234
+- 0x234: 10000.2345";
+
+        let split: AccountAmounts = serde_yaml::from_str(yaml).unwrap();
+        let amounts = vec![
+            vec![(
+                AccountAddress::from_str("0x123").unwrap(),
+                AptosCoin::from_str("500.1234").unwrap(),
+            )]
+            .into_iter()
+            .collect(),
+            vec![(
+                AccountAddress::from_str("0x234").unwrap(),
+                AptosCoin::from_str("10000.2345").unwrap(),
+            )]
+            .into_iter()
+            .collect(),
+        ];
+        let expected = AccountAmounts { amounts };
+
+        assert_eq!(split, expected);
+    }
+
+    #[test]
     fn test_foundation_deserialize() {
         let yaml = "
 admin: 0x123
@@ -257,21 +311,21 @@ operators:
 - [0x345, 2000, 7]
 - [0x456, 3000, 5]";
 
-        let output: Foundation = serde_yaml::from_str(yaml).expect("Should deserialize");
-        let foundation = Foundation {
+        let output: Organization = serde_yaml::from_str(yaml).expect("Should deserialize");
+        let organization = Organization {
             admin: AccountAddress::from_str("0x123").unwrap(),
             operators: vec![
-                FoundationOperator {
+                Operator {
                     operator: AccountAddress::from_str("0x234").unwrap(),
                     amount: 1000,
                     commission: 10,
                 },
-                FoundationOperator {
+                Operator {
                     operator: AccountAddress::from_str("0x345").unwrap(),
                     amount: 2000,
                     commission: 7,
                 },
-                FoundationOperator {
+                Operator {
                     operator: AccountAddress::from_str("0x456").unwrap(),
                     amount: 3000,
                     commission: 5,
@@ -279,13 +333,13 @@ operators:
             ],
         };
         // Ensure that the example can be deserialized
-        assert_eq!(foundation, output);
+        assert_eq!(organization, output);
 
         // Serialization and deserialization should work fine (so we can automate this)
         assert_eq!(
-            serde_yaml::from_str::<Foundation>(&serde_yaml::to_string(&foundation).unwrap())
+            serde_yaml::from_str::<Organization>(&serde_yaml::to_string(&organization).unwrap())
                 .unwrap(),
-            foundation
+            organization
         );
     }
 }
