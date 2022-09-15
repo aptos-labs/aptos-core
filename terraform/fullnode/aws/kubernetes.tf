@@ -118,7 +118,7 @@ resource "helm_release" "pfn-logger" {
         name = "pfn"
       }
       chain = {
-        name = "aptos-${terraform.workspace}"
+        name = "aptos-${local.workspace_name}"
       }
     }),
     jsonencode(var.pfn_logger_helm_values),
