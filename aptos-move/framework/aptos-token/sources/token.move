@@ -25,7 +25,7 @@ module aptos_token::token {
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_NFT_NAME_LENGTH: u64 = 128;
     // URI lengths: Mean: 76.97, StdDev: 37.41, 95th%: 157, 99th%: 199 (http://www.supermind.org/blog/740/average-length-of-a-url-part-2)
-    const MAX_URI_LENGTH: u64 = 256;
+    const MAX_URI_LENGTH: u64 = 512;
 
     //
     // Constants
