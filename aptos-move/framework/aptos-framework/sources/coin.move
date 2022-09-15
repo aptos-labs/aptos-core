@@ -49,6 +49,19 @@ module aptos_framework::coin {
     /// Cannot upgrade the total supply of coins to different implementation.
     const ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED: u64 = 11;
 
+    /// Name of the coin is too long
+    const ECOIN_NAME_TOO_LONG: u64 = 12;
+
+    /// Symbol of the coin is too long
+    const ECOIN_SYMBOL_TOO_LONG: u64 = 13;
+
+    //
+    // Constants
+    //
+
+    const MAX_COIN_NAME_LENGTH: u64 = 32;
+    const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+
     /// Core data structures
 
     /// Main structure representing a coin/token in an account's custody.
@@ -346,6 +359,9 @@ module aptos_framework::coin {
             !exists<CoinInfo<CoinType>>(account_addr),
             error::already_exists(ECOIN_INFO_ALREADY_PUBLISHED),
         );
+
+        assert!(string::length(&name) <= MAX_COIN_NAME_LENGTH, error::invalid_argument(ECOIN_NAME_TOO_LONG));
+        assert!(string::length(&symbol) <= MAX_COIN_SYMBOL_LENGTH, error::invalid_argument(ECOIN_SYMBOL_TOO_LONG));
 
         let coin_info = CoinInfo<CoinType> {
             name,

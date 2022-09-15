@@ -9,13 +9,30 @@ module aptos_token::property_map {
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info::type_name;
 
+    //
+    // Constants
+    //
+
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
+    const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
+
+    //
+    // Errors
+    //
+
     const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;
     const EPROPERTY_NUMBER_EXCEED_LIMIT: u64 = 2;
     const EPROPERTY_NOT_EXIST: u64 = 3;
     const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 = 4;
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
     const ETYPE_NOT_MATCH: u64 = 6;
+    /// The name (key) of the property is too long
+    const EPROPERTY_MAP_NAME_TOO_LONG: u64 = 7;
+
+
+    //
+    // Structs
+    //
 
     struct PropertyMap has copy, drop, store {
         map: SimpleMap<String, PropertyValue>,
@@ -38,9 +55,11 @@ module aptos_token::property_map {
         };
         let i = 0;
         while (i < vector::length(&keys)) {
+            let key = *vector::borrow(&keys, i);
+            assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
             simple_map::add(
                 &mut properties.map,
-                *vector::borrow(&keys, i),
+                key,
                 PropertyValue{ value: *vector::borrow(&values, i), type: *vector::borrow(&types, i) }
             );
             i = i + 1;
@@ -59,7 +78,8 @@ module aptos_token::property_map {
     }
 
     public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
-        assert!(! simple_map::contains_key(&map.map, &key), error::already_exists(EKEY_AREADY_EXIST_IN_PROPERTY_MAP));
+        assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
+        assert!(!simple_map::contains_key(&map.map, &key), error::already_exists(EKEY_AREADY_EXIST_IN_PROPERTY_MAP));
         assert!(simple_map::length<String, PropertyValue>(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
         simple_map::add(&mut map.map, key, value);
     }
