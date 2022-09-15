@@ -18,7 +18,7 @@
     "prepack": "yarn build",
     "build": "yarn build:clean && yarn _build:node && yarn _build:browser",
     "build:clean": "rm -rf dist",
-    "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK",
+    "_build:browser": "tsup --platform browser --format iife --global-name aptosSDK --minify",
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
