@@ -100,6 +100,9 @@ Rails.application.routes.draw do
   # Wallets
   resources :wallets, only: %i[show create]
 
+  # Discord invite link
+  get 'discord', to: redirect('https://discord.com/invite/aptoslabs')
+
   # Static pages
   get 'community', to: 'static_page#community'
   get 'incentivized-testnet', to: 'static_page#incentivized_testnet'
