@@ -56,8 +56,8 @@ impl Debug for DefaultTransactionProcessor {
 fn insert_to_db(
     conn: &PgPoolConnection,
     name: &'static str,
-    start_version: i64,
-    end_version: i64,
+    start_version: u64,
+    end_version: u64,
     txns: Vec<TransactionModel>,
     txn_details: Vec<TransactionDetail>,
     events: Vec<EventModel>,
@@ -300,13 +300,13 @@ impl TransactionProcessor for DefaultTransactionProcessor {
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
-        start_version: i64,
-        end_version: i64,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let (_block_start_version, _block_last_version, block_event) = self
             .context
             .db
-            .get_block_info_by_version(start_version as u64)
+            .get_block_info_by_version(start_version)
             .unwrap_or_else(|_| {
                 panic!(
                     "Could not get block_info for start version {}",

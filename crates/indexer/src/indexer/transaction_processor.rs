@@ -32,8 +32,8 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
-        start_version: i64,
-        end_version: i64,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError>;
 
     /// Gets a reference to the connection pool
@@ -77,8 +77,8 @@ pub trait TransactionProcessor: Send + Sync + Debug {
             .with_label_values(&[self.name()])
             .inc();
 
-        let start_version = txns.first().unwrap().version().unwrap() as i64;
-        let end_version = txns.last().unwrap().version().unwrap() as i64;
+        let start_version = txns.first().unwrap().version().unwrap();
+        let end_version = txns.last().unwrap().version().unwrap();
 
         self.mark_versions_started(start_version, end_version);
         let res = self
@@ -93,7 +93,7 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     }
 
     /// Writes that a version has been started for this `TransactionProcessor` to the DB
-    fn mark_versions_started(&self, start_version: i64, end_version: i64) {
+    fn mark_versions_started(&self, start_version: u64, end_version: u64) {
         aptos_logger::debug!(
             "[{}] Marking processing versions started from versions {} to {}",
             self.name(),

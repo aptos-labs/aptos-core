@@ -4,12 +4,12 @@
 #[derive(Debug)]
 pub struct ProcessingResult {
     pub name: &'static str,
-    pub start_version: i64,
-    pub end_version: i64,
+    pub start_version: u64,
+    pub end_version: u64,
 }
 
 impl ProcessingResult {
-    pub fn new(name: &'static str, start_version: i64, end_version: i64) -> Self {
+    pub fn new(name: &'static str, start_version: u64, end_version: u64) -> Self {
         Self {
             name,
             start_version,

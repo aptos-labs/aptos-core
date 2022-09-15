@@ -24,15 +24,15 @@ pub struct Fetcher {
     pub context: Arc<Context>,
     options: TransactionFetcherOptions,
     chain_id: u8,
-    current_version: i64,
-    highest_known_version: i64,
+    current_version: u64,
+    highest_known_version: u64,
     transactions_sender: mpsc::Sender<Vec<Transaction>>,
 }
 
 impl Fetcher {
     pub fn new(
         context: Arc<Context>,
-        starting_version: i64,
+        starting_version: u64,
         options: TransactionFetcherOptions,
         transactions_sender: mpsc::Sender<Vec<Transaction>>,
     ) -> Self {
@@ -48,7 +48,7 @@ impl Fetcher {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0 as i64;
+        self.highest_known_version = info.ledger_version.0 as u64;
         self.chain_id = info.chain_id;
         Ok(())
     }
@@ -114,7 +114,7 @@ impl Fetcher {
             let mut tasks = vec![];
             for i in 0..num_batches {
                 let starting_version =
-                    self.current_version + (i as i64 * transaction_fetch_batch_size as i64);
+                    self.current_version + (i as u64 * transaction_fetch_batch_size as u64);
 
                 let context = self.context.clone();
                 let highest_known_version = self.highest_known_version;
@@ -156,7 +156,7 @@ impl Fetcher {
         for batch in transaction_batches {
             versions_sent += batch.len();
             self.current_version = std::cmp::max(
-                (batch.last().unwrap().version().unwrap() + 1) as i64,
+                batch.last().unwrap().version().unwrap() + 1,
                 self.current_version,
             );
             self.transactions_sender
@@ -177,8 +177,8 @@ impl Fetcher {
 
 async fn fetch_raw_txns_with_retries(
     context: Arc<Context>,
-    starting_version: i64,
-    ledger_version: i64,
+    starting_version: u64,
+    ledger_version: u64,
     transaction_fetch_batch_size: u16,
     max_retries: u8,
 ) -> Vec<TransactionOnChainData> {
@@ -220,8 +220,8 @@ async fn fetch_raw_txns_with_retries(
 
 async fn fetch_nexts(
     context: Arc<Context>,
-    starting_version: i64,
-    ledger_version: i64,
+    starting_version: u64,
+    ledger_version: u64,
     transaction_fetch_batch_size: u16,
 ) -> Vec<Transaction> {
     let start_millis = chrono::Utc::now().naive_utc();
@@ -423,7 +423,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
         let fetcher_handle = tokio::spawn(async move {
             let mut fetcher = Fetcher::new(
                 context,
-                starting_version as i64,
+                starting_version as u64,
                 options2,
                 transactions_sender,
             );

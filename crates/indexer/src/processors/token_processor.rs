@@ -45,8 +45,8 @@ impl Debug for TokenTransactionProcessor {
 fn insert_to_db(
     conn: &PgPoolConnection,
     name: &'static str,
-    start_version: i64,
-    end_version: i64,
+    start_version: u64,
+    end_version: u64,
     tokens: Vec<Token>,
     token_ownerships: Vec<TokenOwnership>,
     token_datas: Vec<TokenData>,
@@ -166,8 +166,8 @@ impl TransactionProcessor for TokenTransactionProcessor {
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
-        start_version: i64,
-        end_version: i64,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];

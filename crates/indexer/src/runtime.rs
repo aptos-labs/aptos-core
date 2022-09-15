@@ -26,8 +26,8 @@ use tokio::runtime::{Builder, Runtime};
 pub struct MovingAverage {
     window_millis: u64,
     // (timestamp_millis, value)
-    values: VecDeque<(u64, i64)>,
-    sum: i64,
+    values: VecDeque<(u64, u64)>,
+    sum: u64,
 }
 
 impl MovingAverage {
@@ -39,12 +39,12 @@ impl MovingAverage {
         }
     }
 
-    pub fn tick_now(&mut self, value: i64) {
+    pub fn tick_now(&mut self, value: u64) {
         let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
         self.tick(now, value);
     }
 
-    pub fn tick(&mut self, timestamp_millis: u64, value: i64) -> f64 {
+    pub fn tick(&mut self, timestamp_millis: u64, value: u64) -> f64 {
         self.values.push_back((timestamp_millis, value));
         self.sum += value;
         loop {
@@ -157,14 +157,14 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
                 "Could not fetch version from db so starting from version 0"
             );
             0
-        });
+        }) as u64;
     let start_version = match config.starting_version {
         None => starting_version_from_db,
         Some(version) => {
             if version == 0 {
                 starting_version_from_db
             } else {
-                version
+                version as u64
             }
         }
     };
@@ -187,8 +187,8 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         "Indexing loop started!"
     );
 
-    let mut versions_processed: i64 = 0;
-    let mut base: i64 = 0;
+    let mut versions_processed: u64 = 0;
+    let mut base: u64 = 0;
 
     // Check once here to avoid a boolean check every iteration
     if check_chain_id {
@@ -242,7 +242,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         versions_processed += num_res;
         if emit_every != 0 {
-            let new_base: i64 = versions_processed / emit_every;
+            let new_base: u64 = versions_processed / (emit_every as u64);
             if base != new_base {
                 base = new_base;
                 info!(

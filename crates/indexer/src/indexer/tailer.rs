@@ -125,7 +125,7 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-    ) -> (i64, Result<ProcessingResult, TransactionProcessingError>) {
+    ) -> (u64, Result<ProcessingResult, TransactionProcessingError>) {
         let transactions = self
             .transaction_fetcher
             .lock()
@@ -133,7 +133,7 @@ impl Tailer {
             .fetch_next_batch()
             .await;
 
-        let num_txns = transactions.len() as i64;
+        let num_txns = transactions.len() as u64;
         let start_version = transactions.first().unwrap().version();
         let end_version = transactions.last().unwrap().version();
 

@@ -4,7 +4,7 @@
 use anyhow::Error;
 
 // Error, start_version, end_version, name
-type ErrorWithVersionAndName = (Error, i64, i64, &'static str);
+type ErrorWithVersionAndName = (Error, u64, u64, &'static str);
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
