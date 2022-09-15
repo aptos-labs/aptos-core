@@ -216,6 +216,7 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
