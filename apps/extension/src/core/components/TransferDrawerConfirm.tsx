@@ -42,6 +42,7 @@ export default function TransferDrawerConfirm() {
             fontWeight={600}
             position="absolute"
             bottom="1rem"
+            color="white"
           >
             {transferDrawerPage}
           </Text>
