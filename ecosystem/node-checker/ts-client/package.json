@@ -9,8 +9,8 @@
   "module": "./dist/aptos.esm.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "prepack": "tsdx build",
-    "build": "tsdx build",
+    "prepack": "tsup",
+    "build": "tsup",
     "test": "jest",
     "generate-client": "openapi -i ../doc/spec.yaml -o ./src -c axios --name NodeCheckerClient --exportSchemas true --useOptions",
     "checked-publish": "./checked_publish.sh"
@@ -30,20 +30,20 @@
     "Node Health Checker"
   ],
   "dependencies": {
-    "axios": "^0.27.2"
+    "axios": "0.27.2"
   },
   "devDependencies": {
-    "@types/jest": "^28.1.8",
-    "@types/node": "^18.6.2",
-    "@typescript-eslint/eslint-plugin": "^5.36.0",
-    "@typescript-eslint/parser": "^5.36.0",
-    "dotenv": "^16.0.1",
-    "jest": "^28.1.3",
+    "@types/jest": "28.1.8",
+    "@types/node": "18.6.2",
+    "@typescript-eslint/eslint-plugin": "5.36.0",
+    "@typescript-eslint/parser": "5.36.0",
+    "dotenv": "16.0.1",
+    "jest": "28.1.3",
     "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz",
-    "ts-jest": "^28.0.7",
-    "ts-loader": "^9.3.1",
-    "ts-node": "^10.9.1",
-    "tsdx": "^0.14.1",
+    "ts-jest": "28.0.7",
+    "ts-loader": "9.3.1",
+    "ts-node": "10.9.1",
+    "tsup": "6.2.3",
     "typescript": "4.8.2"
   },
   "version": "0.0.2"
