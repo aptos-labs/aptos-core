@@ -173,8 +173,11 @@ service:
   domain:
   validator:
     external:
-      # -- The Kubernetes ServiceType to use for validator
+      # -- The Kubernetes ServiceType to use for validator's HAProxy
       type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for validator
+      type: ClusterIP
     # -- The externalTrafficPolicy for the validator service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
@@ -185,8 +188,11 @@ service:
     enableMetricsPort: true
   fullnode:
     external:
-      # -- The Kubernetes ServiceType to use for fullnodes
+      # -- The Kubernetes ServiceType to use for fullnodes' HAProxy
       type: LoadBalancer
+    internal:
+      # -- The Kubernetes ServiceType to use for fullnodes
+      type: ClusterIP
     # -- The externalTrafficPolicy for the fullnode service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs

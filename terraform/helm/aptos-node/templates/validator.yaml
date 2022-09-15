@@ -11,6 +11,7 @@ spec:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
+  type: {{ $.Values.service.validator.internal.type }}
   ports:
   - name: validator
     port: 6180

@@ -17,10 +17,10 @@ use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
 use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
@@ -461,9 +461,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 Some(Duration::from_secs(240)),
                 None,
             )),
-        "network_latency" => config
-            .with_network_tests(vec![&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
+        "three_region_simulation" => config
+            .with_initial_validator_count(NonZeroUsize::new(6).unwrap())
+            .with_initial_fullnode_count(6)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_network_tests(vec![&ThreeRegionSimulationTest])
+            // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
+            .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None)),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),
@@ -754,7 +758,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &NetworkLatencyTest,
+            &ThreeRegionSimulationTest,
             &NetworkLossTest,
         ])
         .with_success_criteria(SuccessCriteria::new(
