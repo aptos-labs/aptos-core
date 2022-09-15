@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import sha3 from "js-sha3";
-import { HexString } from "../../hex_string";
+import { HexString } from "../hex_string";
 import { Bytes } from "../bcs";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 

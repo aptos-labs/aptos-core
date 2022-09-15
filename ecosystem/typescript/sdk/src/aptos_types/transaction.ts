@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
 import sha3 from "js-sha3";
-import { HexString } from "../../hex_string";
+import { HexString } from "../hex_string";
 import {
   Deserializer,
   Serializer,
