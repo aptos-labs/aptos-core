@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::NetworkLoadTest;
+use crate::{LoadDestination, NetworkLoadTest};
 use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, NodeExt, Test, Validator};
+use forge::{NetworkContext, NetworkTest, NodeExt, Swarm, Test, Validator};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
@@ -16,7 +16,11 @@ impl Test for TwinValidatorTest {
     }
 }
 
-impl NetworkLoadTest for TwinValidatorTest {}
+impl NetworkLoadTest for TwinValidatorTest {
+    fn setup(&self, _swarm: &mut dyn Swarm) -> anyhow::Result<LoadDestination> {
+        Ok(LoadDestination::AllFullnodes)
+    }
+}
 
 impl NetworkTest for TwinValidatorTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
