@@ -13,12 +13,29 @@ module aptos_token::token_coin_swap {
     use aptos_framework::timestamp;
     use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
+    //
+    // Errors.
+    //
+
+    /// Token already listed
     const ETOKEN_ALREADY_LISTED: u64 = 1;
+
+    /// Token listing no longer exists
     const ETOKEN_LISTING_NOT_EXIST: u64 = 2;
+
+    /// Token is not in escrow
     const ETOKEN_NOT_IN_ESCROW: u64 = 3;
+
+    /// Token cannot be moved out of escrow before the lockup time
     const ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME: u64 = 4;
+
+    /// Token buy price doesn't match listing price
     const ETOKEN_MIN_PRICE_NOT_MATCH: u64 = 5;
+
+    /// Token buy amount doesn't match listing amount
     const ETOKEN_AMOUNT_NOT_MATCH: u64 = 6;
+
+    /// Not enough coin to buy token
     const ENOT_ENOUGH_COIN: u64 = 7;
 
     /// TokenCoinSwap records a swap ask for swapping token_amount with CoinType with a minimal price per token
