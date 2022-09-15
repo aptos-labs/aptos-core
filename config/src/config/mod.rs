@@ -334,11 +334,8 @@ impl NodeConfig {
             None,
         );
 
-        self.indexer.starting_version = env_or_default(
-            "STARTING_VERSION",
-            self.indexer.starting_version.or(Some(0)),
-            None,
-        );
+        self.indexer.starting_version =
+            env_or_default("STARTING_VERSION", self.indexer.starting_version, None);
 
         self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
         self.indexer.index_token_uri_data = self.indexer.index_token_uri_data.or(Some(false));

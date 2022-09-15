@@ -66,12 +66,6 @@ pub struct IndexerConfig {
     pub emit_every: Option<i64>,
 }
 
-pub fn default_starting_version() -> Option<i64> {
-    std::env::var("STARTING_VERSION")
-        .ok()
-        .and_then(|s| s.parse().ok())
-}
-
 pub fn env_or_default<T: std::str::FromStr>(
     env_var: &'static str,
     default: Option<T>,
