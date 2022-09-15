@@ -1,5 +1,7 @@
 /// PropertyMap is a specialization of SimpleMap for Tokens.
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
+/// It provides basic on-chain serialization of primitive and string to property value with type information
+/// It also supports deserializing property value to it original type.
 module aptos_token::property_map {
     use std::bcs;
     use std::vector;
@@ -12,20 +14,32 @@ module aptos_token::property_map {
     //
     // Constants
     //
-
+    /// The maximal number of property that can be stored in property map
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
     const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
 
-    //
-    // Errors
-    //
 
+    //
+    // Errors.
+    //
+    /// The property key already exists
     const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;
+
+    /// The number of property exceeds the limit
     const EPROPERTY_NUMBER_EXCEED_LIMIT: u64 = 2;
+
+    /// The property doesn't exist
     const EPROPERTY_NOT_EXIST: u64 = 3;
+
+    /// Property key and value count don't match
     const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 = 4;
+
+    /// Property key and type count don't match
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
+
+    /// Property type doesn't match
     const ETYPE_NOT_MATCH: u64 = 6;
+
     /// The name (key) of the property is too long
     const EPROPERTY_MAP_NAME_TOO_LONG: u64 = 7;
 
@@ -48,8 +62,10 @@ module aptos_token::property_map {
         values: vector<vector<u8>>,
         types: vector<String>
     ): PropertyMap {
-        assert!(vector::length(&keys) == vector::length(&values), error::invalid_state(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
-        assert!(vector::length(&keys) == vector::length(&types), error::invalid_state(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
+        assert!(vector::length(&keys) <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(vector::length(&keys) == vector::length(&values), error::invalid_argument(EKEY_COUNT_NOT_MATCH_VALUE_COUNT));
+        assert!(vector::length(&keys) == vector::length(&types), error::invalid_argument(EKEY_COUNT_NOT_MATCH_TYPE_COUNT));
+
         let properties = PropertyMap{
             map: simple_map::create<String, PropertyValue>(),
         };
