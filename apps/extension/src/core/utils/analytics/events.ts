@@ -226,10 +226,15 @@ const faucetActions = Object.freeze({
 } as const);
 
 export const faucetEvents = eventSchemaTypeCheck({
+  ERROR_RECEIVE_FAUCET: {
+    action: `${faucetActions.CLICK_FAUCET} - unable to query faucet`,
+    category: analyticsCategories.FAUCET,
+    label: `${faucetActions.CLICK_FAUCET} error`,
+  },
   RECEIVE_FAUCET: {
     action: faucetActions.CLICK_FAUCET,
     category: analyticsCategories.FAUCET,
-    label: undefined,
+    label: faucetActions.CLICK_FAUCET,
   },
 } as const);
 

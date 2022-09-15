@@ -4,6 +4,7 @@
 import { createStandaloneToast } from '@chakra-ui/react';
 import { Types } from 'aptos';
 import { parseMoveAbortDetails } from 'shared/move';
+import { DefaultNetworks, Network } from 'shared/types';
 
 export const { toast } = createStandaloneToast({
   defaultOptions: {
@@ -193,6 +194,20 @@ export function transactionErrorToast(err: unknown) {
     description: errorMsg,
     status: 'error',
     title: 'Transaction error',
+  });
+}
+
+// faucet
+
+export function faucetOnErrorToast(activeNetwork: Network) {
+  const localhostMessage = (activeNetwork.name === DefaultNetworks.Localhost)
+    ? 'If you are on localhost, please ensure that the faucet is running.'
+    : undefined;
+
+  toast({
+    description: `Error accessing faucet at ${activeNetwork?.faucetUrl}. ${localhostMessage}`,
+    status: 'error',
+    title: 'Error calling faucet',
   });
 }
 

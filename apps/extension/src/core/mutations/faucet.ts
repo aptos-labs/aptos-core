@@ -5,6 +5,10 @@ import { useNetworks } from 'core/hooks/useNetworks';
 import { useMutation, useQueryClient } from 'react-query';
 import { MaybeHexString } from 'aptos';
 import queryKeys from 'core/queries/queryKeys';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { faucetEvents } from 'core/utils/analytics/events';
+import { aptosCoinStructTag, defaultFundAmount } from 'core/constants';
+import { faucetOnErrorToast } from 'core/components/Toast';
 
 interface UseFundAccountParams {
   address: MaybeHexString,
@@ -12,8 +16,9 @@ interface UseFundAccountParams {
 }
 
 export function useFundAccount() {
-  const { faucetClient } = useNetworks();
+  const { activeNetwork, faucetClient } = useNetworks();
   const queryClient = useQueryClient();
+  const { trackEvent } = useAnalytics();
 
   const fundAccount = faucetClient
     ? ({ address, amount }: UseFundAccountParams) => faucetClient.fundAccount(address, amount)
@@ -25,8 +30,26 @@ export function useFundAccount() {
     ...other
   } = useMutation({
     mutationFn: fundAccount,
+    onError: (err) => {
+      trackEvent({
+        eventType: faucetEvents.ERROR_RECEIVE_FAUCET,
+        params: {
+          amount: defaultFundAmount,
+          coinType: aptosCoinStructTag,
+          error: String(err),
+        },
+      });
+      faucetOnErrorToast(activeNetwork);
+    },
     onSuccess: async (result, { address }: UseFundAccountParams) => {
       if (result) {
+        trackEvent({
+          eventType: faucetEvents.RECEIVE_FAUCET,
+          params: {
+            amount: defaultFundAmount,
+            coinType: aptosCoinStructTag,
+          },
+        });
         await Promise.all([
           queryClient.invalidateQueries([
             queryKeys.getAccountOctaCoinBalance,

@@ -66,11 +66,14 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
       return;
     }
 
+    const eventEnv = (isDevelopment) ? 'dev_event' : 'event';
+
     analytics.user().then((user) => {
       analytics.page(page, {
         properties: {
           $browser: getBrowser({ os: getOS() })?.toString(),
           $os: getOS()?.toString(),
+          eventEnv,
           network: activeNetworkName,
           walletId: user.anonymousId()?.toString(),
         },
@@ -101,11 +104,14 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
       return;
     }
 
+    const eventEnv = (isDevelopment) ? 'dev_event' : 'event';
+
     analytics.user().then((user) => {
       analytics.screen(screen, screen, {
         properties: {
           $browser: getBrowser({ os: getOS() })?.toString(),
           $os: getOS()?.toString(),
+          eventEnv,
           network: activeNetworkName,
           walletId: user.anonymousId()?.toString(),
         },
@@ -148,10 +154,10 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
       label,
     } = eventType;
 
-    const event = (isDevelopment) ? 'dev_event' : 'event';
+    const eventEnv = (isDevelopment) ? 'dev_event' : 'event';
 
     analytics.user().then((user) => {
-      analytics.track((label || event), {
+      analytics.track((label), {
         category,
         name: label,
         properties: {
@@ -159,6 +165,7 @@ export const [AnalyticsProvider, useAnalytics] = constate(() => {
           $browser: getBrowser({ os: getOS() })?.toString() || 'chrome',
           $os: getOS()?.toString(),
           action,
+          eventEnv,
           network: activeNetworkName || defaultNetworkName,
           value,
           walletId: user.anonymousId()?.toString(),
