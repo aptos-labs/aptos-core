@@ -106,6 +106,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
+      FEATURES: indexer
 
   rust-images-testing:
     needs: [permission-check, determine-docker-build-metadata]
@@ -115,7 +116,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
-      FEATURES: failpoints
+      FEATURES: failpoints indexer
       BUILD_TEST_IMAGES: true
 
   rust-images-performance:
@@ -126,6 +127,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: performance
+      FEATURES: indexer
 
   sdk-release:
     needs: [rust-images, determine-docker-build-metadata]
