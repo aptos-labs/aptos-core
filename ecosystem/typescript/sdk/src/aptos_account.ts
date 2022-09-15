@@ -66,7 +66,7 @@ export class AptosAccount {
 
     const { key } = derivePath(path, bytesToHex(bip39.mnemonicToSeedSync(normalizeMnemonics)));
 
-    return new AptosAccount(new HexString(key).toUint8Array());
+    return new AptosAccount(key);
   }
 
   /**

@@ -44,9 +44,9 @@
     "Move"
   ],
   "dependencies": {
+    "@noble/hashes": "1.1.2",
     "@scure/bip39": "1.1.0",
     "axios": "0.27.2",
-    "ed25519-hd-key": "1.2.0",
     "form-data": "4.0.0",
     "js-sha3": "0.8.0",
     "tweetnacl": "1.0.3"
