@@ -78,7 +78,7 @@ export default class extends Controller {
       return;
     }
 
-    const transaction: Types.OnChainTransaction = await response.json();
+    const transaction: Types.Transaction = await response.json();
 
     if (!("timestamp" in transaction && "events" in transaction)) return;
 
@@ -110,9 +110,11 @@ export default class extends Controller {
     this.mintNumberTargets.forEach((el) => {
       el.textContent = `#${mintNumber}`;
     });
-    this.addressTarget.textContent =
-      transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
-    this.addressTarget.title = transaction.sender;
+    if ("sender" in transaction) {
+      this.addressTarget.textContent =
+        transaction.sender.slice(0, 4) + "…" + transaction.sender.slice(-4);
+      this.addressTarget.title = transaction.sender;
+    }
     this.imageTargets.forEach((el) => {
       el.src = imageUrl;
     });

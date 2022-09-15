@@ -52,9 +52,10 @@ export default class extends Controller<HTMLAnchorElement> {
     ].join("/");
     const response = await fetch(accountTransactionsUrl);
     if (!response.ok) return;
-    const transactions: Types.OnChainTransaction[] = await response.json();
+    const transactions: Types.Transaction[] = await response.json();
     const mintTransaction = transactions.find(
       (transaction) =>
+        "success" in transaction &&
         transaction.success &&
         "payload" in transaction &&
         "function" in transaction.payload &&
