@@ -8,7 +8,6 @@ use aptos_logger::prelude::*;
 use aptos_vm::data_cache::StorageAdapterOwned;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use storage_interface::state_view::DbStateView;
@@ -25,15 +24,15 @@ pub struct Fetcher {
     pub context: Arc<Context>,
     options: TransactionFetcherOptions,
     chain_id: u8,
-    current_version: u64,
-    highest_known_version: u64,
+    current_version: i64,
+    highest_known_version: i64,
     transactions_sender: mpsc::Sender<Vec<Transaction>>,
 }
 
 impl Fetcher {
     pub fn new(
         context: Arc<Context>,
-        starting_version: u64,
+        starting_version: i64,
         options: TransactionFetcherOptions,
         transactions_sender: mpsc::Sender<Vec<Transaction>>,
     ) -> Self {
@@ -49,7 +48,7 @@ impl Fetcher {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0;
+        self.highest_known_version = info.ledger_version.0 as i64;
         self.chain_id = info.chain_id;
         Ok(())
     }
@@ -115,7 +114,7 @@ impl Fetcher {
             let mut tasks = vec![];
             for i in 0..num_batches {
                 let starting_version =
-                    self.current_version + (i as u64 * transaction_fetch_batch_size as u64);
+                    self.current_version + (i as i64 * transaction_fetch_batch_size as i64);
 
                 let context = self.context.clone();
                 let highest_known_version = self.highest_known_version;
@@ -157,7 +156,7 @@ impl Fetcher {
         for batch in transaction_batches {
             versions_sent += batch.len();
             self.current_version = std::cmp::max(
-                batch.last().unwrap().version().unwrap() + 1,
+                (batch.last().unwrap().version().unwrap() + 1) as i64,
                 self.current_version,
             );
             self.transactions_sender
@@ -178,17 +177,17 @@ impl Fetcher {
 
 async fn fetch_raw_txns_with_retries(
     context: Arc<Context>,
-    starting_version: u64,
-    ledger_version: u64,
+    starting_version: i64,
+    ledger_version: i64,
     transaction_fetch_batch_size: u16,
     max_retries: u8,
 ) -> Vec<TransactionOnChainData> {
     let mut retries = 0;
     loop {
         match context.get_transactions(
-            starting_version,
+            starting_version as u64,
             transaction_fetch_batch_size,
-            ledger_version,
+            ledger_version as u64,
         ) {
             Ok(raw_txns) => return raw_txns,
             Err(err) => {
@@ -221,8 +220,8 @@ async fn fetch_raw_txns_with_retries(
 
 async fn fetch_nexts(
     context: Arc<Context>,
-    starting_version: u64,
-    ledger_version: u64,
+    starting_version: i64,
+    ledger_version: i64,
     transaction_fetch_batch_size: u16,
 ) -> Vec<Transaction> {
     let start_millis = chrono::Utc::now().naive_utc();
@@ -236,7 +235,10 @@ async fn fetch_nexts(
     )
     .await;
 
-    let mut timestamp = context.db.get_block_timestamp(starting_version).unwrap();
+    let mut timestamp = context
+        .db
+        .get_block_timestamp(starting_version as u64)
+        .unwrap();
 
     let resolver = context.move_resolver().unwrap();
     let converter = resolver.as_converter(context.db.clone());
@@ -248,8 +250,7 @@ async fn fetch_nexts(
             if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction {
                 timestamp = txn.timestamp_usecs();
             }
-            let txn = converter.try_into_onchain_transaction(timestamp, t)?;
-            Ok(remove_null_bytes_from_txn(txn))
+            converter.try_into_onchain_transaction(timestamp, t)
         })
         .collect::<Result<_, anyhow::Error>>();
 
@@ -420,50 +421,16 @@ impl TransactionFetcherTrait for TransactionFetcher {
 
         let options2 = self.options.clone();
         let fetcher_handle = tokio::spawn(async move {
-            let mut fetcher =
-                Fetcher::new(context, starting_version, options2, transactions_sender);
+            let mut fetcher = Fetcher::new(
+                context,
+                starting_version as i64,
+                options2,
+                transactions_sender,
+            );
             fetcher.run().await;
         });
         self.fetcher_handle = Some(fetcher_handle);
     }
-}
-
-pub fn string_null_byte_replacement(value: &mut str) -> String {
-    value.replace('\u{0000}', "").replace("\\u0000", "")
-}
-
-pub fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
-    match sub_json {
-        Value::Array(array) => {
-            for item in array {
-                recurse_remove_null_bytes_from_json(item);
-            }
-        }
-        Value::Object(object) => {
-            for (_key, value) in object {
-                recurse_remove_null_bytes_from_json(value);
-            }
-        }
-        Value::String(str) => {
-            if !str.is_empty() {
-                let replacement = string_null_byte_replacement(str);
-                *str = replacement;
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn remove_null_bytes_from_txn(txn: Transaction) -> Transaction {
-    let mut txn_json = serde_json::to_value(txn).unwrap();
-    recurse_remove_null_bytes_from_json(&mut txn_json);
-    serde_json::from_value::<Transaction>(txn_json).unwrap()
-}
-
-pub fn remove_null_bytes_from_txns(txns: Vec<Transaction>) -> Vec<Transaction> {
-    txns.into_iter()
-        .map(remove_null_bytes_from_txn)
-        .collect::<Vec<Transaction>>()
 }
 
 /// For mocking TransactionFetcher in tests

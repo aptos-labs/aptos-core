@@ -26,8 +26,8 @@ use tokio::runtime::{Builder, Runtime};
 pub struct MovingAverage {
     window_millis: u64,
     // (timestamp_millis, value)
-    values: VecDeque<(u64, u64)>,
-    sum: u64,
+    values: VecDeque<(u64, i64)>,
+    sum: i64,
 }
 
 impl MovingAverage {
@@ -39,12 +39,12 @@ impl MovingAverage {
         }
     }
 
-    pub fn tick_now(&mut self, value: u64) {
+    pub fn tick_now(&mut self, value: i64) {
         let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
         self.tick(now, value);
     }
 
-    pub fn tick(&mut self, timestamp_millis: u64, value: u64) -> f64 {
+    pub fn tick(&mut self, timestamp_millis: u64, value: i64) -> f64 {
         self.values.push_back((timestamp_millis, value));
         self.sum += value;
         loop {
@@ -115,8 +115,13 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     info!(processor_name = processor_name, "Starting indexer...");
 
-    let conn_pool =
-        new_db_pool(&config.postgres_uri.unwrap()).expect("Failed to create connection pool");
+    let db_uri = &config.postgres_uri.unwrap();
+    info!(
+        processor_name = processor_name,
+        database = db_uri,
+        "Creating connection pool..."
+    );
+    let conn_pool = new_db_pool(db_uri).expect("Failed to create connection pool");
     info!(
         processor_name = processor_name,
         "Created the connection pool... "
@@ -126,13 +131,11 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     let processor_enum = Processor::from_string(&processor_name);
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
-        Processor::DefaultProcessor => {
-            Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
-        }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+        Processor::DefaultProcessor => Arc::new(DefaultTransactionProcessor::new(
             conn_pool.clone(),
-            config.index_token_uri_data.unwrap(),
+            context.clone(),
         )),
+        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
     };
 
     let options =
@@ -146,25 +149,34 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         tailer.run_migrations();
     }
 
+    let starting_version_from_db = tailer
+        .get_start_version(&processor_name)
+        .unwrap_or_else(|| {
+            info!(
+                processor_name = processor_name,
+                "Could not fetch version from db so starting from version 0"
+            );
+            0
+        });
     let start_version = match config.starting_version {
-        None => tailer
-            .get_start_version(&processor_name)
-            .unwrap_or_else(|| {
-                info!(
-                    processor_name = processor_name,
-                    "Could not fetch version from db so starting from version 0"
-                );
-                0
-            }),
-        Some(version) => version,
+        None => starting_version_from_db,
+        Some(version) => {
+            if version == 0 {
+                starting_version_from_db
+            } else {
+                version
+            }
+        }
     };
 
     info!(
         processor_name = processor_name,
-        start_version = start_version,
+        final_start_version = start_version,
+        start_version_from_db = starting_version_from_db,
+        start_version_from_config = config.starting_version,
         "Setting starting version..."
     );
-    tailer.set_fetcher_version(start_version).await;
+    tailer.set_fetcher_version(start_version as u64).await;
 
     info!(processor_name = processor_name, "Starting fetcher...");
     tailer.transaction_fetcher.lock().await.start().await;
@@ -175,9 +187,8 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         "Indexing loop started!"
     );
 
-    let mut versions_processed: u64 = 0;
-    let mut base: u64 = 0;
-    let mut version_to_check_chain_id: u64 = 0;
+    let mut versions_processed: i64 = 0;
+    let mut base: i64 = 0;
 
     // Check once here to avoid a boolean check every iteration
     if check_chain_id {
@@ -185,7 +196,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             .check_or_update_chain_id()
             .await
             .expect("Failed to get chain ID");
-        version_to_check_chain_id = versions_processed + 100_000;
     }
 
     let (tx, mut receiver) = tokio::sync::mpsc::channel(100);
@@ -205,14 +215,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let mut ma = MovingAverage::new(10_000);
 
     loop {
-        if check_chain_id && version_to_check_chain_id < versions_processed {
-            tailer
-                .check_or_update_chain_id()
-                .await
-                .expect("Failed to get chain ID");
-            version_to_check_chain_id = versions_processed + 100_000;
-        }
-
         let (num_res, result) = receiver
             .recv()
             .await
@@ -240,7 +242,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         versions_processed += num_res;
         if emit_every != 0 {
-            let new_base: u64 = versions_processed / emit_every;
+            let new_base: i64 = versions_processed / emit_every;
             if base != new_base {
                 base = new_base;
                 info!(

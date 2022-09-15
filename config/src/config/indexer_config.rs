@@ -30,7 +30,7 @@ pub struct IndexerConfig {
     /// This will not delete any database contents, just transactions as it reprocesses them.
     /// Alternatively can set the `STARTING_VERSION` env var
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub starting_version: Option<u64>,
+    pub starting_version: Option<i64>,
 
     ///////////////////
     ///////////////////
@@ -63,10 +63,10 @@ pub struct IndexerConfig {
     /// This will only be checked every `batch_size` number of versions.
     /// Set to 0 to disable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub emit_every: Option<u64>,
+    pub emit_every: Option<i64>,
 }
 
-pub fn default_starting_version() -> Option<u64> {
+pub fn default_starting_version() -> Option<i64> {
     std::env::var("STARTING_VERSION")
         .ok()
         .and_then(|s| s.parse().ok())

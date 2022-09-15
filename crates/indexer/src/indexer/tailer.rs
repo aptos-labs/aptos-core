@@ -9,19 +9,17 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     schema::ledger_infos::{self, dsl},
-    util::bigdecimal_to_u64,
 };
 use aptos_api::context::Context as ApiContext;
 
 use crate::models::ledger_info::LedgerInfo;
 use anyhow::{ensure, Context, Result};
 use aptos_logger::{debug, info};
-use bigdecimal::BigDecimal;
 use chrono::ParseError;
 use diesel::{
     prelude::*,
     sql_query,
-    sql_types::{BigInt, Numeric, Text},
+    sql_types::{BigInt, Text},
     RunQueryDsl,
 };
 use std::{fmt::Debug, sync::Arc};
@@ -54,7 +52,6 @@ impl Tailer {
     }
 
     pub fn run_migrations(&self) {
-        info!("Running migrations...");
         embedded_migrations::run_with_output(
             &self
                 .connection_pool
@@ -63,12 +60,14 @@ impl Tailer {
             &mut std::io::stdout(),
         )
         .expect("migrations failed!");
-        info!("Migrations complete!");
     }
 
     /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
     pub async fn check_or_update_chain_id(&self) -> Result<u64> {
-        info!("Checking if chain id is correct");
+        info!(
+            processor_name = self.processor.name(),
+            "Checking if chain id is correct"
+        );
         let conn = self
             .connection_pool
             .get()
@@ -91,15 +90,17 @@ impl Tailer {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
                 info!(
+                    processor_name = self.processor.name(),
                     chain_id = chain_id,
-                    "Chain id matches! Continuing to index chain"
+                    "Chain id matches! Continue to index...",
                 );
                 Ok(*chain_id as u64)
             }
             None => {
                 info!(
+                    processor_name = self.processor.name(),
                     chain_id = new_chain_id,
-                    "Adding chain id to db, continue indexing"
+                    "Adding chain id to db, continue to index.."
                 );
                 execute_with_better_error(
                     &conn,
@@ -124,7 +125,7 @@ impl Tailer {
 
     pub async fn process_next_batch(
         &self,
-    ) -> (u64, Result<ProcessingResult, TransactionProcessingError>) {
+    ) -> (i64, Result<ProcessingResult, TransactionProcessingError>) {
         let transactions = self
             .transaction_fetcher
             .lock()
@@ -132,7 +133,7 @@ impl Tailer {
             .fetch_next_batch()
             .await;
 
-        let num_txns = transactions.len() as u64;
+        let num_txns = transactions.len() as i64;
         let start_version = transactions.first().unwrap().version();
         let end_version = transactions.last().unwrap().version();
 
@@ -165,7 +166,7 @@ impl Tailer {
 
     /// Get starting version from database. Starting version is defined as the first version that's either
     /// not successful or missing from the DB.
-    pub fn get_start_version(&self, processor_name: &String) -> Option<u64> {
+    pub fn get_start_version(&self, processor_name: &String) -> Option<i64> {
         let conn = self
             .connection_pool
             .get()
@@ -177,8 +178,8 @@ impl Tailer {
           WITH raw_boundaries AS
           (
               SELECT
-                  MAX(version) AS MAX_BLOCK,
-                  MIN(version) AS MIN_BLOCK
+                  MAX(version) AS MAX_V,
+                  MIN(version) AS MIN_V
               FROM
                   processor_statuses
               WHERE
@@ -188,15 +189,14 @@ impl Tailer {
           boundaries AS
           (
               SELECT
-                  MAX(version) AS MAX_BLOCK,
-                  MIN(version) AS MIN_BLOCK
+                  MAX(version) AS MAX_V,
+                  MIN(version) AS MIN_V
               FROM
                   processor_statuses, raw_boundaries
               WHERE
                   name = $1
                   AND success = true
-                  and version >= GREATEST(MAX_BLOCK - $2, 0)
-
+                  and version >= GREATEST(MAX_V - $2, 0)
           ),
           gap AS
           (
@@ -215,7 +215,7 @@ impl Tailer {
                       WHERE
                           name = $1
                           AND success = TRUE
-                          AND version >= GREATEST(MAX_BLOCK - $2, 0)
+                          AND version >= GREATEST(MAX_V - $2, 0)
                   ) a
               WHERE
                   version + 1 <> next_version
@@ -223,11 +223,11 @@ impl Tailer {
           SELECT
               CASE
                   WHEN
-                      MIN_BLOCK <> GREATEST(MAX_BLOCK - $2, 0)
+                      MIN_V <> GREATEST(MAX_V - $2, 0)
                   THEN
-                      GREATEST(MAX_BLOCK - $2, 0)
+                      GREATEST(MAX_V - $2, 0)
                   ELSE
-                      COALESCE(maybe_gap, MAX_BLOCK + 1)
+                      COALESCE(maybe_gap, MAX_V + 1)
               END
               AS version
           FROM
@@ -235,8 +235,8 @@ impl Tailer {
           ";
         #[derive(Debug, QueryableByName)]
         pub struct Gap {
-            #[sql_type = "Numeric"]
-            pub version: BigDecimal,
+            #[sql_type = "BigInt"]
+            pub version: i64,
         }
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
@@ -244,7 +244,7 @@ impl Tailer {
             .bind::<BigInt, _>(1500000)
             .get_results(&conn)
             .unwrap();
-        res.pop().unwrap().map(|g| bigdecimal_to_u64(&g.version))
+        res.pop().unwrap().map(|g| g.version)
     }
 }
 
@@ -346,9 +346,10 @@ mod test {
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&conn_pool.get()?);
 
-        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let test_context = new_test_context("doesnt_matter".to_string(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
+        let pg_transaction_processor =
+            DefaultTransactionProcessor::new(conn_pool.clone(), context.clone());
         let mut tailer = Tailer::new(
             context,
             conn_pool.clone(),
@@ -859,7 +860,7 @@ mod test {
             }
         )).unwrap();
 
-        let txns = crate::indexer::fetcher::remove_null_bytes_from_txns(vec![message_txn.clone()]);
+        let txns = vec![message_txn.clone()];
         tailer
             .processor
             .process_transactions_with_status(txns)

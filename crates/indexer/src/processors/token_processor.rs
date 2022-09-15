@@ -1,49 +1,33 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::database::get_chunks;
-use crate::models::token::{
-    CreateCollectionEventType, CreateTokenDataEventType, MintTokenEventType,
-    MutateTokenPropertyMapEventType, TokenData, TokenEvent,
-};
-use crate::schema::token_datas::dsl::token_datas;
-use crate::schema::token_datas::{last_minted_at, supply};
-use crate::util::{ensure_not_negative, u64_to_bigdecimal};
 use crate::{
-    database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+    database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{
-        errors::TransactionProcessingError, metadata_fetcher::MetaDataFetcher,
-        processing_result::ProcessingResult, transaction_processor::TransactionProcessor,
+        errors::TransactionProcessingError, processing_result::ProcessingResult,
+        transaction_processor::TransactionProcessor,
     },
     models::{
-        collection::Collection,
-        metadata::Metadata,
-        ownership::Ownership,
-        token_property::TokenProperty,
-        transactions::{TransactionModel, UserTransaction},
+        collection_datas::CollectionData,
+        token_datas::TokenData,
+        tokens::{Token, TokenOwnership},
     },
     schema,
-    schema::ownerships::{dsl::amount as ownership_amount, ownership_id},
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::result::Error;
 use field_count::FieldCount;
 use std::fmt::Debug;
 
 pub const NAME: &str = "token_processor";
-
 pub struct TokenTransactionProcessor {
     connection_pool: PgDbPool,
-    index_token_uri: bool,
 }
 
 impl TokenTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, index_token_uri: bool) -> Self {
-        Self {
-            connection_pool,
-            index_token_uri,
-        }
+    pub fn new(connection_pool: PgDbPool) -> Self {
+        Self { connection_pool }
     }
 }
 
@@ -58,187 +42,118 @@ impl Debug for TokenTransactionProcessor {
     }
 }
 
-fn update_mint_token(
+fn insert_to_db(
     conn: &PgPoolConnection,
-    event_data: MintTokenEventType,
-    txn: &UserTransaction,
-) {
-    let last_mint_time = txn.timestamp;
+    name: &'static str,
+    start_version: i64,
+    end_version: i64,
+    tokens: Vec<Token>,
+    token_ownerships: Vec<TokenOwnership>,
+    token_datas: Vec<TokenData>,
+    collection_datas: Vec<CollectionData>,
+) -> Result<(), diesel::result::Error> {
+    aptos_logger::trace!(
+        name = name,
+        start_version = start_version,
+        end_version = end_version,
+        "Inserting to db",
+    );
+    conn.build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|| {
+            insert_tokens(conn, &tokens);
+            insert_token_datas(conn, &token_datas);
+            insert_token_ownerships(conn, &token_ownerships);
+            insert_collection_datas(conn, &collection_datas);
+            Ok(())
+        })
+}
 
-    // update the supply
-    let result = diesel::update(token_datas.find(event_data.id.to_string()))
-        .set((
-            supply.eq(supply + event_data.amount),
-            last_minted_at.eq(last_mint_time),
-        ))
-        .get_result::<TokenData>(conn);
-    if let Err(e) = result {
-        aptos_logger::warn!("Error running query: {:?}", e);
+fn insert_tokens(conn: &PgPoolConnection, tokens_to_insert: &[Token]) {
+    use schema::tokens::dsl::*;
+
+    let chunks = get_chunks(tokens_to_insert.len(), Token::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tokens::table)
+                .values(&tokens_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    creator_address,
+                    collection_name_hash,
+                    name_hash,
+                    property_version,
+                    transaction_version,
+                ))
+                .do_nothing(),
+        )
+        .expect("Error inserting tokens into database");
     }
 }
 
-async fn get_all_metadata(uris: &Vec<(String, String)>, res: &mut Vec<Metadata>) {
-    let fetcher = MetaDataFetcher::new();
-    for (tid, uri) in uris {
-        let token_metadata = fetcher.get_metadata(uri.clone()).await;
-        if let Some(token_metadata) = token_metadata {
-            let metadata = Metadata::from_token_uri_meta(token_metadata, tid.clone());
-            if let Some(metadata) = metadata {
-                res.push(metadata);
-            }
-        }
+fn insert_token_ownerships(conn: &PgPoolConnection, token_ownerships_to_insert: &[TokenOwnership]) {
+    use schema::token_ownerships::dsl::*;
+
+    let chunks = get_chunks(
+        token_ownerships_to_insert.len(),
+        TokenOwnership::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::token_ownerships::table)
+                .values(&token_ownerships_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    creator_address,
+                    collection_name_hash,
+                    name_hash,
+                    property_version,
+                    transaction_version,
+                    table_handle,
+                ))
+                .do_nothing(),
+        )
+        .expect("Error inserting token_ownerships into database");
     }
 }
 
-fn insert_token_properties(
-    conn: &PgPoolConnection,
-    event_data: MutateTokenPropertyMapEventType,
-    txn: &UserTransaction,
-) {
-    let token_property = TokenProperty {
-        token_id: event_data.new_id.to_string(),
-        previous_token_id: event_data.old_id.to_string(),
-        property_keys: event_data.keys.to_string(),
-        property_values: event_data.values.to_string(),
-        property_types: event_data.types.to_string(),
-        updated_at: txn.timestamp,
-        inserted_at: chrono::Utc::now().naive_utc(),
-    };
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::token_propertys::table)
-            .values(&token_property)
-            .on_conflict_do_nothing(),
-    )
-    .expect("Error inserting row into token_properties");
+fn insert_token_datas(conn: &PgPoolConnection, token_datas_to_insert: &[TokenData]) {
+    use schema::token_datas::dsl::*;
+
+    let chunks = get_chunks(token_datas_to_insert.len(), TokenData::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::token_datas::table)
+                .values(&token_datas_to_insert[start_ind..end_ind])
+                .on_conflict((
+                    creator_address,
+                    collection_name_hash,
+                    name_hash,
+                    transaction_version,
+                ))
+                .do_nothing(),
+        )
+        .expect("Error inserting token_datas into database");
+    }
 }
 
-fn insert_token_data(
-    conn: &PgPoolConnection,
-    event_data: CreateTokenDataEventType,
-    txn: &UserTransaction,
-) {
-    let token_data = TokenData {
-        token_data_id: event_data.id.to_string(),
-        creator: event_data.id.creator,
-        collection: event_data.id.collection,
-        name: event_data.id.name,
-        description: event_data.description,
-        max_amount: u64_to_bigdecimal(event_data.maximum),
-        supply: u64_to_bigdecimal(0), // supply only updated with mint event
-        uri: event_data.uri,
-        royalty_payee_address: event_data.royalty_payee_address,
-        royalty_points_denominator: event_data.royalty_points_denominator,
-        royalty_points_numerator: event_data.royalty_points_numerator,
-        mutability_config: event_data.mutability_config.to_string(),
-        property_keys: event_data.property_keys.to_string(),
-        property_values: event_data.property_values.to_string(),
-        property_types: event_data.property_types.to_string(),
-        minted_at: txn.timestamp,
-        inserted_at: chrono::Utc::now().naive_utc(),
-        last_minted_at: txn.timestamp,
-    };
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::token_datas::table)
-            .values(&token_data)
-            .on_conflict_do_nothing(),
-    )
-    .expect("Error inserting row into token_datas");
-}
+fn insert_collection_datas(conn: &PgPoolConnection, collection_datas_to_insert: &[CollectionData]) {
+    use schema::collection_datas::dsl::*;
 
-fn update_token_ownership(
-    conn: &PgPoolConnection,
-    token_id: String,
-    txn: &UserTransaction,
-    amount_update: bigdecimal::BigDecimal,
-) {
-    let ownership = Ownership::new(
-        token_id,
-        txn.sender.clone(),
-        ensure_not_negative(amount_update.clone()),
-        txn.timestamp,
-        chrono::Utc::now().naive_utc(),
+    let chunks = get_chunks(
+        collection_datas_to_insert.len(),
+        CollectionData::field_count(),
     );
-    let new_ownership_amount = ownership_amount + amount_update;
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::ownerships::table)
-            .values(&ownership)
-            .on_conflict(ownership_id)
-            .do_update()
-            .set(ownership_amount.eq(new_ownership_amount)),
-    )
-    .expect("Error update token ownership");
-}
-
-fn insert_collection(
-    conn: &PgPoolConnection,
-    event_data: CreateCollectionEventType,
-    txn: &UserTransaction,
-) {
-    let collection = Collection::new(
-        event_data.creator,
-        event_data.collection_name,
-        event_data.description,
-        event_data.maximum,
-        event_data.uri,
-        txn.timestamp,
-        chrono::Utc::now().naive_utc(),
-    );
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::collections::table)
-            .values(&collection)
-            .on_conflict_do_nothing(),
-    )
-    .expect("Error inserting row into collections");
-}
-
-fn process_token_on_chain_data(
-    conn: &PgPoolConnection,
-    txns_with_token_events: &[(&UserTransaction, Vec<TokenEvent>)],
-    uris: &mut Vec<(String, String)>,
-) {
-    // for create token event, insert a new token to token table,
-    // if token exists, increase the supply
-    for (txn, events) in txns_with_token_events {
-        for event in events {
-            match event {
-                TokenEvent::CreateTokenDataEvent(event_data) => {
-                    let uri = event_data.uri.clone();
-                    let t_data_id = event_data.id.to_string();
-                    insert_token_data(conn, event_data.clone(), txn);
-                    uris.push((t_data_id, uri));
-                }
-                TokenEvent::MintTokenEvent(event_data) => {
-                    update_mint_token(conn, event_data.clone(), txn);
-                }
-                TokenEvent::CollectionCreationEvent(event_data) => {
-                    insert_collection(conn, event_data.clone(), txn);
-                }
-                TokenEvent::DepositEvent(event_data) => {
-                    update_token_ownership(
-                        conn,
-                        event_data.id.to_string(),
-                        txn,
-                        event_data.amount.clone(),
-                    );
-                }
-                TokenEvent::WithdrawEvent(event_data) => {
-                    update_token_ownership(
-                        conn,
-                        event_data.id.to_string(),
-                        txn,
-                        -event_data.amount.clone(),
-                    );
-                }
-                TokenEvent::MutateTokenPropertyMapEvent(event_data) => {
-                    insert_token_properties(conn, event_data.clone(), txn);
-                }
-                _ => (),
-            }
-        }
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::collection_datas::table)
+                .values(&collection_datas_to_insert[start_ind..end_ind])
+                .on_conflict((creator_address, collection_name_hash, transaction_version))
+                .do_nothing(),
+        )
+        .expect("Error inserting collection_datas into database");
     }
 }
 
@@ -251,59 +166,33 @@ impl TransactionProcessor for TokenTransactionProcessor {
     async fn process_transactions(
         &self,
         transactions: Vec<Transaction>,
-        start_version: u64,
-        end_version: u64,
+        start_version: i64,
+        end_version: i64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let txns_with_events = TransactionModel::from_transactions_for_tokens(&transactions);
+        let mut all_tokens = vec![];
+        let mut all_token_ownerships = vec![];
+        let mut all_token_datas = vec![];
+        let mut all_collection_datas = vec![];
+        for txn in transactions {
+            let (mut tokens, mut token_ownerships, mut token_datas, mut collection_datas) =
+                Token::from_transaction(&txn);
+            all_tokens.append(&mut tokens);
+            all_token_ownerships.append(&mut token_ownerships);
+            all_token_datas.append(&mut token_datas);
+            all_collection_datas.append(&mut collection_datas);
+        }
 
         let conn = self.get_conn();
-        let mut token_uris: Vec<(String, String)> = vec![];
-
-        // filter events to only keep token events
-        let txns_with_token_events: Vec<_> = txns_with_events
-            .iter()
-            .filter_map(|(txn, events)| {
-                let events: Vec<_> = events.iter().filter_map(TokenEvent::from_event).collect();
-
-                // Only keep txns with events
-                if events.is_empty() {
-                    None
-                } else {
-                    Some((txn, events))
-                }
-            })
-            .collect();
-
-        let mut tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-            process_token_on_chain_data(&conn, &txns_with_token_events, &mut token_uris);
-            Ok(())
-        });
-
-        if let Err(err) = tx_result {
-            return Err(TransactionProcessingError::TransactionCommitError((
-                anyhow::Error::from(err),
-                start_version,
-                end_version,
-                self.name(),
-            )));
-        };
-        if self.index_token_uri {
-            let mut res: Vec<Metadata> = vec![];
-            get_all_metadata(&token_uris, &mut res).await;
-            tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-                let chunks = get_chunks(res.len(), Metadata::field_count());
-                for (start_ind, end_ind) in chunks {
-                    execute_with_better_error(
-                        &conn,
-                        diesel::insert_into(schema::metadatas::table)
-                            .values(&res[start_ind..end_ind])
-                            .on_conflict_do_nothing(),
-                    )
-                    .expect("Error inserting row into metadatas");
-                }
-                Ok(())
-            });
-        }
+        let tx_result = insert_to_db(
+            &conn,
+            self.name(),
+            start_version,
+            end_version,
+            all_tokens,
+            all_token_ownerships,
+            all_token_datas,
+            all_collection_datas,
+        );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(
                 self.name(),
