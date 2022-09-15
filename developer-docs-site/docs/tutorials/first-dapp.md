@@ -17,7 +17,7 @@ We will use:
 
 The end result is a dapp that lets users publish and share snippets of text on the Aptos blockchain.
 
-The full source code for this tutorial is available [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript/dapp-example).
+The full source code for this tutorial is updating. Meanwhile, the older one is available [here](https://github.com/aptos-labs/aptos-core/tree/53e240003e95c9b865441ea792ab4e1e8134a267/developer-docs-site/static/examples/typescript/dapp-example).
 
 ## Prerequisites
 
