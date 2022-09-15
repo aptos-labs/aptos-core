@@ -106,6 +106,9 @@ kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r ku
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
 username="${USERNAME_PREFIX}-${i}"
 user_dir="${WORKSPACE}/${username}"
+
+cat ${user_dir}/validator-identity.yaml
+
 kubectl create secret generic "${username}-genesis-e${ERA}" \
     --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
     --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \

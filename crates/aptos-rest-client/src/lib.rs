@@ -584,7 +584,7 @@ impl Client {
     }
 
     pub async fn wait_for_version(&self, version: u64) -> Result<State> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(80);
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
 
         let start = std::time::Instant::now();

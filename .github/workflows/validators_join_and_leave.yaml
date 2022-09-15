@@ -1,0 +1,21 @@
+name: Validator Join and Leave Test
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+jobs:
+  run-forge-twin-validator-test:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-validators-join-and-leave
+      FORGE_CLUSTER_NAME: aptos-forge-big-1
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: validators_join_and_leave
+      POST_TO_SLACK: true
