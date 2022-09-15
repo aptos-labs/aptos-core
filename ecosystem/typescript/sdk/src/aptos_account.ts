@@ -4,8 +4,8 @@
 import nacl from "tweetnacl";
 import sha3 from "js-sha3";
 import * as bip39 from "@scure/bip39";
+import { bytesToHex } from "@noble/hashes/utils";
 import { derivePath } from "./utils/hd-key";
-import { bytesToHex } from "./bytes_to_hex.js";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
 import { Memoize } from "./utils";
