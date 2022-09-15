@@ -6,9 +6,10 @@ import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
-import { BCS, TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./transaction_builder";
-import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
+import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./transaction_builder";
+import { MAX_U64_BIG_INT } from "./bcs/consts";
 import { TOKEN_ABIS } from "./abis";
+import { AnyNumber, bcsToBytes } from "./bcs";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -44,7 +45,7 @@ export class TokenClient {
     name: string,
     description: string,
     uri: string,
-    maxAmount: BCS.AnyNumber = MAX_U64_BIG_INT,
+    maxAmount: AnyNumber = MAX_U64_BIG_INT,
   ): Promise<string> {
     // <:!:createCollection
     const payload = this.transactionBuilder.buildTransactionPayload(
@@ -82,7 +83,7 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
-    max: BCS.AnyNumber = MAX_U64_BIG_INT,
+    max: AnyNumber = MAX_U64_BIG_INT,
     royalty_payee_address: MaybeHexString = account.address(),
     royalty_points_denominator: number = 0,
     royalty_points_numerator: number = 0,
@@ -257,7 +258,7 @@ export class TokenClient {
       [receiverAuthenticator], // Secondary signer authenticators
     );
 
-    const bcsTxn = BCS.bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
+    const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
 
     const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
 
