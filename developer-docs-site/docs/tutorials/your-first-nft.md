@@ -58,7 +58,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   poetry update
   ```
 
-  Run the `transfer-coin` example:
+  Run the `simple-nft` example:
   ```sh
   poetry run python -m examples.simple-nft
   ```

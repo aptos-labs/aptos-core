@@ -1,9 +1,0 @@
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=<%= ENV.fetch('GOOGLE_ANALYTICS_ID', '') %>"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', "<%= ENV.fetch('GOOGLE_ANALYTICS_ID', '').to_json %>", <%= { debug_mode: !Rails.env.production? }.to_json.html_safe %>);
-</script>

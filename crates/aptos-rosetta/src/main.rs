@@ -78,8 +78,13 @@ async fn main() {
 
     println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
-    let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("aptos-rosetta: Should bootstrap rosetta server");
+    let _rosetta = bootstrap(
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+        args.synthetic_block_size(),
+    )
+    .expect("aptos-rosetta: Should bootstrap rosetta server");
 
     println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
@@ -99,6 +104,9 @@ trait ServerArgs {
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
+
+    /// Retrieve the block size
+    fn synthetic_block_size(&self) -> Option<u16>;
 }
 
 /// Aptos Rosetta API Server
@@ -137,6 +145,14 @@ impl ServerArgs for CommandArgs {
             CommandArgs::OnlineRemote(args) => args.chain_id(),
             CommandArgs::Offline(args) => args.chain_id(),
             CommandArgs::Online(args) => args.chain_id(),
+        }
+    }
+
+    fn synthetic_block_size(&self) -> Option<u16> {
+        match self {
+            CommandArgs::OnlineRemote(args) => args.synthetic_block_size(),
+            CommandArgs::Offline(args) => args.synthetic_block_size(),
+            CommandArgs::Online(args) => args.synthetic_block_size(),
         }
     }
 }
@@ -179,6 +195,10 @@ impl ServerArgs for OfflineArgs {
     fn chain_id(&self) -> ChainId {
         self.chain_id
     }
+
+    fn synthetic_block_size(&self) -> Option<u16> {
+        None
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -188,6 +208,12 @@ pub struct OnlineRemoteArgs {
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
     #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
+
+    /// In the event that block size is not provided, it will use the actual blocks
+    /// if block size is provided, it will make synthetic blocks based on the transaction
+    /// versions.  Each block will be `synthetic_block_size` transaction versions
+    #[clap(long)]
+    pub synthetic_block_size: Option<u16>,
 }
 
 impl ServerArgs for OnlineRemoteArgs {
@@ -201,6 +227,10 @@ impl ServerArgs for OnlineRemoteArgs {
 
     fn chain_id(&self) -> ChainId {
         self.offline_args.chain_id
+    }
+
+    fn synthetic_block_size(&self) -> Option<u16> {
+        self.synthetic_block_size
     }
 }
 
@@ -225,5 +255,9 @@ impl ServerArgs for OnlineLocalArgs {
 
     fn chain_id(&self) -> ChainId {
         self.online_args.offline_args.chain_id
+    }
+
+    fn synthetic_block_size(&self) -> Option<u16> {
+        self.online_args.synthetic_block_size
     }
 }

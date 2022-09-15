@@ -9,6 +9,9 @@ pub const DEFAULT_ROOT_KEY: &str =
 pub const DEFAULT_ROOT_PRIV_KEY: &str =
     "E25708D90C72A53B400B27FC7602C4D546C7B7469FA6E12544F0EBFB2F16AE19";
 
+// Seed to generate keys for forge tests.
+pub const FORGE_KEY_SEED: &str = "80000";
+
 // binaries expected to be present on test runner
 pub const HELM_BIN: &str = "helm";
 pub const KUBECTL_BIN: &str = "kubectl";

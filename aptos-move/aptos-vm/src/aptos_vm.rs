@@ -30,6 +30,7 @@ use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::account_config::new_block_event_key;
+use aptos_types::on_chain_config::Features;
 use aptos_types::vm_status::AbortLocation;
 use aptos_types::{
     account_config,
@@ -98,9 +99,17 @@ impl AptosVM {
         Self::new(state)
     }
 
-    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
+    pub fn init_with_config(
+        version: Version,
+        gas_schedule: GasSchedule,
+        features: Features,
+    ) -> Self {
         info!("Adapter restarted for Validation");
-        AptosVM(AptosVMImpl::init_with_config(version, gas_schedule))
+        AptosVM(AptosVMImpl::init_with_config(
+            version,
+            gas_schedule,
+            features,
+        ))
     }
 
     /// Sets execution concurrency level when invoked the first time.

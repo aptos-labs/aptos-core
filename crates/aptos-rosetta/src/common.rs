@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{Account, Response};
+use aptos_rest_client::{Account, Response, State};
 use aptos_sdk::move_types::ident_str;
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
@@ -192,9 +192,40 @@ pub async fn get_block_index_from_request(
                 .await?;
             let state = response.state();
 
-            state.block_height
+            get_latest_block_height(server_context, state)
         }
     })
+}
+
+pub fn get_latest_block_height(server_context: &RosettaContext, state: &State) -> u64 {
+    // synthetic blocks need to get the right block height from the version
+    if let Some(synthetic_block_size) = server_context.synthetic_block_size {
+        state.version.saturating_div(synthetic_block_size as u64)
+    } else {
+        state.block_height
+    }
+}
+
+pub fn get_oldest_block_height(server_context: &RosettaContext, state: &State) -> u64 {
+    // synthetic blocks need to get the right block height from the version
+    if let Some(synthetic_block_size) = server_context.synthetic_block_size {
+        // To leave room for error, we skip the oldest block, and hope for the best
+        // If the oldest block is larger than the synthetic block size, this could fail
+        // But, if pruning is off, the oldest block height could still be okay / if it hasn't gone
+        // over the pruning window
+        if state.oldest_block_height > 0 {
+            (state
+                .oldest_ledger_version
+                .saturating_div(synthetic_block_size as u64))
+            .saturating_add(1)
+        } else {
+            state
+                .oldest_ledger_version
+                .saturating_div(synthetic_block_size as u64)
+        }
+    } else {
+        state.oldest_block_height
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
