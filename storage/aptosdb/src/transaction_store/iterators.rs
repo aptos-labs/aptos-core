@@ -1,37 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::TransactionSchema;
 use crate::transaction_by_account::TransactionByAccountSchema;
 use anyhow::{anyhow, ensure, Result};
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::Version;
 use schemadb::iterator::SchemaIterator;
+use std::marker::PhantomData;
 
-pub struct TransactionIter<'a> {
-    inner: SchemaIterator<'a, TransactionSchema>,
+pub struct ContinuousVersionIter<I, T> {
+    inner: I,
     expected_next_version: Version,
     end_version: Version,
+    _phantom: PhantomData<T>,
 }
 
-impl<'a> TransactionIter<'a> {
-    pub(crate) fn new(
-        inner: SchemaIterator<'a, TransactionSchema>,
-        expected_next_version: Version,
-        limit: usize,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner,
-            expected_next_version,
-            end_version: expected_next_version
-                .checked_add(limit as u64)
-                .ok_or_else(|| anyhow!("Too many transactions requested."))?,
-        })
-    }
-}
-
-impl<'a> TransactionIter<'a> {
-    fn next_impl(&mut self) -> Result<Option<Transaction>> {
+impl<I, T> ContinuousVersionIter<I, T>
+where
+    I: Iterator<Item = Result<(Version, T)>>,
+{
+    fn next_impl(&mut self) -> Result<Option<T>> {
         if self.expected_next_version >= self.end_version {
             return Ok(None);
         }
@@ -40,7 +28,10 @@ impl<'a> TransactionIter<'a> {
             Some((version, transaction)) => {
                 ensure!(
                     version == self.expected_next_version,
-                    "Transaction versions are not consecutive.",
+                    "{} iterator: expecting version {}, got {} from underlying iterator.",
+                    std::any::type_name::<T>(),
+                    self.expected_next_version,
+                    version,
                 );
                 self.expected_next_version += 1;
                 Some(transaction)
@@ -52,11 +43,42 @@ impl<'a> TransactionIter<'a> {
     }
 }
 
-impl<'a> Iterator for TransactionIter<'a> {
-    type Item = Result<Transaction>;
+impl<I, T> Iterator for ContinuousVersionIter<I, T>
+where
+    I: Iterator<Item = Result<(Version, T)>>,
+{
+    type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_impl().transpose()
+    }
+}
+
+pub trait ExpectContinuousVersions<T>: Iterator<Item = Result<(Version, T)>> + Sized {
+    fn expect_continuous_versions(
+        self,
+        first_version: Version,
+        limit: usize,
+    ) -> Result<ContinuousVersionIter<Self, T>>;
+}
+
+impl<I, T> ExpectContinuousVersions<T> for I
+where
+    I: Iterator<Item = Result<(Version, T)>>,
+{
+    fn expect_continuous_versions(
+        self,
+        first_version: Version,
+        limit: usize,
+    ) -> Result<ContinuousVersionIter<Self, T>> {
+        Ok(ContinuousVersionIter {
+            inner: self,
+            expected_next_version: first_version,
+            end_version: first_version
+                .checked_add(limit as u64)
+                .ok_or_else(|| anyhow!("Too many items requested"))?,
+            _phantom: Default::default(),
+        })
     }
 }
 
