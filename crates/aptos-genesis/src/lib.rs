@@ -7,6 +7,7 @@ pub mod builder;
 pub mod config;
 pub mod keys;
 
+pub mod extra;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
