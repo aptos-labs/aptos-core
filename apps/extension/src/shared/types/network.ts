@@ -25,15 +25,15 @@ export const defaultCustomNetworks: Networks = {
 };
 
 export const defaultNetworks: Networks = Object.freeze({
-  [DefaultNetworks.Devnet]: {
-    faucetUrl: 'https://faucet.devnet.aptoslabs.com',
-    name: DefaultNetworks.Devnet,
-    nodeUrl: 'https://fullnode.devnet.aptoslabs.com',
-  },
   [DefaultNetworks.Testnet]: {
     faucetUrl: 'https://faucet.testnet.aptoslabs.com',
     name: DefaultNetworks.Testnet,
     nodeUrl: 'https://testnet.aptoslabs.com',
+  },
+  [DefaultNetworks.Devnet]: {
+    faucetUrl: 'https://faucet.devnet.aptoslabs.com',
+    name: DefaultNetworks.Devnet,
+    nodeUrl: 'https://fullnode.devnet.aptoslabs.com',
   },
   [DefaultNetworks.AIT3]: {
     faucetUrl: undefined,
@@ -42,4 +42,4 @@ export const defaultNetworks: Networks = Object.freeze({
   },
 } as const);
 
-export const defaultNetworkName = DefaultNetworks.Devnet;
+export const defaultNetworkName = DefaultNetworks.Testnet;
