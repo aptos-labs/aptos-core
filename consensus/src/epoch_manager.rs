@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
-    block_storage::BlockStore,
+    block_storage::{
+        tracing::{observe_block, BlockStage},
+        BlockStore,
+    },
     commit_notifier::CommitNotifier,
     counters,
     error::{error_kind, DbError},
@@ -679,7 +681,7 @@ impl EpochManager {
         let initial_data = self
             .storage
             .start()
-            .expect_recovery_data("Consensusdb is corrupted, need to do a backup and restore");
+            .expect_recovery_data("consensusdb is not consistent with aptosdb");
         self.start_round_manager(
             initial_data,
             epoch_state,

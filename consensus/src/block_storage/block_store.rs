@@ -319,11 +319,6 @@ impl BlockStore {
         )
         .await;
 
-        let to_remove = self.inner.read().get_all_block_id();
-        if let Err(e) = self.storage.prune_tree(to_remove) {
-            // it's fine to fail here, the next restart will try to clean up dangling blocks again.
-            error!(error = ?e, "Fail to delete block from consensus db");
-        }
         // Unwrap the new tree and replace the existing tree.
         *self.inner.write() = Arc::try_unwrap(inner)
             .unwrap_or_else(|_| panic!("New block tree is not shared"))
