@@ -19,6 +19,7 @@ use serde_json::json;
 use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
+/// TODO: Cleanup after v1 API is ramped up
 pub fn custom_event_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("custom_event")
         .and(warp::post())
