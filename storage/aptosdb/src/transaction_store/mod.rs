@@ -20,7 +20,8 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
+use schemadb::iterator::SchemaIterator;
+use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]

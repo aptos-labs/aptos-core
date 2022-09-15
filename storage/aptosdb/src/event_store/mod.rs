@@ -27,7 +27,8 @@ use aptos_types::{
     proof::position::Position,
     transaction::Version,
 };
-use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, SchemaIterator, DB};
+use schemadb::iterator::SchemaIterator;
+use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     convert::{TryFrom, TryInto},
