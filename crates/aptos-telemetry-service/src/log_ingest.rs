@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
+/// TODO: Cleanup after v1 API is ramped up
 pub fn log_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("log_ingest")
         .and(warp::post())

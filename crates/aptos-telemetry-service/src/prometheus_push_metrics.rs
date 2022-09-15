@@ -11,6 +11,7 @@ use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tracing::{debug, error};
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
 
+/// TODO: Cleanup after v1 API is ramped up
 pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("push-metrics")
         .and(warp::post())

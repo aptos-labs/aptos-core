@@ -41,7 +41,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(prometheus_push_metrics::metrics_ingest_legacy(
             context.clone(),
         ))
-        .or(log_ingest::log_ingest_legacy(context.clone()));
+        .or(log_ingest::log_ingest_legacy(context));
 
     legacy_api
         .or(v1_api)
@@ -55,6 +55,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .recover(handle_rejection)
 }
 
+/// TODO: Cleanup after v1 API is ramped up
 fn index_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path::end()
         .and(warp::get())
