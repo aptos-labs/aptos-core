@@ -14,7 +14,10 @@ use consensus_types::{
 
 use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
@@ -168,7 +171,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (payload, timestamp.as_micros() as u64)
+            (optimize_payload(payload), timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -225,5 +228,36 @@ impl ProposalGenerator {
         }
 
         failed_authors
+    }
+}
+
+fn optimize_payload(payload: Payload) -> Payload {
+    if let Payload::DirectMempool(payload) = payload {
+        let mut senders = HashMap::new();
+        let mut txns_by_sender = Vec::new();
+
+        for txn in payload.into_iter() {
+            let index = *senders.entry(txn.sender()).or_insert_with(|| {
+                let index = txns_by_sender.len();
+                txns_by_sender.push(VecDeque::new());
+                index
+            });
+            txns_by_sender[index].push_back(txn);
+        }
+
+        let mut optimized_txns = Vec::new();
+        while !txns_by_sender.is_empty() {
+            let mut new_txns_by_sender = Vec::new();
+            for mut txns in txns_by_sender.into_iter() {
+                optimized_txns.push(txns.pop_front().unwrap());
+                if !txns.is_empty() {
+                    new_txns_by_sender.push(txns);
+                }
+            }
+            txns_by_sender = new_txns_by_sender;
+        }
+        Payload::DirectMempool(optimized_txns)
+    } else {
+        payload
     }
 }
