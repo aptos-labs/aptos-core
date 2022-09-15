@@ -10,6 +10,7 @@ import {
 } from 'core/hooks/useTransactions';
 import queryKeys from 'core/queries/queryKeys';
 import { buildAccountTransferPayload, buildCoinTransferPayload } from 'shared/transactions';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 
 export interface UseCoinTransferParams {
   doesRecipientExist: boolean | undefined,
@@ -60,6 +61,7 @@ export function useCoinTransferTransaction(
   & UseTransactionSubmitOptions,
 ) {
   const queryClient = useQueryClient();
+  const { activeAccountAddress } = useActiveAccount();
 
   return useTransactionSubmit(
     ({
@@ -71,9 +73,19 @@ export function useCoinTransferTransaction(
       : buildAccountTransferPayload(recipient, amount)),
     {
       ...options,
-      onSuccess(txn, data, ...rest) {
-        queryClient.invalidateQueries(queryKeys.getAccountOctaCoinBalance);
-
+      async onMutate() {
+        await Promise.all([
+          queryClient.invalidateQueries([
+            queryKeys.getAccountOctaCoinBalance,
+            activeAccountAddress,
+          ]),
+          queryClient.invalidateQueries([
+            queryKeys.getUserTransactions,
+            activeAccountAddress,
+          ]),
+        ]);
+      },
+      async onSuccess(txn, data, ...rest) {
         // TODO: re-enable when fixing analytics
         // const { amount } = data;
         //

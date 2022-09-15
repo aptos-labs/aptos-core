@@ -27,9 +27,15 @@ export function useFundAccount() {
     mutationFn: fundAccount,
     onSuccess: async (result, { address }: UseFundAccountParams) => {
       if (result) {
-        await queryClient.invalidateQueries([
-          queryKeys.getAccountOctaCoinBalance,
-          address,
+        await Promise.all([
+          queryClient.invalidateQueries([
+            queryKeys.getAccountOctaCoinBalance,
+            address,
+          ]),
+          queryClient.invalidateQueries([
+            queryKeys.getAccountCoinResources,
+            address,
+          ]),
         ]);
       }
     },
