@@ -76,6 +76,7 @@ pub async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
+        None,
     )
     .await
     .unwrap();
@@ -734,20 +735,14 @@ async fn test_block() {
             "Block timestamp should match actual timestamp but in ms"
         );
 
-        // First transaction should be first in block
-        assert_eq!(
-            current_version, actual_block.first_version,
-            "First transaction in block should be the current version"
-        );
+        // TODO: double check that all transactions do show with the flag, and that all expected txns
+        // are shown without the flag
 
         let actual_txns = actual_block
             .transactions
             .as_ref()
             .expect("Every actual block should have transactions");
         parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
-
-        // The full block must have been processed
-        assert_eq!(current_version - 1, actual_block.last_version);
 
         // Keep track of the previous
         previous_block_index = block_height;
@@ -764,18 +759,33 @@ async fn parse_block_transactions(
     actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
-    for (txn_number, transaction) in block.transactions.iter().enumerate() {
-        let actual_txn = actual_txns
-            .get(txn_number)
-            .expect("There should be the same number of transactions in the actual block");
-        let actual_txn_info = &actual_txn.info;
+    let versions: Vec<_> = block
+        .transactions
+        .iter()
+        .map(|txn| txn.metadata.version.0)
+        .collect();
+    eprintln!(
+        "block: {} txns: {:?}",
+        block.block_identifier.index, versions
+    );
+    for transaction in block.transactions.iter() {
         let txn_metadata = &transaction.metadata;
+        let txn_version = txn_metadata.version.0;
+        let cur_version = *current_version;
+        assert!(
+            txn_version >= cur_version,
+            "Transaction version {} must be greater than previous {}",
+            txn_version,
+            cur_version
+        );
+
+        let actual_txn = actual_txns
+            .iter()
+            .find(|txn| txn.version == txn_version)
+            .expect("There should be the transaction in the actual block");
+        let actual_txn_info = &actual_txn.info;
 
         // Ensure transaction identifier is correct
-        assert_eq!(
-            *current_version, txn_metadata.version.0,
-            "There should be no gaps in transaction versions"
-        );
         assert_eq!(
             format!("{:x}", actual_txn_info.transaction_hash()),
             transaction.transaction_identifier.hash,
@@ -793,7 +803,7 @@ async fn parse_block_transactions(
         match txn_metadata.transaction_type {
             TransactionType::Genesis => {
                 // For this test, there should only be one genesis
-                assert_eq!(0, *current_version);
+                assert_eq!(0, cur_version);
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::GenesisTransaction(_)
@@ -832,13 +842,13 @@ async fn parse_block_transactions(
         .await;
 
         for (_, account_balance) in balances.iter() {
-            if let Some(amount) = account_balance.get(current_version) {
+            if let Some(amount) = account_balance.get(&cur_version) {
                 assert!(*amount >= 0, "Amount shouldn't be negative!")
             }
         }
 
         // Increment to next version
-        *current_version += 1;
+        *current_version = txn_version + 1;
     }
 }
 
@@ -1184,10 +1194,11 @@ async fn test_invalid_transaction_gas_charged() {
     // Verify failed txn
     let rosetta_txn = block_with_transfer
         .transactions
-        .get(txn_version.saturating_sub(block_info.first_version.0) as usize)
+        .iter()
+        .find(|txn| txn.metadata.version.0 == txn_version)
         .unwrap();
 
-    assert_transfer_transaction(
+    assert_failed_transfer_transaction(
         sender,
         AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
         TRANSFER_AMOUNT,
@@ -1196,7 +1207,7 @@ async fn test_invalid_transaction_gas_charged() {
     );
 }
 
-fn assert_transfer_transaction(
+fn assert_failed_transfer_transaction(
     sender: AccountAddress,
     receiver: AccountAddress,
     transfer_amount: u64,
@@ -1212,6 +1223,7 @@ fn assert_transfer_transaction(
     let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
+    // This should have 3, the deposit, withdraw, and fee
     assert_eq!(rosetta_txn.operations.len(), 3);
 
     // Check the operations

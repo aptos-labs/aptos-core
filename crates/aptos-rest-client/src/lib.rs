@@ -5,7 +5,6 @@ pub mod aptos;
 pub mod error;
 pub mod faucet;
 
-use aptos_api_types::TransactionsBatchSubmissionResult;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -16,25 +15,23 @@ pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 pub use state::State;
-pub use types::{Account, Resource};
+pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
 use crate::error::RestError;
 use anyhow::{anyhow, Result};
-use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData,
-    UserTransaction, VersionedEvent,
+    deserialize_from_string,
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
+    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_types::account_config::{AccountResource, CoinStoreResource};
-use aptos_types::contract_event::EventWithVersion;
-use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
-    transaction::SignedTransaction,
+    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    contract_event::EventWithVersion,
+    transaction::{ExecutionStatus, SignedTransaction},
 };
 use move_deps::move_core_types::language_storage::StructTag;
 use reqwest::header::ACCEPT;
@@ -45,7 +42,6 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::time::Duration;
 use tokio::time::Instant;
-use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));

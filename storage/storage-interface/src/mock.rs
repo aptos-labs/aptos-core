@@ -5,14 +5,13 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::{anyhow, Result};
+use aptos_types::account_address::AccountAddress;
+use aptos_types::account_config::AccountResource;
+use aptos_types::account_state::AccountState;
+use aptos_types::event::EventHandle;
+use aptos_types::state_store::state_value::StateValue;
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::AccountResource,
-    account_state::AccountState,
-    event::EventHandle,
-    proof::SparseMerkleProofExt,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Version,
+    proof::SparseMerkleProofExt, state_store::state_key::StateKey, transaction::Version,
 };
 use move_deps::move_core_types::move_resource::MoveResource;
 
@@ -20,32 +19,9 @@ use move_deps::move_core_types::move_resource::MoveResource;
 pub struct MockDbReaderWriter;
 
 impl DbReader for MockDbReaderWriter {
-    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
-        match state_key {
-            StateKey::AccessPath(access_path) => {
-                let account_state = get_mock_account_state();
-                Ok(account_state
-                    .get(&access_path.path)
-                    .cloned()
-                    .map(StateValue::from))
-            }
-            StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key))),
-            _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
-        }
-    }
-
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
         Ok(Some(1))
-    }
-
-    fn get_state_value_by_version(
-        &self,
-        state_key: &StateKey,
-        _: Version,
-    ) -> Result<Option<StateValue>> {
-        // dummy proof which is not used
-        Ok(self.get_latest_state_value(state_key.clone()).unwrap())
     }
 
     fn get_state_proof_by_version_ext(
@@ -54,6 +30,24 @@ impl DbReader for MockDbReaderWriter {
         _version: Version,
     ) -> Result<SparseMerkleProofExt> {
         Ok(SparseMerkleProofExt::new(None, vec![]))
+    }
+
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        _: Version,
+    ) -> Result<Option<StateValue>> {
+        match state_key {
+            StateKey::AccessPath(access_path) => {
+                let account_state = get_mock_account_state();
+                Ok(account_state
+                    .get(&access_path.path)
+                    .cloned()
+                    .map(StateValue::from))
+            }
+            StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
+            _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
+        }
     }
 }
 

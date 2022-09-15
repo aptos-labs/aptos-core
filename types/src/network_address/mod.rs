@@ -130,6 +130,7 @@ pub enum Protocol {
 /// 1. it is not an empty string
 /// 2. it is not larger than 255 bytes
 /// 3. it does not contain any forward slash '/' characters
+/// 4. it is valid ASCII (Unicode characters are not allowed to prevent phishing attacks)
 ///
 /// From the [DNS name syntax RFC](https://tools.ietf.org/html/rfc2181#page-13),
 /// the standard rules are:
@@ -139,7 +140,7 @@ pub enum Protocol {
 /// 3. any binary string is valid
 ///
 /// So the restrictions we're adding are (1) no '/' characters and (2) the name
-/// is a valid unicode string. We do this because '/' characters are already our
+/// is a valid ASCII string. We do this because '/' characters are already our
 /// protocol delimiter and Rust's [`std::net::ToSocketAddrs`] API requires a
 /// `&str`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
@@ -174,6 +175,9 @@ pub enum ParseError {
 
     #[error("dns name cannot contain '/' characters")]
     InvalidDnsNameCharacter,
+
+    #[error("dns name contains non-ASCII characters: {0}")]
+    DnsNameNonASCII(String),
 
     #[error("dns name is too long: len: {0} bytes, max len: 255 bytes")]
     DnsNameTooLong(usize),
@@ -665,6 +669,8 @@ impl DnsName {
             Err(ParseError::DnsNameTooLong(s.as_bytes().len()))
         } else if s.contains('/') {
             Err(ParseError::InvalidDnsNameCharacter)
+        } else if !s.is_ascii() {
+            Err(ParseError::DnsNameNonASCII(s.into()))
         } else {
             Ok(())
         }
@@ -892,6 +898,7 @@ mod test {
     use super::*;
     use anyhow::format_err;
     use bcs::test_helpers::assert_canonical_encode_decode;
+    use claims::assert_matches;
 
     #[test]
     fn test_network_address_display() {
@@ -1052,6 +1059,13 @@ mod test {
             parse_dns_tcp(addr.as_slice()).unwrap(),
             ((IpFilter::OnlyIp6, &dns_name, 123), expected_suffix)
         );
+
+        // The first `e` in `example.com` is a unicode character and not a regular `e`!
+        let bad_address = "/dns6/еxample.com/tcp/123";
+        assert_matches!(
+            NetworkAddress::from_str(bad_address),
+            Err(ParseError::DnsNameNonASCII(_))
+        );
     }
 
     #[test]
@@ -1096,14 +1110,26 @@ mod test {
     proptest! {
         #[test]
         fn test_network_address_canonical_serialization(addr in arb_aptosnet_addr()) {
-            assert_canonical_encode_decode(addr);
+            if addr.to_string().is_ascii() {
+                assert_canonical_encode_decode(addr);
+            } else {
+                let addr_bytes = bcs::to_bytes(&addr).unwrap();
+                bcs::from_bytes::<NetworkAddress>(&addr_bytes).unwrap_err();
+            }
         }
 
         #[test]
         fn test_network_address_display_roundtrip(addr in arb_aptosnet_addr()) {
             let addr_str = addr.to_string();
-            let addr_parsed = NetworkAddress::from_str(&addr_str).unwrap();
-            assert_eq!(addr, addr_parsed);
+            let addr_parsed = NetworkAddress::from_str(&addr_str);
+            if addr_str.is_ascii() {
+                assert_eq!(addr, addr_parsed.unwrap());
+            } else {
+                assert_matches!(
+                    addr_parsed,
+                    Err(ParseError::DnsNameNonASCII(_))
+                );
+            }
         }
 
         #[test]

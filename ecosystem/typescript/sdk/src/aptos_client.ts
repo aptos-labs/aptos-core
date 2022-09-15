@@ -464,7 +464,7 @@ export class AptosClient {
     txnHash: string,
     extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean },
   ): Promise<Gen.Transaction> {
-    const timeoutSecs = extraArgs?.timeoutSecs ?? 10;
+    const timeoutSecs = extraArgs?.timeoutSecs ?? 20;
     const checkSuccess = extraArgs?.checkSuccess ?? false;
 
     let isPending = true;

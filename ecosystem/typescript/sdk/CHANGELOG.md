@@ -5,6 +5,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+
+- Increase the default wait time for `waitForTransactionWithResult` to 20s.
 - A new function called `getEventsByCreationNumber` has been added, corresponding to the new endpoint on the API. For more information on this change, see the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for API version 1.1.0.
 - **[Deprecated]** The `getEventsByEventKey` function is now deprecated. In the next release it will be removed entirely. You must migrate to the new function, `getEventsByCreationNumber`, by then.
 - Included in the `Event` struct (which is what the events endpoints return) is a new field called `guid`. This is a more easily interpretable representation of an event identifier than the `key` field. See the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for an example of the new field.

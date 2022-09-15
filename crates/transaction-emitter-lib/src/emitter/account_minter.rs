@@ -174,7 +174,7 @@ impl<'t> AccountMinter<'t> {
             .await
             .into_iter()
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
+            .map_err(|e| format_err!("Failed to mint accounts: {:?}", e))?
             .into_iter()
             .flatten()
             .collect();
@@ -280,7 +280,7 @@ impl<'t> AccountMinter<'t> {
         let address = account_key.authentication_key().derived_address();
         let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
             format_err!(
-                "query_sequence_number on {:?} for dd account failed: {}",
+                "query_sequence_number on {:?} for dd account failed: {:?}",
                 client,
                 e
             )
@@ -507,7 +507,7 @@ pub async fn execute_and_wait_transactions(
         .await
         .map_err(|e| {
             format_err!(
-                "Failed to submit transactions: {:?}, {}",
+                "Failed to submit transactions: {:?}, {:?}",
                 state
                     .lock()
                     .failures
@@ -551,7 +551,7 @@ pub async fn execute_and_wait_transactions(
         RETRY_POLICY
             .retry(move || client.wait_for_signed_transaction_bcs(txn))
             .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
+            .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
     }
 
     debug!(

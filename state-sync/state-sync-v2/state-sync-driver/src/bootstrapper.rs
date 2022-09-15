@@ -90,7 +90,7 @@ impl VerifiedEpochStates {
 
     /// Verifies the given epoch ending ledger info, updates our latest
     /// trusted epoch state and attempts to verify any given waypoint.
-    pub fn verify_epoch_ending_ledger_info(
+    pub fn update_verified_epoch_states(
         &mut self,
         epoch_ending_ledger_info: &LedgerInfoWithSignatures,
         waypoint: &Waypoint,
@@ -146,7 +146,7 @@ impl VerifiedEpochStates {
             // Check if we've found the ledger info corresponding to the waypoint version
             if ledger_info_version == waypoint_version {
                 match waypoint.verify(ledger_info) {
-                    Ok(()) => self.verified_waypoint = true,
+                    Ok(()) => self.set_verified_waypoint(),
                     Err(error) => {
                         return Err(Error::VerificationError(
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
@@ -374,7 +374,7 @@ impl<
 
     /// Notifies any listeners if we've now bootstrapped
     async fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
-        if self.bootstrapped {
+        if self.is_bootstrapped() {
             if let Some(notifier_channel) = self.bootstrap_notifier_channel.take() {
                 if let Err(error) = notifier_channel.send(Ok(())) {
                     return Err(Error::CallbackSendFailed(format!(
@@ -516,7 +516,7 @@ impl<
                 // validator, consensus will take control and sync depending on how it sees fit.
                 self.bootstrapping_complete().await
             } else {
-                panic!("Snapshot syncing is currently unsupported for nodes with existing state! \
+                panic!("Fast syncing is currently unsupported for nodes with existing state! \
                         You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
                         select a different syncing mode, or delete your storage and restart your node.",
                        num_versions_behind, highest_known_ledger_version);
@@ -834,7 +834,7 @@ impl<
             )));
         }
 
-        // Verify the number of state values is valid
+        // Verify the end index and number of state values is valid
         let expected_num_state_values = state_value_chunk_with_proof
             .last_index
             .checked_sub(state_value_chunk_with_proof.first_index)
@@ -852,26 +852,6 @@ impl<
             return Err(Error::VerificationError(format!(
                 "The expected number of state values was invalid! Expected: {:?}, received: {:?}",
                 expected_num_state_values, num_state_values,
-            )));
-        }
-
-        // Verify the payload end index is valid
-        let expected_end_index = state_value_chunk_with_proof
-            .first_index
-            .checked_add(num_state_values)
-            .and_then(|version| version.checked_sub(1)) // expected_end_index = first_index + num_state_values - 1
-            .ok_or_else(|| {
-                Error::IntegerOverflow("The expected end of index has overflown!".into())
-            })?;
-        if expected_end_index != state_value_chunk_with_proof.last_index {
-            self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
-                NotificationFeedback::InvalidPayloadData,
-            )))
-            .await?;
-            return Err(Error::VerificationError(format!(
-                "The expected end index was invalid! Expected: {:?}, received: {:?}",
-                expected_num_state_values, state_value_chunk_with_proof.last_index,
             )));
         }
 
@@ -917,7 +897,7 @@ impl<
             let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
 
             // Initialize the state value synchronizer
-            let _ = self.storage_synchronizer.initialize_state_synchronizer(
+            let _join_handle = self.storage_synchronizer.initialize_state_synchronizer(
                 epoch_change_proofs,
                 ledger_info_to_sync,
                 transaction_output_to_sync.clone(),
@@ -1010,7 +990,7 @@ impl<
         // Verify the epoch change proofs, update our latest epoch state and
         // verify our waypoint.
         for epoch_ending_ledger_info in epoch_ending_ledger_infos {
-            if let Err(error) = self.verified_epoch_states.verify_epoch_ending_ledger_info(
+            if let Err(error) = self.verified_epoch_states.update_verified_epoch_states(
                 &epoch_ending_ledger_info,
                 &self.driver_configuration.waypoint,
             ) {

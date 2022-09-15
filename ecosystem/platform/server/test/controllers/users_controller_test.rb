@@ -8,7 +8,7 @@ require 'test_helper'
 class UsersControllerTest < ActionDispatch::IntegrationTest
   setup do
     @user = FactoryBot.create(:user)
-    Flipper.enable(:projects)
+    Flipper.enable(:profiles)
   end
 
   test 'overview loads correctly' do

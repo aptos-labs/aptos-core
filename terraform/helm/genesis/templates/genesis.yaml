@@ -116,6 +116,8 @@ spec:
           value: {{ .Values.genesis.domain | quote }}
         - name: VALIDATOR_ENABLE_ONCHAIN_DISCOVERY
           value: {{ .Values.genesis.validator.enable_onchain_discovery | quote }}
+        - name: RANDOM_SEED
+          value: {{ .Values.genesis.validator.key_seed | quote }}
         - name: FULLNODE_ENABLE_ONCHAIN_DISCOVERY
           value: {{ .Values.genesis.fullnode.enable_onchain_discovery | quote }}
         - name: VALIDATOR_INTERNAL_HOST_SUFFIX

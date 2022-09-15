@@ -6,7 +6,7 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
-    use aptos_framework::coin::{Self, MintCapability};
+    use aptos_framework::coin;
     use aptos_framework::account;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
@@ -102,15 +102,12 @@ module aptos_framework::genesis {
     }
 
     /// Genesis step 2: Initialize Aptos coin.
-    fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
+    fun initialize_aptos_coin(aptos_framework: &signer) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
-
-        mint_cap
     }
 
     /// Only called for testnets and e2e tests.
@@ -118,9 +115,14 @@ module aptos_framework::genesis {
         aptos_framework: &signer,
         core_resources_auth_key: vector<u8>,
     ) {
+        let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+        // Give stake module MintCapability<AptosCoin> so it can mint rewards.
+        stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
+        transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
-        let mint_cap = initialize_aptos_coin(aptos_framework);
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
@@ -189,6 +191,57 @@ module aptos_framework::genesis {
     /// The last step of genesis.
     fun set_genesis_end(aptos_framework: &signer) {
         chain_status::set_genesis_end(aptos_framework);
+    }
+
+    #[verify_only]
+    fun initialize_for_verification(
+        gas_schedule: vector<u8>,
+        chain_id: u8,
+        initial_version: u64,
+        consensus_config: vector<u8>,
+        epoch_interval_microsecs: u64,
+        minimum_stake: u64,
+        maximum_stake: u64,
+        recurring_lockup_duration_secs: u64,
+        allow_validator_set_change: bool,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
+
+        aptos_framework: &signer,
+
+        validators: vector<ValidatorConfiguration>,
+
+        min_voting_threshold: u128,
+        required_proposer_stake: u64,
+        voting_duration_secs: u64,
+    ) {
+        initialize(
+            gas_schedule,
+            chain_id,
+            initial_version,
+            consensus_config,
+            epoch_interval_microsecs,
+            minimum_stake,
+            maximum_stake,
+            recurring_lockup_duration_secs,
+            allow_validator_set_change,
+            rewards_rate,
+            rewards_rate_denominator,
+            voting_power_increase_limit
+        );
+
+        initialize_aptos_coin(aptos_framework);
+
+        aptos_governance::initialize_for_verification(
+            aptos_framework,
+            min_voting_threshold,
+            required_proposer_stake,
+            voting_duration_secs
+        );
+
+        create_initialize_validators(aptos_framework, validators);
+        set_genesis_end(aptos_framework);
     }
 
     #[test_only]

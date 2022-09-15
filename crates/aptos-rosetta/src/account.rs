@@ -22,7 +22,9 @@ use aptos_logger::{debug, trace};
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CoinInfoResource, CoinStoreResource};
+use once_cell::sync::Lazy;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use std::collections::BTreeMap;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
@@ -80,7 +82,6 @@ async fn account_balance(
     .await?;
 
     let amounts = convert_balances_to_amounts(
-        &rest_client,
         server_context.coin_cache.clone(),
         request.currencies,
         balances,
@@ -99,7 +100,6 @@ async fn account_balance(
 
 /// Lookup currencies and convert them to Rosetta types
 async fn convert_balances_to_amounts(
-    rest_client: &aptos_rest_client::Client,
     coin_cache: Arc<CoinCache>,
     maybe_filter_currencies: Option<Vec<Currency>>,
     balances: HashMap<TypeTag, u64>,
@@ -109,10 +109,7 @@ async fn convert_balances_to_amounts(
 
     // Lookup coins, and fill in currency codes
     for (coin, balance) in balances {
-        if let Some(currency) = coin_cache
-            .get_currency(rest_client, coin, Some(balance_version))
-            .await?
-        {
+        if let Some(currency) = coin_cache.get_currency(coin, Some(balance_version)).await? {
             amounts.push(Amount {
                 value: balance.to_string(),
                 currency,
@@ -195,29 +192,54 @@ async fn get_balances(
     }
 }
 
+/// Only coins supported by Rosetta
+///
+/// TODO: Allow passing in known supported coins in some sort of config file
+pub static SUPPORTED_COINS: Lazy<Vec<TypeTag>> = Lazy::new(|| vec![native_coin_tag()]);
+
 /// A cache for currencies, so we don't have to keep looking up the status of it
 #[derive(Debug)]
 pub struct CoinCache {
-    currencies: RwLock<HashMap<TypeTag, Option<Currency>>>,
+    rest_client: Option<Arc<aptos_rest_client::Client>>,
+    currencies: RwLock<BTreeMap<TypeTag, Option<Currency>>>,
 }
 
 impl CoinCache {
-    pub fn new() -> Self {
+    pub fn new(rest_client: Option<Arc<aptos_rest_client::Client>>) -> Self {
         Self {
-            currencies: RwLock::new(HashMap::new()),
+            rest_client,
+            currencies: RwLock::new(BTreeMap::new()),
+        }
+    }
+
+    pub fn get_currency_from_cache(&self, coin: &TypeTag) -> Option<Currency> {
+        // Short circuit for the default coin
+        if coin == &native_coin_tag() {
+            return Some(native_coin());
+        }
+
+        let currencies = self.currencies.read().unwrap();
+        if let Some(currency) = currencies.get(coin) {
+            currency.clone()
+        } else {
+            None
         }
     }
 
     /// Retrieve a currency and cache it if applicable
     pub async fn get_currency(
         &self,
-        rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
         version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
         // Short circuit for the default coin
         if coin == native_coin_tag() {
             return Ok(Some(native_coin()));
+        }
+
+        // Unsupported coins should be ignored, as symbol may be used as an identifier
+        if !SUPPORTED_COINS.contains(&coin) {
+            return Ok(None);
         }
 
         {
@@ -228,8 +250,14 @@ impl CoinCache {
         }
 
         let currency = self
-            .get_currency_inner(rest_client, coin.clone(), version)
-            .await?;
+            .get_currency_inner(coin.clone(), version)
+            .await
+            .map_err(|err| {
+                ApiError::CoinTypeFailedToBeFetched(Some(format!(
+                    "Failed to retrieve coin type {} {}",
+                    coin, err
+                )))
+            })?;
         self.currencies
             .write()
             .unwrap()
@@ -240,7 +268,6 @@ impl CoinCache {
     /// Pulls currency information from onchain
     pub async fn get_currency_inner(
         &self,
-        rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
         version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
@@ -250,11 +277,6 @@ impl CoinCache {
             _ => return Ok(None),
         };
 
-        // Nested types are not supported for now
-        if !struct_tag.type_params.is_empty() {
-            return Ok(None);
-        }
-
         // Retrieve the coin type
         const ENCODE_CHARS: &AsciiSet = &CONTROLS.add(b'<').add(b'>');
         let address = struct_tag.address;
@@ -262,7 +284,9 @@ impl CoinCache {
         let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
 
         let response = if let Some(version) = version {
-            rest_client
+            self.rest_client
+                .as_ref()
+                .expect("Should have rest client to check coin cache")
                 .get_account_resource_at_version_bcs::<CoinInfoResource>(
                     address,
                     &encoded_resource_tag,
@@ -270,7 +294,9 @@ impl CoinCache {
                 )
                 .await
         } else {
-            rest_client
+            self.rest_client
+                .as_ref()
+                .expect("Should have rest client to check coin cache")
                 .get_account_resource_bcs::<CoinInfoResource>(address, &encoded_resource_tag)
                 .await
         };

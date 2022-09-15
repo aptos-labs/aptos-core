@@ -335,6 +335,14 @@ where
                         ));
                     }
                 }
+            } else {
+                statuses.push((
+                    transaction.clone(),
+                    (
+                        MempoolStatus::new(MempoolStatusCode::VmError),
+                        Some(DiscardedVMStatus::UNKNOWN_STATUS),
+                    ),
+                ));
             }
         }
     }

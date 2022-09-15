@@ -136,7 +136,7 @@ impl Cluster {
 
         let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.reuse_accounts)
             .await
-            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
+            .map_err(|e| format_err!("failed to create a cluster from host and port: {:?}", e))?;
 
         Ok(cluster)
     }
@@ -152,7 +152,7 @@ impl Cluster {
     ) -> Result<LocalAccount> {
         let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
             format_err!(
-                "query_sequence_numbers on {:?} for account {} failed: {}",
+                "query_sequence_numbers on {:?} for account {} failed: {:?}",
                 client,
                 address,
                 e

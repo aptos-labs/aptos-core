@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::{
     block_storage::BlockStore,
     commit_notifier::CommitNotifier,
@@ -695,6 +696,13 @@ impl EpochManager {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
+
+        if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+        }
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -784,6 +792,12 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
+        if let VerifiedEvent::ProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED,
+            );
+        }
         match event {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {

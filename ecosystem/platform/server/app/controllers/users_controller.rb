@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class UsersController < ApplicationController
-  before_action :ensure_projects_enabled!
+  before_action :ensure_profiles_enabled!
   layout 'users'
 
   # GET /users/1
@@ -36,7 +36,7 @@ class UsersController < ApplicationController
 
   private
 
-  def ensure_projects_enabled!
-    redirect_to root_path unless Flipper.enabled?(:projects)
+  def ensure_profiles_enabled!
+    redirect_to root_path unless Flipper.enabled?(:profiles)
   end
 end

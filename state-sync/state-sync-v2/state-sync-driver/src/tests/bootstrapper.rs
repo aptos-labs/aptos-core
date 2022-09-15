@@ -768,9 +768,7 @@ async fn test_snapshot_sync_lag() {
 }
 
 #[tokio::test]
-#[should_panic(
-    expected = "Snapshot syncing is currently unsupported for nodes with existing state!"
-)]
+#[should_panic(expected = "Fast syncing is currently unsupported for nodes with existing state!")]
 async fn test_snapshot_sync_lag_panic() {
     // Create test data
     let num_versions_behind = 10000;
@@ -1067,7 +1065,7 @@ fn manipulate_verified_epoch_states(
         let epoch_ending_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 0);
         let waypoint_ledger_info = create_random_epoch_ending_ledger_info(0, 1);
         verified_epoch_states
-            .verify_epoch_ending_ledger_info(
+            .update_verified_epoch_states(
                 &epoch_ending_ledger_info,
                 &Waypoint::new_any(waypoint_ledger_info.ledger_info()),
             )

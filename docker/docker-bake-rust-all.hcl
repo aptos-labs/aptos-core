@@ -52,7 +52,6 @@ variable "FEATURES" {
 group "all" {
   targets = flatten([
     "validator",
-    "indexer",
     "node-checker",
     "tools",
     "faucet",
@@ -70,7 +69,6 @@ target "_common" {
   cache-from = flatten([
     // need to repeat all images here until https://github.com/docker/buildx/issues/934 is resolved
     generate_cache_from("validator"),
-    generate_cache_from("indexer"),
     generate_cache_from("node-checker"),
     generate_cache_from("tools"),
     generate_cache_from("faucet"),
@@ -108,13 +106,6 @@ target "validator-testing" {
   target   = "validator-testing"
   cache-to = generate_cache_to("validator-testing")
   tags     = generate_tags("validator-testing")
-}
-
-target "indexer" {
-  inherits = ["_common"]
-  target   = "indexer"
-  cache-to = generate_cache_to("indexer")
-  tags     = generate_tags("indexer")
 }
 
 target "node-checker" {

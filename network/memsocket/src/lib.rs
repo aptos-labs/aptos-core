@@ -13,10 +13,28 @@ use futures::{
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroU16, pin::Pin};
 
-static SWITCHBOARD: Lazy<Mutex<SwitchBoard>> =
-    Lazy::new(|| Mutex::new(SwitchBoard(HashMap::default(), 1)));
+/// A global switch board of all in-memory socket servers
+static SWITCHBOARD: Lazy<Mutex<SwitchBoard>> = Lazy::new(|| Mutex::new(SwitchBoard::new()));
 
-struct SwitchBoard(HashMap<NonZeroU16, UnboundedSender<MemorySocket>>, u16);
+/// The port counter at which to search for available ports
+const PORT_TO_START_AT: u16 = 1; // Port 0 is used to request a random port
+
+/// A struct that contains all in-memory socket servers
+/// that have already been bound, and a counter to search
+/// through available ports.
+struct SwitchBoard {
+    pub port_to_sender_map: HashMap<NonZeroU16, UnboundedSender<MemorySocket>>,
+    pub next_port_to_check: u16,
+}
+
+impl SwitchBoard {
+    pub fn new() -> Self {
+        SwitchBoard {
+            port_to_sender_map: HashMap::new(),
+            next_port_to_check: PORT_TO_START_AT,
+        }
+    }
+}
 
 /// An in-memory socket server, listening for connections.
 ///
@@ -65,7 +83,7 @@ impl Drop for MemoryListener {
         let mut switchboard = (&*SWITCHBOARD).lock();
         // Remove the Sending side of the channel in the switchboard when
         // MemoryListener is dropped
-        switchboard.0.remove(&self.port);
+        switchboard.port_to_sender_map.remove(&self.port);
     }
 }
 
@@ -94,34 +112,40 @@ impl MemoryListener {
     pub fn bind(port: u16) -> Result<Self> {
         let mut switchboard = (&*SWITCHBOARD).lock();
 
-        // Get the port we should bind to.  If 0 was given, use a random port
-        let port = if let Some(port) = NonZeroU16::new(port) {
-            if switchboard.0.contains_key(&port) {
+        // Get the port we should bind to. If 0 was given, use a random port.
+        let port = if port != 0 {
+            let port = NonZeroU16::new(port).unwrap_or_else(|| unreachable!());
+            if switchboard.port_to_sender_map.contains_key(&port) {
                 return Err(ErrorKind::AddrInUse.into());
             }
             port
         } else {
-            loop {
-                let port = NonZeroU16::new(switchboard.1).unwrap_or_else(|| unreachable!());
+            // Check if the switchboard is full and if all ports are in use
+            if Some(switchboard.port_to_sender_map.len())
+                == u16::MAX.checked_sub(1).map(usize::from)
+            {
+                return Err(ErrorKind::AddrInUse.into());
+            }
 
-                // The switchboard is full and all ports are in use
-                if Some(switchboard.0.len()) == std::u16::MAX.checked_sub(1).map(usize::from) {
-                    return Err(ErrorKind::AddrInUse.into());
-                }
+            // Find a random and unused port
+            loop {
+                let port = NonZeroU16::new(switchboard.next_port_to_check)
+                    .unwrap_or_else(|| unreachable!());
 
                 // Instead of overflowing to 0, resume searching at port 1 since port 0 isn't a
                 // valid port to bind to.
-
-                switchboard.1 = switchboard.1.checked_add(1).unwrap_or(1);
-
-                if !switchboard.0.contains_key(&port) {
+                switchboard.next_port_to_check = switchboard
+                    .next_port_to_check
+                    .checked_add(1)
+                    .unwrap_or(PORT_TO_START_AT);
+                if !switchboard.port_to_sender_map.contains_key(&port) {
                     break port;
                 }
             }
         };
 
         let (sender, receiver) = mpsc::unbounded();
-        switchboard.0.insert(port, sender);
+        switchboard.port_to_sender_map.insert(port, sender);
 
         Ok(Self {
             incoming: receiver,
@@ -296,7 +320,7 @@ impl MemorySocket {
         let port = NonZeroU16::new(port).ok_or(ErrorKind::AddrNotAvailable)?;
 
         let sender = switchboard
-            .0
+            .port_to_sender_map
             .get_mut(&port)
             .ok_or(ErrorKind::AddrNotAvailable)?;
 
