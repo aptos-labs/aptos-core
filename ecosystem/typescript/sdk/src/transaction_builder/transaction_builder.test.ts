@@ -3,7 +3,7 @@
 
 /* eslint-disable max-len */
 import nacl from "tweetnacl";
-import { bytesToHex } from "../bytes_to_hex.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";
 import { HexString } from "../hex_string";
 
@@ -30,10 +30,6 @@ const ADDRESS_3 = "0x0a550c18";
 const ADDRESS_4 = "0x01";
 const PRIVATE_KEY = "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f";
 const TXN_EXPIRE = "18446744073709551615";
-
-function hexToBytes(hex: string) {
-  return new HexString(hex).toUint8Array();
-}
 
 function hexSignedTxn(signedTxn: Uint8Array): string {
   return bytesToHex(signedTxn);
