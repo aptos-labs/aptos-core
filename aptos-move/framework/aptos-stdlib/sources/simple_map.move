@@ -34,6 +34,18 @@ module aptos_std::simple_map {
         }
     }
 
+    public fun element_key<Key: store, Value: store>(elem: &Element<Key, Value>): &Key {
+        &elem.key
+    }
+
+    public fun element_value<Key: store, Value: store>(elem: &Element<Key, Value>): &Value {
+        &elem.value
+    }
+
+    public fun element_value_mut<Key: store, Value: store>(elem: &mut Element<Key, Value>): &mut Value {
+        &mut elem.value
+    }
+
     public fun borrow<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
@@ -44,6 +56,13 @@ module aptos_std::simple_map {
         &vector::borrow(&map.data, idx).value
     }
 
+    public fun borrow_at_index<Key: store, Value: store>(
+        map: &SimpleMap<Key, Value>,
+        idx: u64,
+    ): &Element<Key, Value> {
+        vector::borrow(&map.data, idx)
+    }
+
     public fun borrow_mut<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
@@ -52,6 +71,13 @@ module aptos_std::simple_map {
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let idx = option::extract(&mut maybe_idx);
         &mut vector::borrow_mut(&mut map.data, idx).value
+    }
+
+    public fun borrow_at_index_mut<Key: store, Value: store>(
+        map: &mut SimpleMap<Key, Value>,
+        idx: u64,
+    ): &mut Element<Key, Value> {
+        vector::borrow_mut(&mut map.data, idx)
     }
 
     public fun contains_key<Key: store, Value: store>(
@@ -183,6 +209,21 @@ module aptos_std::simple_map {
         let idx = 0;
         while (idx < vector::length(&map.data)) {
             assert!(idx == vector::borrow(&map.data, idx).key, idx);
+            idx = idx + 1;
+        };
+
+        let idx = 0;
+        while (idx < vector::length(&map.data)) {
+            let x = borrow_at_index_mut(&mut map, idx);
+            let v = element_value_mut(x);
+            *v = idx + 2;
+            idx = idx + 1;
+        };
+
+        let idx = 0;
+        while (idx < vector::length(&map.data)) {
+            let v = *element_value(borrow_at_index(&map, idx));
+            assert!(idx == v - 2, idx);
             idx = idx + 1;
         };
 
