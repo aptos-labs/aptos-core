@@ -353,8 +353,7 @@ mod test {
 
         let test_context = new_test_context("doesnt_matter".to_string(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
-        let pg_transaction_processor =
-            DefaultTransactionProcessor::new(conn_pool.clone());
+        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let mut tailer = Tailer::new(
             context,
             conn_pool.clone(),
@@ -382,6 +381,7 @@ mod test {
                "state_change_hash":"0x27b382a98a32256a9e6403ca1f6e26998273d77afa9e8666e7ee13679af40a7a",
                "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
                "gas_used":"0",
+               "block_height":"0",
                "success":true,
                "vm_status":"Executed successfully",
                "accumulator_root_hash":"0x6a527d06063dfd42c6b3a862574d5f3ec1660afb8058135edda5072712bfdb51",
@@ -585,6 +585,7 @@ mod test {
             {
               "type": "block_metadata_transaction",
               "version": "69158",
+              "block_height": "100",
               "hash": "0x2b7c58ed8524d228f9d0543a82e2793d04e8871df322f976b0e7bb8c5ced4ff5",
               "state_change_hash": "0x3ead9eb40582fbc7df5e02f72280931dc3e6f1aae45dc832966b4cd972dac4b8",
               "event_root_hash": "0x2e481956dea9c59b6fc9f823fe5f4c45efce173e42c551c1fe073b5d76a65504",
@@ -686,6 +687,7 @@ mod test {
             {
               "type": "user_transaction",
               "version": "691595",
+              "block_height": "100",
               "hash": "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb",
               "state_change_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
@@ -810,6 +812,7 @@ mod test {
             {
               "type": "user_transaction",
               "version": "260885",
+              "block_height": "100",
               "hash": "0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3",
               "state_change_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",

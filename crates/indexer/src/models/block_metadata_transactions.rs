@@ -7,9 +7,7 @@
 
 use super::transactions::Transaction;
 use crate::{schema::block_metadata_transactions, util::parse_timestamp};
-use aptos_api_types::{
-    BlockMetadataTransaction as APIBlockMetadataTransaction,
-};
+use aptos_api_types::BlockMetadataTransaction as APIBlockMetadataTransaction;
 use field_count::FieldCount;
 use serde::Serialize;
 
