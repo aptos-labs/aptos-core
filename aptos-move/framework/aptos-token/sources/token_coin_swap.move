@@ -5,6 +5,7 @@
 module aptos_token::token_coin_swap {
     use std::signer;
     use std::string::String;
+    use std::error;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::account;
@@ -13,12 +14,29 @@ module aptos_token::token_coin_swap {
     use aptos_framework::timestamp;
     use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
+    //
+    // Errors.
+    //
+
+    /// Token already listed
     const ETOKEN_ALREADY_LISTED: u64 = 1;
+
+    /// Token listing no longer exists
     const ETOKEN_LISTING_NOT_EXIST: u64 = 2;
+
+    /// Token is not in escrow
     const ETOKEN_NOT_IN_ESCROW: u64 = 3;
+
+    /// Token cannot be moved out of escrow before the lockup time
     const ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME: u64 = 4;
+
+    /// Token buy price doesn't match listing price
     const ETOKEN_MIN_PRICE_NOT_MATCH: u64 = 5;
+
+    /// Token buy amount doesn't match listing amount
     const ETOKEN_AMOUNT_NOT_MATCH: u64 = 6;
+
+    /// Not enough coin to buy token
     const ENOT_ENOUGH_COIN: u64 = 7;
 
     /// TokenCoinSwap records a swap ask for swapping token_amount with CoinType with a minimal price per token
@@ -87,12 +105,12 @@ module aptos_token::token_coin_swap {
         // valide listing existing and coin owner has sufficient balance
         let coin_address = signer::address_of(coin_owner);
         let token_listing = borrow_global_mut<TokenListings<CoinType>>(token_owner);
-        assert!(table::contains(&token_listing.listings, token_id), ETOKEN_LISTING_NOT_EXIST);
-        assert!(coin::balance<CoinType>(coin_address) >= coin_amount, ENOT_ENOUGH_COIN);
+        assert!(table::contains(&token_listing.listings, token_id), error::not_found(ETOKEN_LISTING_NOT_EXIST));
+        assert!(coin::balance<CoinType>(coin_address) >= coin_amount, error::invalid_argument(ENOT_ENOUGH_COIN));
         // validate min price and amount
         let token_swap = table::borrow_mut(&mut token_listing.listings, token_id);
-        assert!(token_swap.min_price_per_token * token_amount <= coin_amount, ETOKEN_MIN_PRICE_NOT_MATCH);
-        assert!(token_swap.token_amount >= token_amount, ETOKEN_AMOUNT_NOT_MATCH);
+        assert!(token_swap.min_price_per_token * token_amount <= coin_amount, error::invalid_argument(ETOKEN_MIN_PRICE_NOT_MATCH));
+        assert!(token_swap.token_amount >= token_amount, error::invalid_argument(ETOKEN_AMOUNT_NOT_MATCH));
 
         // withdraw from token escrow of tokens
         let tokens = withdraw_token_from_escrow_internal(token_owner, token_id, token_amount);
@@ -164,7 +182,7 @@ module aptos_token::token_coin_swap {
             min_price_per_token: min_coin_per_token
         };
         let listing = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listings;
-        assert!(!table::contains(listing, token_id), ETOKEN_ALREADY_LISTED);
+        assert!(!table::contains(listing, token_id), error::already_exists(ETOKEN_ALREADY_LISTED));
         table::add(listing, token_id, swap);
 
         let event_handle = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listing_events;
@@ -232,9 +250,9 @@ module aptos_token::token_coin_swap {
         amount: u64
     ): Token acquires TokenStoreEscrow {
         let tokens_in_escrow = &mut borrow_global_mut<TokenStoreEscrow>(token_owner_addr).token_escrows;
-        assert!(table::contains(tokens_in_escrow, token_id), ETOKEN_NOT_IN_ESCROW);
+        assert!(table::contains(tokens_in_escrow, token_id), error::not_found(ETOKEN_NOT_IN_ESCROW));
         let token_escrow = table::borrow_mut(tokens_in_escrow, token_id);
-        assert!(timestamp::now_seconds() > token_escrow.locked_until_secs, ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME);
+        assert!(timestamp::now_seconds() > token_escrow.locked_until_secs, error::invalid_argument(ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME));
         if (amount == token::get_token_amount(&token_escrow.token)) {
             // destruct the token escrow to reclaim storage
             let TokenEscrow {
@@ -265,7 +283,7 @@ module aptos_token::token_coin_swap {
         let token_owner_addr = signer::address_of(token_owner);
         let listing = &mut borrow_global_mut<TokenListings<CoinType>>(token_owner_addr).listings;
         // remove the listing entry
-        assert!(table::contains(listing, token_id), ETOKEN_LISTING_NOT_EXIST);
+        assert!(table::contains(listing, token_id), error::not_found(ETOKEN_LISTING_NOT_EXIST));
         table::remove(listing, token_id);
         // get token out of escrow and deposit back to owner token store
         let tokens = withdraw_token_from_escrow(token_owner, token_id, token_amount);
