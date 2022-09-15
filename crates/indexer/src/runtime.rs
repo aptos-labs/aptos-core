@@ -160,13 +160,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         }) as u64;
     let start_version = match config.starting_version {
         None => starting_version_from_db,
-        Some(version) => {
-            if version == 0 {
-                starting_version_from_db
-            } else {
-                version as u64
-            }
-        }
+        Some(version) => version,
     };
 
     info!(
