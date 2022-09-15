@@ -11,7 +11,7 @@
 import path from "path";
 import nacl from "tweetnacl";
 import fs from "fs";
-import { bytesToHex } from "../bytes_to_hex.js";
+import { bytesToHex } from "@noble/hashes/utils";
 import {
   AccountAddress,
   ChainId,
