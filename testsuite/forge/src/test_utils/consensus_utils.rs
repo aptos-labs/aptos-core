@@ -23,7 +23,7 @@ pub struct NodeState {
 // TODO: check if we can fetch consensus round, not just committed round.
 async fn get_node_state(validator_client: &RestClient) -> NodeState {
     let (events, state) = validator_client
-        .get_new_block_events(None, Some(1))
+        .get_new_block_events_bcs(None, Some(1))
         .await
         .unwrap()
         .into_parts();
