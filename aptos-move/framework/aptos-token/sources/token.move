@@ -444,7 +444,6 @@ module aptos_token::token {
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
-        // TODO: Why need the creator address then if the account's address is expected to be the same as the creator?
         assert!(signer::address_of(account) == creator, error::not_found(ENO_MUTATE_CAPABILITY));
         // validate if the properties is mutable
         assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
@@ -881,9 +880,6 @@ module aptos_token::token {
         token_data_id: TokenDataId,
         amount: u64,
     ): TokenId acquires Collections, TokenStore {
-        // TODO: Validate that amount > 0?
-        // TODO: Validate that token being minted has property_version = 0? Otherwise, it's fungible and cannot be
-        // be minted more.
         assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
