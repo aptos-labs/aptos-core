@@ -18,6 +18,7 @@ pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
 pub mod twin_validator_test;
+pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
 use anyhow::{anyhow, ensure};
@@ -116,7 +117,7 @@ pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllNodes)
     }
-    // Load is started before this funciton is called, and stops after this function returns.
+    // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
     fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {

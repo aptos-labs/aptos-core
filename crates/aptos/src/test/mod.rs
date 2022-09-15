@@ -16,7 +16,10 @@ use crate::common::types::{
     MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
     PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
+
+#[cfg(feature = "cli-framework-test-move")]
 use crate::common::utils::write_to_file;
+
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
     PublishPackage, RunFunction, TestPackage,
@@ -49,7 +52,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+
+#[cfg(feature = "cli-framework-test-move")]
 use thiserror::private::PathAsDisplay;
+
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -662,6 +668,7 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
+    #[cfg(feature = "cli-framework-test-move")]
     pub fn add_move_files(&self) {
         let move_dir = self.move_dir();
         let sources_dir = move_dir.join("sources");

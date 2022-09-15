@@ -22,6 +22,7 @@ use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
 use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::twin_validator_test::TwinValidatorTest;
+use testcases::validator_join_leave_test::ValidatorJoinLeaveTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
@@ -438,6 +439,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             state_sync_perf_fullnodes_execute_transactions(config)
         }
         "state_sync_perf_validators" => state_sync_perf_validators(config),
+        "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => config
             .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
             .with_network_tests(vec![&SimpleValidatorUpgrade])
@@ -749,6 +751,24 @@ fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig
         }))
         .with_network_tests(vec![&StateSyncValidatorPerformance])
         .with_success_criteria(SuccessCriteria::new(5000, 10000, false, None, None, None))
+}
+
+/// The config for running a validator join and leave test.
+fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    forge_config
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 600.into();
+        }))
+        .with_network_tests(vec![&ValidatorJoinLeaveTest])
+        .with_success_criteria(SuccessCriteria::new(
+            5000,
+            10000,
+            false,
+            Some(Duration::from_secs(600)),
+            None,
+            None,
+        ))
 }
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
