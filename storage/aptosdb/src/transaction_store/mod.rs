@@ -4,6 +4,7 @@
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
 use crate::transaction_accumulator::TransactionAccumulatorSchema;
+use crate::transaction_store::iterators::ExpectContinuousVersions;
 use crate::{
     errors::AptosDbError,
     schema::{
@@ -20,7 +21,7 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use iterators::{AccountTransactionVersionIter, TransactionIter};
+use iterators::AccountTransactionVersionIter;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::Arc;
 
@@ -104,15 +105,27 @@ impl TransactionStore {
             .ok_or_else(|| AptosDbError::NotFound(format!("Txn {}", version)).into())
     }
 
-    /// Gets an iterator that yields `num_transactions` transactions starting from `start_version`.
+    /// Gets an iterator that yields at most `num_transactions` transactions starting from `start_version`.
     pub fn get_transaction_iter(
         &self,
         start_version: Version,
         num_transactions: usize,
-    ) -> Result<TransactionIter> {
+    ) -> Result<impl Iterator<Item = Result<Transaction>> + '_> {
         let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
-        TransactionIter::new(iter, start_version, num_transactions)
+        iter.expect_continuous_versions(start_version, num_transactions)
+    }
+
+    #[allow(dead_code)]
+    /// Gets an iterator that yields `num_transactions` write sets starting from `start_version`.
+    pub fn get_write_set_iter(
+        &self,
+        start_version: Version,
+        num_transactions: usize,
+    ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
+        let mut iter = self.db.iter::<WriteSetSchema>(ReadOptions::default())?;
+        iter.seek(&start_version)?;
+        iter.expect_continuous_versions(start_version, num_transactions)
     }
 
     /// Save signed transaction at `version`
