@@ -4,10 +4,11 @@
 use anyhow::Result;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
+use schemadb::iterator::SchemaIterator;
 use schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
-    SchemaIterator, DB,
+    DB,
 };
 
 define_schema!(TestSchema, TestKey, TestValue, "TestCF");
