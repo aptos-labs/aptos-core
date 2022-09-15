@@ -320,11 +320,16 @@ mod test {
 
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
-            "metadatas",
-            "token_activities",
+            "collection_datas",
+            "tokens",
             "token_datas",
-            "token_propertys",
+            "token_ownerships",
+            "signatures",
             "collections",
+            "move_modules",
+            "move_resources",
+            "table_items",
+            "table_metadatas",
             "ownerships",
             "write_set_changes",
             "events",

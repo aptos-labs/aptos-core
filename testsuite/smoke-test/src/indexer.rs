@@ -13,11 +13,16 @@ use std::sync::Arc;
 
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
-        "metadatas",
-        "token_activities",
+        "collection_datas",
+        "tokens",
         "token_datas",
-        "token_propertys",
+        "token_ownerships",
+        "signatures",
         "collections",
+        "move_modules",
+        "move_resources",
+        "table_items",
+        "table_metadatas",
         "ownerships",
         "write_set_changes",
         "events",
@@ -29,7 +34,7 @@ pub fn wipe_database(conn: &PgPoolConnection) {
         "__diesel_schema_migrations",
     ] {
         conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-            .unwrap_or_else(|_| panic!("Could not drop table '{}'", table));
+            .unwrap();
     }
 }
 
