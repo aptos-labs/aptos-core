@@ -4,6 +4,7 @@
 import React, { useMemo } from 'react';
 import {
   Box,
+  Button,
   Center,
   Spinner,
   Text,
@@ -13,6 +14,11 @@ import {
 import { Types } from 'aptos';
 import { secondaryBorderColor } from 'core/colors';
 import ActivityItem from 'core/components/ActivityItem';
+import { useActiveAccount } from 'core/hooks/useAccounts';
+import { useCoinTransferTransactions } from 'core/queries/transaction';
+import { ChevronRightIcon } from '@chakra-ui/icons';
+import ChakraLink from './ChakraLink';
+import { Routes } from '../routes';
 
 function NoActivity() {
   const { colorMode } = useColorMode();
@@ -27,23 +33,59 @@ function NoActivity() {
 
 interface TransactionListProps {
   isLoading?: boolean,
+  limit?: number;
   transactions?: Types.UserTransaction[]
 }
 
 export function TransactionList({
   isLoading,
+  limit,
   transactions,
 }: TransactionListProps) {
+  const { activeAccountAddress } = useActiveAccount();
+  const {
+    data: hookTransactions,
+    isLoading: hookIsLoading,
+  } = useCoinTransferTransactions(activeAccountAddress, { enabled: !transactions });
+
+  const masterIsLoading = (isLoading) || hookIsLoading;
+  const sortedTxns = (transactions) || hookTransactions?.sort(
+    (a, b) => Number(b.version) - Number(a.version),
+  );
+
   const children = useMemo(
-    () => ((transactions && transactions.length > 0)
-      ? transactions.map((t) => <ActivityItem key={t.hash} transaction={t} />)
-      : <NoActivity />),
-    [transactions],
+    () => {
+      if (!(sortedTxns && sortedTxns.length > 0)) {
+        return <NoActivity />;
+      }
+      let result = sortedTxns.map((t) => <ActivityItem key={t.hash} transaction={t} />);
+      const prevResultLength = result.length;
+
+      if (limit) {
+        result = result.slice(0, limit);
+        if (limit < prevResultLength) {
+          result.push((
+            <ChakraLink key="View more" width="100%" to={Routes.activity.path}>
+              <Button
+                py={6}
+                width="100%"
+                rightIcon={<ChevronRightIcon />}
+                justifyContent="space-between"
+              >
+                View more
+              </Button>
+            </ChakraLink>
+          ));
+        }
+      }
+      return result;
+    },
+    [limit, sortedTxns],
   );
 
   return (
     <VStack w="100%" spacing={3}>
-      { isLoading ? <Spinner /> : children }
+      { masterIsLoading ? <Spinner /> : children }
     </VStack>
   );
 }

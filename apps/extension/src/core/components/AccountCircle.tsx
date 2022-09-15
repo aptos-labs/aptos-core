@@ -7,7 +7,7 @@ import {
 } from '@chakra-ui/react';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { Account } from 'shared/types';
-import AvatarImage from 'core/accountImages';
+import AvatarImage from 'core/AvatarImage';
 
 interface AccountCircleProps {
   account?: Account;

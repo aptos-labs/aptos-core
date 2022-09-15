@@ -6,6 +6,7 @@ import { Box, Grid, useColorMode } from '@chakra-ui/react';
 import WalletFooter from 'core/components/WalletFooter';
 import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/colors';
+import styled from '@emotion/styled';
 
 interface WalletLayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,12 @@ interface WalletLayoutProps {
   showBackButton?: boolean;
   title?: string
 }
+
+const BodyDiv = styled(Box)`
+  &::-webkit-scrollbar {
+    display: none
+  }
+`;
 
 export default function WalletLayout({
   children,
@@ -54,9 +61,13 @@ export default function WalletLayout({
           showBackButton={showBackButton}
         />
       ) : undefined}
-      <Box maxH="100%" overflowY="auto" pb={4}>
+      <BodyDiv
+        maxH="100%"
+        overflowY="auto"
+        pb={4}
+      >
         {children}
-      </Box>
+      </BodyDiv>
       {hasWalletFooter ? (
         <WalletFooter />
       ) : undefined}
