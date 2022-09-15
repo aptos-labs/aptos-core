@@ -5,7 +5,7 @@ module.exports = {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   testEnvironment: "node",
-  coveragePathIgnorePatterns: ["generated/*", "transaction_builder/aptos_types/*"],
+  coveragePathIgnorePatterns: ["generated/*", "./aptos_types/*", "utils/memoize-decorator.ts", "utils/hd-key.ts"],
   testPathIgnorePatterns: ["dist/*"],
   collectCoverage: true,
   setupFiles: ["dotenv/config"],
