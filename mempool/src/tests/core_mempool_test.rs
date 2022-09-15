@@ -63,6 +63,38 @@ fn test_transaction_ordering_only_seqnos() {
 }
 
 #[test]
+fn test_transaction_metrics() {
+    let (mut mempool, _) = setup_mempool();
+
+    let txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
+    mempool.add_txn(
+        txn.clone(),
+        txn.gas_unit_price(),
+        AccountSequenceInfo::Sequential(0),
+        TimelineState::NotReady,
+    );
+    let txn = TestTransaction::new(1, 0, 2).make_signed_transaction();
+    mempool.add_txn(
+        txn.clone(),
+        txn.gas_unit_price(),
+        AccountSequenceInfo::Sequential(0),
+        TimelineState::NonQualified,
+    );
+
+    // Check timestamp returned for broadcast-able transaction
+    assert!(mempool
+        .get_transaction_store()
+        .get_insertion_time(&TestTransaction::get_address(0), 0)
+        .is_some());
+
+    // Check timestamp not returned for non-broadcast-able transaction
+    assert!(mempool
+        .get_transaction_store()
+        .get_insertion_time(&TestTransaction::get_address(1), 0)
+        .is_none());
+}
+
+#[test]
 fn test_update_transaction_in_mempool() {
     let (mut mempool, mut consensus) = setup_mempool();
     let txns = add_txns_to_mempool(
