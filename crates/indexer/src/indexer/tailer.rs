@@ -865,7 +865,7 @@ mod test {
             }
         )).unwrap();
 
-        let txns = vec![message_txn.clone()];
+        let txns = vec![message_txn];
         tailer
             .processor
             .process_transactions_with_status(txns)
