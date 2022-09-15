@@ -49,16 +49,23 @@ const generateUnitString = ({
  * brackets (ie. [0000]) indicates format always rounds to the nearest number
  * with that format
  */
-const generateNumeralFormat = (decimals: 0 | 2 | 4 | 8) => {
+const generateNumeralFormat = (decimals: number) => {
   switch (decimals) {
     case 0:
       return '0,0';
     case 2:
       return '0,0.[00]';
+    case 4:
+      return '0,0.[0000]';
     case 8:
       return '0,0.[00000000]';
-    default:
-      return '0,0.[0000]';
+    default: {
+      let decimalsString = '';
+      for (let x = 0; x < decimals; x += 1) {
+        decimalsString += '0';
+      }
+      return `0,0.[${decimalsString}]`;
+    }
   }
 };
 
@@ -91,7 +98,7 @@ const numeralTransformer = ({
 };
 
 interface FormatCoinOptions {
-  decimals?: 0 | 2 | 4 | 8;
+  decimals?: number;
   includeUnit?: boolean;
   isLowercase?: boolean;
   isNonNegative?: boolean;

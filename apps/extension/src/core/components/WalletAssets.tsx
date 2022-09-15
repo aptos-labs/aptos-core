@@ -7,7 +7,7 @@ import {
   Grid, Heading, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
 import AvatarImage from 'core/AvatarImage';
-import { assetSecondaryBgColor, secondaryTextColor } from 'core/colors';
+import { assetSecondaryBgColor, secondaryBorderColor, secondaryTextColor } from 'core/colors';
 import { aptosCoinStoreStructTag } from 'core/constants';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useAccountCoinResources } from 'core/queries/account';
@@ -20,12 +20,29 @@ const CoinType = {
   APTOS_TOKEN: aptosCoinStoreStructTag,
 };
 
+function NoAssets() {
+  const { colorMode } = useColorMode();
+  return (
+    <Box w="100%" borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
+      <Center height="100%" p={4}>
+        <Text fontSize="md" textAlign="center">No assets yet!</Text>
+      </Center>
+    </Box>
+  );
+}
+
 interface AssetListItemProps {
+  decimals: number;
+  name: string;
+  symbol: string;
   type: string;
   value: number;
 }
 
 function AssetListItem({
+  decimals,
+  name,
+  symbol,
   type,
   value,
 }: AssetListItemProps) {
@@ -42,26 +59,25 @@ function AssetListItem({
     }
   }, [type]);
 
-  const name = useMemo(() => {
+  const coinInfoName = useMemo(() => {
     switch (type) {
       case CoinType.APTOS_TOKEN: {
         return 'Aptos';
       }
       default: {
-        const splitName = type.split('::')[4].replace('>', '');
-        return splitName;
+        return name;
       }
     }
-  }, [type]);
+  }, [type, name]);
 
   const amount = useMemo(() => {
     switch (type) {
       case CoinType.APTOS_TOKEN:
         return formatCoin(value);
       default:
-        return `${value}`;
+        return `${formatCoin(value, { decimals, includeUnit: false })} ${symbol}`;
     }
-  }, [type, value]);
+  }, [type, value, decimals, symbol]);
 
   return (
     <Grid
@@ -77,7 +93,7 @@ function AssetListItem({
       </Center>
       <VStack fontSize="md" alignItems="left" spacing={0}>
         <Text fontWeight={600}>
-          {name}
+          {coinInfoName}
         </Text>
         <Text color={secondaryTextColor[colorMode]}>
           {amount}
@@ -107,11 +123,13 @@ export default function WalletAssets() {
       >
         ASSETS
       </Heading>
-      <VStack width="100%" gap={2}>
+      <VStack width="100%" gap={1}>
         {
-          coinResources?.map((coinResource) => (
-            <AssetListItem key={coinResource.type} {...coinResource} />
-          ))
+          (coinResources && coinResources.length > 0) ? (
+            coinResources?.map((coinResource) => (
+              <AssetListItem key={coinResource.type} {...coinResource} />
+            ))
+          ) : <NoAssets />
         }
       </VStack>
       <Heading

@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+export const coinStoreResource = 'CoinStore';
+export const coinInfoResource = 'CoinInfo';
 export const accountNamespace = '0x1::aptos_account';
 export const coinNamespace = '0x1::coin';
 export const stakeNamespace = '0x1::stake';
 export const aptosCoinStructTag = '0x1::aptos_coin::AptosCoin';
-export const coinStoreStructTag = `${coinNamespace}::CoinStore` as const;
+export const coinStoreStructTag = `${coinNamespace}::${coinStoreResource}` as const;
 export const aptosCoinStoreStructTag = `${coinStoreStructTag}<${aptosCoinStructTag}>` as const;
 export const aptosStakePoolStructTag = `${stakeNamespace}::StakePool` as const;
 

@@ -46,7 +46,9 @@ export function TransactionList({
   const {
     data: hookTransactions,
     isLoading: hookIsLoading,
-  } = useCoinTransferTransactions(activeAccountAddress, { enabled: !transactions });
+  } = useCoinTransferTransactions(activeAccountAddress, {
+    enabled: !transactions, refetchInterval: 5000,
+  });
 
   const masterIsLoading = (isLoading) || hookIsLoading;
   const sortedTxns = (transactions) || hookTransactions?.sort(
