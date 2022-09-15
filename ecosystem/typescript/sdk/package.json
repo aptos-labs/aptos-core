@@ -43,8 +43,8 @@
   "dependencies": {
     "@scure/bip39": "^1.1.0",
     "axios": "^0.27.2",
-    "ed25519-hd-key": "^1.2.0",
     "form-data": "^4.0.0",
+    "hash.js": "1.1.7",
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3"
   },
