@@ -182,6 +182,6 @@ module aptos_framework::reconfiguration {
             return
         };
         config_ref.last_reconfiguration_time = current_time;
-        config_ref.epoch = config_ref.epoch + 1;        
+        config_ref.epoch = config_ref.epoch + 1;
     }
 }
