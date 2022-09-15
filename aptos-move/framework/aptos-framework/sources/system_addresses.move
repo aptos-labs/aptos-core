@@ -53,6 +53,10 @@ module aptos_framework::system_addresses {
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
-        assert!(signer::address_of(account) == @vm_reserved, error::permission_denied(EVM))
+        assert!(is_vm(account), error::permission_denied(EVM))
+    }
+
+    public fun is_vm(account: &signer): bool {
+        signer::address_of(account) == @vm_reserved
     }
 }
