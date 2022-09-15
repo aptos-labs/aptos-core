@@ -868,17 +868,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
-        gauged_api("get_latest_state_value", || {
-            let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
-            let version = ledger_info_with_sigs.ledger_info().version();
-            let (blob, _proof) = self
-                .state_store
-                .get_state_value_with_proof_by_version(&state_key, version)?;
-            Ok(blob)
-        })
-    }
-
     fn get_state_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
