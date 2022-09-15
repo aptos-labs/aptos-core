@@ -19,7 +19,7 @@ export BUILT_VIA_BUILDKIT="true"
 export NORMALIZED_GIT_BRANCH_OR_PR=$(printf "$TARGET_CACHE_ID" | sed -e 's/[^a-zA-Z0-9]/-/g')
 
 export PROFILE=${PROFILE:-release}
-export FEATURES=${FEATURES:-"indexer"}
+export FEATURES=${FEATURES:-""}
 export NORMALIZED_FEATURES_LIST=$(printf "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/g')
 if [ "$PROFILE" = "release" ]; then
   # Do not prefix image tags if we're building the default profile "release"
