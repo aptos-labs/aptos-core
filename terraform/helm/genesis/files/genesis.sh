@@ -49,8 +49,6 @@ RANDOM_SEED_IN_DECIMAL=$(printf "%d" 0x${RANDOM_SEED})
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     username="${USERNAME_PREFIX}-${i}"
     user_dir="${WORKSPACE}/${username}"
-    seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL}+i))")
-    echo "seed=$seed for ${i}th validator"
 
     mkdir $user_dir
 
@@ -77,6 +75,8 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     if [[ -z "${RANDOM_SEED}" ]]; then
       aptos genesis generate-keys --output-dir $user_dir
     else
+      seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL}+i))")
+      echo "seed=$seed for ${i}th validator"
       aptos genesis generate-keys --random-seed $seed --output-dir $user_dir
     fi
 
