@@ -39,6 +39,9 @@ module "eks" {
 }
 
 data "aws_eks_cluster" "aptos" {
+  depends_on = [
+    module.eks
+  ]
   name = "aptos-pfn-${terraform.workspace}"
 }
 
