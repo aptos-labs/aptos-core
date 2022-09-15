@@ -8,12 +8,12 @@ use std::{
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::x25519;
-use aptos_logger::info;
 use aptos_types::{chain_id::ChainId, PeerId};
 use clap::Parser;
 use gcp_bigquery_client::Client;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use warp::{Filter, Reply};
 
 use crate::{

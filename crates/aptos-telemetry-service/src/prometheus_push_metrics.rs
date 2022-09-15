@@ -7,8 +7,8 @@ use crate::{
     context::Context,
     types::{auth::Claims, common::NodeType},
 };
-use aptos_logger::{debug, error};
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
 
 pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {

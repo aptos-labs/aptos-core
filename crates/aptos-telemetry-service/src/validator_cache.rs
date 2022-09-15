@@ -3,10 +3,10 @@
 
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
 use aptos_types::chain_id::ChainId;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
+use tracing::{debug, error};
 use url::Url;
 
 use crate::{clients::aptos_api::RestClient, TelemetryServiceConfig};
