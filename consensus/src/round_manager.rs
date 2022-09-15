@@ -47,8 +47,11 @@ use futures::{channel::oneshot, FutureExt, StreamExt};
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
 use serde::Serialize;
-use std::mem::discriminant;
-use std::{mem::Discriminant, sync::Arc, time::Duration};
+use std::{
+    mem::{discriminant, Discriminant},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::time::{sleep, Instant};
 
 #[derive(Serialize, Clone)]
@@ -809,7 +812,10 @@ impl RoundManager {
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
             }
-            _ => Ok(()),
+            VoteReceptionResult::VoteAdded(_)
+            | VoteReceptionResult::EchoTimeout(_)
+            | VoteReceptionResult::DuplicateVote => Ok(()),
+            e @ _ => Err(anyhow::anyhow!("{:?}", e)),
         }
     }
 
