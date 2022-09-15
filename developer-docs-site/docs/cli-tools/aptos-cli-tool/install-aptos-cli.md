@@ -5,7 +5,7 @@ id: "install-aptos-cli"
 
 # Install Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, for debugging Move contracts, and for node operations. This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
 
 You can install the CLI in one of the two ways: 
 
