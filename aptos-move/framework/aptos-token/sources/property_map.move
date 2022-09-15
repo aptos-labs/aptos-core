@@ -9,20 +9,26 @@ module aptos_token::property_map {
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info::type_name;
 
+    //
+    // Constants
+    //
+
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
+    const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
+
+    //
+    // Errors
+    //
+
     const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;
     const EPROPERTY_NUMBER_EXCEED_LIMIT: u64 = 2;
     const EPROPERTY_NOT_EXIST: u64 = 3;
     const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 = 4;
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
     const ETYPE_NOT_MATCH: u64 = 6;
+    /// The name (key) of the property is too long
     const EPROPERTY_MAP_NAME_TOO_LONG: u64 = 7;
 
-    //
-    // Constants
-    //
-
-    const MAX_PROPERTY_NAME_LENGTH: u64 = 64;
 
     //
     // Structs

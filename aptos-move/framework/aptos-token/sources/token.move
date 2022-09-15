@@ -22,6 +22,15 @@ module aptos_token::token {
     const COLLECTION_URI_MUTABLE_IND: u64 = 1;
     const COLLECTION_MAX_MUTABLE_IND: u64 = 2;
 
+    const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
+    const MAX_NFT_NAME_LENGTH: u64 = 128;
+    // URI lengths: Mean: 76.97, StdDev: 37.41, 95th%: 157, 99th%: 199 (http://www.supermind.org/blog/740/average-length-of-a-url-part-2)
+    const MAX_URI_LENGTH: u64 = 256;
+
+    //
+    // Constants
+    //
+
     const EALREADY_HAS_BALANCE: u64 = 0;
     const EBALANCE_NOT_PUBLISHED: u64 = 1;
     const ECOLLECTIONS_NOT_PUBLISHED: u64 = 2;
@@ -47,19 +56,12 @@ module aptos_token::token {
     const EWITHDRAW_ZERO: u64 = 22;
     const ENOT_TRACKING_SUPPLY: u64 = 23;
     const ENFT_NOT_SPLITABLE: u64 = 24;
+    /// The collection name is too long
     const ECOLLECTION_NAME_TOO_LONG: u64 = 25;
+    /// The NFT name is too long
     const ENFT_NAME_TOO_LONG: u64 = 26;
+    /// The URI is too long
     const EURI_TOO_LONG: u64 = 27;
-
-    //
-    // Constants
-    //
-
-    const MAX_COLLECTION_NAME_LENGTH: u64 = 32;
-    const MAX_NFT_NAME_LENGTH: u64 = 32;
-    // URI lengths: Mean: 76.97, StdDev: 37.41, 95th%: 157, 99th%: 199 (http://www.supermind.org/blog/740/average-length-of-a-url-part-2)
-    const MAX_URI_LENGTH: u64 = 200;
-
 
     //
     // Core data structures for holding tokens
