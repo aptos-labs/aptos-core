@@ -8,10 +8,10 @@ import * as Gen from "./generated/index";
 import {
   TxnBuilderTypes,
   TransactionBuilderEd25519,
-  BCS,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
 } from "./transaction_builder";
+import { bcsSerializeBytes, bcsSerializeU8, bcsToBytes, Bytes, Seq, Serializer, serializeVector, Uint64 } from "./bcs";
 
 /**
  * Provides methods for retrieving data from Aptos node.
@@ -581,7 +581,7 @@ export class AptosClient {
   async generateRawTransaction(
     accountFrom: HexString,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: { maxGasAmount?: BCS.Uint64; gasUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
+    extraArgs?: { maxGasAmount?: Uint64; gasUnitPrice?: Uint64; expireTimestamp?: Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
       maxGasAmount: BigInt(2000),
@@ -618,9 +618,9 @@ export class AptosClient {
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
     // :!:>generateSignSubmitTransactionInner
@@ -642,23 +642,23 @@ export class AptosClient {
    */
   async publishPackage(
     sender: AptosAccount,
-    packageMetadata: BCS.Bytes,
-    modules: BCS.Seq<TxnBuilderTypes.Module>,
+    packageMetadata: Bytes,
+    modules: Seq<TxnBuilderTypes.Module>,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
-    const codeSerializer = new BCS.Serializer();
-    BCS.serializeVector(modules, codeSerializer);
+    const codeSerializer = new Serializer();
+    serializeVector(modules, codeSerializer);
 
     const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
         "0x1::code",
         "publish_package_txn",
         [],
-        [BCS.bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
+        [bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
       ),
     );
 
@@ -675,9 +675,9 @@ export class AptosClient {
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
       checkSuccess?: boolean;
       timeoutSecs?: number;
     },
@@ -699,9 +699,9 @@ export class AptosClient {
     forAccount: AptosAccount,
     toPrivateKeyBytes: Uint8Array,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<Gen.PendingTransaction> {
     const { sequence_number: sequenceNumber, authentication_key: authKey } = await this.getAccount(
@@ -720,7 +720,7 @@ export class AptosClient {
       helperAccount.pubKey().toUint8Array(),
     );
 
-    const challengeHex = HexString.fromUint8Array(BCS.bcsToBytes(challenge));
+    const challengeHex = HexString.fromUint8Array(bcsToBytes(challenge));
 
     const proofSignedByCurrentPrivateKey = forAccount.signHexString(challengeHex);
 
@@ -732,12 +732,12 @@ export class AptosClient {
         "rotate_authentication_key",
         [],
         [
-          BCS.bcsSerializeU8(0), // ed25519 scheme
-          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeU8(0), // ed25519 scheme
-          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
-          BCS.bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
+          bcsSerializeU8(0), // ed25519 scheme
+          bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
+          bcsSerializeU8(0), // ed25519 scheme
+          bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
+          bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
+          bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
         ],
       ),
     );
