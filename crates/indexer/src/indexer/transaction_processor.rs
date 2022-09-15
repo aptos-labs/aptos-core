@@ -13,7 +13,7 @@ use crate::{
     models::processor_statuses::ProcessorStatusModel,
     schema,
 };
-use aptos_rest_client::Transaction;
+use aptos_api_types::Transaction;
 use async_trait::async_trait;
 use diesel::pg::upsert::excluded;
 use diesel::{prelude::*, RunQueryDsl};
