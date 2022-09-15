@@ -76,7 +76,6 @@ impl Transaction {
 
     pub fn from_transaction(
         transaction: &APITransaction,
-        block_height: i64,
     ) -> (
         Self,
         Option<TransactionDetail>,
@@ -84,6 +83,12 @@ impl Transaction {
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
+        let block_height = *transaction
+            .transaction_info()
+            .unwrap()
+            .block_height
+            .unwrap()
+            .inner() as i64;
         match transaction {
             APITransaction::UserTransaction(user_txn) => {
                 let (user_txn_output, signatures) =
@@ -191,7 +196,6 @@ impl Transaction {
 
     pub fn from_transactions(
         transactions: &[APITransaction],
-        start_block_height: i64,
     ) -> (
         Vec<Self>,
         Vec<TransactionDetail>,
@@ -204,26 +208,10 @@ impl Transaction {
         let mut events = vec![];
         let mut wscs = vec![];
         let mut wsc_details = vec![];
-        let mut block_height = start_block_height;
 
         for txn in transactions {
-            // Update block height from block metadata
-            let maybe_new_block = BlockMetadataTransaction::get_block_height_from_txn(
-                txn,
-                txn.transaction_info().unwrap().version,
-            )
-            .unwrap();
-            if let Some(new_block_height) = maybe_new_block {
-                if !(block_height == new_block_height || block_height + 1 == new_block_height) {
-                    panic!(
-                        "blocks need to be monotonically increasing! block: {}, next block: {}",
-                        block_height, new_block_height
-                    );
-                }
-                block_height = new_block_height;
-            }
             let (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) =
-                Self::from_transaction(txn, block_height);
+                Self::from_transaction(txn);
             txns.push(txn);
             if let Some(a) = txn_detail {
                 txn_details.push(a);

@@ -131,10 +131,9 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     let processor_enum = Processor::from_string(&processor_name);
     let processor: Arc<dyn TransactionProcessor> = match processor_enum {
-        Processor::DefaultProcessor => Arc::new(DefaultTransactionProcessor::new(
-            conn_pool.clone(),
-            context.clone(),
-        )),
+        Processor::DefaultProcessor => {
+            Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
+        }
         Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
     };
 

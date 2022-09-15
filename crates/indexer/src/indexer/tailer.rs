@@ -354,7 +354,7 @@ mod test {
         let test_context = new_test_context("doesnt_matter".to_string(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
         let pg_transaction_processor =
-            DefaultTransactionProcessor::new(conn_pool.clone(), context.clone());
+            DefaultTransactionProcessor::new(conn_pool.clone());
         let mut tailer = Tailer::new(
             context,
             conn_pool.clone(),

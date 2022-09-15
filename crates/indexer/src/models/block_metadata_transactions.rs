@@ -7,9 +7,8 @@
 
 use super::transactions::Transaction;
 use crate::{schema::block_metadata_transactions, util::parse_timestamp};
-use anyhow::Context;
 use aptos_api_types::{
-    BlockMetadataTransaction as APIBlockMetadataTransaction, Transaction as APITransaction, U64,
+    BlockMetadataTransaction as APIBlockMetadataTransaction,
 };
 use field_count::FieldCount;
 use serde::Serialize;
@@ -50,35 +49,6 @@ impl BlockMetadataTransaction {
             // time is in microseconds
             timestamp: parse_timestamp(txn.timestamp, txn_version),
             inserted_at: chrono::Utc::now().naive_utc(),
-        }
-    }
-
-    pub fn get_block_height_from_txn(
-        txn: &APITransaction,
-        txn_version: U64,
-    ) -> anyhow::Result<Option<i64>> {
-        if let APITransaction::BlockMetadataTransaction(bmt) = txn {
-            for event in &bmt.events {
-                if event.typ.to_string() == "0x1::block::NewBlockEvent" {
-                    return Ok(Some(
-                        event.data["height"]
-                            .as_str()
-                            .map(|s| s.parse::<i64>())
-                            .context(format!(
-                                "version {} failed! height missing from event.BlockResource {:?}",
-                                txn_version, event.data
-                            ))?
-                            .context(format!(
-                                "version {} failed! failed to parse block height {:?}",
-                                txn_version, event.data["height"]
-                            ))?,
-                    ));
-                }
-            }
-            panic!("Block metadata must contain a 0x1::block::BlockResource event");
-        }
-        {
-            Ok(None)
         }
     }
 }

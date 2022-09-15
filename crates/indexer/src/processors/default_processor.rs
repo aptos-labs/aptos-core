@@ -20,25 +20,20 @@ use crate::{
     },
     schema,
 };
-use aptos_api::Context;
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
 use diesel::result::Error;
 use field_count::FieldCount;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 pub const NAME: &str = "default_processor";
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
-    context: Arc<Context>,
 }
 
 impl DefaultTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, context: Arc<Context>) -> Self {
-        Self {
-            connection_pool,
-            context,
-        }
+    pub fn new(connection_pool: PgDbPool) -> Self {
+        Self { connection_pool }
     }
 }
 
@@ -303,19 +298,8 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let (_block_start_version, _block_last_version, block_event) = self
-            .context
-            .db
-            .get_block_info_by_version(start_version)
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Could not get block_info for start version {}",
-                    start_version,
-                )
-            });
-
         let (txns, user_txns, bm_txns, events, write_set_changes) =
-            TransactionModel::from_transactions(&transactions, block_event.height() as i64);
+            TransactionModel::from_transactions(&transactions);
 
         let conn = self.get_conn();
         let tx_result = insert_to_db(

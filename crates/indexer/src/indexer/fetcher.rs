@@ -235,22 +235,58 @@ async fn fetch_nexts(
     )
     .await;
 
-    let mut timestamp = context
+    let (_, _, block_event) = context
         .db
-        .get_block_timestamp(starting_version as u64)
-        .unwrap();
+        .get_block_info_by_version(starting_version as u64)
+        .unwrap_or_else(|_| {
+            panic!(
+                "Could not get block_info for start version {}",
+                starting_version,
+            )
+        });
+    let mut timestamp = block_event.proposed_time();
+    let mut block_height = block_event.height();
+    let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let resolver = context.move_resolver().unwrap();
     let converter = resolver.as_converter(context.db.clone());
 
     let transactions_res: Result<Vec<Transaction>, anyhow::Error> = raw_txns
         .into_iter()
-        .map(|t| {
-            // Update the timestamp if the next block occurs
-            if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction {
-                timestamp = txn.timestamp_usecs();
+        .enumerate()
+        .map(|(ind, t)| {
+            // Do not update block_height if first block is block metadata
+            if ind > 0 {
+                // Update the timestamp if the next block occurs
+                if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction
+                {
+                    timestamp = txn.timestamp_usecs();
+                    block_height += 1;
+                    block_height_bcs = aptos_api_types::U64::from(block_height);
+                }
             }
-            converter.try_into_onchain_transaction(timestamp, t)
+            converter
+                .try_into_onchain_transaction(timestamp, t)
+                .map(|mut txn| {
+                    match txn {
+                        Transaction::PendingTransaction(_) => {
+                            unreachable!("Indexer should never see pending transactions")
+                        }
+                        Transaction::UserTransaction(ref mut ut) => {
+                            ut.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::GenesisTransaction(ref mut gt) => {
+                            gt.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::BlockMetadataTransaction(ref mut bmt) => {
+                            bmt.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::StateCheckpointTransaction(ref mut sct) => {
+                            sct.info.block_height = Some(block_height_bcs)
+                        }
+                    };
+                    txn
+                })
         })
         .collect::<Result<_, anyhow::Error>>();
 
