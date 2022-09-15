@@ -19,8 +19,8 @@ import {
   TypeTagU64,
   TypeTagU8,
   TypeTagVector,
-} from "./aptos_types";
-import { Serializer } from "./bcs";
+} from "../aptos_types";
+import { Serializer } from "../bcs";
 import {
   argToTransactionArgument,
   TypeTagParser,

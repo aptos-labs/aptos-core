@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "../../hex_string";
+import { HexString } from "../hex_string";
 import { Deserializer } from "../bcs";
 import { ScriptABI, EntryFunctionABI, TransactionScriptABI } from "./abi";
 import { TypeTagAddress, TypeTagU64 } from "./type_tag";
