@@ -330,6 +330,7 @@ impl BufferManager {
         while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+        counters::NUM_BLOCKS_IN_PIPELINE.set(0);
     }
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
