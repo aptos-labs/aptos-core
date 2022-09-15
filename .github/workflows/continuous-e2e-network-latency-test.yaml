@@ -11,15 +11,15 @@ on:
 
 jobs:
   # Test under sub optimal circumstances (network delay)
-  run-forge-network-latency:
+  run-forge-three-region:
 
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-network-latency
+      FORGE_NAMESPACE: forge-three-region
       FORGE_CLUSTER_NAME: aptos-forge-big-1
       # Run for 30 minutes
       FORGE_RUNNER_DURATION_SECS: 1800
       # Pre release has chaos applied
-      FORGE_TEST_SUITE: network_latency
+      FORGE_TEST_SUITE: three_region_simulation
       POST_TO_SLACK: true
