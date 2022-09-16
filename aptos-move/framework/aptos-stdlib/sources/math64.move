@@ -13,7 +13,17 @@ module aptos_std::math64 {
 
     /// Return the average of two.
     public fun average(a: u64, b: u64): u64 {
-        (a + b) / 2
+        if (a < b) {
+            a + (b - a) / 2
+        } else {
+            b + (a - b) / 2
+        }
+    }
+
+    spec average {
+        pragma opaque;
+        aborts_if false;
+        ensures result == (a + b) / 2;
     }
 
     /// Return the value of n raised to power e
@@ -58,6 +68,12 @@ module aptos_std::math64 {
 
         let result = average(15u64, 12u64);
         assert!(result == 13, 0);
+    }
+
+    #[test]
+    public entry fun test_average_does_not_overflow() {
+        let result = average(18446744073709551615, 18446744073709551615);
+        assert!(result == 18446744073709551615, 0);
     }
 
     #[test]
