@@ -52,6 +52,7 @@ REST API service: https://fullnode.testnet.aptoslabs.com/v1
 Aptos currently has two SDKs:
 1. [Typescript](/sdks/typescript-sdk)
 2. [Python](/sdks/python-sdk)
+3. [Rust](/sdks/rust-sdk)
 
 
 ### Other Areas
@@ -59,6 +60,7 @@ Aptos currently has two SDKs:
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../sdks/typescript-sdk)
 * [Python SDK](../sdks/python-sdk)
+* [Rust SDK](../sdks/rust-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 

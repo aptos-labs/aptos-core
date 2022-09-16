@@ -121,7 +121,7 @@ spec aptos_framework::stake {
 
     spec is_current_epoch_validator {
         include ResourceRequirement;
-        aborts_if false;
+        aborts_if !spec_has_stake_pool(pool_address);
         ensures result == spec_is_current_epoch_validator(pool_address);
     }
 

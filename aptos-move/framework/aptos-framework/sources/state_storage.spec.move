@@ -12,12 +12,6 @@ spec aptos_framework::state_storage {
         aborts_if false;
     }
 
-    spec on_reconfig {
-        use aptos_std::chain_status;
-        requires chain_status::is_operating();
-        aborts_if false;
-    }
-
     spec get_state_storage_usage_only_at_epoch_beginning { // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
