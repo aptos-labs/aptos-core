@@ -25,6 +25,8 @@ pub struct QuorumStoreClient {
     poll_count: u64,
     /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
     pull_timeout_ms: u64,
+    create_empty_blocks_for_pending_ordering: bool,
+    create_partial_blocks_before_poll_ends: bool,
 }
 
 impl QuorumStoreClient {
@@ -32,6 +34,8 @@ impl QuorumStoreClient {
         consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
         poll_count: u64,
         pull_timeout_ms: u64,
+        create_empty_blocks_for_pending_ordering: bool,
+        create_partial_blocks_before_poll_ends: bool,
     ) -> Self {
         assert!(
             poll_count > 0,
@@ -41,6 +45,8 @@ impl QuorumStoreClient {
             consensus_to_quorum_store_sender,
             poll_count,
             pull_timeout_ms,
+            create_empty_blocks_for_pending_ordering, 
+            create_partial_blocks_before_poll_ends,
         }
     }
 
@@ -49,6 +55,7 @@ impl QuorumStoreClient {
         round: Round,
         max_items: u64,
         max_bytes: u64,
+        return_non_full: bool,
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
@@ -56,6 +63,7 @@ impl QuorumStoreClient {
             round,
             max_items,
             max_bytes,
+            return_non_full,
             exclude_payloads.clone(),
             callback,
         );
@@ -90,6 +98,9 @@ impl PayloadClient for QuorumStoreClient {
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
     ) -> Result<Payload, QuorumStoreError> {
+        let return_empty = pending_ordering && self.create_empty_blocks_for_pending_ordering;
+        let return_non_full = self.create_partial_blocks_before_poll_ends;
+
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
         });
@@ -99,9 +110,15 @@ impl PayloadClient for QuorumStoreClient {
         let payload = loop {
             count -= 1;
             let payload = self
-                .pull_internal(round, max_items, max_bytes, exclude_payloads.clone())
+                .pull_internal(
+                    round,
+                    max_items,
+                    max_bytes,
+                    return_non_full || return_empty || count == 0 || self.poll_count == u64::MAX,
+                    exclude_payloads.clone(),
+                )
                 .await?;
-            if payload.is_empty() && !pending_ordering && count > 0 {
+            if payload.is_empty() && !return_empty && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
@@ -110,9 +127,16 @@ impl PayloadClient for QuorumStoreClient {
             }
             break payload;
         };
-        debug!(
+        info!(
             poll_count = self.poll_count - count,
-            "Pull payloads from QuorumStore"
+            max_poll_count = self.poll_count,
+            payload_len = payload.len(),
+            max_items = max_items,
+            max_bytes = max_bytes,
+            pending_ordering = pending_ordering,
+            return_empty = return_empty,
+            return_non_full = return_non_full,
+            "Pull payloads from QuorumStore: proposal"
         );
         Ok(payload)
     }

@@ -165,6 +165,7 @@ impl Mempool {
         &self,
         max_txns: u64,
         max_bytes: u64,
+        return_non_full: bool,
         mut seen: HashSet<TxnPointer>,
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
@@ -214,12 +215,14 @@ impl Mempool {
         }
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);
+        let mut full_bytes = false;
         for (address, seq) in result {
             if let Some((txn, ranking_score)) =
                 self.transactions.get_with_ranking_score(&address, seq)
             {
                 let txn_size = txn.raw_txn_bytes_len();
                 if total_bytes + txn_size > max_bytes as usize {
+                    full_bytes = true;
                     break;
                 }
                 total_bytes += txn_size;
@@ -233,14 +236,21 @@ impl Mempool {
             }
         }
 
+        if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
+            block.clear();
+        }
+
         debug!(
             LogSchema::new(LogEntry::GetBlock),
             seen_consensus = seen_size,
             walked = txn_walked,
             seen_after = seen.len(),
+            // before size and non full check
             result_size = result_size,
-            block_size = block.len(),
+            // before non full check
             byte_size = total_bytes,
+            block_size = block.len(),
+            return_non_full = return_non_full,
         );
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
