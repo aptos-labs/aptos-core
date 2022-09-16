@@ -126,6 +126,7 @@ impl QuorumStoreWrapper {
         debug!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         for txn in pulled_txns {
+            // Daniel: remaining of the txn will be lost when hitting the limit, is it ok?
             if !self.batch_builder.append_transaction(&txn) {
                 end_batch = true;
                 break;
@@ -149,6 +150,8 @@ impl QuorumStoreWrapper {
             None
         } else {
             if self.batch_builder.is_empty() {
+                // Quorum store metrics
+                counters::CREATED_EMPTY_BATCHES_COUNT.inc();
                 return None;
             }
 
@@ -174,6 +177,9 @@ impl QuorumStoreWrapper {
                 .insert(batch_id, self.batch_builder.take_summaries());
             self.batch_expirations.add_item(batch_id, expiry_round);
 
+            // Quorum store metrics
+            counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
+
             Some(proof_rx)
         }
     }
@@ -191,6 +197,8 @@ impl QuorumStoreWrapper {
     }
 
     pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
+        counters::POS_COUNT.inc();
+
         let maybe_proof = self.proofs_for_consensus.remove(new_proof.digest());
         if let Some(proof) = maybe_proof {
             if proof.expiration() > new_proof.expiration() {

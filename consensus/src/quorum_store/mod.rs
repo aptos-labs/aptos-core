@@ -8,6 +8,7 @@ pub(crate) mod batch_aggregator;
 pub(crate) mod batch_reader;
 pub(crate) mod batch_requester;
 pub(crate) mod batch_store;
+pub(crate) mod counters;
 pub(crate) mod network_listener;
 pub(crate) mod proof_builder;
 pub(crate) mod quorum_store;
@@ -16,7 +17,6 @@ pub(crate) mod quorum_store_wrapper;
 pub(crate) mod types;
 pub(crate) mod utils;
 
-mod counters;
 mod schema;
 #[cfg(test)]
 mod tests;

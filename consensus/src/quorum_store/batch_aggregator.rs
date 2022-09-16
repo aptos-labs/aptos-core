@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{BatchId, SerializedTransaction};
+use crate::quorum_store::{
+    counters,
+    types::{BatchId, SerializedTransaction},
+};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_logger::debug;
 use aptos_types::transaction::SignedTransaction;
@@ -75,6 +78,9 @@ impl IncrementalBatchState {
     pub(crate) fn finalize_batch(
         self,
     ) -> Result<(usize, Vec<SignedTransaction>, HashValue), BatchAggregatorError> {
+        // Quorum store metrics
+        counters::DELIVERED_BATCHES_COUNT.inc();
+
         self.status
             .clone()
             .map(|_| (self.num_bytes, self.txns, self.hasher.finish()))

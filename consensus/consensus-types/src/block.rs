@@ -102,6 +102,17 @@ impl Block {
         self.block_data.payload()
     }
 
+    pub fn payload_size(&self) -> usize {
+        match self.block_data.payload() {
+            None => 0,
+            Some(payload) => match payload {
+                Payload::Empty => 0,
+                Payload::InQuorumStore(pos) => pos.len(),
+                Payload::DirectMempool(_) => unreachable!(),
+            },
+        }
+    }
+
     pub fn quorum_cert(&self) -> &QuorumCert {
         self.block_data.quorum_cert()
     }

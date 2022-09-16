@@ -7,6 +7,7 @@ use crate::quorum_store::{
     batch_aggregator::BatchAggregator,
     batch_reader::BatchReader,
     batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
+    counters,
     network_listener::NetworkListener,
     proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
     quorum_store_db::QuorumStoreDB,
@@ -192,6 +193,9 @@ impl QuorumStore {
             .end_batch(batch_id, self.fragment_id, fragment_payload.clone())
         {
             Ok((num_bytes, payload, digest)) => {
+                // Quorum store metrics
+                counters::CREATED_BATCHES_COUNT.inc();
+
                 let fragment = Fragment::new(
                     self.epoch,
                     batch_id,
