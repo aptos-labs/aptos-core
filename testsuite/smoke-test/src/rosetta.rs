@@ -10,6 +10,7 @@ use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
+use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
 use aptos_rest_client::Transaction;
 use aptos_rosetta::common::BlockHash;
@@ -27,6 +28,8 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
+use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
@@ -468,6 +471,16 @@ async fn test_block() {
     cli.fund_account(2, Some(500000)).await.unwrap();
     cli.fund_account(3, Some(200000)).await.unwrap();
 
+    // Get minimum gas price
+    let gas_schedule: GasScheduleV2 = rest_client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::gas_schedule::GasScheduleV2")
+        .await
+        .unwrap()
+        .into_inner();
+    let gas_params =
+        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
+
     let private_key_0 = cli.private_key(0);
     let private_key_1 = cli.private_key(1);
     let private_key_2 = cli.private_key(2);
@@ -544,7 +557,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         Some(20000),
-        Some(1),
+        Some(min_gas_price),
     )
     .await
     .unwrap()
@@ -578,7 +591,7 @@ async fn test_block() {
         // Test the default behavior
         None,
         None,
-        Some(2),
+        Some(min_gas_price + 1),
     )
     .await
     .unwrap();
@@ -648,7 +661,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         Some(100000),
-        None,
+        Some(min_gas_price),
     )
     .await
     .unwrap_err();

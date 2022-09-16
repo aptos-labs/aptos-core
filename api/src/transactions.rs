@@ -411,9 +411,9 @@ impl TransactionsApi {
             let gas_unit_price =
                 estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
-            // With 0 gas price, we set it to 0, since we can't divide by 0
+            // With 0 gas price, we set it to max gas units, since we can't divide by 0
             let max_account_gas_units = if gas_unit_price == 0 {
-                0
+                max_number_of_gas_units
             } else {
                 coin_store.coin() / gas_unit_price
             };

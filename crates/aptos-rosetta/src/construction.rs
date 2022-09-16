@@ -635,13 +635,6 @@ async fn construction_preprocess(
     let internal_operation = InternalOperation::extract(&request.operations)?;
     let required_public_keys = vec![internal_operation.sender().into()];
 
-    if let Some(gas_price) = request.metadata.as_ref().and_then(|inner| inner.gas_price) {
-        if gas_price.0 < 1 {
-            return Err(ApiError::InvalidInput(Some(
-                "Cannot have a gas price less than 1".to_string(),
-            )));
-        }
-    }
     if let Some(max_gas) = request
         .metadata
         .as_ref()
