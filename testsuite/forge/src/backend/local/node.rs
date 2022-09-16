@@ -269,7 +269,7 @@ impl Node for LocalNode {
         todo!()
     }
 
-    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
+    async fn set_identity(&mut self, _k8s_secret_name: String) -> Result<()> {
         todo!()
     }
 

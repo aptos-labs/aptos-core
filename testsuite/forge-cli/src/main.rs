@@ -580,7 +580,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<
         "twin_validator_test" => config
             .with_network_tests(vec![&TwinValidatorTest])
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-            .with_initial_fullnode_count(10)
+            .with_initial_fullnode_count(5)
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {
                 // Have single epoch change in land blocking
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();

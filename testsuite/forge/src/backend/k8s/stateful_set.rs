@@ -10,7 +10,6 @@ use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 
 use again::RetryPolicy;
 use aptos_logger::info;
-use futures::TryFutureExt;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use kube::{
     api::{Api, Meta, Patch, PatchParams},

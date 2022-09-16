@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_logger::info;
-use forge::{NetworkContext, NetworkTest, NodeExt, Swarm, Test, Validator};
-use std::thread::sleep;
+use aptos_sdk::move_types::account_address::AccountAddress;
+use forge::{NetworkContext, NetworkTest, NodeExt, Swarm, Test};
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -32,36 +31,56 @@ impl NetworkTest for TwinValidatorTest {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
         let validator_count = all_validators_ids.len();
-        let twin_count = 2;
+        let twin_count = 3;
         runtime.block_on(async {
             for i in 0..twin_count {
-                let main_id = all_validators_ids[i];
+                let main_id: AccountAddress = all_validators_ids[i];
                 let twin_id = all_validators_ids[i + validator_count - twin_count];
-                ctx.swarm().validator_mut(main_id).unwrap().stop().await;
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .clear_storage()
-                    .await;
-                let main_identity: String = ctx
+                    .await
+                    .expect(
+                        format!("Error while clearing storage and stopping {twin_id}").as_str(),
+                    );
+                let main_identity = ctx
                     .swarm()
                     .validator_mut(main_id)
                     .unwrap()
                     .get_identity()
                     .await
-                    .unwrap();
+                    .expect(format!("Error while getting identity for {main_id}").as_str());
+                ctx.swarm()
+                    .validator_mut(main_id)
+                    .unwrap()
+                    .stop()
+                    .await
+                    .expect(format!("Error while stopping {twin_id}").as_str());
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .set_identity(main_identity)
-                    .await;
-                ctx.swarm().validator_mut(twin_id).unwrap().start().await;
+                    .await
+                    .expect(format!("Error while setting identity for {twin_id}").as_str());
+                ctx.swarm()
+                    .validator_mut(twin_id)
+                    .unwrap()
+                    .start()
+                    .await
+                    .expect(format!("Error while starting {twin_id}").as_str());
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .wait_until_healthy(Instant::now() + Duration::from_secs(300))
-                    .await;
-                ctx.swarm().validator_mut(main_id).unwrap().start().await;
+                    .await
+                    .expect(format!("Error while waiting for {twin_id}").as_str());
+                ctx.swarm()
+                    .validator_mut(main_id)
+                    .unwrap()
+                    .start()
+                    .await
+                    .expect(format!("Error while starting {twin_id}").as_str());
             }
         });
         <dyn NetworkLoadTest>::run(self, ctx)
