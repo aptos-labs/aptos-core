@@ -171,9 +171,14 @@ pub trait BackupStorage: Send + Sync {
 
 #[derive(Parser)]
 pub enum StorageOpt {
-    #[clap(about = "Select the LocalFs backup store.")]
+    #[clap(about = "Select the LocalFs backup storage type, which is used mainly for tests.")]
     LocalFs(LocalFsOpt),
-    #[clap(about = "Select the CommandAdapter backup store.")]
+    #[clap(
+        about = "Select the CommandAdapter backup storage type, which reads shell commands with which \
+    it communicates with either a local file system or a remote cloud storage. Compression or other \
+    fitlers can be added as part of the commands. See a sample config here: \
+    https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src/storage/command_adapter/sample_configs/"
+    )]
     CommandAdapter(CommandAdapterOpt),
 }
 

@@ -111,7 +111,10 @@ enum BackupType {
 
 #[derive(Parser)]
 enum CoordinatorCommand {
-    #[clap(about = "Run the coordinator.")]
+    #[clap(
+        about = "Run the backup coordinator which backs up blockchain data continuously off \
+    a Aptos Node."
+    )]
     Run(CoordinatorRunOpt),
 }
 
