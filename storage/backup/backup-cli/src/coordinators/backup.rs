@@ -35,9 +35,10 @@ use tokio_stream::wrappers::IntervalStream;
 pub struct BackupCoordinatorOpt {
     #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
+    // Defaulting to 1 to try to always have the latest state snapshot.
     #[clap(
         long,
-        default_value = "24",
+        default_value = "1",
         help = "Frequency (in number of epochs) to take state snapshots at epoch ending versions. \
         Adjacent epochs share much of the state, so it's inefficient storage-wise and bandwidth-wise \
         to take it too frequently. However, a recent snapshot is obviously desirable if one intends \
@@ -49,9 +50,11 @@ pub struct BackupCoordinatorOpt {
         before the one after the epoch isn't available yet."
     )]
     pub state_snapshot_interval_epochs: usize,
+    // Defaulting to 1M, which converts to a 20 minutes delay of a transaction showing up in a backup,
+    // from a 1K TPS chain, and a few minutes replay time.
     #[clap(
         long,
-        default_value = "100000",
+        default_value = "1000000",
         help = "The frequency (in transaction versions) to take an incremental transaction backup. \
         Making a transaction backup every 10 Million versions will result in the latest transaction \
         to appear in the backup potentially 10 Million versions later. If the net work is running \
