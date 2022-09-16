@@ -1297,6 +1297,7 @@ dependencies = [
  "flate2",
  "gcp-bigquery-client",
  "hex",
+ "httpmock",
  "jsonwebtoken",
  "rand 0.7.3",
  "rand_core 0.5.1",
