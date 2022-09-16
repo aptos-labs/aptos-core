@@ -107,8 +107,9 @@ impl Mempool {
             ));
         }
 
+        let now = SystemTime::now();
         let expiration_time =
-            aptos_infallible::duration_since_epoch() + self.system_transaction_timeout;
+            aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let txn_info = MempoolTransaction::new(
             txn,
@@ -116,7 +117,7 @@ impl Mempool {
             ranking_score,
             timeline_state,
             AccountSequenceInfo::Sequential(db_sequence_number),
-            SystemTime::now(),
+            now,
         );
 
         self.transactions.insert(txn_info)
