@@ -76,7 +76,7 @@ impl ProofManager {
     pub(crate) fn handle_proposal_request(&mut self, msg: BlockProposalCommand) {
         match msg {
             // TODO: check what max_txns consensus is using
-            BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
+            BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, return_non_full, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -91,6 +91,7 @@ impl ProofManager {
                     LogicalTime::new(self.latest_logical_time.epoch(), round),
                     max_txns,
                     max_bytes,
+                    return_non_full,
                 );
 
                 let res = ConsensusResponse::GetBlockResponse(

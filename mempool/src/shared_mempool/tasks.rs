@@ -446,7 +446,13 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     let start_time = Instant::now();
 
     let (resp, callback, counter_label) = match req {
-        QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(
+            max_txns,
+            max_bytes,
+            return_non_full,
+            transactions,
+            callback,
+        ) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
@@ -476,7 +482,8 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     counters::GET_BLOCK_GET_BATCH_LABEL,
                     counters::REQUEST_SUCCESS_LABEL,
                 );
-                txns = mempool.get_batch(max_txns, max_bytes, exclude_transactions);
+                txns =
+                    mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions);
             }
 
             // mempool_service_transactions is logged inside get_batch
