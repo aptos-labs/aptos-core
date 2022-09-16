@@ -1,3 +1,4 @@
+> :warning: DO* NOT USE THIS, IT'S NOT READY. Go to crates/indexer for a working indexer
 # API
 
 This module provides a StreamingFast Firehose Streamer for pushing protobuf data from the Aptos Blockchain

@@ -115,8 +115,12 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     info!(processor_name = processor_name, "Starting indexer...");
 
-    let conn_pool =
-        new_db_pool(&config.postgres_uri.unwrap()).expect("Failed to create connection pool");
+    let db_uri = &config.postgres_uri.unwrap();
+    info!(
+        processor_name = processor_name,
+        "Creating connection pool..."
+    );
+    let conn_pool = new_db_pool(db_uri).expect("Failed to create connection pool");
     info!(
         processor_name = processor_name,
         "Created the connection pool... "
@@ -129,10 +133,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         Processor::DefaultProcessor => {
             Arc::new(DefaultTransactionProcessor::new(conn_pool.clone()))
         }
-        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
-            conn_pool.clone(),
-            config.index_token_uri_data.unwrap(),
-        )),
+        Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(conn_pool.clone())),
     };
 
     let options =
@@ -146,25 +147,28 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
         tailer.run_migrations();
     }
 
+    let starting_version_from_db = tailer
+        .get_start_version(&processor_name)
+        .unwrap_or_else(|| {
+            info!(
+                processor_name = processor_name,
+                "Could not fetch version from db so starting from version 0"
+            );
+            0
+        }) as u64;
     let start_version = match config.starting_version {
-        None => tailer
-            .get_start_version(&processor_name)
-            .unwrap_or_else(|| {
-                info!(
-                    processor_name = processor_name,
-                    "Could not fetch version from db so starting from version 0"
-                );
-                0
-            }),
+        None => starting_version_from_db,
         Some(version) => version,
     };
 
     info!(
         processor_name = processor_name,
-        start_version = start_version,
+        final_start_version = start_version,
+        start_version_from_db = starting_version_from_db,
+        start_version_from_config = config.starting_version,
         "Setting starting version..."
     );
-    tailer.set_fetcher_version(start_version).await;
+    tailer.set_fetcher_version(start_version as u64).await;
 
     info!(processor_name = processor_name, "Starting fetcher...");
     tailer.transaction_fetcher.lock().await.start().await;
@@ -177,7 +181,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
     let mut versions_processed: u64 = 0;
     let mut base: u64 = 0;
-    let mut version_to_check_chain_id: u64 = 0;
 
     // Check once here to avoid a boolean check every iteration
     if check_chain_id {
@@ -185,7 +188,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
             .check_or_update_chain_id()
             .await
             .expect("Failed to get chain ID");
-        version_to_check_chain_id = versions_processed + 100_000;
     }
 
     let (tx, mut receiver) = tokio::sync::mpsc::channel(100);
@@ -205,14 +207,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let mut ma = MovingAverage::new(10_000);
 
     loop {
-        if check_chain_id && version_to_check_chain_id < versions_processed {
-            tailer
-                .check_or_update_chain_id()
-                .await
-                .expect("Failed to get chain ID");
-            version_to_check_chain_id = versions_processed + 100_000;
-        }
-
         let (num_res, result) = receiver
             .recv()
             .await
@@ -240,7 +234,7 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
 
         versions_processed += num_res;
         if emit_every != 0 {
-            let new_base: u64 = versions_processed / emit_every;
+            let new_base: u64 = versions_processed / (emit_every as u64);
             if base != new_base {
                 base = new_base;
                 info!(

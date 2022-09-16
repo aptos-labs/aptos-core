@@ -2,19 +2,13 @@
 
 > Tails the blockchain's transactions and pushes them into a postgres DB
 
-Tails the node utilizing the rest interface/client, and maintains state for each registered `TransactionProcessor`. On
-startup, by default, will retry any previously errored versions for each registered processor.
+A fullnode can run an indexer with the proper configs. If enabled, the indexer will tail
+transactions in the fullnode with business logic from  each registered `TransactionProcessor`. On
+startup, by default, will restart from the first gap (e.g. version 5 if versions succeeded are 0, 1, 2, 3, 4, 6). 
 
-When developing your own, ensure each `TransactionProcessor` is idempotent, and being called with the same input won't
-result in an error if some or all of the processing had previously been completed.
+Each `TransactionProcessor` will need to be run in a separate fullnode. Please note that it may be difficult to run several transaction processors simultaneously in a single machine due to port conflicts. 
 
-Example invocation:
-
-```bash
-cargo run --bin aptos-node --features "indexer"  -- --config some_path/fullnode.yaml
- ```
-
-Try running the indexer with `--help` to get more details
+When developing your own, ensure each `TransactionProcessor` is idempotent, and being called with the same input won't result in an error if some or all of the processing had previously been completed.
 
 ## Requirements
 
@@ -24,19 +18,37 @@ Try running the indexer with `--help` to get more details
 
 # Local Development
 
-### Installation Guide (for apple sillicon)
+## Installation Guide (for apple sillicon)
+### Postgres 
 1. `brew install libpq` ([this is a postgres C API library](https://formulae.brew.sh/formula/libpq)). Also perform all export commands post-installation
 2. `brew install postgres`
 3. `pg_ctl -D /opt/homebrew/var/postgres start` or `brew services start postgresql`
 4. `/opt/homebrew/bin/createuser -s postgres`
 5. Ensure you're able to do: `psql postgres`
 6. `cargo install diesel_cli --no-default-features --features postgres`
-7. `diesel migration run --database-url postgresql://localhost/postgres`
-8. Start indexer
-```bash
-cargo run --bin aptos-node --features "indexer"  -- --config some_path/fullnode.yaml
-```
+7. In this folder, run `diesel migration run --database-url postgresql://localhost/postgres`
+   a. If for some reason this database is already being used, try a different db. e.g.
+      `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
+### Installing fullnode
+Please follow standard fullnode installation guide on aptos.dev (https://aptos.dev/nodes/full-node/fullnode-source-code-or-docker)
+
+### Running indexer
+```bash
+cargo run --bin aptos-node --features "indexer"  -- --config <some_path>/fullnode.yaml
+```
+   * Example fullnode.yaml modification
+      ```
+      storage:
+         enable_indexer: true
+
+      indexer:
+         enabled: true
+         postgres_uri: "postgres://postgres@localhost:5432/postgres"
+         processor: "default_processor"
+         check_chain_id: true
+         emit_every: 500
+      ```
 
 ### Optional PgAdmin4
 1. Complete Installation Guide above
@@ -74,46 +86,13 @@ Username: postgres
 * `diesel database reset` drops the existing database and reruns all the migrations
 * You can find more information in the [Diesel](https://diesel.rs/) documentation
 
-# General Flow
-
-The `Tailer` is the central glue that holds all the other components together. It's responsible for the following:
-
-1. Maintaining processor state. The `Tailer` keeps a record of the `Result` of each `TransactionProcessor`'s output for
-   each transaction version (eg: transaction). If a `TransactionProcessor` returns a `Result::Err()` for a transaction,
-   the `Tailer` will mark that version as failed in the database (along with the stringified error text) and continue
-   on.
-2. Retry failed versions for each `TransactionProcessor`. By default, when a `Tailer` is started, it will re-fetch the
-   versions for all `TransactionProcessor` which have failed, and attempt to re-process them. The `Result::Ok`
-   /`Result::Err` returned from the `TransactionProcessor::process_version` replace the state in the DB for the
-   given `TransactionProcessor`/version combination.
-3. Piping new transactions from the `Fetcher` into each `TransactionProcessor` that was registered to it.
-   Each `TransactionProcessor` gets its own copy, in its own `tokio::Task`, for each version. These are done in batches,
-   the size of which is specifiable via `--batch-size`. For other tunable parameters, try `cargo run -- --help`.
-
-The `Fetcher` is responsible for fetching transactions from a node in one of two ways:
-
-1. One at a time (used by the `Tailer` when retrying previously errored transactions).
-2. In bulk, with an internal buffer. Although the `Tailer` only fetches one transaction at a time from the `Fetcher`,
-   internally the `Fetcher` will fetch from the `/transactions` endpoint, which returns potentially hundreds of
-   transactions at a time. This is much more efficient than making hundreds of individual HTTP calls. In the future,
-   when there is a streaming Node API, that would be the optimal source of transactions.
-
-All the above comes free 'out of the box'. The `TransactionProcessor` is where everything becomes useful for those
-writing their own indexers. The trait only has one main method that needs to be implemented: `process_transaction`. You
-can do anything you want in a `TransactionProcessor` - write data to Postgres tables like the `DefaultProcessor` does,
-make restful HTTP calls to some other service, submit its own transactions to the chain: anything at all. There is just
-one note: *transaction processing is guaranteed at least once*. It's possible for a given `TransactionProcessor` to
-receive the same transaction more than once: and so your implementation must be idempotent.
-
-To implement your own `TransactionProcessor`, check out the documentation and source code
-here: [`./src/indexer/transaction_processor.rs`](src/indexer/transaction_processor.rs).
-
 ### Miscellaneous
 1. If you run into
 ```bash
   = note: ld: library not found for -lpq
           clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ```
+
 first make sure you have `postgres` and `libpq` installed via `homebrew`, see installation guide above for more details.
 This is complaining about the `libpq` library, a postgres C API library which diesel needs to run, more on this issue [here](https://github.com/diesel-rs/diesel/issues/2612)
 2. [Postgresql Mac M1 installation guide](https://gist.github.com/phortuin/2fe698b6c741fd84357cec84219c6667)

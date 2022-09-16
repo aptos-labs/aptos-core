@@ -325,6 +325,10 @@ pub struct TransactionInfo {
     pub accumulator_root_hash: HashValue,
     /// Final state of resources changed by the transaction
     pub changes: Vec<WriteSetChange>,
+    /// Block height that the transaction belongs in, this field will not be present through the API
+    #[oai(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block_height: Option<U64>,
 }
 
 /// A transaction waiting in mempool

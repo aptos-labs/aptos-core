@@ -8,7 +8,6 @@ use aptos_logger::prelude::*;
 use aptos_vm::data_cache::StorageAdapterOwned;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use storage_interface::state_view::DbStateView;
@@ -49,7 +48,7 @@ impl Fetcher {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0;
+        self.highest_known_version = info.ledger_version.0 as u64;
         self.chain_id = info.chain_id;
         Ok(())
     }
@@ -186,9 +185,9 @@ async fn fetch_raw_txns_with_retries(
     let mut retries = 0;
     loop {
         match context.get_transactions(
-            starting_version,
+            starting_version as u64,
             transaction_fetch_batch_size,
-            ledger_version,
+            ledger_version as u64,
         ) {
             Ok(raw_txns) => return raw_txns,
             Err(err) => {
@@ -236,20 +235,58 @@ async fn fetch_nexts(
     )
     .await;
 
-    let mut timestamp = context.db.get_block_timestamp(starting_version).unwrap();
+    let (_, _, block_event) = context
+        .db
+        .get_block_info_by_version(starting_version as u64)
+        .unwrap_or_else(|_| {
+            panic!(
+                "Could not get block_info for start version {}",
+                starting_version,
+            )
+        });
+    let mut timestamp = block_event.proposed_time();
+    let mut block_height = block_event.height();
+    let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let resolver = context.move_resolver().unwrap();
     let converter = resolver.as_converter(context.db.clone());
 
     let transactions_res: Result<Vec<Transaction>, anyhow::Error> = raw_txns
         .into_iter()
-        .map(|t| {
-            // Update the timestamp if the next block occurs
-            if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction {
-                timestamp = txn.timestamp_usecs();
+        .enumerate()
+        .map(|(ind, t)| {
+            // Do not update block_height if first block is block metadata
+            if ind > 0 {
+                // Update the timestamp if the next block occurs
+                if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) = t.transaction
+                {
+                    timestamp = txn.timestamp_usecs();
+                    block_height += 1;
+                    block_height_bcs = aptos_api_types::U64::from(block_height);
+                }
             }
-            let txn = converter.try_into_onchain_transaction(timestamp, t)?;
-            Ok(remove_null_bytes_from_txn(txn))
+            converter
+                .try_into_onchain_transaction(timestamp, t)
+                .map(|mut txn| {
+                    match txn {
+                        Transaction::PendingTransaction(_) => {
+                            unreachable!("Indexer should never see pending transactions")
+                        }
+                        Transaction::UserTransaction(ref mut ut) => {
+                            ut.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::GenesisTransaction(ref mut gt) => {
+                            gt.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::BlockMetadataTransaction(ref mut bmt) => {
+                            bmt.info.block_height = Some(block_height_bcs)
+                        }
+                        Transaction::StateCheckpointTransaction(ref mut sct) => {
+                            sct.info.block_height = Some(block_height_bcs)
+                        }
+                    };
+                    txn
+                })
         })
         .collect::<Result<_, anyhow::Error>>();
 
@@ -420,50 +457,16 @@ impl TransactionFetcherTrait for TransactionFetcher {
 
         let options2 = self.options.clone();
         let fetcher_handle = tokio::spawn(async move {
-            let mut fetcher =
-                Fetcher::new(context, starting_version, options2, transactions_sender);
+            let mut fetcher = Fetcher::new(
+                context,
+                starting_version as u64,
+                options2,
+                transactions_sender,
+            );
             fetcher.run().await;
         });
         self.fetcher_handle = Some(fetcher_handle);
     }
-}
-
-pub fn string_null_byte_replacement(value: &mut str) -> String {
-    value.replace('\u{0000}', "").replace("\\u0000", "")
-}
-
-pub fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
-    match sub_json {
-        Value::Array(array) => {
-            for item in array {
-                recurse_remove_null_bytes_from_json(item);
-            }
-        }
-        Value::Object(object) => {
-            for (_key, value) in object {
-                recurse_remove_null_bytes_from_json(value);
-            }
-        }
-        Value::String(str) => {
-            if !str.is_empty() {
-                let replacement = string_null_byte_replacement(str);
-                *str = replacement;
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn remove_null_bytes_from_txn(txn: Transaction) -> Transaction {
-    let mut txn_json = serde_json::to_value(txn).unwrap();
-    recurse_remove_null_bytes_from_json(&mut txn_json);
-    serde_json::from_value::<Transaction>(txn_json).unwrap()
-}
-
-pub fn remove_null_bytes_from_txns(txns: Vec<Transaction>) -> Vec<Transaction> {
-    txns.into_iter()
-        .map(remove_null_bytes_from_txn)
-        .collect::<Vec<Transaction>>()
 }
 
 /// For mocking TransactionFetcher in tests
