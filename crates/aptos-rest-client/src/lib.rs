@@ -18,19 +18,15 @@ pub use state::State;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
-use crate::error::{AptosErrorResponse, RestError};
+use crate::error::RestError;
 use anyhow::{anyhow, Result};
 use aptos_api_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
-    AptosError, AptosErrorCode, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId,
-    TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent,
+    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, MoveModuleId, TransactionData,
+    TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
-use aptos_types::transaction::RawTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
@@ -291,103 +287,29 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
-    pub async fn estimate_gas(
+    pub async fn simulate_bcs_with_gas_estimation(
         &self,
-        sender: AccountAddress,
-        gas_unit_price: Option<u64>,
-        signed_transaction: &SignedTransaction,
-    ) -> AptosResult<GasEstimationParams> {
-        // TODO: Cache gas schedule
-        let result = self
-            .get_account_resource_bcs::<GasScheduleV2>(
-                CORE_CODE_ADDRESS,
-                &GasScheduleV2::struct_tag().to_string(),
-            )
-            .await;
-        let gas_params = match result {
-            Ok(gas_schedule) => AptosGasParameters::from_on_chain_gas_schedule(
-                &gas_schedule.into_inner().to_btree_map(),
-            ),
-            Err(RestError::Api(AptosErrorResponse {
-                error:
-                    AptosError {
-                        error_code: AptosErrorCode::ResourceNotFound,
-                        ..
-                    },
-                ..
-            })) => {
-                // Backwards compatibility with old gas schedule
-                let gas_schedule: GasSchedule = self
-                    .get_account_resource_bcs(
-                        CORE_CODE_ADDRESS,
-                        &GasSchedule::struct_tag().to_string(),
-                    )
-                    .await?
-                    .into_inner();
-                AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
-            }
-            Err(err) => return Err(err),
-        }
-        .ok_or_else(|| {
-            RestError::Api(AptosErrorResponse {
-                error: AptosError::new_with_error_code(
-                    "Gas schedule isn't parsable",
-                    AptosErrorCode::InternalError,
-                ),
-                state: None,
-                status_code: StatusCode::INTERNAL_SERVER_ERROR,
-            })
-        })?;
+        txn: &SignedTransaction,
+        estimate_max_gas_amount: bool,
+        estimate_max_gas_unit_price: bool,
+    ) -> AptosResult<Response<TransactionOnChainData>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path(&format!(
+            "transactions/simulate?estimate_max_gas_amount={}&estimate_gas_unit_price={}",
+            estimate_max_gas_amount, estimate_max_gas_unit_price
+        ))?;
 
-        // Special case, 0 gas unit price doesn't need gas
-        let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
-        if min_gas_price == 0 {
-            return Ok(GasEstimationParams {
-                estimated_gas_used: 0,
-                estimated_gas_price: 0,
-            });
-        }
-        let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
 
-        // Retrieve the sender's aptos coin balance
-        let account_balance = self
-            .get_account_balance_bcs(sender, "0x1::aptos_coin::AptosCoin")
-            .await?
-            .into_inner();
-
-        // If a gas unit price is given, use that.  Otherwise, use the estimator
-        let gas_unit_price = if let Some(gas_unit_price) = gas_unit_price {
-            gas_unit_price
-        } else {
-            self.estimate_gas_price().await?.into_inner().gas_estimate
-        };
-
-        // The minimum of the max gas units, and the current balance is a starting point
-        let max_possible_gas =
-            std::cmp::min(account_balance / gas_unit_price, max_number_of_gas_units);
-
-        // Simulate transaction
-        let txn = override_gas_parameters(signed_transaction, max_possible_gas, gas_unit_price);
-        let response = self.simulate_bcs(&txn).await?;
-
-        // Ensure the transaction succeeds
-        let status = response.inner().info.status();
-        if status.is_success() {
-            Ok(GasEstimationParams {
-                estimated_gas_used: response.inner().info.gas_used(),
-                estimated_gas_price: gas_unit_price,
-            })
-        } else {
-            Err(RestError::Api(AptosErrorResponse {
-                error: AptosError {
-                    message: format!("Transaction simulation for gas failed with {:?}", status),
-                    error_code: AptosErrorCode::InvalidInput,
-                    vm_error_code: None,
-                },
-                state: Some(response.state().clone()),
-                status_code: StatusCode::BAD_REQUEST,
-            }))
-        }
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit(
@@ -1282,26 +1204,6 @@ async fn parse_error(response: reqwest::Response) -> RestError {
         Ok(error) => (error, maybe_state, status_code).into(),
         Err(e) => RestError::Http(status_code, e),
     }
-}
-
-fn override_gas_parameters(
-    signed_txn: &SignedTransaction,
-    max_gas_amount: u64,
-    gas_unit_price: u64,
-) -> SignedTransaction {
-    let payload = signed_txn.payload();
-    let raw_txn = RawTransaction::new(
-        signed_txn.sender(),
-        signed_txn.sequence_number(),
-        payload.clone(),
-        max_gas_amount,
-        gas_unit_price,
-        signed_txn.expiration_timestamp_secs(),
-        signed_txn.chain_id(),
-    );
-
-    // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
 }
 
 pub struct GasEstimationParams {
