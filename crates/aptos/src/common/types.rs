@@ -1222,7 +1222,6 @@ impl TransactionOptions {
     pub async fn submit_transaction(
         &self,
         payload: TransactionPayload,
-        amount_transfer: Option<u64>,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
@@ -1246,16 +1245,23 @@ impl TransactionOptions {
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             max_gas
         } else if self.estimate_max_gas {
-            let simulated_txn = self
-                .simulate_transaction(payload.clone(), Some(gas_unit_price), amount_transfer)
+            let transaction_factory = TransactionFactory::new(chain_id(&client).await?);
+
+            let unsigned_transaction = transaction_factory
+                .payload(payload.clone())
+                .sender(sender_address)
+                .sequence_number(sequence_number)
+                .build();
+
+            let signed_transaction = SignedTransaction::new(
+                unsigned_transaction,
+                sender_key.public_key(),
+                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            );
+            let estimated_gas = client
+                .estimate_gas(sender_address, Some(gas_unit_price), &signed_transaction)
                 .await?;
-            if !simulated_txn.info.success {
-                return Err(CliError::ApiError(format!(
-                    "Simulated transaction failed with status {}",
-                    simulated_txn.info.vm_status
-                )));
-            }
-            simulated_txn.info.gas_used.0
+            estimated_gas.estimated_gas_used
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
             DEFAULT_MAX_GAS
