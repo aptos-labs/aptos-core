@@ -15,7 +15,7 @@ use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::account_config::NewBlockEvent;
-use aptos_types::on_chain_config::{GasSchedule, OnChainConfig};
+use aptos_types::on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig};
 use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -636,18 +636,25 @@ impl Context {
             .state_view_at_version(Some(ledger_info.version()))
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))?;
         let storage_adapter = StorageAdapter::new(&state_view);
-        GasSchedule::fetch_config(&storage_adapter)
-            .and_then(|gas_schedule| {
-                let gas_schedule = gas_schedule.to_btree_map();
-                AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
-            })
-            .ok_or_else(|| {
-                E::internal_with_code(
-                    "Failed to retrieve gas schedule",
-                    AptosErrorCode::InternalError,
-                    ledger_info,
-                )
-            })
+
+        match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+            let gas_schedule = gas_schedule.to_btree_map();
+            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+        }) {
+            Some(gas_schedule) => Ok(gas_schedule),
+            None => GasSchedule::fetch_config(&storage_adapter)
+                .and_then(|gas_schedule| {
+                    let gas_schedule = gas_schedule.to_btree_map();
+                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+                })
+                .ok_or_else(|| {
+                    E::internal_with_code(
+                        "Failed to retrieve gas schedule",
+                        AptosErrorCode::InternalError,
+                        ledger_info,
+                    )
+                }),
+        }
     }
 
     pub fn check_api_output_enabled<E: ForbiddenError>(
