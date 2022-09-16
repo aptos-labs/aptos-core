@@ -47,6 +47,7 @@ CREATE TABLE transactions (
   -- Default time columns
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE INDEX txn_insat_index ON transactions (inserted_at);
 /* Ex:
  {
  "type":"block_metadata_transaction",
@@ -96,6 +97,7 @@ CREATE TABLE block_metadata_transactions (
   -- Constraints
   CONSTRAINT fk_versions FOREIGN KEY (version) REFERENCES transactions (version)
 );
+CREATE INDEX bmt_insat_index ON block_metadata_transactions (inserted_at);
 /* Ex:
  {
  "type":"user_transaction",
@@ -160,6 +162,7 @@ CREATE TABLE user_transactions (
   gas_unit_price NUMERIC NOT NULL,
   -- from UserTransaction
   "timestamp" TIMESTAMP NOT NULL,
+  entry_function_id_str text NOT NULL,
   -- Default time columns
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
@@ -167,6 +170,8 @@ CREATE TABLE user_transactions (
   UNIQUE (sender, sequence_number)
 );
 CREATE INDEX ut_sender_seq_index ON user_transactions (sender, sequence_number);
+CREATE INDEX ut_insat_index ON user_transactions (inserted_at);
+-- tracks signatures for user transactions
 CREATE TABLE signatures (
   transaction_version BIGINT NOT NULL,
   multi_agent_index BIGINT NOT NULL,
@@ -189,6 +194,7 @@ CREATE TABLE signatures (
   ),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
+CREATE INDEX sig_insat_index ON signatures (inserted_at);
 /** Ex:
  {
  "key": "0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
@@ -213,7 +219,9 @@ CREATE TABLE events (
   PRIMARY KEY (key, sequence_number),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
-CREATE INDEX event_addr_type_index ON events (account_address);
+CREATE INDEX ev_addr_type_index ON events (account_address);
+CREATE INDEX ev_insat_index ON events (inserted_at);
+-- write set changes
 CREATE TABLE write_set_changes (
   transaction_version BIGINT NOT NULL,
   index BIGINT NOT NULL,
@@ -226,7 +234,9 @@ CREATE TABLE write_set_changes (
   PRIMARY KEY (transaction_version, index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
-CREATE INDEX write_set_changes_addr_type_ver_index ON write_set_changes (address, transaction_version DESC);
+CREATE INDEX wsc_addr_type_ver_index ON write_set_changes (address, transaction_version DESC);
+CREATE INDEX wsc_insat_index ON write_set_changes (inserted_at);
+-- move modules in write set changes
 CREATE TABLE move_modules (
   transaction_version BIGINT NOT NULL,
   write_set_change_index BIGINT NOT NULL,
@@ -243,7 +253,9 @@ CREATE TABLE move_modules (
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
-CREATE INDEX move_modules_addr_name_ver_index ON move_modules (address, name, transaction_version);
+CREATE INDEX mm_addr_name_ver_index ON move_modules (address, name, transaction_version);
+CREATE INDEX mm_insat_index ON move_modules (inserted_at);
+-- move resources in write set changes
 CREATE TABLE move_resources (
   transaction_version BIGINT NOT NULL,
   write_set_change_index BIGINT NOT NULL,
@@ -260,7 +272,9 @@ CREATE TABLE move_resources (
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
-CREATE INDEX move_resources_addr_mod_name_ver_index ON move_resources (address, module, name, transaction_version);
+CREATE INDEX mr_addr_mod_name_ver_index ON move_resources (address, module, name, transaction_version);
+CREATE INDEX mr_insat_index ON move_resources (inserted_at);
+-- table items in write set changes
 CREATE TABLE table_items (
   key text NOT NULL,
   transaction_version BIGINT NOT NULL,
@@ -275,13 +289,17 @@ CREATE TABLE table_items (
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
 );
-CREATE INDEX table_items_hand_ver_key_index ON table_items (table_handle, transaction_version);
+CREATE INDEX ti_hand_ver_key_index ON table_items (table_handle, transaction_version);
+CREATE INDEX ti_insat_index ON table_items (inserted_at);
+-- table metadatas from table items
 CREATE TABLE table_metadatas (
   handle VARCHAR(255) UNIQUE PRIMARY KEY NOT NULL,
   key_type text NOT NULL,
   value_type text NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE INDEX tm_insat_index ON table_metadatas (inserted_at);
+-- table metadatas in write set changes
 CREATE TABLE processor_statuses (
   name VARCHAR(50) NOT NULL,
   version BIGINT NOT NULL,
@@ -291,5 +309,6 @@ CREATE TABLE processor_statuses (
   -- Constraints
   PRIMARY KEY (name, version)
 );
-CREATE INDEX processor_statuses_succ_ver_index ON processor_statuses (success, version ASC);
+CREATE INDEX ps_succ_ver_index ON processor_statuses (success, version ASC);
+CREATE INDEX ps_lastup_index ON processor_statuses (last_updated);
 CREATE TABLE ledger_infos (chain_id BIGINT UNIQUE PRIMARY KEY NOT NULL);

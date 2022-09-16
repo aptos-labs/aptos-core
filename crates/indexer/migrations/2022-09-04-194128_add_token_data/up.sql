@@ -1,6 +1,5 @@
 -- Your SQL goes here
-ALTER TABLE user_transactions
-ADD COLUMN entry_function_id_str text NOT NULL;
+-- tracks tokens per version
 CREATE TABLE tokens (
   creator_address VARCHAR(100) NOT NULL,
   collection_name_hash VARCHAR(64) NOT NULL,
@@ -20,6 +19,8 @@ CREATE TABLE tokens (
     transaction_version
   )
 );
+CREATE INDEX token_insat_index ON tokens (inserted_at);
+-- tracks who owns tokens at certain version
 CREATE TABLE token_ownerships (
   creator_address VARCHAR(100) NOT NULL,
   collection_name_hash VARCHAR(64) NOT NULL,
@@ -44,6 +45,8 @@ CREATE TABLE token_ownerships (
   )
 );
 CREATE INDEX to_owner ON token_ownerships (owner_address);
+CREATE INDEX to_insat_index ON token_ownerships (inserted_at);
+-- tracks token metadata
 CREATE TABLE token_datas (
   creator_address VARCHAR(100) NOT NULL,
   collection_name_hash VARCHAR(64) NOT NULL,
@@ -73,6 +76,8 @@ CREATE TABLE token_datas (
     transaction_version
   )
 );
+CREATE INDEX td_insat_index ON token_datas (inserted_at);
+-- tracks collection metadata
 CREATE TABLE collection_datas (
   creator_address VARCHAR(100) NOT NULL,
   collection_name_hash VARCHAR(64) NOT NULL,
@@ -93,3 +98,4 @@ CREATE TABLE collection_datas (
     transaction_version
   )
 );
+CREATE INDEX cd_insat_index ON collection_datas (inserted_at);

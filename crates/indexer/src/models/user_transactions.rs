@@ -38,8 +38,8 @@ pub struct UserTransaction {
     pub expiration_timestamp_secs: chrono::NaiveDateTime,
     pub gas_unit_price: bigdecimal::BigDecimal,
     pub timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
+    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl UserTransaction {
