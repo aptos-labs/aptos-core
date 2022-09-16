@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
+use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
     core::{Collector, Desc, Describer},
@@ -23,6 +24,12 @@ const RUN_TIME: &str = "run_time";
 const CPU_USAGE: &str = "cpu_usage";
 const TOTAL_READ_BYTES: &str = "disk_total_read_bytes";
 const TOTAL_WRITTEN_BYTES: &str = "disk_total_written_bytes";
+
+const LINUX_PROCESS_SUBSYSTEM: &str = "linux_process";
+const LINUX_PROCESS_METRICS_COUNT: usize = 2;
+
+const LINUX_VMEM_SIZE: &str = "vm_size_bytes";
+const LINUX_VMEM_RSS: &str = "vm_rss_bytes";
 
 /// A Collector for exposing process metrics
 pub(crate) struct ProcessMetricsCollector {
@@ -177,14 +184,102 @@ impl Collector for ProcessMetricsCollector {
     }
 }
 
+pub(crate) struct LinuxProcessMetricsCollector {
+    vm_size_bytes: Desc,
+    vm_rss_bytes: Desc,
+}
+
+impl LinuxProcessMetricsCollector {
+    fn new() -> Self {
+        let vm_size_bytes = Opts::new(LINUX_VMEM_SIZE, "Memory usage in bytes.")
+            .namespace(NAMESPACE)
+            .subsystem(LINUX_PROCESS_SUBSYSTEM)
+            .describe()
+            .unwrap();
+        let vm_rss_bytes = Opts::new(LINUX_VMEM_RSS, "Memory usage in bytes.")
+            .namespace(NAMESPACE)
+            .subsystem(LINUX_PROCESS_SUBSYSTEM)
+            .describe()
+            .unwrap();
+        Self {
+            vm_size_bytes,
+            vm_rss_bytes,
+        }
+    }
+}
+
+impl Default for LinuxProcessMetricsCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Collector for LinuxProcessMetricsCollector {
+    fn desc(&self) -> Vec<&Desc> {
+        vec![&self.vm_size_bytes, &self.vm_rss_bytes]
+    }
+
+    fn collect(&self) -> Vec<MetricFamily> {
+        let mut mfs = Vec::with_capacity(LINUX_PROCESS_METRICS_COUNT);
+
+        let page_size = match procfs::page_size() {
+            Ok(page_size) => page_size,
+            Err(err) => {
+                warn!(
+                    "unable to get page_size in linux, not collecting process memory metrics: {}",
+                    err
+                );
+                return mfs;
+            }
+        };
+
+        let proc_statm = procfs::process::Process::myself().and_then(|p| p.statm());
+        if proc_statm.is_err() {
+            warn!(
+                "unable to collect process memory metrics for linux: {}",
+                proc_statm.unwrap_err()
+            );
+            return mfs;
+        }
+
+        let proc_statm = proc_statm.unwrap();
+        let vm_size_bytes = ConstMetric::new_gauge(
+            self.vm_size_bytes.clone(),
+            (proc_statm.size * page_size) as f64,
+            None,
+        )
+        .unwrap();
+        let vm_rss_bytes = ConstMetric::new_gauge(
+            self.vm_rss_bytes.clone(),
+            (proc_statm.resident * page_size) as f64,
+            None,
+        )
+        .unwrap();
+
+        mfs.extend(vm_size_bytes.collect());
+        mfs.extend(vm_rss_bytes.collect());
+
+        mfs
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ProcessMetricsCollector;
+    use super::{LinuxProcessMetricsCollector, ProcessMetricsCollector};
     use prometheus::Registry;
 
     #[test]
-    fn test_cpu_collector_register() {
+    fn test_process_collector_register() {
         let collector = ProcessMetricsCollector::default();
+
+        let r = Registry::new();
+        let res = r.register(Box::new(collector));
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_linux_process_collector_register() {
+        let collector = LinuxProcessMetricsCollector::default();
 
         let r = Registry::new();
         let res = r.register(Box::new(collector));
