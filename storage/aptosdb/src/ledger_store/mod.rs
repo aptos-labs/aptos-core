@@ -29,7 +29,8 @@ use aptos_types::{
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
+use schemadb::iterator::SchemaIterator;
+use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{ops::Deref, sync::Arc};
 
 #[derive(Debug)]
