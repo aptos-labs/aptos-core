@@ -60,6 +60,8 @@ genesis:
     num_validators_with_larger_stake: 0
     # -- Stake amount for nodes we are giving larger state to. Defaults to 10M APTOS coins with 8 decimals
     larger_stake_amount: "1000000000000000"
+    # -- Random seed to generate validator keys in order to make the key generation deterministic
+    key_seed:
   fullnode:
     # -- Use External DNS as created by aptos-node helm chart for fullnode host in genesis
     enable_onchain_discovery: true

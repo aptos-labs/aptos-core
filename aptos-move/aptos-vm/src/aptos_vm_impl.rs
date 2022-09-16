@@ -17,10 +17,13 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
-    on_chain_config::{GasSchedule, OnChainConfig, Version},
+    on_chain_config::{
+        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, Version,
+    },
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
@@ -44,6 +47,7 @@ use std::sync::Arc;
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
+    gas_feature_version: Option<u64>,
     gas_params: Option<AptosGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
@@ -55,13 +59,32 @@ impl AptosVMImpl {
     pub fn new<S: StateView>(state: &S) -> Self {
         let storage = StorageAdapter::new(state);
 
-        // TODO(Gas): this should not panic
-        let gas_params = GasSchedule::fetch_config(&storage).and_then(|gas_schedule| {
-            let gas_schedule = gas_schedule.to_btree_map();
-            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
-        });
+        let (gas_params, gas_feature_version): (Option<AptosGasParameters>, Option<u64>) =
+            match GasScheduleV2::fetch_config(&storage) {
+                Some(gas_schedule) => {
+                    let feature_version = gas_schedule.feature_version;
+                    let map = gas_schedule.to_btree_map();
+                    (
+                        AptosGasParameters::from_on_chain_gas_schedule(&map),
+                        Some(feature_version),
+                    )
+                }
+                None => match GasSchedule::fetch_config(&storage) {
+                    Some(gas_schedule) => {
+                        let map = gas_schedule.to_btree_map();
+                        (
+                            AptosGasParameters::from_on_chain_gas_schedule(&map),
+                            Some(0),
+                        )
+                    }
+                    None => (None, None),
+                },
+            };
 
-        // TODO(Gas): this doesn't look right.
+        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+        //            This only happens in a edge case that is probably related to write set transactions or genesis,
+        //            which logically speaking, shouldn't be handled by the VM at all.
+        //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
             Some(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
             None => (
@@ -70,11 +93,17 @@ impl AptosVMImpl {
             ),
         };
 
-        let inner = MoveVmExt::new(native_gas_params, abs_val_size_gas_params)
-            .expect("should be able to create Move VM; check if there are duplicated natives");
+        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let inner = MoveVmExt::new(
+            native_gas_params,
+            abs_val_size_gas_params,
+            features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        )
+        .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
             move_vm: Arc::new(inner),
+            gas_feature_version,
             gas_params,
             version: None,
             transaction_validation: None,
@@ -83,24 +112,6 @@ impl AptosVMImpl {
         vm.version = Version::fetch_config(&storage);
         vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
         vm
-    }
-
-    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
-        // TODO(Gas): this should not panic
-        let gas_params =
-            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
-                .expect("failed to get gas parameters");
-
-        let inner = MoveVmExt::new(gas_params.natives.clone(), gas_params.misc.abs_val.clone())
-            .expect("should be able to create Move VM; check if there are duplicated natives");
-
-        Self {
-            move_vm: Arc::new(inner),
-            gas_params: Some(gas_params),
-            version: Some(version),
-            transaction_validation: None,
-            metadata_cache: Default::default(),
-        }
     }
 
     /// Provides access to some internal APIs of the VM.
@@ -138,6 +149,17 @@ impl AptosVMImpl {
         })
     }
 
+    pub fn get_gas_feature_version(&self, log_context: &AdapterLogSchema) -> Result<u64, VMStatus> {
+        self.gas_feature_version.ok_or_else(|| {
+            log_context.alert();
+            error!(
+                *log_context,
+                "VM Startup Failed. Gas Feature Version Not Found"
+            );
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+        })
+    }
+
     pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
             CRITICAL_ERRORS.inc();
@@ -146,8 +168,9 @@ impl AptosVMImpl {
         })
     }
 
-    pub fn check_gas(
+    pub fn check_gas<S: MoveResolverExt>(
         &self,
+        storage: &S,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -155,18 +178,33 @@ impl AptosVMImpl {
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
-            warn!(
-                *log_context,
-                "[VM] Transaction size too big {} (max {})",
-                raw_bytes_len,
-                txn_gas_params.max_transaction_size_in_bytes,
-            );
-            return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
-        }
+            let data =
+                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
-        // Check is performed on `txn.raw_txn_bytes_len()` which is the same as
-        // `raw_bytes_len`
-        assume!(raw_bytes_len <= txn_gas_params.max_transaction_size_in_bytes);
+            let valid = if let Ok(Some(data)) = data {
+                let approved_execution_hashes =
+                    bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
+                approved_execution_hashes
+                    .map(|aeh| {
+                        aeh.entries
+                            .into_iter()
+                            .any(|(_, hash)| hash == txn_data.script_hash)
+                    })
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if !valid {
+                warn!(
+                    *log_context,
+                    "[VM] Transaction size too big {} (max {})",
+                    raw_bytes_len,
+                    txn_gas_params.max_transaction_size_in_bytes,
+                );
+                return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
+            }
+        }
 
         // The submitted max gas units that the transaction can consume is greater than the
         // maximum number of gas units bound that we have set for any

@@ -129,7 +129,11 @@ impl TransactionsApi {
         fail_point_poem("endpoint_get_transactions")?;
         self.context
             .check_api_output_enabled("Get transactions", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_transactions_page_size(),
+        );
         self.list(&accept_type, page)
     }
 
@@ -219,7 +223,11 @@ impl TransactionsApi {
         fail_point_poem("endpoint_get_accounts_transactions")?;
         self.context
             .check_api_output_enabled("Get account transactions", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_transactions_page_size(),
+        );
         self.list_by_account(&accept_type, page, address.0)
     }
 

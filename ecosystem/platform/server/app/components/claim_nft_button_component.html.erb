@@ -2,7 +2,7 @@
   <p class="text-red-400 hidden mb-8" data-claim-nft-target="transactionFailedError">
   NFT minting failed. Please ensure that your account has sufficient tokens to perform the transaction and try again.
   </p>
-  <%= render ButtonComponent.new(href: nft_offer_path(@nft_offer, wallet: @wallet.public_key), data: { action: 'claim-nft#handleClick' }, **@rest) do %>
+  <%= render ButtonComponent.new(href: nft_offer_path(@nft_offer, wallet: @wallet.public_key, wallet_name: @wallet.wallet_name), data: { action: 'claim-nft#handleClick' }, **@rest) do %>
     <% if content %>
       <%= content %>
     <% else %>

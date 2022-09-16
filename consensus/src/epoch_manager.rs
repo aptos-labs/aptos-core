@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::BlockStore,
+    block_storage::{
+        tracing::{observe_block, BlockStage},
+        BlockStore,
+    },
     commit_notifier::CommitNotifier,
     counters,
     error::{error_kind, DbError},
@@ -627,6 +630,14 @@ impl EpochManager {
             onchain_config.max_failed_authors_to_store(),
         );
 
+        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+
+        self.round_manager_tx = Some(round_manager_tx.clone());
+
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),
@@ -638,15 +649,12 @@ impl EpochManager {
             self.storage.clone(),
             self.config.sync_only,
             onchain_config,
+            round_manager_tx,
+            self.config.round_initial_timeout_ms,
         );
 
         round_manager.init(last_vote).await;
-        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            1,
-            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
-        );
-        self.round_manager_tx = Some(round_manager_tx);
+
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
         tokio::spawn(round_manager.start(round_manager_rx, close_rx));
@@ -673,7 +681,7 @@ impl EpochManager {
         let initial_data = self
             .storage
             .start()
-            .expect_recovery_data("Consensusdb is corrupted, need to do a backup and restore");
+            .expect_recovery_data("consensusdb is not consistent with aptosdb");
         self.start_round_manager(
             initial_data,
             epoch_state,
@@ -690,6 +698,13 @@ impl EpochManager {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
+
+        if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+        }
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -779,6 +794,12 @@ impl EpochManager {
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
+        if let VerifiedEvent::ProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.proposal().timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED,
+            );
+        }
         match event {
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {

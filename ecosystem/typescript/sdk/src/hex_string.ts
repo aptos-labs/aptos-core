@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { bytesToHex, hexToBytes } from "./bytes_to_hex.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { HexEncodedBytes } from "./generated";
 
 // eslint-disable-next-line no-use-before-define

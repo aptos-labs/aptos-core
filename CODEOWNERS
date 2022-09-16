@@ -3,10 +3,10 @@
 # Owners for the `.github` directory and all its subdirectories.
 /.github/ @aptos-labs/prod-eng
 
-# Owners for the `/api` directory and all its subdirectories. 
+# Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario
 
-# Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`. 
+# Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`.
 /aptos-move/aptos-gas/ @vgao1996
 /aptos-move/aptos-vm/ @davidiw @wrwg @zekun000
 /aptos-move/e2e-tests/src/account.rs @alinush
@@ -26,7 +26,7 @@
 # Owners for quorum store.
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 
-# Owners for the `/crates/aptos` directory and all its subdirectories. 
+# Owners for the `/crates/aptos` directory and all its subdirectories.
 /crates/aptos @gregnazario
 
 # Owners for the `/crates/aptos-crypto*` directories.
@@ -37,6 +37,10 @@
 /crates/aptos-faucet @banool @gregnazario
 /crates/aptos-faucet-cli @gregnazario
 /crates/aptos-genesis @gregnazario
+
+# Owners for the aptos-logger crate
+/crates/aptos-logger @markuze
+
 /crates/aptos-open-api @banool @gregnazario
 /crates/aptos-rest-client @banool @gregnazario
 
@@ -65,6 +69,9 @@
 
 # Owners for mempool.
 /mempool/ @bchocho
+
+# Owners for the `Network Stack`
+/networking @markuze
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind

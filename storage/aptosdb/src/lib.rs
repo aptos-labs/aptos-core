@@ -63,10 +63,8 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_types::access_path::AccessPath;
 use aptos_types::proof::TransactionAccumulatorSummary;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StaleStateValueIndex;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -98,7 +96,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::{ReadOptions, SchemaBatch, DB};
+use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -109,14 +107,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::db_metadata::DbMetadataKey;
 use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
     state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
 };
 use crate::stale_node_index::StaleNodeIndexSchema;
 use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
-use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
@@ -125,7 +121,7 @@ use storage_interface::{
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
-const MAX_LIMIT: u64 = 5000;
+const MAX_LIMIT: u64 = 10000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -268,37 +264,6 @@ impl AptosDB {
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        // hack to delete un-pruned stale value indice due to bug
-        {
-            let min_readable_version = ledger_rocksdb
-                .get::<crate::db_metadata::DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)
-                .unwrap()
-                .map_or(0, |v| v.expect_version());
-            let mut iter = ledger_rocksdb
-                .iter::<StaleStateValueIndexSchema>(ReadOptions::default())
-                .unwrap();
-            iter.seek(&0).unwrap();
-            if let Some((k, _)) = iter.next().transpose().unwrap() {
-                let state_key = StateKey::AccessPath(AccessPath::new(AccountAddress::ZERO, vec![]));
-                if k.stale_since_version < min_readable_version {
-                    ledger_rocksdb
-                        .range_delete(
-                            &StaleStateValueIndex {
-                                stale_since_version: 1,
-                                version: 0,
-                                state_key: state_key.clone(),
-                            },
-                            &StaleStateValueIndex {
-                                stale_since_version: min_readable_version + 1,
-                                version: 0,
-                                state_key,
-                            },
-                        )
-                        .unwrap();
-                }
-            }
-        }
-
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
         let state_pruner = StatePrunerManager::new(
@@ -900,17 +865,6 @@ impl DbReader for AptosDB {
             let (ledger_info_with_sigs, more) =
                 Self::get_epoch_ending_ledger_infos(self, start_epoch, end_epoch)?;
             Ok(EpochChangeProof::new(ledger_info_with_sigs, more))
-        })
-    }
-
-    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
-        gauged_api("get_latest_state_value", || {
-            let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
-            let version = ledger_info_with_sigs.ledger_info().version();
-            let (blob, _proof) = self
-                .state_store
-                .get_state_value_with_proof_by_version(&state_key, version)?;
-            Ok(blob)
         })
     }
 

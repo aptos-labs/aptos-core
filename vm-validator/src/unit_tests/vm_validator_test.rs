@@ -8,7 +8,7 @@ use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
-    transaction::{Module, Script, TransactionPayload},
+    transaction::{Script, TransactionPayload},
     vm_status::StatusCode,
 };
 use aptos_vm::AptosVM;
@@ -273,40 +273,6 @@ fn test_validate_max_gas_price_below_bounds() {
     //    ret.status().unwrap().major_status,
     //    StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND
     //);
-}
-
-// Make sure that we can publish non-allowlisted modules from the association address
-#[test]
-fn test_validate_module_publishing() {
-    let vm_validator = TestValidator::new();
-
-    let address = account_config::aptos_test_root_address();
-    let transaction = transaction_test_helpers::get_test_signed_module_publishing_transaction(
-        address,
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Module::new(vec![]),
-    );
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(ret.status(), None);
-}
-
-#[test]
-fn test_validate_module_publishing_non_association() {
-    let vm_validator = TestValidator::new();
-
-    let address = account_config::aptos_test_root_address();
-    let transaction = transaction_test_helpers::get_test_signed_module_publishing_transaction(
-        address,
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Module::new(vec![]),
-    );
-    // open publishing is enabled
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert!(ret.status().is_none());
 }
 
 #[test]

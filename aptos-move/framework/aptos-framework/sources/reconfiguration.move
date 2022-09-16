@@ -7,14 +7,15 @@ module aptos_framework::reconfiguration {
 
     use aptos_framework::account;
     use aptos_framework::stake;
-    use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::storage_gas;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
     friend aptos_framework::consensus_config;
+    friend aptos_framework::features;
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::version;
@@ -116,10 +117,13 @@ module aptos_framework::reconfiguration {
 
         // Call stake to compute the new validator set and distribute rewards.
         stake::on_new_epoch();
-        state_storage::on_reconfig();
+        storage_gas::on_reconfig();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
+        spec {
+            assume config_ref.epoch + 1 <= MAX_U64;
+        };
         config_ref.epoch = config_ref.epoch + 1;
 
         event::emit_event<NewEpochEvent>(
@@ -170,5 +174,18 @@ module aptos_framework::reconfiguration {
     #[test_only]
     public fun reconfigure_for_test() acquires Configuration {
         reconfigure();
+    }
+
+    // This is used together with stake::end_epoch() for testing with last_reconfiguration_time
+    // It must be called each time an epoch changes
+    #[test_only]
+    public fun reconfigure_for_test_custom() acquires Configuration {
+        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+        let current_time = timestamp::now_microseconds();
+        if (current_time == config_ref.last_reconfiguration_time) {
+            return
+        };
+        config_ref.last_reconfiguration_time = current_time;
+        config_ref.epoch = config_ref.epoch + 1;
     }
 }

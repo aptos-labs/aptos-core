@@ -31,6 +31,7 @@ pub enum ApiError {
     NodeIsOffline,
     TransactionParseError(Option<String>),
     InternalError(Option<String>),
+    CoinTypeFailedToBeFetched(Option<String>),
 
     // Below here are codes directly from the REST API
     AccountNotFound(Option<String>),
@@ -79,6 +80,7 @@ impl ApiError {
             NodeIsOffline,
             TransactionParseError(None),
             InternalError(None),
+            CoinTypeFailedToBeFetched(None),
             AccountNotFound(None),
             ResourceNotFound(None),
             ModuleNotFound(None),
@@ -132,6 +134,7 @@ impl ApiError {
             SequenceNumberTooOld(_) => 30,
             VmError(_) => 31,
             MempoolIsFull(_) => 32,
+            CoinTypeFailedToBeFetched(_) => 33,
         }
     }
 
@@ -139,7 +142,11 @@ impl ApiError {
         use ApiError::*;
         matches!(
             self,
-            AccountNotFound(_) | BlockNotFound(_) | MempoolIsFull(_) | GasEstimationFailed(_)
+            AccountNotFound(_)
+                | BlockNotFound(_)
+                | MempoolIsFull(_)
+                | GasEstimationFailed(_)
+                | CoinTypeFailedToBeFetched(_)
         )
     }
 
@@ -169,6 +176,7 @@ impl ApiError {
             ApiError::BlockNotFound(_) => "Block is missing events",
             ApiError::TransactionParseError(_) => "Transaction failed to parse",
             ApiError::InternalError(_) => "Internal error",
+            ApiError::CoinTypeFailedToBeFetched(_) => "Faileed to retrieve the coin type information, please retry",
             ApiError::ResourceNotFound(_) => "Resource not found",
             ApiError::ModuleNotFound(_) => "Module not found",
             ApiError::StructFieldNotFound(_) => "Struct field not found",
@@ -195,6 +203,7 @@ impl ApiError {
             ApiError::TransactionParseError(inner) => inner,
             ApiError::InvalidOperations(inner) => inner,
             ApiError::InternalError(inner) => inner,
+            ApiError::CoinTypeFailedToBeFetched(inner) => inner,
             ApiError::AccountNotFound(inner) => inner,
             ApiError::ResourceNotFound(inner) => inner,
             ApiError::ModuleNotFound(inner) => inner,
@@ -287,9 +296,9 @@ impl From<RestError> for ApiError {
             },
             RestError::Bcs(_) => ApiError::DeserializationFailed(None),
             RestError::Json(_) => ApiError::DeserializationFailed(None),
-            RestError::Http(err) => ApiError::InternalError(Some(format!(
-                "Failed internal API call with HTTP code {}",
-                err
+            RestError::Http(status_code, err) => ApiError::InternalError(Some(format!(
+                "Failed internal API call with HTTP code {}: {:#}",
+                status_code, err
             ))),
             RestError::UrlParse(err) => ApiError::InternalError(Some(err.to_string())),
             RestError::Timeout(err) => ApiError::InternalError(Some(err.to_string())),

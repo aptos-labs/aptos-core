@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
-
 use crate::common::{
     types::{
         CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
@@ -16,6 +14,8 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey,
 };
+use aptos_rest_client::aptos_api_types::{AptosError, AptosErrorCode};
+use aptos_rest_client::error::{AptosErrorResponse, RestError};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// Command to rotate an account's authentication key
 ///
@@ -34,10 +35,10 @@ pub struct RotateKey {
     pub(crate) txn_options: TransactionOptions,
 
     /// File name that contains the new private key
-    #[clap(long, group = "private_key_to_rotate_to", parse(from_os_str))]
+    #[clap(long, group = "new_private_key", parse(from_os_str))]
     pub(crate) new_private_key_file: Option<PathBuf>,
     /// New private key encoded in a type as shown in `encoding`
-    #[clap(long, group = "private_key_to_roate_to")]
+    #[clap(long, group = "new_private_key")]
     pub(crate) new_private_key: Option<String>,
 
     /// Name of the profile to save the new private key
@@ -83,7 +84,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 )
             })?;
 
-        let sender_address = self.txn_options.sender_address()?;
+        let (current_private_key, sender_address) = self.txn_options.get_key_and_address()?;
 
         // Get sequence number for account
         let sequence_number = self.txn_options.sequence_number(sender_address).await?;
@@ -104,10 +105,8 @@ impl CliCommand<RotateSummary> for RotateKey {
             bcs::to_bytes(&rotation_proof).map_err(|err| CliError::BCS("rotation_proof", err))?;
 
         // Signs the struct using both the current private key and the next private key
-        let rotation_proof_signed_by_current_private_key = self
-            .txn_options
-            .private_key()?
-            .sign_arbitrary_message(&rotation_msg.clone());
+        let rotation_proof_signed_by_current_private_key =
+            current_private_key.sign_arbitrary_message(&rotation_msg.clone());
         let rotation_proof_signed_by_new_private_key =
             new_private_key.sign_arbitrary_message(&rotation_msg);
 
@@ -117,11 +116,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 aptos_stdlib::account_rotate_authentication_key(
                     0,
                     // Existing public key
-                    self.txn_options
-                        .private_key()?
-                        .public_key()
-                        .to_bytes()
-                        .to_vec(),
+                    current_private_key.public_key().to_bytes().to_vec(),
                     0,
                     // New public key
                     new_private_key.public_key().to_bytes().to_vec(),
@@ -283,41 +278,52 @@ impl CliCommand<AccountAddress> for LookupAddress {
     }
 
     async fn execute(self) -> CliTypedResult<AccountAddress> {
-        let originating_resource = self
-            .rest_client()?
-            .get_account_resource(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?
-            .into_inner()
-            .ok_or_else(|| CliError::UnexpectedError("Unable to parse API response.".to_string()))?
-            .data;
+        let rest_client = self.rest_client()?;
 
-        let table_handle = originating_resource["address_map"]["handle"]
-            .as_str()
-            .ok_or_else(|| {
-                CliError::UnexpectedError("Unable to parse table handle.".to_string())
-            })?;
+        let originating_resource: OriginatingResource = rest_client
+            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::account::OriginatingAddress")
+            .await?
+            .into_inner();
+
+        let table_handle = originating_resource.address_map.handle;
 
         // The derived address that can be used to look up the original address
+        // TODO: This command needs to support multi-ed25519
         let address_key = AuthenticationKey::ed25519(&self.public_key()?).derived_address();
-
-        Ok(AccountAddress::from_hex_literal(
-            self.rest_client()?
-                .get_table_item(
-                    AccountAddress::from_str(table_handle)
-                        .map_err(|err| CliError::UnableToParse("table_handle", err.to_string()))?,
-                    "address",
-                    "address",
-                    address_key.to_hex_literal(),
-                )
-                .await
-                .map_err(|err| CliError::ApiError(err.to_string()))?
-                .into_inner()
-                .as_str()
-                .ok_or_else(|| {
-                    CliError::UnexpectedError("Unable to parse API response.".to_string())
-                })?,
-        )
-        .map_err(|err| CliError::UnableToParse("AccountAddress", err.to_string()))?)
+        match rest_client
+            .get_table_item_bcs(
+                table_handle,
+                "address",
+                "address",
+                address_key.to_hex_literal(),
+            )
+            .await
+        {
+            Ok(inner) => Ok(inner.into_inner()),
+            Err(RestError::Api(AptosErrorResponse {
+                error:
+                    AptosError {
+                        error_code: AptosErrorCode::TableItemNotFound,
+                        ..
+                    },
+                ..
+            })) => {
+                // If the table item wasn't found, let's at least check if the account exists
+                // It won't be in the table if it wasn't rotated, then return the derived account address
+                rest_client.get_account_bcs(address_key).await?;
+                Ok(address_key)
+            }
+            Err(err) => Err(err)?,
+        }
     }
+}
+
+#[derive(Deserialize)]
+pub struct OriginatingResource {
+    pub address_map: Table,
+}
+
+#[derive(Deserialize)]
+pub struct Table {
+    pub handle: AccountAddress,
 }

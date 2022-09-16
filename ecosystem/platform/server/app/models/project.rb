@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class Project < ApplicationRecord
+  include PgSearch::Model
+
   URL_FORMAT = URI::DEFAULT_PARSER.make_regexp(%w[http https])
   VALID_HOSTS = {
     github_url: 'github.com',
@@ -49,4 +51,8 @@ class Project < ApplicationRecord
   end
   validates :project_categories, length: { minimum: 1, maximum: 4 }
   validates :screenshots, length: { minimum: 1, maximum: 5 }
+
+  pg_search_scope :search,
+                  against: %i[title short_description full_description],
+                  using: { tsearch: { dictionary: 'english' } }
 end

@@ -4,8 +4,9 @@
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { HexString } from "./hex_string";
-import { BCS, TransactionBuilderABI } from "./transaction_builder";
+import { TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";
+import { Uint64 } from "./bcs";
 
 export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
 
@@ -46,9 +47,9 @@ export class CoinClient {
     extraArgs?: {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;

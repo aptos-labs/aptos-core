@@ -3,13 +3,13 @@
 
 use std::{
     collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf,
+    path::PathBuf, sync::Arc,
 };
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::x25519;
 use aptos_logger::info;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, PeerId};
 use clap::Parser;
 use gcp_bigquery_client::Client;
 use reqwest::Url;
@@ -77,11 +77,15 @@ impl AptosTelemetryServiceArgs {
         );
         let validators_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
         let vfns_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
+        let pfns_cache = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
+
+        pfns_cache.write().clone_from(&config.pfn_allowlist);
 
         let context = Context::new(
             &config,
             validators_cache.clone(),
             vfns_cache.clone(),
+            pfns_cache.clone(),
             Some(gcp_bigquery_client),
             Some(victoria_metrics_client),
             humio_client,
@@ -128,6 +132,7 @@ pub struct TelemetryServiceConfig {
     pub victoria_metrics_token: String,
     pub humio_url: String,
     pub humio_auth_token: String,
+    pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 }
 
 impl TelemetryServiceConfig {

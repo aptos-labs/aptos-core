@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class NftOffersController < ApplicationController
-  before_action :authenticate_user!, only: %i[create]
+  before_action :authenticate_user!, only: %i[update]
+  before_action :ensure_confirmed!, only: %i[update], if: -> { Flipper.enabled?(:require_email_verification_for_nft) }
 
   def short
     @nft_offer = NftOffer.find(params[:offer_id])
@@ -12,8 +13,12 @@ class NftOffersController < ApplicationController
   end
 
   def show
-    @image_dialog = DialogComponent.new(id: 'image_dialog', class: '!w-max max-h-max')
     store_location_for(:user, request.path)
+    if Flipper.enabled?(:require_email_verification_for_nft) && user_signed_in? && !current_user.email_confirmed?
+      return redirect_to onboarding_email_path
+    end
+
+    @image_dialog = DialogComponent.new(id: 'image_dialog', class: '!w-max max-h-max')
     @nft_offer = NftOffer.find_by(slug: params[:slug])
     @wallet = current_user&.wallets&.find_by(network: @nft_offer.network, public_key: params[:wallet]) ||
               Wallet.new(network: @nft_offer.network, challenge: 24.times.map { rand(10) }.join)
@@ -28,22 +33,18 @@ class NftOffersController < ApplicationController
     @transaction_version = nil
     @transaction_hash = nil
 
-    @steps = [
-      sign_in_step,
-      connect_wallet_step,
-      claim_nft_step
-    ].map do |h|
-      # rubocop:disable Style/OpenStructUse
-      OpenStruct.new(**h)
-      # rubocop:enable Style/OpenStructUse
-    end
-    first_incomplete = @steps.index { |step| !step.completed }
-    @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
+    @steps = all_steps
   end
 
   def update
     @nft_offer = NftOffer.find_by(slug: params[:slug])
-    @wallet = current_user.wallets.find_by(network: @nft_offer.network, public_key: params[:wallet])
+    @wallet = current_user.wallets.find_by(
+      network: @nft_offer.network,
+      public_key: params[:wallet],
+      wallet_name: params[:wallet_name]
+    )
+
+    return render json: { error: 'wallet_not_found' } if @wallet.nil?
 
     result = NftClaimer.new.claim_nft(
       nft_offer: @nft_offer,
@@ -61,6 +62,21 @@ class NftOffersController < ApplicationController
   end
 
   private
+
+  def all_steps
+    steps = [
+      sign_in_step,
+      connect_wallet_step,
+      claim_nft_step
+    ].map do |h|
+      # rubocop:disable Style/OpenStructUse
+      OpenStruct.new(**h)
+      # rubocop:enable Style/OpenStructUse
+    end
+    first_incomplete = steps.index { |step| !step.completed }
+    steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
+    steps
+  end
 
   def sign_in_step
     @login_dialog = DialogComponent.new(id: 'login_dialog')

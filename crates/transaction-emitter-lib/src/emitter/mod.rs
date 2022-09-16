@@ -58,7 +58,7 @@ const GAS_AMOUNT: u64 = 1000;
 // account sequence numbers). If these fail, the whole test fails. We do not use
 // this for submitting transactions, as we have a way to handle when that fails.
 // This retry policy means an operation will take 8 seconds at most.
-static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
+pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
     RetryPolicy::exponential(Duration::from_millis(125))
         .with_max_retries(6)
         .with_jitter(true)
@@ -577,9 +577,9 @@ async fn wait_for_single_account_sequence(
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
         time::sleep(Duration::from_millis(1000)).await;
-        match query_sequence_numbers(client, [account.address()].iter()).await {
-            Ok(sequence_numbers) => {
-                if sequence_numbers[0] >= account.sequence_number() {
+        match query_sequence_number(client, account.address()).await {
+            Ok(sequence_number) => {
+                if sequence_number >= account.sequence_number() {
                     return Ok(());
                 }
             }
@@ -621,7 +621,6 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
-
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok(sequence_numbers) => {
@@ -702,6 +701,10 @@ fn update_seq_num_and_get_num_expired(
         .sum()
 }
 
+pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
+    Ok(query_sequence_numbers(client, [address].iter()).await?[0])
+}
+
 pub async fn query_sequence_numbers<'a, I>(client: &RestClient, addresses: I) -> Result<Vec<u64>>
 where
     I: Iterator<Item = &'a AccountAddress>,
@@ -710,7 +713,7 @@ where
         addresses.map(|address| RETRY_POLICY.retry(move || client.get_account_bcs(*address))),
     )
     .await
-    .map_err(|e| format_err!("Get accounts failed: {}", e))?
+    .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
     .into_iter()
     .map(|resp| resp.into_inner().sequence_number())
     .collect())

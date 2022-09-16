@@ -483,7 +483,7 @@ function App() {
   const [resources, setResources] = React.useState<Types.AccountResource[]>([]);
   React.useEffect(() => {
     if (!address) return;
-    client.getAccountResources(address).then(setResourdces);
+    client.getAccountResources(address).then(setResources);
   }, [address]);
   const resourceType = `${address}::message::MessageHolder`;
   const resource = resources.find((r) => r.type === resourceType);

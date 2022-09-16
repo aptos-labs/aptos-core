@@ -30,6 +30,7 @@ spec:
             - emit-tx
             - --mint-key={{ .Values.load_test.config.mint_key }}
             - --chain-id={{ .Values.genesis.chain_id }}
+            # Build targets args for internal cluster targets
             {{- $numTargets := 0 }}
             {{- $targetSuffix := "" }}
             {{- $targetGroups := list }}
@@ -54,13 +55,15 @@ spec:
             - --targets=http://{{ $nodeName }}:{{ $port }}
               {{- end }}
             {{- end }}
-          # This with terminates on line 77
           {{- with .Values.load_test }}
-            - --mempool-backlog={{ .config.mempool_backlog }}
+            # Either provide target TPS or mempool backlog
+            {{- if gt (int .config.target_tps) 0 }}
             - --target-tps={{ .config.target_tps }}
+            {{- else }}
+            - --mempool-backlog={{ .config.mempool_backlog }}
+            {{- end }}
             - --duration={{ .config.duration }}
             - --txn-expiration-time-secs={{ .config.txn_expiration_time_secs }}
-            {{- end }}
             env:
             - name: RUST_BACKTRACE
               value: "1"

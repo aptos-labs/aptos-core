@@ -26,7 +26,8 @@ This guide will overview the following topics for integrating with Aptos:
 There are two well-supported approaches for integrating with the Aptos blockchain:
 
 1. Local development using our standalone testnet
-2. Devnet -- a shared resource for the community
+2. Devnet -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
+3. Testnet -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 
 ### Local Testnet
 
@@ -41,11 +42,17 @@ This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet s
 Faucet service: https://faucet.devnet.aptoslabs.com
 REST API service: https://fullnode.devnet.aptoslabs.com/v1
 
+### Access Testnet
+
+Faucet service: https://faucet.testnet.aptoslabs.com
+REST API service: https://fullnode.testnet.aptoslabs.com/v1
+
 ### SDKs
 
 Aptos currently has two SDKs:
 1. [Typescript](/sdks/typescript-sdk)
 2. [Python](/sdks/python-sdk)
+3. [Rust](/sdks/rust-sdk)
 
 
 ### Other Areas
@@ -53,6 +60,7 @@ Aptos currently has two SDKs:
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../sdks/typescript-sdk)
 * [Python SDK](../sdks/python-sdk)
+* [Rust SDK](../sdks/rust-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 

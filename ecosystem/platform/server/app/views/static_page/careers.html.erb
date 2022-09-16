@@ -9,7 +9,7 @@
       </h2>
       <%= render DividerComponent.new(scheme: :primary, class: 'mt-6 mb-16') %>
       <div class="mb-20">
-        <% @job_departments.each do |department, jobs| %>
+        <% @job_departments.sort.each do |department, jobs| %>
           <div class="mb-12">
             <h2 class="text-4xl mb-4 block font-display font-light"><%= department %></h2>
             <% jobs.each do |job| %>

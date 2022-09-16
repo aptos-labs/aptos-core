@@ -37,7 +37,7 @@ class ApplicationController < ActionController::Base
   end
 
   def ensure_confirmed!
-    redirect_to onboarding_email_path unless current_user&.registration_completed?
+    redirect_to onboarding_email_path, status: :see_other unless current_user&.registration_completed?
   end
 
   def append_info_to_payload(payload)

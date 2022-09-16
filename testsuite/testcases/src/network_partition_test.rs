@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, Result, SwarmChaos, SwarmNetworkPartition, Test};
+use crate::{LoadDestination, NetworkLoadTest};
+use forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkPartition, Test};
 
 pub struct NetworkPartitionTest;
 
@@ -15,37 +15,37 @@ impl Test for NetworkPartitionTest {
     }
 }
 
-impl NetworkTest for NetworkPartitionTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let duration = ctx.global_duration;
+impl NetworkLoadTest for NetworkPartitionTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+                partition_percentage: PARTITION_PERCENTAGE,
+            }))?;
 
-        let partition = SwarmChaos::Partition(SwarmNetworkPartition {
-            partition_percentage: PARTITION_PERCENTAGE,
-        });
-
-        // emit to all validator
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        // INJECT PARTITION AND EMIT TXNS
-        ctx.swarm().inject_chaos(partition.clone())?;
         let msg = format!(
             "Partitioned {}% validators in namespace",
             PARTITION_PERCENTAGE
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
-        ctx.report
-            .report_txn_stats(format!("{}:partition", self.name()), &txn_stat, duration);
-        ctx.swarm().remove_chaos(partition)?;
+        // Just send the load to last validator which is not included in the partition
+        Ok(LoadDestination::Peers(vec![ctx
+            .swarm()
+            .validators()
+            .last()
+            .map(|v| v.peer_id())
+            .unwrap()]))
+    }
 
-        // ensure we meet the success criteria
-        ctx.check_for_success(&txn_stat, &duration)?;
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        swarm.remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+            partition_percentage: PARTITION_PERCENTAGE,
+        }))
+    }
+}
 
-        Ok(())
+impl NetworkTest for NetworkPartitionTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

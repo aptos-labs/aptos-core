@@ -21,6 +21,7 @@ ENV RAILS_ENV production
 ENV RAILS_LOG_TO_STDOUT true
 ENV RAILS_SERVE_STATIC_FILES true
 ENV NODE_ENV production
+ENV SENTRY_FRONTEND_DSN https://ef8e0deb57234fe2bf276abab441e42a@o1162451.ingest.sentry.io/6369000
 WORKDIR /home/app/webapp
 
 COPY --chown=app:app Gemfile Gemfile.lock .

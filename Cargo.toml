@@ -64,13 +64,14 @@ members = [
     "crates/channel",
     "crates/crash-handler",
     "crates/fallible",
+    "crates/indexer",
     "crates/inspection-service",
+    "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
-    "ecosystem/indexer",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "ecosystem/sf-indexer/aptos-sf-indexer",
@@ -116,6 +117,8 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
+    "testsuite/dos/listener",
+    "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",
@@ -147,7 +150,6 @@ default-members = [
     "aptos-move/framework",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
-    "ecosystem/indexer",
     "ecosystem/node-checker",
 ]
 
@@ -159,7 +161,7 @@ overflow-checks = true
 inherits = "release"
 opt-level = 3
 debug = true
-overflow-checks = false
+overflow-checks = true
 lto = true
 codegen-units = 1
 

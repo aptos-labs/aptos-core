@@ -3,10 +3,7 @@
 
 use aptos_indexer::{
     database::{new_db_pool, PgDbPool, PgPoolConnection},
-    default_processor::DefaultTransactionProcessor,
-    indexer::tailer::Tailer,
     models::transactions::TransactionModel,
-    token_processor::TokenTransactionProcessor,
 };
 use aptos_sdk::types::LocalAccount;
 use cached_packages::aptos_stdlib::aptos_token_stdlib;
@@ -14,15 +11,18 @@ use diesel::connection::Connection;
 use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
-
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
-        "metadatas",
-        "token_activities",
+        "collection_datas",
+        "tokens",
         "token_datas",
-        "token_propertys",
+        "token_ownerships",
+        "signatures",
         "collections",
+        "move_modules",
+        "move_resources",
+        "table_items",
+        "table_metadatas",
         "ownerships",
         "write_set_changes",
         "events",
@@ -34,24 +34,18 @@ pub fn wipe_database(conn: &PgPoolConnection) {
         "__diesel_schema_migrations",
     ] {
         conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-            .unwrap();
+            .unwrap_or_else(|_| panic!("Could not drop table '{}'", table));
     }
 }
 
-pub fn setup_indexer(info: &mut AptosPublicInfo) -> anyhow::Result<(PgDbPool, Tailer)> {
-    let database_url = std::env::var("INDEXER_DATABASE_URL")
-        .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
+pub fn get_database_url() -> String {
+    std::env::var("INDEXER_DATABASE_URL").expect("must set 'INDEXER_DATABASE_URL' to run tests!")
+}
 
-    let conn_pool = new_db_pool(database_url.as_str())?;
+pub fn setup_indexer() -> anyhow::Result<PgDbPool> {
+    let conn_pool = new_db_pool(get_database_url().as_str())?;
     wipe_database(&conn_pool.get()?);
-    let mut tailer = Tailer::new(info.url(), conn_pool.clone())?;
-    tailer.run_migrations();
-
-    let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-    let token_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
-    tailer.add_processor(Arc::new(pg_transaction_processor));
-    tailer.add_processor(Arc::new(token_processor));
-    Ok((conn_pool, tailer))
+    Ok(conn_pool)
 }
 
 pub async fn execute_nft_txns<'t>(
@@ -114,15 +108,35 @@ pub async fn execute_nft_txns<'t>(
 
 #[tokio::test]
 async fn test_old_indexer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-    let mut info = swarm.aptos_public_info();
-
     if aptos_indexer::should_skip_pg_tests() {
         return;
     }
-    let (conn_pool, tailer) = setup_indexer(&mut info).unwrap();
 
-    info.client().get_ledger_information().await.unwrap();
+    let conn_pool = setup_indexer().unwrap();
+
+    let mut swarm = crate::smoke_test_environment::SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.storage.enable_indexer = true;
+
+            config.indexer.enabled = true;
+            config.indexer.postgres_uri = Some(get_database_url());
+            config.indexer.processor =
+                Some(aptos_indexer::processors::default_processor::NAME.to_string());
+        }))
+        .build()
+        .await;
+
+    let mut info = swarm.aptos_public_info();
+
+    let ledger = info
+        .client()
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner();
+
+    println!("ledger state: {:?}", ledger);
 
     // Set up accounts, generate some traffic
     // TODO(Gas): double check this
@@ -132,60 +146,46 @@ async fn test_old_indexer() {
     let t_tx = info.transfer(&mut account1, &account2, 717).await.unwrap();
     // test NFT creation event indexing
     execute_nft_txns(account1, &mut info).await.unwrap();
-    tailer.transaction_fetcher.lock().await.start().await;
 
-    // Why do this twice? To ensure the idempotency of the tailer :-)
-    for _ in 0..2 {
-        // Process the next versions
-        let version = info
-            .client()
-            .get_ledger_information()
-            .await
-            .unwrap()
-            .into_inner()
-            .version;
-        tailer.process_next_batch((version + 1) as u8).await;
+    // Let the test complete! Yes, this does suck.
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-        // Get them into the array and sort by type in order to prevent ordering from breaking tests
-        let mut transactions = vec![];
-        for v in 0..2 {
-            transactions
-                .push(TransactionModel::get_by_version(v, &conn_pool.get().unwrap()).unwrap());
-        }
-        transactions.sort_by(|a, b| a.0.type_.partial_cmp(&b.0.type_).unwrap());
-
-        // This is a block metadata transaction
-        let (tx1, ut1, bmt1, events1, wsc1) = &transactions[0];
-        assert_eq!(tx1.type_, "block_metadata_transaction");
-        assert!(ut1.is_none());
-        assert!(bmt1.is_some());
-        assert!(!events1.is_empty());
-        assert!(!wsc1.is_empty());
-
-        // This is the genesis transaction
-        let (tx0, ut0, bmt0, events0, wsc0) = &transactions[1];
-        assert_eq!(tx0.type_, "genesis_transaction");
-        assert!(ut0.is_none());
-        assert!(bmt0.is_none());
-        assert!(!events0.is_empty());
-        assert!(wsc0.len() > 10);
-
-        // This is the transfer
-        let (tx2, ut2, bmt2, events2, wsc2) = TransactionModel::get_by_hash(
-            t_tx.hash.to_string().as_str(),
-            &conn_pool.get().unwrap(),
-        )
-        .unwrap();
-
-        assert_eq!(tx2.type_, "user_transaction");
-        assert_eq!(tx2.hash, t_tx.hash.to_string());
-
-        // This is a user transaction, so the bmt should be None
-        assert!(ut2.is_some());
-        assert!(bmt2.is_none());
-        assert!(wsc2.len() > 1);
-        assert_eq!(events2.len(), 2);
-        assert_eq!(events2.first().unwrap().type_, "0x1::coin::WithdrawEvent");
-        assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
+    // Get them into the array and sort by type in order to prevent ordering from breaking tests
+    let mut transactions = vec![];
+    for v in 0..2 {
+        transactions.push(TransactionModel::get_by_version(v, &conn_pool.get().unwrap()).unwrap());
     }
+    transactions.sort_by(|a, b| a.0.type_.partial_cmp(&b.0.type_).unwrap());
+
+    // This is a block metadata transaction
+    let (tx1, ut1, bmt1, events1, wsc1) = &transactions[0];
+    assert_eq!(tx1.type_, "block_metadata_transaction");
+    assert!(ut1.is_none());
+    assert!(bmt1.is_some());
+    assert!(!events1.is_empty());
+    assert!(!wsc1.is_empty());
+
+    // This is the genesis transaction
+    let (tx0, ut0, bmt0, events0, wsc0) = &transactions[1];
+    assert_eq!(tx0.type_, "genesis_transaction");
+    assert!(ut0.is_none());
+    assert!(bmt0.is_none());
+    assert!(!events0.is_empty());
+    assert!(wsc0.len() > 10);
+
+    // This is the transfer
+    let (tx2, ut2, bmt2, events2, wsc2) =
+        TransactionModel::get_by_hash(t_tx.hash.to_string().as_str(), &conn_pool.get().unwrap())
+            .unwrap();
+
+    assert_eq!(tx2.type_, "user_transaction");
+    assert_eq!(tx2.hash, t_tx.hash.to_string());
+
+    // This is a user transaction, so the bmt should be None
+    assert!(ut2.is_some());
+    assert!(bmt2.is_none());
+    assert!(wsc2.len() > 1);
+    assert_eq!(events2.len(), 2);
+    assert_eq!(events2.first().unwrap().type_, "0x1::coin::WithdrawEvent");
+    assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
 }

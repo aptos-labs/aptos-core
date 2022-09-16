@@ -190,7 +190,7 @@ module aptos_std::big_vector {
         }
     }
 
-    /// Reserver `additional_buckets` more buckets.
+    /// Reserve `additional_buckets` more buckets.
     public fun reserve<T>(v: &mut BigVector<T>, additional_buckets: u64) {
         while (additional_buckets > 0) {
             table_with_length::add(&mut v.buckets, v.num_buckets, vector::empty());

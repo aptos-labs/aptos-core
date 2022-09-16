@@ -5,7 +5,7 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::common::types::TransactionSummary;
 use aptos::node::analyze::analyze_validators::{AnalyzeValidators, EpochStats};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
-use aptos::test::{to_validator_set, ValidatorPerformance};
+use aptos::test::ValidatorPerformance;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519};
@@ -14,6 +14,7 @@ use aptos_keygen::KeyGen;
 use aptos_rest_client::{Client, State};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::network_address::DnsName;
+use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::PeerId;
 use forge::{reconfig, NodeExt, Swarm, SwarmExt};
 use std::collections::HashMap;
@@ -194,12 +195,11 @@ async fn test_nodes_rewards() {
     println!("{:?}", addresses.iter().enumerate().collect::<Vec<_>>());
 
     async fn get_state_and_validator_set(rest_client: &Client) -> (State, HashMap<PeerId, u64>) {
-        let response = rest_client
-            .get_resource(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+        let (validator_set, state): (ValidatorSet, State) = rest_client
+            .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
             .await
-            .unwrap();
-        let (result, state) = response.into_parts();
-        let validator_set = to_validator_set(&result);
+            .unwrap()
+            .into_parts();
         let validator_to_voting_power = validator_set
             .active_validators
             .iter()

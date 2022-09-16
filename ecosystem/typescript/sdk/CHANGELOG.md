@@ -5,6 +5,17 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
+N/A
+
+## 1.3.13 (2022-09-15)
+
+- Increase the default wait time for `waitForTransactionWithResult` to 20s.
+- A new function called `getEventsByCreationNumber` has been added, corresponding to the new endpoint on the API. For more information on this change, see the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for API version 1.1.0.
+- **[Deprecated]** The `getEventsByEventKey` function is now deprecated. In the next release it will be removed entirely. You must migrate to the new function, `getEventsByCreationNumber`, by then.
+- Included in the `Event` struct (which is what the events endpoints return) is a new field called `guid`. This is a more easily interpretable representation of an event identifier than the `key` field. See the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/CHANGELOG.md) for an example of the new field.
+- **[Deprecated]** The `key` field in the `Event` struct is now deprecated. In the next release it will be removed entirely. You must migrate to using the `guid` field by then.
+- Removed NPM dependencies ed25519-hd-key and typescript-memoize.
+- Added IIFE bundle that can be served from CDN. No NPM is required to use the SDK in browser environment.
 
 ## 1.3.12 (2022-09-08)
 

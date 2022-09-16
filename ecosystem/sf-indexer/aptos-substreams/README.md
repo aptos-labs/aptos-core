@@ -1,6 +1,4 @@
-# StreamingFast Substreams Aptos Statistics
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
+> :warning: DO* NOT USE THIS, IT'S NOT READY. Go to crates/indexer for a working indexer
 ## Quick Start (Locally)
 
 Use this quickstart guide to set up your environment to use Substreams locally.

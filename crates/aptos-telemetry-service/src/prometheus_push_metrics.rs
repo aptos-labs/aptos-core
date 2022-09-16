@@ -1,8 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auth::with_auth, context::Context, types::auth::Claims};
-use aptos_config::config::PeerRole;
+use crate::{
+    auth::with_auth,
+    context::Context,
+    types::{auth::Claims, common::NodeType},
+};
 use aptos_logger::{debug, error};
 use reqwest::StatusCode;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
@@ -13,7 +16,11 @@ pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::ValidatorFullNode],
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+            ],
         ))
         .and(warp::body::bytes())
         .and_then(handle_metrics_ingest)
@@ -54,7 +61,7 @@ pub async fn handle_metrics_ingest(
 
 fn claims_to_extra_labels(claims: &Claims) -> Vec<String> {
     vec![
-        format!("role={}", claims.peer_role),
+        format!("role={}", claims.node_type),
         format!("chain_name={}", claims.chain_id),
         format!("namespace={}", "telemetry-service"),
         // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all), so we use the peer id as an approximation/replacement for pod_name
@@ -77,7 +84,7 @@ mod test {
         let claims = claims_to_extra_labels(&super::Claims {
             chain_id: ChainId::new(25),
             peer_id: PeerId::from_str("0x1").unwrap(),
-            peer_role: PeerRole::Validator,
+            node_type: NodeType::Validator,
             epoch: 3,
             exp: 123,
             iat: 123,

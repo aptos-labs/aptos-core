@@ -4,7 +4,7 @@
 use crate::emitter::wait_for_single_account_sequence;
 use crate::{
     emitter::{GAS_AMOUNT, MAX_TXNS, RETRY_POLICY, SEND_AMOUNT},
-    query_sequence_numbers, EmitJobRequest, EmitModeParams,
+    query_sequence_number, EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
 use aptos::common::types::EncodingType;
@@ -174,7 +174,7 @@ impl<'t> AccountMinter<'t> {
             .await
             .into_iter()
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
+            .map_err(|e| format_err!("Failed to mint accounts: {:?}", e))?
             .into_iter()
             .flatten()
             .collect();
@@ -278,15 +278,13 @@ impl<'t> AccountMinter<'t> {
             .unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
-        let sequence_number = query_sequence_numbers(client, [address].iter())
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
+        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
+            format_err!(
+                "query_sequence_number on {:?} for dd account failed: {:?}",
+                client,
+                e
+            )
+        })?;
         Ok(LocalAccount::new(address, account_key, sequence_number))
     }
 
@@ -399,10 +397,7 @@ where
 {
     let account_key = AccountKey::generate(rng);
     let address = account_key.authentication_key().derived_address();
-    let sequence_number = match query_sequence_numbers(client, [address].iter()).await {
-        Ok(v) => v[0],
-        Err(_) => 0,
-    };
+    let sequence_number = query_sequence_number(client, address).await.unwrap_or(0);
     Ok(LocalAccount::new(address, account_key, sequence_number))
 }
 
@@ -512,7 +507,7 @@ pub async fn execute_and_wait_transactions(
         .await
         .map_err(|e| {
             format_err!(
-                "Failed to submit transactions: {:?}, {}",
+                "Failed to submit transactions: {:?}, {:?}",
                 state
                     .lock()
                     .failures
@@ -556,7 +551,7 @@ pub async fn execute_and_wait_transactions(
         RETRY_POLICY
             .retry(move || client.wait_for_signed_transaction_bcs(txn))
             .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
+            .map_err(|e| format_err!("Failed to wait for transactions: {:?}", e))?;
     }
 
     debug!(

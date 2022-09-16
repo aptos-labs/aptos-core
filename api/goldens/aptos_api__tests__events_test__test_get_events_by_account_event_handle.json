@@ -2,6 +2,10 @@
   {
     "version": "0",
     "key": "0x02000000000000000000000000000000000000000000000000000000000000000000000000000001",
+    "guid": {
+      "creation_number": "2",
+      "account_address": "0x1"
+    },
     "sequence_number": "0",
     "type": "0x1::reconfiguration::NewEpochEvent",
     "data": {

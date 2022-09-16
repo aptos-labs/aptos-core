@@ -162,7 +162,7 @@ where
     let target_directory = target_directory.as_ref();
     let directory = directory.as_ref();
 
-    let mut args = vec!["build", "--bin=aptos-node", "--features=failpoints"];
+    let mut args = vec!["build", "--bin=aptos-node", "--features=failpoints,indexer"];
     if use_release {
         args.push("--release");
     }

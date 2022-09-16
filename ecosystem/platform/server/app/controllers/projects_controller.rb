@@ -12,11 +12,13 @@ class ProjectsController < ApplicationController
   # GET /projects
   def index
     @categories = Category.all.index_by(&:id)
-    @projects = Project.where(public: true)
-                       .includes(:project_categories)
-                       .with_attached_thumbnail
+    @projects = params[:s].blank? ? Project : Project.search(params[:s])
+    @projects = @projects.where(public: true, verified: true)
+                         .includes(:project_categories)
+                         .with_attached_thumbnail
 
-    selected_category = params[:category]&.to_i
+    selected_category = params[:category].to_i
+    selected_category = nil if params[:category].blank?
     @projects = @projects.filter_by_category(selected_category) if selected_category
 
     @groups = @projects.each_with_object({}) do |project, groups|
@@ -30,6 +32,7 @@ class ProjectsController < ApplicationController
   # GET /projects/1
   def show
     @project = Project.find(params[:id])
+    head :not_found unless @project.verified
     head :forbidden if @project.user_id != current_user&.id && !@project.public
   end
 
@@ -55,7 +58,8 @@ class ProjectsController < ApplicationController
     return unless check_recaptcha
 
     if @project.save
-      redirect_to project_url(@project), notice: 'Project was successfully created.'
+      redirect_to project_url(@project),
+                  notice: 'Project was successfully created. It will not be visible until approved by a moderator.'
     else
       render :new, status: :unprocessable_entity
     end

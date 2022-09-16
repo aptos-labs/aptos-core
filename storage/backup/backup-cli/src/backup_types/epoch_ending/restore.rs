@@ -275,12 +275,16 @@ impl EpochHistory {
     pub fn verify_ledger_info(&self, li_with_sigs: &LedgerInfoWithSignatures) -> Result<()> {
         let epoch = li_with_sigs.ledger_info().epoch();
         ensure!(!self.epoch_endings.is_empty(), "Empty epoch history.",);
-        ensure!(
-            epoch <= self.epoch_endings.len() as u64,
-            "History until epoch {} can't verify epoch {}",
-            self.epoch_endings.len(),
-            epoch,
-        );
+        if epoch > self.epoch_endings.len() as u64 {
+            // TODO(aldenhu): fix this from upper level
+            warn!(
+                epoch = epoch,
+                epoch_history_until = self.epoch_endings.len(),
+                "Epoch is too new and can't be verified. Previous chunks are verified and node \
+                won't be able to start if this data is malicious."
+            );
+            return Ok(());
+        }
         if epoch == 0 {
             ensure!(
                 li_with_sigs.ledger_info() == &self.epoch_endings[0],
@@ -317,11 +321,7 @@ impl EpochHistoryRestoreController {
 
     pub async fn run(self) -> Result<EpochHistory> {
         let name = self.name();
-        info!(
-            "{} started. Trying epoch endings starting from epoch 0, {} in total.",
-            name,
-            self.manifest_handles.len(),
-        );
+        info!("{} started.", name,);
         let res = self
             .run_impl()
             .await

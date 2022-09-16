@@ -60,7 +60,7 @@ fn verify_signature() {
 
 #[test]
 fn verify_multi_agent_invalid_sender_signature() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     let sender = executor.create_raw_account_data(1_000_010, 10);
@@ -91,7 +91,7 @@ fn verify_multi_agent_invalid_sender_signature() {
 
 #[test]
 fn verify_multi_agent_invalid_secondary_signature() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_010, 10);
     let secondary_signer = executor.create_raw_account_data(100_100, 100);
@@ -121,7 +121,7 @@ fn verify_multi_agent_invalid_secondary_signature() {
 
 #[test]
 fn verify_multi_agent_duplicate_secondary_signer() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
     let sender = executor.create_raw_account_data(1_000_010, 10);
     let secondary_signer = executor.create_raw_account_data(100_100, 100);
@@ -433,7 +433,7 @@ fn verify_simple_payment() {
 #[test]
 pub fn test_arbitrary_script_execution() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create an empty transaction
@@ -560,7 +560,7 @@ fn verify_max_sequence_number() {
 #[test]
 pub fn test_open_publishing_invalid_address() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -625,7 +625,7 @@ pub fn test_open_publishing_invalid_address() {
 #[test]
 pub fn test_open_publishing() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -736,7 +736,7 @@ fn good_module_uses_bad(
 
 #[test]
 fn test_script_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -783,7 +783,7 @@ fn test_script_dependency_fails_verification() {
 
 #[test]
 fn test_module_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -819,7 +819,7 @@ fn test_module_dependency_fails_verification() {
 
 #[test]
 fn test_type_tag_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -871,7 +871,7 @@ fn test_type_tag_dependency_fails_verification() {
 
 #[test]
 fn test_script_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -922,7 +922,7 @@ fn test_script_transitive_dependency_fails_verification() {
 
 #[test]
 fn test_module_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -983,7 +983,7 @@ fn test_module_transitive_dependency_fails_verification() {
 
 #[test]
 fn test_type_tag_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_file();
+    let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.

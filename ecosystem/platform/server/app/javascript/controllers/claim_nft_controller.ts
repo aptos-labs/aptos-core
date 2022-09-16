@@ -3,6 +3,7 @@
 
 import { Controller } from "./controller";
 import type { Types } from "aptos";
+import * as Sentry from "@sentry/browser";
 
 interface ClaimDetails {
   wallet_name: string;
@@ -51,9 +52,10 @@ export default class extends Controller<HTMLAnchorElement> {
     ].join("/");
     const response = await fetch(accountTransactionsUrl);
     if (!response.ok) return;
-    const transactions: Types.OnChainTransaction[] = await response.json();
+    const transactions: Types.Transaction[] = await response.json();
     const mintTransaction = transactions.find(
       (transaction) =>
+        "success" in transaction &&
         transaction.success &&
         "payload" in transaction &&
         "function" in transaction.payload &&
@@ -90,6 +92,10 @@ export default class extends Controller<HTMLAnchorElement> {
     });
 
     if (!response.ok) {
+      if (response.redirected) {
+        location.href = response.url;
+        return;
+      }
       throw "Unable to retrieve claim details.";
     }
 
@@ -97,7 +103,8 @@ export default class extends Controller<HTMLAnchorElement> {
 
     if ("error" in json) {
       this.transactionFailedErrorTarget.classList.remove("hidden");
-      console.error(json.error);
+      const error = new Error(json.error);
+      Sentry.captureException(error);
       return;
     }
 
@@ -126,8 +133,15 @@ export default class extends Controller<HTMLAnchorElement> {
         ) {
           return this.redirectToTransaction(pendingTransaction.hash);
         }
-      } catch (error) {
-        console.error(error);
+      } catch (error: any) {
+        if (error.name === "Unauthorized") {
+          // if unauthorized, we need to connect to wallet
+          const url = new URL(location.href);
+          url.search = ``;
+          location.href = url.toString();
+        } else {
+          Sentry.captureException(error);
+        }
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {
@@ -138,7 +152,7 @@ export default class extends Controller<HTMLAnchorElement> {
         );
         return this.redirectToTransaction(txnHash);
       } catch (error) {
-        console.error(error);
+        Sentry.captureException(error);
       }
     } else if (false) {
       // TODO: Add support for other wallets here.

@@ -3,7 +3,7 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_sdk::move_types::account_address::AccountAddress;
-use forge::{NetworkContext, NetworkTest, NodeExt, Swarm, Test};
+use forge::{NetworkContext, NetworkTest, NodeExt, Test};
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -16,7 +16,7 @@ impl Test for TwinValidatorTest {
 }
 
 impl NetworkLoadTest for TwinValidatorTest {
-    fn setup(&self, _swarm: &mut dyn Swarm) -> anyhow::Result<LoadDestination> {
+    fn setup(&self, _ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         Ok(LoadDestination::AllFullnodes)
     }
 }

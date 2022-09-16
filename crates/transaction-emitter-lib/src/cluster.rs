@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::query_sequence_numbers, instance::Instance, ClusterArgs};
+use crate::{emitter::query_sequence_number, instance::Instance, ClusterArgs};
 use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -136,7 +136,7 @@ impl Cluster {
 
         let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.reuse_accounts)
             .await
-            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
+            .map_err(|e| format_err!("failed to create a cluster from host and port: {:?}", e))?;
 
         Ok(cluster)
     }
@@ -150,16 +150,14 @@ impl Cluster {
         client: &RestClient,
         address: AccountAddress,
     ) -> Result<LocalAccount> {
-        let sequence_number = query_sequence_numbers(client, [address].iter())
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for account {} failed: {}",
-                    client,
-                    address,
-                    e
-                )
-            })?[0];
+        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
+            format_err!(
+                "query_sequence_numbers on {:?} for account {} failed: {:?}",
+                client,
+                address,
+                e
+            )
+        })?;
         Ok(LocalAccount::new(
             address,
             self.account_key(),

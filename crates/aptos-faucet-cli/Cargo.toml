@@ -7,35 +7,18 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-anyhow = "1.0.57"
-bcs = "0.1.3"
-bytes = "1.1.0"
 clap = "3.1.18"
-futures = "0.3.21"
-hex = "0.4.3"
-rand = "0.7.3"
-reqwest = { version = "0.11.10", features = ["blocking"], default-features = false }
 serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
 serde_yaml = "0.8.24"
 tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
-warp = "0.3.2"
 
 aptos = { path = "../aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-faucet = { path = "../aptos-faucet" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-
-[dev-dependencies]
-serde_json = "1.0.81"
-tempfile = "3.3.0"
-
-aptos-config = { path = "../../config" }
-aptos-infallible = { path = "../../crates/aptos-infallible" }

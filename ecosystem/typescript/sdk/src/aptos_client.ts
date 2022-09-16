@@ -1,18 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { fixNodeUrl, sleep } from "./util";
+import { fixNodeUrl, Memoize, sleep } from "./utils";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import {
   TxnBuilderTypes,
   TransactionBuilderEd25519,
-  BCS,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
 } from "./transaction_builder";
+import { bcsSerializeBytes, bcsSerializeU8, bcsToBytes, Bytes, Seq, Serializer, serializeVector, Uint64 } from "./bcs";
 
 /**
  * Provides methods for retrieving data from Aptos node.
@@ -256,6 +255,8 @@ export class AptosClient {
   }
 
   /**
+   * @deprecated Use `getEventsByCreationNumber` instead. This will be removed in the next release.
+   *
    * Queries events by event key
    * @param eventKey Event key for an event stream. It is BCS serialized bytes
    * of `guid` field in the Move struct `EventHandle`
@@ -267,9 +268,31 @@ export class AptosClient {
   }
 
   /**
-   * Extracts event key from the account resource identified by the
-   * `event_handle_struct` and `field_name`, then returns events identified by the event key
-   * @param address Hex-encoded 32 byte Aptos account from which events are queried
+   * Event types are globally identifiable by an account `address` and
+   * monotonically increasing `creation_number`, one per event type emitted
+   * to the given account. This API returns events corresponding to that
+   * that event type.
+   * @param address Hex-encoded 32 byte Aptos account, with or without a `0x` prefix,
+   * for which events are queried. This refers to the account that events were emitted
+   * to, not the account hosting the move module that emits that event type.
+   * @param creationNumber Creation number corresponding to the event type.
+   * @returns Array of events assotiated with the given account and creation number.
+   */
+  @parseApiError
+  async getEventsByCreationNumber(
+    address: MaybeHexString,
+    creationNumber: number | bigint | string,
+  ): Promise<Gen.Event[]> {
+    return this.client.events.getEventsByCreationNumber(HexString.ensure(address).hex(), creationNumber.toString());
+  }
+
+  /**
+   * This API uses the given account `address`, `eventHandle`, and `fieldName`
+   * to build a key that can globally identify an event types. It then uses this
+   * key to return events emitted to the given account matching that event type.
+   * @param address Hex-encoded 32 byte Aptos account, with or without a `0x` prefix,
+   * for which events are queried. This refers to the account that events were emitted
+   * to, not the account hosting the move module that emits that event type.
    * @param eventHandleStruct String representation of an on-chain Move struct type.
    * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
@@ -440,7 +463,7 @@ export class AptosClient {
     txnHash: string,
     extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean },
   ): Promise<Gen.Transaction> {
-    const timeoutSecs = extraArgs?.timeoutSecs ?? 10;
+    const timeoutSecs = extraArgs?.timeoutSecs ?? 20;
     const checkSuccess = extraArgs?.checkSuccess ?? false;
 
     let isPending = true;
@@ -558,7 +581,7 @@ export class AptosClient {
   async generateRawTransaction(
     accountFrom: HexString,
     payload: TxnBuilderTypes.TransactionPayload,
-    extraArgs?: { maxGasAmount?: BCS.Uint64; gasUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
+    extraArgs?: { maxGasAmount?: Uint64; gasUnitPrice?: Uint64; expireTimestamp?: Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
       maxGasAmount: BigInt(2000),
@@ -595,9 +618,9 @@ export class AptosClient {
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
     // :!:>generateSignSubmitTransactionInner
@@ -619,23 +642,23 @@ export class AptosClient {
    */
   async publishPackage(
     sender: AptosAccount,
-    packageMetadata: BCS.Bytes,
-    modules: BCS.Seq<TxnBuilderTypes.Module>,
+    packageMetadata: Bytes,
+    modules: Seq<TxnBuilderTypes.Module>,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<string> {
-    const codeSerializer = new BCS.Serializer();
-    BCS.serializeVector(modules, codeSerializer);
+    const codeSerializer = new Serializer();
+    serializeVector(modules, codeSerializer);
 
     const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
         "0x1::code",
         "publish_package_txn",
         [],
-        [BCS.bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
+        [bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
       ),
     );
 
@@ -652,9 +675,9 @@ export class AptosClient {
     sender: AptosAccount,
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
       checkSuccess?: boolean;
       timeoutSecs?: number;
     },
@@ -676,9 +699,9 @@ export class AptosClient {
     forAccount: AptosAccount,
     toPrivateKeyBytes: Uint8Array,
     extraArgs?: {
-      maxGasAmount?: BCS.Uint64;
-      gasUnitPrice?: BCS.Uint64;
-      expireTimestamp?: BCS.Uint64;
+      maxGasAmount?: Uint64;
+      gasUnitPrice?: Uint64;
+      expireTimestamp?: Uint64;
     },
   ): Promise<Gen.PendingTransaction> {
     const { sequence_number: sequenceNumber, authentication_key: authKey } = await this.getAccount(
@@ -697,7 +720,7 @@ export class AptosClient {
       helperAccount.pubKey().toUint8Array(),
     );
 
-    const challengeHex = HexString.fromUint8Array(BCS.bcsToBytes(challenge));
+    const challengeHex = HexString.fromUint8Array(bcsToBytes(challenge));
 
     const proofSignedByCurrentPrivateKey = forAccount.signHexString(challengeHex);
 
@@ -709,12 +732,12 @@ export class AptosClient {
         "rotate_authentication_key",
         [],
         [
-          BCS.bcsSerializeU8(0), // ed25519 scheme
-          BCS.bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeU8(0), // ed25519 scheme
-          BCS.bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
-          BCS.bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
-          BCS.bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
+          bcsSerializeU8(0), // ed25519 scheme
+          bcsSerializeBytes(forAccount.pubKey().toUint8Array()),
+          bcsSerializeU8(0), // ed25519 scheme
+          bcsSerializeBytes(helperAccount.pubKey().toUint8Array()),
+          bcsSerializeBytes(proofSignedByCurrentPrivateKey.toUint8Array()),
+          bcsSerializeBytes(proofSignedByNewPrivateKey.toUint8Array()),
         ],
       ),
     );

@@ -11,7 +11,7 @@ Follow these instructions when you need to take down the validator node and clea
 Before you shutdown the node, you should make sure to leave validator set first (will take effect in next epoch).
 
 ```bash
-aptos node leave-validator-set --profile ait3-operator
+aptos node leave-validator-set --profile testnet-operator --pool-address <owner-address>
 ```
 
 ### Using source code
@@ -70,8 +70,8 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
 - Initialize CLI with your wallet private key or create new wallet
 
   ```bash
-  aptos init --profile ait3-owner \
-    --rest-url http://ait3.aptosdev.com
+  aptos init --profile testnet-owner \
+    --rest-url http://testnet.aptoslabs.com
   ```
 
   You can either enter the private key from an existing wallet, or create new wallet address depends on your need.
@@ -83,7 +83,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
     --initial-stake-amount 100000000000000 \
     --operator-address <operator-address> \
     --voter-address <voter-address> \
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Transfer coin between accounts
@@ -92,7 +92,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   aptos account transfer \
     --account <operator-address> \
     --amount <amount> \
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Switch operator
@@ -100,7 +100,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   ```bash
   aptos stake set-operator \
     --operator-address <new-operator-address> \ 
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Switch voter
@@ -108,7 +108,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   ```bash
   aptos stake set-delegated-voter \
     --voter-address <new-voter-address> \ 
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Add stake
@@ -116,7 +116,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   ```bash
   aptos stake add-stake \
     --amount <amount> \
-    --profile ait3-owner \
+    --profile testnet-owner \
     --max-gas 10000
   ```
 
@@ -127,7 +127,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
 - Increase stake lockup
 
   ```bash
-  aptos stake increase-lockup --profile ait3-owner
+  aptos stake increase-lockup --profile testnet-owner
   ```
 
 - Unlock stake
@@ -135,7 +135,7 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   ```bash
   aptos stake unlock-stake \
     --amount <amount> \
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Withdraw stake
@@ -143,5 +143,5 @@ You can also use UI to perform a few staking operations. See the [**Initialize s
   ```bash
   aptos stake withdraw-stake \
     --amount <amount> \
-    --profile ait3-owner
+    --profile testnet-owner
   ```

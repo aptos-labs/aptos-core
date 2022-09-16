@@ -163,6 +163,7 @@ mod tests {
                     vm_status: "Executed".to_string(),
                     accumulator_root_hash: HashValue::zero().into(),
                     changes: vec![],
+                    block_height: None,
                 };
                 let serializable_txn: aptos_rest_client::aptos_api_types::Transaction = (
                     txn.as_signed_user_txn().unwrap(),
@@ -468,9 +469,17 @@ mod tests {
             .reply(&filter)
             .await;
 
-        assert_eq!(
-            resp.body(),
-            &format!("faucet account {:?} not found", address)
+        assert!(
+            resp.body().starts_with(
+                format!(
+                    "Faucet account {:?} not found: HTTP error 404 Not Found:",
+                    address
+                )
+                .as_str()
+                .as_bytes()
+            ),
+            "{} did not start with the expected string",
+            std::str::from_utf8(resp.body()).unwrap()
         );
     }
 

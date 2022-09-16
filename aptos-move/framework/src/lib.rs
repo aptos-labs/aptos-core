@@ -19,6 +19,9 @@ pub mod natives;
 mod release_builder;
 pub use release_builder::*;
 mod release_bundle;
+mod released_framework;
+pub use released_framework::*;
+
 pub use release_bundle::*;
 
 use flate2::read::GzDecoder;

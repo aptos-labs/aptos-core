@@ -7,9 +7,8 @@ use crate::{
     constants::MAX_CONTENT_LENGTH,
     context::Context,
     error::ServiceError,
-    types::{auth::Claims, humio::UnstructuredLog},
+    types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
-use aptos_config::config::PeerRole;
 use aptos_logger::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
@@ -22,7 +21,11 @@ pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.clone().filter())
         .and(with_auth(
             context,
-            vec![PeerRole::Validator, PeerRole::ValidatorFullNode],
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+            ],
         ))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
@@ -64,7 +67,7 @@ pub async fn handle_log_ingest(
 
     let mut tags = HashMap::new();
     tags.insert(CHAIN_ID_TAG_NAME.into(), claims.chain_id.to_string());
-    tags.insert(PEER_ROLE_TAG_NAME.into(), claims.peer_role.to_string());
+    tags.insert(PEER_ROLE_TAG_NAME.into(), claims.node_type.to_string());
 
     let unstructured_log = UnstructuredLog {
         fields,

@@ -5,7 +5,9 @@ pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod continuous_progress_test;
 pub mod forge_setup_test;
+pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;
+pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
 pub mod network_latency_test;
 pub mod network_loss_test;
@@ -16,14 +18,16 @@ pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod twin_validator_test;
+pub mod validator_reboot_stress_test;
 
 use anyhow::{anyhow, ensure};
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{
-    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, Test, TxnEmitter,
-    TxnStats, Version,
+    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
+    TxnEmitter, TxnStats, Version,
 };
+use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Builder;
@@ -64,24 +68,13 @@ pub fn create_emitter_and_request(
 
     // as we are loading nodes, use higher client timeout
     let client_timeout = Duration::from_secs(30);
-    let validator_clients = swarm
-        .validators()
-        .filter(|v| nodes.contains(&v.peer_id()))
-        .map(|n| n.rest_client_with_timeout(client_timeout))
-        .collect::<Vec<_>>();
-    let fullnode_clients = swarm
-        .full_nodes()
-        .filter(|v| nodes.contains(&v.peer_id()))
-        .map(|n| n.rest_client_with_timeout(client_timeout))
-        .collect::<Vec<_>>();
-    let all_node_clients = [&fullnode_clients[..], &validator_clients[..]].concat();
 
     let chain_info = swarm.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
-        .rest_clients(all_node_clients)
+        .rest_clients(swarm.get_clients_for_peers(nodes, client_timeout))
         .gas_price(gas_price);
     Ok((emitter, emit_job_request))
 }
@@ -120,7 +113,7 @@ pub enum LoadDestination {
 }
 
 pub trait NetworkLoadTest: Test {
-    fn setup(&self, _swarm: &mut dyn Swarm) -> Result<LoadDestination> {
+    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::AllNodes)
     }
     // Load is started before this funciton is called, and stops after this function returns.
@@ -130,7 +123,8 @@ pub trait NetworkLoadTest: Test {
         std::thread::sleep(duration);
         Ok(())
     }
-    fn finish(&self, _swarm: &mut dyn Swarm, _start_time: u64, _end_time: u64) -> Result<()> {
+
+    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
         Ok(())
     }
 }
@@ -144,8 +138,8 @@ impl NetworkTest for dyn NetworkLoadTest {
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let (txn_stat, actual_test_duration) = self.network_load_test(
-            ctx.swarm(),
+        let (txn_stat, actual_test_duration, _ledger_transactions) = self.network_load_test(
+            ctx,
             emit_job_request,
             duration,
             WARMUP_DURATION_FRACTION,
@@ -160,9 +154,14 @@ impl NetworkTest for dyn NetworkLoadTest {
             .expect("Time went backwards")
             .as_secs();
 
-        ctx.check_for_success(&txn_stat, &actual_test_duration)?;
+        self.finish(ctx.swarm())?;
 
-        self.finish(ctx.swarm(), start_timestamp, end_timestamp)?;
+        ctx.check_for_success(
+            &txn_stat,
+            &actual_test_duration,
+            start_timestamp as i64,
+            end_timestamp as i64,
+        )?;
 
         Ok(())
     }
@@ -171,18 +170,26 @@ impl NetworkTest for dyn NetworkLoadTest {
 impl dyn NetworkLoadTest {
     pub fn network_load_test(
         &self,
-        swarm: &mut dyn Swarm,
+        ctx: &mut NetworkContext,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
-    ) -> Result<(TxnStats, Duration)> {
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    ) -> Result<(TxnStats, Duration, u64)> {
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
 
-        let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let all_fullnodes = ctx
+            .swarm()
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
 
-        let nodes_to_send_load_to = match self.setup(swarm)? {
+        let nodes_to_send_load_to = match self.setup(ctx)? {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
@@ -191,8 +198,13 @@ impl dyn NetworkLoadTest {
 
         // Generate some traffic
 
-        let (mut emitter, emit_job_request) =
-            create_emitter_and_request(swarm, emit_job_request, &nodes_to_send_load_to, 1, rng)?;
+        let (mut emitter, emit_job_request) = create_emitter_and_request(
+            ctx.swarm(),
+            emit_job_request,
+            &nodes_to_send_load_to,
+            1,
+            rng,
+        )?;
 
         let mut runtime_builder = Builder::new_multi_thread();
         runtime_builder.disable_lifo_slot().enable_all();
@@ -201,8 +213,11 @@ impl dyn NetworkLoadTest {
             .build()
             .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
 
-        let job =
-            rt.block_on(emitter.start_job(swarm.chain_info().root_account, emit_job_request, 3))?;
+        let job = rt.block_on(emitter.start_job(
+            ctx.swarm().chain_info().root_account,
+            emit_job_request,
+            3,
+        ))?;
 
         let warmup_duration = duration.mul_f32(warmup_duration_fraction);
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
@@ -212,10 +227,24 @@ impl dyn NetworkLoadTest {
         std::thread::sleep(warmup_duration);
         info!("{}s warmup finished", warmup_duration.as_secs());
 
+        let clients = ctx
+            .swarm()
+            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
+
+        let max_start_ledger_transactions = rt
+            .block_on(join_all(
+                clients.iter().map(|client| client.get_ledger_information()),
+            ))
+            .into_iter()
+            .filter(|r| r.is_ok())
+            .map(|r| r.unwrap().into_inner())
+            .map(|s| s.version - 2 * s.block_height)
+            .max();
+
         job.start_next_phase();
 
         let test_start = Instant::now();
-        self.test(swarm, test_duration)?;
+        self.test(ctx.swarm(), test_duration)?;
         let actual_test_duration = test_start.elapsed();
         info!(
             "{}s test finished after {}s",
@@ -224,8 +253,21 @@ impl dyn NetworkLoadTest {
         );
 
         job.start_next_phase();
+        let cooldown_start = Instant::now();
+        let max_end_ledger_transactions = rt
+            .block_on(join_all(
+                clients.iter().map(|client| client.get_ledger_information()),
+            ))
+            .into_iter()
+            .filter(|r| r.is_ok())
+            .map(|r| r.unwrap().into_inner())
+            .map(|s| s.version - 2 * s.block_height)
+            .max();
 
-        std::thread::sleep(cooldown_duration);
+        let cooldown_used = cooldown_start.elapsed();
+        if cooldown_used < cooldown_duration {
+            std::thread::sleep(cooldown_duration - cooldown_used);
+        }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
         info!(
@@ -239,6 +281,19 @@ impl dyn NetworkLoadTest {
         info!("Test stats: {}", txn_stats[1].rate(actual_test_duration));
         info!("Cooldown stats: {}", txn_stats[2].rate(cooldown_duration));
 
-        Ok((txn_stats.into_iter().nth(1).unwrap(), actual_test_duration))
+        let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
+            if let Some(start_t) = max_start_ledger_transactions {
+                end_t - start_t
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        Ok((
+            txn_stats.into_iter().nth(1).unwrap(),
+            actual_test_duration,
+            ledger_transactions,
+        ))
     }
 }
