@@ -17,6 +17,8 @@ pub enum PayloadRequest {
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
@@ -29,11 +31,18 @@ pub enum PayloadRequest {
 impl fmt::Display for PayloadRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
+            PayloadRequest::GetBlockRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
                 write!(
                     f,
-                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
-                    round, max_txns, max_bytes, excluded
+                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {}, return_non_full: {}, excluded: {}]",
+                    round, max_txns, max_bytes, return_non_full, excluded
                 )
             }
             PayloadRequest::CleanRequest(logical_time, digests) => {

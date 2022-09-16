@@ -126,12 +126,13 @@ impl QuorumStoreWrapper {
 
     /// return true when quorum store is back pressured
     pub(crate) fn back_pressure(&self) -> bool {
-        debug!(
-            "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
-            self.remaining_proof_num, self.back_pressure_limit
-        );
-        counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(self.remaining_proof_num as f64);
-        self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure()
+        // debug!(
+        //     "QS: back pressure check remaining_proof_num {} back_pressure_limit {}",
+        //     self.remaining_proof_num, self.back_pressure_limit
+        // );
+        // counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(self.remaining_proof_num as f64);
+        // self.remaining_proof_num > self.back_pressure_limit || self.block_store.back_pressure()
+        false
     }
 
     pub(crate) async fn handle_scheduled_pull(
@@ -154,6 +155,9 @@ impl QuorumStoreWrapper {
             .pull_internal(
                 self.mempool_txn_pull_max_count,
                 self.mempool_txn_pull_max_bytes,
+                // allow creating non-full fragments
+                // is this a good place to disable fragments actually?
+                true,  
                 exclude_txns,
             )
             .await
@@ -324,7 +328,7 @@ impl QuorumStoreWrapper {
     pub(crate) fn handle_consensus_request(&mut self, msg: PayloadRequest) {
         match msg {
             // TODO: check what max_txns consensus is using
-            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
+            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, return_non_full, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -339,6 +343,7 @@ impl QuorumStoreWrapper {
                     LogicalTime::new(self.latest_logical_time.epoch(), round),
                     max_txns,
                     max_bytes,
+                    return_non_full,
                 );
                 self.remaining_proof_num = remaining_proof_num;
 

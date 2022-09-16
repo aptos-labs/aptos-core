@@ -7,7 +7,7 @@ use crate::quorum_store::{
     types::{BatchId, SerializedTransaction},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
@@ -179,10 +179,11 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
+        return_non_full: bool,
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, return_non_full, exclude_txns, callback);
         self.mempool_tx
             .clone()
             .try_send(msg)
@@ -248,6 +249,7 @@ impl ProofQueue {
         current_time: LogicalTime,
         max_txns: u64,
         max_bytes: u64,
+        return_non_full: bool,
     ) -> (Vec<ProofOfStore>, usize) {
         let num_expired = self
             .digest_queue
@@ -262,7 +264,9 @@ impl ProofQueue {
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
+        let initial_size = self.digest_queue.len();
         let mut size = self.digest_queue.len();
+        let mut full = false;
         for (digest, expiration) in self.digest_queue.iter() {
             if *expiration >= current_time && !excluded_proofs.contains(digest) {
                 match self
@@ -277,6 +281,7 @@ impl ProofQueue {
                             counters::NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK.observe(size as f64);
 
                             // Exceeded the limit for requested bytes or number of transactions.
+                            full = true;
                             break;
                         }
                         ret.push(proof.clone());
@@ -296,7 +301,24 @@ impl ProofQueue {
             }
             size = size - 1;
         }
-        (ret, size)
+
+        info!(
+            // before non full check
+            byte_size = cur_bytes,
+            block_size = cur_txns,
+            batch_count = ret,
+            remaining_proof_num = size,
+            initial_remaining_proof_num = initial_size,
+            full = full,
+            return_non_full = return_non_full,
+            "Pull payloads from QuorumStore: internal"
+        );
+
+        if full || return_non_full {
+            (ret, size)
+        } else {
+            (Vec::new(), 0)
+        }
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire
