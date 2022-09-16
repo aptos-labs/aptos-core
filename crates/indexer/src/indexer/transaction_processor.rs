@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::LATEST_PROCESSED_VERSION;
 use crate::database::get_chunks;
-use crate::util::bigdecimal_to_u64;
 use crate::{
     counters::{
         GOT_CONNECTION, PROCESSOR_ERRORS, PROCESSOR_INVOCATIONS, PROCESSOR_SUCCESSES,
@@ -15,8 +15,7 @@ use crate::{
 };
 use aptos_api_types::Transaction;
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
-use diesel::{prelude::*, RunQueryDsl};
+use diesel::{pg::upsert::excluded, prelude::*};
 use field_count::FieldCount;
 use schema::processor_statuses::{self, dsl};
 use std::fmt::Debug;
@@ -120,6 +119,9 @@ pub trait TransactionProcessor: Send + Sync + Debug {
             processing_result.end_version
         );
         PROCESSOR_SUCCESSES.with_label_values(&[self.name()]).inc();
+        LATEST_PROCESSED_VERSION
+            .with_label_values(&[self.name()])
+            .set(processing_result.end_version as i64);
         let psms = ProcessorStatusModel::from_versions(
             self.name(),
             processing_result.start_version,
@@ -161,38 +163,5 @@ pub trait TransactionProcessor: Send + Sync + Debug {
             )
             .expect("Error updating Processor Status!");
         }
-    }
-
-    /// Gets all versions which were not successfully processed for this `TransactionProcessor` from the DB
-    /// This is so the `Tailer` can know which versions to retry
-    fn get_error_versions(&self) -> Vec<u64> {
-        let conn = self.get_conn();
-
-        dsl::processor_statuses
-            .select(dsl::version)
-            .filter(
-                dsl::success
-                    .eq(false)
-                    .and(dsl::name.eq(self.name().to_string())),
-            )
-            .load::<bigdecimal::BigDecimal>(&conn)
-            .expect("Error loading the error versions only query")
-            .iter()
-            .map(bigdecimal_to_u64)
-            .collect()
-    }
-
-    /// Gets the highest version for this `TransactionProcessor` from the DB
-    /// This is so we know where to resume from on restarts
-    fn get_max_version(&self) -> Option<u64> {
-        let conn = self.get_conn();
-
-        let res = dsl::processor_statuses
-            .select(diesel::dsl::max(dsl::version))
-            .filter(dsl::name.eq(self.name().to_string()))
-            .first::<Option<bigdecimal::BigDecimal>>(&conn);
-
-        res.expect("Error loading the max version query")
-            .map(|v| bigdecimal_to_u64(&v))
     }
 }

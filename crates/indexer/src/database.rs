@@ -3,13 +3,13 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
-use std::{cmp::min, sync::Arc};
-
+use crate::util::remove_null_bytes;
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, PoolError, PooledConnection},
     RunQueryDsl,
 };
+use std::{cmp::min, sync::Arc};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgDbPool = Arc<PgPool>;
@@ -32,6 +32,19 @@ pub fn get_chunks(num_items_to_insert: usize, column_count: usize) -> Vec<(usize
         chunks.push(chunk);
     }
     chunks
+}
+
+/// This function will clean the data for postgres. Currently it has support for removing
+/// null bytes from strings but in the future we will add more functionality.
+pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(
+    items: Vec<T>,
+    should_remove_null_bytes: bool,
+) -> Vec<T> {
+    if should_remove_null_bytes {
+        items.iter().map(remove_null_bytes).collect()
+    } else {
+        items
+    }
 }
 
 pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {

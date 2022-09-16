@@ -1,3 +1,4 @@
+> :warning: DO* NOT USE THIS, IT'S NOT READY. Go to crates/indexer for a working indexer
 # Aptos Indexer
 
 > Indexes Aptos Blockchain via Substreams connected to Aptos Firehose (https://github.com/streamingfast/firehose-aptos). 

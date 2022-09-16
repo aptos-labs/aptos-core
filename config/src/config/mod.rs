@@ -334,14 +334,16 @@ impl NodeConfig {
             None,
         );
 
-        self.indexer.starting_version = env_or_default(
-            "STARTING_VERSION",
-            self.indexer.starting_version.or(Some(0)),
-            None,
-        );
+        self.indexer.starting_version = match std::env::var("STARTING_VERSION").ok() {
+            None => self.indexer.starting_version,
+            Some(s) => Some(s.parse().map_err(|_| {
+                Error::InvariantViolation(
+                    "Could not parse 'STARTING_VERSION' env var as u64".to_string(),
+                )
+            })?),
+        };
 
         self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
-        self.indexer.index_token_uri_data = self.indexer.index_token_uri_data.or(Some(false));
         self.indexer.check_chain_id = self.indexer.check_chain_id.or(Some(true));
         self.indexer.batch_size = default_if_zero(
             self.indexer.batch_size.map(|v| v as u64),
