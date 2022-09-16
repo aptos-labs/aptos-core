@@ -2,6 +2,11 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "workspace_name_override" {
+  description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  default     = ""
+}
+
 variable "iam_path" {
   default     = "/"
   description = "Path to use when naming IAM objects"
