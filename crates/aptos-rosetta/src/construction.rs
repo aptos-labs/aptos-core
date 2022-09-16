@@ -24,7 +24,7 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::{native_coin_tag, parse_currency};
+use crate::common::parse_currency;
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
@@ -218,8 +218,6 @@ async fn construction_hash(
     })
 }
 
-const MAX_GAS_UNITS_PER_REQUEST: u64 = 1_000_000;
-
 /// Construction metadata command
 ///
 /// Retrieve sequence number for submitting transactions
@@ -263,28 +261,9 @@ async fn construction_metadata(
     let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
         max_gas.0
     } else {
-        let account_balance = rest_client
-            .get_account_balance_bcs(address, &native_coin_tag().to_string())
-            .await
-            .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
-            .into_inner();
-
-        let maximum_possible_gas =
-            if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
-                std::cmp::min(
-                    (account_balance.saturating_sub(transfer.amount.0)) / gas_price_per_unit,
-                    MAX_GAS_UNITS_PER_REQUEST,
-                )
-            } else {
-                std::cmp::min(
-                    account_balance / gas_price_per_unit,
-                    MAX_GAS_UNITS_PER_REQUEST,
-                )
-            };
-
         let transaction_factory = TransactionFactory::new(server_context.chain_id)
             .with_gas_unit_price(gas_price_per_unit)
-            .with_max_gas_amount(maximum_possible_gas);
+            .with_max_gas_amount(0); // This value doesn't matter, it's overridden in the payload
 
         let (txn_payload, sender) = request.options.internal_operation.payload()?;
         let unsigned_transaction = transaction_factory
@@ -317,19 +296,10 @@ async fn construction_metadata(
                 .expect("Zero signature should always work"),
         );
 
-        let request = rest_client
-            .simulate_bcs(&signed_transaction)
-            .await?
-            .into_inner();
-
-        if request.info.status().is_success() {
-            request.info.gas_used()
-        } else {
-            return Err(ApiError::VmError(Some(format!(
-                "Transaction simulation for gas failed with {:?}",
-                request.info.status()
-            ))));
-        }
+        let estimated_gas_params = rest_client
+            .estimate_gas(address, Some(gas_price_per_unit), &signed_transaction)
+            .await?;
+        estimated_gas_params.estimated_gas_used
     };
 
     let suggested_fee = Amount {
