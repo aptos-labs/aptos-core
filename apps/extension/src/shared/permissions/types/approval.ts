@@ -7,15 +7,11 @@ export interface ConnectPermissionApproval {
   account: PublicAccount,
 }
 
-export interface SignAndSubmitTransactionPermissionApproval {
-  maxGasFee: number,
-}
-
 export interface SignTransactionPermissionApproval {
+  gasUnitPrice: number,
   maxGasFee: number,
 }
 
 export type PermissionApproval = ConnectPermissionApproval
-| SignAndSubmitTransactionPermissionApproval
 | SignTransactionPermissionApproval
 | undefined;

@@ -74,7 +74,7 @@ export const [TransferFlowProvider, useTransferFlow] = constate(() => {
 
   const estimatedGasFeeOcta = debouncedNumberAmountOcta
    && simulationResult
-   && Number(simulationResult.gas_used);
+   && Number(simulationResult.gas_used) * Number(simulationResult.gas_unit_price);
 
   const estimatedGasFeeApt = useMemo(
     () => formatCoin(estimatedGasFeeOcta, { decimals: 8 }),

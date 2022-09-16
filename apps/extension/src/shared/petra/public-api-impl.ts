@@ -16,7 +16,6 @@ import { defaultCustomNetworks, defaultNetworkName, defaultNetworks } from 'shar
 import {
   DappInfo,
   PermissionHandler,
-  SignAndSubmitTransactionPermissionApproval,
   SignTransactionPermissionApproval,
 } from 'shared/permissions';
 import { PetraPublicApi, SignMessagePayload } from './public-api';
@@ -84,20 +83,18 @@ async function getAptosAccount(address: string) {
 
 /**
  * Create and sign a transaction from a payload
- * @param client
- * @param signerAddress
- * @param payload
- * @param maxGasFee
  */
 async function signTransaction(
   client: AptosClient,
   signerAddress: string,
   payload: Types.EntryFunctionPayload,
-  maxGasFee?: number,
+  gasUnitPrice: number,
+  maxGasFee: number,
 ) {
   const signer = await getAptosAccount(signerAddress);
   const txn = await client.generateTransaction(signerAddress, payload, {
-    max_gas_amount: maxGasFee !== undefined ? `${maxGasFee}` : undefined,
+    gas_unit_price: `${gasUnitPrice}`,
+    max_gas_amount: `${maxGasFee}`,
   });
   return client.signTransaction(signer, txn);
 }
@@ -178,10 +175,10 @@ export const PetraPublicApiImpl = {
   async signAndSubmitTransaction(dappInfo: DappInfo, payload: Types.EntryFunctionPayload) {
     const { address } = await ensureAccountConnected(dappInfo.domain);
 
-    const { maxGasFee } = await PermissionHandler.requestPermission(
+    const { gasUnitPrice, maxGasFee } = await PermissionHandler.requestPermission(
       dappInfo,
       { payload, type: 'signAndSubmitTransaction' },
-    ) as SignAndSubmitTransactionPermissionApproval;
+    ) as SignTransactionPermissionApproval;
 
     // handle rejection and timeout
 
@@ -192,6 +189,7 @@ export const PetraPublicApiImpl = {
         aptosClient,
         address,
         payload,
+        gasUnitPrice,
         maxGasFee,
       );
       return await aptosClient.submitTransaction(signedTxn);
@@ -265,7 +263,7 @@ export const PetraPublicApiImpl = {
    */
   async signTransaction(dappInfo: DappInfo, payload: Types.EntryFunctionPayload) {
     const { address } = await ensureAccountConnected(dappInfo.domain);
-    const { maxGasFee } = await PermissionHandler.requestPermission(
+    const { gasUnitPrice, maxGasFee } = await PermissionHandler.requestPermission(
       dappInfo,
       { payload, type: 'signTransaction' },
     ) as SignTransactionPermissionApproval;
@@ -273,7 +271,13 @@ export const PetraPublicApiImpl = {
     const { nodeUrl } = await getActiveNetwork();
     const aptosClient = new AptosClient(nodeUrl);
     try {
-      return await signTransaction(aptosClient, address, payload, maxGasFee);
+      return await signTransaction(
+        aptosClient,
+        address,
+        payload,
+        gasUnitPrice,
+        maxGasFee,
+      );
     } catch (err) {
       // Trace original error without rethrowing (this is a dapp error)
       // eslint-disable-next-line no-console

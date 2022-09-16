@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Types, TxnBuilderTypes } from 'aptos';
+import axios from 'axios';
+import { useCallback } from 'react';
 import {
   buildRawTransactionFromBCSPayload,
   buildRawTransactionFromJsonPayload, maxGasFeeFromEstimated,
@@ -64,6 +66,28 @@ export function useSequenceNumber() {
       return queryClient.invalidateQueries(queryKey);
     },
   };
+}
+
+export function useGasUnitPrice() {
+  const { activeNetwork } = useNetworks();
+  const queryClient = useQueryClient();
+
+  const getGasUnitPriceEstimate = useCallback(
+    () => queryClient.fetchQuery(
+      ['getGasPriceEstimate', activeNetwork.nodeUrl],
+      async () => {
+        const gasPriceEstimationEndpoint = `${activeNetwork.nodeUrl}/v1/estimate_gas_price`;
+        const result = await axios.get<{ gas_estimate: number }>(gasPriceEstimationEndpoint);
+        return result.data.gas_estimate;
+      },
+      {
+        staleTime: 10000,
+      },
+    ),
+    [activeNetwork.nodeUrl, queryClient],
+  );
+
+  return { getGasUnitPriceEstimate };
 }
 
 export function useTransactions() {
@@ -139,15 +163,22 @@ export function useTransactionSimulation(
     buildRawTransaction,
     simulateTransaction,
   } = useTransactions();
+  const { getGasUnitPriceEstimate } = useGasUnitPrice();
 
   return useQuery(
     key,
     async () => {
       const payload = payloadOrFactory instanceof Function ? payloadOrFactory() : payloadOrFactory;
-      // TODO: Should cap by maximum maxGasAmount
-      const txnOptions = options?.maxGasOctaAmount
-        ? { maxGasAmount: Math.min(options.maxGasOctaAmount, maxNumberOfGasUnits) }
-        : {};
+      const gasUnitPriceEstimate = await getGasUnitPriceEstimate();
+      const txnOptions: TransactionOptions = {
+        gasUnitPrice: gasUnitPriceEstimate,
+      };
+
+      if (options?.maxGasOctaAmount !== undefined) {
+        const maxGasAmountEstimate = options.maxGasOctaAmount / gasUnitPriceEstimate;
+        txnOptions.maxGasAmount = Math.min(maxGasAmountEstimate, maxNumberOfGasUnits);
+      }
+
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
         return await simulateTransaction(rawTxn);
@@ -181,6 +212,7 @@ export function useTransactionSubmit<TParams>(
     increment: incrementSeqNumber,
     invalidate: invalidateSeqNumber,
   } = useSequenceNumber();
+  const { getGasUnitPriceEstimate } = useGasUnitPrice();
   const {
     buildRawTransaction,
     submitTransaction,
@@ -189,9 +221,15 @@ export function useTransactionSubmit<TParams>(
   return useMutation(
     async (params: TParams) => {
       const payload = payloadFactory(params);
-      const txnOptions = options?.estimatedGasFee
-        ? { maxGasAmount: maxGasFeeFromEstimated(options.estimatedGasFee) }
-        : {};
+      const gasUnitPriceEstimate = await getGasUnitPriceEstimate();
+      const txnOptions: TransactionOptions = {
+        gasUnitPrice: gasUnitPriceEstimate,
+      };
+
+      if (options?.estimatedGasFee !== undefined) {
+        txnOptions.maxGasAmount = maxGasFeeFromEstimated(options.estimatedGasFee);
+      }
+
       const rawTxn = await buildRawTransaction(payload, txnOptions);
       try {
         return await submitTransaction(rawTxn);

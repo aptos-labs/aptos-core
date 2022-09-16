@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createStandaloneToast } from '@chakra-ui/react';
-import { UserTransaction } from 'aptos/dist/generated';
+import { Types } from 'aptos';
 import { parseMoveAbortDetails } from 'shared/move';
 
 export const { toast } = createStandaloneToast({
@@ -156,7 +156,7 @@ export const networkDoesNotExistToast = () => {
 
 // transfer
 
-export function coinTransferSuccessToast(amount: number, txn: UserTransaction) {
+export function coinTransferSuccessToast(amount: number, txn: Types.UserTransaction) {
   toast({
     description: `Amount transferred: ${amount}, gas consumed: ${txn.gas_used}`,
     status: 'success',
@@ -164,7 +164,7 @@ export function coinTransferSuccessToast(amount: number, txn: UserTransaction) {
   });
 }
 
-export function coinTransferAbortToast(txn: UserTransaction) {
+export function coinTransferAbortToast(txn: Types.UserTransaction) {
   const abortDetails = parseMoveAbortDetails(txn.vm_status);
   const abortReasonDescr = abortDetails !== undefined
     ? abortDetails.reasonDescr

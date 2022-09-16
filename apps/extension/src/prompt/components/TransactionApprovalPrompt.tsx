@@ -24,7 +24,9 @@ import { darcula, docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import { secondaryErrorMessageColor } from 'core/colors';
 import { aptosCoinStoreStructTag } from 'core/constants';
+import { useActiveAccount } from 'core/hooks/useAccounts';
 import { useTransactionSimulation } from 'core/hooks/useTransactions';
+import { useAccountOctaCoinBalance } from 'core/queries/account';
 import { formatCoin } from 'core/utils/coin';
 import { maxGasFeeFromEstimated } from 'shared/transactions';
 import { usePermissionRequestContext } from '../hooks';
@@ -35,6 +37,7 @@ import { Tile } from './Tile';
 const ChakraSyntaxHighlighter = chakra(SyntaxHighlighter);
 
 const simulationQueryKey = 'promptSimulation';
+const simulationRefetchInterval = 10000;
 
 const headingProps = {
   lineHeight: '24px',
@@ -199,9 +202,15 @@ interface TransactionApprovalPromptProps {
 export function TransactionApprovalPrompt({ payload }: TransactionApprovalPromptProps) {
   const { colorMode } = useColorMode();
   const queryClient = useQueryClient();
+  const { activeAccountAddress } = useActiveAccount();
+  const { data: coinBalance } = useAccountOctaCoinBalance(activeAccountAddress, {
+    refetchInterval: simulationRefetchInterval,
+  });
   const simulation = useTransactionSimulation(simulationQueryKey, payload, {
     cacheTime: 0,
-    refetchInterval: 10000,
+    enabled: coinBalance !== undefined,
+    maxGasOctaAmount: coinBalance,
+    refetchInterval: simulationRefetchInterval,
   });
   const { setApprovalState } = usePermissionRequestContext();
   const details = simulation.data && getSimulationDetails(simulation.data);
@@ -221,11 +230,14 @@ export function TransactionApprovalPrompt({ payload }: TransactionApprovalPrompt
 
   useEffect(() => {
     const isSimulationSuccessful = simulation.data?.success === true;
-    const approvalArgs = details?.networkFee !== undefined
-      ? { maxGasFee: maxGasFeeFromEstimated(details.networkFee) }
+    const approvalArgs = isSimulationSuccessful
+      ? {
+        gasUnitPrice: Number(simulation.data!.gas_unit_price),
+        maxGasFee: maxGasFeeFromEstimated(Number(simulation.data!.gas_used)),
+      }
       : undefined;
     setApprovalState({ args: approvalArgs, canApprove: isSimulationSuccessful });
-  }, [simulation.data?.success, details?.networkFee, setApprovalState]);
+  }, [simulation.data, setApprovalState]);
 
   return (
     <PermissionPromptLayout title="Approve transaction">
