@@ -6,10 +6,11 @@
 class ClaimNftButtonComponent < ViewComponent::Base
   include ActionText::Engine.helpers
 
-  def initialize(nft_offer:, wallet:, **rest)
+  def initialize(nft_offer:, wallet:, recaptcha_v2: false, **rest)
     @rest = rest
     @nft_offer = nft_offer
     @wallet = wallet
+    @recaptcha_v2 = recaptcha_v2
 
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'claim-nft'

@@ -178,13 +178,6 @@ impl ConsensusMock {
     }
 }
 
-pub(crate) fn exist_in_metrics_cache(mempool: &CoreMempool, txn: &SignedTransaction) -> bool {
-    mempool
-        .metrics_cache
-        .get(&(txn.sender(), txn.sequence_number()))
-        .is_some()
-}
-
 /// Decompresses and deserializes the raw message bytes into a message struct
 pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
     bcs::from_bytes(

@@ -4,10 +4,8 @@
 pub mod default_processor;
 pub mod token_processor;
 
-use self::{
-    default_processor::NAME as DEFAULT_PROCESSOR_NAME,
-    token_processor::NAME as TOKEN_PROCESSOR_NAME,
-};
+use self::default_processor::NAME as DEFAULT_PROCESSOR_NAME;
+use self::token_processor::NAME as TOKEN_PROCESSOR_NAME;
 
 pub enum Processor {
     DefaultProcessor,

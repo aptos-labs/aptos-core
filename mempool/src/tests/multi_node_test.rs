@@ -285,26 +285,6 @@ impl TestHarness {
             .check_no_network_messages_sent(network_id);
     }
 
-    /// Convenience function to get rid of the string of true falses
-    fn broadcast_txns_successfully(
-        &mut self,
-        sender: &NodeId,
-        network_id: NetworkId,
-        num_messages: usize,
-        num_transactions_in_message: usize,
-    ) -> (Vec<SignedTransaction>, PeerId) {
-        self.broadcast_txns(
-            sender,
-            network_id,
-            num_messages,
-            Some(num_transactions_in_message),
-            None,
-            true,
-            true,
-            false,
-        )
-    }
-
     /// Broadcast Transactions queued up in the local mempool of the sender
     fn broadcast_txns(
         &mut self,
@@ -457,18 +437,6 @@ impl TestHarness {
             request => panic!("Node did not ACK broadcast, instead got {:?}", request),
         }
     }
-
-    /// Check if a transaction made it into the metrics cache
-    fn exist_in_metrics_cache(&self, node_id: &NodeId, txn: &TestTransaction) -> bool {
-        self.node(node_id)
-            .mempool()
-            .metrics_cache
-            .get(&(
-                TestTransaction::get_address(txn.address),
-                txn.sequence_number,
-            ))
-            .is_some()
-    }
 }
 
 fn test_transactions(start: u64, num: u64) -> Vec<TestTransaction> {
@@ -503,40 +471,6 @@ fn test_transactions_with_byte_limit(
 
 fn test_transaction(seq_num: u64) -> TestTransaction {
     TestTransaction::new(1, seq_num, 1)
-}
-
-#[test]
-fn test_metric_cache_ignore_shared_txns() {
-    let (mut harness, validators) =
-        TestHarness::bootstrap_validator_network(2, Some(MempoolOverrideConfig::new()));
-    let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
-
-    let txns = test_transactions(0, 3);
-    harness.add_txns(v_a, test_transactions(0, 3));
-    // Check if txns's creation timestamp exist in peer_a's metrics_cache.
-    assert_eq!(
-        harness.exist_in_metrics_cache(v_a, &test_transaction(0)),
-        true
-    );
-    assert_eq!(
-        harness.exist_in_metrics_cache(v_a, &test_transaction(1)),
-        true
-    );
-    assert_eq!(
-        harness.exist_in_metrics_cache(v_a, &test_transaction(2)),
-        true
-    );
-
-    // Connect B to A incoming
-    harness.connect(v_b, v_a);
-
-    // TODO: Why not use the information that comes back from the broadcast?
-    for txn in txns.iter().take(3) {
-        // Let peer_a share txns with peer_b
-        let _ = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1, 1);
-        // Check if txns's creation timestamp exist in peer_b's metrics_cache.
-        assert_eq!(harness.exist_in_metrics_cache(v_b, txn), false);
-    }
 }
 
 #[test]

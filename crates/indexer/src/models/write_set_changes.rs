@@ -1,155 +1,192 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::write_set_changes};
-use aptos_api_types::{
-    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
-    WriteSetChange as APIWriteSetChange, WriteTableItem,
+use super::{
+    move_modules::MoveModule,
+    move_resources::MoveResource,
+    move_tables::{TableItem, TableMetadata},
 };
+use crate::{models::transactions::Transaction, schema::write_set_changes};
+use aptos_api_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
-use serde::Serialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 #[derive(
-    AsChangeset, Associations, Debug, FieldCount, Identifiable, Insertable, Queryable, Serialize,
+    Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Queryable, Serialize,
 )]
 #[diesel(table_name = "write_set_changes")]
-#[belongs_to(Transaction, foreign_key = "transaction_hash")]
-#[primary_key(transaction_hash, hash)]
+#[belongs_to(Transaction, foreign_key = "transaction_version")]
+#[primary_key(transaction_version, index)]
 pub struct WriteSetChange {
-    pub transaction_hash: String,
+    pub transaction_version: i64,
+    pub index: i64,
     pub hash: String,
+    transaction_block_height: i64,
     #[diesel(column_name = type)]
     pub type_: String,
     pub address: String,
-    pub module: serde_json::Value,
-    pub resource: serde_json::Value,
-    pub data: serde_json::Value,
-
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl WriteSetChange {
     pub fn from_write_set_change(
-        transaction_hash: String,
         write_set_change: &APIWriteSetChange,
-    ) -> Self {
+        index: i64,
+        transaction_version: i64,
+        transaction_block_height: i64,
+    ) -> (Self, WriteSetChangeDetail) {
+        let type_ = Self::get_write_set_change_type(write_set_change);
         match write_set_change {
-            APIWriteSetChange::DeleteModule(DeleteModule {
-                address,
-                state_key_hash,
-                module,
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: address.to_string(),
-                module: serde_json::to_value(module).expect("Should be able to parse module"),
-                resource: Default::default(),
-                data: Default::default(),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
-            APIWriteSetChange::DeleteResource(DeleteResource {
-                address,
-                state_key_hash,
-                resource,
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: address.to_string(),
-                module: Default::default(),
-                resource: serde_json::to_value(resource).expect("Should be able to parse resource"),
-                data: Default::default(),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
-            APIWriteSetChange::DeleteTableItem(DeleteTableItem {
-                state_key_hash,
-                handle,
-                key,
-                ..
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: "".to_owned(),
-                module: Default::default(),
-                resource: Default::default(),
-                data: json!({
-                    "handle": handle,
-                    "key": key,
-                }),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
-            APIWriteSetChange::WriteModule(WriteModule {
-                address,
-                state_key_hash,
-                data,
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: address.to_string(),
-                module: Default::default(),
-                resource: Default::default(),
-                data: serde_json::to_value(data).unwrap(),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
-            APIWriteSetChange::WriteResource(WriteResource {
-                address,
-                state_key_hash,
-                data,
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: address.to_string(),
-                module: Default::default(),
-                resource: Default::default(),
-                data: serde_json::to_value(data)
-                    .expect("Should be able to parse write resource data"),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
-            APIWriteSetChange::WriteTableItem(WriteTableItem {
-                state_key_hash,
-                handle,
-                key,
-                value,
-                ..
-            }) => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: "".to_owned(),
-                module: Default::default(),
-                resource: Default::default(),
-                data: json!({
-                    "handle": handle,
-                    "key": key,
-                    "value": value,
-                }),
-                inserted_at: chrono::Utc::now().naive_utc(),
-            },
+            APIWriteSetChange::WriteModule(module) => (
+                Self {
+                    transaction_version,
+                    hash: module.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: module.address.to_string(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Module(MoveModule::from_write_module(
+                    module,
+                    index,
+                    transaction_version,
+                    transaction_block_height,
+                )),
+            ),
+            APIWriteSetChange::DeleteModule(module) => (
+                Self {
+                    transaction_version,
+                    hash: module.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: module.address.to_string(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Module(MoveModule::from_delete_module(
+                    module,
+                    index,
+                    transaction_version,
+                    transaction_block_height,
+                )),
+            ),
+            APIWriteSetChange::WriteResource(resource) => (
+                Self {
+                    transaction_version,
+                    hash: resource.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: resource.address.to_string(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
+                    resource,
+                    index,
+                    transaction_version,
+                    transaction_block_height,
+                )),
+            ),
+            APIWriteSetChange::DeleteResource(resource) => (
+                Self {
+                    transaction_version,
+                    hash: resource.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: resource.address.to_string(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
+                    resource,
+                    index,
+                    transaction_version,
+                    transaction_block_height,
+                )),
+            ),
+            APIWriteSetChange::WriteTableItem(table_item) => (
+                Self {
+                    transaction_version,
+                    hash: table_item.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: String::default(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Table(
+                    TableItem::from_write_table_item(
+                        table_item,
+                        index,
+                        transaction_version,
+                        transaction_block_height,
+                    ),
+                    Some(TableMetadata::from_write_table_item(table_item)),
+                ),
+            ),
+            APIWriteSetChange::DeleteTableItem(table_item) => (
+                Self {
+                    transaction_version,
+                    hash: table_item.state_key_hash.clone(),
+                    transaction_block_height,
+                    type_,
+                    address: String::default(),
+                    index,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                },
+                WriteSetChangeDetail::Table(
+                    TableItem::from_delete_table_item(
+                        table_item,
+                        index,
+                        transaction_version,
+                        transaction_block_height,
+                    ),
+                    None,
+                ),
+            ),
         }
     }
 
     pub fn from_write_set_changes(
-        transaction_hash: String,
         write_set_changes: &[APIWriteSetChange],
-    ) -> Option<Vec<Self>> {
-        if write_set_changes.is_empty() {
-            return None;
-        }
-        Some(
-            write_set_changes
-                .iter()
-                .map(|write_set_change| {
-                    Self::from_write_set_change(transaction_hash.clone(), write_set_change)
-                })
-                .collect::<Vec<WriteSetChangeModel>>(),
-        )
+        transaction_version: i64,
+        transaction_block_height: i64,
+    ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
+        write_set_changes
+            .iter()
+            .enumerate()
+            .map(|(index, write_set_change)| {
+                Self::from_write_set_change(
+                    write_set_change,
+                    index as i64,
+                    transaction_version,
+                    transaction_block_height,
+                )
+            })
+            .collect::<Vec<(Self, WriteSetChangeDetail)>>()
+            .into_iter()
+            .unzip()
     }
+
+    fn get_write_set_change_type(t: &APIWriteSetChange) -> String {
+        match t {
+            APIWriteSetChange::DeleteModule(_) => String::from("delete_module"),
+            APIWriteSetChange::DeleteResource(_) => String::from("delete_resource"),
+            APIWriteSetChange::DeleteTableItem(_) => String::from("delete_table_item"),
+            APIWriteSetChange::WriteModule(_) => String::from("write_module"),
+            APIWriteSetChange::WriteResource(_) => String::from("write_resource"),
+            APIWriteSetChange::WriteTableItem(_) => String::from("write_table_item"),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum WriteSetChangeDetail {
+    Module(MoveModule),
+    Resource(MoveResource),
+    Table(TableItem, Option<TableMetadata>),
 }
 
 // Prevent conflicts with other things named `WriteSetChange`
