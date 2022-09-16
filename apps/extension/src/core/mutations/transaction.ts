@@ -11,6 +11,9 @@ import {
 import queryKeys from 'core/queries/queryKeys';
 import { buildAccountTransferPayload, buildCoinTransferPayload } from 'shared/transactions';
 import { useActiveAccount } from 'core/hooks/useAccounts';
+import { coinEvents } from 'core/utils/analytics/events';
+import { useNetworks } from 'core/hooks/useNetworks';
+import { useAnalytics } from 'core/hooks/useAnalytics';
 
 export interface UseCoinTransferParams {
   doesRecipientExist: boolean | undefined,
@@ -62,6 +65,8 @@ export function useCoinTransferTransaction(
 ) {
   const queryClient = useQueryClient();
   const { activeAccountAddress } = useActiveAccount();
+  const { trackEvent } = useAnalytics();
+  const { activeNetwork } = useNetworks();
 
   return useTransactionSubmit(
     ({
@@ -85,28 +90,28 @@ export function useCoinTransferTransaction(
           ]),
         ]);
       },
-      async onSuccess(txn, data, ...rest) {
+      async onSettled(txn, error, data, ...rest) {
         // TODO: re-enable when fixing analytics
-        // const { amount } = data;
-        //
-        // const eventType = txn.success
-        //   ? coinEvents.TRANSFER_APTOS_COIN
-        //   : coinEvents.ERROR_TRANSFER_APTOS_COIN;
-        //
-        // const payload = txn.payload as EntryFunctionPayload;
-        // const coinType = payload.type_arguments[0];
-        //
-        // const params = {
-        //   amount,
-        //   coinType,
-        //   fromAddress: txn.sender,
-        //   network: activeNetwork.nodeUrl,
-        //   ...txn,
-        // };
-        //
-        // Analytics.event({ eventType, params });
+        const { amount } = data;
 
-        if (options?.onSuccess) {
+        const eventType = txn?.success
+          ? coinEvents.TRANSFER_APTOS_COIN
+          : coinEvents.ERROR_TRANSFER_APTOS_COIN;
+
+        const payload = (txn) ? txn.payload as Types.EntryFunctionPayload : undefined;
+        const coinType = (payload) ? payload.type_arguments[0] : undefined;
+
+        const params = {
+          amount,
+          coinType,
+          fromAddress: txn?.sender,
+          network: activeNetwork.nodeUrl,
+          txnHash: txn?.hash,
+        };
+
+        trackEvent({ eventType, params });
+
+        if (options?.onSuccess && txn) {
           options.onSuccess(txn, data, ...rest);
         }
       },
