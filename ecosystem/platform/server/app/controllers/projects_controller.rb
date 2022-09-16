@@ -12,12 +12,13 @@ class ProjectsController < ApplicationController
   # GET /projects
   def index
     @categories = Category.all.index_by(&:id)
-    @projects = params[:s] ? Project.search(params[:s]) : Project
+    @projects = params[:s].blank? ? Project : Project.search(params[:s])
     @projects = @projects.where(public: true, verified: true)
                          .includes(:project_categories)
                          .with_attached_thumbnail
 
-    selected_category = params[:category]&.to_i
+    selected_category = params[:category].to_i
+    selected_category = nil if params[:category].blank?
     @projects = @projects.filter_by_category(selected_category) if selected_category
 
     @groups = @projects.each_with_object({}) do |project, groups|
