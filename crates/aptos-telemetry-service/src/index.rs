@@ -45,6 +45,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
 
     legacy_api
         .or(v1_api)
+        .recover(handle_rejection)
         .with(warp::trace::trace(|info| {
             let span = tracing::debug_span!("request", method=%info.method(), path=%info.path());
             if let Some(header_value) = info.request_headers().get(GCP_CLOUD_TRACE_CONTEXT_HEADER) {
@@ -52,7 +53,6 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
             }
             span
         }))
-        .recover(handle_rejection)
 }
 
 /// TODO: Cleanup after v1 API is ramped up
