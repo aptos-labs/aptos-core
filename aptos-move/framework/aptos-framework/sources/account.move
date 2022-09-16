@@ -97,10 +97,14 @@ module aptos_framework::account {
     const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 10;
     ///
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
+    /// Spcified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
     const EINVALID_SCHEME: u64 = 12;
+    /// Abort the transaction if the expected originating address is different from the originating addres on-chain
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
     const EINVALID_CAPABILITY_TYPE: u64 = 14;
+    /// The offerer didn't offer a signer capability to the current account, so the `accept_signer_capability` transaction is invalid
     const EINVALID_ACCEPT_SIGNER_CAPABILITY: u64 = 15;
+    /// The offere didn't offer a rotation capability to the current account, so the transaction is invalid
     const EINVALID_REVOKE_SIGNER_CAPABILITY: u64 = 16;
 
     native fun create_signer(addr: address): signer;
