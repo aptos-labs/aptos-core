@@ -24,6 +24,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     sync::Arc,
+    time::Instant,
 };
 use storage_interface::{DbReader, Order};
 
@@ -495,6 +496,8 @@ impl LeaderReputation {
         CHAIN_HEALTH_TOTAL_VOTING_POWER.set(self.voting_powers.iter().map(|v| *v as f64).sum());
         CHAIN_HEALTH_TOTAL_NUM_VALIDATORS.set(candidates.len() as i64);
 
+        let time = Instant::now();
+
         for (counter_index, participants_window_size) in
             CHAIN_HEALTH_WINDOW_SIZES.iter().enumerate()
         {
@@ -529,6 +532,12 @@ impl LeaderReputation {
                     .set(participants.len() as i64);
             }
         }
+
+        error!(
+            "logged chain health for round {} in {}us",
+            round,
+            time.elapsed().as_micros()
+        );
     }
 }
 
