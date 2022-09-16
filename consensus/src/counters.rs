@@ -120,7 +120,7 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
 /// Computed at leader election time, with some delay.
 
 /// Window sizes for which to measure chain health.
-pub static CHAIN_HEALTH_WINDOW_SIZES: [usize; 2] = [10, 100];
+pub static CHAIN_HEALTH_WINDOW_SIZES: [usize; 3] = [10, 100, 1000];
 
 /// Current (with some delay) total voting power
 pub static CHAIN_HEALTH_TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
