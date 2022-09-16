@@ -31,7 +31,7 @@ import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder
 import * as Gen from "../generated/index";
 import { MemoizeExpiring } from "../utils";
 
-export { TypeTagParser } from "./builder_utils.js";
+export { TypeTagParser } from "./builder_utils";
 
 const { sha3_256: sha3Hash } = sha3;
 
