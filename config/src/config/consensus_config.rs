@@ -36,9 +36,10 @@ pub struct ConsensusConfig {
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
+    pub quorum_store_create_empty_blocks_for_pending_ordering: bool,
+    pub quorum_store_create_partial_blocks_before_poll_ends: bool,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
-
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
@@ -80,7 +81,9 @@ impl Default for ConsensusConfig {
             sync_only: false,
             channel_size: 30, // hard-coded
             quorum_store_pull_timeout_ms: 1000,
-            quorum_store_poll_count: 10,
+            quorum_store_poll_count: 15,
+            quorum_store_create_empty_blocks_for_pending_ordering: true,
+            quorum_store_create_partial_blocks_before_poll_ends: true,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
 

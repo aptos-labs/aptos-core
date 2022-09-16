@@ -114,6 +114,9 @@ impl BatchGenerator {
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
+                // allow creating non-full fragments
+                // is this a good place to disable fragments actually?
+                true,
                 exclude_txns,
             )
             .await

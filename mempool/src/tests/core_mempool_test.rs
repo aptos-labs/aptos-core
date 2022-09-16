@@ -251,7 +251,7 @@ fn test_system_ttl() {
 
     // GC routine should clear transaction from first insert but keep last one.
     mempool.gc();
-    let batch = mempool.get_batch(1, 1024, HashSet::new());
+    let batch = mempool.get_batch(1, 1024, true, HashSet::new());
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
 
@@ -263,11 +263,11 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, 1024, HashSet::new()).is_empty());
+    assert!(pool.get_batch(1, 1024, true, HashSet::new()).is_empty());
     // Transaction 5 got back from consensus.
     pool.commit_transaction(&TestTransaction::get_address(1), 5);
     // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
+    assert_eq!(pool.get_batch(1, 1024, true, HashSet::new())[0], txns[0]);
 }
 
 #[test]
@@ -556,7 +556,7 @@ fn test_parking_lot_eviction() {
     }
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, HashSet::new())
+        .get_batch(5, 5120, true, HashSet::new())
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -585,7 +585,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
 
     // Make sure that we have correct txns in Mempool.
     let mut txns: Vec<_> = pool
-        .get_batch(5, 5120, HashSet::new())
+        .get_batch(5, 5120, true, HashSet::new())
         .iter()
         .map(SignedTransaction::sequence_number)
         .collect();
@@ -621,7 +621,7 @@ fn test_gc_ready_transaction() {
     pool.gc_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
-    let block = pool.get_batch(1, 1024, HashSet::new());
+    let block = pool.get_batch(1, 1024, true, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 0);
 
@@ -646,7 +646,7 @@ fn test_clean_stuck_transactions() {
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady);
-    let block = pool.get_batch(1, 1024, HashSet::new());
+    let block = pool.get_batch(1, 1024, true, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
 }
@@ -699,11 +699,11 @@ fn test_bytes_limit() {
     for seq in 0..100 {
         add_txn(&mut pool, TestTransaction::new(1, seq, 1)).unwrap();
     }
-    let get_all = pool.get_batch(100, 100 * 1024, HashSet::new());
+    let get_all = pool.get_batch(100, 100 * 1024, true, HashSet::new());
     assert_eq!(get_all.len(), 100);
     let txn_size = get_all[0].raw_txn_bytes_len() as u64;
     let limit = 10;
-    let hit_limit = pool.get_batch(100, txn_size * limit, HashSet::new());
+    let hit_limit = pool.get_batch(100, txn_size * limit, true, HashSet::new());
     assert_eq!(hit_limit.len(), limit as usize);
 }
 
@@ -746,6 +746,23 @@ fn test_sequence_number_behavior_at_capacity() {
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     pool.commit_transaction(&TestTransaction::get_address(2), 0);
 
-    let batch = pool.get_batch(10, 10240, HashSet::new());
+    let batch = pool.get_batch(10, 10240, true, HashSet::new());
+    assert_eq!(batch.len(), 1);
+}
+
+#[test]
+fn test_not_return_non_full() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+
+    let batch = pool.get_batch(10, 10240, true, HashSet::new());
+    assert_eq!(batch.len(), 1);
+
+    let batch = pool.get_batch(10, 10240, false, HashSet::new());
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(1, 10240, false, HashSet::new());
     assert_eq!(batch.len(), 1);
 }

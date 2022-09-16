@@ -26,7 +26,7 @@ pub struct MockPayloadManager {
 impl MockPayloadManager {
     pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<GetPayloadCommand>>) -> Self {
         let quorum_store_client =
-            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
+            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1, false, false));
         Self {
             _quorum_store_client: quorum_store_client,
         }
