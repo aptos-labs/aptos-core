@@ -45,6 +45,7 @@ class NftOffersController < ApplicationController
     )
 
     return render json: { error: 'wallet_not_found' } if @wallet.nil?
+    return render json: { error: 'captcha_invalid' } unless check_recaptcha
 
     result = NftClaimer.new.claim_nft(
       nft_offer: @nft_offer,
@@ -101,5 +102,14 @@ class NftOffersController < ApplicationController
       name: :claim_nft,
       completed:
     }
+  end
+
+  def check_recaptcha
+    recaptcha_v3_success = verify_recaptcha(action: 'claim_nft', minimum_score: 0.5,
+                                            secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: @nft_offer)
+    recaptcha_v2_success = verify_recaptcha(model: @nft_offer) unless recaptcha_v3_success
+    return false unless recaptcha_v3_success || recaptcha_v2_success
+
+    true
   end
 end
