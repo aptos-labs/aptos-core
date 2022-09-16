@@ -4,7 +4,7 @@ data "aws_route53_zone" "aptos" {
 }
 
 locals {
-  dns_prefix = var.workspace_dns ? "${local.workspace}." : ""
+  dns_prefix = var.workspace_dns ? "${local.workspace_name}." : ""
   domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.aptos[0].name}" : null
 }
 

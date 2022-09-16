@@ -9,19 +9,17 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     schema::ledger_infos::{self, dsl},
-    util::bigdecimal_to_u64,
 };
 use aptos_api::context::Context as ApiContext;
 
 use crate::models::ledger_info::LedgerInfo;
 use anyhow::{ensure, Context, Result};
 use aptos_logger::{debug, info};
-use bigdecimal::BigDecimal;
 use chrono::ParseError;
 use diesel::{
     prelude::*,
     sql_query,
-    sql_types::{BigInt, Numeric, Text},
+    sql_types::{BigInt, Text},
     RunQueryDsl,
 };
 use std::{fmt::Debug, sync::Arc};
@@ -54,7 +52,6 @@ impl Tailer {
     }
 
     pub fn run_migrations(&self) {
-        info!("Running migrations...");
         embedded_migrations::run_with_output(
             &self
                 .connection_pool
@@ -63,12 +60,14 @@ impl Tailer {
             &mut std::io::stdout(),
         )
         .expect("migrations failed!");
-        info!("Migrations complete!");
     }
 
     /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
     pub async fn check_or_update_chain_id(&self) -> Result<u64> {
-        info!("Checking if chain id is correct");
+        info!(
+            processor_name = self.processor.name(),
+            "Checking if chain id is correct"
+        );
         let conn = self
             .connection_pool
             .get()
@@ -91,15 +90,17 @@ impl Tailer {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
                 info!(
+                    processor_name = self.processor.name(),
                     chain_id = chain_id,
-                    "Chain id matches! Continuing to index chain"
+                    "Chain id matches! Continue to index...",
                 );
                 Ok(*chain_id as u64)
             }
             None => {
                 info!(
+                    processor_name = self.processor.name(),
                     chain_id = new_chain_id,
-                    "Adding chain id to db, continue indexing"
+                    "Adding chain id to db, continue to index.."
                 );
                 execute_with_better_error(
                     &conn,
@@ -165,7 +166,7 @@ impl Tailer {
 
     /// Get starting version from database. Starting version is defined as the first version that's either
     /// not successful or missing from the DB.
-    pub fn get_start_version(&self, processor_name: &String) -> Option<u64> {
+    pub fn get_start_version(&self, processor_name: &String) -> Option<i64> {
         let conn = self
             .connection_pool
             .get()
@@ -177,8 +178,8 @@ impl Tailer {
           WITH raw_boundaries AS
           (
               SELECT
-                  MAX(version) AS MAX_BLOCK,
-                  MIN(version) AS MIN_BLOCK
+                  MAX(version) AS MAX_V,
+                  MIN(version) AS MIN_V
               FROM
                   processor_statuses
               WHERE
@@ -188,15 +189,14 @@ impl Tailer {
           boundaries AS
           (
               SELECT
-                  MAX(version) AS MAX_BLOCK,
-                  MIN(version) AS MIN_BLOCK
+                  MAX(version) AS MAX_V,
+                  MIN(version) AS MIN_V
               FROM
                   processor_statuses, raw_boundaries
               WHERE
                   name = $1
                   AND success = true
-                  and version >= GREATEST(MAX_BLOCK - $2, 0)
-
+                  and version >= GREATEST(MAX_V - $2, 0)
           ),
           gap AS
           (
@@ -215,7 +215,7 @@ impl Tailer {
                       WHERE
                           name = $1
                           AND success = TRUE
-                          AND version >= GREATEST(MAX_BLOCK - $2, 0)
+                          AND version >= GREATEST(MAX_V - $2, 0)
                   ) a
               WHERE
                   version + 1 <> next_version
@@ -223,11 +223,11 @@ impl Tailer {
           SELECT
               CASE
                   WHEN
-                      MIN_BLOCK <> GREATEST(MAX_BLOCK - $2, 0)
+                      MIN_V <> GREATEST(MAX_V - $2, 0)
                   THEN
-                      GREATEST(MAX_BLOCK - $2, 0)
+                      GREATEST(MAX_V - $2, 0)
                   ELSE
-                      COALESCE(maybe_gap, MAX_BLOCK + 1)
+                      COALESCE(maybe_gap, MAX_V + 1)
               END
               AS version
           FROM
@@ -235,8 +235,8 @@ impl Tailer {
           ";
         #[derive(Debug, QueryableByName)]
         pub struct Gap {
-            #[sql_type = "Numeric"]
-            pub version: BigDecimal,
+            #[sql_type = "BigInt"]
+            pub version: i64,
         }
         let mut res: Vec<Option<Gap>> = sql_query(sql)
             .bind::<Text, _>(processor_name)
@@ -244,7 +244,7 @@ impl Tailer {
             .bind::<BigInt, _>(1500000)
             .get_results(&conn)
             .unwrap();
-        res.pop().unwrap().map(|g| bigdecimal_to_u64(&g.version))
+        res.pop().unwrap().map(|g| g.version)
     }
 }
 
@@ -320,11 +320,16 @@ mod test {
 
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
-            "metadatas",
-            "token_activities",
+            "collection_datas",
+            "tokens",
             "token_datas",
-            "token_propertys",
+            "token_ownerships",
+            "signatures",
             "collections",
+            "move_modules",
+            "move_resources",
+            "table_items",
+            "table_metadatas",
             "ownerships",
             "write_set_changes",
             "events",
@@ -346,9 +351,9 @@ mod test {
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&conn_pool.get()?);
 
-        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let test_context = new_test_context("doesnt_matter".to_string(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
+        let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let mut tailer = Tailer::new(
             context,
             conn_pool.clone(),
@@ -376,6 +381,7 @@ mod test {
                "state_change_hash":"0x27b382a98a32256a9e6403ca1f6e26998273d77afa9e8666e7ee13679af40a7a",
                "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
                "gas_used":"0",
+               "block_height":"0",
                "success":true,
                "vm_status":"Executed successfully",
                "accumulator_root_hash":"0x6a527d06063dfd42c6b3a862574d5f3ec1660afb8058135edda5072712bfdb51",
@@ -579,6 +585,7 @@ mod test {
             {
               "type": "block_metadata_transaction",
               "version": "69158",
+              "block_height": "100",
               "hash": "0x2b7c58ed8524d228f9d0543a82e2793d04e8871df322f976b0e7bb8c5ced4ff5",
               "state_change_hash": "0x3ead9eb40582fbc7df5e02f72280931dc3e6f1aae45dc832966b4cd972dac4b8",
               "event_root_hash": "0x2e481956dea9c59b6fc9f823fe5f4c45efce173e42c551c1fe073b5d76a65504",
@@ -680,6 +687,7 @@ mod test {
             {
               "type": "user_transaction",
               "version": "691595",
+              "block_height": "100",
               "hash": "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb",
               "state_change_hash": "0xebfe1eb7aa5321e7a7d741d927487163c34c821eaab60646ae0efd02b286c97c",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
@@ -804,6 +812,7 @@ mod test {
             {
               "type": "user_transaction",
               "version": "260885",
+              "block_height": "100",
               "hash": "0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3",
               "state_change_hash": "0xde91b595abbeef217fb0be956df0909c1459ba8d82ed12b983e226ecbf0a4ec5",
               "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
@@ -859,7 +868,7 @@ mod test {
             }
         )).unwrap();
 
-        let txns = crate::indexer::fetcher::remove_null_bytes_from_txns(vec![message_txn.clone()]);
+        let txns = vec![message_txn];
         tailer
             .processor
             .process_transactions_with_status(txns)

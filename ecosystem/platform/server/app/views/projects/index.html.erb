@@ -12,19 +12,18 @@
   </section>
   <section class="md:sticky top-20 z-30 bg-neutral-900 pt-8 pb-12">
     <div class="max-w-screen-2xl mx-auto px-6">
+      <%= render 'layouts/flash' %>
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-20">
         <div class="order-2 lg:order-1 lg:col-span-8">
-          <div class="grid md:grid-cols-2 gap-4">
-            <%= form_with url: projects_path, method: 'post', data: { turbo: false }, class: 'flex flex-col xl:flex-row gap-2 !text-sm relative', builder: AptosFormBuilder do |form| %>
+          <%= form_with url: projects_path, method: 'GET', class: 'grid md:grid-cols-2 gap-4', builder: AptosFormBuilder do |form| %>
+            <%= content_tag :div, class: 'flex flex-col xl:flex-row gap-2 !text-sm relative' do %>
               <div class="flex absolute inset-y-0 right-0 items-center pr-4 pointer-events-none">
                 <%= render IconComponent.new(:search, class: 'w-5 h-5 text-neutral-400') %>
               </div>
-              <%= form.search_field :project_search, class: 'block p-4 pr-10 w-full text-base rounded-lg text-neutral-100 bg-neutral-900 border-neutral-600 placeholder-neutral-400 focus:ring-teal-700 focus:border-teal-700', placeholder: 'Search Projects…' %>
+              <%= form.search_field :s, value: params[:s], class: 'block p-4 pr-10 w-full text-base rounded-lg text-neutral-100 bg-neutral-900 border-neutral-600 placeholder-neutral-400 focus:ring-teal-700 focus:border-teal-700', placeholder: 'Search Projects…' %>
             <% end %>
-            <%= form_with builder: AptosFormBuilder do |form| %>
-              <%= form.collection_select(:category_id, Category.all, :id, :title, { include_blank: 'Filter by category' }, { class: 'block p-4 w-full text-base text-neutral-400 bg-neutral-900 rounded-lg border border-neutral-600 focus:ring-teal-700 focus:border-teal-700 placeholder-neutral-400' }) %>
-            <% end %>
-          </div>
+            <%= form.collection_select(:category, @categories.values, :id, :title, { selected: params[:category], include_blank: 'Filter by category' }, { class: 'block p-4 w-full text-base text-neutral-400 bg-neutral-900 rounded-lg border border-neutral-600 focus:ring-teal-700 focus:border-teal-700 placeholder-neutral-400', onchange: 'this.form.requestSubmit()' }) %>
+          <% end %>
         </div>
         <div class="order-1 lg:order-2 lg:col-span-4 flex lg:justify-end">
           <%= render ButtonComponent.new(href: new_project_path, size: :large, class: '!inline-block rounded-lg') do %>

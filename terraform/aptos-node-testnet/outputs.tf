@@ -4,5 +4,5 @@ output "oidc_provider" {
 }
 
 output "workspace" {
-  value = local.workspace
+  value = local.workspace_name
 }

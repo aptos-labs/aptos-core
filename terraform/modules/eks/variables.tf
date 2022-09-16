@@ -90,11 +90,6 @@ variable "node_pool_sizes" {
   description = "Override the number of nodes in the specified pool"
 }
 
-variable "max_node_pool_surge" {
-  default     = 1
-  description = "Multiplier on the max size of the node pool"
-}
-
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""

@@ -4,7 +4,7 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_vm::natives;
 use framework::path_in_crate;
-use move_deps::move_cli::base::test::run_move_unit_tests;
+use move_deps::move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_deps::{
     move_unit_test::UnitTestingConfig, move_vm_runtime::native_functions::NativeFunctionTable,
 };
@@ -12,7 +12,7 @@ use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    run_move_unit_tests(
+    let ok = run_move_unit_tests(
         &pkg_path,
         move_deps::move_package::BuildConfig {
             test_mode: true,
@@ -26,6 +26,9 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         &mut std::io::stdout(),
     )
     .unwrap();
+    if ok != UnitTestResult::Success {
+        panic!("move unit tests failed")
+    }
 }
 
 pub fn aptos_test_natives() -> NativeFunctionTable {
