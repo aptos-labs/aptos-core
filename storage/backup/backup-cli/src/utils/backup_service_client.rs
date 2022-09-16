@@ -16,7 +16,8 @@ pub struct BackupServiceClientOpt {
     #[clap(
         long = "backup-service-address",
         default_value = "http://localhost:6186",
-        help = "Backup service address."
+        help = "Backup service address. (By default a Aptos Node runs the backup service serving \
+        on local tcp port 6186."
     )]
     pub address: String,
 }

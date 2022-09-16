@@ -35,14 +35,30 @@ use tokio_stream::wrappers::IntervalStream;
 pub struct BackupCoordinatorOpt {
     #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
-    // Taking a state snapshot involves going through the entire state tree, should be taken
-    // infrequently.
-    #[clap(long, default_value = "24")]
+    #[clap(
+        long,
+        default_value = "24",
+        help = "Frequency (in number of epochs) to take state snapshots at epoch ending versions. \
+        Adjacent epochs share much of the state, so it's inefficient storage-wise and bandwidth-wise \
+        to take it too frequently. However, a recent snapshot is obviously desirable if one intends \
+        to recover a snapshot and catch up with the chain by replaying transactions on top of it. \
+        Notice that a snapshot won't be taken exactly according to this option if it's missed due \
+        to the previous backup finishing too late -- if the next epoch to be snapshoted is already \
+        available, the missed ones will be skipped, i.e. setting this to 1 will make the tool take \
+        a state snapshot at every epoch ending only if the previous epoch ending snapshot is finished \
+        before the one after the epoch isn't available yet."
+    )]
     pub state_snapshot_interval_epochs: usize,
-    // Assuming the network runs at 100 tps, it's 100 * 3600 = 360k transactions per hour, we don't
-    // want the backups to lag behind too much. Defaulting to 100k here in case the network is way
-    // slower than expected.
-    #[clap(long, default_value = "100000")]
+    #[clap(
+        long,
+        default_value = "100000",
+        help = "The frequency (in transaction versions) to take an incremental transaction backup. \
+        Making a transaction backup every 10 Million versions will result in the latest transaction \
+        to appear in the backup potentially 10 Million versions later. If the net work is running \
+        at 1 thousand transactions per second, that is roughly 3 hours. On the other hand, if \
+        backups are too frequent and hence small, it slows down loading the backup metadata by too \
+        many small files. "
+    )]
     pub transaction_batch_size: usize,
     #[clap(flatten)]
     pub concurrent_downloads: ConcurrentDownloadsOpt,
