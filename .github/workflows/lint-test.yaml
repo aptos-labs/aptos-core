@@ -154,6 +154,12 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
+  rust-move-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: cargo test -p framework
+
   rust-smoke-test:
     runs-on: high-perf-docker
     steps:
