@@ -32,7 +32,7 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
-    gas_schedule::GasSchedule,
+    gas_schedule::{GasSchedule, GasScheduleV2},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
@@ -62,7 +62,6 @@ impl fmt::Display for ConfigID {
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     ApprovedExecutionHashes::CONFIG_ID,
-    GasSchedule::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
