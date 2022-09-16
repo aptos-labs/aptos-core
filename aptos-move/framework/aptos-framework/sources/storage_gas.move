@@ -279,9 +279,9 @@ module aptos_framework::storage_gas {
         initialize(&framework);
         on_reconfig();
         let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
-        assert!(gas_parameter.per_item_read == 100, 0);
-        assert!(gas_parameter.per_item_create == 100, 0);
-        assert!(gas_parameter.per_item_write == 100, 0);
+        assert!(gas_parameter.per_item_read == 10, 0);
+        assert!(gas_parameter.per_item_create == 10, 0);
+        assert!(gas_parameter.per_item_write == 10, 0);
         assert!(gas_parameter.per_byte_read == 1, 0);
         assert!(gas_parameter.per_byte_create == 1, 0);
         assert!(gas_parameter.per_byte_write == 1, 0);
