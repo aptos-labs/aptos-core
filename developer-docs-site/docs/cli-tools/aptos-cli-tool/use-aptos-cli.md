@@ -818,6 +818,10 @@ You can additionally use named profiles for the addresses.  The first placeholde
 $ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
 
+:::tip
+When publishing Move modules, if multiple modules are in one package, then all the modules in this package must have the same account. If they have different accounts, then the publishing will fail at the transaction level. 
+:::
+
 ### Running a Move function
 
 Now that you've published the function above, you can run it.
