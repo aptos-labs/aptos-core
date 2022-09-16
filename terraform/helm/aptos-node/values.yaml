@@ -42,7 +42,7 @@ haproxy:
   limits:
     validator:
       # -- Limit the number of connections per IP address per sec
-      connectionsPerIPPerMin: 2
+      connectionsPerIPPerSec: 2
       # Sustained 100mb/s for 10 sec.
       maxBytesOutRate10sec: 134217728
       rateLimitSession: 256
