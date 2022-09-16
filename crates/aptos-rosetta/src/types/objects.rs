@@ -23,7 +23,7 @@ use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::TransactionOnChainData;
-use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
+use aptos_rest_client::aptos_api_types::U64;
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
 use aptos_types::contract_event::ContractEvent;
@@ -84,11 +84,10 @@ pub struct Amount {
     pub currency: Currency,
 }
 
-impl From<Balance> for Amount {
-    fn from(balance: Balance) -> Self {
+impl Amount {
+    pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> Amount {
         Amount {
-            value: balance.coin.value.to_string(),
-            // TODO: Support other currencies
+            value: (gas_unit_price * max_gas_amount).to_string(),
             currency: native_coin(),
         }
     }

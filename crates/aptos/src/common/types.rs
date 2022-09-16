@@ -1258,10 +1258,16 @@ impl TransactionOptions {
                 sender_key.public_key(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
-            let estimated_gas = client
-                .estimate_gas(sender_address, Some(gas_unit_price), &signed_transaction)
+            // TODO: Cleanup to use the gas price estimation here
+            let simulated_txn = client
+                .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
                 .await?;
-            estimated_gas.estimated_gas_used
+            simulated_txn
+                .into_inner()
+                .transaction
+                .as_signed_user_txn()
+                .expect("Should be a user transaction from simulation!")
+                .max_gas_amount()
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
             DEFAULT_MAX_GAS
