@@ -512,10 +512,9 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if legacy_flow {
             // Send the compiled module using a module bundle
             txn_options
-                .submit_transaction(
-                    TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units)),
-                    None,
-                )
+                .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
+                    compiled_units,
+                )))
                 .await
                 .map(TransactionSummary::from)
         } else {
@@ -536,7 +535,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 )));
             }
             txn_options
-                .submit_transaction(payload, None)
+                .submit_transaction(payload)
                 .await
                 .map(TransactionSummary::from)
         }
@@ -754,15 +753,12 @@ impl CliCommand<TransactionSummary> for RunFunction {
         }
 
         self.txn_options
-            .submit_transaction(
-                TransactionPayload::EntryFunction(EntryFunction::new(
-                    self.function_id.module_id,
-                    self.function_id.member_id,
-                    type_args,
-                    args,
-                )),
-                None,
-            )
+            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
+                self.function_id.module_id,
+                self.function_id.member_id,
+                type_args,
+                args,
+            )))
             .await
             .map(TransactionSummary::from)
     }
@@ -790,10 +786,11 @@ impl CliCommand<TransactionSummary> for RunScript {
 
         let txn = self
             .txn_options
-            .submit_transaction(
-                TransactionPayload::Script(Script::new(bytecode, vec![], vec![])),
-                None,
-            )
+            .submit_transaction(TransactionPayload::Script(Script::new(
+                bytecode,
+                vec![],
+                vec![],
+            )))
             .await?;
         Ok(TransactionSummary::from(&txn))
     }
