@@ -105,6 +105,8 @@ class NftOffersController < ApplicationController
   end
 
   def check_recaptcha
+    return true unless Flipper.enabled?(:require_captcha_for_nft)
+
     recaptcha_v3_success = verify_recaptcha(action: 'claim_nft', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: @nft_offer)
     recaptcha_v2_success = verify_recaptcha(model: @nft_offer) unless recaptcha_v3_success

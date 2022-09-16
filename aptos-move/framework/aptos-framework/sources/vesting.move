@@ -955,7 +955,7 @@ module aptos_framework::vesting {
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x10001)]
+    #[expected_failure(abort_code = 0x60001)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
         aptos_framework: &signer,
         admin: &signer,
