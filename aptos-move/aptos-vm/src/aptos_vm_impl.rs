@@ -56,7 +56,7 @@ pub struct AptosVMImpl {
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new<S: StateView>(state: &S, include_test_natives: bool) -> Self {
         let storage = StorageAdapter::new(state);
 
         let (gas_params, gas_feature_version): (Option<AptosGasParameters>, Option<u64>) =
@@ -98,6 +98,7 @@ impl AptosVMImpl {
             native_gas_params,
             abs_val_size_gas_params,
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            include_test_natives,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

@@ -16,7 +16,7 @@ fn initial_aptos_version() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
 
-        let vm = AptosVM::new(executor.get_state_view());
+        let vm = AptosVM::new(executor.get_state_view(), false);
 
         assert_eq!(
             vm.internals().version().unwrap(),
@@ -31,7 +31,7 @@ fn initial_aptos_version() {
         executor.new_block();
         executor.execute_and_apply(txn);
 
-        let new_vm = AptosVM::new(executor.get_state_view());
+        let new_vm = AptosVM::new(executor.get_state_view(), false);
         assert_eq!(
             new_vm.internals().version().unwrap(),
             Version { major: test_env.version_number + 1 }
@@ -44,7 +44,7 @@ fn initial_aptos_version() {
 fn drop_txn_after_reconfiguration() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
-        let vm = AptosVM::new(executor.get_state_view());
+        let vm = AptosVM::new(executor.get_state_view(), false);
 
         assert_eq!(
             vm.internals().version().unwrap(),

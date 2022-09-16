@@ -22,8 +22,12 @@ static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 pub fn aptos_natives(
     gas_params: NativeGasParameters,
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
-    include_test_natives: bool,
+    mut include_test_natives: bool,
 ) -> NativeFunctionTable {
+    // TODO(bug):
+    include_test_natives;
+    include_test_natives = true;
+
     let iter_chain = move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
         .chain(framework::natives::all_natives(
