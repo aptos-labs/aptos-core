@@ -127,10 +127,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
       - uses: pre-commit/action@v3.0.0
-      - run: cargo xclippy
-      - run: cargo fmt --check
       - run: cargo install cargo-sort
-      - run: cargo sort --grouped --check --workspace
+      - run: scripts/rust_lint.sh --check
 
   rust-doc-test:
     runs-on: high-perf-docker
@@ -184,10 +182,6 @@ jobs:
 
   python-unit-test:
     uses: ./.github/workflows/python-unit-test.yaml
-    with:
-      GIT_SHA: ${{ github.ref || github.sha }}
 
   helm-lint:
     uses: ./.github/workflows/helm-lint.yaml
-    with:
-      GIT_SHA: ${{ github.ref || github.sha }}

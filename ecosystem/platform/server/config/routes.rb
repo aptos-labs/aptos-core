@@ -88,7 +88,7 @@ Rails.application.routes.draw do
   get 'it2', to: 'leaderboard#it2'
 
   # Projects
-  resources :projects
+  resources :projects, except: %i[edit update]
 
   # User profiles
   resources :users, only: %i[show] do

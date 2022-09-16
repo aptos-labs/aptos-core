@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       GIT_SHA:
-        required: true
+        required: false
         type: string
 
 jobs:
