@@ -246,25 +246,26 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
-    // Determine the gas price (either provided from upstream, or through estimation)
-    let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
-        gas_price.0
+    // If both are present, we skip simulation
+    let (suggested_fee, gas_unit_price, max_gas_amount) = if let (
+        Some(gas_unit_price),
+        Some(max_gas_amount),
+    ) = (
+        request.options.gas_price_per_unit,
+        request.options.max_gas_amount,
+    ) {
+        let suggested_fee = Amount::suggested_gas_fee(gas_unit_price.0, max_gas_amount.0);
+        (suggested_fee, gas_unit_price.0, max_gas_amount.0)
     } else {
-        rest_client
-            .estimate_gas_price()
-            .await?
-            .into_inner()
-            .gas_estimate
-    };
+        // If we have any missing fields, let's simulate!
+        let mut transaction_factory = TransactionFactory::new(server_context.chain_id);
 
-    // Determine max gas by simulation if it isn't provided
-    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
-        max_gas.0
-    } else {
-        let transaction_factory = TransactionFactory::new(server_context.chain_id)
-            .with_gas_unit_price(gas_price_per_unit)
-            .with_max_gas_amount(0); // This value doesn't matter, it's overridden in the payload
+        // If there's a gas unit price we're using it, max gas doesn't matter the API will overwrite it
+        if let Some(gas_unit_price) = request.options.gas_price_per_unit {
+            transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0)
+        }
 
+        // Build up the transaction
         let (txn_payload, sender) = request.options.internal_operation.payload()?;
         let unsigned_transaction = transaction_factory
             .payload(txn_payload)
@@ -296,24 +297,53 @@ async fn construction_metadata(
                 .expect("Zero signature should always work"),
         );
 
-        let estimated_gas_params = rest_client
-            .estimate_gas(address, Some(gas_price_per_unit), &signed_transaction)
-            .await?;
-        estimated_gas_params.estimated_gas_used
-    };
+        let simulated_txn = rest_client
+            .simulate_bcs_with_gas_estimation(
+                &signed_transaction,
+                true,
+                request.options.gas_price_per_unit.is_none(),
+            )
+            .await?
+            .into_inner();
 
-    let suggested_fee = Amount {
-        value: gas_price_per_unit
-            .saturating_mul(max_gas_amount)
-            .to_string(),
-        currency: native_coin(),
+        let simulation_status = simulated_txn.info.status();
+
+        if !simulation_status.is_success() {
+            // TODO: Fix case for not enough gas to be a better message
+            return Err(ApiError::InvalidInput(Some(format!(
+                "Transaction failed to execute with status: {:?}",
+                simulation_status
+            ))));
+        }
+
+        if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+            let estimated_gas_unit_price = user_txn.gas_unit_price();
+            let suggested_fee =
+                Amount::suggested_gas_fee(estimated_gas_unit_price, simulated_txn.info.gas_used());
+            let gas_unit_price = request
+                .options
+                .gas_price_per_unit
+                .map(|inner| inner.0)
+                .unwrap_or(estimated_gas_unit_price);
+            let max_gas_amount = request
+                .options
+                .max_gas_amount
+                .map(|inner| inner.0)
+                .unwrap_or_else(|| simulated_txn.info.gas_used());
+            (suggested_fee, gas_unit_price, max_gas_amount)
+        } else {
+            return Err(ApiError::InternalError(Some(format!(
+                "Transaction returned by API was not a user transaction: {:?}",
+                simulated_txn.transaction
+            ))));
+        }
     };
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
             sequence_number: sequence_number.into(),
             max_gas_amount: max_gas_amount.into(),
-            gas_price_per_unit: gas_price_per_unit.into(),
+            gas_price_per_unit: gas_unit_price.into(),
             expiry_time_secs: request.options.expiry_time_secs,
         },
         suggested_fee: vec![suggested_fee],
