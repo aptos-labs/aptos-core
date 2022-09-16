@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
+use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -26,14 +27,26 @@ use storage_interface::{DbReader, Order};
 pub trait MetadataBackend: Send + Sync {
     /// Return a contiguous NewBlockEvent window in which last one is at target_round or
     /// latest committed, return all previous one if not enough.
-    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent>;
+    fn get_block_metadata(
+        &self,
+        target_epoch: u64,
+        target_round: Round,
+    ) -> (Vec<NewBlockEvent>, HashValue);
+}
+
+#[derive(Debug, Clone)]
+pub struct VersionedNewBlockEvent {
+    /// event
+    pub event: NewBlockEvent,
+    /// version
+    pub version: u64,
 }
 
 pub struct AptosDBBackend {
     window_size: usize,
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
-    db_result: Mutex<(Vec<NewBlockEvent>, u64, bool)>,
+    db_result: Mutex<(Vec<VersionedNewBlockEvent>, u64, bool)>,
 }
 
 impl AptosDBBackend {
@@ -48,9 +61,9 @@ impl AptosDBBackend {
 
     fn refresh_db_result(
         &self,
-        mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
+        mut locked: MutexGuard<'_, (Vec<VersionedNewBlockEvent>, u64, bool)>,
         lastest_db_version: u64,
-    ) -> Result<(Vec<NewBlockEvent>, u64, bool)> {
+    ) -> Result<(Vec<VersionedNewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
 
@@ -74,8 +87,13 @@ impl AptosDBBackend {
 
         let new_block_events = events
             .into_iter()
-            .map(|event| bcs::from_bytes::<NewBlockEvent>(event.event.event_data()))
-            .collect::<Result<Vec<NewBlockEvent>, bcs::Error>>()?;
+            .map(|event| {
+                Ok(VersionedNewBlockEvent {
+                    event: bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?,
+                    version: event.transaction_version,
+                })
+            })
+            .collect::<Result<Vec<VersionedNewBlockEvent>, bcs::Error>>()?;
 
         let hit_end = new_block_events.len() < limit;
 
@@ -92,26 +110,32 @@ impl AptosDBBackend {
         &self,
         target_epoch: u64,
         target_round: Round,
-        events: &Vec<NewBlockEvent>,
+        events: &Vec<VersionedNewBlockEvent>,
         hit_end: bool,
-    ) -> Vec<NewBlockEvent> {
-        let has_larger = events.first().map_or(false, |e| {
-            (e.epoch(), e.round()) >= (target_epoch, target_round)
-        });
-        if !has_larger {
-            // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
-            // and nobody has any newer successful blocks.
-            error!(
-                "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
-                target_epoch, target_round, events.first().map_or(0, |e| e.epoch()), events.first().map_or(0, |e| e.round()))
+    ) -> (Vec<NewBlockEvent>, HashValue) {
+        // Do not warn when round==0, because check will always be unsure of whether we have
+        // all events from the previous epoch. If there is an actual issue, next round will log it.
+        if target_round != 0 {
+            let has_larger = events.first().map_or(false, |e| {
+                (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
+            });
+            if !has_larger {
+                // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
+                // and nobody has any newer successful blocks.
+                error!(
+                    "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
+                    target_epoch, target_round, events.first().map_or(0, |e| e.event.epoch()), events.first().map_or(0, |e| e.event.round()))
+            }
         }
 
+        let mut max_version = 0;
         let mut result = vec![];
         for event in events {
-            if (event.epoch(), event.round()) <= (target_epoch, target_round)
+            if (event.event.epoch(), event.event.round()) <= (target_epoch, target_round)
                 && result.len() < self.window_size
             {
-                result.push(event.clone());
+                max_version = std::cmp::max(max_version, event.version);
+                result.push(event.event.clone());
             }
         }
 
@@ -123,20 +147,34 @@ impl AptosDBBackend {
                 self.window_size
             );
         }
-        result
+        let root_hash = self
+            .aptos_db
+            .get_accumulator_root_hash(max_version)
+            .unwrap_or_else(|_| {
+                error!(
+                    "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
+                    max_version, target_epoch, target_round,
+                );
+                HashValue::zero()
+            });
+        (result, root_hash)
     }
 }
 
 impl MetadataBackend for AptosDBBackend {
     // assume the target_round only increases
-    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(
+        &self,
+        target_epoch: u64,
+        target_round: Round,
+    ) -> (Vec<NewBlockEvent>, HashValue) {
         let locked = self.db_result.lock();
         let events = &locked.0;
         let version = locked.1;
         let hit_end = locked.2;
 
         let has_larger = events.first().map_or(false, |e| {
-            (e.epoch(), e.round()) >= (target_epoch, target_round)
+            (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
         });
         let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
@@ -150,7 +188,7 @@ impl MetadataBackend for AptosDBBackend {
                     error!(
                         error = ?e, "[leader reputation] Fail to refresh window",
                     );
-                    vec![]
+                    (vec![], HashValue::zero())
                 }
             }
         } else {
@@ -452,6 +490,7 @@ pub struct LeaderReputation {
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
     exclude_round: u64,
+    use_root_hash: bool,
 }
 
 impl LeaderReputation {
@@ -462,6 +501,7 @@ impl LeaderReputation {
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
+        use_root_hash: bool,
     ) -> Self {
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
@@ -473,6 +513,7 @@ impl LeaderReputation {
             backend,
             heuristic,
             exclude_round,
+            use_root_hash,
         }
     }
 }
@@ -480,7 +521,7 @@ impl LeaderReputation {
 impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
         let target_round = round.saturating_sub(self.exclude_round);
-        let sliding_window = self.backend.get_block_metadata(self.epoch, target_round);
+        let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
         let mut weights =
             self.heuristic
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
@@ -494,9 +535,20 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let state = [self.epoch.to_le_bytes(), round.to_le_bytes()]
+        let state = if self.use_root_hash {
+            [
+                root_hash.to_vec(),
+                self.epoch.to_le_bytes().to_vec(),
+                round.to_le_bytes().to_vec(),
+            ]
             .concat()
-            .to_vec();
+        } else {
+            [
+                self.epoch.to_le_bytes().to_vec(),
+                round.to_le_bytes().to_vec(),
+            ]
+            .concat()
+        };
 
         let chosen_index = choose_index(stake_weights, state);
         proposers[chosen_index]

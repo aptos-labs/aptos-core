@@ -211,7 +211,8 @@ impl EpochManager {
                 let proposer = choose_leader(proposers);
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             }
-            ProposerElectionType::LeaderReputation(leader_reputation_type) => {
+            ProposerElectionType::LeaderReputation(leader_reputation_type)
+            | ProposerElectionType::LeaderReputationV2(leader_reputation_type) => {
                 let (
                     heuristic,
                     window_size,
@@ -301,6 +302,10 @@ impl EpochManager {
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),
+                    matches!(
+                        onchain_config.proposer_election_type(),
+                        ProposerElectionType::LeaderReputationV2(_)
+                    ),
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(

@@ -11,7 +11,7 @@ use crate::liveness::{
     proposer_election::{choose_index, ProposerElection},
 };
 use aptos_bitvec::BitVec;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
 use aptos_types::{
@@ -34,22 +34,31 @@ use storage_interface::{DbReader, Order};
 struct MockHistory {
     window_size: usize,
     data: Vec<NewBlockEvent>,
+    hash: HashValue,
 }
 
 impl MockHistory {
-    fn new(window_size: usize, data: Vec<NewBlockEvent>) -> Self {
-        Self { window_size, data }
+    fn new(window_size: usize, data: Vec<NewBlockEvent>, hash: HashValue) -> Self {
+        Self {
+            window_size,
+            data,
+            hash,
+        }
     }
 }
 
 impl MetadataBackend for MockHistory {
-    fn get_block_metadata(&self, _target_epoch: u64, _target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(
+        &self,
+        _target_epoch: u64,
+        _target_round: Round,
+    ) -> (Vec<NewBlockEvent>, HashValue) {
         let start = if self.data.len() > self.window_size {
             self.data.len() - self.window_size
         } else {
             0
         };
-        self.data[start..].to_vec()
+        (self.data[start..].to_vec(), self.hash)
     }
 }
 
@@ -351,7 +360,16 @@ fn test_proposer_and_voter_heuristic() {
 /// #### LeaderReputation test ####
 
 #[test]
-fn test_api() {
+fn test_api_v1() {
+    test_api(false);
+}
+
+#[test]
+fn test_api_v2() {
+    test_api(true);
+}
+
+fn test_api(use_root_hash: bool) {
     let active_weight: u64 = 9;
     let inactive_weight: u64 = 1;
     let proposers: Vec<AccountAddress> =
@@ -361,6 +379,7 @@ fn test_api() {
     let base_stake: u64 = 3_000_000_000_000_000_000;
 
     let voting_powers: Vec<u64> = (0..5).map(|i| base_stake * (i + 1)).collect();
+    let root_hash = HashValue::zero();
 
     let mut block_builder = TestBlockBuilder::new();
     // first metadata is ignored because of window size 1
@@ -388,7 +407,7 @@ fn test_api() {
             epoch,
             HashMap::from([(epoch, proposers.clone())]),
             voting_powers.clone(),
-            Box::new(MockHistory::new(1, history)),
+            Box::new(MockHistory::new(1, history, root_hash)),
             Box::new(ProposerAndVoterHeuristic::new(
                 proposers[0],
                 active_weight,
@@ -399,9 +418,20 @@ fn test_api() {
                 proposers.len(),
             )),
             4,
+            use_root_hash,
         );
         let round = 42u64;
-        let state = [epoch.to_le_bytes(), round.to_le_bytes()].concat().to_vec();
+
+        let state = if use_root_hash {
+            [
+                root_hash.to_vec(),
+                epoch.to_le_bytes().to_vec(),
+                round.to_le_bytes().to_vec(),
+            ]
+            .concat()
+        } else {
+            [epoch.to_le_bytes().to_vec(), round.to_le_bytes().to_vec()].concat()
+        };
 
         let expected_index = choose_index(expected_weights.clone(), state);
         selected[expected_index] += 1;
@@ -532,6 +562,12 @@ impl DbReader for MockDbReader {
         }
         Ok(version)
     }
+
+    /// Gets the transaction accumulator root hash at specified version.
+    /// Caller must guarantee the version is not greater than the latest version.
+    fn get_accumulator_root_hash(&self, _version: Version) -> anyhow::Result<HashValue> {
+        Ok(HashValue::zero())
+    }
 }
 
 #[test]
@@ -548,6 +584,7 @@ fn backend_wrapper_test() {
     let mut assert_history = |round, expected_history: Vec<Round>, to_fetch| {
         let history: Vec<Round> = backend
             .get_block_metadata(1, round)
+            .0
             .iter()
             .map(|e| e.round())
             .collect();
@@ -630,6 +667,7 @@ fn backend_test_cross_epoch() {
     let mut assert_history = |epoch, round, expected_history: Vec<(u64, Round)>, to_fetch| {
         let history: Vec<(u64, Round)> = backend
             .get_block_metadata(epoch, round)
+            .0
             .iter()
             .map(|e| (e.epoch(), e.round()))
             .collect();
