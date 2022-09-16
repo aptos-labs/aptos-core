@@ -50,7 +50,14 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data directory. **Make sure you remove the secure-data.json file too**, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
-- Pull the latest changes on `testnet-stable` branch. It should be commit `21a6d9c1bc44ebeb5a6fcbacab62af46dff55bbc`
+- Pull the latest changes on `testnet` branch. It should be commit `843b204dce971d98449b82624f4f684c7a18b991`
+- You should use fast sync to bootstrap your node, to sync faster when starting, add this to your `validator.yaml` and `fullnode.yaml`
+    ```
+    state_sync:
+     state_sync_driver:
+         bootstrapping_mode: DownloadLatestStates
+         continuous_syncing_mode: ApplyTransactionOutputs
+    ```
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
@@ -59,22 +66,39 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data.json file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
-- Update your docker image to use tag `testnet-stable_21a6d9c1bc44ebeb5a6fcbacab62af46dff55bbc`
+- Update your docker image to use tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`
+- You should use fast sync to bootstrap your node, to sync faster when starting, add this to your `validator.yaml` and `fullnode.yaml`
+    ```
+    state_sync:
+     state_sync_driver:
+         bootstrapping_mode: DownloadLatestStates
+         continuous_syncing_mode: ApplyTransactionOutputs
+    ```
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update `chain_id` to 47.
-- Update your docker image to use tag `testnet-stable_21a6d9c1bc44ebeb5a6fcbacab62af46dff55bbc`
-- Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
+- Update `chain_id` to 2.
+- Update your docker image to use tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`
+- Close metrics port and REST API port for validator, also use fast sync to bootstrap the node. add the helm values in your `main.tf ` file, for example:
 
-    ```rust
+    ```
     module "aptos-node" {
         ...
 
         helm_values = {
+            validator = {
+              config = {
+                # use fast sync to start the node
+                state_sync = {
+                  state_sync_driver = {
+                    bootstrapping_mode = "DownloadLatestStates"
+                  }
+                }
+              }
+            }
             service = {
               validator = {
                 enableRestApi = false
