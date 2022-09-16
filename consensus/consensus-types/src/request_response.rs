@@ -14,6 +14,8 @@ pub enum ConsensusRequest {
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
@@ -33,11 +35,17 @@ pub enum ConsensusRequest {
 impl fmt::Display for ConsensusRequest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ConsensusRequest::GetBlockRequest(max_txns, max_bytes, excluded, _) => {
+            ConsensusRequest::GetBlockRequest(
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
                 write!(
                     f,
-                    "GetBlockRequest [max_txns: {}, max_bytes: {} excluded: {}]",
-                    max_txns, max_bytes, excluded
+                    "GetBlockRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded: {}]",
+                    max_txns, max_bytes, return_non_full, excluded
                 )
             }
             ConsensusRequest::CleanRequest(epoch, round, _) => {

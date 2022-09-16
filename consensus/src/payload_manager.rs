@@ -48,12 +48,14 @@ impl QuorumStoreClient {
         &self,
         max_items: u64,
         max_bytes: u64,
+        return_non_full: bool,
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = ConsensusRequest::GetBlockRequest(
             max_items,
             max_bytes,
+            return_non_full,
             exclude_payloads.clone(),
             callback,
         );
@@ -99,7 +101,12 @@ impl PayloadManager for QuorumStoreClient {
         let payload = loop {
             count -= 1;
             let payload = self
-                .pull_internal(max_items, max_bytes, exclude_payloads.clone())
+                .pull_internal(
+                    max_items,
+                    max_bytes,
+                    count == 0 || self.poll_count == u64::MAX,
+                    exclude_payloads.clone(),
+                )
                 .await?;
             if payload.is_empty() && !pending_ordering && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
@@ -112,6 +119,11 @@ impl PayloadManager for QuorumStoreClient {
         };
         debug!(
             poll_count = self.poll_count - count,
+            max_poll_count = self.poll_count,
+            payload_len = payload.len(),
+            max_items = max_items,
+            max_bytes = max_bytes,
+            pending_ordering = pending_ordering,
             "Pull payloads from QuorumStore"
         );
         Ok(payload)
