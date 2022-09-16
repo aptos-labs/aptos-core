@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::backend::k8s::stateful_set;
 use crate::{
-    get_free_port, get_identity, scale_stateful_set_replicas, set_identity, FullNode,
-    HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
-    NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
+    get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
+    Validator, Version, KUBECTL_BIN, LOCALHOST, NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT,
+    REST_API_SERVICE_PORT,
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
@@ -259,18 +260,16 @@ impl Node for K8sNode {
     }
 
     async fn get_identity(&mut self) -> Result<String> {
-        let ret = get_identity(self.stateful_set_name(), self.namespace()).await;
-        ret
+        stateful_set::get_identity(self.stateful_set_name(), self.namespace()).await
     }
 
     async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
-        let ret = set_identity(
+        stateful_set::set_identity(
             self.stateful_set_name(),
             self.namespace(),
             k8s_secret_name.as_str(),
         )
-        .await;
-        ret
+        .await
     }
 }
 
