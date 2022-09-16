@@ -126,7 +126,7 @@ impl Tailer {
             .fetch_ledger_info()
             .ledger_version
             .0;
-        
+
         if ledger_version < starting_version_from_db {
             panic!("Please drop all tables in the DB as Chain has been reset! Ledger version is {}, latest version processed {}", ledger_version, starting_version_from_db);
         }
