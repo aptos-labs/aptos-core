@@ -32,8 +32,11 @@ class ProjectsController < ApplicationController
   # GET /projects/1
   def show
     @project = Project.find(params[:id])
-    head :not_found unless @project.verified
-    head :forbidden if @project.user_id != current_user&.id && !@project.public
+
+    if @project.user_id != current_user&.id
+      return head :not_found unless @project.verified
+      return head :forbidden unless @project.public
+    end
   end
 
   # GET /projects/new
@@ -58,8 +61,9 @@ class ProjectsController < ApplicationController
     return unless check_recaptcha
 
     if @project.save
-      redirect_to projects_url,
-                  notice: 'Project was successfully created. It will not be visible until approved by a moderator.'
+      redirect_to project_url(@project),
+                  notice: 'Project was successfully created. ' \
+                          'It will not be publicly visible until approved by a moderator.'
     else
       render :new, status: :unprocessable_entity
     end

@@ -59,6 +59,14 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test 'view unverified project succeeds if it belongs to the current user' do
+    user = FactoryBot.create(:user)
+    sign_in user
+    project = FactoryBot.create(:project, user:, verified: false)
+    get project_path(project)
+    assert_response :success
+  end
+
   test 'new project page' do
     get new_project_path
     assert_response :success
@@ -103,7 +111,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     end
 
     project = Project.last
-    assert_redirected_to projects_path
+    assert_redirected_to project_path(project)
     assert_equal @user, project.user
   end
 
