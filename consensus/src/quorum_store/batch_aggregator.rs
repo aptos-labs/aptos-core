@@ -161,12 +161,14 @@ impl BatchAggregator {
         transactions: Vec<SerializedTransaction>,
     ) -> Result<(), BatchAggregatorError> {
         if self.outdated_fragment(batch_id, fragment_id) {
+            counters::EXPIRED_BATCH_FRAGMENTS_COUNT.inc();
             // Replay or batch / fragment received out of order.
             return Err(BatchAggregatorError::OutdatedFragment);
         }
 
         let missed_fragment = self.missed_fragment(batch_id, fragment_id);
         if missed_fragment {
+            counters::MISSED_BATCH_FRAGMENTS_COUNT.inc();
             debug!(
                 "QS: missed_fragment batch_id: {:?} fragment_id {:?}",
                 batch_id, fragment_id

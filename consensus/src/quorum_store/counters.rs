@@ -56,7 +56,7 @@ pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_batch_per_block",
         "Histogram for the number of batches per (committed) blocks.",
-        exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.0, /*count=*/ 20).unwrap(),
+        exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });
@@ -66,7 +66,7 @@ pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.0, /*count=*/ 100).unwrap(),
+        exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
     )
     .unwrap()
 });
@@ -118,6 +118,33 @@ pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the timeout batches at the sender side.
+pub static TIMEOUT_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_timeout_batch_count",
+        "Count of the timeout batches at the sender side."
+    )
+    .unwrap()
+});
+
+/// Count of the expired batch fragments at the receiver side.
+pub static EXPIRED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_expired_batch_fragments_count",
+        "Count of the expired batch fragments at the receiver side."
+    )
+    .unwrap()
+});
+
+/// Count of the missed batch fragments at the receiver side.
+pub static MISSED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_missed_batch_fragments_count",
+        "Count of the missed batch fragments at the receiver side."
+    )
+    .unwrap()
+});
+
 /// Latencies
 
 /// Histogram of the time durations for batch creation.
@@ -125,7 +152,8 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
         register_histogram!(
             "quorum_store_batch_creation_duration",
-            "Histogram of the time durations for batch creation."
+            "Histogram of the time durations for batch creation.",
+            exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
         )
         .unwrap(),
     )
@@ -136,7 +164,8 @@ pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     DurationHistogram::new(
         register_histogram!(
             "quorum_store_empty_batch_creation_duration",
-            "Histogram of the time durations for empty batch creation."
+            "Histogram of the time durations for empty batch creation.",
+            exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
         )
         .unwrap(),
     )
@@ -147,7 +176,8 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
         register_histogram!(
             "quorum_store_batch_to_PoS_duration",
-            "Histogram of the time durations from batch creation to PoS creation."
+            "Histogram of the time durations from batch creation to PoS creation.",
+            exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
         )
         .unwrap(),
     )

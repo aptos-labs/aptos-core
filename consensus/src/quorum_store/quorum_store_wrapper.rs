@@ -237,6 +237,9 @@ impl QuorumStoreWrapper {
                 self.broadcast_completed_proof(proof, network_sender).await;
             }
             Err(QuorumStoreError::Timeout(batch_id)) => {
+                // Quorum store measurements
+                counters::TIMEOUT_BATCHES_COUNT.inc();
+
                 debug!(
                     "QS: received timeout for proof of store, batch id = {}",
                     batch_id
