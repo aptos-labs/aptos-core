@@ -152,8 +152,21 @@ impl QuorumStoreWrapper {
             if self.batch_builder.is_empty() {
                 // Quorum store metrics
                 counters::CREATED_EMPTY_BATCHES_COUNT.inc();
+
+                let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
+                    - self.batch_builder.time_created();
+                counters::EMPTY_BATCH_CREATION_DURATION
+                    .observe_duration(Duration::from_millis(duration));
+
                 return None;
             }
+
+            // Quorum store metrics
+            let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
+                - self.batch_builder.time_created();
+            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_millis(duration));
+
+            counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 
             self.db
                 .save_batch_id(self.latest_logical_time.epoch(), batch_id + 1)
@@ -176,9 +189,6 @@ impl QuorumStoreWrapper {
             self.batches_in_progress
                 .insert(batch_id, self.batch_builder.take_summaries());
             self.batch_expirations.add_item(batch_id, expiry_round);
-
-            // Quorum store metrics
-            counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 
             Some(proof_rx)
         }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, Histogram, HistogramVec, IntCounter,
+    exponential_buckets, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, Histogram, HistogramVec, IntCounter,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -55,7 +55,8 @@ pub static WRAPPER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
 pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_batch_per_block",
-        "Histogram for the number of batches per (committed) blocks."
+        "Histogram for the number of batches per (committed) blocks.",
+        exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });
@@ -64,7 +65,8 @@ pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
 pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_txn_per_batch",
-        "Histogram for the number of transanctions per batch."
+        "Histogram for the number of transanctions per batch.",
+        exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.0, /*count=*/ 100).unwrap(),
     )
     .unwrap()
 });
@@ -80,6 +82,7 @@ pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the created empty batches since last restart.
 pub static CREATED_EMPTY_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_created_empty_batch_count",
@@ -88,11 +91,11 @@ pub static CREATED_EMPTY_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the proof-of-store (PoS) gathered since last restart.
+/// Count of the created proof-of-store (PoS) since last restart.
 pub static POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_PoS_count",
-        "Count of the PoS gathered since last restart."
+        "Count of the created PoS since last restart."
     )
     .unwrap()
 });
@@ -113,4 +116,39 @@ pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
         "Count of the missed batches when execute."
     )
     .unwrap()
+});
+
+/// Latencies
+
+/// Histogram of the time durations for batch creation.
+pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_creation_duration",
+            "Histogram of the time durations for batch creation."
+        )
+        .unwrap(),
+    )
+});
+
+/// Histogram of the time durations for empty batch creation.
+pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_empty_batch_creation_duration",
+            "Histogram of the time durations for empty batch creation."
+        )
+        .unwrap(),
+    )
+});
+
+/// Histogram of the time durations from created batch to created PoS.
+pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_to_PoS_duration",
+            "Histogram of the time durations from batch creation to PoS creation."
+        )
+        .unwrap(),
+    )
 });

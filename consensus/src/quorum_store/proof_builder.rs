@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts};
+use crate::quorum_store::{
+    counters, quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts,
+};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
 use aptos_types::aggregate_signature::PartialSignatures;
@@ -87,6 +89,7 @@ pub(crate) struct ProofBuilder {
     peer_id: PeerId,
     proof_timeout_ms: usize,
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
+    digest_to_time: HashMap<HashValue, u64>, // to record the batch creation time
     timeouts: DigestTimeouts,
 }
 
@@ -97,6 +100,7 @@ impl ProofBuilder {
             peer_id,
             proof_timeout_ms,
             digest_to_proof: HashMap::new(),
+            digest_to_time: HashMap::new(),
             timeouts: DigestTimeouts::new(),
         }
     }
@@ -108,8 +112,14 @@ impl ProofBuilder {
         tx: ProofReturnChannel,
     ) -> Result<(), SignedDigestError> {
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
-        self.digest_to_proof
-            .insert(info.digest, IncrementalProofState::new(info, batch_id, tx));
+        self.digest_to_proof.insert(
+            info.digest,
+            IncrementalProofState::new(info.clone(), batch_id, tx),
+        );
+        self.digest_to_time.insert(
+            info.digest,
+            chrono::Utc::now().naive_utc().timestamp_millis() as u64,
+        );
         Ok(())
     }
 
@@ -142,6 +152,15 @@ impl ProofBuilder {
                 .remove(&digest)
                 .unwrap()
                 .take(validator_verifier);
+
+            // quorum store measurements
+            let duration = chrono::Utc::now().naive_utc().timestamp_millis() as u64
+                - self
+                    .digest_to_time
+                    .get(&digest)
+                    .expect("Batch created without recording the time!");
+            counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_millis(duration));
+
             tx.send(Ok((proof, batch_id)))
                 .expect("Unable to send the proof of store");
         }
