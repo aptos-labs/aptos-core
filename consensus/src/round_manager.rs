@@ -628,6 +628,11 @@ impl RoundManager {
             self.round_state.current_round()
         );
 
+        ensure!(
+            !self.sync_only(),
+            "[RoundManager] sync_only flag is set, stop voting"
+        );
+
         let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
         let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
             &vote_proposal,

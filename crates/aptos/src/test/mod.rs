@@ -334,7 +334,14 @@ impl CliTestFramework {
 
     pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
         AddStake {
-            txn_options: self.transaction_options(index, None),
+            txn_options: self.transaction_options(
+                index,
+                // TODO(greg): revisit after fixing gas estimation
+                Some(GasOptions {
+                    gas_unit_price: Some(1),
+                    max_gas: Some(10000),
+                }),
+            ),
             amount,
         }
         .execute()
@@ -486,7 +493,14 @@ impl CliTestFramework {
         operator_index: Option<usize>,
     ) -> CliTypedResult<TransactionSummary> {
         InitializeStakeOwner {
-            txn_options: self.transaction_options(owner_index, None),
+            txn_options: self.transaction_options(
+                owner_index,
+                // TODO(greg): revisit after fixing gas estimation
+                Some(GasOptions {
+                    gas_unit_price: Some(1),
+                    max_gas: Some(10000),
+                }),
+            ),
             initial_stake_amount,
             operator_address: operator_index.map(|idx| self.account_id(idx)),
             voter_address: voter_index.map(|idx| self.account_id(idx)),

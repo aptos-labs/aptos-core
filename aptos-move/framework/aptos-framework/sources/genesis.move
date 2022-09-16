@@ -248,7 +248,7 @@ module aptos_framework::genesis {
     #[test_only]
     public fun setup() {
         initialize(
-            x"00", // empty gas schedule
+            x"000000000000000000", // empty gas schedule
             4u8, // TESTING chain ID
             0,
             x"12",
