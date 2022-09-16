@@ -81,6 +81,44 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Total voting power of all votes collected for the last round this node was proposer
+pub static COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_collected_voting_power_for_last_proposal",
+        "Total voting power of all votes collected for the last round this node was proposer",
+    )
+    .unwrap()
+});
+
+/// Total number of votes collected for the last round this node was proposer
+pub static COLLECTED_VOTES_FOR_LAST_PROPOSAL: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_collected_votes_for_last_proposal",
+        "Total number of votes collected for the last round this node was proposer",
+    )
+    .unwrap()
+});
+
+/// Total voting power of all votes collected for the last round this node was proposer
+pub static COLLECTED_VOTING_POWER_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS: Lazy<Gauge> =
+    Lazy::new(|| {
+        register_gauge!(
+            "aptos_collected_voting_power_for_last_proposal_including_conflicts",
+            "Total voting power of all votes collected for the last round this node was proposer",
+        )
+        .unwrap()
+    });
+
+/// Total number of votes collected for the last round this node was proposer
+pub static COLLECTED_VOTES_FOR_LAST_PROPOSAL_INCLUDING_CONFLICTS: Lazy<IntGauge> =
+    Lazy::new(|| {
+        register_int_gauge!(
+            "aptos_collected_votes_for_last_proposal_including_conflicts",
+            "Total number of votes collected for the last round this node was proposer",
+        )
+        .unwrap()
+    });
+
 /// Committed proposals map when using LeaderReputation as the ProposerElection
 pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
