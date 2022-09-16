@@ -111,3 +111,12 @@ fn test_mint_nft() {
     )]);
     run_tests_for_pkg("mint_nft", named_address);
 }
+
+#[test]
+fn test_nft_auction_house() {
+    let named_address = BTreeMap::from([(
+        String::from("auction_house"),
+        AccountAddress::from_hex_literal("0xAF").unwrap(),
+    )]);
+    run_tests_for_pkg("nft_auction_house", named_address);
+}
