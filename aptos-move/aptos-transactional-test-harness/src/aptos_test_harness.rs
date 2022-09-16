@@ -53,6 +53,7 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
+use std::ops::Deref;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -302,6 +303,11 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     }
 });
 
+// #[test]
+// fn test_bla() {
+//     PRECOMPILED_APTOS_FRAMEWORK.deref();
+// }
+
 /**
  * Test Adapter Implementation
  */
@@ -471,7 +477,8 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
+        let mut outputs =
+            AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage, true)?;
 
         assert_eq!(outputs.len(), 1);
 

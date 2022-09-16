@@ -112,6 +112,7 @@ where
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+        false,
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

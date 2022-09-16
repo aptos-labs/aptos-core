@@ -4,8 +4,6 @@
 module aptos_std::bulletproofs {
     use aptos_std::pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, point_to_bytes, point_equals, scalar_to_bytes};
-    #[test_only]
-    use aptos_std::pedersen::new_commitment_from_point;
 
     //
     // Constants
@@ -62,7 +60,7 @@ module aptos_std::bulletproofs {
     /// Computes a range proof for the Pedersen commitment to 'val' with 'randomness', under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`. Returns the said commitment too.
     ///  Only works for `num_bits` \in {8, 16, 32, 64}.
-    public fun prove_range(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
+    fun prove_range(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst);
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
         let point = &std::option::extract(&mut point);
@@ -120,6 +118,9 @@ module aptos_std::bulletproofs {
     //
     // Testing
     //
+
+    #[test_only]
+    use aptos_std::pedersen::new_commitment_from_point;
 
     #[test_only]
     const A_DST: vector<u8> = b"AptosBulletproofs";

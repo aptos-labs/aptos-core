@@ -86,16 +86,16 @@ pub struct AptosVM(pub(crate) AptosVMImpl);
 struct AptosSimulationVM(AptosVM);
 
 impl AptosVM {
-    pub fn new<S: StateView>(state: &S) -> Self {
-        Self(AptosVMImpl::new(state))
+    pub fn new<S: StateView>(state: &S, include_test_natives: bool) -> Self {
+        Self(AptosVMImpl::new(state, include_test_natives))
     }
 
-    pub fn new_for_validation<S: StateView>(state: &S) -> Self {
+    pub fn new_for_validation<S: StateView>(state: &S, include_test_natives: bool) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"
         );
-        Self::new(state)
+        Self::new(state, include_test_natives)
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -860,10 +860,11 @@ impl AptosVM {
     pub fn execute_block_and_keep_vm_status(
         transactions: Vec<Transaction>,
         state_view: &impl StateView,
+        include_test_natives: bool,
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
         let mut state_view_cache = StateViewCache::new(state_view);
         let count = transactions.len();
-        let vm = AptosVM::new(&state_view_cache);
+        let vm = AptosVM::new(&state_view_cache, include_test_natives);
         let res = adapter_common::execute_block_impl(&vm, transactions, &mut state_view_cache)?;
         // Record the histogram count for transactions per block.
         BLOCK_TRANSACTION_COUNT.observe(count as f64);
@@ -874,7 +875,7 @@ impl AptosVM {
         txn: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutputExt) {
-        let vm = AptosVM::new(state_view);
+        let vm = AptosVM::new(state_view, false);
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
@@ -936,7 +937,7 @@ impl VMExecutor for AptosVM {
             debug!("Parallel execution error {:?}", err);
             Ok(result)
         } else {
-            let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
+            let output = Self::execute_block_and_keep_vm_status(transactions, state_view, false)?;
             Ok(output
                 .into_iter()
                 .map(|(_vm_status, txn_output)| txn_output)

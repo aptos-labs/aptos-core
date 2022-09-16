@@ -28,10 +28,15 @@ impl MoveVmExt {
         native_gas_params: NativeGasParameters,
         abs_val_size_gas_params: AbstractValueSizeGasParameters,
         treat_friend_as_private: bool,
+        include_test_natives: bool,
     ) -> VMResult<Self> {
         Ok(Self {
             inner: MoveVM::new_with_verifier_config(
-                aptos_natives(native_gas_params, abs_val_size_gas_params, false),
+                aptos_natives(
+                    native_gas_params,
+                    abs_val_size_gas_params,
+                    include_test_natives,
+                ),
                 VerifierConfig {
                     max_loop_depth: Some(5),
                     treat_friend_as_private,
