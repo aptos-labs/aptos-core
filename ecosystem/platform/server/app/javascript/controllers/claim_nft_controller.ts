@@ -92,6 +92,10 @@ export default class extends Controller<HTMLAnchorElement> {
     });
 
     if (!response.ok) {
+      if (response.redirected) {
+        location.href = response.url;
+        return;
+      }
       throw "Unable to retrieve claim details.";
     }
 
