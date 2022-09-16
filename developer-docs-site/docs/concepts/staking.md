@@ -101,7 +101,7 @@ Participating as a validator node on the Aptos network works like this:
 4. Your stake will automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](https://aptos.dev/nodes/ait/connect-to-testnet#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/ait/connect-to-testnet#joining-validator-set).
 :::
 
 ### Minimum and maximum stake
@@ -109,6 +109,8 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. 
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
+
+The owner can withdraw part of the stake and leave their balance below the required minimum. In such case, their stake pool will be removed from the validator set when the next epoch starts.
 
 ### Automatic lockup duration
 
@@ -124,13 +126,7 @@ You can request to unlock your stake at any time. However, your stake will only 
 
 ### Resetting the lockup
 
-When the lockup period expires, it is automatically renewed by the network. However, the owner can explicitly reset the lockup. For example, if the voting period for a governance proposal extends beyond the lockup expiry date, then the voter (designated by the stake owner) cannot participate in voting for this governance proposal without manually extending the lockup period. In such cases, the owner can manually reset the lockup period so that the new lockup expiry date extends beyond the voting period. 
-
-### Example flow
-
-1. Alice adds enough coins to her stake and requests to join the validator set. Once she’s added to the active validator set, a one-month lockup is automatically enforced on her total stake.
-2. The lockup for the Alice’s stake is renewed by the Aptos network every month. This is similar to having your monthly subscription of a service (utility, phone, etc.) automatically renewed when the current billing cycle ends.
-3. 25 days into the current one month cycle, a governance proposal is submitted with a voting duration of 7 days. Alice has only 5 days left in her current lockup. If Alice wants to wait until the last day of the voting to cast her vote, but This is not enough to guarantee her stake will stay locked for the 7-day voting period. Alice wants to participate in voting on this proposal so she resets her lockup, which locks her stake for 30 days. She can now vote on the governance proposal.
+When the lockup period expires, it is automatically renewed by the network. However, the owner can explicitly reset the lockup. 
 
 :::tip Set by the governance
 
