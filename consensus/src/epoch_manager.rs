@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_storage::tracing::{observe_block, BlockStage};
 use crate::quorum_store::{
     batch_reader::BatchReader,
     quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
@@ -13,7 +12,6 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    commit_notifier::CommitNotifier,
     counters,
     data_manager::DataManager,
     error::{error_kind, DbError},

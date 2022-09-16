@@ -3,8 +3,7 @@
 
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter, Histogram, HistogramVec, IntCounter,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -61,6 +60,7 @@ pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of transactions per batch.
 pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_txn_per_batch",

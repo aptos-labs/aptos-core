@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{self, batch_reader::BatchReader, counters, utils::RoundExpirations};
+use crate::quorum_store::{batch_reader::BatchReader, counters, utils::RoundExpirations};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::debug;
@@ -206,7 +206,7 @@ impl DataManager for QuorumStoreDataManager {
                             entry.replace_entry(DataStatus::Cached(ret.clone()));
 
                             // Quorum store metrics
-                            quorum_store::counters::MISSED_BATCHES_COUNT.inc();
+                            counters::MISSED_BATCHES_COUNT.inc();
 
                             Ok(ret)
                         }
