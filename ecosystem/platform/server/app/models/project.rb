@@ -38,14 +38,14 @@ class Project < ApplicationRecord
   validates :short_description, presence: true, length: { maximum: 140 }
   validates :full_description, presence: true, length: { minimum: 140 }
   validates :website_url, presence: true, format: URL_FORMAT
-  validates :github_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :discord_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :twitter_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :telegram_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :linkedin_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :youtube_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :forum_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates_each VALID_HOSTS.keys, allow_nil: true, allow_blank: true do |record, attr, value|
+  validates :github_url, format: URL_FORMAT, allow_nil: true
+  validates :discord_url, format: URL_FORMAT, allow_nil: true
+  validates :twitter_url, format: URL_FORMAT, allow_nil: true
+  validates :telegram_url, format: URL_FORMAT, allow_nil: true
+  validates :linkedin_url, format: URL_FORMAT, allow_nil: true
+  validates :youtube_url, format: URL_FORMAT, allow_nil: true
+  validates :forum_url, format: URL_FORMAT, allow_nil: true
+  validates_each VALID_HOSTS.keys, allow_nil: true do |record, attr, value|
     host = VALID_HOSTS[attr]
     record.errors.add(attr, "must point to #{host}") unless URI.parse(value).host == host
   end

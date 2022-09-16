@@ -12,6 +12,7 @@
   </section>
   <section class="md:sticky top-20 z-30 bg-neutral-900 pt-8 pb-12">
     <div class="max-w-screen-2xl mx-auto px-6">
+      <%= render 'layouts/flash' %>
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-20">
         <div class="order-2 lg:order-1 lg:col-span-8">
           <%= form_with url: projects_path, method: 'GET', class: 'grid md:grid-cols-2 gap-4', builder: AptosFormBuilder do |form| %>
