@@ -404,9 +404,6 @@ module aptos_framework::coin {
         Coin<CoinType> { value: amount }
     }
 
-    #[test_only]
-    use aptos_framework::aggregator_factory;
-
     public fun register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
         assert!(
@@ -485,6 +482,9 @@ module aptos_framework::coin {
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> { } = burn_cap;
     }
+
+    #[test_only]
+    use aptos_framework::aggregator_factory;
 
     #[test_only]
     struct FakeMoney { }
