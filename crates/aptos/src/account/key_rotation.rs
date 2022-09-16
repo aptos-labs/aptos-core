@@ -112,21 +112,18 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         let txn_summary = self
             .txn_options
-            .submit_transaction(
-                aptos_stdlib::account_rotate_authentication_key(
-                    0,
-                    // Existing public key
-                    current_private_key.public_key().to_bytes().to_vec(),
-                    0,
-                    // New public key
-                    new_private_key.public_key().to_bytes().to_vec(),
-                    rotation_proof_signed_by_current_private_key
-                        .to_bytes()
-                        .to_vec(),
-                    rotation_proof_signed_by_new_private_key.to_bytes().to_vec(),
-                ),
-                None,
-            )
+            .submit_transaction(aptos_stdlib::account_rotate_authentication_key(
+                0,
+                // Existing public key
+                current_private_key.public_key().to_bytes().to_vec(),
+                0,
+                // New public key
+                new_private_key.public_key().to_bytes().to_vec(),
+                rotation_proof_signed_by_current_private_key
+                    .to_bytes()
+                    .to_vec(),
+                rotation_proof_signed_by_new_private_key.to_bytes().to_vec(),
+            ))
             .await
             .map(TransactionSummary::from)?;
 
