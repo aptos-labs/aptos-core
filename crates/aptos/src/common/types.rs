@@ -1243,6 +1243,9 @@ impl TransactionOptions {
             gas_unit_price
         };
 
+        println!("{:?}", self);
+        println!(">>> unit price: {}", gas_unit_price);
+
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             max_gas
         } else if self.estimate_max_gas {

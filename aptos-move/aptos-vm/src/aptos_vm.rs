@@ -628,6 +628,15 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
+        if unwrap_or_discard!(self.0.get_gas_feature_version(log_context)) >= 1 {
+            // Create a new session so that the data cache is flushed.
+            // This is to ensure we correctly charge for loading certain resources, even if they
+            // have been previously cached in the prologue.
+            //
+            // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
+            session = self.0.new_session(storage, SessionId::txn(txn));
+        }
+
         let gas_params = unwrap_or_discard!(self.0.get_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
         let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());

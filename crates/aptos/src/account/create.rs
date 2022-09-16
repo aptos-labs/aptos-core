@@ -8,7 +8,7 @@ use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 // TODO(Gas): double check if this is correct
-pub const DEFAULT_FUNDED_COINS: u64 = 50_000;
+pub const DEFAULT_FUNDED_COINS: u64 = 500_000;
 
 /// Command to create a new account on-chain
 ///
