@@ -26,7 +26,7 @@ import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
 interface WalletHeaderProps {
   showAccountCircle?: boolean;
   showBackButton?: boolean;
-  title?: string
+  title?: string;
 }
 
 export default function WalletHeader({
@@ -124,7 +124,7 @@ export default function WalletHeader({
             ) : null
           }
           <VStack spacing={0} alignItems="flex-start" width="100%">
-            <Text fontSize={20} fontWeight={600}>
+            <Text fontSize="1.1vw" fontWeight={600}>
               {title}
             </Text>
             {walletNameAndAddress}

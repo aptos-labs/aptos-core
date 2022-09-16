@@ -5,7 +5,6 @@ import { Navigate } from 'react-router-dom';
 import Account from 'pages/Account';
 import Activity from 'pages/Activity';
 import CreateWallet from 'pages/CreateWallet';
-import Credentials from 'pages/Credentials';
 import SecurityPrivacy from 'pages/SecurityPrivacy';
 import Gallery from 'pages/Gallery';
 import Help from 'pages/Help';
@@ -31,6 +30,7 @@ import ChangePassword from 'pages/ChangePassword';
 import AutoLockTimer from 'pages/AutoLockTimer';
 import Welcome from 'pages/Welcome';
 import Reauthenticate from 'pages/Reauthenticate';
+import ExportPublicPrivateKey from 'pages/ExportPublicPrivateKey';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -77,9 +77,12 @@ export const Routes = Object.freeze({
     element: <CreateWalletViaImportAccount />,
     path: '/create-wallet/import-account',
   },
-  credentials: {
-    element: <Credentials />,
-    path: '/settings/credentials',
+  export_public_private_key: {
+    element:
+  <Reauthenticate title="Export Keys">
+    <ExportPublicPrivateKey />
+  </Reauthenticate>,
+    path: '/settings/export_public_private_key',
   },
   gallery: {
     element: <Gallery />,
@@ -115,7 +118,7 @@ export const Routes = Object.freeze({
   },
   recovery_phrase: {
     element: (
-      <Reauthenticate>
+      <Reauthenticate title="Show Secret Recovery Phrase">
         <RecoveryPhrase />
       </Reauthenticate>
     ),
@@ -185,12 +188,12 @@ export const routes = [
               Routes.token,
               Routes.activity,
               Routes.transaction,
+              Routes.export_public_private_key,
               Routes.account,
               Routes.settings,
               Routes.switchAccount,
               Routes.change_password,
               Routes.rename_account,
-              Routes.credentials,
               Routes.network,
               Routes.addNetwork,
               Routes.recovery_phrase,

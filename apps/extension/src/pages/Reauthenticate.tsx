@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Box,
   Button,
-  Center,
   Flex,
   FormControl,
   FormLabel,
@@ -12,15 +11,13 @@ import {
   useDisclosure,
   VStack,
   chakra,
-  Heading,
   InputGroup,
   InputRightElement,
 } from '@chakra-ui/react';
 
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
 import WalletLayout from 'core/layouts/WalletLayout';
-import { secondaryBgColor, textColor } from 'core/colors';
+import { secondaryBgColor, buttonBorderColor } from 'core/colors';
 import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
@@ -34,9 +31,10 @@ interface FormValues {
 
 type ReauthenticateProps = {
   children: JSX.Element;
+  title: string;
 };
 
-function Reauthenticate({ children }: ReauthenticateProps) {
+function Reauthenticate({ children, title }: ReauthenticateProps) {
   const { colorMode } = useColorMode();
   const { clearAccounts, unlockAccounts } = useInitializedAccounts();
   const { isOpen, onClose, onOpen } = useDisclosure();
@@ -82,35 +80,16 @@ function Reauthenticate({ children }: ReauthenticateProps) {
   // prompt user for password if they have not yet re-authenticated
   if (!hasReauthenticated) {
     return (
-      <WalletLayout title="Reauthentication" showBackButton>
+      <WalletLayout title={title} showBackButton hasWalletFooter={false} showAccountCircle={false}>
         <VStack
           bgColor={secondaryBgColor[colorMode]}
-          justifyContent="center"
           spacing={4}
           width="100%"
           height="100%"
         >
-          <Center
-            w="100%"
-            pt={8}
-            h="100%"
-            display="flex"
-            flexDir="column"
-          >
-            <Box width="72px" pb={4}>
-              {
-            (colorMode === 'dark')
-              ? <AptosWhiteLogo />
-              : <AptosBlackLogo />
-          }
-            </Box>
-            <Heading fontSize="xl" fontWeight="600" color={textColor[colorMode]}>
-              Please re-enter your password
-            </Heading>
-          </Center>
-          <chakra.form onSubmit={handleSubmit(onSubmit)} width="100%" px={6}>
-            <VStack gap={4}>
-              <FormControl display="flex" flexDir="column" isRequired>
+          <chakra.form onSubmit={handleSubmit(onSubmit)} width="100%" height="100%" pt={10}>
+            <VStack gap={4} height="100%">
+              <FormControl display="flex" flexDir="column" isRequired height="100%" px={4}>
                 <Flex flexDirection="row">
                   <FormLabel
                     requiredIndicator={<span />}
@@ -118,7 +97,7 @@ function Reauthenticate({ children }: ReauthenticateProps) {
                     fontWeight={500}
                     flex={1}
                   >
-                    Password
+                    Enter password
                   </FormLabel>
                   <Button
                     cursor="pointer"
@@ -138,6 +117,7 @@ function Reauthenticate({ children }: ReauthenticateProps) {
                 />
                 <InputGroup>
                   <Input
+                    size="lg"
                     autoComplete="false"
                     variant="filled"
                     type={show ? 'text' : 'password'}
@@ -145,7 +125,7 @@ function Reauthenticate({ children }: ReauthenticateProps) {
                     maxLength={64}
                     {...register('password')}
                   />
-                  <InputRightElement width="4.5rem">
+                  <InputRightElement width="4.5rem" pt={1}>
                     {show
                       ? <AiOutlineEyeInvisible size={28} onClick={handleToggleShowPassword} />
                       : <AiOutlineEye size={28} onClick={handleToggleShowPassword} />}
@@ -159,9 +139,9 @@ function Reauthenticate({ children }: ReauthenticateProps) {
                     )
                   }
               </FormControl>
-              <Box w="100%" pb={4}>
+              <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
                 <Button py={6} width="100%" type="submit" colorScheme="teal">
-                  Re-authenticate
+                  Next
                 </Button>
               </Box>
             </VStack>

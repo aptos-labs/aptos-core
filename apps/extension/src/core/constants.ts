@@ -25,6 +25,7 @@ export const validStorageUris = [
 
 export const settingsItemLabel = {
   EXPLORER: 'View on explorer',
+  EXPORT_PUBLIC_PRIVATE_KEY: 'Show public & private keys',
   HELP_SUPPORT: 'Help & Support',
   LOCK_WALLET: 'Lock wallet',
   NETWORK: 'Network',

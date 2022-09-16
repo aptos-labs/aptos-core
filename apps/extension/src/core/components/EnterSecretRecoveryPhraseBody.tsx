@@ -66,7 +66,7 @@ export default function EnterSecretRecoveryPhraseBody() {
       </HStack>
       <VStack pt={2} width="100%" spacing={2}>
         <SimpleGrid columns={2} gap={4}>
-          <VStack>
+          <VStack key="first-col">
             {mnemonic.slice(0, 6).map((item, index) => (
               <InputGroup key={item} fontWeight="bold" border={borderColor[colorMode]}>
                 <InputLeftElement color="teal">{`${index + 1}.`}</InputLeftElement>
@@ -74,7 +74,7 @@ export default function EnterSecretRecoveryPhraseBody() {
               </InputGroup>
             ))}
           </VStack>
-          <VStack>
+          <VStack key="second-col">
             {mnemonic.slice(6, 12).map((item, index) => (
               <InputGroup size="md" key={item} fontWeight="bold" border={borderColor[colorMode]}>
                 <InputLeftElement color="teal">{`${index + 7}.`}</InputLeftElement>

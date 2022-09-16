@@ -14,7 +14,7 @@ interface WalletLayoutProps {
   hasWalletHeader?: boolean;
   showAccountCircle?: boolean;
   showBackButton?: boolean;
-  title?: string
+  title?: string;
 }
 
 const BodyDiv = styled(Box)`

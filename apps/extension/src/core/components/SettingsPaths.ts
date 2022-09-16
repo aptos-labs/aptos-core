@@ -56,8 +56,8 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
     },
     {
       iconAfter: FiChevronRight,
-      path: Routes.credentials.path,
-      title: settingsItemLabel.SHOW_CREDENTIALS,
+      path: Routes.export_public_private_key.path,
+      title: settingsItemLabel.EXPORT_PUBLIC_PRIVATE_KEY,
     },
     {
       externalLink: `https://explorer.devnet.aptos.dev/account/${account.address}`,
