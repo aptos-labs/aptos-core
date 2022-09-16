@@ -767,6 +767,26 @@ export class AptosClient {
 
     return new HexString(origAddress);
   }
+
+  /**
+   * Get block by height
+   * @param blockHeight
+   * @param withTransactions
+   * @returns
+   */
+  async getBlockByHeight(blockHeight: number, withTransactions?:boolean): Promise<Gen.Block> {
+    return this.client.blocks.getBlockByHeight(blockHeight, withTransactions);
+  }
+
+  /**
+   * Get block by block transaction version
+   * @param version
+   * @param withTransactions
+   * @returns
+   */
+  async getBlockByVersion(version: number, withTransactions?:boolean): Promise<Gen.Block> {
+    return this.client.blocks.getBlockByVersion(version, withTransactions);
+  }
 }
 
 export class ApiError extends Error {

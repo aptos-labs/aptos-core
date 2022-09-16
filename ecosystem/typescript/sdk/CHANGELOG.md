@@ -7,6 +7,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 ## Unreleased
 N/A
 
+## 1.3.14 (2022-09-16)
+
+- Added new functions `getBlockByHeight` and `getBlockByVersion`. 
+
 ## 1.3.13 (2022-09-15)
 
 - Increase the default wait time for `waitForTransactionWithResult` to 20s.
