@@ -3041,9 +3041,9 @@ onetime@^5.1.2:
   dependencies:
     mimic-fn "^2.1.0"
 
-"openapi-typescript-codegen@https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz":
-  version "0.23.0-p2"
-  resolved "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p2/openapi-typescript-codegen-v0.23.0-p2.tgz#273123a28737f2e099fcddf2d76f1011374e6855"
+"openapi-typescript-codegen@https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p4/openapi-typescript-codegen-v0.23.0-p4.tgz":
+  version "0.23.0-p4"
+  resolved "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0-p4/openapi-typescript-codegen-v0.23.0-p4.tgz#8c463437cc4c8c933e6107899de64e7265f11487"
   dependencies:
     camelcase "^6.3.0"
     commander "^9.3.0"

@@ -40,6 +40,14 @@ export class AptosClient {
     } else {
       conf.BASE = fixNodeUrl(nodeUrl);
     }
+
+    // Do not carry cookies when `WITH_CREDENTIALS` is explicitly set to `false`. By default, cookies will be sent
+    if (config?.WITH_CREDENTIALS === false) {
+      conf.WITH_CREDENTIALS = false;
+    } else {
+      conf.WITH_CREDENTIALS = true;
+    }
+
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 
