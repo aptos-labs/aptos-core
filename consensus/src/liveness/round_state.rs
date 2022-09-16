@@ -235,6 +235,8 @@ impl RoundState {
         }
         let new_round = sync_info.highest_round() + 1;
         if new_round > self.current_round {
+            self.pending_votes.log_voting_power();
+
             // Start a new round.
             self.current_round = new_round;
             self.pending_votes = PendingVotes::new();
