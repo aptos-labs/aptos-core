@@ -368,12 +368,26 @@ impl Client {
 
         // Simulate transaction
         let txn = override_gas_parameters(signed_transaction, max_possible_gas, gas_unit_price);
-        let simulated_txn = self.simulate_bcs(&txn).await?.into_inner();
+        let response = self.simulate_bcs(&txn).await?;
 
-        Ok(GasEstimationParams {
-            estimated_gas_used: simulated_txn.info.gas_used(),
-            estimated_gas_price: gas_unit_price,
-        })
+        // Ensure the transaction succeeds
+        let status = response.inner().info.status();
+        if status.is_success() {
+            Ok(GasEstimationParams {
+                estimated_gas_used: response.inner().info.gas_used(),
+                estimated_gas_price: gas_unit_price,
+            })
+        } else {
+            Err(RestError::Api(AptosErrorResponse {
+                error: AptosError {
+                    message: format!("Transaction simulation for gas failed with {:?}", status),
+                    error_code: AptosErrorCode::InvalidInput,
+                    vm_error_code: None,
+                },
+                state: Some(response.state().clone()),
+                status_code: StatusCode::BAD_REQUEST,
+            }))
+        }
     }
 
     pub async fn submit(
