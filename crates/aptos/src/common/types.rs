@@ -1255,7 +1255,7 @@ impl TransactionOptions {
                     simulated_txn.info.vm_status
                 )));
             }
-            simulated_txn.info.gas_used.0
+            simulated_txn.info.gas_used.0 + 1
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases
             DEFAULT_MAX_GAS
