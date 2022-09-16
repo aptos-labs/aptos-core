@@ -22,6 +22,7 @@ if [ "$1" = "--check" ]; then
     CHECK_ARG="--check"
 fi
 
+set -e
 set -x
 
 cargo xclippy
