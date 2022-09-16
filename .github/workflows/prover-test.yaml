@@ -1,13 +1,14 @@
 name: "Prover Test"
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - devnet
-      - testnet
-      - auto
-      - canary
+  # Uncomment when this is fixed
+  # pull_request:
+  # push:
+  #   branches:
+  #     - main
+  #     - devnet
+  #     - testnet
+  #     - auto
+  #     - canary
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
