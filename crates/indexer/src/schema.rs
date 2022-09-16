@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 table! {
     block_metadata_transactions (version) {
         version -> Int8,
@@ -59,7 +56,7 @@ table! {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
         transaction_block_height -> Int8,
-        name -> Varchar,
+        name -> Text,
         address -> Varchar,
         bytecode -> Nullable<Bytea>,
         friends -> Nullable<Jsonb>,
@@ -75,11 +72,11 @@ table! {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
         transaction_block_height -> Int8,
-        name -> Varchar,
+        name -> Text,
         address -> Varchar,
         #[sql_name = "type"]
         type_ -> Text,
-        module -> Varchar,
+        module -> Text,
         generic_type_params -> Nullable<Jsonb>,
         data -> Nullable<Jsonb>,
         is_deleted -> Bool,

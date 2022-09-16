@@ -106,7 +106,7 @@ pub fn bootstrap(
 pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     // All of these options should be filled already with defaults
     let processor_name = config.processor.clone().unwrap();
-    let check_chain_id = config.check_chain_id.unwrap();
+    let check_correct_chain = config.check_correct_chain.unwrap();
     let skip_migrations = config.skip_migrations.unwrap();
     let fetch_tasks = config.fetch_tasks.unwrap();
     let processor_tasks = config.processor_tasks.unwrap();
@@ -182,12 +182,16 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let mut versions_processed: u64 = 0;
     let mut base: u64 = 0;
 
-    // Check once here to avoid a boolean check every iteration
-    if check_chain_id {
+    // Makes sure that we're indexing the right chain and that the highest version processed is < ledger version
+    if check_correct_chain {
         tailer
             .check_or_update_chain_id()
             .await
             .expect("Failed to get chain ID");
+
+        tailer
+            .ensure_chain_has_not_been_reset(starting_version_from_db)
+            .await;
     }
 
     let (tx, mut receiver) = tokio::sync::mpsc::channel(100);

@@ -344,7 +344,7 @@ impl NodeConfig {
         };
 
         self.indexer.skip_migrations = self.indexer.skip_migrations.or(Some(false));
-        self.indexer.check_chain_id = self.indexer.check_chain_id.or(Some(true));
+        self.indexer.check_correct_chain = self.indexer.check_correct_chain.or(Some(true));
         self.indexer.batch_size = default_if_zero(
             self.indexer.batch_size.map(|v| v as u64),
             DEFAULT_BATCH_SIZE as u64,

@@ -114,6 +114,24 @@ impl Tailer {
         }
     }
 
+    pub async fn ensure_chain_has_not_been_reset(&self, starting_version_from_db: u64) {
+        info!(
+            processor_name = self.processor.name(),
+            "Ensuring that chain has not been reset"
+        );
+        let ledger_version = self
+            .transaction_fetcher
+            .lock()
+            .await
+            .fetch_ledger_info()
+            .ledger_version
+            .0;
+        
+        if ledger_version < starting_version_from_db {
+            panic!("Please drop all tables in the DB as Chain has been reset! Ledger version is {}, latest version processed {}", ledger_version, starting_version_from_db);
+        }
+    }
+
     pub async fn set_fetcher_version(&self, version: u64) {
         self.transaction_fetcher
             .lock()

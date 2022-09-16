@@ -41,7 +41,7 @@ impl Fetcher {
             options,
             chain_id: 0,
             current_version: starting_version,
-            highest_known_version: starting_version,
+            highest_known_version: 0,
             transactions_sender,
         }
     }
@@ -57,7 +57,7 @@ impl Fetcher {
     /// If there are, it will set the highest known version
     async fn ensure_highest_known_version(&mut self) {
         let mut empty_loops = 0;
-        while self.current_version >= self.highest_known_version {
+        while self.highest_known_version == 0 || self.current_version > self.highest_known_version {
             if empty_loops > 0 {
                 tokio::time::sleep(self.options.starting_retry_time).await;
             }
@@ -92,29 +92,25 @@ impl Fetcher {
         loop {
             self.ensure_highest_known_version().await;
 
-            let num_missing = self.highest_known_version - self.current_version;
-
-            let num_batches = std::cmp::max(
-                std::cmp::min(
-                    (num_missing as f64 / transaction_fetch_batch_size as f64).ceil() as u64,
-                    self.options.max_tasks as u64,
-                ),
-                1,
-            ) as usize;
-
             info!(
-                num_missing = num_missing,
-                num_batches = num_batches,
                 current_version = self.current_version,
                 highest_known_version = self.highest_known_version,
+                max_batch_size = transaction_fetch_batch_size,
                 "Preparing to fetch transactions"
             );
 
             let fetch_start = chrono::Utc::now().naive_utc();
             let mut tasks = vec![];
-            for i in 0..num_batches {
-                let starting_version =
-                    self.current_version + (i as u64 * transaction_fetch_batch_size as u64);
+            let mut starting_version = self.current_version;
+            let mut num_fetches = 0;
+
+            while num_fetches < self.options.max_tasks
+                && starting_version <= self.highest_known_version
+            {
+                let num_transactions_to_fetch = std::cmp::min(
+                    transaction_fetch_batch_size as u64,
+                    self.highest_known_version - starting_version + 1,
+                ) as u16;
 
                 let context = self.context.clone();
                 let highest_known_version = self.highest_known_version;
@@ -123,11 +119,13 @@ impl Fetcher {
                         context,
                         starting_version,
                         highest_known_version,
-                        transaction_fetch_batch_size,
+                        num_transactions_to_fetch,
                     )
                     .await
                 });
                 tasks.push(task);
+                starting_version += num_transactions_to_fetch as u64;
+                num_fetches += 1;
             }
 
             let batches = match futures::future::try_join_all(tasks).await {
@@ -140,7 +138,7 @@ impl Fetcher {
             info!(
                 versions_fetched = versions_fetched,
                 fetch_millis = fetch_millis,
-                num_batches = num_batches,
+                num_batches = batches.len(),
                 "Finished fetching transaction batches"
             );
             self.send_transaction_batches(batches).await;
@@ -179,14 +177,14 @@ async fn fetch_raw_txns_with_retries(
     context: Arc<Context>,
     starting_version: u64,
     ledger_version: u64,
-    transaction_fetch_batch_size: u16,
+    num_transactions_to_fetch: u16,
     max_retries: u8,
 ) -> Vec<TransactionOnChainData> {
     let mut retries = 0;
     loop {
         match context.get_transactions(
             starting_version as u64,
-            transaction_fetch_batch_size,
+            num_transactions_to_fetch,
             ledger_version as u64,
         ) {
             Ok(raw_txns) => return raw_txns,
@@ -196,18 +194,18 @@ async fn fetch_raw_txns_with_retries(
                 if retries >= max_retries {
                     error!(
                         starting_version = starting_version,
-                        transaction_fetch_batch_size = transaction_fetch_batch_size,
+                        num_transactions = num_transactions_to_fetch,
                         error = format!("{:?}", err),
                         "Could not fetch transactions: retries exhausted",
                     );
                     panic!(
                         "Could not fetch {} transactions after {} retries, starting at {}: {:?}",
-                        transaction_fetch_batch_size, retries, starting_version, err
+                        num_transactions_to_fetch, retries, starting_version, err
                     );
                 } else {
                     error!(
                         starting_version = starting_version,
-                        transaction_fetch_batch_size = transaction_fetch_batch_size,
+                        num_transactions = num_transactions_to_fetch,
                         error = format!("{:?}", err),
                         "Could not fetch transactions: will retry",
                     );
@@ -222,7 +220,7 @@ async fn fetch_nexts(
     context: Arc<Context>,
     starting_version: u64,
     ledger_version: u64,
-    transaction_fetch_batch_size: u16,
+    num_transactions_to_fetch: u16,
 ) -> Vec<Transaction> {
     let start_millis = chrono::Utc::now().naive_utc();
 
@@ -230,7 +228,7 @@ async fn fetch_nexts(
         context.clone(),
         starting_version,
         ledger_version,
-        transaction_fetch_batch_size,
+        num_transactions_to_fetch,
         3,
     )
     .await;
@@ -296,13 +294,13 @@ async fn fetch_nexts(
             UNABLE_TO_FETCH_TRANSACTION.inc();
             error!(
                 starting_version = starting_version,
-                transaction_fetch_batch_size = transaction_fetch_batch_size,
+                num_transactions = num_transactions_to_fetch,
                 error = format!("{:?}", err),
                 "Could not convert from OnChainTransactions",
             );
             panic!(
                 "Could not convert {} txn from OnChainTransactions starting at {}: {:?}",
-                transaction_fetch_batch_size, starting_version, err
+                num_transactions_to_fetch, starting_version, err
             );
         }
     };
