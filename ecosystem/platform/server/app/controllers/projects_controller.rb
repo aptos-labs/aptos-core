@@ -33,7 +33,7 @@ class ProjectsController < ApplicationController
   def show
     @project = Project.find(params[:id])
 
-    if @project.user_id != current_user&.id
+    if @project.user_id != current_user&.id && !current_user&.is_root
       return head :not_found unless @project.verified
       return head :forbidden unless @project.public
     end
