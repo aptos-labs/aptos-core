@@ -5,7 +5,7 @@
 
 class NftOffersController < ApplicationController
   before_action :authenticate_user!, only: %i[update]
-  before_action :ensure_confirmed!, only: %i[update]
+  before_action :ensure_confirmed!, only: %i[update], if: -> { Flipper.enabled?(:require_email_verification_for_nft) }
 
   def short
     @nft_offer = NftOffer.find(params[:offer_id])
@@ -14,8 +14,9 @@ class NftOffersController < ApplicationController
 
   def show
     store_location_for(:user, request.path)
-
-    return redirect_to onboarding_email_path if user_signed_in? && !current_user.email_confirmed?
+    if Flipper.enabled?(:require_email_verification_for_nft) && user_signed_in? && !current_user.email_confirmed?
+      return redirect_to onboarding_email_path
+    end
 
     @image_dialog = DialogComponent.new(id: 'image_dialog', class: '!w-max max-h-max')
     @nft_offer = NftOffer.find_by(slug: params[:slug])
