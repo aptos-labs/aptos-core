@@ -34,12 +34,24 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
-    /// Offers the capability to sign on behalf of account to the account at address recipient_address.
+    /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
+    /// An account can delegate its signer capability to only one other address at one time.
+    /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+    /// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
+    /// `account_public_key_bytes` is the public key of the account owner
+    /// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
+    /// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
+    /// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+    /// to the account owner's signer capability)
     AccountOfferSignerCapability {
         signer_capability_sig_bytes: Vec<u8>,
         account_scheme: u8,
         account_public_key_bytes: Vec<u8>,
         recipient_address: AccountAddress,
+    },
+
+    AccountRevokeSignerCapability {
+        to_be_revoked_address: AccountAddress,
     },
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
@@ -285,6 +297,9 @@ impl EntryFunctionCall {
                 account_public_key_bytes,
                 recipient_address,
             ),
+            AccountRevokeSignerCapability {
+                to_be_revoked_address,
+            } => account_revoke_signer_capability(to_be_revoked_address),
             AccountRotateAuthenticationKey {
                 from_scheme,
                 from_public_key_bytes,
@@ -434,7 +449,15 @@ impl EntryFunctionCall {
     }
 }
 
-/// Offers the capability to sign on behalf of account to the account at address recipient_address.
+/// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
+/// An account can delegate its signer capability to only one other address at one time.
+/// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallenge` signed by the account owner's key
+/// `account_scheme` is the scheme of the account (ed25519 or multi_ed25519)
+/// `account_public_key_bytes` is the public key of the account owner
+/// `recipient_address` is the address of the recipient of the signer capability - note that if there's an existing
+/// `recipient_address` in the account owner's `SignerCapabilityOffer`, this will replace the
+/// previous `recipient_address` upon successful verification (the previous recipient will no longer have access
+/// to the account owner's signer capability)
 pub fn account_offer_signer_capability(
     signer_capability_sig_bytes: Vec<u8>,
     account_scheme: u8,
@@ -457,6 +480,23 @@ pub fn account_offer_signer_capability(
             bcs::to_bytes(&account_public_key_bytes).unwrap(),
             bcs::to_bytes(&recipient_address).unwrap(),
         ],
+    ))
+}
+
+pub fn account_revoke_signer_capability(
+    to_be_revoked_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("revoke_signer_capability").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&to_be_revoked_address).unwrap()],
     ))
 }
 
@@ -1148,6 +1188,18 @@ mod decoder {
         }
     }
 
+    pub fn account_revoke_signer_capability(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountRevokeSignerCapability {
+                to_be_revoked_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -1550,6 +1602,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_offer_signer_capability".to_string(),
             Box::new(decoder::account_offer_signer_capability),
+        );
+        map.insert(
+            "account_revoke_signer_capability".to_string(),
+            Box::new(decoder::account_revoke_signer_capability),
         );
         map.insert(
             "account_rotate_authentication_key".to_string(),

@@ -666,10 +666,16 @@ name = "aptos-indexer"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
  "aptos-logger",
+ "aptos-mempool",
  "aptos-metrics-core",
- "aptos-rest-client",
  "aptos-types",
+ "aptos-vm",
  "async-trait",
  "bigdecimal",
  "chrono",
@@ -678,15 +684,13 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
- "http",
- "hyper",
- "inspection-service",
  "once_cell",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
  "serde 1.0.144",
  "serde_json",
+ "storage-interface",
  "tokio",
  "url",
 ]
@@ -848,6 +852,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-fh-stream",
  "aptos-genesis",
+ "aptos-indexer",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
@@ -1859,9 +1864,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4f44a0e6200e9d11a1cdc989e4b358f6e3d354fbf48478f345a17f4e43f8635"
+checksum = "d9f0c0a60006f2a293d82d571f635042a72edf927539b7685bd62d361963839b"
 dependencies = [
  "async-trait",
  "bytes 1.2.1",
@@ -1869,6 +1874,8 @@ dependencies = [
  "http",
  "http-body",
  "mime",
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]

@@ -37,7 +37,7 @@ impl Default for MempoolConfig {
             max_broadcasts_per_peer: 1,
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,
-            capacity_bytes: 2_147_483_648,
+            capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
             default_failovers: 3,
             system_transaction_timeout_secs: 600,

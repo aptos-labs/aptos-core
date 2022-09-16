@@ -64,6 +64,7 @@ members = [
     "crates/channel",
     "crates/crash-handler",
     "crates/fallible",
+    "crates/indexer",
     "crates/inspection-service",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -71,7 +72,6 @@ members = [
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
-    "ecosystem/indexer",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "ecosystem/sf-indexer/aptos-sf-indexer",
@@ -150,7 +150,6 @@ default-members = [
     "aptos-move/framework",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
-    "ecosystem/indexer",
     "ecosystem/node-checker",
 ]
 

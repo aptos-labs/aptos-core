@@ -77,6 +77,7 @@ const sidebars = {
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
+        "guides/running-a-local-multi-node-network",
         {
           type: "category",
           label: "Move Guides",
@@ -167,13 +168,7 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: [
-        "sdks/aptos-sdk-overview",
-        "sdks/typescript-sdk",
-        "sdks/transactions-with-ts-sdk",
-        "sdks/python-sdk",
-        "sdks/rust-sdk",
-      ],
+      items: ["sdks/aptos-sdk-overview", "sdks/typescript-sdk", "sdks/python-sdk", "sdks/rust-sdk"],
     },
     {
       type: "category",

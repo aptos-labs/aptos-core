@@ -451,7 +451,16 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["chain"]["epoch_duration_secs"] = 30.into();
             })),
         "config" => config.with_network_tests(vec![&ReconfigurationTest]),
-        "network_partition" => config.with_network_tests(vec![&NetworkPartitionTest]),
+        "network_partition" => config
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_network_tests(vec![&NetworkPartitionTest])
+            .with_success_criteria(SuccessCriteria::new(
+                3000,
+                10000,
+                true,
+                Some(Duration::from_secs(240)),
+                None,
+            )),
         "network_latency" => config
             .with_network_tests(vec![&NetworkLatencyTest])
             .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),

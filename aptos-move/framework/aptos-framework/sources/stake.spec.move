@@ -92,8 +92,11 @@ spec aptos_framework::stake {
 
     spec find_validator {
         pragma opaque;
+        aborts_if false;
         ensures option::is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
         ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
+        // Additional postcondition to help the quantifier instantiation.
+        ensures option::is_some(result) ==> spec_contains(v, addr);
     }
 
     spec append {
@@ -116,6 +119,35 @@ spec aptos_framework::stake {
         requires spec_validator_indices_are_valid(active_validators);
     }
 
+    spec is_current_epoch_validator {
+        include ResourceRequirement;
+        aborts_if false;
+        ensures result == spec_is_current_epoch_validator(pool_address);
+    }
+
+    spec get_validator_state {
+        let validator_set = global<ValidatorSet>(@aptos_framework);
+        ensures result == VALIDATOR_STATUS_PENDING_ACTIVE ==> spec_contains(validator_set.pending_active, pool_address);
+        ensures result == VALIDATOR_STATUS_ACTIVE ==> spec_contains(validator_set.active_validators, pool_address);
+        ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==> spec_contains(validator_set.pending_inactive, pool_address);
+        ensures result == VALIDATOR_STATUS_INACTIVE ==> (
+            !spec_contains(validator_set.pending_active, pool_address)
+            && !spec_contains(validator_set.active_validators, pool_address)
+            && !spec_contains(validator_set.pending_inactive, pool_address)
+        );
+    }
+
+    spec add_stake_with_cap {
+        include ResourceRequirement;
+    }
+
+    spec add_stake {
+        include ResourceRequirement;
+    }
+
+    spec initialize_stake_owner {
+        include ResourceRequirement;
+    }
 
     // ---------------------------------
     // Spec helper functions and schemas
@@ -155,6 +187,17 @@ spec aptos_framework::stake {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ): u64;
+
+    spec fun spec_contains(validators: vector<ValidatorInfo>, addr: address): bool {
+        exists i in 0..len(validators): validators[i].addr == addr
+    }
+
+    spec fun spec_is_current_epoch_validator(pool_address: address): bool {
+        let validator_set = global<ValidatorSet>(@aptos_framework);
+        !spec_contains(validator_set.pending_active, pool_address)
+            && (spec_contains(validator_set.active_validators, pool_address)
+                || spec_contains(validator_set.pending_inactive, pool_address))
+    }
 
     // These resources are required to successfully execute `on_new_epoch`, which cannot
     // be discharged by the global invariants because `on_new_epoch` is called in genesis.
