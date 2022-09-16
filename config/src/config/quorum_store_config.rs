@@ -54,7 +54,7 @@ impl Default for QuorumStoreConfig {
             mempool_txn_pull_max_count: 200,
             mempool_txn_pull_max_bytes: 1000000,
             num_nodes_per_worker_handles: 10,
-            back_pressure_factor: 1, // back pressure limit for QS is back_pressure_factor * num_validator
+            back_pressure_factor: 5, // back pressure limit for QS is back_pressure_factor * num_validator
         }
     }
 }
