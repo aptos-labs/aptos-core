@@ -14,6 +14,7 @@ modules and transaction scripts, along with a framework for generation of
 documentation, ABIs, and error information from the Move source
 files. See the [Layout](#layout) section for a more detailed overview of the structure.
 
+
 ## Documentation
 
 Each of the main components of the Aptos Framework and contributing guidelines are documented separately. Particularly:
