@@ -41,13 +41,13 @@ pub struct BlockMetadataTransaction {
 
 impl BlockMetadataTransaction {
     pub fn from_transaction(txn: &APIBlockMetadataTransaction, block_height: i64) -> Self {
-        let txn_version = *txn.info.version.inner() as i64;
+        let txn_version = txn.info.version.0 as i64;
         Self {
             version: txn_version,
             block_height,
             id: txn.id.to_string(),
-            epoch: *txn.epoch.inner() as i64,
-            round: *txn.round.inner() as i64,
+            epoch: txn.epoch.0 as i64,
+            round: txn.round.0 as i64,
             proposer: txn.proposer.inner().to_hex_literal(),
             failed_proposer_indices: serde_json::to_value(&txn.failed_proposer_indices).unwrap(),
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)

@@ -58,13 +58,13 @@ impl Transaction {
         Self {
             type_,
             payload,
-            version: *info.version.inner() as i64,
+            version: info.version.0 as i64,
             block_height,
             hash: info.hash.to_string(),
             state_change_hash: info.state_change_hash.to_string(),
             event_root_hash: info.event_root_hash.to_string(),
             state_checkpoint_hash: info.state_checkpoint_hash.map(|h| h.to_string()),
-            gas_used: u64_to_bigdecimal(*info.gas_used.inner()),
+            gas_used: u64_to_bigdecimal(info.gas_used.0),
             success: info.success,
             vm_status: info.vm_status.clone(),
             accumulator_root_hash: info.accumulator_root_hash.to_string(),
@@ -83,19 +83,19 @@ impl Transaction {
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
-        let block_height = *transaction
+        let block_height = transaction
             .transaction_info()
             .unwrap()
             .block_height
             .unwrap()
-            .inner() as i64;
+            .0 as i64;
         match transaction {
             APITransaction::UserTransaction(user_txn) => {
                 let (user_txn_output, signatures) =
                     UserTransaction::from_transaction(user_txn, block_height);
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &user_txn.info.changes,
-                    *user_txn.info.version.inner() as i64,
+                    user_txn.info.version.0 as i64,
                     block_height,
                 );
                 (
@@ -112,7 +112,7 @@ impl Transaction {
                     Some(TransactionDetail::User(user_txn_output, signatures)),
                     EventModel::from_events(
                         &user_txn.events,
-                        *user_txn.info.version.inner() as i64,
+                        user_txn.info.version.0 as i64,
                         block_height,
                     ),
                     wsc,
@@ -122,7 +122,7 @@ impl Transaction {
             APITransaction::GenesisTransaction(genesis_txn) => {
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &genesis_txn.info.changes,
-                    *genesis_txn.info.version.inner() as i64,
+                    genesis_txn.info.version.0 as i64,
                     block_height,
                 );
                 (
@@ -139,7 +139,7 @@ impl Transaction {
                     None,
                     EventModel::from_events(
                         &genesis_txn.events,
-                        *genesis_txn.info.version.inner() as i64,
+                        genesis_txn.info.version.0 as i64,
                         block_height,
                     ),
                     wsc,
@@ -149,7 +149,7 @@ impl Transaction {
             APITransaction::BlockMetadataTransaction(block_metadata_txn) => {
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &block_metadata_txn.info.changes,
-                    *block_metadata_txn.info.version.inner() as i64,
+                    block_metadata_txn.info.version.0 as i64,
                     block_height,
                 );
                 (
@@ -168,7 +168,7 @@ impl Transaction {
                     )),
                     EventModel::from_events(
                         &block_metadata_txn.events,
-                        *block_metadata_txn.info.version.inner() as i64,
+                        block_metadata_txn.info.version.0 as i64,
                         block_height,
                     ),
                     wsc,

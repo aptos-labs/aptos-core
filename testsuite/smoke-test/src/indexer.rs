@@ -34,7 +34,7 @@ pub fn wipe_database(conn: &PgPoolConnection) {
         "__diesel_schema_migrations",
     ] {
         conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
-            .unwrap();
+            .unwrap_or_else(|_| panic!("Could not drop table '{}'", table));
     }
 }
 

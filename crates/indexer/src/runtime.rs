@@ -118,7 +118,6 @@ pub async fn run_forever(config: IndexerConfig, context: Arc<Context>) {
     let db_uri = &config.postgres_uri.unwrap();
     info!(
         processor_name = processor_name,
-        database = db_uri,
         "Creating connection pool..."
     );
     let conn_pool = new_db_pool(db_uri).expect("Failed to create connection pool");

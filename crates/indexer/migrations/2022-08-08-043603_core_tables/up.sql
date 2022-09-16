@@ -32,16 +32,16 @@
 CREATE TABLE transactions (
   version BIGINT UNIQUE PRIMARY KEY NOT NULL,
   block_height BIGINT NOT NULL,
-  hash VARCHAR(255) UNIQUE NOT NULL,
-  type VARCHAR(255) NOT NULL,
+  hash VARCHAR(66) UNIQUE NOT NULL,
+  type VARCHAR(50) NOT NULL,
   payload jsonb,
-  state_change_hash VARCHAR(255) NOT NULL,
-  event_root_hash VARCHAR(255) NOT NULL,
-  state_checkpoint_hash VARCHAR(255),
+  state_change_hash VARCHAR(66) NOT NULL,
+  event_root_hash VARCHAR(66) NOT NULL,
+  state_checkpoint_hash VARCHAR(66),
   gas_used NUMERIC NOT NULL,
   success BOOLEAN NOT NULL,
   vm_status TEXT NOT NULL,
-  accumulator_root_hash VARCHAR(255) NOT NULL,
+  accumulator_root_hash VARCHAR(66) NOT NULL,
   num_events BIGINT NOT NULL,
   num_write_set_changes BIGINT NOT NULL,
   -- Default time columns
@@ -85,11 +85,11 @@ CREATE INDEX txn_insat_index ON transactions (inserted_at);
 CREATE TABLE block_metadata_transactions (
   version BIGINT UNIQUE PRIMARY KEY NOT NULL,
   block_height BIGINT UNIQUE NOT NULL,
-  id VARCHAR(255) NOT NULL,
+  id VARCHAR(66) NOT NULL,
   round BIGINT NOT NULL,
   epoch BIGINT NOT NULL,
   previous_block_votes_bitvec jsonb NOT NULL,
-  proposer VARCHAR(255) NOT NULL,
+  proposer VARCHAR(66) NOT NULL,
   failed_proposer_indices jsonb NOT NULL,
   "timestamp" TIMESTAMP NOT NULL,
   -- Default time columns
@@ -154,8 +154,8 @@ CREATE INDEX bmt_insat_index ON block_metadata_transactions (inserted_at);
 CREATE TABLE user_transactions (
   version BIGINT UNIQUE PRIMARY KEY NOT NULL,
   block_height BIGINT NOT NULL,
-  parent_signature_type VARCHAR(255) NOT NULL,
-  sender VARCHAR(255) NOT NULL,
+  parent_signature_type VARCHAR(50) NOT NULL,
+  sender VARCHAR(66) NOT NULL,
   sequence_number BIGINT NOT NULL,
   max_gas_amount NUMERIC NOT NULL,
   expiration_timestamp_secs TIMESTAMP NOT NULL,
@@ -177,11 +177,11 @@ CREATE TABLE signatures (
   multi_agent_index BIGINT NOT NULL,
   multi_sig_index BIGINT NOT NULL,
   transaction_block_height BIGINT NOT NULL,
-  signer VARCHAR(255) NOT NULL,
+  signer VARCHAR(66) NOT NULL,
   is_sender_primary BOOLEAN NOT NULL,
   type VARCHAR(50) NOT NULL,
-  public_key VARCHAR(255) NOT NULL,
-  signature VARCHAR(255) NOT NULL,
+  public_key VARCHAR(66) NOT NULL,
+  signature VARCHAR(200) NOT NULL,
   threshold BIGINT NOT NULL,
   public_key_indices jsonb NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -225,10 +225,10 @@ CREATE INDEX ev_insat_index ON events (inserted_at);
 CREATE TABLE write_set_changes (
   transaction_version BIGINT NOT NULL,
   index BIGINT NOT NULL,
-  hash VARCHAR(255) NOT NULL,
+  hash VARCHAR(66) NOT NULL,
   transaction_block_height BIGINT NOT NULL,
   type TEXT NOT NULL,
-  address VARCHAR(255) NOT NULL,
+  address VARCHAR(66) NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, index),
@@ -241,8 +241,8 @@ CREATE TABLE move_modules (
   transaction_version BIGINT NOT NULL,
   write_set_change_index BIGINT NOT NULL,
   transaction_block_height BIGINT NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  address VARCHAR(255) NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  address VARCHAR(66) NOT NULL,
   bytecode bytea,
   friends jsonb,
   exposed_functions jsonb,
@@ -260,10 +260,10 @@ CREATE TABLE move_resources (
   transaction_version BIGINT NOT NULL,
   write_set_change_index BIGINT NOT NULL,
   transaction_block_height BIGINT NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  address VARCHAR(255) NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  address VARCHAR(66) NOT NULL,
   type TEXT NOT NULL,
-  module VARCHAR(255) NOT NULL,
+  module VARCHAR(50) NOT NULL,
   generic_type_params jsonb,
   data jsonb,
   is_deleted BOOLEAN NOT NULL,
@@ -293,7 +293,7 @@ CREATE INDEX ti_hand_ver_key_index ON table_items (table_handle, transaction_ver
 CREATE INDEX ti_insat_index ON table_items (inserted_at);
 -- table metadatas from table items
 CREATE TABLE table_metadatas (
-  handle VARCHAR(255) UNIQUE PRIMARY KEY NOT NULL,
+  handle VARCHAR(66) UNIQUE PRIMARY KEY NOT NULL,
   key_type text NOT NULL,
   value_type text NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -310,5 +310,6 @@ CREATE TABLE processor_statuses (
   PRIMARY KEY (name, version)
 );
 CREATE INDEX ps_succ_ver_index ON processor_statuses (success, version ASC);
+CREATE INDEX ps_ver_index ON processor_statuses (version ASC);
 CREATE INDEX ps_lastup_index ON processor_statuses (last_updated);
 CREATE TABLE ledger_infos (chain_id BIGINT UNIQUE PRIMARY KEY NOT NULL);

@@ -96,10 +96,7 @@ impl MoveModule {
     ) -> Option<MoveModuleByteCodeParsed> {
         mmb.clone().try_parse_abi().map_or_else(
             |e| {
-                aptos_logger::warn!(
-                    "[fh-stream] Could not decode MoveModuleBytecode ABI. Error: {:?}",
-                    e
-                );
+                aptos_logger::warn!("Could not decode MoveModuleBytecode ABI. Error: {:?}", e);
                 None
             },
             |mmb| {

@@ -101,7 +101,7 @@ impl Token {
             let mut token_datas = vec![];
             let mut collection_datas = vec![];
 
-            let txn_version = *user_txn.info.version.inner() as i64;
+            let txn_version = user_txn.info.version.0 as i64;
             let mut table_handle_to_owner: TableHandleToOwner = HashMap::new();
             for wsc in &user_txn.info.changes {
                 if let APIWriteSetChange::WriteResource(write_resource) = wsc {

@@ -26,13 +26,13 @@ pub fn ensure_not_negative(val: bigdecimal::BigDecimal) -> bigdecimal::BigDecima
 }
 
 pub fn parse_timestamp(ts: U64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt((*ts.inner() / 1000000) as i64, 0)
+    chrono::NaiveDateTime::from_timestamp_opt((ts.0 / 1000000) as i64, 0)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn parse_timestamp_secs(ts: U64, version: i64) -> chrono::NaiveDateTime {
     chrono::NaiveDateTime::from_timestamp_opt(
-        std::cmp::min(*ts.inner(), chrono::NaiveDateTime::MAX.timestamp() as u64) as i64,
+        std::cmp::min(ts.0 as i64, chrono::NaiveDateTime::MAX.timestamp()),
         0,
     )
     .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))

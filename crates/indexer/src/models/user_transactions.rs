@@ -44,7 +44,7 @@ pub struct UserTransaction {
 
 impl UserTransaction {
     pub fn from_transaction(txn: &APIUserTransaction, block_height: i64) -> (Self, Vec<Signature>) {
-        let version = *txn.info.version.inner() as i64;
+        let version = txn.info.version.0 as i64;
         (
             Self {
                 version,
@@ -56,8 +56,8 @@ impl UserTransaction {
                     .map(Signature::get_signature_type)
                     .unwrap_or_default(),
                 sender: txn.request.sender.inner().to_hex_literal(),
-                sequence_number: *txn.request.sequence_number.inner() as i64,
-                max_gas_amount: u64_to_bigdecimal(*txn.request.max_gas_amount.inner()),
+                sequence_number: txn.request.sequence_number.0 as i64,
+                max_gas_amount: u64_to_bigdecimal(txn.request.max_gas_amount.0),
                 expiration_timestamp_secs: parse_timestamp_secs(
                     txn.request.expiration_timestamp_secs,
                     version,
@@ -84,7 +84,7 @@ impl UserTransaction {
                     )
                     .unwrap()
                 })
-                .unwrap_or_default(),
+                .unwrap_or_default(), // empty vec if signature is None
         )
     }
 }
