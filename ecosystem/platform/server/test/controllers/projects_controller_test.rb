@@ -103,7 +103,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     end
 
     project = Project.last
-    assert_redirected_to project_path(project)
+    assert_redirected_to projects_path
     assert_equal @user, project.user
   end
 
