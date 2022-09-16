@@ -2,38 +2,45 @@
 // SPDX-License-Identifier: Apache-2.0
 
 table! {
-    block_metadata_transactions (hash) {
-        hash -> Varchar,
+    block_metadata_transactions (version) {
+        version -> Int8,
+        block_height -> Int8,
         id -> Varchar,
-        round -> Numeric,
-        previous_block_votes -> Jsonb,
+        round -> Int8,
+        epoch -> Int8,
+        previous_block_votes_bitvec -> Jsonb,
         proposer -> Varchar,
+        failed_proposer_indices -> Jsonb,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
-        epoch -> Numeric,
-        previous_block_votes_bitvec -> Jsonb,
-        failed_proposer_indices -> Jsonb,
     }
 }
 
 table! {
-    collections (collection_id) {
-        collection_id -> Varchar,
-        creator -> Varchar,
-        name -> Varchar,
-        description -> Varchar,
-        max_amount -> Numeric,
-        uri -> Varchar,
-        created_at -> Timestamp,
+    collection_datas (creator_address, collection_name_hash, transaction_version) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        collection_name -> Text,
+        description -> Text,
+        transaction_version -> Int8,
+        metadata_uri -> Text,
+        supply -> Numeric,
+        maximum -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
         inserted_at -> Timestamp,
     }
 }
 
 table! {
     events (key, sequence_number) {
-        transaction_hash -> Varchar,
         key -> Varchar,
-        sequence_number -> Numeric,
+        sequence_number -> Int8,
+        creation_number -> Int8,
+        account_address -> Varchar,
+        transaction_version -> Int8,
+        transaction_block_height -> Int8,
         #[sql_name = "type"]
         type_ -> Text,
         data -> Jsonb,
@@ -48,29 +55,34 @@ table! {
 }
 
 table! {
-    metadatas (token_id) {
-        token_id -> Varchar,
-        name -> Nullable<Varchar>,
-        symbol -> Nullable<Varchar>,
-        seller_fee_basis_points -> Numeric,
-        description -> Nullable<Varchar>,
-        image -> Varchar,
-        external_url -> Nullable<Varchar>,
-        animation_url -> Nullable<Varchar>,
-        attributes -> Nullable<Jsonb>,
-        properties -> Nullable<Jsonb>,
-        last_updated_at -> Timestamp,
+    move_modules (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        transaction_block_height -> Int8,
+        name -> Varchar,
+        address -> Varchar,
+        bytecode -> Nullable<Bytea>,
+        friends -> Nullable<Jsonb>,
+        exposed_functions -> Nullable<Jsonb>,
+        structs -> Nullable<Jsonb>,
+        is_deleted -> Bool,
         inserted_at -> Timestamp,
     }
 }
 
 table! {
-    ownerships (ownership_id) {
-        ownership_id -> Varchar,
-        token_id -> Nullable<Varchar>,
-        owner -> Nullable<Varchar>,
-        amount -> Numeric,
-        updated_at -> Timestamp,
+    move_resources (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        transaction_block_height -> Int8,
+        name -> Varchar,
+        address -> Varchar,
+        #[sql_name = "type"]
+        type_ -> Text,
+        module -> Varchar,
+        generic_type_params -> Nullable<Jsonb>,
+        data -> Nullable<Jsonb>,
+        is_deleted -> Bool,
         inserted_at -> Timestamp,
     }
 }
@@ -78,7 +90,7 @@ table! {
 table! {
     processor_statuses (name, version) {
         name -> Varchar,
-        version -> Numeric,
+        version -> Int8,
         success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
@@ -86,110 +98,166 @@ table! {
 }
 
 table! {
-    token_activities (event_key, sequence_number) {
-        event_key -> Varchar,
-        sequence_number -> Numeric,
-        account -> Varchar,
-        token_id -> Nullable<Varchar>,
-        event_type -> Nullable<Varchar>,
-        amount -> Nullable<Numeric>,
-        created_at -> Timestamp,
-        inserted_at -> Timestamp,
-        transaction_hash -> Varchar,
-    }
-}
-
-table! {
-    token_datas (token_data_id) {
-        token_data_id -> Varchar,
-        creator -> Varchar,
-        collection -> Varchar,
-        name -> Varchar,
-        description -> Varchar,
-        max_amount -> Numeric,
-        supply -> Numeric,
-        uri -> Varchar,
-        royalty_payee_address -> Varchar,
-        royalty_points_denominator -> Numeric,
-        royalty_points_numerator -> Numeric,
-        mutability_config -> Varchar,
-        property_keys -> Varchar,
-        property_values -> Varchar,
-        property_types -> Varchar,
-        minted_at -> Timestamp,
-        last_minted_at -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-table! {
-    token_propertys (token_id) {
-        token_id -> Varchar,
-        previous_token_id -> Varchar,
-        property_keys -> Varchar,
-        property_values -> Varchar,
-        property_types -> Varchar,
-        updated_at -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-table! {
-    transactions (hash) {
+    signatures (transaction_version, multi_agent_index, multi_sig_index, is_sender_primary) {
+        transaction_version -> Int8,
+        multi_agent_index -> Int8,
+        multi_sig_index -> Int8,
+        transaction_block_height -> Int8,
+        signer -> Varchar,
+        is_sender_primary -> Bool,
         #[sql_name = "type"]
         type_ -> Varchar,
-        payload -> Jsonb,
-        version -> Numeric,
+        public_key -> Varchar,
+        signature -> Varchar,
+        threshold -> Int8,
+        public_key_indices -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    table_items (transaction_version, write_set_change_index) {
+        key -> Text,
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        transaction_block_height -> Int8,
+        table_handle -> Varchar,
+        decoded_key -> Jsonb,
+        decoded_value -> Nullable<Jsonb>,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    table_metadatas (handle) {
+        handle -> Varchar,
+        key_type -> Text,
+        value_type -> Text,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    token_datas (creator_address, collection_name_hash, name_hash, transaction_version) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        transaction_version -> Int8,
+        maximum -> Numeric,
+        supply -> Numeric,
+        largest_property_version -> Numeric,
+        metadata_uri -> Text,
+        payee_address -> Varchar,
+        royalty_points_numerator -> Numeric,
+        royalty_points_denominator -> Numeric,
+        maximum_mutable -> Bool,
+        uri_mutable -> Bool,
+        description_mutable -> Bool,
+        properties_mutable -> Bool,
+        royalty_mutable -> Bool,
+        default_properties -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    token_ownerships (creator_address, collection_name_hash, name_hash, property_version, transaction_version, table_handle) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        property_version -> Numeric,
+        transaction_version -> Int8,
+        owner_address -> Nullable<Varchar>,
+        amount -> Numeric,
+        table_handle -> Varchar,
+        table_type -> Nullable<Text>,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    tokens (creator_address, collection_name_hash, name_hash, property_version, transaction_version) {
+        creator_address -> Varchar,
+        collection_name_hash -> Varchar,
+        name_hash -> Varchar,
+        collection_name -> Text,
+        name -> Text,
+        property_version -> Numeric,
+        transaction_version -> Int8,
+        token_properties -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    transactions (version) {
+        version -> Int8,
+        block_height -> Int8,
         hash -> Varchar,
-        state_root_hash -> Varchar,
+        #[sql_name = "type"]
+        type_ -> Varchar,
+        payload -> Nullable<Jsonb>,
+        state_change_hash -> Varchar,
         event_root_hash -> Varchar,
+        state_checkpoint_hash -> Nullable<Varchar>,
         gas_used -> Numeric,
         success -> Bool,
         vm_status -> Text,
         accumulator_root_hash -> Varchar,
+        num_events -> Int8,
+        num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
     }
 }
 
 table! {
-    user_transactions (hash) {
-        hash -> Varchar,
-        signature -> Jsonb,
+    user_transactions (version) {
+        version -> Int8,
+        block_height -> Int8,
+        parent_signature_type -> Varchar,
         sender -> Varchar,
-        sequence_number -> Numeric,
+        sequence_number -> Int8,
         max_gas_amount -> Numeric,
         expiration_timestamp_secs -> Timestamp,
         gas_unit_price -> Numeric,
         timestamp -> Timestamp,
+        entry_function_id_str -> Text,
         inserted_at -> Timestamp,
     }
 }
 
 table! {
-    write_set_changes (transaction_hash, hash) {
-        transaction_hash -> Varchar,
+    write_set_changes (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
         hash -> Varchar,
+        transaction_block_height -> Int8,
         #[sql_name = "type"]
         type_ -> Text,
         address -> Varchar,
-        module -> Jsonb,
-        resource -> Jsonb,
-        data -> Jsonb,
         inserted_at -> Timestamp,
     }
 }
 
 allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
-    collections,
+    collection_datas,
     events,
     ledger_infos,
-    metadatas,
-    ownerships,
+    move_modules,
+    move_resources,
     processor_statuses,
-    token_activities,
+    signatures,
+    table_items,
+    table_metadatas,
     token_datas,
-    token_propertys,
+    token_ownerships,
+    tokens,
     transactions,
     user_transactions,
     write_set_changes,

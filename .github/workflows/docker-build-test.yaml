@@ -107,6 +107,16 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
 
+  rust-images-indexer:
+    needs: [permission-check, determine-docker-build-metadata]
+    uses: ./.github/workflows/docker-rust-build.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      PROFILE: release
+      FEATURES: indexer
+
   rust-images-testing:
     needs: [permission-check, determine-docker-build-metadata]
     uses: ./.github/workflows/docker-rust-build.yaml

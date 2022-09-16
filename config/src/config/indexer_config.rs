@@ -39,10 +39,6 @@ pub struct IndexerConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skip_migrations: Option<bool>,
 
-    /// turn on the token URI fetcher
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub index_token_uri_data: Option<bool>,
-
     /// If set, will make sure that we're still indexing the right chain every 100K transactions
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_chain_id: Option<bool>,
@@ -66,12 +62,6 @@ pub struct IndexerConfig {
     pub emit_every: Option<u64>,
 }
 
-pub fn default_starting_version() -> Option<u64> {
-    std::env::var("STARTING_VERSION")
-        .ok()
-        .and_then(|s| s.parse().ok())
-}
-
 pub fn env_or_default<T: std::str::FromStr>(
     env_var: &'static str,
     default: Option<T>,
@@ -79,7 +69,13 @@ pub fn env_or_default<T: std::str::FromStr>(
 ) -> Option<T> {
     let partial = std::env::var(env_var).ok().map(|s| s.parse().ok());
     match default {
-        None => partial.unwrap_or_else(|| panic!("{}", expected_message.unwrap())),
+        None => partial.unwrap_or_else(|| {
+            panic!(
+                "{}",
+                expected_message
+                    .unwrap_or_else(|| { format!("Expected env var {} to be set", env_var) })
+            )
+        }),
         Some(default_value) => partial.unwrap_or(Some(default_value)),
     }
 }
