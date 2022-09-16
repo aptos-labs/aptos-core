@@ -631,7 +631,7 @@ impl TransactionStore {
                 } else {
                     "ready"
                 };
-                let timestamp = self.get_insertion_time(account, *seq_num).map(|v| *v);
+                let timestamp = self.get_insertion_time(account, *seq_num).copied();
                 txns_log.add_full_metadata(*account, *seq_num, status, timestamp);
             }
         }
