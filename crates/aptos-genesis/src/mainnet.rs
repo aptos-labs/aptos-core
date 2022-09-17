@@ -1,50 +1,31 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
-pub mod builder;
-pub mod config;
-pub mod keys;
-pub mod mainnet;
-
-#[cfg(any(test, feature = "testing"))]
-pub mod test_utils;
-
 use crate::{builder::GenesisConfiguration, config::ValidatorConfiguration};
 use aptos_config::config::{
     RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     TARGET_SNAPSHOT_SIZE,
 };
-use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use framework::ReleaseBundle;
-use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
-use vm_genesis::Validator;
+use vm_genesis::{AccountMap, EmployeeAccountMap, ValidatorWithCommissionRate};
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
-pub struct GenesisInfo {
+pub struct MainnetGenesisInfo {
     /// ChainId for identifying the network
     chain_id: ChainId,
-    /// Key used for minting tokens
-    root_key: Ed25519PublicKey,
-    /// Set of configurations for validators on the network
-    validators: Vec<Validator>,
     /// Released framework packages
     framework: ReleaseBundle,
     /// The genesis transaction, once it's been generated
     genesis: Option<Transaction>,
 
-    /// Whether to allow new validators to join the set after genesis
-    pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
-    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
     /// Minimum number of votes to consider a proposal valid.
@@ -61,31 +42,36 @@ pub struct GenesisInfo {
     pub voting_duration_secs: u64,
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
+
+    // MAINNET SPECIFIC FIELDS.
+    /// Initial accounts and balances.
+    accounts: Vec<AccountMap>,
+    /// Employee vesting configurations.
+    employee_vesting_accounts: Vec<EmployeeAccountMap>,
+    /// Set of configurations for validators who will be joining the genesis validator set.
+    validators: Vec<ValidatorWithCommissionRate>,
 }
 
-impl GenesisInfo {
+impl MainnetGenesisInfo {
     pub fn new(
         chain_id: ChainId,
-        root_key: Ed25519PublicKey,
-        configs: Vec<ValidatorConfiguration>,
+        accounts: Vec<AccountMap>,
+        employee_vesting_accounts: Vec<EmployeeAccountMap>,
+        validators: Vec<ValidatorConfiguration>,
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
-    ) -> anyhow::Result<GenesisInfo> {
-        let mut validators = Vec::new();
-
-        for config in configs {
-            validators.push(config.try_into()?)
-        }
-
-        Ok(GenesisInfo {
+    ) -> anyhow::Result<MainnetGenesisInfo> {
+        Ok(MainnetGenesisInfo {
             chain_id,
-            root_key,
-            validators,
+            accounts,
+            employee_vesting_accounts,
+            validators: validators
+                .into_iter()
+                .map(|v| ValidatorWithCommissionRate::try_from(v).unwrap())
+                .collect(),
             framework,
             genesis: None,
-            allow_new_validators: genesis_config.allow_new_validators,
             epoch_duration_secs: genesis_config.epoch_duration_secs,
-            is_test: genesis_config.is_test,
             min_stake: genesis_config.min_stake,
             min_voting_threshold: genesis_config.min_voting_threshold,
             max_stake: genesis_config.max_stake,
@@ -107,15 +93,16 @@ impl GenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
-        vm_genesis::encode_genesis_transaction(
-            self.root_key.clone(),
+        vm_genesis::encode_aptos_mainnet_genesis_transaction(
+            &self.accounts,
+            &self.employee_vesting_accounts,
             &self.validators,
             &self.framework,
             self.chain_id,
-            vm_genesis::GenesisConfiguration {
-                allow_new_validators: self.allow_new_validators,
+            &vm_genesis::GenesisConfiguration {
+                allow_new_validators: true,
+                is_test: false,
                 epoch_duration_secs: self.epoch_duration_secs,
-                is_test: true,
                 min_stake: self.min_stake,
                 min_voting_threshold: self.min_voting_threshold,
                 max_stake: self.max_stake,

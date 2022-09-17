@@ -788,8 +788,8 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountMap {
-    account_address: AccountAddress,
-    balance: u64,
+    pub account_address: AccountAddress,
+    pub balance: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -803,8 +803,8 @@ pub struct EmployeeAccountMap {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidatorWithCommissionRate {
-    validator: Validator,
-    validator_commission_percentage: u64,
+    pub validator: Validator,
+    pub validator_commission_percentage: u64,
 }
 
 #[test]
