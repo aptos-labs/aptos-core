@@ -23,6 +23,9 @@ pub const LAYOUT_FILE: &str = "layout.yaml";
 pub const OPERATOR_FILE: &str = "operator.yaml";
 pub const OWNER_FILE: &str = "owner.yaml";
 pub const FRAMEWORK_NAME: &str = "framework.mrb";
+pub const ACCOUNT_FILE: &str = "accounts.yaml";
+pub const EMPLOYEE_VESTING_ACCOUNTS_FILE: &str = "employee_vesting_accounts.yaml";
+
 
 /// Setup a shared Git repository for Genesis
 ///

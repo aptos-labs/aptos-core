@@ -18,7 +18,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use vm_genesis::Validator;
+use vm_genesis::{Validator, ValidatorWithCommissionRate};
 
 /// Template for setting up Github for Genesis
 ///
@@ -119,18 +119,38 @@ pub struct ValidatorConfiguration {
     pub full_node_host: Option<HostAndPort>,
     /// Stake amount for consensus
     pub stake_amount: u64,
+    /// Commission percentage for validator
+    pub commission_percentage: u64,
 }
 
 impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = anyhow::Error;
 
     fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
-        let validator_addresses = vec![config
+        config.to_validator()
+    }
+}
+
+impl TryFrom<ValidatorConfiguration> for ValidatorWithCommissionRate {
+    type Error = anyhow::Error;
+
+    fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
+        let validator_commission_percentage = config.commission_percentage;
+        ValidatorWithCommissionRate {
+            validator: config.to_validator(),
+            validator_commission_percentage,
+        }
+    }
+}
+
+impl ValidatorConfiguration {
+    pub fn to_validator(self: ValidatorConfiguration) -> Result<Validator, Self::Error>  {
+        let validator_addresses = vec![self
             .validator_host
-            .as_network_address(config.validator_network_public_key)
+            .as_network_address(self.validator_network_public_key)
             .unwrap()];
-        let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
-            if let Some(full_node_network_key) = config.full_node_network_public_key {
+        let full_node_addresses = if let Some(full_node_host) = self.full_node_host {
+            if let Some(full_node_network_key) = self.full_node_network_public_key {
                 vec![full_node_host
                     .as_network_address(full_node_network_key)
                     .unwrap()]
@@ -143,7 +163,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             vec![]
         };
 
-        let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
+        let auth_key = AuthenticationKey::ed25519(&self.owner_account_public_key);
         let derived_address = auth_key.derived_address();
         if config.owner_account_address != derived_address {
             return Err(anyhow::Error::msg(format!(
@@ -152,33 +172,33 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
 
-        let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
+        let auth_key = AuthenticationKey::ed25519(&self.operator_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.operator_account_address != derived_address {
+        if self.operator_account_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "operator_account_address {} does not match account key derived one {}",
-                config.operator_account_address, derived_address
+                self.operator_account_address, derived_address
             )));
         }
 
-        let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
+        let auth_key = AuthenticationKey::ed25519(&self.voter_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.voter_account_address != derived_address {
+        if self.voter_account_address != derived_address {
             return Err(anyhow::Error::msg(format!(
                 "voter_account_address {} does not match account key derived one {}",
-                config.voter_account_address, derived_address
+                self.voter_account_address, derived_address
             )));
         }
 
         Ok(Validator {
-            owner_address: config.owner_account_address,
-            operator_address: config.operator_account_address,
-            voter_address: config.voter_account_address,
-            consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
-            proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
+            owner_address: self.owner_account_address,
+            operator_address: self.operator_account_address,
+            voter_address: self.voter_account_address,
+            consensus_pubkey: self.consensus_public_key.to_bytes().to_vec(),
+            proof_of_possession: self.proof_of_possession.to_bytes().to_vec(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
-            stake_amount: config.stake_amount,
+            stake_amount: self.stake_amount,
         })
     }
 }
@@ -259,6 +279,7 @@ pub struct OwnerConfiguration {
     pub operator_account_address: AccountAddress,
     pub operator_account_public_key: Ed25519PublicKey,
     pub stake_amount: u64,
+    pub commission_percentage: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -282,6 +303,7 @@ pub struct StringOwnerConfiguration {
     pub operator_account_address: Option<String>,
     pub operator_account_public_key: Option<String>,
     pub stake_amount: Option<String>,
+    pub commission_percentage: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -53,6 +53,7 @@ pub struct ValidatorNodeConfig {
     pub dir: PathBuf,
     pub account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     pub genesis_stake_amount: u64,
+    pub commission_percentage: u64,
 }
 
 impl ValidatorNodeConfig {
@@ -63,6 +64,7 @@ impl ValidatorNodeConfig {
         base_dir: &Path,
         mut config: NodeConfig,
         genesis_stake_amount: u64,
+        commission_percentage: u64,
     ) -> anyhow::Result<ValidatorNodeConfig> {
         // Create the data dir and set it appropriately
         let dir = base_dir.join(&name);
@@ -76,6 +78,7 @@ impl ValidatorNodeConfig {
             dir,
             account_private_key: None,
             genesis_stake_amount,
+            commission_percentage,
         })
     }
 
@@ -205,6 +208,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             ),
             full_node_host,
             stake_amount: config.genesis_stake_amount,
+            commission_percentage: config.commission_percentage,
         })
     }
 }
@@ -512,6 +516,8 @@ impl Builder {
             self.config_dir.as_path(),
             config,
             genesis_stake_amount,
+            // Default to 0% commission for local node building.
+            0,
         )?;
 
         validator.init_keys(Some(rng.gen()))?;

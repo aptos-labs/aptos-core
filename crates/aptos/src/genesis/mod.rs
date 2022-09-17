@@ -13,7 +13,7 @@ use crate::{
         types::{CliError, CliTypedResult, PromptOptions},
         utils::{check_if_file_exists, write_to_file},
     },
-    genesis::git::{Client, GitOptions, LAYOUT_FILE},
+    genesis::git::{Client, GitOptions, ACCOUNT_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE, LAYOUT_FILE},
     CliCommand, CliResult,
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
@@ -22,12 +22,14 @@ use aptos_genesis::config::{StringOperatorConfiguration, StringOwnerConfiguratio
 use aptos_genesis::{
     config::{Layout, ValidatorConfiguration},
     GenesisInfo,
+    MainnetGenesisInfo,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
+use vm_genesis::{AccountMap, EmployeeAccountMap};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
@@ -103,12 +105,42 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
     }
 }
 
+/// Retrieves all information for mainnet genesis from the Git repository
+pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo> {
+    let client = git_options.get_client()?;
+    let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
+
+    let accounts: Vec<AccountMap> = client.get(Path::new(ACCOUNT_FILE))?;
+    let employee_vesting_accounts: Vec<EmployeeAccountMap> = client.get(Path::new(EMPLOYEE_VESTING_ACCOUNTS_FILE))?;
+    let validators = get_validator_configs(&layout).or_else(parse_error)?;
+    let framework = client.get_framework()?;
+    Ok(MainnetGenesisInfo::new(
+        layout.chain_id,
+        accounts,
+        employee_vesting_accounts,
+        validators,
+        framework,
+        &GenesisConfiguration {
+            allow_new_validators: true,
+            epoch_duration_secs: layout.epoch_duration_secs,
+            is_test: false,
+            min_stake: layout.min_stake,
+            min_voting_threshold: layout.min_voting_threshold,
+            max_stake: layout.max_stake,
+            recurring_lockup_duration_secs: layout.recurring_lockup_duration_secs,
+            required_proposer_stake: layout.required_proposer_stake,
+            rewards_apy_percentage: layout.rewards_apy_percentage,
+            voting_duration_secs: layout.voting_duration_secs,
+            voting_power_increase_limit: layout.voting_power_increase_limit,
+        },
+    )?)
+}
+
 /// Retrieves all information for genesis from the Git repository
 pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo> {
     let client = git_options.get_client()?;
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
-    // TODO: Remove this requirement when root key isn't needed
     if layout.root_key.is_none() {
         return Err(CliError::UnexpectedError(
             "Layout field root_key was not set.  Please provide a hex encoded Ed25519PublicKey."
@@ -116,36 +148,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
-    let mut validators = Vec::new();
-    let mut errors = Vec::new();
-    for user in &layout.users {
-        match get_config(&client, user) {
-            Ok(validator) => {
-                validators.push(validator);
-            }
-            Err(failure) => {
-                if let CliError::UnexpectedError(failure) = failure {
-                    errors.push(format!("{}: {}", user, failure));
-                } else {
-                    errors.push(format!("{}: {:?}", user, failure));
-                }
-            }
-        }
-    }
-
-    // Collect errors, and print out failed inputs
-    if !errors.is_empty() {
-        eprintln!(
-            "Failed to parse genesis inputs:\n{}",
-            serde_yaml::to_string(&errors).unwrap()
-        );
-        return Err(CliError::UnexpectedError(
-            "Failed to parse genesis inputs".to_string(),
-        ));
-    }
-
+    let validators = get_validator_configs(&layout).or_else(parse_error)?;
     let framework = client.get_framework()?;
-
     Ok(GenesisInfo::new(
         layout.chain_id,
         layout.root_key.unwrap(),
@@ -165,6 +169,37 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             voting_power_increase_limit: layout.voting_power_increase_limit,
         },
     )?)
+}
+
+fn parse_error(errors: Vec<String>) -> CliTypedResult<String> {
+    eprintln!(
+        "Failed to parse genesis inputs:\n{}",
+        serde_yaml::to_string(&errors).unwrap()
+    );
+    Err(CliError::UnexpectedError(
+        "Failed to parse genesis inputs".to_string(),
+    ))
+}
+
+fn get_validator_configs(layout: &Layout) -> Result<Vec<ValidatorConfiguration>, Vec<String>> {
+    let mut validators = Vec::new();
+    let mut errors = Vec::new();
+    for user in &layout.users {
+        match get_config(&client, user) {
+            Ok(validator) => {
+                validators.push(validator);
+            }
+            Err(failure) => {
+                if let CliError::UnexpectedError(failure) = failure {
+                    errors.push(format!("{}: {}", user, failure));
+                } else {
+                    errors.push(format!("{}: {:?}", user, failure));
+                }
+            }
+        }
+    }
+
+    if errors.is_empty() { Ok(validators) } else { Err(errors) }
 }
 
 /// Do proper parsing so more information is known about failures
@@ -225,6 +260,14 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
         "stake_amount",
         u64::from_str,
     )?;
+
+    // Default to 0 for commission percentage if missing.
+    let commission_percentage = parse_optional_option(
+        &owner_config.commission_percentage,
+        owner_file,
+        "commission_percentage",
+        u64::from_str,
+    )?.unwrap_or_else(0);
 
     // Check and convert fields in operator file
     let operator_account_address_from_file = parse_required_option(
@@ -301,6 +344,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
         full_node_network_public_key,
         full_node_host: operator_config.full_node_host,
         stake_amount,
+        commission_percentage,
     })
 }
 
