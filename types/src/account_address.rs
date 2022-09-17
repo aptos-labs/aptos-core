@@ -9,6 +9,8 @@ use aptos_crypto::{
 
 pub use move_deps::move_core_types::account_address::AccountAddress;
 
+const SALT: &[u8] = b"aptos_framework::staking_contract";
+
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     AuthenticationKey::ed25519(public_key).derived_address()
 }
@@ -24,6 +26,37 @@ pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> Accou
     // keep only the last 16 bytes
     array.copy_from_slice(&pubkey_slice[x25519::PUBLIC_KEY_SIZE - AccountAddress::LENGTH..]);
     AccountAddress::new(array)
+}
+
+pub fn default_owner_stake_pool_address(owner: AccountAddress) -> AccountAddress {
+    default_stake_pool_address(owner, owner)
+}
+
+pub fn default_stake_pool_address(
+    owner: AccountAddress,
+    operator: AccountAddress,
+) -> AccountAddress {
+    create_stake_pool_address(owner, operator, &vec![])
+}
+
+pub fn create_stake_pool_address(
+    owner: AccountAddress,
+    operator: AccountAddress,
+    seed: &[u8],
+) -> AccountAddress {
+    let mut full_seed = vec![];
+    full_seed.extend(bcs::to_bytes(&owner).unwrap());
+    full_seed.extend(bcs::to_bytes(&operator).unwrap());
+    full_seed.extend(SALT.clone());
+    full_seed.extend(seed.clone());
+    create_resource_address(owner, &full_seed)
+}
+
+pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountAddress {
+    let mut input = bcs::to_bytes(&address).unwrap();
+    input.extend(seed);
+    let hash = HashValue::sha3_256_of(&input);
+    AccountAddress::from_bytes(&hash.as_ref()).unwrap()
 }
 
 // Define the Hasher used for hashing AccountAddress types. In order to properly use the
