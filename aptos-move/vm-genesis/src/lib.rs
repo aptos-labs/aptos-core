@@ -832,7 +832,7 @@ pub fn test_genesis_module_publishing() {
 pub fn test_mainnet_end_to_end() {
     let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
     let test_validators = TestValidator::new_test_set(Some(3), Some(balance * 9 / 10));
-    let employee_validator = test_validators[0].data.clone();
+    let mut employee_validator = test_validators[0].data.clone();
     let mut direct_validator = test_validators[1].data.clone();
     let commissioned_validator = test_validators[2].data.clone();
 
@@ -841,6 +841,7 @@ pub fn test_mainnet_end_to_end() {
     let account46 = AccountAddress::from_hex_literal("0x46").unwrap();
     let account47 = AccountAddress::from_hex_literal("0x47").unwrap();
     let account48 = AccountAddress::from_hex_literal("0x48").unwrap();
+    let account49 = AccountAddress::from_hex_literal("0x49").unwrap();
 
     let accounts = vec![
         AccountMap {
@@ -859,8 +860,13 @@ pub fn test_mainnet_end_to_end() {
             account_address: account48,
             balance,
         },
+        AccountMap {
+            account_address: account49,
+            balance,
+        },
     ];
 
+    employee_validator.owner_address = account49;
     let employees = vec![EmployeeAccountMap {
         accounts: vec![account46, account47],
         validator: ValidatorWithCommissionRate {
