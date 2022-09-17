@@ -3,7 +3,7 @@
 /// {8, 16, 32, 64}.
 module aptos_std::bulletproofs {
     use aptos_std::pedersen;
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, point_to_bytes, point_equals, scalar_to_bytes};
+    use aptos_std::ristretto255::{point_to_bytes, RistrettoPoint};
 
     //
     // Constants
@@ -119,6 +119,8 @@ module aptos_std::bulletproofs {
     // Testing
     //
 
+    #[test_only]
+    use aptos_std::ristretto255::{Self, Scalar, scalar_to_bytes, point_equals};
     #[test_only]
     use aptos_std::pedersen::new_commitment_from_point;
 

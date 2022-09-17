@@ -53,7 +53,6 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
-use std::ops::Deref;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -302,11 +301,6 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
         }
     }
 });
-
-// #[test]
-// fn test_bla() {
-//     PRECOMPILED_APTOS_FRAMEWORK.deref();
-// }
 
 /**
  * Test Adapter Implementation
