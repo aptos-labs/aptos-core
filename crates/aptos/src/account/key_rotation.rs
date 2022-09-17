@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::prompt_yes;
 use crate::common::{
     types::{
         CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
@@ -44,6 +45,10 @@ pub struct RotateKey {
     /// Name of the profile to save the new private key
     #[clap(long)]
     pub(crate) save_to_profile: Option<String>,
+
+    /// Skip saving profile
+    #[clap(long)]
+    pub(crate) skip_saving_profile: bool,
 }
 
 impl ParsePrivateKey for RotateKey {}
@@ -147,21 +152,13 @@ impl CliCommand<RotateSummary> for RotateKey {
         let mut profile_name: String;
 
         if self.save_to_profile.is_none() {
-            if let Err(cli_err) = prompt_yes_with_override(
-                "Do you want to create a profile for the new key?",
-                self.txn_options.prompt_options,
-            ) {
-                match cli_err {
-                    CliError::AbortedError => {
-                        return Ok(RotateSummary {
-                            transaction: txn_summary,
-                            message: None,
-                        });
-                    }
-                    _ => {
-                        return Err(cli_err);
-                    }
-                }
+            if self.skip_saving_profile
+                || !prompt_yes("Do you want to create a profile for the new key?")
+            {
+                return Ok(RotateSummary {
+                    transaction: txn_summary,
+                    message: None,
+                });
             }
 
             eprintln!("Enter the name for the profile");
