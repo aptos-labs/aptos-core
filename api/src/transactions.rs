@@ -413,7 +413,7 @@ impl TransactionsApi {
 
             // With 0 gas price, we set it to max gas units, since we can't divide by 0
             let max_account_gas_units = if gas_unit_price == 0 {
-                0
+                coin_store.coin()
             } else {
                 coin_store.coin() / gas_unit_price
             };
