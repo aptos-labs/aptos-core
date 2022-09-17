@@ -1,4 +1,8 @@
 spec aptos_framework::code {
+    spec module {
+        pragma verify=false;
+    }
+
     spec request_publish { // TODO: temporary mockup.
         pragma opaque;
     }
