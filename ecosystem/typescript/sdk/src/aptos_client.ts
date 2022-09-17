@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HexString, MaybeHexString } from "./hex_string";
-import { fixNodeUrl, Memoize, sleep } from "./utils";
+import { clear, fixNodeUrl, Memoize, sleep } from "./utils";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import {
@@ -589,17 +589,18 @@ export class AptosClient {
     payload: TxnBuilderTypes.TransactionPayload,
     extraArgs?: { maxGasAmount?: Uint64; gasUnitPrice?: Uint64; expireTimestamp?: Uint64 },
   ): Promise<TxnBuilderTypes.RawTransaction> {
+    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
+      this.getAccount(accountFrom),
+      this.getChainId(),
+      extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
+    ]);
+
     const { maxGasAmount, gasUnitPrice, expireTimestamp } = {
       maxGasAmount: BigInt(20000),
-      gasUnitPrice: BigInt(1),
+      gasUnitPrice: BigInt(gasEstimate),
       expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
       ...extraArgs,
     };
-
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      this.getAccount(accountFrom),
-      this.getChainId(),
-    ]);
 
     return new TxnBuilderTypes.RawTransaction(
       TxnBuilderTypes.AccountAddress.fromHex(accountFrom),
@@ -692,6 +693,15 @@ export class AptosClient {
     return this.waitForTransactionWithResult(txnHash, extraArgs);
   }
 
+  @parseApiError
+  @Memoize({
+    ttlMs: 5 * 60 * 1000, // cache result for 5min
+    tags: ["gas_estimates"],
+  })
+  async estimateGasPrice(): Promise<Gen.GasEstimation> {
+    return this.client.transactions.estimateGasPrice();
+  }
+
   /**
    * Rotate an account's auth key. After rotation, only the new private key can be used to sign txns for
    * the account.
@@ -772,6 +782,11 @@ export class AptosClient {
     });
 
     return new HexString(origAddress);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  clearCache(tags: string[]) {
+    clear(tags);
   }
 }
 
