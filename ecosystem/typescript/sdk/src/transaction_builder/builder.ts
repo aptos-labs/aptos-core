@@ -151,7 +151,7 @@ export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn
 interface ABIBuilderConfig {
   sender: MaybeHexString | AccountAddress;
   sequenceNumber: Uint64 | string;
-  gasUnitPrice?: Uint64 | string;
+  gasUnitPrice: Uint64 | string;
   maxGasAmount?: Uint64 | string;
   expSecFromNow?: number | string;
   chainId: Uint8 | string;
@@ -194,7 +194,6 @@ export class TransactionBuilderABI {
     });
 
     this.builderConfig = {
-      gasUnitPrice: BigInt(1),
       maxGasAmount: BigInt(2000),
       expSecFromNow: 20,
       ...builderConfig,
@@ -285,6 +284,10 @@ export class TransactionBuilderABI {
   build(func: string, ty_tags: string[], args: any[]): RawTransaction {
     const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
 
+    if (!gasUnitPrice) {
+      throw new Error("No gasUnitPrice provided.");
+    }
+
     const senderAccount = sender instanceof AccountAddress ? sender : AccountAddress.fromHex(sender);
     const expTimestampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
     const payload = this.buildTransactionPayload(func, ty_tags, args);
@@ -313,6 +316,7 @@ interface AptosClientInterface {
   getAccountModules: (accountAddress: MaybeHexString) => Promise<Gen.MoveModuleBytecode[]>;
   getAccount: (accountAddress: MaybeHexString) => Promise<Gen.AccountData>;
   getChainId: () => Promise<number>;
+  estimateGasPrice: () => Promise<Gen.GasEstimation>;
 }
 
 /**
@@ -402,17 +406,19 @@ export class TransactionBuilderRemoteABI {
 
     const senderAddress = sender instanceof AccountAddress ? HexString.fromUint8Array(sender.address) : sender;
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasUnitPrice }] = await Promise.all([
       rest?.sequenceNumber
         ? Promise.resolve({ sequence_number: rest?.sequenceNumber })
         : this.aptosClient.getAccount(senderAddress),
       rest?.chainId ? Promise.resolve(rest?.chainId) : this.aptosClient.getChainId(),
+      rest?.gasUnitPrice ? Promise.resolve({ gas_estimate: rest?.gasUnitPrice }) : this.aptosClient.estimateGasPrice(),
     ]);
 
     const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)], {
       sender,
       sequenceNumber,
       chainId,
+      gasUnitPrice: BigInt(gasUnitPrice),
       ...rest,
     });
 
