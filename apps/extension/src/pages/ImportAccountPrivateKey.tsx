@@ -10,10 +10,13 @@ import { useNavigate } from 'react-router-dom';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import { keysFromAptosAccount } from 'core/utils/account';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { importAccountEvents } from 'core/utils/analytics/events';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
   const { addAccount } = useUnlockedAccounts();
+  const { trackEvent } = useAnalytics();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,
@@ -30,11 +33,19 @@ export default function ImportAccountPrivateKey() {
       await addAccount(keysFromAptosAccount(aptosAccount));
 
       importAccountToast();
+
+      trackEvent({ eventType: importAccountEvents.IMPORT_PK_ACCOUNT });
       navigate(Routes.wallet.path);
     } catch (err) {
+      trackEvent({
+        eventType: importAccountEvents.ERROR_IMPORT_PK_ACCOUNT,
+        params: {
+          error: String(err),
+        },
+      });
       importAccountErrorToast();
     }
-  }, [addAccount, navigate]);
+  }, [addAccount, navigate, trackEvent]);
 
   return (
     <ImportAccountPrivateKeyLayout

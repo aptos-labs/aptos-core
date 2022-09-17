@@ -127,9 +127,9 @@ export const removeAccountToast = (message: string) => {
 
 export const removeAccountErrorToast = () => {
   toast({
-    description: 'Account deletion process incurred an error',
+    description: 'Account removal process incurred an error',
     status: 'error',
-    title: 'Error deleting account',
+    title: 'Error removing account',
   });
 };
 

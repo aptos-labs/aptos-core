@@ -16,7 +16,9 @@ import { useActiveAccount, useUnlockedAccounts } from 'core/hooks/useAccounts';
 import { collapseHexString } from 'core/utils/hex';
 import { Routes } from 'core/routes';
 import { removeButtonBg } from 'core/colors';
-import { removeAccountToast } from '../core/components/Toast';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { removeAccountEvents } from 'core/utils/analytics/events';
+import { removeAccountErrorToast, removeAccountToast } from '../core/components/Toast';
 
 function WarningIcon() {
   return (
@@ -37,14 +39,24 @@ export default function RemoveAccount() {
   const { colorMode } = useColorMode();
   const navigate = useNavigate();
   const { removeAccount } = useUnlockedAccounts();
+  const { trackEvent } = useAnalytics();
 
   const handleRemove = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
-    await removeAccount(activeAccount.activeAccountAddress);
-    const removedAddress = `${activeAccount.activeAccountAddress.slice(0, 4)}...${activeAccount.activeAccountAddress.slice(62)}`;
-    removeAccountToast(`Successfully removed account ${removedAddress}`);
-    navigate(Routes.wallet.path);
+    try {
+      await removeAccount(activeAccount.activeAccountAddress);
+      const removedAddress = `${activeAccount.activeAccountAddress.slice(0, 4)}...${activeAccount.activeAccountAddress.slice(62)}`;
+      removeAccountToast(`Successfully removed account ${removedAddress}`);
+      trackEvent({ eventType: removeAccountEvents.REMOVE_ACCOUNT });
+      navigate(Routes.wallet.path);
+    } catch (err) {
+      removeAccountErrorToast();
+      trackEvent({
+        eventType: removeAccountEvents.ERROR_REMOVE_ACCOUNT,
+        params: { error: String(err) },
+      });
+    }
   };
 
   const handleCancel = (e: React.MouseEvent<HTMLButtonElement>) => {

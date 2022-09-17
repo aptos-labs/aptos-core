@@ -10,10 +10,13 @@ import { generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account
 import { AptosAccount } from 'aptos';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { importAccountEvents } from 'core/utils/analytics/events';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
   const { addAccount } = useUnlockedAccounts();
+  const { trackEvent } = useAnalytics();
 
   const onSubmit = useCallback(async (
     mnemonicAll: MnemonicFormValues,
@@ -36,13 +39,18 @@ export default function ImportWalletMnemonic() {
       });
 
       importAccountToast();
+      trackEvent({ eventType: importAccountEvents.IMPORT_MNEMONIC_ACCOUNT });
       navigate(Routes.wallet.path);
     } catch (err) {
       importAccountErrorToast();
-      // eslint-disable-next-line no-console
-      console.error('Invalid mnemonic, account not found');
+      trackEvent({
+        eventType: importAccountEvents.ERROR_IMPORT_MNEMONIC_ACCOUNT,
+        params: {
+          error: String(err),
+        },
+      });
     }
-  }, [addAccount, navigate]);
+  }, [addAccount, navigate, trackEvent]);
 
   return (
     <ImportAccountMnemonicLayout

@@ -35,6 +35,8 @@ import {
   switchAccountErrorToast,
   switchAccountToast,
 } from 'core/components/Toast';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { switchAccountEvents } from 'core/utils/analytics/events';
 import Copyable from './Copyable';
 
 interface AccountViewProps {
@@ -53,18 +55,28 @@ const AccountView = React.forwardRef(({
   const { colorMode } = useColorMode();
   const navigate = useNavigate();
   const { activeAccount } = useActiveAccount();
+  const { trackEvent } = useAnalytics();
   const {
     switchAccount,
   } = useUnlockedAccounts();
 
-  const switchAccountOnClick = () => {
+  const switchAccountOnClick = async () => {
     try {
       if (account?.address) {
-        switchAccount(account?.address);
+        await switchAccount(account?.address);
+        trackEvent({
+          eventType: switchAccountEvents.SWITCH_ACCOUNT,
+        });
         switchAccountToast(account?.address);
         navigate(Routes.wallet.path);
       }
-    } catch {
+    } catch (err) {
+      trackEvent({
+        eventType: switchAccountEvents.ERROR_SWITCHING_ACCOUNT,
+        params: {
+          error: String(err),
+        },
+      });
       switchAccountErrorToast();
     }
   };

@@ -13,6 +13,8 @@ import SecretPhraseConfirmationPopup from 'core/components/SecretPhraseConfirmat
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { createAccountErrorToast, createAccountToast } from 'core/components/Toast';
+import { useAnalytics } from 'core/hooks/useAnalytics';
+import { accountEvents } from 'core/utils/analytics/events';
 
 const transitionDuration = 200;
 
@@ -22,6 +24,7 @@ function CreateAccount() {
   const { fundAccount } = useFundAccount();
   const newMnemonic = useMemo(() => generateMnemonic(), []);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { trackEvent } = useAnalytics();
   const ref = useRef();
   const [
     showSecretRecoveryPhrasePopup,
@@ -49,8 +52,18 @@ function CreateAccount() {
         await fundAccount({ address: newAccount.address, amount: 0 });
       }
 
+      trackEvent({
+        eventType: accountEvents.CREATE_ACCOUNT,
+      });
+
       createAccountToast();
     } catch (err) {
+      trackEvent({
+        eventType: accountEvents.ERROR_CREATE_ACCOUNT,
+        params: {
+          error: String(err),
+        },
+      });
       createAccountErrorToast();
       // eslint-disable-next-line no-console
       console.error(err);

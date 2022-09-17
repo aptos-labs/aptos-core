@@ -37,21 +37,27 @@ export const analyticsCategories = Object.freeze({
 
 const accountActions = Object.freeze({
   CREATE_ACCOUNT: 'Create account',
+  IMPORT_ACCOUNT: 'Import account',
   LOGIN_WITH_PRIVATE_KEY: 'Login with private key',
+  REMOVE_ACCOUNT: 'Remove account',
   SIGN_OUT: 'Sign out',
+  SWITCH_ACCOUNT: 'Switch account',
 } as const);
 
 const accountLabels = Object.freeze({
   CREATE_ACCOUNT: 'Create account',
+  IMPORT_ACCOUNT: 'Import account',
   LOGIN_WITH_PRIVATE_KEY: 'Login',
+  REMOVE_ACCOUNT: 'Remove account',
   SIGN_OUT: 'Sign out',
+  SWITCH_ACCOUNT: 'Switch account',
 } as const);
 
 export const loginEvents = eventSchemaTypeCheck({
   ERROR_LOGIN_WITH_PRIVATE_KEY: {
-    action: `${accountActions.LOGIN_WITH_PRIVATE_KEY} - invalid private key`,
+    action: `${accountActions.LOGIN_WITH_PRIVATE_KEY} - invalid private key` as const,
     category: analyticsCategories.ACCOUNT,
-    label: `${accountLabels.LOGIN_WITH_PRIVATE_KEY} error`,
+    label: `${accountLabels.LOGIN_WITH_PRIVATE_KEY} error` as const,
   },
   LOGIN_WITH_PRIVATE_KEY: {
     action: accountActions.LOGIN_WITH_PRIVATE_KEY,
@@ -67,11 +73,60 @@ export const createAccountEvents = eventSchemaTypeCheck({
     label: accountLabels.CREATE_ACCOUNT,
   },
   ERROR_CREATE_ACCOUNT: {
-    action: `${accountActions.CREATE_ACCOUNT} - unable to create account`,
+    action: `${accountActions.CREATE_ACCOUNT} - unable to create account` as const,
     category: analyticsCategories.ACCOUNT,
-    label: `${accountLabels.CREATE_ACCOUNT} error`,
+    label: `${accountLabels.CREATE_ACCOUNT} error` as const,
   },
 } as const);
+
+export const importAccountEvents = eventSchemaTypeCheck({
+  ERROR_IMPORT_MNEMONIC_ACCOUNT: {
+    action: `${accountActions.IMPORT_ACCOUNT} - unable to import mnemonic` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.IMPORT_ACCOUNT} mnemonic error` as const,
+  },
+  ERROR_IMPORT_PK_ACCOUNT: {
+    action: `${accountActions.IMPORT_ACCOUNT} - unable to import private key` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.IMPORT_ACCOUNT} private key error` as const,
+  },
+  IMPORT_MNEMONIC_ACCOUNT: {
+    action: `${accountActions.IMPORT_ACCOUNT} - mnemonic` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.IMPORT_ACCOUNT} mnemonic` as const,
+  },
+  IMPORT_PK_ACCOUNT: {
+    action: `${accountActions.IMPORT_ACCOUNT} - private key` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.IMPORT_ACCOUNT} private key` as const,
+  },
+} as const);
+
+export const switchAccountEvents = eventSchemaTypeCheck({
+  ERROR_SWITCHING_ACCOUNT: {
+    action: `${accountActions.SWITCH_ACCOUNT} - unable to switch account` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.SWITCH_ACCOUNT} error` as const,
+  },
+  SWITCH_ACCOUNT: {
+    action: accountActions.SWITCH_ACCOUNT,
+    category: analyticsCategories.ACCOUNT,
+    label: accountLabels.SWITCH_ACCOUNT,
+  },
+} as const);
+
+export const removeAccountEvents = eventSchemaTypeCheck({
+  ERROR_REMOVE_ACCOUNT: {
+    action: `${accountActions.REMOVE_ACCOUNT} - unable to remove account` as const,
+    category: analyticsCategories.ACCOUNT,
+    label: `${accountLabels.REMOVE_ACCOUNT} error` as const,
+  },
+  REMOVE_ACCOUNT: {
+    action: accountActions.REMOVE_ACCOUNT,
+    category: analyticsCategories.ACCOUNT,
+    label: accountLabels.REMOVE_ACCOUNT,
+  },
+});
 
 export const signOutEvents = eventSchemaTypeCheck({
   SIGN_OUT: {
@@ -85,6 +140,9 @@ export const accountEvents = eventSchemaTypeCheck({
   ...loginEvents,
   ...createAccountEvents,
   ...signOutEvents,
+  ...switchAccountEvents,
+  ...importAccountEvents,
+  ...removeAccountEvents,
 } as const);
 
 export interface AccountEventParams {
@@ -113,9 +171,9 @@ const coinLabels = Object.freeze({
 
 export const coinEvents = eventSchemaTypeCheck({
   ERROR_TRANSFER_APTOS_COIN: {
-    action: `${coinActions.TRANSFER_COIN} - unable to transfer coin`,
+    action: `${coinActions.TRANSFER_COIN} - unable to transfer coin` as const,
     category: analyticsCategories.COIN,
-    label: `${coinLabels.TRANSFER_APTOS_COIN} error`,
+    label: `${coinLabels.TRANSFER_APTOS_COIN} error` as const,
   },
   TRANSFER_APTOS_COIN: {
     action: coinActions.TRANSFER_COIN,
@@ -184,9 +242,9 @@ export const collectiblesEvents = eventSchemaTypeCheck({
     label: collectiblesLabels.CREATE_TOKEN,
   },
   ERROR_CLAIM_TOKEN: {
-    action: `${collectiblesActions.CLAIM_TOKEN} - unable to claim token`,
+    action: `${collectiblesActions.CLAIM_TOKEN} - unable to claim token` as const,
     category: analyticsCategories.COLLECTIBLES,
-    label: `${collectiblesLabels.CLAIM_TOKEN} error`,
+    label: `${collectiblesLabels.CLAIM_TOKEN} error` as const,
   },
   OFFER_NFT: {
     action: collectiblesActions.OFFER_TOKEN,
@@ -227,9 +285,9 @@ const faucetActions = Object.freeze({
 
 export const faucetEvents = eventSchemaTypeCheck({
   ERROR_RECEIVE_FAUCET: {
-    action: `${faucetActions.CLICK_FAUCET} - unable to query faucet`,
+    action: `${faucetActions.CLICK_FAUCET} - unable to query faucet` as const,
     category: analyticsCategories.FAUCET,
-    label: `${faucetActions.CLICK_FAUCET} error`,
+    label: `${faucetActions.CLICK_FAUCET} error` as const,
   },
   RECEIVE_FAUCET: {
     action: faucetActions.CLICK_FAUCET,
