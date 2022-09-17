@@ -11,3 +11,4 @@ export * from "./token_client";
 export * from "./transaction_builder";
 export * as TokenTypes from "./token_types";
 export * as Types from "./generated/index";
+export { derivePath } from "./utils/hd-key";
