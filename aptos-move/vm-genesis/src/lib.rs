@@ -830,13 +830,13 @@ pub fn test_genesis_module_publishing() {
 
 #[test]
 pub fn test_mainnet_end_to_end() {
-    let test_validators = TestValidator::new_test_set(Some(3), Some(0));
+    let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
+    let test_validators = TestValidator::new_test_set(Some(3), Some(balance * 9 / 10));
     let employee_validator = test_validators[0].data.clone();
     let mut direct_validator = test_validators[1].data.clone();
     let commissioned_validator = test_validators[2].data.clone();
 
     // currently just test that all functions have the right interface
-    let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
     let account45 = AccountAddress::from_hex_literal("0x45").unwrap();
     let account46 = AccountAddress::from_hex_literal("0x46").unwrap();
     let account47 = AccountAddress::from_hex_literal("0x47").unwrap();
