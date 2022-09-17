@@ -6,6 +6,8 @@ use bigdecimal::{FromPrimitive, Signed, ToPrimitive, Zero};
 use serde_json::Value;
 use sha2::Digest;
 
+pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799; // 9999-12-31 23:59:59;
+
 pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }
@@ -31,11 +33,8 @@ pub fn parse_timestamp(ts: U64, version: i64) -> chrono::NaiveDateTime {
 }
 
 pub fn parse_timestamp_secs(ts: U64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(
-        std::cmp::min(ts.0 as i64, chrono::NaiveDateTime::MAX.timestamp()),
-        0,
-    )
-    .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+    chrono::NaiveDateTime::from_timestamp_opt(std::cmp::min(ts.0 as i64, MAX_TIMESTAMP_SECS), 0)
+        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn remove_null_bytes<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(input: &T) -> T {
@@ -84,7 +83,7 @@ mod tests {
         assert_eq!(ts.year(), current_year);
 
         let ts2 = parse_timestamp_secs(U64::from(600000000000000), 2);
-        assert_eq!(ts2.year(), chrono::NaiveDateTime::MAX.date().year());
+        assert_eq!(ts2.year(), 9999);
 
         let ts3 = parse_timestamp_secs(U64::from(1659386386), 2);
         assert_eq!(ts3.timestamp(), 1659386386);
