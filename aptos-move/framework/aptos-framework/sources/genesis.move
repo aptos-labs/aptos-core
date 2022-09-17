@@ -1,6 +1,9 @@
 module aptos_framework::genesis {
     use std::error;
+    use std::fixed_point32;
     use std::vector;
+
+    use aptos_std::simple_map;
 
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
@@ -22,6 +25,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_fee;
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
+    use aptos_framework::vesting;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
 
@@ -184,7 +188,67 @@ module aptos_framework::genesis {
         }
     }
 
-    fun create_employee_validators(_aptos_framework: &signer, _employees: vector<EmployeeAccountMap>) {
+    fun create_employee_validators(_aptos_framework: &signer, employees: vector<EmployeeAccountMap>) {
+        let i = 0;
+        let num_employee_groups = vector::length(&employees);
+        let unique_accounts = vector::empty();
+
+        while (i < num_employee_groups) {
+            let j = 0;
+            let employee_group = vector::borrow(&employees, i);
+            let num_employees_in_group = vector::length(&employee_group.accounts);
+
+            let buy_ins = simple_map::create();
+
+            while (j < num_employees_in_group) {
+                let account = vector::borrow(&employee_group.accounts, j);
+                assert!(
+                    !vector::contains(&unique_accounts, account),
+                    error::already_exists(EDUPLICATE_ACCOUNT),
+                );
+                vector::push_back(&mut unique_accounts, *account);
+
+                let employee = create_signer(*account);
+                let total = coin::balance<AptosCoin>(*account);
+                let coins = coin::withdraw<AptosCoin>(&employee, total);
+                simple_map::add(&mut buy_ins, *account, coins);
+
+                j = j + 1;
+            };
+
+            let j = 0;
+            let num_vesting_events = vector::length(&employee_group.vesting_schedule_numerator);
+            let schedule = vector::empty();
+
+            while (j < num_vesting_events) {
+                let numerator = vector::borrow(&employee_group.vesting_schedule_numerator, j);
+                let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
+                vector::push_back(&mut schedule, event);
+
+                j = j + 1;
+            };
+
+            let vesting_schedule = vesting::create_vesting_schedule(
+                schedule,
+                1663456089, // Update before mainnet or pass in by config
+                30 * 24 * 60 * 60, // 30 days
+            );
+
+            let admin = employee_group.validator.validator_config.owner_address;
+            vesting::create_vesting_contract(
+                &create_signer(admin),
+                &employee_group.accounts,
+                buy_ins,
+                vesting_schedule,
+                admin,
+                employee_group.validator.validator_config.operator_address,
+                employee_group.validator.validator_config.voter_address,
+                employee_group.validator.commission_percentage,
+                x"",
+            );
+
+            i = i + 1;
+        }
     }
 
     fun create_initialize_validators_with_commission(
