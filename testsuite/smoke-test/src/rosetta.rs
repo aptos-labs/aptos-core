@@ -650,7 +650,7 @@ async fn test_block() {
     // Also fail to set an operator
     cli.set_operator(1, 3).await.unwrap_err();
 
-    // This one will fail
+    // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -686,8 +686,6 @@ async fn test_block() {
     // TODO: Check no repeated txn hashes (in a block)
     // TODO: Check account balance block hashes?
     // TODO: Handle multiple coin types
-
-    eprintln!("Checking blocks 0..{}", final_block_height);
 
     // Wait until the Rosetta service is ready
     let request = NetworkRequest {
@@ -773,15 +771,6 @@ async fn parse_block_transactions(
     actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
-    let versions: Vec<_> = block
-        .transactions
-        .iter()
-        .map(|txn| txn.metadata.version.0)
-        .collect();
-    eprintln!(
-        "block: {} txns: {:?}",
-        block.block_identifier.index, versions
-    );
     for transaction in block.transactions.iter() {
         let txn_metadata = &transaction.metadata;
         let txn_version = txn_metadata.version.0;

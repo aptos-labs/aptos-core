@@ -1238,14 +1238,15 @@ impl TransactionOptions {
         } else {
             let gas_unit_price = client.estimate_gas_price().await?.into_inner().gas_estimate;
 
-            ask_to_confirm_price = gas_unit_price > 1;
+            ask_to_confirm_price = true;
             gas_unit_price
         };
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             max_gas
         } else if self.estimate_max_gas {
-            let transaction_factory = TransactionFactory::new(chain_id(&client).await?);
+            let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+                .with_gas_unit_price(gas_unit_price);
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
