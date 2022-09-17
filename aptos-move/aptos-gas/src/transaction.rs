@@ -5,11 +5,94 @@
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
 use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{
+    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
+};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
     ToUnitFractionalWithParams, ToUnitWithParams,
 };
+
+#[derive(Clone, Debug)]
+pub struct StorageGasParameters {
+    pub per_item_read: InternalGasPerArg,
+    pub per_item_create: InternalGasPerArg,
+    pub per_item_write: InternalGasPerArg,
+    pub per_byte_read: InternalGasPerByte,
+    pub per_byte_create: InternalGasPerByte,
+    pub per_byte_write: InternalGasPerByte,
+}
+
+impl From<StorageGasSchedule> for StorageGasParameters {
+    fn from(gas_schedule: StorageGasSchedule) -> Self {
+        Self {
+            per_item_read: gas_schedule.per_item_read.into(),
+            per_item_create: gas_schedule.per_item_create.into(),
+            per_item_write: gas_schedule.per_item_write.into(),
+            per_byte_read: gas_schedule.per_byte_read.into(),
+            per_byte_create: gas_schedule.per_byte_create.into(),
+            per_byte_write: gas_schedule.per_byte_write.into(),
+        }
+    }
+}
+
+impl StorageGasParameters {
+    pub fn zeros() -> Self {
+        Self {
+            per_item_read: 0.into(),
+            per_item_create: 0.into(),
+            per_item_write: 0.into(),
+            per_byte_read: 0.into(),
+            per_byte_create: 0.into(),
+            per_byte_write: 0.into(),
+        }
+    }
+}
+
+impl StorageGasParameters {
+    pub fn calculate_write_set_gas<'a>(
+        &self,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> InternalGas {
+        use WriteOp::*;
+
+        let mut num_items_create = NumArgs::zero();
+        let mut num_items_write = NumArgs::zero();
+        let mut num_bytes_create = NumBytes::zero();
+        let mut num_bytes_write = NumBytes::zero();
+
+        for (key, op) in ops.into_iter() {
+            let key_size = || {
+                NumBytes::new(
+                    key.encode()
+                        .expect("Should be able to serialize state key")
+                        .len() as u64,
+                )
+            };
+
+            match op {
+                Creation(data) => {
+                    num_items_create += 1.into();
+
+                    num_bytes_create += key_size();
+                    num_bytes_create += NumBytes::new(data.len() as u64);
+                }
+                Modification(data) => {
+                    num_items_write += 1.into();
+
+                    num_bytes_write += key_size();
+                    num_bytes_write += NumBytes::new(data.len() as u64);
+                }
+                Deletion => (),
+            }
+        }
+
+        num_items_create * self.per_item_create
+            + num_items_write * self.per_item_write
+            + num_bytes_create * self.per_byte_create
+            + num_bytes_write * self.per_byte_write
+    }
+}
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
