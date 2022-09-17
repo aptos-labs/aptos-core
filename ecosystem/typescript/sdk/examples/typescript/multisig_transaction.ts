@@ -7,10 +7,8 @@ import { AptosClient, AptosAccount, FaucetClient, BCS, TransactionBuilderMultiEd
 import { aptosCoinStore } from "./common";
 import assert from "assert";
 
-// const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
-// const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-const NODE_URL = "http://127.0.0.1:8080";
-const FAUCET_URL = "http://127.0.0.1:8081";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
 /**
  * This code example demonstrates the process of moving test coins from one multisig
