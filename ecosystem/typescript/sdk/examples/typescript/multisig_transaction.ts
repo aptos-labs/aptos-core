@@ -7,8 +7,10 @@ import { AptosClient, AptosAccount, FaucetClient, BCS, TransactionBuilderMultiEd
 import { aptosCoinStore } from "./common";
 import assert from "assert";
 
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+// const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+// const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+const NODE_URL = "http://127.0.0.1:8080";
+const FAUCET_URL = "http://127.0.0.1:8081";
 
 /**
  * This code example demonstrates the process of moving test coins from one multisig
@@ -57,7 +59,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
-  console.log(`multisig account coins: ${balance}. Should be 0!`);
+  console.log(`account4 coins: ${balance}. Should be 0!`);
 
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
@@ -123,9 +125,14 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 
   await client.waitForTransaction(transactionRes.hash);
 
+  resources = await client.getAccountResources(mutisigAccountAddress);
+  accountResource = resources.find((r) => r.type === aptosCoinStore);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  console.log(`multisig account coins: ${balance}.`);
+
   resources = await client.getAccountResources(account4.address());
   accountResource = resources.find((r) => r.type === aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
-  console.log(`multisig account coins: ${balance}. Should be 123!`);
+  console.log(`account4 coins: ${balance}. Should be 123!`);
 })();
