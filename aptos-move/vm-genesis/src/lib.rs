@@ -251,7 +251,7 @@ fn exec_function(
         });
 }
 
-const LATEST_GAS_FEATURE_VERSION: u64 = 1;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 1;
 
 fn initialize(
     session: &mut SessionExt<impl MoveResolver>,

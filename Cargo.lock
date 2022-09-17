@@ -5039,6 +5039,7 @@ dependencies = [
  "move-deps",
  "proptest",
  "serde 1.0.144",
+ "vm-genesis",
 ]
 
 [[package]]

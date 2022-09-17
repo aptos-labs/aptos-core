@@ -145,20 +145,18 @@ module aptos_framework::storage_gas {
             !exists<StorageGasConfig>(@aptos_framework),
             error::already_exists(ESTORAGE_GAS_CONFIG)
         );
-        let item_curve = base_8192_exponential_curve(10, 10000);
-        let byte_curve = base_8192_exponential_curve(1, 1000);
 
         let item_config = UsageGasConfig {
             target_usage: 1000000000,  // 1 billion
-            read_curve: item_curve,
-            create_curve: item_curve,
-            write_curve: item_curve,
+            read_curve: base_8192_exponential_curve(1, 100),
+            create_curve: base_8192_exponential_curve(1000, 100000),
+            write_curve: base_8192_exponential_curve(100, 10000),
         };
         let byte_config = UsageGasConfig {
             target_usage: 500000000000, // 500 GB
-            read_curve: byte_curve,
-            create_curve: byte_curve,
-            write_curve: byte_curve,
+            read_curve: base_8192_exponential_curve(1, 100),
+            create_curve: base_8192_exponential_curve(100, 10000),
+            write_curve: base_8192_exponential_curve(100, 10000),
         };
         validate_usage_config(&item_config);
         validate_usage_config(&item_config);
@@ -172,12 +170,12 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 100,
-            per_item_create: 100,
+            per_item_read: 1,
+            per_item_create: 1000,
             per_item_write: 100,
-            per_byte_read: 1,
-            per_byte_create: 1,
-            per_byte_write: 1,
+            per_byte_read: 100,
+            per_byte_create: 100,
+            per_byte_write: 100,
         });
     }
 
