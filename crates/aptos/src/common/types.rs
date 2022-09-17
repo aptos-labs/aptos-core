@@ -1267,7 +1267,12 @@ impl TransactionOptions {
                 .into_inner()
                 .transaction
                 .as_signed_user_txn()
-                .expect("Should be a user transaction from simulation!")
+                .map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Transaction found was not a user transaction {}",
+                        err
+                    ))
+                })?
                 .max_gas_amount()
         } else {
             // TODO: Remove once simulation is stabilized and can handle all cases

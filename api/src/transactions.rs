@@ -399,7 +399,14 @@ impl TransactionsApi {
                 })?;
             let coin_store: CoinStoreResource = account_state
                 .get_coin_store_resource()
-                .and_then(|inner| inner.ok_or_else(|| anyhow!("No coin store found!")))
+                .and_then(|inner| {
+                    inner.ok_or_else(|| {
+                        anyhow!(
+                            "No coin store found for account {}",
+                            signed_transaction.sender()
+                        )
+                    })
+                })
                 .map_err(|err| {
                     SubmitTransactionError::internal_with_code(
                         format!("Failed to get coin store resource {}", err),
