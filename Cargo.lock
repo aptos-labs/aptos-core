@@ -188,6 +188,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.3",
  "toml",
+ "vm-genesis",
  "walkdir",
 ]
 

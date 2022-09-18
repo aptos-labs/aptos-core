@@ -114,6 +114,10 @@ pub struct SetValidatorConfiguration {
     #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
 
+    /// Commission rate to pay operator
+    #[clap(long, default_value_t = 0)]
+    pub(crate) commission_percentage: u64,
+
     /// Path to private identity generated from GenerateKeys
     #[clap(long, parse(from_os_str))]
     pub(crate) owner_public_identity_file: Option<PathBuf>,
@@ -223,6 +227,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
             operator_account_address: operator_identity.account_address,
             operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
+            commission_percentage: self.commission_percentage,
         };
 
         let directory = PathBuf::from(&self.username);
