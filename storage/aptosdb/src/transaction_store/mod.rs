@@ -114,7 +114,6 @@ impl TransactionStore {
         iter.expect_continuous_versions(start_version, num_transactions)
     }
 
-    #[allow(dead_code)]
     /// Gets an iterator that yields `num_transactions` write sets starting from `start_version`.
     pub fn get_write_set_iter(
         &self,
