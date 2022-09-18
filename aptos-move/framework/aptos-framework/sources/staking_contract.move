@@ -43,21 +43,21 @@ module aptos_framework::staking_contract {
     const SALT: vector<u8> = b"aptos_framework::staking_contract";
 
     /// Store amount must be at least the min stake required for a stake pool to join the validator set.
-    const EINSUFFICIENT_STAKE_AMOUNT: u64 = 1;
+    const EINSUFFICIENT_STAKE_AMOUNT: u64 = 11;
     /// Commission percentage has to be between 0 and 100.
-    const EINVALID_COMMISSION_PERCENTAGE: u64 = 2;
+    const EINVALID_COMMISSION_PERCENTAGE: u64 = 12;
     /// Staker has no staking contracts.
-    const ENO_STAKING_CONTRACT_FOUND_FOR_STAKER: u64 = 3;
+    const ENO_STAKING_CONTRACT_FOUND_FOR_STAKER: u64 = 13;
     /// No staking contract between the staker and operator found.
-    const ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR: u64 = 4;
+    const ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR: u64 = 14;
     /// Staking contracts can't be merged.
-    const ECANT_MERGE_STAKING_CONTRACTS: u64 = 5;
+    const ECANT_MERGE_STAKING_CONTRACTS: u64 = 15;
     /// The staking contract already exists and cannot be re-created.
-    const ESTAKING_CONTRACT_ALREADY_EXISTS: u64 = 6;
+    const ESTAKING_CONTRACT_ALREADY_EXISTS: u64 = 16;
     /// Not enough active stake to withdraw. Some stake might still pending and will be active in the next epoch.
-    const EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW: u64 = 7;
+    const EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW: u64 = 17;
     /// Caller must be either the staker or operator.
-    const ENOT_STAKER_OR_OPERATOR: u64 = 8;
+    const ENOT_STAKER_OR_OPERATOR: u64 = 18;
 
     /// Maximum number of distributions a stake pool can support.
     const MAXIMUM_PENDING_DISTRIBUTIONS: u64 = 20;
