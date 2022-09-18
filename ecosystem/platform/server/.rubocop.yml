@@ -19,6 +19,9 @@ Metrics/PerceivedComplexity:
 Style/Documentation:
   Enabled: false
 
+Style/GuardClause:
+  Enabled: false
+
 Metrics/AbcSize:
   Max: 100
 

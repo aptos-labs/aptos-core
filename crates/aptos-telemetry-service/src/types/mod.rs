@@ -3,7 +3,6 @@
 
 pub mod auth;
 pub mod telemetry;
-pub mod validator_set;
 
 pub mod common {
 

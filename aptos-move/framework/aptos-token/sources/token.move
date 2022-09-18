@@ -7,8 +7,9 @@ module aptos_token::token {
     use std::vector;
     use std::option::{Self, Option};
 
-    use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::account;
+    use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
 
@@ -110,10 +111,12 @@ module aptos_token::token {
     /// Cannot burn 0 Token
     const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
 
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
+
     //
     // Core data structures for holding tokens
     //
-
     struct Token has store {
         id: TokenId,
         // the amount of tokens. Only property_version = 0 can have a value bigger than 1.
@@ -232,6 +235,14 @@ module aptos_token::token {
         maximum: u64,
         // control which collection field is mutable
         mutability_config: CollectionMutabilityConfig,
+    }
+
+    /// capability to withdraw without signer, this struct should be non-copyable
+    struct WithdrawCapability has drop, store {
+        token_owner: address,
+        token_id: TokenId,
+        amount: u64,
+        expiration_sec: u64,
     }
 
     /// Set of data sent to the event stream during a receive
@@ -492,6 +503,13 @@ module aptos_token::token {
         direct_deposit(account_addr, token)
     }
 
+    /// direct deposit if user opt in direct transfer
+    public fun direct_deposit_with_opt_in(account_addr: address, token: Token) acquires TokenStore {
+        let opt_in_transfer = borrow_global<TokenStore>(account_addr).direct_transfer;
+        assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
+        direct_deposit(account_addr, token);
+    }
+
     /// Deposit the token balance into the recipients account and emit an event.
     fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
@@ -584,6 +602,36 @@ module aptos_token::token {
         assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
         let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
+    }
+
+
+    /// Token owner can create this one-time withdraw capability with an expiration time
+    public fun create_withdraw_capability(
+        owner: &signer,
+        token_id: TokenId,
+        amount: u64,
+        expiration_sec: u64,
+    ): WithdrawCapability {
+        WithdrawCapability {
+            token_owner: signer::address_of(owner),
+            token_id,
+            amount,
+            expiration_sec,
+        }
+    }
+
+    /// Withdraw the token with a capability
+    public fun withdraw_with_capability(
+        withdraw_proof: WithdrawCapability,
+    ): Token acquires TokenStore {
+        // verify the delegation hasn't expired yet
+        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+
+        withdraw_with_event_internal(
+            withdraw_proof.token_owner,
+            withdraw_proof.token_id,
+            withdraw_proof.amount,
+        )
     }
 
     public fun withdraw_token(
@@ -1404,5 +1452,24 @@ module aptos_token::token {
         assert!(property_map::read_u64(&updated_pm, &string::utf8(b"attack")) == 2, 1);
         let og_pm = get_property_map(signer::address_of(creator), new_token_id);
         assert!(property_map::read_u64(&og_pm, &string::utf8(b"attack")) == 1, 1);
+    }
+
+    #[test(framework = @0x1, creator=@0xcafe)]
+    fun test_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
+        timestamp::set_time_has_started_for_testing(framework);
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+
+        timestamp::update_global_time_for_test(1000000);
+
+        // provide the proof to the account
+        let cap =  create_withdraw_capability(
+            creator, // ask user to provide address to avoid ambiguity from rotated keys
+            token_id,
+            1,
+            2000000,
+        );
+
+        withdraw_with_capability(cap)
     }
 }

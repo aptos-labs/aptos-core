@@ -1036,6 +1036,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-logger",
  "aptos-types",
  "bcs",
@@ -1297,6 +1298,7 @@ dependencies = [
  "flate2",
  "gcp-bigquery-client",
  "hex",
+ "httpmock",
  "jsonwebtoken",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -5038,6 +5040,7 @@ dependencies = [
  "move-deps",
  "proptest",
  "serde 1.0.144",
+ "vm-genesis",
 ]
 
 [[package]]

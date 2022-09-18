@@ -294,14 +294,9 @@ impl RosettaClient {
             native_coin(),
             "Fee should always be the native coin"
         );
-        assert!(expected_fee > 0, "Suggested fee should be greater than 0");
-        assert_eq!(
-            metadata
-                .metadata
-                .max_gas_amount
-                .0
-                .saturating_mul(metadata.metadata.gas_price_per_unit.0),
-            expected_fee
+        assert!(
+            metadata.metadata.max_gas_amount.0 * metadata.metadata.gas_price_per_unit.0
+                >= expected_fee
         );
 
         // Build the transaction, sign it, and submit it
