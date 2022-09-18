@@ -143,7 +143,7 @@ crate::params::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            32 * 1024
+            64 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,
