@@ -59,6 +59,8 @@ fn code_publishing_basic() {
     assert_eq!(state.value, 42)
 }
 
+// Ignored because we've disabled incompatible upgrade policy.
+#[ignore]
 #[test]
 fn code_publishing_upgrade_success_no_compat() {
     let mut h = MoveHarness::new();
