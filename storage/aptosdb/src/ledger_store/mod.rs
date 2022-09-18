@@ -4,6 +4,7 @@
 //! This file defines ledger store APIs that are related to the main ledger accumulator, from the
 //! root(LedgerInfo) to leaf(TransactionInfo).
 
+use crate::utils::iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions};
 use crate::{
     errors::AptosDbError,
     schema::{
@@ -29,7 +30,6 @@ use aptos_types::{
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use schemadb::iterator::SchemaIterator;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{ops::Deref, sync::Arc};
 
@@ -184,22 +184,16 @@ impl LedgerStore {
 
     /// Gets an iterator that yields `num_transaction_infos` transaction infos starting from
     /// `start_version`.
-    pub fn get_transaction_info_iter(
+    pub(crate) fn get_transaction_info_iter(
         &self,
         start_version: Version,
         num_transaction_infos: usize,
-    ) -> Result<TransactionInfoIter> {
+    ) -> Result<impl Iterator<Item = Result<TransactionInfo>> + '_> {
         let mut iter = self
             .db
             .iter::<TransactionInfoSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
-        Ok(TransactionInfoIter {
-            inner: iter,
-            expected_next_version: start_version,
-            end_version: start_version
-                .checked_add(num_transaction_infos as u64)
-                .ok_or_else(|| format_err!("Too many transaction infos requested."))?,
-        })
+        iter.expect_continuous_versions(start_version, num_transaction_infos)
     }
 
     /// Gets an iterator that yields epoch ending ledger infos, starting
@@ -211,11 +205,7 @@ impl LedgerStore {
     ) -> Result<EpochEndingLedgerInfoIter> {
         let mut iter = self.db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
         iter.seek(&start_epoch)?;
-        Ok(EpochEndingLedgerInfoIter {
-            inner: iter,
-            next_epoch: start_epoch,
-            end_epoch,
-        })
+        Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))
     }
 
     pub fn ensure_epoch_ending(&self, version: Version) -> Result<()> {
@@ -331,79 +321,6 @@ impl HashReader for LedgerStore {
         self.db
             .get::<TransactionAccumulatorSchema>(&position)?
             .ok_or_else(|| format_err!("{} does not exist.", position))
-    }
-}
-
-pub struct TransactionInfoIter<'a> {
-    inner: SchemaIterator<'a, TransactionInfoSchema>,
-    expected_next_version: Version,
-    end_version: Version,
-}
-
-impl<'a> TransactionInfoIter<'a> {
-    fn next_impl(&mut self) -> Result<Option<TransactionInfo>> {
-        if self.expected_next_version >= self.end_version {
-            return Ok(None);
-        }
-
-        let ret = match self.inner.next().transpose()? {
-            Some((version, transaction_info)) => {
-                ensure!(
-                    version == self.expected_next_version,
-                    "Transaction info versions are not consecutive.",
-                );
-                self.expected_next_version += 1;
-                Some(transaction_info)
-            }
-            _ => None,
-        };
-
-        Ok(ret)
-    }
-}
-
-impl<'a> Iterator for TransactionInfoIter<'a> {
-    type Item = Result<TransactionInfo>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_impl().transpose()
-    }
-}
-
-pub struct EpochEndingLedgerInfoIter<'a> {
-    inner: SchemaIterator<'a, LedgerInfoSchema>,
-    next_epoch: u64,
-    end_epoch: u64,
-}
-
-impl<'a> EpochEndingLedgerInfoIter<'a> {
-    fn next_impl(&mut self) -> Result<Option<LedgerInfoWithSignatures>> {
-        if self.next_epoch >= self.end_epoch {
-            return Ok(None);
-        }
-
-        let ret = match self.inner.next().transpose()? {
-            Some((epoch, li)) => {
-                if !li.ledger_info().ends_epoch() {
-                    None
-                } else {
-                    ensure!(epoch == self.next_epoch, "Epochs are not consecutive.");
-                    self.next_epoch += 1;
-                    Some(li)
-                }
-            }
-            _ => None,
-        };
-
-        Ok(ret)
-    }
-}
-
-impl<'a> Iterator for EpochEndingLedgerInfoIter<'a> {
-    type Item = Result<LedgerInfoWithSignatures>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_impl().transpose()
     }
 }
 

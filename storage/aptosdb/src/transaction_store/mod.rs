@@ -4,7 +4,8 @@
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
 use crate::transaction_accumulator::TransactionAccumulatorSchema;
-use crate::transaction_store::iterators::ExpectContinuousVersions;
+use crate::utils::iterators::AccountTransactionVersionIter;
+use crate::utils::iterators::ExpectContinuousVersions;
 use crate::{
     errors::AptosDbError,
     schema::{
@@ -21,11 +22,8 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use iterators::AccountTransactionVersionIter;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::Arc;
-
-mod iterators;
 
 #[cfg(test)]
 mod test;
