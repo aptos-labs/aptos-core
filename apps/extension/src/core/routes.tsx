@@ -31,6 +31,7 @@ import AutoLockTimer from 'pages/AutoLockTimer';
 import Welcome from 'pages/Welcome';
 import Reauthenticate from 'pages/Reauthenticate';
 import ExportPublicPrivateKey from 'pages/ExportPublicPrivateKey';
+import RemoveAccount from 'pages/RemoveAccount';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -124,6 +125,13 @@ export const Routes = Object.freeze({
     ),
     path: '/settings/recovery_phrase',
   },
+  remove_account: {
+    element:
+  <Reauthenticate title="Remove account">
+    <RemoveAccount />
+  </Reauthenticate>,
+    path: '/remove-account',
+  },
   rename_account: {
     element: <RenameAccount />,
     path: '/settings/rename_account',
@@ -188,6 +196,7 @@ export const routes = [
               Routes.token,
               Routes.activity,
               Routes.transaction,
+              Routes.remove_account,
               Routes.export_public_private_key,
               Routes.account,
               Routes.settings,

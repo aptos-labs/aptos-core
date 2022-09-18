@@ -6,16 +6,13 @@ import {
   Grid, Icon, Text, useColorMode, Flex, VStack,
 } from '@chakra-ui/react';
 import React, { useCallback, useMemo } from 'react';
-import { useActiveAccount, useInitializedAccounts, useUnlockedAccounts } from 'core/hooks/useAccounts';
+import { useActiveAccount, useInitializedAccounts } from 'core/hooks/useAccounts';
 import { settingsItemLabel } from 'core/constants';
 import {
   secondaryGridHoverBgColor,
   textColor, secondaryAddressFontColor,
 } from 'core/colors';
-import { Routes } from 'core/routes';
-import { useNavigate } from 'react-router-dom';
 import ChakraLink from './ChakraLink';
-import { removeAccountToast } from './Toast';
 
 interface BgColorDictType {
   dark: string;
@@ -48,8 +45,6 @@ export default function SettingsListItem({
   const { colorMode } = useColorMode();
   const { activeAccount } = useActiveAccount();
   const { lockAccounts } = useInitializedAccounts();
-  const { removeAccount } = useUnlockedAccounts();
-  const navigate = useNavigate();
 
   const gridOnClick = useCallback(async () => {
     // todo: Create an enum for these titles for more typed code
@@ -57,13 +52,8 @@ export default function SettingsListItem({
       // todo: add toasts for removing the account
       // we should probably combine the toasts from the wallet drawer
       await lockAccounts();
-    } else if (title === settingsItemLabel.REMOVE_ACCOUNT) {
-      await removeAccount(activeAccount.address);
-      const removedAddress = `${activeAccount.address.slice(0, 4)}...${activeAccount.address.slice(62)}`;
-      removeAccountToast(`Successfully removed account ${removedAddress}`);
-      navigate(Routes.wallet.path);
     }
-  }, [activeAccount, lockAccounts, navigate, removeAccount, title]);
+  }, [activeAccount, lockAccounts, title]);
 
   const renderTitle = useMemo(() => {
     if (title === settingsItemLabel.NETWORK) {

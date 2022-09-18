@@ -22,6 +22,14 @@ export const createAccountToast = () => {
   });
 };
 
+export const lockAccountToast = ({ address }: { address: string }) => {
+  toast({
+    description: `Successfully lock account ${address}`,
+    status: 'success',
+    title: 'Locked account',
+  });
+};
+
 export const createAccountErrorToast = () => {
   toast({
     description: 'Error creating new account',

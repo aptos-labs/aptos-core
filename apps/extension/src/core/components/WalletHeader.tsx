@@ -124,7 +124,7 @@ export default function WalletHeader({
             ) : null
           }
           <VStack spacing={0} alignItems="flex-start" width="100%">
-            <Text fontSize="1.1vw" fontWeight={600}>
+            <Text fontSize="1.2rem" fontWeight={600}>
               {title}
             </Text>
             {walletNameAndAddress}

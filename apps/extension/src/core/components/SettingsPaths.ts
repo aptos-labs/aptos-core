@@ -83,7 +83,8 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
         title: settingsItemLabel.SWITCH_ACCOUNT,
       },
       {
-        path: null,
+        iconAfter: FiChevronRight,
+        path: Routes.remove_account.path,
         textColorDict: {
           dark: 'red.400',
           light: 'red.400',

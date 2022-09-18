@@ -52,6 +52,11 @@ export const checkCircleSuccessBg = {
   light: '#48BB78',
 };
 
+export const removeButtonBg = {
+  dark: '#D76D61',
+  light: '#D76D61',
+};
+
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',
