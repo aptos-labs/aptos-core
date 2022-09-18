@@ -460,8 +460,9 @@ fn create_employee_validators(
     employees: &[EmployeeAccountMap],
 ) {
     let employees_bytes = bcs::to_bytes(employees).expect("AccountMaps can be serialized");
-    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    let mut serialized_values = serialize_values(&[]);
     serialized_values.push(employees_bytes);
+
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -644,7 +645,8 @@ pub fn test_genesis_change_set_and_validators(
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
-    /// The Aptos account address of the validator.
+    /// The Aptos account address of the validator or the admin in the case of a commissioned or
+    /// vesting managed validator.
     pub owner_address: AccountAddress,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator).
@@ -795,7 +797,6 @@ pub struct AccountMap {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmployeeAccountMap {
     accounts: Vec<AccountAddress>,
-    // Note: the owner account address is irrelevant, this will be derived from a resource account
     validator: ValidatorWithCommissionRate,
     vesting_schedule_numerators: Vec<u64>,
     vesting_schedule_denominator: u64,
@@ -830,20 +831,40 @@ pub fn test_genesis_module_publishing() {
 
 #[test]
 pub fn test_mainnet_end_to_end() {
+    use aptos_types::{
+        account_address,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+        state_store::state_key::StateKey,
+        write_set::{TransactionWrite, WriteSet},
+    };
+
     let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
-    let test_validators = TestValidator::new_test_set(Some(3), Some(balance * 9 / 10));
-    let mut employee_validator = test_validators[0].data.clone();
-    let mut direct_validator = test_validators[1].data.clone();
-    let commissioned_validator = test_validators[2].data.clone();
+    let non_validator_balance = 10 * APTOS_COINS_BASE_WITH_DECIMALS;
 
     // currently just test that all functions have the right interface
+    let account44 = AccountAddress::from_hex_literal("0x44").unwrap();
     let account45 = AccountAddress::from_hex_literal("0x45").unwrap();
     let account46 = AccountAddress::from_hex_literal("0x46").unwrap();
     let account47 = AccountAddress::from_hex_literal("0x47").unwrap();
     let account48 = AccountAddress::from_hex_literal("0x48").unwrap();
     let account49 = AccountAddress::from_hex_literal("0x49").unwrap();
+    let operator0 = AccountAddress::from_hex_literal("0x100").unwrap();
+    let operator1 = AccountAddress::from_hex_literal("0x101").unwrap();
+    let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
+    let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
+    let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
+    let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
+    let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
+    let voter3 = AccountAddress::from_hex_literal("0x203").unwrap();
+    let admin0 = AccountAddress::from_hex_literal("0x300").unwrap();
+    let admin1 = AccountAddress::from_hex_literal("0x301").unwrap();
+    let admin2 = AccountAddress::from_hex_literal("0x302").unwrap();
 
     let accounts = vec![
+        AccountMap {
+            account_address: account44,
+            balance,
+        },
         AccountMap {
             account_address: account45,
             balance,
@@ -864,20 +885,91 @@ pub fn test_mainnet_end_to_end() {
             account_address: account49,
             balance,
         },
+        AccountMap {
+            account_address: admin0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: admin1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: admin2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: operator3,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter0,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter1,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter2,
+            balance: non_validator_balance,
+        },
+        AccountMap {
+            account_address: voter3,
+            balance: non_validator_balance,
+        },
     ];
 
-    employee_validator.owner_address = account49;
-    let employees = vec![EmployeeAccountMap {
-        accounts: vec![account46, account47],
-        validator: ValidatorWithCommissionRate {
-            validator: employee_validator,
-            validator_commission_percentage: 10,
-        },
-        vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
-        vesting_schedule_denominator: 48,
-    }];
+    let test_validators = TestValidator::new_test_set(Some(4), Some(balance * 9 / 10));
+    let mut employee_validator_1 = test_validators[0].data.clone();
+    employee_validator_1.owner_address = admin0;
+    employee_validator_1.operator_address = operator0;
+    employee_validator_1.voter_address = voter0;
+    let mut employee_validator_2 = test_validators[1].data.clone();
+    employee_validator_2.owner_address = admin1;
+    employee_validator_2.operator_address = operator1;
+    employee_validator_2.voter_address = voter1;
+    let mut direct_validator = test_validators[2].data.clone();
+    direct_validator.owner_address = account44;
+    direct_validator.operator_address = operator2;
+    direct_validator.voter_address = voter2;
+    let mut commissioned_validator = test_validators[3].data.clone();
+    commissioned_validator.owner_address = account45;
+    commissioned_validator.operator_address = operator3;
+    commissioned_validator.voter_address = voter3;
 
-    direct_validator.owner_address = account45;
+    let employees = vec![
+        EmployeeAccountMap {
+            accounts: vec![account46, account47],
+            validator: ValidatorWithCommissionRate {
+                validator: employee_validator_1,
+                validator_commission_percentage: 10,
+            },
+            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_denominator: 48,
+        },
+        EmployeeAccountMap {
+            accounts: vec![account48, account49],
+            validator: ValidatorWithCommissionRate {
+                validator: employee_validator_2,
+                validator_commission_percentage: 10,
+            },
+            vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+            vesting_schedule_denominator: 48,
+        },
+    ];
+
     let validators = vec![
         ValidatorWithCommissionRate {
             validator: commissioned_validator,
@@ -889,7 +981,7 @@ pub fn test_mainnet_end_to_end() {
         },
     ];
 
-    encode_aptos_mainnet_genesis_transaction(
+    let transaction = encode_aptos_mainnet_genesis_transaction(
         &accounts,
         &employees,
         &validators,
@@ -897,4 +989,43 @@ pub fn test_mainnet_end_to_end() {
         ChainId::mainnet(),
         &mainnet_genesis_config(),
     );
+
+    let direct_writeset = if let Transaction::GenesisTransaction(direct_writeset) = transaction {
+        direct_writeset
+    } else {
+        panic!("Invalid GenesisTransaction");
+    };
+
+    let changeset = if let WriteSetPayload::Direct(changeset) = direct_writeset {
+        changeset
+    } else {
+        panic!("Invalid WriteSetPayload");
+    };
+
+    let WriteSet::V0(writeset) = changeset.write_set();
+
+    let state_key = StateKey::AccessPath(ValidatorSet::access_path());
+    let bytes = writeset
+        .get(&state_key)
+        .unwrap()
+        .extract_raw_bytes()
+        .unwrap();
+    let validator_set: ValidatorSet = bcs::from_bytes(&bytes).unwrap();
+    let validator_set_addresses = validator_set
+        .active_validators
+        .iter()
+        .map(|v| v.account_address)
+        .collect::<Vec<_>>();
+
+    let commissioned_pool_address =
+        account_address::default_stake_pool_address(account45, operator3);
+    let employee_1_pool_address =
+        account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
+    let employee_2_pool_address =
+        account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
+
+    assert!(validator_set_addresses.contains(&employee_1_pool_address));
+    assert!(validator_set_addresses.contains(&employee_2_pool_address));
+    assert!(validator_set_addresses.contains(&commissioned_pool_address));
+    assert!(validator_set_addresses.contains(&account44));
 }

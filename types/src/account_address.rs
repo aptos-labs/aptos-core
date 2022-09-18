@@ -10,6 +10,7 @@ use aptos_crypto::{
 pub use move_deps::move_core_types::account_address::AccountAddress;
 
 const SALT: &[u8] = b"aptos_framework::staking_contract";
+const VESTING_POOL_SALT: &[u8] = b"aptos_framework::vesting";
 
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     AuthenticationKey::ed25519(public_key).derived_address()
@@ -36,7 +37,7 @@ pub fn default_stake_pool_address(
     owner: AccountAddress,
     operator: AccountAddress,
 ) -> AccountAddress {
-    create_stake_pool_address(owner, operator, &vec![])
+    create_stake_pool_address(owner, operator, &[])
 }
 
 pub fn create_stake_pool_address(
@@ -47,9 +48,32 @@ pub fn create_stake_pool_address(
     let mut full_seed = vec![];
     full_seed.extend(bcs::to_bytes(&owner).unwrap());
     full_seed.extend(bcs::to_bytes(&operator).unwrap());
-    full_seed.extend(SALT.clone());
-    full_seed.extend(seed.clone());
+    full_seed.extend(SALT);
+    full_seed.extend(seed);
     create_resource_address(owner, &full_seed)
+}
+
+pub fn create_vesting_contract_address(
+    admin: AccountAddress,
+    nonce: u64,
+    seed: &[u8],
+) -> AccountAddress {
+    let mut full_seed = vec![];
+    full_seed.extend(bcs::to_bytes(&admin).unwrap());
+    full_seed.extend(bcs::to_bytes(&nonce).unwrap());
+    full_seed.extend(VESTING_POOL_SALT);
+    full_seed.extend(seed);
+    create_resource_address(admin, &full_seed)
+}
+
+pub fn create_vesting_pool_address(
+    admin: AccountAddress,
+    operator: AccountAddress,
+    nonce: u64,
+    seed: &[u8],
+) -> AccountAddress {
+    let contract = create_vesting_contract_address(admin, nonce, seed);
+    create_stake_pool_address(contract, operator, seed)
 }
 
 pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountAddress {
