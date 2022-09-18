@@ -9,6 +9,7 @@ mod memory_metrics_collector;
 mod network_metrics_collector;
 mod process_metrics_collector;
 
+pub(crate) use common::CollectorLatencyCollector;
 pub(crate) use cpu_metrics_collector::CpuMetricsCollector;
 pub(crate) use cpu_metrics_collector::LinuxCpuMetricsCollector;
 pub(crate) use disk_metrics_collector::DiskMetricsCollector;

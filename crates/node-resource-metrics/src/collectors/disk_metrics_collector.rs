@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::common::NAMESPACE;
+use crate::collectors::common::MeasureLatency;
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
-use procfs::DiskStat;
 use prometheus::{
     core::{Collector, Desc, Describer},
     proto::MetricFamily,
     Opts,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use sysinfo::{DiskExt, RefreshKind, System, SystemExt};
 
 const DISK_SUBSYSTEM: &str = "disk";
@@ -90,6 +90,8 @@ impl Collector for DiskMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("disk".into());
+
         let mut system = self.system.lock();
         system.refresh_disks_list();
         system.refresh_disks();
@@ -128,6 +130,7 @@ impl Collector for DiskMetricsCollector {
     }
 }
 
+/// A Collector for exposing Linux Disk stats as metrics
 pub(crate) struct LinuxDiskMetricsCollector {
     num_reads: Desc,
     num_merged_reads: Desc,
@@ -192,6 +195,8 @@ impl Collector for LinuxDiskMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("linux_disk".into());
+
         macro_rules! disk_stats_counter {
             ($METRICS:ident, $DESC:ident, $FIELD:expr, $LABELS:expr) => {
                 $METRICS.extend(

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::collectors::common::{MeasureLatency, NAMESPACE};
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
@@ -11,8 +12,6 @@ use prometheus::{
 };
 use std::sync::Arc;
 use sysinfo::{ProcessExt, System, SystemExt};
-
-use super::common::NAMESPACE;
 
 const PROCESS_METRICS_COUNT: usize = 3;
 const PROCESS_SUBSYSTEM: &str = "process";
@@ -120,6 +119,8 @@ impl Collector for ProcessMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("process".into());
+
         let mut system = self.system.lock();
 
         let pid = if let Ok(pid) = sysinfo::get_current_pid() {
@@ -184,6 +185,7 @@ impl Collector for ProcessMetricsCollector {
     }
 }
 
+/// A Collector for exposing Linux process metrics
 pub(crate) struct LinuxProcessMetricsCollector {
     vm_size_bytes: Desc,
     vm_rss_bytes: Desc,
@@ -220,6 +222,8 @@ impl Collector for LinuxProcessMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("linux_process".into());
+
         let mut mfs = Vec::with_capacity(LINUX_PROCESS_METRICS_COUNT);
 
         let page_size = match procfs::page_size() {

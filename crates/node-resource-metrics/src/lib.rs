@@ -8,6 +8,8 @@ use collectors::{
     NetworkMetricsCollector, ProcessMetricsCollector,
 };
 
+use crate::collectors::CollectorLatencyCollector;
+
 mod collectors;
 
 /// Registers the node metrics collector with the default registry.
@@ -25,4 +27,5 @@ pub fn register_node_metrics_collector() {
             prometheus::register(Box::new(LinuxProcessMetricsCollector::default())).unwrap();
         }
     }
+    prometheus::register(Box::new(CollectorLatencyCollector::default())).unwrap();
 }

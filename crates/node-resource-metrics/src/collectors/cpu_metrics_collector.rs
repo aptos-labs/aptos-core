@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::common::NAMESPACE;
+use crate::collectors::common::MeasureLatency;
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
@@ -72,6 +73,8 @@ impl Collector for CpuMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("cpu".into());
+
         let mut system = self.system.lock();
 
         system.refresh_cpu();
@@ -118,6 +121,7 @@ impl Collector for CpuMetricsCollector {
     }
 }
 
+/// A Collector for exposing Linux CPU metrics
 pub(crate) struct LinuxCpuMetricsCollector {
     cpu: Desc,
 }
@@ -146,6 +150,8 @@ impl Collector for LinuxCpuMetricsCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
+        let _measure = MeasureLatency::new("linux_cpu".into());
+
         macro_rules! cpu_time_counter {
             ($METRICS:ident, $FIELD:expr, $LABEL:expr) => {
                 $METRICS.extend(
