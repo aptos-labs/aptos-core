@@ -788,7 +788,7 @@ module aptos_token::token {
 
         assert!(
             table::contains(&collections.collection_data, token_data_id.collection),
-            error::already_exists(ECOLLECTION_NOT_PUBLISHED),
+            error::not_found(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
             !table::contains(&collections.token_data, token_data_id),
@@ -1046,21 +1046,26 @@ module aptos_token::token {
             &mut collections.token_data,
             token_id.token_data_id,
         );
-        token_data.supply = token_data.supply - burned_amount;
 
-        // Delete the token_data if supply drops to 0.
-        if (token_data.supply == 0) {
-            let TokenData {
-                maximum: _,
-                largest_property_version: _,
-                supply: _,
-                uri: _,
-                royalty: _,
-                name: _,
-                description: _,
-                default_properties: _,
-                mutability_config: _,
-            } = table::remove(&mut collections.token_data, token_id.token_data_id);
+        // only update the supply if we tracking the supply and maximal
+        // maximal == 0 is reserved for unlimited token and collection with no tracking info.
+        if (token_data.maximum > 0) {
+            token_data.supply = token_data.supply - burned_amount;
+
+            // Delete the token_data if supply drops to 0.
+            if (token_data.supply == 0) {
+                let TokenData{
+                    maximum: _,
+                    largest_property_version: _,
+                    supply: _,
+                    uri: _,
+                    royalty: _,
+                    name: _,
+                    description: _,
+                    default_properties: _,
+                    mutability_config: _,
+                } = table::remove(&mut collections.token_data, token_id.token_data_id);
+            };
         };
     }
 
@@ -1303,7 +1308,7 @@ module aptos_token::token {
     }
 
     #[test(creator = @0xAF)]
-    fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
+    fun test_mint_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
         account::create_account_for_test(signer::address_of(creator));
 
         create_collection_and_token(creator, 2, 4, 4);
@@ -1482,5 +1487,80 @@ module aptos_token::token {
         );
 
         withdraw_with_capability(cap)
+    }
+
+    #[test(creator=@0xcafe, another_creator=@0xde)]
+    fun test_burn_token_from_both_limited_and_unlimited(
+        creator: &signer,
+        another_creator: &signer,
+    )acquires Collections, TokenStore {
+        // create limited token and collection
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(another_creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        // burn token from limited token
+        let creator_addr = signer::address_of(creator);
+        let pre_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
+        burn(creator, creator_addr, get_collection_name(), get_token_name(), 0, 1);
+        let aft_amount = &mut get_token_supply(creator_addr, token_id.token_data_id);
+        assert!((option::extract<u64>(pre_amount) - option::extract<u64>(aft_amount)) == 1, 1);
+
+        // create unlimited token and collection
+        let new_addr = signer::address_of(another_creator);
+        let new_token_id = create_collection_and_token(another_creator, 2, 0, 0);
+        let pre = balance_of(new_addr, new_token_id);
+        // burn token from unlimited token and collection
+        burn(another_creator, new_addr, get_collection_name(), get_token_name(), 0, 1);
+        let aft = balance_of(new_addr, new_token_id);
+        assert!(pre - aft == 1, 1);
+    }
+
+    #[test(creator=@0xcafe, owner=@0xafe)]
+    fun test_mint_token_to_different_address(
+        creator: &signer,
+        owner: &signer,
+    )acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let owner_addr = signer::address_of(owner);
+        opt_in_direct_transfer(owner, true);
+        mint_token_to(creator, owner_addr, token_id.token_data_id, 1);
+        assert!(balance_of(owner_addr, token_id) == 1, 1);
+    }
+
+    #[test(creator=@0xcafe, owner=@0xafe)]
+    #[expected_failure(abort_code = 327696)]
+    fun test_opt_in_direct_transfer_fail(
+        creator: &signer,
+        owner: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let owner_addr = signer::address_of(owner);
+        initialize_token_store(owner);
+        transfer(creator, token_id, owner_addr, 1);
+    }
+
+    #[test(creator=@0xcafe, owner=@0xafe)]
+    #[expected_failure(abort_code = 327696)]
+    fun test_opt_in_direct_deposit_fail(
+        creator: &signer,
+        owner: &signer,
+    ) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        let owner_addr = signer::address_of(owner);
+        let token = withdraw_token(creator, token_id, 2);
+        initialize_token_store(owner);
+        direct_deposit_with_opt_in(owner_addr, token);
     }
 }
