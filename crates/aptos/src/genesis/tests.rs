@@ -32,14 +32,16 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use vm_genesis::{AccountMap, EmployeeAccountMap};
+use vm_genesis::{AccountMap, EmployeeAccountMap, TestValidator, ValidatorWithCommissionRate};
+
+const INITIAL_BALANCE: u64 = 100_000_000_000_000;
 
 /// Test the E2E genesis flow since it doesn't require a node to run
 #[tokio::test]
 async fn test_genesis_e2e_flow() {
     let dir = TempPath::new();
     dir.create_as_dir().unwrap();
-    let git_options = create_users(2, &dir).await;
+    let git_options = create_users(2, &dir, &mut vec![]).await;
 
     // Now generate genesis
     let output_dir = TempPath::new();
@@ -58,20 +60,31 @@ async fn test_genesis_e2e_flow() {
 async fn test_mainnet_genesis_e2e_flow() {
     let dir = TempPath::new();
     dir.create_as_dir().unwrap();
-    let git_options = create_users(2, &dir).await;
+    let git_options = create_users(2, &dir, &mut vec![10, 0]).await;
+
+    let account_1 = AccountAddress::from_hex_literal("0x101").unwrap();
+    let account_2 = AccountAddress::from_hex_literal("0x102").unwrap();
+    let employee_1 = AccountAddress::from_hex_literal("0x201").unwrap();
+    let employee_2 = AccountAddress::from_hex_literal("0x202").unwrap();
+    let employee_3 = AccountAddress::from_hex_literal("0x203").unwrap();
+    let employee_4 = AccountAddress::from_hex_literal("0x204").unwrap();
+    let admin = AccountAddress::from_hex_literal("0x301").unwrap();
 
     // Create initial balances and employee vesting account files.
     let git_dir = git_options.local_repository_dir.as_ref().unwrap().as_path();
     create_account_balances_file(
         PathBuf::from(git_dir),
         vec![
-            AccountAddress::from_hex_literal("0x123").unwrap(),
-            AccountAddress::from_hex_literal("0x234").unwrap(),
+            account_1, account_2, employee_1, employee_2, employee_3, employee_4, admin,
         ],
-        vec![1, 2],
     )
     .await;
-    create_employee_vesting_accounts_file(PathBuf::from(git_dir)).await;
+    create_employee_vesting_accounts_file(
+        PathBuf::from(git_dir),
+        admin,
+        &vec![vec![employee_1, employee_2], vec![employee_3, employee_4]],
+    )
+    .await;
 
     // Now generate genesis
     let output_dir = TempPath::new();
@@ -86,7 +99,11 @@ async fn test_mainnet_genesis_e2e_flow() {
     assert!(genesis_file.exists());
 }
 
-async fn create_users(num_users: u8, dir: &TempPath) -> GitOptions {
+async fn create_users(
+    num_users: u8,
+    dir: &TempPath,
+    commission_rates: &mut Vec<u64>,
+) -> GitOptions {
     let mut users: HashMap<String, PathBuf> = HashMap::new();
     for i in 0..num_users {
         let name = format!("user-{}", i);
@@ -101,7 +118,18 @@ async fn create_users(num_users: u8, dir: &TempPath) -> GitOptions {
     let git_options = setup_git_dir(&root_private_key, names, ChainId::test()).await;
 
     for (name, user_dir) in users.iter() {
-        set_validator_config(name.to_string(), git_options.clone(), user_dir.as_path()).await;
+        let commission_rate = if commission_rates.is_empty() {
+            0
+        } else {
+            commission_rates.remove(0)
+        };
+        set_validator_config(
+            name.to_string(),
+            git_options.clone(),
+            user_dir.as_path(),
+            commission_rate,
+        )
+        .await;
     }
     git_options
 }
@@ -207,7 +235,12 @@ async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
 }
 
 /// Set validator configuration for a user
-async fn set_validator_config(username: String, git_options: GitOptions, keys_dir: &Path) {
+async fn set_validator_config(
+    username: String,
+    git_options: GitOptions,
+    keys_dir: &Path,
+    commission_percentage: u64,
+) {
     let command = SetValidatorConfiguration {
         username,
         git_options,
@@ -217,23 +250,18 @@ async fn set_validator_config(username: String, git_options: GitOptions, keys_di
         full_node_host: None,
         operator_public_identity_file: None,
         voter_public_identity_file: None,
-        commission_percentage: 0,
+        commission_percentage,
     };
 
     command.execute().await.unwrap()
 }
 
-async fn create_account_balances_file(
-    path: PathBuf,
-    addresses: Vec<AccountAddress>,
-    balances: Vec<u64>,
-) {
+async fn create_account_balances_file(path: PathBuf, addresses: Vec<AccountAddress>) {
     let account_balances: &Vec<AccountMap> = &addresses
         .iter()
-        .zip(balances)
-        .map(|(account_address, balance)| AccountMap {
+        .map(|account_address| AccountMap {
             account_address: *account_address,
-            balance,
+            balance: INITIAL_BALANCE,
         })
         .collect();
 
@@ -245,9 +273,34 @@ async fn create_account_balances_file(
     .unwrap();
 }
 
-// TODO: Update to generate real employee vesting account details.
-async fn create_employee_vesting_accounts_file(path: PathBuf) {
-    let employee_vesting_accounts: Vec<EmployeeAccountMap> = vec![];
+async fn create_employee_vesting_accounts_file(
+    path: PathBuf,
+    admin_address: AccountAddress,
+    employee_groups: &Vec<Vec<AccountAddress>>,
+) {
+    let test_validators =
+        TestValidator::new_test_set(Some(employee_groups.len()), Some(INITIAL_BALANCE));
+    let employee_vesting_accounts: Vec<_> = employee_groups
+        .iter()
+        .enumerate()
+        .map(|(index, account)| {
+            let mut validator = test_validators[index].data.clone();
+            validator.owner_address = admin_address;
+            validator.operator_address = admin_address;
+            validator.voter_address = admin_address;
+            EmployeeAccountMap {
+                accounts: account.clone(),
+                validator: ValidatorWithCommissionRate {
+                    validator,
+                    validator_commission_percentage: 10,
+                },
+                vesting_schedule_numerators: vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1,
+                ],
+                vesting_schedule_denominator: 48,
+            }
+        })
+        .collect();
 
     write_to_file(
         &path.join(EMPLOYEE_VESTING_ACCOUNTS_FILE),
