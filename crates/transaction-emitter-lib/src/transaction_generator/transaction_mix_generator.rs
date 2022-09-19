@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use async_trait::async_trait;
+use futures::future::join_all;
 use rand::prelude::StdRng;
 use rand::Rng;
 use rand_core::{OsRng, SeedableRng};
@@ -53,16 +55,23 @@ impl TxnMixGeneratorCreator {
     }
 }
 
+#[async_trait]
 impl TransactionGeneratorCreator for TxnMixGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(TxnMixGenerator::new(
             StdRng::from_seed(OsRng.gen()),
-            self.txn_mix_creators
-                .iter()
-                .map(|(generator_creator, weight)| {
-                    (generator_creator.create_transaction_generator(), *weight)
-                })
-                .collect(),
+            join_all(
+                self.txn_mix_creators
+                    .iter()
+                    .map(|(generator_creator, weight)| async {
+                        (
+                            generator_creator.create_transaction_generator().await,
+                            *weight,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await,
         ))
     }
 }
