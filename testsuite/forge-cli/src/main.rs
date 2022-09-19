@@ -532,7 +532,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     .transaction_type(if test_name == "account_creation" {
                         TransactionType::AccountGeneration
                     } else {
-                        TransactionType::NftMint
+                        TransactionType::NftMintAndTransfer
                     }),
             )
             .with_success_criteria(SuccessCriteria::new(
