@@ -127,7 +127,7 @@ impl FetchMetadata {
         end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
         let (last_events, state) = client
-            .get_new_block_events(None, Some(1))
+            .get_new_block_events_bcs(None, Some(1))
             .await?
             .into_parts();
         let mut start_seq_num = state.oldest_block_height;
@@ -142,7 +142,7 @@ impl FetchMetadata {
             }
 
             let oldest_event = client
-                .get_new_block_events(Some(start_seq_num), Some(1))
+                .get_new_block_events_bcs(Some(start_seq_num), Some(1))
                 .await?
                 .into_inner()
                 .into_iter()
@@ -181,7 +181,7 @@ impl FetchMetadata {
                 let mid = (start_seq_num + search_end) / 2;
 
                 let mid_epoch = client
-                    .get_new_block_events(Some(mid), Some(1))
+                    .get_new_block_events_bcs(Some(mid), Some(1))
                     .await?
                     .into_inner()
                     .first()
@@ -215,7 +215,9 @@ impl FetchMetadata {
 
         let mut cursor = start_seq_num;
         loop {
-            let events = client.get_new_block_events(Some(cursor), Some(batch)).await;
+            let events = client
+                .get_new_block_events_bcs(Some(cursor), Some(batch))
+                .await;
 
             if events.is_err() {
                 println!(

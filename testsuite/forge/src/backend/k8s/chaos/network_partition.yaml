@@ -16,7 +16,7 @@ spec:
     selector:
       namespaces:
         - {namespace}
-      labelSelectors:
-        app.kubernetes.io/name: validator
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [validator-0, validator-1, validator-2] }}
     mode: fixed-percent
     value: "{partition_percentage}"

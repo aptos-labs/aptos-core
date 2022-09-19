@@ -21,8 +21,8 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
-} from "./aptos_types";
-import { Serializer } from "./bcs";
+} from "../aptos_types";
+import { Serializer } from "../bcs";
 
 function assertType(val: any, types: string[] | string, message?: string) {
   if (!types?.includes(typeof val)) {

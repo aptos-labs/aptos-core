@@ -512,10 +512,9 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if legacy_flow {
             // Send the compiled module using a module bundle
             txn_options
-                .submit_transaction(
-                    TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units)),
-                    None,
-                )
+                .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
+                    compiled_units,
+                )))
                 .await
                 .map(TransactionSummary::from)
         } else {
@@ -536,7 +535,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 )));
             }
             txn_options
-                .submit_transaction(payload, None)
+                .submit_transaction(payload)
                 .await
                 .map(TransactionSummary::from)
         }
@@ -716,7 +715,7 @@ pub struct RunFunction {
 
     /// Arguments combined with their type separated by spaces.
     ///
-    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    /// Supported types [u8, u64, u128, bool, hex, string, address, raw]
     ///
     /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
@@ -754,15 +753,12 @@ impl CliCommand<TransactionSummary> for RunFunction {
         }
 
         self.txn_options
-            .submit_transaction(
-                TransactionPayload::EntryFunction(EntryFunction::new(
-                    self.function_id.module_id,
-                    self.function_id.member_id,
-                    type_args,
-                    args,
-                )),
-                None,
-            )
+            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
+                self.function_id.module_id,
+                self.function_id.member_id,
+                type_args,
+                args,
+            )))
             .await
             .map(TransactionSummary::from)
     }
@@ -790,10 +786,11 @@ impl CliCommand<TransactionSummary> for RunScript {
 
         let txn = self
             .txn_options
-            .submit_transaction(
-                TransactionPayload::Script(Script::new(bytecode, vec![], vec![])),
-                None,
-            )
+            .submit_transaction(TransactionPayload::Script(Script::new(
+                bytecode,
+                vec![],
+                vec![],
+            )))
             .await?;
         Ok(TransactionSummary::from(&txn))
     }
@@ -808,6 +805,7 @@ pub(crate) enum FunctionArgType {
     U8,
     U64,
     U128,
+    Raw,
 }
 
 impl FunctionArgType {
@@ -836,6 +834,11 @@ impl FunctionArgType {
                 &u128::from_str(arg)
                     .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
             ),
+            FunctionArgType::Raw => {
+                let raw = hex::decode(arg)
+                    .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?;
+                Ok(raw)
+            }
         }
         .map_err(|err| CliError::BCS("arg", err))
     }
@@ -852,7 +855,8 @@ impl FromStr for FunctionArgType {
             "u8" => Ok(FunctionArgType::U8),
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
-            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','string','u8','u64','u128']", str))),
+            "raw" => Ok(FunctionArgType::Raw),
+            str => Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','string','u8','u64','u128','raw']", str))),
         }
     }
 }

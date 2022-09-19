@@ -5,11 +5,11 @@ slug: "node-requirements"
 
 # Node Requirements
 
-Follow the requirements specified in this document to make your AIT-3 Validator and fullnode deployment hassle-free.
+Follow the requirements specified in this document to make your Testnet/Mainnet Validator and fullnode deployment hassle-free.
 
 ## Validator and fullnode
 
-- For the AIT-3, we require that you run the Validator. We recommend that optionally you run a fullnode also. However, a fullnode is not required. 
+- For the Testnet/Mainnet, we require that you run the Validator. We recommend that optionally you run a fullnode also. However, a fullnode is not required. 
 - If you run fullnode also, then we strongly recommend that you run the Validator and the fullnode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the fullnode will help ensure smooth deployment of these nodes.
 - For best availability and stability, **we recommend that you deploy your node on the cloud**. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure. See [Validators](/nodes/validator-node/validators).
 - Make sure that you open the network ports prior to the date the AIT goes live. See [Networking configuration requirements](#networking-requirements).
@@ -17,7 +17,7 @@ Follow the requirements specified in this document to make your AIT-3 Validator 
 
 ## Validator node in test mode
 
-You must run a validator node in the test mode to be eligible for AIT-3. This is a method Aptos Labs uses to verify that a node operator can successfully start a validator node and configure it properly with the Aptos network identity. 
+You must run a validator node in the test mode to be eligible for Testnet/Mainnet. This is a method Aptos Labs uses to verify that a node operator can successfully start a validator node and configure it properly with the Aptos network identity. 
 
 In test mode, you will be running a local network with one single node, and it should be functioning like a normal blockchain.
 
@@ -30,27 +30,28 @@ For running an Aptos **validator and fullnode** we recommend the following hardw
       - 2.8GHz, or faster
       - Intel Xeon Skylake or newer
   - **Memory**: 32GB RAM.
+  - **Storage**: 1T SSD with at least 40K IOPS and 200MiB/s bandwidth.
+  - **Networking bandwidth**: 1Gbps
 
 Example machine types on various clouds:
   - AWS
-      - c5.4xlarge
-      - c6i.4xlarge
+      - c6id.4xlarge (if use local SSD)
+      - c6i.8xlarge + io1/io2 EBS volume with 40K IOPS.
   - GCP
-      - c2-standard-16
-  - Azure
-      - Standard_B8ms
+      - n2-standard-16 (if use local SSD)
+      - n2-standard-32 + pd-ssd with 40K IOPS.
 
-## Storage requirements
+### Implications on hardware requirements
 
-The amount of data stored by the Aptos Blockhain depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner.
+The amount of data stored by the Aptos Blockhain depends on the ledger history (the number of transactions) of the blockchain and the number of on-chain states (e.g., accounts and resources). These values depend on several factors, including: the age of the blockchain, the average transaction rate, and the configuration of the ledger pruner.
 
-We recommend nodes have at least 300GB of disk space to ensure adequate storage space for load testing. You have the option to start with a smaller size and adjust based upon demands. You will be responsible for monitoring your node's disk usage and adjusting appropriately to ensure node uptime.
+Hardware requirements depend on the transaction rate and storage demands. Over time, hardware requirements will need to scale with these demands. The current hardware requirements are set with the consideration of estimated growth over the next 6 months.
 
-## Networking requirements
+**Local SSD v.s. network storage**
 
-Bandwidth requirement: 1 Gbps
+Cloud deployments typically must make a decision between using local or network storage (e.g., AWS EBS, GCP PD). Local SSD typically provides lower latency and cost especially relative to IOPS. Network storage usually requires additional CPU support to scale IOPS. In contrast, network storage provides better support for backup/snapshot support and resilience for nodes in scenarios where the instance is stopped. Network storage makes it easier to support storage for high availability.
 
-### Ports
+## Ports
 
 When you are running a validator node, you are required to open network ports on your node to allow other nodes to connect to you. For fullnodes this is optional.
 

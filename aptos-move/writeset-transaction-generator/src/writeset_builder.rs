@@ -5,6 +5,7 @@ use anyhow::format_err;
 use aptos_crypto::HashValue;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_state_view::StateView;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -110,6 +111,7 @@ where
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
+        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

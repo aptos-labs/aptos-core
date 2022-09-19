@@ -4,7 +4,6 @@ set -ex
 
 IMAGES=(
   validator
-  indexer
   node-checker
   tools
   faucet

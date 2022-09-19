@@ -58,6 +58,7 @@ As an owner:
 
 - Bob owns the funds that will be used for staking.
 - Only Bob can add or unlock or withdraw funds.
+- Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 - The reward will be deposited into Bob's (owner's) account.
 
@@ -100,7 +101,7 @@ Participating as a validator node on the Aptos network works like this:
 4. Your stake will automatically be locked up for a fixed duration (set by the Aptos governance) and will be automatically renewed at expiration. You cannot withdraw any of your staked amount until your lockup period expires. See [https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728](https://github.com/aptos-labs/aptos-core/blob/00a234cc233b01f1a7e1680f81b72214a7af91a9/aptos-move/framework/aptos-framework/sources/stake.move#L728).
 
 :::tip Joining the validator set
-For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](https://aptos.dev/nodes/ait/connect-to-testnet#joining-validator-set).
+For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](/nodes/ait/connect-to-testnet#joining-validator-set).
 :::
 
 ### Minimum and maximum stake
@@ -108,6 +109,8 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. 
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
+
+The owner can withdraw part of the stake and leave their balance below the required minimum. In such case, their stake pool will be removed from the validator set when the next epoch starts.
 
 ### Automatic lockup duration
 
@@ -120,6 +123,10 @@ When your lockup period expires, it will be automatically renewed, so that you c
 ### Unlocking your stake
 
 You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. 
+
+### Resetting the lockup
+
+When the lockup period expires, it is automatically renewed by the network. However, the owner can explicitly reset the lockup. 
 
 :::tip Set by the governance
 
@@ -155,51 +162,32 @@ Rewards for staking are calculated by using:
 
 1. The `rewards_rate`, an annual percentage yield (APY), i.e., rewards accrue as a compound interest on your current staked amount.
 2. Your staked amount, and 
-3. Your voting performance.
+3. Your proposer performance in the Aptos governance.
 
 :::tip Set by the governance
-
 The `rewards_rate` is set by the Aptos governance.
-
 :::
 
-### Rewards paid every epoch
-
-Rewards are paid every epoch. Any reward you earned at the end of current epoch is added to your staked amount. The reward at the end of the next epoch is calculated based on your increased staked amount (i.e., original staked amount plus the added reward), and so on.
+Also see [Validation on the Aptos blockchain](#validation-on-the-aptos-blockchain).
 
 ### Rewards formula
 
-See below the formula used to calculate rewards:
+See below the formula used to calculate rewards to the validator:
 
 ```
-Reward = staked_amount * rewards_rate * (Number of successful votes / Total number of blocks in the current epoch)
+Reward = staked_amount * rewards_rate per epoch * (Number of successful proposals by the validator / Total number of proposals made by the validator)
 ```
 
-### Rewards based on the voting performance
+### Rewards paid every epoch
 
-Your rewards calculation also uses your voting performance. Once you are in the validator set, you can vote in every epoch. The more consistently you vote, i.e., vote in every epoch, without any missed votes, you will receive additional voting power. This voting power is used to calculate your rewards. 
+Rewards are paid every epoch. Any reward you (i.e., validator) earned at the end of current epoch is added to your staked amount. The reward at the end of the next epoch is calculated based on your increased staked amount (i.e., original staked amount plus the added reward), and so on.
 
-For every epoch, your voting performance is determined as follows:
+### Rewards based on the proposer performance
 
-- A running count of your missed votes, `validator_missed_votes_counts`, is maintained.
-- The number of successful votes cast by you is calculated as:
-
-```
-Total number of successful votes = Total number of blocks in the epoch - Total number of your missed votes in the current epoch
-```
-
-Hence:
-
-```
-Reward = staked_amount * rewards_rate * (Number of successful votes / Total number of blocks in the current epoch)
-```
+The validator rewards calculation uses the validator's proposer performance. Once you are in the validator set, you can propose in every epoch. The more successfully you propose, i.e., your proposals pass, the more rewards you will receive. 
 
 :::tip
-A validator’s missed votes count does not affect whether the validator is in the validator set or not. The missed votes count is used only to calculate the rewards, using the above formula.
-:::
-
-:::tip
-All your rewards are also subject to lockup period as they are added to the original staked amount. Hence you cannot withdraw your rewards until your lockup period has entirely expired.
+All the validator rewards are also subject to lockup period as they are added to the original staked amount. 
 :::
 
 ## Leaving the validator set

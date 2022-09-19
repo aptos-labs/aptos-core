@@ -2,20 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, MempoolTransaction, TimelineState, TtlCache},
-    tests::common::{
-        add_signed_txn, add_txn, add_txns_to_mempool, exist_in_metrics_cache, setup_mempool,
-        TestTransaction,
-    },
+    core_mempool::{CoreMempool, MempoolTransaction, TimelineState},
+    tests::common::{add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool, TestTransaction},
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
-use std::{
-    collections::HashSet,
-    time::{Duration, SystemTime},
-};
+use std::time::SystemTime;
+use std::{collections::HashSet, time::Duration};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
@@ -68,15 +63,35 @@ fn test_transaction_ordering_only_seqnos() {
 }
 
 #[test]
-fn test_metric_cache_add_local_txns() {
+fn test_transaction_metrics() {
     let (mut mempool, _) = setup_mempool();
-    let txns = add_txns_to_mempool(
-        &mut mempool,
-        vec![TestTransaction::new(0, 0, 1), TestTransaction::new(1, 0, 2)],
+
+    let txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
+    mempool.add_txn(
+        txn.clone(),
+        txn.gas_unit_price(),
+        AccountSequenceInfo::Sequential(0),
+        TimelineState::NotReady,
     );
-    // Check txns' timestamps exist in metrics_cache.
-    assert_eq!(exist_in_metrics_cache(&mempool, &txns[0]), true);
-    assert_eq!(exist_in_metrics_cache(&mempool, &txns[1]), true);
+    let txn = TestTransaction::new(1, 0, 2).make_signed_transaction();
+    mempool.add_txn(
+        txn.clone(),
+        txn.gas_unit_price(),
+        AccountSequenceInfo::Sequential(0),
+        TimelineState::NonQualified,
+    );
+
+    // Check timestamp returned for broadcast-able transaction
+    assert!(mempool
+        .get_transaction_store()
+        .get_insertion_time(&TestTransaction::get_address(0), 0)
+        .is_some());
+
+    // Check timestamp not returned for non-broadcast-able transaction
+    assert!(mempool
+        .get_transaction_store()
+        .get_insertion_time(&TestTransaction::get_address(1), 0)
+        .is_none());
 }
 
 #[test]
@@ -203,20 +218,6 @@ fn test_commit_callback() {
     pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
     // Verify that we can execute transaction 6.
     assert_eq!(pool.get_batch(1, 1024, HashSet::new())[0], txns[0]);
-}
-
-#[test]
-fn test_sequence_number_cache() {
-    // Checks potential race where StateDB is lagging.
-    let mut pool = setup_mempool().0;
-    // Callback from consensus should set current sequence number for account.
-    pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
-
-    // Try to add transaction with sequence number 6 to pool (while last known executed transaction
-    // for AC is 0).
-    add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
-    // Verify that we can execute transaction 6.
-    assert_eq!(pool.get_batch(1, 1024, HashSet::new()).len(), 1);
 }
 
 #[test]
@@ -366,6 +367,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         1,
         TimelineState::NotReady,
         AccountSequenceInfo::Sequential(0),
+        SystemTime::now(),
     )
 }
 
@@ -490,30 +492,6 @@ fn test_clean_stuck_transactions() {
 }
 
 #[test]
-fn test_ttl_cache() {
-    let mut cache = TtlCache::new(2, Duration::from_secs(1));
-    // Test basic insertion.
-    cache.insert(1, 1);
-    cache.insert(1, 2);
-    cache.insert(2, 2);
-    cache.insert(1, 3);
-    assert_eq!(cache.get(&1), Some(&3));
-    assert_eq!(cache.get(&2), Some(&2));
-    assert_eq!(cache.size(), 2);
-    // Test reaching max capacity.
-    cache.insert(3, 3);
-    assert_eq!(cache.size(), 2);
-    assert_eq!(cache.get(&1), Some(&3));
-    assert_eq!(cache.get(&3), Some(&3));
-    assert_eq!(cache.get(&2), None);
-    // Test ttl functionality.
-    cache.gc(SystemTime::now()
-        .checked_add(Duration::from_secs(10))
-        .unwrap());
-    assert_eq!(cache.size(), 0);
-}
-
-#[test]
 fn test_get_transaction_by_hash() {
     let mut pool = setup_mempool().0;
     let db_sequence_number = 10;
@@ -577,4 +555,45 @@ fn test_bytes_limit() {
     let limit = 10;
     let hit_limit = pool.get_batch(100, txn_size * limit, HashSet::new());
     assert_eq!(hit_limit.len(), limit as usize);
+}
+
+#[test]
+fn test_transaction_store_remove_account_if_empty() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 100;
+    let mut pool = CoreMempool::new(&config);
+
+    assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
+
+    add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
+    add_txn(&mut pool, TestTransaction::new(1, 1, 1)).unwrap();
+    add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
+    assert_eq!(pool.get_transaction_store().get_transactions().len(), 2);
+
+    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    pool.remove_transaction(&TestTransaction::get_address(1), 1, false);
+    pool.remove_transaction(&TestTransaction::get_address(2), 0, true);
+    assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
+
+    add_txn(&mut pool, TestTransaction::new(2, 2, 1)).unwrap();
+    assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
+
+    pool.remove_transaction(&TestTransaction::get_address(2), 2, true);
+    assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
+}
+
+#[test]
+fn test_sequence_number_behavior_at_capacity() {
+    let mut config = NodeConfig::random();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+
+    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+    add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
+    add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
+    pool.remove_transaction(&TestTransaction::get_address(2), 0, false);
+
+    let batch = pool.get_batch(10, 10240, HashSet::new());
+    assert_eq!(batch.len(), 1);
 }

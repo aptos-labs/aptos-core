@@ -14,12 +14,14 @@ use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
 use testcases::consensus_reliability_tests::ChangingWorkingQuorumTest;
 use testcases::continuous_progress_test::ContinuousProgressTest;
+use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
 use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
@@ -449,7 +451,16 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 helm_values["chain"]["epoch_duration_secs"] = 30.into();
             })),
         "config" => config.with_network_tests(vec![&ReconfigurationTest]),
-        "network_partition" => config.with_network_tests(vec![&NetworkPartitionTest]),
+        "network_partition" => config
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_network_tests(vec![&NetworkPartitionTest])
+            .with_success_criteria(SuccessCriteria::new(
+                3000,
+                10000,
+                true,
+                Some(Duration::from_secs(240)),
+                None,
+            )),
         "network_latency" => config
             .with_network_tests(vec![&NetworkLatencyTest])
             .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
@@ -468,6 +479,32 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 10000,
                 true,
                 Some(Duration::from_secs(240)),
+                None,
+            )),
+        "validator_reboot_stress_test" => config
+            .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
+            .with_initial_fullnode_count(1)
+            .with_network_tests(vec![&ValidatorRebootStressTest])
+            .with_success_criteria(SuccessCriteria::new(
+                3000,
+                50000,
+                false,
+                Some(Duration::from_secs(600)),
+                None,
+            ))
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 120.into();
+            })),
+        "fullnode_reboot_stress_test" => config
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_initial_fullnode_count(10)
+            .with_network_tests(vec![&FullNodeRebootStressTest])
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_success_criteria(SuccessCriteria::new(
+                2000,
+                50000,
+                false,
+                Some(Duration::from_secs(600)),
                 None,
             )),
         "account_creation_state_sync" => config
@@ -627,8 +664,10 @@ fn state_sync_perf_fullnodes_apply_outputs(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -643,8 +682,10 @@ fn state_sync_perf_fullnodes_execute_transactions(
     forge_config: ForgeConfig<'static>,
 ) -> ForgeConfig<'static> {
     state_sync_perf_fullnodes_config(forge_config)
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -658,8 +699,10 @@ fn state_sync_perf_fullnodes_execute_transactions(
 fn state_sync_perf_validators(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     forge_config
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_node_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ApplyTransactionOutputsFromGenesis".into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]

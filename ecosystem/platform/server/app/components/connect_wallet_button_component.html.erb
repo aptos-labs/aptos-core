@@ -1,4 +1,4 @@
-<%= content_tag :div, data: { controller: 'connect-wallet', connect_wallet_wallet_persisted_value: @wallet.persisted?, connect_wallet_required_network_value: @required_network } do %>
+<%= content_tag :div, data: { controller: 'connect-wallet', connect_wallet_required_network_value: @required_network } do %>
   <%= render @dialog do |dialog| %>
     <% dialog.with_title do %>
       Select Wallet

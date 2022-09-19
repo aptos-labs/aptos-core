@@ -32,7 +32,7 @@
         <%= render DividerComponent.new(class: 'mb-4') %>
         <div class="flex flex-col gap-8">
           <%= form_with url: 'https://aptoslabs.us18.list-manage.com/subscribe/post?u=5456bc936272125ed825d0218&amp;id=a15b523910', method: 'post', html: { target: '_blank' }, data: { turbo: false }, class: 'flex flex-col xl:flex-row gap-2 !text-sm', builder: AptosFormBuilder do |form| %>
-            <%= form.email_field :EMAIL, required: true, class: '!text-sm', placeholder: 'Enter Email' %>
+            <%= form.email_field :EMAIL, required: true, class: '!text-sm py-2', placeholder: 'Enter Email' %>
             <%= form.submit 'Subscribe', size: :small, scheme: :secondary %>
           <% end %>
           <div class="flex gap-4 items-center">

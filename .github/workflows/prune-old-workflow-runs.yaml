@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
-      - run: yarn task pruneGithubWorkflowRuns
+      - run: yarn pruneGithubWorkflowRuns
         env:
           GITHUB_TOKEN: ${{ github.token }}
         working-directory: .github/ts-tasks

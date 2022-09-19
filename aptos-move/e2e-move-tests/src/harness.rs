@@ -6,7 +6,7 @@ use aptos::move_tool::MemberId;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, Uniform};
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
-use aptos_types::on_chain_config::GasSchedule;
+use aptos_types::on_chain_config::{FeatureFlag, GasSchedule};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -14,6 +14,7 @@ use aptos_types::{
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_packages::aptos_stdlib;
+use framework::natives::code::PackageMetadata;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
@@ -69,6 +70,14 @@ impl MoveHarness {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
+    }
+
+    pub fn new_with_features(features: Vec<FeatureFlag>) -> Self {
+        let mut h = Self::new();
+        if !features.is_empty() {
+            h.enable_features(features);
+        }
+        h
     }
 
     pub fn new_mainnet() -> Self {
@@ -197,18 +206,22 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
     pub fn create_publish_package(
         &mut self,
         account: &Account,
         path: &Path,
         options: Option<BuildOptions>,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         let code = package.extract_code();
-        let metadata = package
+        let mut metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -220,7 +233,7 @@ impl MoveHarness {
 
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, None);
+        let txn = self.create_publish_package(account, path, None, |_| {});
         self.run(txn)
     }
 
@@ -231,7 +244,18 @@ impl MoveHarness {
         path: &Path,
         options: BuildOptions,
     ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, Some(options));
+        let txn = self.create_publish_package(account, path, Some(options), |_| {});
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package, and alllows to patch the metadata
+    pub fn publish_package_with_patcher(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        metadata_patcher: impl FnMut(&mut PackageMetadata),
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, None, metadata_patcher);
         self.run(txn)
     }
 
@@ -294,6 +318,24 @@ impl MoveHarness {
         self.read_resource_raw(addr, struct_tag).is_some()
     }
 
+    /// Enables features
+    pub fn enable_features(&mut self, features: Vec<FeatureFlag>) {
+        let acc = self.aptos_framework_account();
+        let enable = features.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        self.executor.exec(
+            "features",
+            "change_feature_flags",
+            vec![],
+            vec![
+                MoveValue::Signer(*acc.address())
+                    .simple_serialize()
+                    .unwrap(),
+                bcs::to_bytes(&enable).unwrap(),
+                bcs::to_bytes(&Vec::<u64>::new()).unwrap(),
+            ],
+        );
+    }
+
     /// Increase maximal transaction size.
     pub fn increase_transaction_size(&mut self) {
         // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
@@ -310,6 +352,7 @@ impl MoveHarness {
                 }
             })
             .collect::<Vec<_>>();
+        // TODO(Gas): use GasScheduleV2 for the next testnet release
         let schedule_bytes = bcs::to_bytes(&GasSchedule { entries }).expect("bcs");
         // set_gas_schedule is not a transaction, so directly call as function
         self.executor.exec(

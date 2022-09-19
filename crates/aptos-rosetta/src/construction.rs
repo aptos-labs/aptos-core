@@ -24,7 +24,7 @@
 //! a connection to a full node.  The online ones need a connection to a full node.
 //!
 
-use crate::common::{native_coin_tag, parse_currency};
+use crate::common::parse_currency;
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
@@ -218,8 +218,6 @@ async fn construction_hash(
     })
 }
 
-const MAX_GAS_UNITS_PER_REQUEST: u64 = 1_000_000;
-
 /// Construction metadata command
 ///
 /// Retrieve sequence number for submitting transactions
@@ -248,44 +246,26 @@ async fn construction_metadata(
         response.inner().sequence_number
     };
 
-    // Determine the gas price (either provided from upstream, or through estimation)
-    let gas_price_per_unit = if let Some(gas_price) = request.options.gas_price_per_unit {
-        gas_price.0
+    // If both are present, we skip simulation
+    let (suggested_fee, gas_unit_price, max_gas_amount) = if let (
+        Some(gas_unit_price),
+        Some(max_gas_amount),
+    ) = (
+        request.options.gas_price_per_unit,
+        request.options.max_gas_amount,
+    ) {
+        let suggested_fee = Amount::suggested_gas_fee(gas_unit_price.0, max_gas_amount.0);
+        (suggested_fee, gas_unit_price.0, max_gas_amount.0)
     } else {
-        rest_client
-            .estimate_gas_price()
-            .await?
-            .into_inner()
-            .gas_estimate
-    };
+        // If we have any missing fields, let's simulate!
+        let mut transaction_factory = TransactionFactory::new(server_context.chain_id);
 
-    // Determine max gas by simulation if it isn't provided
-    let max_gas_amount = if let Some(max_gas) = request.options.max_gas_amount {
-        max_gas.0
-    } else {
-        let account_balance = rest_client
-            .get_account_balance_bcs(address, &native_coin_tag().to_string())
-            .await
-            .map_err(|err| ApiError::GasEstimationFailed(Some(err.to_string())))?
-            .into_inner();
+        // If there's a gas unit price we're using it, max gas doesn't matter the API will overwrite it
+        if let Some(gas_unit_price) = request.options.gas_price_per_unit {
+            transaction_factory = transaction_factory.with_gas_unit_price(gas_unit_price.0)
+        }
 
-        let maximum_possible_gas =
-            if let InternalOperation::Transfer(ref transfer) = request.options.internal_operation {
-                std::cmp::min(
-                    (account_balance.saturating_sub(transfer.amount.0)) / gas_price_per_unit,
-                    MAX_GAS_UNITS_PER_REQUEST,
-                )
-            } else {
-                std::cmp::min(
-                    account_balance / gas_price_per_unit,
-                    MAX_GAS_UNITS_PER_REQUEST,
-                )
-            };
-
-        let transaction_factory = TransactionFactory::new(server_context.chain_id)
-            .with_gas_unit_price(gas_price_per_unit)
-            .with_max_gas_amount(maximum_possible_gas);
-
+        // Build up the transaction
         let (txn_payload, sender) = request.options.internal_operation.payload()?;
         let unsigned_transaction = transaction_factory
             .payload(txn_payload)
@@ -313,36 +293,57 @@ async fn construction_metadata(
         let signed_transaction = SignedTransaction::new(
             unsigned_transaction,
             public_key,
-            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+            Ed25519Signature::try_from([0u8; 64].as_ref())
+                .expect("Zero signature should always work"),
         );
 
-        let request = rest_client
-            .simulate_bcs(&signed_transaction)
+        let simulated_txn = rest_client
+            .simulate_bcs_with_gas_estimation(
+                &signed_transaction,
+                true,
+                request.options.gas_price_per_unit.is_none(),
+            )
             .await?
             .into_inner();
 
-        if request.info.status().is_success() {
-            request.info.gas_used()
-        } else {
-            return Err(ApiError::VmError(Some(format!(
-                "Transaction simulation for gas failed with {:?}",
-                request.info.status()
+        let simulation_status = simulated_txn.info.status();
+
+        if !simulation_status.is_success() {
+            // TODO: Fix case for not enough gas to be a better message
+            return Err(ApiError::InvalidInput(Some(format!(
+                "Transaction failed to execute with status: {:?}",
+                simulation_status
             ))));
         }
-    };
 
-    let suggested_fee = Amount {
-        value: gas_price_per_unit
-            .saturating_mul(max_gas_amount)
-            .to_string(),
-        currency: native_coin(),
+        if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+            let estimated_gas_unit_price = user_txn.gas_unit_price();
+            let suggested_fee =
+                Amount::suggested_gas_fee(estimated_gas_unit_price, simulated_txn.info.gas_used());
+            let gas_unit_price = request
+                .options
+                .gas_price_per_unit
+                .map(|inner| inner.0)
+                .unwrap_or(estimated_gas_unit_price);
+            let max_gas_amount = request
+                .options
+                .max_gas_amount
+                .map(|inner| inner.0)
+                .unwrap_or_else(|| simulated_txn.info.gas_used());
+            (suggested_fee, gas_unit_price, max_gas_amount)
+        } else {
+            return Err(ApiError::InternalError(Some(format!(
+                "Transaction returned by API was not a user transaction: {:?}",
+                simulated_txn.transaction
+            ))));
+        }
     };
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
             sequence_number: sequence_number.into(),
             max_gas_amount: max_gas_amount.into(),
-            gas_price_per_unit: gas_price_per_unit.into(),
+            gas_price_per_unit: gas_unit_price.into(),
             expiry_time_secs: request.options.expiry_time_secs,
         },
         suggested_fee: vec![suggested_fee],
@@ -634,13 +635,6 @@ async fn construction_preprocess(
     let internal_operation = InternalOperation::extract(&request.operations)?;
     let required_public_keys = vec![internal_operation.sender().into()];
 
-    if let Some(gas_price) = request.metadata.as_ref().and_then(|inner| inner.gas_price) {
-        if gas_price.0 < 1 {
-            return Err(ApiError::InvalidInput(Some(
-                "Cannot have a gas price less than 1".to_string(),
-            )));
-        }
-    }
     if let Some(max_gas) = request
         .metadata
         .as_ref()
@@ -682,7 +676,10 @@ async fn construction_preprocess(
         .as_ref()
         .and_then(|inner| inner.max_gas_amount)
         .is_none()
-        && (public_keys.is_none() || public_keys.unwrap().is_empty())
+        && public_keys
+            .as_ref()
+            .map(|inner| inner.is_empty())
+            .unwrap_or(false)
     {
         return Err(ApiError::InvalidInput(Some(
             "Must provide either max gas amount or public keys to estimate max gas amount"

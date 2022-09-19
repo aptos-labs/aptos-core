@@ -1,4 +1,8 @@
 spec aptos_framework::aggregator {
+    spec module {
+        pragma verify=false;
+    }
+
     spec add { // TODO: temporary mockup.
         pragma opaque;
     }

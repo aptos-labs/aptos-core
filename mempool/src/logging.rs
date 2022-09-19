@@ -12,26 +12,44 @@ use std::{fmt, fmt::Write, time::SystemTime};
 
 pub struct TxnsLog {
     txns: Vec<(AccountAddress, u64, Option<String>, Option<SystemTime>)>,
+    len: usize,
+    max_displayed: usize,
 }
 
 impl TxnsLog {
     pub fn new() -> Self {
-        Self { txns: vec![] }
+        Self::new_with_max(usize::MAX)
+    }
+
+    pub fn new_with_max(max_displayed: usize) -> Self {
+        Self {
+            txns: vec![],
+            len: 0,
+            max_displayed,
+        }
     }
 
     pub fn new_txn(account: AccountAddress, seq_num: u64) -> Self {
         Self {
             txns: vec![(account, seq_num, None, None)],
+            len: 0,
+            max_displayed: usize::MAX,
         }
     }
 
     pub fn add(&mut self, account: AccountAddress, seq_num: u64) {
-        self.txns.push((account, seq_num, None, None));
+        if self.txns.len() < self.max_displayed {
+            self.txns.push((account, seq_num, None, None));
+        }
+        self.len += 1;
     }
 
     pub fn add_with_status(&mut self, account: AccountAddress, seq_num: u64, status: &str) {
-        self.txns
-            .push((account, seq_num, Some(status.to_string()), None));
+        if self.txns.len() < self.max_displayed {
+            self.txns
+                .push((account, seq_num, Some(status.to_string()), None));
+        }
+        self.len += 1;
     }
 
     pub fn add_full_metadata(
@@ -41,8 +59,11 @@ impl TxnsLog {
         status: &str,
         timestamp: Option<SystemTime>,
     ) {
-        self.txns
-            .push((account, seq_num, Some(status.to_string()), timestamp));
+        if self.txns.len() < self.max_displayed {
+            self.txns
+                .push((account, seq_num, Some(status.to_string()), timestamp));
+        }
+        self.len += 1;
     }
 }
 
@@ -62,7 +83,7 @@ impl fmt::Display for TxnsLog {
             write!(txns, "{} ", txn)?;
         }
 
-        write!(f, "{}", txns)
+        write!(f, "{}/{} txns: {}", self.txns.len(), self.len, txns)
     }
 }
 

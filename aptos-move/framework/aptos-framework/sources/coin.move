@@ -49,6 +49,19 @@ module aptos_framework::coin {
     /// Cannot upgrade the total supply of coins to different implementation.
     const ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED: u64 = 11;
 
+    /// Name of the coin is too long
+    const ECOIN_NAME_TOO_LONG: u64 = 12;
+
+    /// Symbol of the coin is too long
+    const ECOIN_SYMBOL_TOO_LONG: u64 = 13;
+
+    //
+    // Constants
+    //
+
+    const MAX_COIN_NAME_LENGTH: u64 = 32;
+    const MAX_COIN_SYMBOL_LENGTH: u64 = 10;
+
     /// Core data structures
 
     /// Main structure representing a coin/token in an account's custody.
@@ -347,6 +360,9 @@ module aptos_framework::coin {
             error::already_exists(ECOIN_INFO_ALREADY_PUBLISHED),
         );
 
+        assert!(string::length(&name) <= MAX_COIN_NAME_LENGTH, error::invalid_argument(ECOIN_NAME_TOO_LONG));
+        assert!(string::length(&symbol) <= MAX_COIN_SYMBOL_LENGTH, error::invalid_argument(ECOIN_SYMBOL_TOO_LONG));
+
         let coin_info = CoinInfo<CoinType> {
             name,
             symbol,
@@ -361,6 +377,9 @@ module aptos_framework::coin {
     /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
     /// to the sum of the two tokens (`dst_coin` and `source_coin`).
     public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        spec {
+            assume dst_coin.value + source_coin.value <= MAX_U64;
+        };
         dst_coin.value = dst_coin.value + source_coin.value;
         let Coin { value: _ } = source_coin;
     }
@@ -384,9 +403,6 @@ module aptos_framework::coin {
 
         Coin<CoinType> { value: amount }
     }
-
-    #[test_only]
-    use aptos_framework::aggregator_factory;
 
     public fun register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
@@ -466,6 +482,9 @@ module aptos_framework::coin {
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> { } = burn_cap;
     }
+
+    #[test_only]
+    use aptos_framework::aggregator_factory;
 
     #[test_only]
     struct FakeMoney { }

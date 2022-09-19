@@ -7,7 +7,7 @@ import { AptosAccount } from "./aptos_account";
 import { HexString } from "./hex_string";
 import * as Gen from "./generated/index";
 
-import { NODE_URL, FAUCET_URL } from "./util.test";
+import { NODE_URL, FAUCET_URL } from "./utils/test_helper.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -68,7 +68,10 @@ test(
     });
     expect(eventSubset[0].type).toBe("0x1::coin::WithdrawEvent");
 
-    const events2 = await client.getEventsByEventKey(events[0].key);
+    const events2 = await client.getEventsByCreationNumber(
+      events[0].guid.account_address,
+      events[0].guid.creation_number,
+    );
     expect(events2[0].type).toBe("0x1::coin::WithdrawEvent");
   },
   30 * 1000,

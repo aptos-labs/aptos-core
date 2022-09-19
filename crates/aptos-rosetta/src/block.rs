@@ -52,16 +52,30 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     )
     .await?;
 
-    let block = build_block(parent_transaction, block, server_context.chain_id).await?;
+    let keep_empty_transactions = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.keep_empty_transactions)
+        .unwrap_or_default();
+    let block = build_block(
+        &server_context,
+        parent_transaction,
+        block,
+        server_context.chain_id,
+        keep_empty_transactions,
+    )
+    .await?;
 
     Ok(BlockResponse { block })
 }
 
 /// Build up the transaction, which should contain the `operations` as the change set
 async fn build_block(
+    server_context: &RosettaContext,
     parent_block_identifier: BlockIdentifier,
     block: aptos_rest_client::aptos_api_types::BcsBlock,
     chain_id: ChainId,
+    keep_empty_transactions: bool,
 ) -> ApiResult<Block> {
     // note: timestamps are in microseconds, so we convert to milliseconds
     let timestamp = get_timestamp(block.block_timestamp);
@@ -69,11 +83,19 @@ async fn build_block(
 
     // Convert the transactions and build the block
     let mut transactions: Vec<Transaction> = Vec::new();
+    // TODO: Parallelize these and then sort at end
     if let Some(txns) = block.transactions {
         for txn in txns {
-            transactions.push(Transaction::from_transaction(txn).await?)
+            let transaction =
+                Transaction::from_transaction(server_context.coin_cache.clone(), txn).await?;
+            if keep_empty_transactions || !transaction.operations.is_empty() {
+                transactions.push(transaction)
+            }
         }
     }
+
+    // Ensure the transactions are sorted in order
+    transactions.sort_by(|first, second| first.metadata.version.0.cmp(&second.metadata.version.0));
 
     Ok(Block {
         block_identifier,

@@ -202,9 +202,11 @@ async fn loopback_commit_vote(
 ) {
     match self_loop_rx.next().await {
         Some(Event::Message(author, msg)) => {
-            let event: UnverifiedEvent = msg.into();
-            // verify the message and send the message into self loop
-            msg_tx.push(author, event.verify(verifier).unwrap()).ok();
+            if matches!(msg, ConsensusMsg::CommitVoteMsg(_)) {
+                let event: UnverifiedEvent = msg.into();
+                // verify the message and send the message into self loop
+                msg_tx.push(author, event.verify(verifier).unwrap()).ok();
+            }
         }
         _ => {
             panic!("We are expecting a commit vote message.");
@@ -278,7 +280,8 @@ fn buffer_manager_happy_path_test() {
                 .ok();
         }
 
-        for _ in 0..3 {
+        // commit decision will be sent too, so 3 * 2
+        for _ in 0..6 {
             loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
         }
 

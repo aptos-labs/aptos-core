@@ -22,6 +22,7 @@ use aptos_crypto::HashValue;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -82,6 +83,7 @@ pub struct FakeExecutor {
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
     no_parallel_exec: bool,
+    features: Features,
 }
 
 impl FakeExecutor {
@@ -94,6 +96,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             no_parallel_exec: false,
+            features: Features::default(),
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
@@ -131,6 +134,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             no_parallel_exec: false,
+            features: Features::default(),
         }
     }
 
@@ -196,7 +200,7 @@ impl FakeExecutor {
 
     /// Creates fresh genesis from the framework passed in.
     pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts, true);
         Self::from_genesis(genesis.0.write_set())
     }
 
@@ -543,6 +547,8 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
+                self.features
+                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -586,6 +592,8 @@ impl FakeExecutor {
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
+            self.features
+                .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

@@ -10,6 +10,8 @@ publish = false
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.57"
 prometheus = { version = "0.13.0", default-features = false }
 
-
+[dev-dependencies]
+claims = "0.7"

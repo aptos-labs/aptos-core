@@ -2,6 +2,12 @@
 name = "aptos-telemetry-service"
 version = "0.1.0"
 edition = "2021"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Web service to receive telemetry from nodes and ingest it to backends"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -31,3 +37,6 @@ thiserror = "1.0"
 tokio = { version = "1.21.0", features = ["full"] }
 url = "2.2.2"
 warp = { version = "0.3.2", features = ["tls"] }
+
+[dev-dependencies]
+httpmock = "0.6"

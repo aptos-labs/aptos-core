@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import sha3 from "js-sha3";
-import { MemoizeExpiring } from "typescript-memoize";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
@@ -24,12 +23,13 @@ import {
   TransactionPayloadEntryFunction,
   TransactionPayloadScript,
   ModuleId,
-} from "./aptos_types";
-import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
-import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "./aptos_types/abi";
+} from "../aptos_types";
+import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "../bcs";
+import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "../aptos_types/abi";
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
+import { MemoizeExpiring } from "../utils";
 
 export { TypeTagParser } from "./builder_utils.js";
 

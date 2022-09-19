@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, BlockArgs, NetworkArgs, UrlArgs};
-use aptos_rosetta::types::{BlockRequest, BlockResponse};
+use aptos_rosetta::types::{BlockRequest, BlockRequestMetadata, BlockResponse};
 use clap::{Parser, Subcommand};
 
 /// Block APIs
@@ -38,9 +38,16 @@ pub struct GetBlockCommand {
 
 impl GetBlockCommand {
     pub async fn execute(self) -> anyhow::Result<BlockResponse> {
+        let metadata = self
+            .block_args
+            .keep_all_transactions
+            .map(|inner| BlockRequestMetadata {
+                keep_empty_transactions: Some(inner),
+            });
         let request = BlockRequest {
             network_identifier: self.network_args.network_identifier(),
             block_identifier: self.block_args.into(),
+            metadata,
         };
         self.url_args.client().block(&request).await
     }

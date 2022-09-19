@@ -17,7 +17,7 @@ use crate::response::{
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
-use anyhow::Context as AnyhowContext;
+use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
     Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
     HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
@@ -26,6 +26,8 @@ use aptos_api_types::{
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::signing_message;
+use aptos_types::account_config::CoinStoreResource;
+use aptos_types::account_view::AccountView;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
@@ -129,7 +131,11 @@ impl TransactionsApi {
         fail_point_poem("endpoint_get_transactions")?;
         self.context
             .check_api_output_enabled("Get transactions", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_transactions_page_size(),
+        );
         self.list(&accept_type, page)
     }
 
@@ -219,7 +225,11 @@ impl TransactionsApi {
         fail_point_poem("endpoint_get_accounts_transactions")?;
         self.context
             .check_api_output_enabled("Get account transactions", &accept_type)?;
-        let page = Page::new(start.0.map(|v| v.0), limit.0);
+        let page = Page::new(
+            start.0.map(|v| v.0),
+            limit.0,
+            self.context.max_transactions_page_size(),
+        );
         self.list_by_account(&accept_type, page, address.0)
     }
 
@@ -343,6 +353,12 @@ impl TransactionsApi {
     async fn simulate_transaction(
         &self,
         accept_type: AcceptType,
+        /// If set to true, the max gas value in the transaction will be ignored
+        /// and the maximum possible gas will be used
+        estimate_max_gas_amount: Query<Option<bool>>,
+        /// If set to true, the gas unit price in the transaction will be ignored
+        /// and the estimated value will be used
+        estimate_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
@@ -352,7 +368,81 @@ impl TransactionsApi {
             return Err(api_disabled("Simulate transaction"));
         }
         let ledger_info = self.context.get_latest_ledger_info()?;
-        let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
+        let mut signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
+
+        let estimated_gas_unit_price = if estimate_gas_unit_price.0.unwrap_or_default() {
+            Some(self.context.estimate_gas_price(&ledger_info)?)
+        } else {
+            None
+        };
+
+        // If estimate max gas amount is provided, we will just make it the maximum value
+        let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
+            // Retrieve max possible gas units
+            let gas_params = self.context.get_gas_schedule(&ledger_info)?;
+            let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
+
+            // Retrieve account balance to determine max gas available
+            let account_state = self
+                .context
+                .get_account_state(
+                    signed_transaction.sender(),
+                    ledger_info.version(),
+                    &ledger_info,
+                )?
+                .ok_or_else(|| {
+                    SubmitTransactionError::bad_request_with_code(
+                        "Account not found",
+                        AptosErrorCode::InvalidInput,
+                        &ledger_info,
+                    )
+                })?;
+            let coin_store: CoinStoreResource = account_state
+                .get_coin_store_resource()
+                .and_then(|inner| {
+                    inner.ok_or_else(|| {
+                        anyhow!(
+                            "No coin store found for account {}",
+                            signed_transaction.sender()
+                        )
+                    })
+                })
+                .map_err(|err| {
+                    SubmitTransactionError::internal_with_code(
+                        format!("Failed to get coin store resource {}", err),
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?;
+
+            let gas_unit_price =
+                estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
+
+            // With 0 gas price, we set it to max gas units, since we can't divide by 0
+            let max_account_gas_units = if gas_unit_price == 0 {
+                coin_store.coin()
+            } else {
+                coin_store.coin() / gas_unit_price
+            };
+
+            // Minimum of the max account and the max total needs to be used for estimation
+            Some(std::cmp::min(
+                max_account_gas_units,
+                max_number_of_gas_units,
+            ))
+        } else {
+            None
+        };
+
+        // If there is an estimation of either, replace the values
+        if estimated_max_gas_amount.is_some() || estimated_gas_unit_price.is_some() {
+            signed_transaction = override_gas_parameters(
+                &signed_transaction,
+                estimated_max_gas_amount,
+                estimated_gas_unit_price,
+            );
+        }
+
         self.simulate(&accept_type, ledger_info, signed_transaction)
             .await
     }
@@ -1021,4 +1111,25 @@ impl TransactionsApi {
             BasicResponseStatus::Ok,
         ))
     }
+}
+
+fn override_gas_parameters(
+    signed_txn: &SignedTransaction,
+    max_gas_amount: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> SignedTransaction {
+    let payload = signed_txn.payload();
+
+    let raw_txn = RawTransaction::new(
+        signed_txn.sender(),
+        signed_txn.sequence_number(),
+        payload.clone(),
+        max_gas_amount.unwrap_or_else(|| signed_txn.max_gas_amount()),
+        gas_unit_price.unwrap_or_else(|| signed_txn.gas_unit_price()),
+        signed_txn.expiration_timestamp_secs(),
+        signed_txn.chain_id(),
+    );
+
+    // TODO: Check that signature is null, this would just be helpful for downstream use
+    SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
 }

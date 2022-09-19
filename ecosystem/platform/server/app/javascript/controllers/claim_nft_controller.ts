@@ -19,8 +19,9 @@ const fromHexString = (hexString: string) =>
 
 // Connects to data-controller="claim-nft"
 export default class extends Controller<HTMLAnchorElement> {
-  static targets = ["transactionFailedError"];
+  static targets = ["form", "transactionFailedError"];
 
+  declare readonly formTarget: HTMLFormElement;
   declare readonly transactionFailedErrorTarget: HTMLElement;
 
   static values = {
@@ -52,9 +53,10 @@ export default class extends Controller<HTMLAnchorElement> {
     ].join("/");
     const response = await fetch(accountTransactionsUrl);
     if (!response.ok) return;
-    const transactions: Types.OnChainTransaction[] = await response.json();
+    const transactions: Types.Transaction[] = await response.json();
     const mintTransaction = transactions.find(
       (transaction) =>
+        "success" in transaction &&
         transaction.success &&
         "payload" in transaction &&
         "function" in transaction.payload &&
@@ -74,30 +76,39 @@ export default class extends Controller<HTMLAnchorElement> {
     location.href = url.toString();
   }
 
-  async handleClick(event: Event) {
+  async handleSubmit(event: Event) {
     event.preventDefault();
     this.transactionFailedErrorTarget.classList.add("hidden");
 
-    const csrfToken = (
-      document.getElementsByName("csrf-token")[0] as HTMLMetaElement
-    ).content;
-    const response = await fetch(this.element.querySelector("a")!.href, {
-      method: "PUT",
+    const formData = new FormData(this.formTarget);
+    const response = await fetch(this.formTarget.action, {
+      method: this.formTarget.method,
       headers: {
-        "X-CSRF-Token": csrfToken,
-        "Content-Type": "application/json",
         Accept: "application/json",
       },
+      body: formData,
     });
 
     if (!response.ok) {
+      if (response.redirected) {
+        location.href = response.url;
+        return;
+      }
       throw "Unable to retrieve claim details.";
     }
 
     const json = await response.json();
 
     if ("error" in json) {
-      this.transactionFailedErrorTarget.classList.remove("hidden");
+      if (json.error === "account_not_found") {
+        this.transactionFailedErrorTarget.classList.remove("hidden");
+      } else if (json.error === "captcha_invalid") {
+        const urlParams = new URLSearchParams(location.search);
+        urlParams.set("captcha2", "1");
+        const url = new URL(location.href);
+        url.search = urlParams.toString();
+        location.href = url.toString();
+      }
       const error = new Error(json.error);
       Sentry.captureException(error);
       return;
@@ -132,10 +143,11 @@ export default class extends Controller<HTMLAnchorElement> {
         if (error.name === "Unauthorized") {
           // if unauthorized, we need to connect to wallet
           const url = new URL(location.href);
-          url.search = `connect-wallet`;
+          url.search = ``;
           location.href = url.toString();
+        } else {
+          Sentry.captureException(error);
         }
-        Sentry.captureException(error);
       }
     } else if (claimDetails.wallet_name === "martian") {
       try {

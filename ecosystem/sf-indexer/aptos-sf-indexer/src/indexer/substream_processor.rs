@@ -136,7 +136,7 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
         .expect("Error updating Processor Status!");
     }
 
-    /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
+    /// If chain id doesn't exist, save it. Otherwise, make sure that we're indexing the same chain
     /// If check is successful, we will call set_is_chain_id_verified to attempt to persist the result
     /// of the check. Make sure to implement this function and call is_chain_id_verified to read the flag.
     fn check_or_update_chain_id(&mut self, input_chain_id: i64) {

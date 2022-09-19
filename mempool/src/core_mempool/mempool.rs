@@ -8,7 +8,6 @@ use crate::{
         index::TxnPointer,
         transaction::{MempoolTransaction, TimelineState},
         transaction_store::TransactionStore,
-        ttl_cache::TtlCache,
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
@@ -23,7 +22,6 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use std::{
-    cmp::max,
     collections::HashSet,
     time::{Duration, SystemTime},
 };
@@ -32,11 +30,6 @@ pub struct Mempool {
     // Stores the metadata of all transactions in mempool (of all states).
     transactions: TransactionStore,
 
-    sequence_number_cache: TtlCache<AccountAddress, u64>,
-    // For each transaction, an entry with a timestamp is added when the transaction enters mempool.
-    // This is used to measure e2e latency of transactions in the system, as well as the time it
-    // takes to pick it up by consensus.
-    pub(crate) metrics_cache: TtlCache<(AccountAddress, u64), SystemTime>,
     pub system_transaction_timeout: Duration,
 }
 
@@ -44,8 +37,6 @@ impl Mempool {
     pub fn new(config: &NodeConfig) -> Self {
         Mempool {
             transactions: TransactionStore::new(&config.mempool),
-            sequence_number_cache: TtlCache::new(config.mempool.capacity, Duration::from_secs(100)),
-            metrics_cache: TtlCache::new(config.mempool.capacity, Duration::from_secs(100)),
             system_transaction_timeout: Duration::from_secs(
                 config.mempool.system_transaction_timeout_secs,
             ),
@@ -69,46 +60,17 @@ impl Mempool {
             counters::COMMIT_ACCEPTED_LABEL
         };
         self.log_latency(*sender, sequence_number, metric_label);
-        self.metrics_cache.remove(&(*sender, sequence_number));
 
-        let current_seq_number = self
-            .sequence_number_cache
-            .remove(sender)
-            .unwrap_or_default();
-
-        if is_rejected {
-            if sequence_number >= current_seq_number {
-                self.transactions
-                    .reject_transaction(sender, sequence_number);
-            }
-        } else {
-            let new_seq_number = max(current_seq_number, sequence_number + 1);
-            self.sequence_number_cache.insert(*sender, new_seq_number);
-
-            let new_seq_number = if let Some(mempool_transaction) =
-                self.transactions.get_mempool_txn(sender, sequence_number)
-            {
-                match mempool_transaction
-                    .sequence_info
-                    .account_sequence_number_type
-                {
-                    AccountSequenceInfo::Sequential(_) => {
-                        AccountSequenceInfo::Sequential(new_seq_number)
-                    }
-                }
-            } else {
-                AccountSequenceInfo::Sequential(new_seq_number)
-            };
-            // update current cached sequence number for account
-            self.sequence_number_cache
-                .insert(*sender, new_seq_number.min_seq());
-            self.transactions.commit_transaction(sender, new_seq_number);
-        }
+        self.transactions
+            .remove(sender, sequence_number, is_rejected);
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, metric: &str) {
-        if let Some(&creation_time) = self.metrics_cache.get(&(account, sequence_number)) {
-            if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
+        if let Some(&insertion_time) = self
+            .transactions
+            .get_insertion_time(&account, sequence_number)
+        {
+            if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
                 counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
                     .with_label_values(&[metric])
                     .observe(time_delta.as_secs_f64());
@@ -135,37 +97,27 @@ impl Mempool {
                 .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
             committed_seq_number = db_sequence_number
         );
-        let cached_value = self.sequence_number_cache.get(&txn.sender());
-        let sequence_number = match sequence_info {
-            AccountSequenceInfo::Sequential(_) => AccountSequenceInfo::Sequential(
-                cached_value.map_or(db_sequence_number, |value| max(*value, db_sequence_number)),
-            ),
-        };
-        self.sequence_number_cache
-            .insert(txn.sender(), sequence_number.min_seq());
 
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
-        if txn.sequence_number() < sequence_number.min_seq() {
+        if txn.sequence_number() < db_sequence_number {
             return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
                 "transaction sequence number is {}, current sequence number is  {}",
                 txn.sequence_number(),
-                sequence_number.min_seq(),
+                db_sequence_number,
             ));
         }
 
+        let now = SystemTime::now();
         let expiration_time =
-            aptos_infallible::duration_since_epoch() + self.system_transaction_timeout;
-        if timeline_state != TimelineState::NonQualified {
-            self.metrics_cache
-                .insert((txn.sender(), txn.sequence_number()), SystemTime::now());
-        }
+            aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
         let txn_info = MempoolTransaction::new(
             txn,
             expiration_time,
             ranking_score,
             timeline_state,
-            sequence_number,
+            AccountSequenceInfo::Sequential(db_sequence_number),
+            now,
         );
 
         self.transactions.insert(txn_info)
@@ -200,7 +152,7 @@ impl Mempool {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
-            let account_sequence_number = self.sequence_number_cache.get(&txn.address);
+            let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
             let seen_previous = tx_seq > 0 && seen.contains(&(txn.address, tx_seq - 1));
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
@@ -263,16 +215,13 @@ impl Mempool {
     /// Removes all expired transactions and clears expired entries in metrics
     /// cache and sequence number cache.
     pub(crate) fn gc(&mut self) {
-        let now = SystemTime::now();
-        self.transactions.gc_by_system_ttl(&self.metrics_cache);
-        self.metrics_cache.gc(now);
-        self.sequence_number_cache.gc(now);
+        let now = aptos_infallible::duration_since_epoch();
+        self.transactions.gc_by_system_ttl(now);
     }
 
     /// Garbage collection based on client-specified expiration time.
     pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.transactions
-            .gc_by_expiration_time(block_time, &self.metrics_cache);
+        self.transactions.gc_by_expiration_time(block_time);
     }
 
     /// Returns block of transactions and new last_timeline_id.
@@ -290,11 +239,16 @@ impl Mempool {
     }
 
     pub fn gen_snapshot(&self) -> TxnsLog {
-        self.transactions.gen_snapshot(&self.metrics_cache)
+        self.transactions.gen_snapshot()
     }
 
     #[cfg(test)]
     pub fn get_parking_lot_size(&self) -> usize {
         self.transactions.get_parking_lot_size()
+    }
+
+    #[cfg(test)]
+    pub fn get_transaction_store(&self) -> &TransactionStore {
+        &self.transactions
     }
 }

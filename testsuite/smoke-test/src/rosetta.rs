@@ -10,6 +10,7 @@ use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_crypto::{HashValue, PrivateKey};
+use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, UserTransaction};
 use aptos_rest_client::Transaction;
 use aptos_rosetta::common::BlockHash;
@@ -27,6 +28,8 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
+use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use cached_packages::aptos_stdlib;
@@ -462,10 +465,21 @@ async fn test_block() {
     let account_id_1 = cli.account_id(1);
     let account_id_3 = cli.account_id(3);
 
-    cli.fund_account(0, Some(10000000)).await.unwrap();
-    cli.fund_account(1, Some(650000)).await.unwrap();
-    cli.fund_account(2, Some(50000)).await.unwrap();
-    cli.fund_account(3, Some(20000)).await.unwrap();
+    // TODO(greg): revisit after fixing gas estimation
+    cli.fund_account(0, Some(100000000)).await.unwrap();
+    cli.fund_account(1, Some(6500000)).await.unwrap();
+    cli.fund_account(2, Some(500000)).await.unwrap();
+    cli.fund_account(3, Some(200000)).await.unwrap();
+
+    // Get minimum gas price
+    let gas_schedule: GasScheduleV2 = rest_client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::gas_schedule::GasScheduleV2")
+        .await
+        .unwrap()
+        .into_inner();
+    let gas_params =
+        AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map()).unwrap();
+    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
     let private_key_1 = cli.private_key(1);
@@ -512,7 +526,8 @@ async fn test_block() {
         20,
         Duration::from_secs(5),
         Some(seq_no_0 + 1),
-        None,
+        // TODO(greg): revisit after fixing gas estimation
+        Some(10000),
         None,
     )
     .await
@@ -542,7 +557,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         Some(20000),
-        Some(1),
+        Some(min_gas_price),
     )
     .await
     .unwrap()
@@ -576,7 +591,7 @@ async fn test_block() {
         // Test the default behavior
         None,
         None,
-        Some(2),
+        Some(min_gas_price + 1),
     )
     .await
     .unwrap();
@@ -635,7 +650,7 @@ async fn test_block() {
     // Also fail to set an operator
     cli.set_operator(1, 3).await.unwrap_err();
 
-    // This one will fail
+    // This one will fail (and skip estimation of gas)
     let maybe_final_txn = transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -646,7 +661,7 @@ async fn test_block() {
         Duration::from_secs(5),
         None,
         Some(100000),
-        None,
+        Some(min_gas_price),
     )
     .await
     .unwrap_err();
@@ -671,8 +686,6 @@ async fn test_block() {
     // TODO: Check no repeated txn hashes (in a block)
     // TODO: Check account balance block hashes?
     // TODO: Handle multiple coin types
-
-    eprintln!("Checking blocks 0..{}", final_block_height);
 
     // Wait until the Rosetta service is ready
     let request = NetworkRequest {
@@ -734,20 +747,14 @@ async fn test_block() {
             "Block timestamp should match actual timestamp but in ms"
         );
 
-        // First transaction should be first in block
-        assert_eq!(
-            current_version, actual_block.first_version,
-            "First transaction in block should be the current version"
-        );
+        // TODO: double check that all transactions do show with the flag, and that all expected txns
+        // are shown without the flag
 
         let actual_txns = actual_block
             .transactions
             .as_ref()
             .expect("Every actual block should have transactions");
         parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
-
-        // The full block must have been processed
-        assert_eq!(current_version - 1, actual_block.last_version);
 
         // Keep track of the previous
         previous_block_index = block_height;
@@ -764,18 +771,24 @@ async fn parse_block_transactions(
     actual_txns: &[TransactionOnChainData],
     current_version: &mut u64,
 ) {
-    for (txn_number, transaction) in block.transactions.iter().enumerate() {
-        let actual_txn = actual_txns
-            .get(txn_number)
-            .expect("There should be the same number of transactions in the actual block");
-        let actual_txn_info = &actual_txn.info;
+    for transaction in block.transactions.iter() {
         let txn_metadata = &transaction.metadata;
+        let txn_version = txn_metadata.version.0;
+        let cur_version = *current_version;
+        assert!(
+            txn_version >= cur_version,
+            "Transaction version {} must be greater than previous {}",
+            txn_version,
+            cur_version
+        );
+
+        let actual_txn = actual_txns
+            .iter()
+            .find(|txn| txn.version == txn_version)
+            .expect("There should be the transaction in the actual block");
+        let actual_txn_info = &actual_txn.info;
 
         // Ensure transaction identifier is correct
-        assert_eq!(
-            *current_version, txn_metadata.version.0,
-            "There should be no gaps in transaction versions"
-        );
         assert_eq!(
             format!("{:x}", actual_txn_info.transaction_hash()),
             transaction.transaction_identifier.hash,
@@ -793,7 +806,7 @@ async fn parse_block_transactions(
         match txn_metadata.transaction_type {
             TransactionType::Genesis => {
                 // For this test, there should only be one genesis
-                assert_eq!(0, *current_version);
+                assert_eq!(0, cur_version);
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::GenesisTransaction(_)
@@ -832,13 +845,13 @@ async fn parse_block_transactions(
         .await;
 
         for (_, account_balance) in balances.iter() {
-            if let Some(amount) = account_balance.get(current_version) {
+            if let Some(amount) = account_balance.get(&cur_version) {
                 assert!(*amount >= 0, "Amount shouldn't be negative!")
             }
         }
 
         // Increment to next version
-        *current_version += 1;
+        *current_version = txn_version + 1;
     }
 }
 
@@ -1184,10 +1197,11 @@ async fn test_invalid_transaction_gas_charged() {
     // Verify failed txn
     let rosetta_txn = block_with_transfer
         .transactions
-        .get(txn_version.saturating_sub(block_info.first_version.0) as usize)
+        .iter()
+        .find(|txn| txn.metadata.version.0 == txn_version)
         .unwrap();
 
-    assert_transfer_transaction(
+    assert_failed_transfer_transaction(
         sender,
         AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
         TRANSFER_AMOUNT,
@@ -1196,7 +1210,7 @@ async fn test_invalid_transaction_gas_charged() {
     );
 }
 
-fn assert_transfer_transaction(
+fn assert_failed_transfer_transaction(
     sender: AccountAddress,
     receiver: AccountAddress,
     transfer_amount: u64,
@@ -1212,6 +1226,7 @@ fn assert_transfer_transaction(
     let rosetta_txn_metadata = &rosetta_txn.metadata;
     assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
     assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
+    // This should have 3, the deposit, withdraw, and fee
     assert_eq!(rosetta_txn.operations.len(), 3);
 
     // Check the operations

@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class Project < ApplicationRecord
+  include PgSearch::Model
+
   URL_FORMAT = URI::DEFAULT_PARSER.make_regexp(%w[http https])
   VALID_HOSTS = {
     github_url: 'github.com',
@@ -36,17 +38,21 @@ class Project < ApplicationRecord
   validates :short_description, presence: true, length: { maximum: 140 }
   validates :full_description, presence: true, length: { minimum: 140 }
   validates :website_url, presence: true, format: URL_FORMAT
-  validates :github_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :discord_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :twitter_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :telegram_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :linkedin_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :youtube_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates :forum_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates_each VALID_HOSTS.keys, allow_nil: true, allow_blank: true do |record, attr, value|
+  validates :github_url, format: URL_FORMAT, allow_nil: true
+  validates :discord_url, format: URL_FORMAT, allow_nil: true
+  validates :twitter_url, format: URL_FORMAT, allow_nil: true
+  validates :telegram_url, format: URL_FORMAT, allow_nil: true
+  validates :linkedin_url, format: URL_FORMAT, allow_nil: true
+  validates :youtube_url, format: URL_FORMAT, allow_nil: true
+  validates :forum_url, format: URL_FORMAT, allow_nil: true
+  validates_each VALID_HOSTS.keys, allow_nil: true do |record, attr, value|
     host = VALID_HOSTS[attr]
     record.errors.add(attr, "must point to #{host}") unless URI.parse(value).host == host
   end
   validates :project_categories, length: { minimum: 1, maximum: 4 }
   validates :screenshots, length: { minimum: 1, maximum: 5 }
+
+  pg_search_scope :search,
+                  against: %i[title short_description full_description],
+                  using: { tsearch: { dictionary: 'english' } }
 end

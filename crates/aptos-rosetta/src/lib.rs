@@ -113,7 +113,7 @@ pub async fn bootstrap_async(
             client
                 .get_ledger_information()
                 .await
-                .expect("Should successfully get ledger information from Rest API")
+                .expect("Should successfully get ledger information from Rest API on bootstap")
                 .into_inner()
                 .chain_id,
             "Failed to match Rosetta chain Id to upstream server"
@@ -131,7 +131,7 @@ pub async fn bootstrap_async(
         let context = RosettaContext {
             rest_client: rest_client.clone(),
             chain_id,
-            coin_cache: Arc::new(CoinCache::new()),
+            coin_cache: Arc::new(CoinCache::new(rest_client.clone())),
             block_cache,
             accounts: Arc::new(Mutex::new(BTreeMap::new())),
         };

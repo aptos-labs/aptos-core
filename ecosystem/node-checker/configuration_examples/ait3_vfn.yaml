@@ -1,0 +1,71 @@
+# Base config yanked from ait3_fullnode.
+# No metrics checks for this one, just API based checks.
+---
+node_address:
+  url: "https://ait3.aptosdev.com"
+  metrics_port: 9101
+  api_port: 443
+  noise_port: 6180
+  public_key: ~
+configuration_name: ait3_vfn
+configuration_name_pretty: AIT3 Validator FullNode (VFN) Checker
+chain_id: ~
+role_type: ~
+evaluators:
+  - api_latency
+  - api_transaction_availability
+  - state_sync_version
+evaluator_args:
+  build_version_args: {}
+  consensus_proposals_args: {}
+  consensus_round_args: {}
+  consensus_timeouts_args:
+    allowed_consensus_timeouts: 5
+  handshake_args:
+    handshake_args:
+      network_id: public
+      timeout_seconds: 5
+      no_handshake: false
+  hardware_args:
+    min_cpu_cores: 8
+    min_ram_gb: 15
+  latency_args:
+    num_samples: 5
+    delay_between_samples_ms: 20
+    num_allowed_errors: 1
+    max_api_latency_ms: 750
+  network_minimum_peers_args:
+    minimum_peers_inbound: 0
+    minimum_peers_outbound: 1
+  network_peers_tolerance_args:
+    inbound_peers_tolerance: 10
+    outbound_peers_tolerance: 10
+  node_identity_args: {}
+  state_sync_version_args:
+    version_delta_tolerance: 200000
+    version_fetch_delay_secs: 5
+    api_call_timeout_secs: 4
+  state_sync_version_metrics_args:
+    metrics_version_delta_tolerance: 200000
+  tps_args:
+    emit_args:
+      mempool_backlog: ~
+      target_tps: 1500
+      txn_expiration_time_secs: 30
+      duration: 10
+      invalid_tx: 0
+      transaction_type:
+        - P2P
+      transaction_type_weights: []
+    mint_args:
+      mint_key: ~
+      mint_file: mint.key
+    minimum_tps: 1200
+    repeat_target_count: 1
+  transaction_availability_args:
+    transaction_fetch_delay_secs: 5
+runner_args:
+  blocking_runner_args:
+    metrics_fetch_delay_secs: 5
+    api_client_timeout_secs: 4
+

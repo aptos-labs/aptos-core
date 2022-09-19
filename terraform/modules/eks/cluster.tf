@@ -83,6 +83,17 @@ resource "aws_eks_node_group" "nodes" {
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags
 
+  lifecycle {
+    ignore_changes = [
+      # ignore autoupgrade version
+      version,
+      # ignore changes to the desired size that may occur due to cluster autoscaler
+      scaling_config[0].desired_size,
+      # ignore changes to max size, especially when it decreases to < desired_size, which fails
+      scaling_config[0].max_size,
+    ]
+  }
+
   launch_template {
     id      = aws_launch_template.nodes[each.key].id
     version = aws_launch_template.nodes[each.key].latest_version
@@ -90,12 +101,12 @@ resource "aws_eks_node_group" "nodes" {
 
   scaling_config {
     desired_size = lookup(var.node_pool_sizes, each.key, each.value.size)
-    min_size     = lookup(var.node_pool_sizes, each.key, each.value.size)
-    max_size     = lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge
+    min_size     = 1
+    max_size     = lookup(var.node_pool_sizes, each.key, each.value.size) * 2 # surge to twice the size if necessary
   }
 
   update_config {
-    max_unavailable = var.max_node_pool_surge > 1 ? lookup(var.node_pool_sizes, each.key, each.value.size) * (var.max_node_pool_surge - 1) : 1
+    max_unavailable_percentage = 50
   }
 
   depends_on = [

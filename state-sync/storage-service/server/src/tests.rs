@@ -2228,8 +2228,6 @@ mock! {
             _ledger_version: Version,
         ) -> Result<Version>;
 
-        fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>>;
-
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;

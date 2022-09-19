@@ -3,12 +3,12 @@
 
 import nacl from "tweetnacl";
 import sha3 from "js-sha3";
-import { derivePath } from "ed25519-hd-key";
 import * as bip39 from "@scure/bip39";
-import { Memoize } from "typescript-memoize";
-import { bytesToHex } from "./bytes_to_hex.js";
+import { bytesToHex } from "@noble/hashes/utils";
+import { derivePath } from "./utils/hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+import { Memoize } from "./utils";
 
 const { sha3_256: sha3Hash } = sha3;
 
@@ -66,7 +66,7 @@ export class AptosAccount {
 
     const { key } = derivePath(path, bytesToHex(bip39.mnemonicToSeedSync(normalizeMnemonics)));
 
-    return new AptosAccount(new Uint8Array(key));
+    return new AptosAccount(key);
   }
 
   /**

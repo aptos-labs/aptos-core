@@ -45,6 +45,14 @@ const sidebars = {
         "concepts/basics-accounts",
         "concepts/basics-events",
         "concepts/basics-gas-txn-fee",
+        {
+          type: "category",
+          label: "Coin and Token",
+          link: { type: "doc", id: "concepts/coin-and-token/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["concepts/coin-and-token/aptos-coin", "concepts/coin-and-token/aptos-token"],
+        },
         "concepts/basics-merkle-proof",
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
@@ -69,6 +77,7 @@ const sidebars = {
         "guides/building-wallet-extension",
         "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
+        "guides/running-a-local-multi-node-network",
         {
           type: "category",
           label: "Move Guides",
@@ -133,6 +142,7 @@ const sidebars = {
             "nodes/full-node/network-identity-fullnode",
             "nodes/full-node/troubleshooting-fullnode",
             "nodes/full-node/run-a-fullnode-on-gcp",
+            "nodes/full-node/bootstrap-fullnode",
           ],
         },
         {
@@ -143,8 +153,14 @@ const sidebars = {
           collapsed: true,
           items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
         },
-        "nodes/node-health-checker",
-        "nodes/node-health-checker-faq",
+        {
+          type: "category",
+          label: "Node Health Checker",
+          link: { type: "doc", id: "nodes/node-health-checker/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["nodes/node-health-checker/node-health-checker-faq"],
+        },
       ],
     },
     {
@@ -152,13 +168,7 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: [
-        "sdks/aptos-sdk-overview",
-        "sdks/typescript-sdk",
-        "sdks/transactions-with-ts-sdk",
-        "sdks/python-sdk",
-        "sdks/rust-sdk",
-      ],
+      items: ["sdks/aptos-sdk-overview", "sdks/typescript-sdk", "sdks/python-sdk", "sdks/rust-sdk"],
     },
     {
       type: "category",

@@ -14,72 +14,72 @@
   <% end %>
 
   <div class="mb-16">
-    <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Project Details</h3>
+    <h3 class="font-display text-3xl mb-2 sticky top-20 py-4 bg-neutral-900/[.95] backdrop-blur-lg">Project Details</h3>
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :title, class: 'font-mono uppercase block mb-2' %>
       <%= form.text_field :title, placeholder: 'Enter project name', required: true %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :website_url, 'Website', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :website_url, placeholder: 'Enter project website URL', required: true %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :short_description, class: 'font-mono uppercase block mb-2' %>
       <%= form.text_field :short_description, placeholder: 'Enter tagline / short description', required: true %>
     </div>
 
-    <div class="mb-6">
+    <div class="mb-10">
       <%= form.label :full_description, class: 'font-mono uppercase block mb-2' %>
       <%= form.text_area :full_description, placeholder: 'Enter full project description', rows: 8, required: true %>
     </div>
 
-    <div class="mb-6">
+    <div class="mb-10">
       <%= form.label :category_ids, 'Categories', class: 'font-mono uppercase block mb-2' %>
-      <%= form.collection_select :category_ids, Category.all, :id, :title, {}, { multiple: true, class: 'text-black' } %>
+      <%= form.collection_select :category_ids, Category.all, :id, :title, {}, { multiple: true, class: 'bg-transparent border border-neutral-600 text-neutral-400 rounded-lg focus:ring-teal-700 focus:border-teal-700 block w-full max-w-2xl' } %>
     </div>
   </div>
 
   <div class="mb-16">
-    <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Social Links</h3>
+    <h3 class="font-display text-3xl mb-2 sticky top-20 py-4 bg-neutral-900/[.95] backdrop-blur-lg">Social Links</h3>
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :github_url, 'GitHub', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :github_url, placeholder: 'Enter project GitHub URL' %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :discord_url, 'Discord', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :discord_url, placeholder: 'Enter project Discord URL' %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :twitter_url, 'Twitter', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :twitter_url, placeholder: 'Enter project Twitter URL' %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :telegram_url, 'Telegram', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :telegram_url, placeholder: 'Enter project Telegram URL' %>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :linkedin_url, 'LinkedIn', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :linkedin_url, placeholder: 'Enter project LinkedIn URL' %>
     </div>
   </div>
 
   <%= content_tag :div, class: 'mb-16', data: { controller: 'project-images', project_images_thumbnail_url_value: project.thumbnail.attached? ? url_for(project.thumbnail) : nil, project_images_screenshot_urls_value: project.screenshots.attached? ? project.screenshots.map { |screenshot| url_for(screenshot) } : nil } do %>
-    <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Media</h3>
+    <h3 class="font-display text-3xl mb-2 sticky top-20 py-4 bg-neutral-900/[.95] backdrop-blur-lg">Media</h3>
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
-    <div class="mb-6">
+    <div class="mb-10">
       <%= form.label :thumbnail, 'Thumbnail', class: 'font-mono uppercase block mb-2' %>
-      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-48 h-48 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 bg-contain bg-no-repeat bg-center', data: { project_images_target: 'thumbnail', action: 'click->project-images#imageButtonClick change->project-images#thumbnailChange' } do %>
+      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-48 h-48 bg-neutral-900 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 bg-contain bg-no-repeat bg-center', data: { project_images_target: 'thumbnail', action: 'click->project-images#imageButtonClick change->project-images#thumbnailChange' } do %>
         <div class="flex flex-col justify-center items-center pt-5 pb-6">
           <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
           <p class="text-sm text-neutral-400"><span class="font-semibold">Click to upload</span></p>
@@ -88,9 +88,9 @@
       <% end %>
     </div>
 
-    <div class="mb-6">
+    <div class="mb-10">
       <%= form.label :screenshots, 'Screenshot Gallery', class: 'font-mono uppercase block mb-2' %>
-      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-full h-64 bg-neutral-800 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 mb-8', data: { action: 'click->project-images#imageButtonClick change->project-images#screenshotsChange' } do %>
+      <%= content_tag :button, class: 'flex flex-col justify-center items-center w-full h-64 bg-neutral-900 rounded-lg border-2 border-neutral-700 border-dashed cursor-pointer hover:brightness-105 mb-8', data: { action: 'click->project-images#imageButtonClick change->project-images#screenshotsChange' } do %>
         <div class="flex flex-col justify-center items-center pt-5 pb-6">
           <%= render IconComponent.new(:upload, class: 'mb-3 w-10 h-10 text-neutral-400') %>
           <p class="mb-2 text-sm text-neutral-400"><span class="font-semibold">Click to upload</span></p>
@@ -110,39 +110,41 @@
       </template>
     </div>
 
-    <div class="mb-6 max-w-prose">
+    <div class="mb-10 max-w-2xl">
       <%= form.label :youtube_url, 'Video', class: 'font-mono uppercase block mb-2' %>
       <%= form.url_field :youtube_url, placeholder: 'YouTube video URL' %>
     </div>
   <% end %>
 
-  <div class="mb-16">
-    <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Project Members</h3>
-    <div class="mb-8"><%= render DividerComponent.new %></div>
+  <% if Flipper.enabled?(:profiles) %>
+    <div class="mb-16">
+      <h3 class="font-display text-3xl mb-2 sticky top-20 py-4 bg-neutral-900/[.95] backdrop-blur-lg">Project Members</h3>
+      <div class="mb-8"><%= render DividerComponent.new %></div>
 
-    <div class="mb-6 max-w-prose">
-      <%= form.fields_for(:project_members) do |member_form| %>
-        <%= member_form.label :user_id, 'Add Users', class: 'font-mono uppercase block mb-2' %>
-        <%= member_form.text_field :user_id, placeholder: 'Enter username or email address' %>
-        <%= member_form.label :role, 'Role', class: 'font-mono uppercase block mb-2' %>
-        <%= member_form.radio_button :role, 'member', checked: true, required: true %>
-        <%= member_form.label :role, 'Member', value: 'member', class: 'mr-4' %>
-        <%= member_form.radio_button :role, 'admin', required: true %>
-        <%= member_form.label :role, 'Admin', value: 'admin' %>
-        <%= member_form.label :public, 'Visibility', class: 'font-mono uppercase block mb-2' %>
-        <%= member_form.radio_button :public, 'public', checked: true, required: true %>
-        <%= member_form.label :public, 'Public', value: 'public', class: 'mr-4' %>
-        <%= member_form.radio_button :public, 'private', required: true %>
-        <%= member_form.label :public, 'Private', value: 'private' %>
-      <% end %>
+      <div class="mb-10 max-w-2xl">
+        <%= form.fields_for(:project_members) do |member_form| %>
+          <%= member_form.label :user_id, 'Add Users', class: 'font-mono uppercase block mb-2' %>
+          <%= member_form.text_field :user_id, placeholder: 'Enter username or email address' %>
+          <%= member_form.label :role, 'Role', class: 'font-mono uppercase block mb-2' %>
+          <%= member_form.radio_button :role, 'member', checked: true, required: true %>
+          <%= member_form.label :role, 'Member', value: 'member', class: 'mr-4' %>
+          <%= member_form.radio_button :role, 'admin', required: true %>
+          <%= member_form.label :role, 'Admin', value: 'admin' %>
+          <%= member_form.label :public, 'Visibility', class: 'font-mono uppercase block mb-2' %>
+          <%= member_form.radio_button :public, 'public', checked: true, required: true %>
+          <%= member_form.label :public, 'Public', value: 'public', class: 'mr-4' %>
+          <%= member_form.radio_button :public, 'private', required: true %>
+          <%= member_form.label :public, 'Private', value: 'private' %>
+        <% end %>
+      </div>
     </div>
-  </div>
+  <% end %>
 
   <div class="mb-16">
-    <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Publishing</h3>
+    <h3 class="font-display text-3xl mb-2 sticky top-20 py-4 bg-neutral-900/[.95] backdrop-blur-lg">Publishing</h3>
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
-    <div class="mb-6">
+    <div class="mb-10">
       <%= form.label :public, 'Visibility', class: 'font-mono uppercase block mb-2' %>
       <%= form.radio_button :public, 'public', checked: true, required: true %>
       <%= form.label :public, 'Public', value: 'public', class: 'mr-4' %>

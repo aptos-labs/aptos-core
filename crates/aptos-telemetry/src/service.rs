@@ -27,21 +27,10 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    constants::{
-        APTOS_GA_API_SECRET, APTOS_GA_MEASUREMENT_ID, ENV_APTOS_DISABLE_TELEMETRY,
-        ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS, ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS,
-        ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS, ENV_APTOS_FORCE_ENABLE_TELEMETRY,
-        ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, ENV_TELEMETRY_SERVICE_URL, GA4_URL, HTTPBIN_URL,
-        NODE_CORE_METRICS_FREQ_SECS, NODE_NETWORK_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS,
-        PROMETHEUS_PUSH_METRICS_FREQ_SECS, TELEMETRY_SERVICE_URL,
-    },
-    core_metrics::create_core_metric_telemetry_event,
-    metrics,
-    network_metrics::create_network_metric_telemetry_event,
-    sender::TelemetrySender,
+    constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
+    network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
-    telemetry_log_sender::TelemetryLogSender,
-    utils::create_build_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
 };
 
 // The chain ID key
@@ -76,6 +65,10 @@ fn force_enable_telemetry() -> bool {
 fn enable_prometheus_push_metrics() -> bool {
     force_enable_telemetry()
         || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS).is_ok())
+}
+
+fn enable_prometheus_node_metrics() -> bool {
+    env::var(ENV_APTOS_DISABLE_PROMETHEUS_NODE_METRICS).is_err()
 }
 
 /// Flag to control enabling/disabling push logs
@@ -163,6 +156,10 @@ async fn spawn_telemetry_service(
     }
 
     if enable_prometheus_push_metrics() {
+        if enable_prometheus_node_metrics() {
+            node_resource_metrics::register_node_metrics_collector();
+        }
+
         let telemetry_sender = telemetry_sender.clone();
         tokio::spawn(async move {
             // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
