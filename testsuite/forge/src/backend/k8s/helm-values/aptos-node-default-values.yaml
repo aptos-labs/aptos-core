@@ -28,5 +28,12 @@ service:
     enableRestApi: true
     enableMetricsPort: true
 
+# to give HAProxy access to more resources, schedule it on validators nodegroup
+# in the long term, we should consider giving the "utilities" nodegroup more resources
+# or removing it from the reference implementation entirely
+haproxy:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: "validators"
+
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
