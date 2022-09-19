@@ -658,18 +658,10 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<
                 helm_values["chain"]["epoch_duration_secs"] = 300.into();
             }))
             .with_success_criteria(SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    5000
-                } else {
-                    6000
-                },
+                6000,
                 10000,
                 true,
-                Some(Duration::from_secs(if duration.as_secs() > 1200 {
-                    240
-                } else {
-                    60
-                })),
+                Some(Duration::from_secs(60)),
                 Some(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
                     MetricsThreshold::new(12, 30),
