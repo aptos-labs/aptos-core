@@ -35,7 +35,7 @@ pub struct SubmissionWorker {
     stats: Arc<DynamicStatsTracking>,
     txn_generator: Box<dyn TransactionGenerator>,
     worker_index: usize,
-    check_account_sequence_only_once: bool,
+    skip_latency_stats: bool,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -48,7 +48,7 @@ impl SubmissionWorker {
         stats: Arc<DynamicStatsTracking>,
         txn_generator: Box<dyn TransactionGenerator>,
         worker_index: usize,
-        check_account_sequence_only_once: bool,
+        skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
         Self {
@@ -59,7 +59,7 @@ impl SubmissionWorker {
             stats,
             txn_generator,
             worker_index,
-            check_account_sequence_only_once,
+            skip_latency_stats,
             rng,
         }
     }
@@ -123,14 +123,14 @@ impl SubmissionWorker {
             )
             .await;
 
-            let early_return_due_to_stop = if self.check_account_sequence_only_once {
+            if self.skip_latency_stats {
                 // we also don't want to be stuck waiting for txn_expiration_time_secs
                 // after stop is called, so we sleep until time or stop is set.
-                self.sleep_check_done(Duration::from_secs(self.params.txn_expiration_time_secs))
-                    .await
-            } else {
-                false
-            };
+                self.sleep_check_done(Duration::from_secs(
+                    self.params.txn_expiration_time_secs + 20,
+                ))
+                .await
+            }
 
             self.update_stats(
                 *loop_start_time,
@@ -138,11 +138,16 @@ impl SubmissionWorker {
                 num_requests,
                 // skip latency if asked to check seq_num only once
                 // even if we check more often due to stop (to not affect sampling)
-                self.check_account_sequence_only_once,
+                self.skip_latency_stats,
                 txn_expiration_time,
-                // if we needed to stop sleep early, we should check until complete
-                // as not enough time might have passed otherwise for txn to be committed.
-                self.check_account_sequence_only_once && !early_return_due_to_stop,
+                // if we don't care about latency, we can recheck less often.
+                // generally, we should never need to recheck, as we wait enough time
+                // before calling here, but in case of shutdown/or client we are talking
+                // to being stale (having stale transaction_version), we might need to wait.
+                Duration::from_millis(
+                    if self.skip_latency_stats { 10 } else { 1 }
+                        * self.params.check_account_sequence_sleep_millis,
+                ),
                 loop_stats,
             )
             .await;
@@ -157,15 +162,15 @@ impl SubmissionWorker {
     }
 
     // returns true if it returned early
-    async fn sleep_check_done(&self, duration: Duration) -> bool {
+    async fn sleep_check_done(&self, duration: Duration) {
         let start_time = Instant::now();
         loop {
             sleep(Duration::from_secs(1)).await;
             if self.stop.load(Ordering::Relaxed) {
-                return true;
+                return;
             }
             if start_time.elapsed() >= duration {
-                return false;
+                return;
             }
         }
     }
@@ -196,7 +201,7 @@ impl SubmissionWorker {
         num_requests: usize,
         skip_latency_stats: bool,
         txn_expiration_ts_secs: u64,
-        check_account_sequence_only_once: bool,
+        check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
         assert_eq!(
@@ -209,8 +214,7 @@ impl SubmissionWorker {
             &mut self.accounts,
             self.params.transactions_per_account,
             txn_expiration_ts_secs,
-            check_account_sequence_only_once,
-            Duration::from_millis(self.params.check_account_sequence_sleep_millis),
+            check_account_sleep_duration,
         )
         .await;
 
@@ -220,13 +224,17 @@ impl SubmissionWorker {
             loop_stats
                 .expired
                 .fetch_add(num_expired as u64, Ordering::Relaxed);
-            sample!(
-                SampleRate::Duration(Duration::from_secs(120)),
-                warn!(
-                    "[{:?}] Transactions were not committed before expiration: {:?}",
-                    self.client.path_prefix_string(),
-                    num_expired
-                )
+            // sample!(
+            //     SampleRate::Duration(Duration::from_secs(120)),
+            warn!(
+                "[{:?}] Transactions were not committed before expiration: {:?}, for {:?}",
+                self.client.path_prefix_string(),
+                num_expired,
+                self.accounts
+                    .iter()
+                    .map(|a| a.address())
+                    .collect::<Vec<_>>(),
+                // )
             );
         }
 
@@ -303,26 +311,44 @@ pub async fn submit_transactions(
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
 
-            sample!(SampleRate::Duration(Duration::from_secs(15)), {
-                let by_error = failures
-                    .iter()
-                    .map(|f| {
-                        f.error
-                            .vm_error_code
-                            .and_then(|c| StatusCode::try_from(c).ok())
-                    })
-                    .counts();
-                if let Some(f) = failures.first() {
-                    warn!(
-                            "[{:?}] Failed to submit due to {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}",
-                            client.path_prefix_string(),
-                            f,
-                            txns[0].sequence_number(),
-                            failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
-                            by_error,
-                        );
-                }
-            });
+            // sample!(SampleRate::Duration(Duration::from_secs(15)), {
+            let by_error = failures
+                .iter()
+                .map(|f| {
+                    f.error
+                        .vm_error_code
+                        .and_then(|c| StatusCode::try_from(c).ok())
+                })
+                .counts();
+            if !failures.is_empty() {
+                let sender = txns[0].sender();
+
+                let last_transactions = if let Ok(account) = client.get_account_bcs(sender).await {
+                    client
+                        .get_account_transactions_bcs(
+                            sender,
+                            Some(account.into_inner().sequence_number() - 1),
+                            Some(5),
+                        )
+                        .await
+                        .ok()
+                        .map(|r| r.into_inner())
+                } else {
+                    None
+                };
+
+                warn!(
+                    "[{:?}] Failed to submit due to {:?}, for account {}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, last transaction for account: {:?}",
+                    client.path_prefix_string(),
+                    failures.first().unwrap(),
+                    sender,
+                    txns[0].sequence_number(),
+                    failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
+                    by_error,
+                    last_transactions,
+                );
+            }
+            // });
 
             stats
                 .failed_submission

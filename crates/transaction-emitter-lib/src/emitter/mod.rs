@@ -614,7 +614,6 @@ async fn wait_for_accounts_sequence(
     accounts: &mut [LocalAccount],
     transactions_per_account: usize,
     txn_expiration_ts_secs: u64,
-    fetch_only_once: bool,
     sleep_between_cycles: Duration,
 ) -> (usize, u128) {
     let mut pending_addresses: HashSet<_> = accounts.iter().map(|d| d.address()).collect();
@@ -633,7 +632,7 @@ async fn wait_for_accounts_sequence(
                     sum_of_completion_timestamps_millis +=
                         millis_elapsed * (*sequence_number - prev_sequence_number) as u128;
 
-                    if account.sequence_number() == *sequence_number || fetch_only_once {
+                    if account.sequence_number() == *sequence_number {
                         pending_addresses.remove(&account.address());
                     }
                 }
@@ -643,6 +642,15 @@ async fn wait_for_accounts_sequence(
                 }
 
                 if chain_timestamp_secs > txn_expiration_ts_secs {
+                    warn!(
+                        "Chain timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                        chain_timestamp_secs,
+                        txn_expiration_ts_secs,
+                        accounts
+                            .iter()
+                            .map(|a| a.address().to_hex_literal())
+                            .collect::<Vec<_>>(),
+                    );
                     break;
                 }
             }
@@ -696,6 +704,12 @@ fn update_seq_num_and_get_num_expired(
                             account.sequence_number() <= count + transactions_per_account as u64
                         );
                         let diff = (account.sequence_number() - count) as usize;
+                        warn!(
+                            "Stale sequence_number for {}, expected {}, setting to {}",
+                            account.address(),
+                            account.sequence_number(),
+                            count
+                        );
                         *account.sequence_number_mut() = *count;
                         Some(diff)
                     } else {
@@ -703,6 +717,12 @@ fn update_seq_num_and_get_num_expired(
                     }
                 }
                 None => {
+                    warn!(
+                        "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
+                        account.address(),
+                        account.sequence_number(),
+                        account.sequence_number() - transactions_per_account as u64
+                    );
                     *account.sequence_number_mut() -= transactions_per_account as u64;
                     Some(transactions_per_account)
                 }
@@ -737,7 +757,7 @@ where
     })
     .unzip();
 
-    Ok((seq_nums, timestamps.into_iter().max().unwrap()))
+    Ok((seq_nums, timestamps.into_iter().min().unwrap()))
 }
 
 pub fn gen_transfer_txn_request(
