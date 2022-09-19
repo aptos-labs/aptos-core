@@ -14,6 +14,7 @@ spec:
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
+  type: {{ $.Values.service.fullnode.internal.type }}
   ports:
   - name: aptosnet
     port: 6182
