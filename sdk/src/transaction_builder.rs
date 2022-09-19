@@ -35,7 +35,8 @@ impl TransactionBuilder {
             payload,
             chain_id,
             expiration_timestamp_secs,
-            max_gas_amount: 4000,
+            // TODO(Gas): double check this
+            max_gas_amount: 2_000,
             gas_unit_price: 1,
             sender: None,
             sequence_number: None,
@@ -98,7 +99,7 @@ impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
             // TODO(Gas): double check if this right
-            max_gas_amount: 2_000,
+            max_gas_amount: 20_000,
             gas_unit_price: 0,
             transaction_expiration_time: 30,
             chain_id,

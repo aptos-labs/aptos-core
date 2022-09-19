@@ -49,7 +49,7 @@ async fn test_indexer() {
         .await
         .unwrap();
     // TODO(Gas): double check if this is correct
-    chain_info.mint(account1.address(), 1_000).await.unwrap();
+    chain_info.mint(account1.address(), 100_000).await.unwrap();
     chain_info
         .create_user_account(account2.public_key())
         .await

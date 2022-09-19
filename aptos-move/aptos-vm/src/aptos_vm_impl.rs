@@ -87,8 +87,6 @@ impl AptosVMImpl {
                 .map(|storage_gas_schedule| storage_gas_schedule.into()),
         };
 
-        println!("{}, {:#?}", gas_feature_version, storage_gas_params);
-
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
         //            which logically speaking, shouldn't be handled by the VM at all.

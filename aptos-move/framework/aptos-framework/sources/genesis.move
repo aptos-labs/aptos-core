@@ -1,6 +1,9 @@
 module aptos_framework::genesis {
     use std::error;
+    use std::fixed_point32;
     use std::vector;
+
+    use aptos_std::simple_map;
 
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
@@ -14,6 +17,7 @@ module aptos_framework::genesis {
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::staking_contract;
     use aptos_framework::staking_config;
     use aptos_framework::state_storage;
     use aptos_framework::storage_gas;
@@ -21,8 +25,10 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_fee;
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
+    use aptos_framework::vesting;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
+    const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
 
     struct AccountMap has drop {
         account_address: address,
@@ -94,7 +100,6 @@ module aptos_framework::genesis {
             aptos_governance::store_signer_cap(&aptos_account, address, framework_signer_cap);
             i = i + 1;
         };
-
 
         consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
@@ -184,15 +189,111 @@ module aptos_framework::genesis {
         }
     }
 
-    fun create_employee_validators(
-        _aptos_framework: &signer,
-        _employees: vector<EmployeeAccountMap>,
-    ) {
+    fun create_employee_validators(employees: vector<EmployeeAccountMap>) {
+        let i = 0;
+        let num_employee_groups = vector::length(&employees);
+        let unique_accounts = vector::empty();
+
+        while (i < num_employee_groups) {
+            let j = 0;
+            let employee_group = vector::borrow(&employees, i);
+            let num_employees_in_group = vector::length(&employee_group.accounts);
+
+            let buy_ins = simple_map::create();
+
+            while (j < num_employees_in_group) {
+                let account = vector::borrow(&employee_group.accounts, j);
+                assert!(
+                    !vector::contains(&unique_accounts, account),
+                    error::already_exists(EDUPLICATE_ACCOUNT),
+                );
+                vector::push_back(&mut unique_accounts, *account);
+
+                let employee = create_signer(*account);
+                let total = coin::balance<AptosCoin>(*account);
+                let coins = coin::withdraw<AptosCoin>(&employee, total);
+                simple_map::add(&mut buy_ins, *account, coins);
+
+                j = j + 1;
+            };
+
+            let j = 0;
+            let num_vesting_events = vector::length(&employee_group.vesting_schedule_numerator);
+            let schedule = vector::empty();
+
+            while (j < num_vesting_events) {
+                let numerator = vector::borrow(&employee_group.vesting_schedule_numerator, j);
+                let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
+                vector::push_back(&mut schedule, event);
+
+                j = j + 1;
+            };
+
+            let vesting_schedule = vesting::create_vesting_schedule(
+                schedule,
+                1663456089, // Update before mainnet or pass in by config
+                30 * 24 * 60 * 60, // 30 days
+            );
+
+            let admin = employee_group.validator.validator_config.owner_address;
+            let contract_address = vesting::create_vesting_contract(
+                &create_signer(admin),
+                &employee_group.accounts,
+                buy_ins,
+                vesting_schedule,
+                admin,
+                employee_group.validator.validator_config.operator_address,
+                employee_group.validator.validator_config.voter_address,
+                employee_group.validator.commission_percentage,
+                x"",
+            );
+            let pool_address = vesting::stake_pool_address(contract_address);
+
+            let validator = &employee_group.validator.validator_config;
+            assert!(
+                account::exists_at(validator.owner_address),
+                error::not_found(EACCOUNT_DOES_NOT_EXIST),
+            );
+            assert!(
+                account::exists_at(validator.operator_address),
+                error::not_found(EACCOUNT_DOES_NOT_EXIST),
+            );
+            assert!(
+                account::exists_at(validator.voter_address),
+                error::not_found(EACCOUNT_DOES_NOT_EXIST),
+            );
+            initialize_validator(pool_address, validator);
+
+            i = i + 1;
+        }
     }
 
     fun create_initialize_validators_with_commission(
-        _aptos_framework: &signer,
-        _validators: vector<ValidatorConfigurationWithCommission>) {
+        aptos_framework: &signer,
+        validators: vector<ValidatorConfigurationWithCommission>,
+    ) {
+        let i = 0;
+        let num_validators = vector::length(&validators);
+        let unique_accounts = vector::empty();
+
+        while (i < num_validators) {
+            let validator = vector::borrow(&validators, i);
+
+            assert!(
+                !vector::contains(&unique_accounts, &validator.validator_config.owner_address),
+                error::already_exists(EDUPLICATE_ACCOUNT),
+            );
+            vector::push_back(&mut unique_accounts, validator.validator_config.owner_address);
+            create_initialize_validator(aptos_framework, validator);
+
+            i = i + 1;
+        };
+
+        // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
+        // validators.
+        aptos_coin::destroy_mint_cap(aptos_framework);
+
+        stake::on_new_epoch();
     }
 
     /// Sets up the initial validator set for the network.
@@ -208,50 +309,72 @@ module aptos_framework::genesis {
     fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
         let i = 0;
         let num_validators = vector::length(&validators);
-        let unique_accounts = vector::empty();
+
+        let validators_with_commission = vector::empty();
 
         while (i < num_validators) {
-            let validator = vector::borrow(&validators, i);
+            let validator_with_commission = ValidatorConfigurationWithCommission {
+                validator_config: vector::pop_back(&mut validators),
+                commission_percentage: 0,
+            };
+            vector::push_back(&mut validators_with_commission, validator_with_commission);
 
-            assert!(
-                !vector::contains(&unique_accounts, &validator.owner_address),
-                error::already_exists(EDUPLICATE_ACCOUNT),
-            );
-            vector::push_back(&mut unique_accounts, validator.owner_address);
+            i = i + 1;
+        };
 
-            let owner = &create_account(aptos_framework, validator.owner_address, validator.stake_amount);
-            let operator = &create_account(aptos_framework, validator.operator_address, 0);
-            create_account(aptos_framework, validator.voter_address, 0);
+        create_initialize_validators_with_commission(aptos_framework, validators_with_commission);
+    }
 
-            // Initialize the stake pool and join the validator set.
+    fun create_initialize_validator(
+        aptos_framework: &signer,
+        commission_config: &ValidatorConfigurationWithCommission,
+    ) {
+        let validator = &commission_config.validator_config;
+
+        let owner = &create_account(aptos_framework, validator.owner_address, validator.stake_amount);
+        create_account(aptos_framework, validator.operator_address, 0);
+        create_account(aptos_framework, validator.voter_address, 0);
+
+        // Initialize the stake pool and join the validator set.
+        let pool_address = if (commission_config.commission_percentage == 0) {
             stake::initialize_stake_owner(
                 owner,
                 validator.stake_amount,
                 validator.operator_address,
                 validator.voter_address,
             );
-            stake::rotate_consensus_key(
-                operator,
-                validator.owner_address,
-                validator.consensus_pubkey,
-                validator.proof_of_possession,
+            validator.owner_address
+        } else {
+            staking_contract::create_staking_contract(
+                owner,
+                validator.operator_address,
+                validator.voter_address,
+                validator.stake_amount,
+                commission_config.commission_percentage,
+                x"",
             );
-            stake::update_network_and_fullnode_addresses(
-                operator,
-                validator.owner_address,
-                validator.network_addresses,
-                validator.full_node_network_addresses,
-            );
-            stake::join_validator_set_internal(operator, validator.owner_address);
-
-            i = i + 1;
+            staking_contract::stake_pool_address(validator.owner_address, validator.operator_address)
         };
 
-        // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
-        // validators.
-        aptos_coin::destroy_mint_cap(aptos_framework);
+        initialize_validator(pool_address, validator);
+    }
 
-        stake::on_new_epoch();
+    fun initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
+        let operator = &create_signer(validator.operator_address);
+
+        stake::rotate_consensus_key(
+            operator,
+            pool_address,
+            validator.consensus_pubkey,
+            validator.proof_of_possession,
+        );
+        stake::update_network_and_fullnode_addresses(
+            operator,
+            pool_address,
+            validator.network_addresses,
+            validator.full_node_network_addresses,
+        );
+        stake::join_validator_set_internal(operator, pool_address);
     }
 
     /// The last step of genesis.

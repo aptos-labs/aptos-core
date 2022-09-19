@@ -236,7 +236,7 @@ Coming soon!
 
 ### Step 4.3: Creating blockchain accounts
 
-In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create Alice and Bob's accounts. Only Alice's is funded:
+In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create Alice and Bob's accounts:
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
