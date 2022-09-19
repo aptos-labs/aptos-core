@@ -11,7 +11,7 @@ use std::{
     cmp::min,
     time::{Duration, Instant},
 };
-use transaction_emitter_lib::{query_sequence_numbers, Cluster, TxnEmitter};
+use transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 
 pub async fn diag(cluster: &Cluster) -> Result<()> {
     let client = cluster.random_instance().rest_client();
@@ -40,20 +40,19 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
             faucet_account.sequence_number()
         );
         loop {
-            let addresses = &[faucet_account_address];
             let clients = instances
                 .iter()
                 .map(|instance| instance.rest_client())
                 .collect::<Vec<_>>();
             let futures = clients
                 .iter()
-                .map(|client| query_sequence_numbers(client, addresses.iter()));
+                .map(|client| query_sequence_number(client, faucet_account_address));
             let results = join_all(futures).await;
             let mut all_good = true;
             for (instance, result) in zip(instances.iter(), results) {
                 let seq = result.map_err(|e| {
                     format_err!("Failed to query sequence number from {}: {:?}", instance, e)
-                })?[0];
+                })?;
                 let host = instance.api_url().host().unwrap().to_string();
                 let status = if seq != faucet_account.sequence_number() {
                     all_good = false;

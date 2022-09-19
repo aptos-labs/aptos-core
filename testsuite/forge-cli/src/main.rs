@@ -185,6 +185,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    if suite_name == "compat" {
+        panic!("{}", suite_name);
+    }
+
+    let duration = Duration::from_secs(20 * 60);
+    let suite_name = "graceful_overload";
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -542,6 +549,28 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                 None,
                 None,
             )),
+        // TODO: Add tracing latency of high-gas-fee transactions
+        "graceful_overload" => config
+            .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
+            .with_initial_fullnode_count(4)
+            .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 15000 }))
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                // Have single epoch change in land blocking
+                helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            }))
+            .with_success_criteria(SuccessCriteria::new(
+                5500,
+                50000,
+                true,
+                Some(Duration::from_secs(120)),
+                Some(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(15 * 1024 * 1024 * 1024, 30),
+                )),
+            )),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => config
             .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -549,7 +578,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             .with_network_tests(vec![&LoadVsPerfBenchmark {
                 test: &PerformanceBenchmarkWithFN,
                 tps: &[
-                    200, 1000, 3000, 5000, 6000, 6300, 6600, 7000, 7500, 8000, 10000, 12000,
+                    200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
                 ],
             }])
             .with_genesis_helm_config_fn(Arc::new(|helm_values| {

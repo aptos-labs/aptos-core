@@ -7,7 +7,7 @@ use crate::{
     get_stateful_set_image,
     node::K8sNode,
     prometheus::{self, query_with_metadata},
-    query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
+    query_sequence_number, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
     FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
@@ -64,15 +64,13 @@ impl K8sSwarm {
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::aptos_test_root_address();
-        let sequence_number = query_sequence_numbers(&client, [address].iter())
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
+        let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
+            format_err!(
+                "query_sequence_number on {:?} for dd account failed: {}",
+                client,
+                e
+            )
+        })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
 
         let mut versions = HashMap::new();
