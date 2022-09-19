@@ -148,6 +148,7 @@ function App() {
   };
 
   const onIsConnectedClick = async () => {
+    console.log(await window.aptos.connect());
     console.log(await window.aptos.isConnected());
   };
 

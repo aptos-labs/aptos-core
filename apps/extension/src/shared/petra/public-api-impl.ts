@@ -119,20 +119,27 @@ export const PetraPublicApiImpl = {
    */
   async connect(dappInfo: DappInfo) {
     const account = await getActiveAccount();
+    const isAllowed = account
+      ? await Permissions.isDomainAllowed(dappInfo.domain, account.address)
+      : false;
 
-    const connectRequest = PermissionHandler.requestPermission(
-      dappInfo,
-      { type: 'connect' },
-    );
+    const connectRequest = !isAllowed
+      ? PermissionHandler.requestPermission(
+        dappInfo,
+        { type: 'connect' },
+      )
+      : undefined;
 
     // Check for backward compatibility, ideally should be removed
     if (account === undefined) {
       throw DappErrorType.NO_ACCOUNTS;
     }
 
-    // TODO: should get account from here
-    await connectRequest;
-    await Permissions.addDomain(dappInfo.domain, account!.address);
+    if (connectRequest) {
+      await connectRequest;
+      await Permissions.addDomain(dappInfo.domain, account!.address);
+    }
+
     return account;
   },
 
