@@ -56,6 +56,7 @@ module aptos_framework::genesis {
     struct ValidatorConfigurationWithCommission has copy, drop {
         validator_config: ValidatorConfiguration,
         commission_percentage: u64,
+        join_during_genesis: bool,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -262,7 +263,9 @@ module aptos_framework::genesis {
                 account::exists_at(validator.voter_address),
                 error::not_found(EACCOUNT_DOES_NOT_EXIST),
             );
-            initialize_validator(pool_address, validator);
+            if (employee_group.validator.join_during_genesis) {
+                initialize_validator(pool_address, validator);
+            };
 
             i = i + 1;
         }
@@ -308,6 +311,7 @@ module aptos_framework::genesis {
             let validator_with_commission = ValidatorConfigurationWithCommission {
                 validator_config: vector::pop_back(&mut validators),
                 commission_percentage: 0,
+                join_during_genesis: true,
             };
             vector::push_back(&mut validators_with_commission, validator_with_commission);
 
@@ -348,7 +352,9 @@ module aptos_framework::genesis {
             staking_contract::stake_pool_address(validator.owner_address, validator.operator_address)
         };
 
-        initialize_validator(pool_address, validator);
+        if (commission_config.join_during_genesis) {
+            initialize_validator(pool_address, validator);
+        };
     }
 
     fun initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
