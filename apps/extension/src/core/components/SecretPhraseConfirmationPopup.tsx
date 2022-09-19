@@ -129,7 +129,7 @@ function SecretPhraseConfirmationPopup({
         alignContent="flex-end"
         height="60%"
         p={4}
-        borderRadius={8}
+        borderTopRadius={8}
         opacity={1}
         display="flex"
         justifyContent="center"
