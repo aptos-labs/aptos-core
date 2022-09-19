@@ -334,12 +334,12 @@ async fn handle_network_event<V>(
 
 /// Garbage collect all expired transactions by SystemTTL.
 pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<CoreMempool>>, gc_interval_ms: u64) {
-    info!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Start));
+    debug!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Start));
     let mut interval = IntervalStream::new(interval(Duration::from_millis(gc_interval_ms)));
     while let Some(_interval) = interval.next().await {
         sample!(
             SampleRate::Duration(Duration::from_secs(60)),
-            info!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Live))
+            debug!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Live))
         );
         mempool.lock().gc();
     }

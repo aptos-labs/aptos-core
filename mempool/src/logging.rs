@@ -65,6 +65,10 @@ impl TxnsLog {
         }
         self.len += 1;
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 impl fmt::Display for TxnsLog {
