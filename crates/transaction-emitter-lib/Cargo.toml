@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 again = "0.1.2"
 anyhow = { version = "1.0.57", features = ["backtrace"] }
+async-trait = "0.1.53"
 clap = "3.1.17"
 futures = "0.3.21"
 itertools = "0.10.3"

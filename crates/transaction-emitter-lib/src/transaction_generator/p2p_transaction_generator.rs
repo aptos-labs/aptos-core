@@ -7,6 +7,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
+use async_trait::async_trait;
 use rand::{
     distributions::{Distribution, Standard},
     prelude::{SliceRandom, StdRng},
@@ -136,6 +137,7 @@ impl Distribution<InvalidTransactionType> for Standard {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for P2PTransactionGenerator {
     fn generate_transactions(
         &mut self,

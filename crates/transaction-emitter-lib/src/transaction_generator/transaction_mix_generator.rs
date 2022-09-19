@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use async_trait::async_trait;
 use rand::prelude::StdRng;
 use rand::Rng;
 use rand_core::{OsRng, SeedableRng};
@@ -23,6 +24,7 @@ impl TxnMixGenerator {
     }
 }
 
+#[async_trait]
 impl TransactionGenerator for TxnMixGenerator {
     fn generate_transactions(
         &mut self,
