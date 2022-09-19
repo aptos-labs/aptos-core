@@ -6454,7 +6454,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "cfg-if 1.0.0",
+ "cfg-if",
  "once_cell",
  "procfs",
  "prometheus",
