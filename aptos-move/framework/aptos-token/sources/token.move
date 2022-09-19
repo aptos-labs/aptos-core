@@ -748,6 +748,17 @@ module aptos_token::token {
         table::contains(collection_data, name)
     }
 
+    public fun check_tokendata_exists(creator: address, collection_name: String, token_name: String): bool acquires Collections {
+        assert!(
+            exists<Collections>(creator),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
+        );
+
+        let token_data = &borrow_global<Collections>(creator).token_data;
+        let token_data_id = create_token_data_id(creator, collection_name, token_name);
+        table::contains(token_data, token_data_id)
+    }
+
     public fun create_tokendata(
         account: &signer,
         collection: String,
