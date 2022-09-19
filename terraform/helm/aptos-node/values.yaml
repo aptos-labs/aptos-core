@@ -109,13 +109,10 @@ validator:
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
   statefulset:
-    # To do: validator statefulset related property should be pulled here
     labels: {}
   service:
-    # To do: validator service related property should be pulled here
     labels: {}
   pod:
-    # To do: validator pod related property should be pulled here
     labels: {}
 
 fullnode:
@@ -177,13 +174,10 @@ fullnode:
     validator_network: {}
     failpoints: {}
   statefulset:
-    # -- To do: fullnode statefulset related property should be pulled here
     labels: {}
   service:
-    # -- To do: fullnode service related property should be pulled here
     labels: {}
   pod:
-    # To do: fullnode pod related property should be pulled here
     labels: {}
 
 service:
