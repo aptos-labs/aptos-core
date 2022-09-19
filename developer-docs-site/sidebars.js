@@ -87,7 +87,6 @@ const sidebars = {
           items: [
             "guides/move-guides/move-on-aptos",
             "guides/move-guides/upgrading-move-code",
-            "guides/move-guides/guide-move-transactional-testing",
           ],
         },
       ],
