@@ -145,20 +145,18 @@ module aptos_framework::storage_gas {
             !exists<StorageGasConfig>(@aptos_framework),
             error::already_exists(ESTORAGE_GAS_CONFIG)
         );
-        let item_curve = base_8192_exponential_curve(10, 10000);
-        let byte_curve = base_8192_exponential_curve(1, 1000);
 
         let item_config = UsageGasConfig {
             target_usage: 1000000000,  // 1 billion
-            read_curve: item_curve,
-            create_curve: item_curve,
-            write_curve: item_curve,
+            read_curve: base_8192_exponential_curve(8000, 16000),
+            create_curve: base_8192_exponential_curve(1280000, 128000000),
+            write_curve: base_8192_exponential_curve(160000, 16000000),
         };
         let byte_config = UsageGasConfig {
             target_usage: 500000000000, // 500 GB
-            read_curve: byte_curve,
-            create_curve: byte_curve,
-            write_curve: byte_curve,
+            read_curve: base_8192_exponential_curve(1000, 2000),
+            create_curve: base_8192_exponential_curve(10000, 1000000),
+            write_curve: base_8192_exponential_curve(10000, 1000000),
         };
         validate_usage_config(&item_config);
         validate_usage_config(&item_config);
@@ -172,12 +170,12 @@ module aptos_framework::storage_gas {
             error::already_exists(ESTORAGE_GAS)
         );
         move_to(aptos_framework, StorageGas {
-            per_item_read: 100,
-            per_item_create: 100,
-            per_item_write: 100,
-            per_byte_read: 1,
-            per_byte_create: 1,
-            per_byte_write: 1,
+            per_item_read: 8000,
+            per_item_create: 1280000,
+            per_item_write: 160000,
+            per_byte_read: 1000,
+            per_byte_create: 10000,
+            per_byte_write: 10000,
         });
     }
 
@@ -279,9 +277,9 @@ module aptos_framework::storage_gas {
         initialize(&framework);
         on_reconfig();
         let gas_parameter = borrow_global<StorageGas>(@aptos_framework);
-        assert!(gas_parameter.per_item_read == 100, 0);
-        assert!(gas_parameter.per_item_create == 100, 0);
-        assert!(gas_parameter.per_item_write == 100, 0);
+        assert!(gas_parameter.per_item_read == 10, 0);
+        assert!(gas_parameter.per_item_create == 10, 0);
+        assert!(gas_parameter.per_item_write == 10, 0);
         assert!(gas_parameter.per_byte_read == 1, 0);
         assert!(gas_parameter.per_byte_create == 1, 0);
         assert!(gas_parameter.per_byte_write == 1, 0);
@@ -298,7 +296,7 @@ module aptos_framework::storage_gas {
             let old_standard_curve_gas = 1;
             while (i <= target + 7) {
                 assert!(calculate_gas(target, i, &constant_curve) == 5, 0);
-                assert!(calculate_gas(target, i, &linear_curve) == if (i < target) {1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION} else {1000}, 0);
+                assert!(calculate_gas(target, i, &linear_curve) == (if (i < target) {1 + 999 * (i * BASIS_POINT_DENOMINATION / target) / BASIS_POINT_DENOMINATION} else {1000}), 0);
                 let new_standard_curve_gas = calculate_gas(target, i, &standard_curve);
                 assert!(new_standard_curve_gas >= old_standard_curve_gas, 0);
                 old_standard_curve_gas = new_standard_curve_gas;

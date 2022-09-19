@@ -13,7 +13,7 @@ use crate::{
 use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
-    NativeGasParameters,
+    NativeGasParameters, StorageGasParameters,
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
@@ -22,7 +22,8 @@ use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, Version,
+        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
+        Version,
     },
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -47,8 +48,9 @@ use std::sync::Arc;
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
-    gas_feature_version: Option<u64>,
+    gas_feature_version: u64,
     gas_params: Option<AptosGasParameters>,
+    storage_gas_params: Option<StorageGasParameters>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
@@ -59,27 +61,31 @@ impl AptosVMImpl {
     pub fn new<S: StateView>(state: &S) -> Self {
         let storage = StorageAdapter::new(state);
 
-        let (gas_params, gas_feature_version): (Option<AptosGasParameters>, Option<u64>) =
+        // Get the gas parameters
+        let (gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
             match GasScheduleV2::fetch_config(&storage) {
                 Some(gas_schedule) => {
                     let feature_version = gas_schedule.feature_version;
                     let map = gas_schedule.to_btree_map();
                     (
                         AptosGasParameters::from_on_chain_gas_schedule(&map),
-                        Some(feature_version),
+                        feature_version,
                     )
                 }
                 None => match GasSchedule::fetch_config(&storage) {
                     Some(gas_schedule) => {
                         let map = gas_schedule.to_btree_map();
-                        (
-                            AptosGasParameters::from_on_chain_gas_schedule(&map),
-                            Some(0),
-                        )
+                        (AptosGasParameters::from_on_chain_gas_schedule(&map), 0)
                     }
-                    None => (None, None),
+                    None => (None, 0),
                 },
             };
+
+        let storage_gas_params = match gas_feature_version {
+            0 => None,
+            _ => StorageGasSchedule::fetch_config(&storage)
+                .map(|storage_gas_schedule| storage_gas_schedule.into()),
+        };
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
@@ -105,6 +111,7 @@ impl AptosVMImpl {
             move_vm: Arc::new(inner),
             gas_feature_version,
             gas_params,
+            storage_gas_params,
             version: None,
             transaction_validation: None,
             metadata_cache: Default::default(),
@@ -149,15 +156,25 @@ impl AptosVMImpl {
         })
     }
 
-    pub fn get_gas_feature_version(&self, log_context: &AdapterLogSchema) -> Result<u64, VMStatus> {
-        self.gas_feature_version.ok_or_else(|| {
-            log_context.alert();
-            error!(
-                *log_context,
-                "VM Startup Failed. Gas Feature Version Not Found"
-            );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
-        })
+    pub fn get_storage_gas_parameters(
+        &self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<Option<&StorageGasParameters>, VMStatus> {
+        match self.gas_feature_version {
+            0 => Ok(None),
+            _ => Ok(Some(self.storage_gas_params.as_ref().ok_or_else(|| {
+                log_context.alert();
+                error!(
+                    *log_context,
+                    "VM Startup Failed. Storage Gas Parameters Not Found"
+                );
+                VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+            })?)),
+        }
+    }
+
+    pub fn get_gas_feature_version(&self) -> u64 {
+        self.gas_feature_version
     }
 
     pub fn get_version(&self) -> Result<Version, VMStatus> {

@@ -214,13 +214,14 @@ impl CliTestFramework {
                 sender_account: Some(self.account_id(index)),
                 rest_options: self.rest_options(),
                 gas_options: gas_options.unwrap_or_default(),
-                prompt_options: PromptOptions::no(),
+                prompt_options: PromptOptions::yes(),
                 estimate_max_gas: true,
                 ..Default::default()
             },
             new_private_key: Some(new_private_key),
             save_to_profile: None,
             new_private_key_file: None,
+            skip_saving_profile: true,
         }
         .execute()
         .await?;
@@ -334,7 +335,14 @@ impl CliTestFramework {
 
     pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
         AddStake {
-            txn_options: self.transaction_options(index, None),
+            txn_options: self.transaction_options(
+                index,
+                // TODO(greg): revisit after fixing gas estimation
+                Some(GasOptions {
+                    gas_unit_price: Some(1),
+                    max_gas: Some(10000),
+                }),
+            ),
             amount,
         }
         .execute()
@@ -486,7 +494,14 @@ impl CliTestFramework {
         operator_index: Option<usize>,
     ) -> CliTypedResult<TransactionSummary> {
         InitializeStakeOwner {
-            txn_options: self.transaction_options(owner_index, None),
+            txn_options: self.transaction_options(
+                owner_index,
+                // TODO(greg): revisit after fixing gas estimation
+                Some(GasOptions {
+                    gas_unit_price: Some(1),
+                    max_gas: Some(10000),
+                }),
+            ),
             initial_stake_amount,
             operator_address: operator_index.map(|idx| self.account_id(idx)),
             voter_address: voter_index.map(|idx| self.account_id(idx)),

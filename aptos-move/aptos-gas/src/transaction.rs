@@ -5,11 +5,94 @@
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
 use crate::algebra::{FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{
+    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
+};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
     ToUnitFractionalWithParams, ToUnitWithParams,
 };
+
+#[derive(Clone, Debug)]
+pub struct StorageGasParameters {
+    pub per_item_read: InternalGasPerArg,
+    pub per_item_create: InternalGasPerArg,
+    pub per_item_write: InternalGasPerArg,
+    pub per_byte_read: InternalGasPerByte,
+    pub per_byte_create: InternalGasPerByte,
+    pub per_byte_write: InternalGasPerByte,
+}
+
+impl From<StorageGasSchedule> for StorageGasParameters {
+    fn from(gas_schedule: StorageGasSchedule) -> Self {
+        Self {
+            per_item_read: gas_schedule.per_item_read.into(),
+            per_item_create: gas_schedule.per_item_create.into(),
+            per_item_write: gas_schedule.per_item_write.into(),
+            per_byte_read: gas_schedule.per_byte_read.into(),
+            per_byte_create: gas_schedule.per_byte_create.into(),
+            per_byte_write: gas_schedule.per_byte_write.into(),
+        }
+    }
+}
+
+impl StorageGasParameters {
+    pub fn zeros() -> Self {
+        Self {
+            per_item_read: 0.into(),
+            per_item_create: 0.into(),
+            per_item_write: 0.into(),
+            per_byte_read: 0.into(),
+            per_byte_create: 0.into(),
+            per_byte_write: 0.into(),
+        }
+    }
+}
+
+impl StorageGasParameters {
+    pub fn calculate_write_set_gas<'a>(
+        &self,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> InternalGas {
+        use WriteOp::*;
+
+        let mut num_items_create = NumArgs::zero();
+        let mut num_items_write = NumArgs::zero();
+        let mut num_bytes_create = NumBytes::zero();
+        let mut num_bytes_write = NumBytes::zero();
+
+        for (key, op) in ops.into_iter() {
+            let key_size = || {
+                NumBytes::new(
+                    key.encode()
+                        .expect("Should be able to serialize state key")
+                        .len() as u64,
+                )
+            };
+
+            match op {
+                Creation(data) => {
+                    num_items_create += 1.into();
+
+                    num_bytes_create += key_size();
+                    num_bytes_create += NumBytes::new(data.len() as u64);
+                }
+                Modification(data) => {
+                    num_items_write += 1.into();
+
+                    num_bytes_write += key_size();
+                    num_bytes_write += NumBytes::new(data.len() as u64);
+                }
+                Deletion => (),
+            }
+        }
+
+        num_items_create * self.per_item_create
+            + num_items_write * self.per_item_write
+            + num_bytes_create * self.per_byte_create
+            + num_bytes_write * self.per_byte_write
+    }
+}
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
@@ -20,7 +103,7 @@ crate::params::define_gas_parameters!(
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
-            600
+            1_500_000
         ],
         // Any transaction over this size will be charged an additional amount per byte.
         [
@@ -33,7 +116,7 @@ crate::params::define_gas_parameters!(
         [
             intrinsic_gas_per_byte: InternalGasPerByte,
             "intrinsic_gas_per_byte",
-            8
+            2_000
         ],
         // ~5 microseconds should equal one unit of computational gas. We bound the maximum
         // computational time of any given transaction at roughly 20 seconds. We want this number and
@@ -60,41 +143,41 @@ crate::params::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            32 * 1024
+            64 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,
             "gas_unit_scaling_factor",
-            1000
+            10_000
         ],
         // Gas Parameters for reading data from storage.
-        [load_data_base: InternalGas, "load_data.base", 1],
+        [load_data_base: InternalGas, "load_data.base", 16_000],
         [
             load_data_per_byte: InternalGasPerByte,
             "load_data.per_byte",
-            1
+            1_000
         ],
-        [load_data_failure: InternalGas, "load_data.failure", 1],
+        [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
             write_data_per_op: InternalGasPerArg,
             "write_data.per_op",
-            100
+            160_000
         ],
         [
             write_data_per_new_item: InternalGasPerArg,
             "write_data.new_item",
-            1000
+            1_280_000
         ],
         [
             write_data_per_byte_in_key: InternalGasPerByte,
             "write_data.per_byte_in_key",
-            100
+            10_000
         ],
         [
             write_data_per_byte_in_val: InternalGasPerByte,
             "write_data.per_byte_in_val",
-            100
+            10_000
         ],
     ]
 );

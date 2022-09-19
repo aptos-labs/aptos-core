@@ -614,7 +614,11 @@ impl TransactionStore {
             }
         }
 
-        debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        if !gc_txns_log.is_empty() {
+            debug!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        } else {
+            trace!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
+        }
         self.track_indices();
     }
 

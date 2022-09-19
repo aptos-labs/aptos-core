@@ -287,6 +287,31 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
+    pub async fn simulate_bcs_with_gas_estimation(
+        &self,
+        txn: &SignedTransaction,
+        estimate_max_gas_amount: bool,
+        estimate_max_gas_unit_price: bool,
+    ) -> AptosResult<Response<TransactionOnChainData>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path(&format!(
+            "transactions/simulate?estimate_max_gas_amount={}&estimate_gas_unit_price={}",
+            estimate_max_gas_amount, estimate_max_gas_unit_price
+        ))?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn submit(
         &self,
         txn: &SignedTransaction,
@@ -1179,4 +1204,9 @@ async fn parse_error(response: reqwest::Response) -> RestError {
         Ok(error) => (error, maybe_state, status_code).into(),
         Err(e) => RestError::Http(status_code, e),
     }
+}
+
+pub struct GasEstimationParams {
+    pub estimated_gas_used: u64,
+    pub estimated_gas_price: u64,
 }

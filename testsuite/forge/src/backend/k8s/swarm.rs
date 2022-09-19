@@ -3,7 +3,8 @@
 
 use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
-    chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
+    check_for_container_restart, create_k8s_client, delete_all_chaos, get_free_port,
+    get_stateful_set_image,
     node::K8sNode,
     prometheus::{self, query_with_metadata},
     query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
@@ -41,14 +42,14 @@ pub struct K8sSwarm {
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
-    kube_namespace: String,
+    pub kube_namespace: String,
     keep: bool,
     chaoses: HashSet<SwarmChaos>,
     prom_client: Option<PrometheusClient>,
 }
 
 impl K8sSwarm {
-    pub async fn new(
+    pub async fn new<'b>(
         root_key: &[u8],
         image_tag: &str,
         upgrade_image_tag: &str,
@@ -250,17 +251,29 @@ impl Swarm for K8sSwarm {
     }
 
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
-        chaos::inject_swarm_chaos(&self.kube_namespace, &chaos)?;
+        self.inject_swarm_chaos(&chaos)?;
         self.chaoses.insert(chaos);
         Ok(())
     }
 
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
         if self.chaoses.remove(&chaos) {
-            chaos::remove_swarm_chaos(&self.kube_namespace, &chaos)?;
+            self.remove_swarm_chaos(&chaos)?;
         } else {
             bail!("Chaos {:?} not found", chaos);
         }
+        Ok(())
+    }
+
+    fn remove_all_chaos(&mut self) -> Result<()> {
+        // try removing all existing chaoses
+        for chaos in self.chaoses.clone() {
+            self.remove_swarm_chaos(&chaos)?;
+        }
+        // force remove all others
+        delete_all_chaos(&self.kube_namespace)?;
+
+        self.chaoses.clear();
         Ok(())
     }
 
