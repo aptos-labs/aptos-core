@@ -4,7 +4,8 @@
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_counter, register_gauge, register_histogram,
     register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    register_int_gauge_vec, Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -313,11 +314,12 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for the number of blocks in the pipeline.
-pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+/// Counter for the number of blocks in the pipeline broken down by stage.
+pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_consensus_num_blocks_in_pipeline",
-        "Counter for the number of blocks in the pipeline"
+        "Counter for the number of blocks in the pipeline",
+        &["stage"]
     )
     .unwrap()
 });
