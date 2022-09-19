@@ -282,8 +282,14 @@ export class AptosClient {
   async getEventsByCreationNumber(
     address: MaybeHexString,
     creationNumber: number | bigint | string,
+    query?: { start?: BigInt | number; limit?: number },
   ): Promise<Gen.Event[]> {
-    return this.client.events.getEventsByCreationNumber(HexString.ensure(address).hex(), creationNumber.toString());
+    return this.client.events.getEventsByCreationNumber(
+      HexString.ensure(address).hex(),
+      creationNumber.toString(),
+      query?.start?.toString(),
+      query?.limit,
+    );
   }
 
   /**
