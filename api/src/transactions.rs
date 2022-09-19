@@ -19,6 +19,10 @@ use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
+    verify_function_identifier, verify_module_identifier, MoveType, VerifyInput,
+    VerifyInputWithRecursion,
+};
+use aptos_api_types::{
     Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
     HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
     Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
@@ -30,7 +34,8 @@ use aptos_types::account_config::CoinStoreResource;
 use aptos_types::account_view::AccountView;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
-    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
+    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionPayload,
+    TransactionStatus,
 };
 use aptos_types::vm_status::StatusCode;
 use aptos_vm::AptosVM;
@@ -83,6 +88,15 @@ pub enum SubmitTransactionPost {
     Bcs(Bcs),
 }
 
+impl VerifyInput for SubmitTransactionPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionPost::Json(inner) => inner.0.verify(),
+            SubmitTransactionPost::Bcs(_) => Ok(()),
+        }
+    }
+}
+
 // We need a custom type here because we use different types for each of the
 // content types possible for the POST data.
 #[derive(ApiRequest, Debug)]
@@ -95,6 +109,20 @@ pub enum SubmitTransactionsBatchPost {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
     #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
     Bcs(Bcs),
+}
+
+impl VerifyInput for SubmitTransactionsBatchPost {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            SubmitTransactionsBatchPost::Json(inner) => {
+                for request in inner.0.iter() {
+                    request.verify()?;
+                }
+            }
+            SubmitTransactionsBatchPost::Bcs(_) => {}
+        }
+        Ok(())
+    }
 }
 
 /// API for interacting with transactions
@@ -263,6 +291,9 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_submit_transaction")?;
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
@@ -308,6 +339,9 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
     ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_submit_batch_transactions")?;
         self.context
             .check_api_output_enabled("Submit batch transactions", &accept_type)?;
@@ -361,6 +395,9 @@ impl TransactionsApi {
         estimate_gas_unit_price: Query<Option<bool>>,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+        data.verify().map_err(|err| {
+            SubmitTransactionError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_simulate_transaction")?;
         self.context
             .check_api_output_enabled("Simulate transaction", &accept_type)?;
@@ -479,6 +516,9 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
+        data.0.verify().map_err(|err| {
+            BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+        })?;
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
@@ -748,7 +788,7 @@ impl TransactionsApi {
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
-                let signed_transaction = bcs::from_bytes(&data.0)
+                let signed_transaction: SignedTransaction = bcs::from_bytes(&data.0)
                     .context("Failed to deserialize input into SignedTransaction")
                     .map_err(|err| {
                         SubmitTransactionError::bad_request_with_code(
@@ -757,6 +797,63 @@ impl TransactionsApi {
                             ledger_info,
                         )
                     })?;
+                // Verify the signed transaction
+                match signed_transaction.payload() {
+                    TransactionPayload::EntryFunction(entry_function) => {
+                        verify_module_identifier(entry_function.module().name().as_str()).map_err(
+                            |err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            },
+                        )?;
+
+                        verify_function_identifier(entry_function.function().as_str()).map_err(
+                            |err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            },
+                        )?;
+                        for arg in entry_function.ty_args() {
+                            let arg: MoveType = arg.into();
+                            arg.verify(0).map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        }
+                    }
+                    TransactionPayload::Script(script) => {
+                        if script.code().is_empty() {
+                            return Err(SubmitTransactionError::bad_request_with_code(
+                                "Script payload bytecode must not be empty",
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            ));
+                        }
+
+                        for arg in script.ty_args() {
+                            let arg = MoveType::from(arg);
+                            arg.verify(0).map_err(|err| {
+                                SubmitTransactionError::bad_request_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidInput,
+                                    ledger_info,
+                                )
+                            })?;
+                        }
+                    }
+                    TransactionPayload::ModuleBundle(_) => {}
+                }
+                // TODO: Verify script args?
+
                 Ok(signed_transaction)
             }
             SubmitTransactionPost::Json(data) => self

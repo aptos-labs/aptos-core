@@ -237,7 +237,7 @@ fn insert_events(conn: &PgPoolConnection, ev: &[EventModel]) -> Result<(), diese
             conn,
             diesel::insert_into(schema::events::table)
                 .values(&ev[start_ind..end_ind])
-                .on_conflict((key, sequence_number))
+                .on_conflict((account_address, creation_number, sequence_number))
                 .do_nothing(),
         ) {
             Ok(_) => {}

@@ -34,8 +34,7 @@ table! {
 }
 
 table! {
-    events (key, sequence_number) {
-        key -> Varchar,
+    events (account_address, creation_number, sequence_number) {
         sequence_number -> Int8,
         creation_number -> Int8,
         account_address -> Varchar,

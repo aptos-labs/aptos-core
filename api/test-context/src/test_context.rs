@@ -248,17 +248,27 @@ impl TestContext {
     // Resource may appear in many different places, so make a convenient stripper
     fn resource_replacer(val: &Value) -> Value {
         let mut nval = val.clone();
-        nval["data"] = match val["type"].as_str().unwrap() {
-            "0x1::code::PackageRegistry" => Value::String("package registry omitted".to_string()),
+
+        // Skip things that change, plus bytecode and others that don't have a type
+        nval["data"] = match val["type"].as_str() {
+            Some("0x1::code::PackageRegistry") => {
+                Value::String("package registry omitted".to_string())
+            }
             // Ideally this wouldn't be stripped, but it changes by minor changes to the
             // Move modules, which leads to a bad devx.
-            "0x1::state_storage::StateStorageUsage" => {
+            Some("0x1::state_storage::StateStorageUsage") => {
                 Value::String("state storage omitted".to_string())
             }
-            "0x1::state_storage::GasParameter" => {
+            Some("0x1::state_storage::GasParameter") => {
                 Value::String("state storage gas parameter omitted".to_string())
             }
-            _ => val["data"].clone(),
+            _ => {
+                if val["bytecode"].as_str().is_some() {
+                    Value::String("bytecode omitted".to_string())
+                } else {
+                    val["data"].clone()
+                }
+            }
         };
         nval
     }

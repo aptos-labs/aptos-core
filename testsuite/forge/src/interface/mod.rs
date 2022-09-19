@@ -4,7 +4,7 @@
 mod admin;
 pub use admin::*;
 mod aptos;
-pub use aptos::*;
+pub use self::aptos::*;
 mod network;
 pub use network::*;
 mod test;
