@@ -40,7 +40,8 @@ use crate::{
         submission_worker::SubmissionWorker,
     },
     transaction_generator::{
-        account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
+        account_generator::AccountGeneratorCreator,
+        nft_mint_and_transfer::NFTMintAndTransferGeneratorCreator,
         p2p_transaction_generator::P2PTransactionGeneratorCreator,
         transaction_mix_generator::TxnMixGeneratorCreator, TransactionGeneratorCreator,
     },
@@ -419,8 +420,8 @@ impl TxnEmitter {
                     req.max_account_working_set,
                     req.gas_price,
                 )),
-                TransactionType::NftMint => Box::new(
-                    NFTMintGeneratorCreator::new(
+                TransactionType::NftMintAndTransfer => Box::new(
+                    NFTMintAndTransferGeneratorCreator::new(
                         self.from_rng(),
                         txn_factory.clone(),
                         root_account,

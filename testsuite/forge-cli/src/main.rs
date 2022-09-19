@@ -820,7 +820,7 @@ fn changing_working_quorum_test(
                 .transaction_mix(vec![
                     (TransactionType::P2P, 75),
                     (TransactionType::AccountGeneration, 20),
-                    (TransactionType::NftMint, 5),
+                    (TransactionType::NftMintAndTransfer, 5),
                 ]),
         )
         .with_success_criteria(SuccessCriteria::new(

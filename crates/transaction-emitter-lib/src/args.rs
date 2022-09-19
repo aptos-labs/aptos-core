@@ -58,7 +58,7 @@ pub struct ClusterArgs {
 pub enum TransactionType {
     P2P,
     AccountGeneration,
-    NftMint,
+    NftMintAndTransfer,
 }
 
 impl Default for TransactionType {

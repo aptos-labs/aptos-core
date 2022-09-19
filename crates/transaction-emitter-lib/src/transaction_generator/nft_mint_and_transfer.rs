@@ -1,5 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
@@ -8,21 +9,27 @@ use aptos_sdk::{
 };
 
 use crate::emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY};
+use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
+use aptos_sdk::types::account_address::AccountAddress;
+use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
+use rand::thread_rng;
+use std::collections::HashMap;
 use std::sync::Arc;
 
-pub struct NFTMint {
+pub struct NFTMintAndTransfer {
     txn_factory: TransactionFactory,
-    creator_account: Arc<LocalAccount>,
+    creator_account: Arc<Mutex<LocalAccount>>,
     collection_name: Vec<u8>,
     token_name: Vec<u8>,
+    nft_balance: HashMap<AccountAddress, u64>,
 }
 
-impl NFTMint {
+impl NFTMintAndTransfer {
     pub fn new(
         txn_factory: TransactionFactory,
-        creator_account: Arc<LocalAccount>,
+        creator_account: Arc<Mutex<LocalAccount>>,
         collection_name: Vec<u8>,
         token_name: Vec<u8>,
     ) -> Self {
@@ -31,27 +38,52 @@ impl NFTMint {
             creator_account,
             collection_name,
             token_name,
+            nft_balance: HashMap::new(),
         }
     }
 }
 
-impl TransactionGenerator for NFTMint {
+impl TransactionGenerator for NFTMintAndTransfer {
     fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
         transactions_per_account: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
+        let mut visited_accounts: Vec<&LocalAccount> = vec![];
         for account in accounts {
             for _ in 0..transactions_per_account {
-                requests.push(create_nft_transfer_request(
-                    account,
-                    &self.creator_account,
-                    &self.collection_name,
-                    &self.token_name,
-                    &self.txn_factory,
-                ));
+                requests.push({
+                    let balance = *self.nft_balance.get(&account.address()).unwrap_or(&0);
+                    if visited_accounts.is_empty() || balance == 0 {
+                        let creator_account = &mut self.creator_account.lock();
+                        let creator_address = creator_account.address();
+                        create_nft_transfer_request(
+                            creator_account,
+                            account,
+                            creator_address,
+                            &self.collection_name,
+                            &self.token_name,
+                            &self.txn_factory,
+                            1,
+                        )
+                    } else {
+                        let receiver = visited_accounts.choose(&mut thread_rng()).unwrap();
+                        *self.nft_balance.get_mut(&account.address()).unwrap() = 0;
+                        *self.nft_balance.entry(receiver.address()).or_insert(0) += balance;
+                        create_nft_transfer_request(
+                            account,
+                            receiver,
+                            self.creator_account.lock().address(),
+                            &self.collection_name,
+                            &self.token_name,
+                            &self.txn_factory,
+                            balance,
+                        )
+                    }
+                })
             }
+            visited_accounts.push(&*account);
         }
         requests
     }
@@ -148,32 +180,34 @@ pub fn create_nft_token_request(
 }
 
 pub fn create_nft_transfer_request(
-    owner_account: &mut LocalAccount,
-    creation_account: &LocalAccount,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    creation_address: AccountAddress,
     collection_name: &[u8],
     token_name: &[u8],
     txn_factory: &TransactionFactory,
+    amount: u64,
 ) -> SignedTransaction {
-    owner_account.sign_multi_agent_with_transaction_builder(
-        vec![creation_account],
+    sender.sign_multi_agent_with_transaction_builder(
+        vec![receiver],
         txn_factory.payload(aptos_token_stdlib::token_direct_transfer_script(
-            creation_account.address(),
+            creation_address,
             collection_name.to_vec(),
             token_name.to_vec(),
             0,
-            1,
+            amount,
         )),
     )
 }
 
-pub struct NFTMintGeneratorCreator {
+pub struct NFTMintAndTransferGeneratorCreator {
     txn_factory: TransactionFactory,
-    creator_account: Arc<LocalAccount>,
+    creator_account: Arc<Mutex<LocalAccount>>,
     collection_name: Vec<u8>,
     token_name: Vec<u8>,
 }
 
-impl NFTMintGeneratorCreator {
+impl NFTMintAndTransferGeneratorCreator {
     pub async fn new(
         mut rng: StdRng,
         txn_factory: TransactionFactory,
@@ -194,16 +228,16 @@ impl NFTMintGeneratorCreator {
         .await;
         Self {
             txn_factory,
-            creator_account: Arc::new(creator_account),
+            creator_account: Arc::new(Mutex::new(creator_account)),
             collection_name,
             token_name,
         }
     }
 }
 
-impl TransactionGeneratorCreator for NFTMintGeneratorCreator {
+impl TransactionGeneratorCreator for NFTMintAndTransferGeneratorCreator {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
-        Box::new(NFTMint::new(
+        Box::new(NFTMintAndTransfer::new(
             self.txn_factory.clone(),
             self.creator_account.clone(),
             self.collection_name.clone(),

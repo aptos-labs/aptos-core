@@ -4,7 +4,7 @@
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 
 pub mod account_generator;
-pub mod nft_mint;
+pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
 pub mod transaction_mix_generator;
 
