@@ -11,4 +11,8 @@ spec aptos_framework::genesis {
     spec initialize_for_verification {
         pragma verify=true;
     }
+
+    spec create_signer { // TODO: temporary mockup.
+        pragma opaque;
+    }
 }

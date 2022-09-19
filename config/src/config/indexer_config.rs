@@ -39,7 +39,7 @@ pub struct IndexerConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skip_migrations: Option<bool>,
 
-    /// If set, will make sure that we're still indexing the right chain every 100K transactions
+    /// If set, will make sure that we're indexing the right chain
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_chain_id: Option<bool>,
 

@@ -22,7 +22,7 @@ pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
 
-    let config = &TelemetryServiceConfig {
+    let config = TelemetryServiceConfig {
         address: format!("{}:{}", "127.0.0.1", 80).parse().unwrap(),
         tls_cert_path: None,
         tls_key_path: None,
@@ -52,27 +52,32 @@ pub async fn new_test_context() -> TestContext {
     let vfn_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
     let pfn_cache = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-    TestContext::new(Context::new(
-        config,
-        validator_cache,
-        vfn_cache,
-        pfn_cache,
-        Some(gcp_bigquery_client),
-        None,
-        humio_client,
-    ))
+    TestContext::new(
+        config.clone(),
+        Context::new(
+            &config,
+            validator_cache,
+            vfn_cache,
+            pfn_cache,
+            Some(gcp_bigquery_client),
+            None,
+            humio_client,
+        ),
+    )
 }
 
 #[derive(Clone)]
 pub struct TestContext {
+    pub config: TelemetryServiceConfig,
     expect_status_code: u16,
     pub inner: Context,
     bearer_token: String,
 }
 
 impl TestContext {
-    pub fn new(context: Context) -> Self {
+    pub fn new(config: TelemetryServiceConfig, context: Context) -> Self {
         Self {
+            config,
             expect_status_code: 200,
             inner: context,
             bearer_token: "".into(),

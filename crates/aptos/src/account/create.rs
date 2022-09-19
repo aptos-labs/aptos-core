@@ -32,7 +32,7 @@ impl CliCommand<TransactionSummary> for CreateAccount {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let address = self.account;
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_account_create_account(address), None)
+            .submit_transaction(aptos_stdlib::aptos_account_create_account(address))
             .await
             .map(TransactionSummary::from)
     }

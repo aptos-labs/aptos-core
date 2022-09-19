@@ -214,13 +214,14 @@ impl CliTestFramework {
                 sender_account: Some(self.account_id(index)),
                 rest_options: self.rest_options(),
                 gas_options: gas_options.unwrap_or_default(),
-                prompt_options: PromptOptions::no(),
+                prompt_options: PromptOptions::yes(),
                 estimate_max_gas: true,
                 ..Default::default()
             },
             new_private_key: Some(new_private_key),
             save_to_profile: None,
             new_private_key_file: None,
+            skip_saving_profile: true,
         }
         .execute()
         .await?;

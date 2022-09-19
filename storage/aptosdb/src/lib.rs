@@ -1618,19 +1618,19 @@ impl DbWriter for AptosDB {
                     .maybe_set_pruner_target_db_version(last_version);
             }
 
+            // Note: this must happen after txns have been saved to db because types can be newly
+            // created in this same chunk of transactions.
+            if let Some(indexer) = &self.indexer {
+                let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
+                indexer.index(self.state_store.clone(), first_version, &write_sets)?;
+            }
+
             // Once everything is successfully persisted, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
                 self.ledger_store.set_latest_ledger_info(x.clone());
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
-            }
-
-            // Note: this must happen after txns have been saved to db because types can be newly
-            // created in this same chunk of transactions.
-            if let Some(indexer) = &self.indexer {
-                let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
-                indexer.index(self.state_store.clone(), first_version, &write_sets)?;
             }
 
             Ok(())

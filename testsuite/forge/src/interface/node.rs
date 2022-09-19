@@ -158,11 +158,13 @@ pub trait NodeExt: Node {
     }
 
     /// Query a Metric for from this Node
-    async fn get_metric(&self, metric_name: &str) -> Result<Option<i64>> {
-        self.inspection_client().get_node_metric(metric_name).await
+    async fn get_metric_i64(&self, metric_name: &str) -> Result<Option<i64>> {
+        self.inspection_client()
+            .get_node_metric_i64(metric_name)
+            .await
     }
 
-    async fn get_metric_with_fields(
+    async fn get_metric_with_fields_i64(
         &self,
         metric_name: &str,
         fields: HashMap<String, String>,
@@ -188,7 +190,8 @@ pub trait NodeExt: Node {
         Ok(if filtered.is_empty() {
             None
         } else {
-            Some(filtered.iter().sum())
+            let checked: Result<Vec<i64>> = filtered.into_iter().map(|v| v.to_i64()).collect();
+            Some(checked?.into_iter().sum())
         })
     }
 
@@ -202,7 +205,8 @@ pub trait NodeExt: Node {
         if let Some(direction) = direction {
             map.insert("direction".to_string(), direction.to_string());
         }
-        self.get_metric_with_fields("aptos_connections", map).await
+        self.get_metric_with_fields_i64("aptos_connections", map)
+            .await
     }
 
     async fn liveness_check(&self, seconds: u64) -> Result<()> {

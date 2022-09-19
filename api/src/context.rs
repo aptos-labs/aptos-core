@@ -229,15 +229,22 @@ impl Context {
             .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
     }
 
-    pub fn get_account_state(
+    pub fn get_account_state<E: InternalError>(
         &self,
         address: AccountAddress,
         version: u64,
-    ) -> Result<Option<AccountState>> {
+        latest_ledger_info: &LedgerInfo,
+    ) -> Result<Option<AccountState>, E> {
         AccountState::from_access_paths_and_values(
             address,
-            &self.get_state_values(address, version)?,
+            &self.get_state_values(address, version).map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+            })?,
         )
+        .context("Failed to read account state at requested version")
+        .map_err(|err| {
+            E::internal_with_code(err, AptosErrorCode::InternalError, latest_ledger_info)
+        })
     }
 
     pub fn get_block_timestamp<E: InternalError>(

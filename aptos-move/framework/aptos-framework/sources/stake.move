@@ -1253,6 +1253,9 @@ module aptos_framework::stake {
         assert!(exists<StakePool>(pool_address), error::invalid_argument(ESTAKE_POOL_DOES_NOT_EXIST));
     }
 
+    /// This provides an ACL for Testnet purposes. In testnet, everyone is a whale, a whale can be a validator.
+    /// This allows a testnet to bring additional entities into the validator set without compromising the
+    /// security of the testnet. This will NOT be enabled in Mainnet.
     struct AllowedValidators has key {
         accounts: vector<address>,
     }

@@ -628,7 +628,7 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
-        if unwrap_or_discard!(self.0.get_gas_feature_version(log_context)) >= 1 {
+        if self.0.get_gas_feature_version() >= 1 {
             // Create a new session so that the data cache is flushed.
             // This is to ensure we correctly charge for loading certain resources, even if they
             // have been previously cached in the prologue.
@@ -638,8 +638,14 @@ impl AptosVM {
         }
 
         let gas_params = unwrap_or_discard!(self.0.get_gas_parameters(log_context));
+        let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let mut gas_meter = AptosGasMeter::new(
+            self.0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
@@ -1131,7 +1137,17 @@ impl AptosSimulationVM {
             Err(err) => return discard_error_vm_status(err),
             Ok(s) => s,
         };
-        let mut gas_meter = AptosGasMeter::new(gas_params.clone(), txn_data.max_gas_amount());
+        let storage_gas_params = match self.0 .0.get_storage_gas_parameters(log_context) {
+            Err(err) => return discard_error_vm_status(err),
+            Ok(s) => s,
+        };
+
+        let mut gas_meter = AptosGasMeter::new(
+            self.0 .0.get_gas_feature_version(),
+            gas_params.clone(),
+            storage_gas_params.cloned(),
+            txn_data.max_gas_amount(),
+        );
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
