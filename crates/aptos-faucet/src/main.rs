@@ -470,7 +470,7 @@ mod tests {
 
         assert_eq!(
             resp.body(),
-            &format!("faucet account {:?} not found", address)
+            &format!("faucet account {:?} not found, error Http(404)", address)
         );
     }
 
