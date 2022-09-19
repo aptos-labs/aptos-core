@@ -198,19 +198,16 @@ impl RecoveryData {
                 // for better readability
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
                 format!(
-                    "\nRoot id: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
-                    ledger_recovery_data
-                        .storage_ledger
-                        .ledger_info()
-                        .consensus_block_id(),
+                    "\nRoot: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                    ledger_recovery_data.storage_ledger.ledger_info(),
                     blocks
                         .iter()
-                        .map(|b| format!("\n\t{}", b))
+                        .map(|b| format!("\n{}", b))
                         .collect::<Vec<String>>()
                         .concat(),
                     quorum_certs
                         .iter()
-                        .map(|qc| format!("\n\t{}", qc))
+                        .map(|qc| format!("\n{}", qc))
                         .collect::<Vec<String>>()
                         .concat(),
                 )

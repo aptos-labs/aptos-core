@@ -402,7 +402,7 @@ impl RoundManager {
     pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> Result<()> {
         if proposal.round() != self.round_state.current_round() {
             bail!(
-                "Discarding stale self proposal {}, current round {}",
+                "Discarding stale delayed proposal {}, current round {}",
                 proposal,
                 self.round_state.current_round()
             );
