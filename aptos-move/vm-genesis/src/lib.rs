@@ -806,6 +806,8 @@ pub struct EmployeeAccountMap {
 pub struct ValidatorWithCommissionRate {
     pub validator: Validator,
     pub validator_commission_percentage: u64,
+    /// Whether the validator should be joining the genesis validator set.
+    pub join_during_genesis: bool,
 }
 
 #[test]
@@ -853,6 +855,7 @@ pub fn test_mainnet_end_to_end() {
     let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
     let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
     let operator4 = AccountAddress::from_hex_literal("0x104").unwrap();
+    let operator5 = AccountAddress::from_hex_literal("0x105").unwrap();
     let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
     let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
     let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
@@ -868,7 +871,7 @@ pub fn test_mainnet_end_to_end() {
         },
         AccountMap {
             account_address: account45,
-            balance: balance * 2, // twice the balance so it can host 2 operators.
+            balance: balance * 3, // Three times the balance so it can host 2 operators.
         },
         AccountMap {
             account_address: account46,
@@ -919,6 +922,10 @@ pub fn test_mainnet_end_to_end() {
             balance: non_validator_balance,
         },
         AccountMap {
+            account_address: operator5,
+            balance: non_validator_balance,
+        },
+        AccountMap {
             account_address: voter0,
             balance: non_validator_balance,
         },
@@ -936,7 +943,7 @@ pub fn test_mainnet_end_to_end() {
         },
     ];
 
-    let test_validators = TestValidator::new_test_set(Some(5), Some(balance * 9 / 10));
+    let test_validators = TestValidator::new_test_set(Some(6), Some(balance * 9 / 10));
     let mut employee_validator_1 = test_validators[0].data.clone();
     employee_validator_1.owner_address = admin0;
     employee_validator_1.operator_address = operator0;
@@ -957,6 +964,10 @@ pub fn test_mainnet_end_to_end() {
     same_owner_validator_2.owner_address = account45;
     same_owner_validator_2.operator_address = operator4;
     same_owner_validator_2.voter_address = voter3;
+    let mut same_owner_validator_3 = test_validators[5].data.clone();
+    same_owner_validator_3.owner_address = account45;
+    same_owner_validator_3.operator_address = operator5;
+    same_owner_validator_3.voter_address = voter3;
 
     let employees = vec![
         EmployeeAccountMap {
@@ -964,6 +975,7 @@ pub fn test_mainnet_end_to_end() {
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_1,
                 validator_commission_percentage: 10,
+                join_during_genesis: true,
             },
             vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
@@ -973,6 +985,7 @@ pub fn test_mainnet_end_to_end() {
             validator: ValidatorWithCommissionRate {
                 validator: employee_validator_2,
                 validator_commission_percentage: 10,
+                join_during_genesis: false,
             },
             vesting_schedule_numerators: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 1],
             vesting_schedule_denominator: 48,
@@ -983,14 +996,22 @@ pub fn test_mainnet_end_to_end() {
         ValidatorWithCommissionRate {
             validator: same_owner_validator_1,
             validator_commission_percentage: 10,
+            join_during_genesis: true,
         },
         ValidatorWithCommissionRate {
             validator: same_owner_validator_2,
             validator_commission_percentage: 15,
+            join_during_genesis: true,
+        },
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_3,
+            validator_commission_percentage: 10,
+            join_during_genesis: false,
         },
         ValidatorWithCommissionRate {
             validator: direct_validator,
             validator_commission_percentage: 0,
+            join_during_genesis: true,
         },
     ];
 
@@ -1034,14 +1055,21 @@ pub fn test_mainnet_end_to_end() {
         account_address::default_stake_pool_address(account45, operator3);
     let same_owner_validator_2_pool_address =
         account_address::default_stake_pool_address(account45, operator4);
+    let same_owner_validator_3_pool_address =
+        account_address::default_stake_pool_address(account45, operator5);
     let employee_1_pool_address =
         account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
     let employee_2_pool_address =
         account_address::create_vesting_pool_address(admin1, operator1, 0, &[]);
 
     assert!(validator_set_addresses.contains(&employee_1_pool_address));
-    assert!(validator_set_addresses.contains(&employee_2_pool_address));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&employee_2_pool_address));
     assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
     assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
+    // This validator should not be in the genesis validator set as they specified
+    // join_during_genesis = false.
+    assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
     assert!(validator_set_addresses.contains(&account44));
 }
