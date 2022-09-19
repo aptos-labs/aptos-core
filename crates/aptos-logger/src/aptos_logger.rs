@@ -4,6 +4,7 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
+use crate::info;
 use crate::telemetry_log_writer::{TelemetryLog, TelemetryLogWriter};
 use crate::{
     counters::{
@@ -36,12 +37,14 @@ use strum_macros::EnumString;
 
 const RUST_LOG: &str = "RUST_LOG";
 const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
-const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
+pub const RUST_LOG_TELEMETRY: &str = "RUST_LOG_TELEMETRY";
 const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
+const FILTER_REFRESH_INTERVAL: Duration =
+    Duration::from_secs(15 /* minutes */ * 60 /* seconds */);
 
 #[derive(EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -312,58 +315,60 @@ impl AptosDataBuilder {
         self.build();
     }
 
-    pub fn build(&mut self) -> Arc<AptosData> {
-        let filter = {
-            let local_filter = {
-                let mut filter_builder = Filter::builder();
+    fn build_filter(&self) -> FilterTuple {
+        let local_filter = {
+            let mut filter_builder = Filter::builder();
 
-                if env::var(RUST_LOG).is_ok() {
+            if env::var(RUST_LOG).is_ok() {
+                filter_builder.with_env(RUST_LOG);
+            } else {
+                filter_builder.filter_level(self.level.into());
+            }
+
+            filter_builder.build()
+        };
+        let remote_filter = {
+            let mut filter_builder = Filter::builder();
+
+            if self.is_async && self.address.is_some() {
+                if env::var(RUST_LOG_REMOTE).is_ok() {
+                    filter_builder.with_env(RUST_LOG_REMOTE);
+                } else if env::var(RUST_LOG).is_ok() {
                     filter_builder.with_env(RUST_LOG);
                 } else {
-                    filter_builder.filter_level(self.level.into());
+                    filter_builder.filter_level(self.remote_level.into());
                 }
-
-                filter_builder.build()
-            };
-            let remote_filter = {
-                let mut filter_builder = Filter::builder();
-
-                if self.is_async && self.address.is_some() {
-                    if env::var(RUST_LOG_REMOTE).is_ok() {
-                        filter_builder.with_env(RUST_LOG_REMOTE);
-                    } else if env::var(RUST_LOG).is_ok() {
-                        filter_builder.with_env(RUST_LOG);
-                    } else {
-                        filter_builder.filter_level(self.remote_level.into());
-                    }
-                } else {
-                    filter_builder.filter_level(LevelFilter::Off);
-                }
-
-                filter_builder.build()
-            };
-            let telemetry_filter = {
-                let mut filter_builder = Filter::builder();
-
-                if self.is_async && self.remote_log_tx.is_some() {
-                    if env::var(RUST_LOG_TELEMETRY).is_ok() {
-                        filter_builder.with_env(RUST_LOG_TELEMETRY);
-                    } else {
-                        filter_builder.filter_level(self.telemetry_level.into());
-                    }
-                } else {
-                    filter_builder.filter_level(LevelFilter::Off);
-                }
-
-                filter_builder.build()
-            };
-
-            FilterTuple {
-                local_filter,
-                remote_filter,
-                telemetry_filter,
+            } else {
+                filter_builder.filter_level(LevelFilter::Off);
             }
+
+            filter_builder.build()
         };
+        let telemetry_filter = {
+            let mut filter_builder = Filter::builder();
+
+            if self.is_async && self.remote_log_tx.is_some() {
+                if env::var(RUST_LOG_TELEMETRY).is_ok() {
+                    filter_builder.with_env(RUST_LOG_TELEMETRY);
+                } else {
+                    filter_builder.filter_level(self.telemetry_level.into());
+                }
+            } else {
+                filter_builder.filter_level(LevelFilter::Off);
+            }
+
+            filter_builder.build()
+        };
+
+        FilterTuple {
+            local_filter,
+            remote_filter,
+            telemetry_filter,
+        }
+    }
+
+    pub fn build(&mut self) -> Arc<AptosData> {
+        let filter = self.build_filter();
 
         if let Ok(log_format) = env::var(RUST_LOG_FORMAT) {
             let log_format = LogFormat::from_str(&log_format).unwrap();
@@ -376,8 +381,8 @@ impl AptosDataBuilder {
         let logger = if self.is_async {
             let (sender, receiver) = sync::mpsc::sync_channel(self.channel_size);
             let mut remote_tx = None;
-            if let Some(tx) = self.remote_log_tx.take() {
-                remote_tx = Some(tx);
+            if let Some(tx) = &self.remote_log_tx {
+                remote_tx = Some(tx.clone());
             }
 
             let logger = Arc::new(AptosData {
@@ -421,7 +426,7 @@ impl AptosDataBuilder {
 }
 
 /// A combination of `Filter`s to control where logs are written
-struct FilterTuple {
+pub struct FilterTuple {
     /// The local printer `Filter` to control what is logged in text output
     local_filter: Filter,
     /// The remote logging `Filter` to control what is sent to external logging
@@ -469,7 +474,11 @@ impl AptosData {
             .build();
     }
 
-    pub fn set_filter(&self, filter: Filter) {
+    pub fn set_filter(&self, filter_tuple: FilterTuple) {
+        *self.filter.write() = filter_tuple;
+    }
+
+    pub fn set_local_filter(&self, filter: Filter) {
         self.filter.write().local_filter = filter;
     }
 
@@ -748,6 +757,37 @@ fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
             STRUCT_LOG_PARSE_ERROR_COUNT.inc();
             Err(fmt::Error)
         }
+    }
+}
+
+/// Periodically rebuilds the filter and replaces the current logger filter.
+/// This is useful for dynamically changing log levels at runtime via existing
+/// environment variables such as `RUST_LOG_TELEMETRY`.
+pub struct LoggerFilterUpdater {
+    logger: Arc<AptosData>,
+    logger_builder: AptosDataBuilder,
+}
+
+impl LoggerFilterUpdater {
+    pub fn new(logger: Arc<AptosData>, logger_builder: AptosDataBuilder) -> Self {
+        Self {
+            logger,
+            logger_builder,
+        }
+    }
+
+    pub fn run(self) {
+        thread::spawn(move || {
+            loop {
+                thread::sleep(FILTER_REFRESH_INTERVAL);
+
+                // TODO: check for change to env var before rebuilding filter.
+                let filter = self.logger_builder.build_filter();
+                self.logger.set_filter(filter);
+
+                info!("Logger filters rebuilt and reset.");
+            }
+        });
     }
 }
 

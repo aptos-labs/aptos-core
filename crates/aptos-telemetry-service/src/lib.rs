@@ -3,7 +3,7 @@
 
 use std::{
     collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf, sync::Arc, time::Duration,
+    path::PathBuf, time::Duration,
 };
 
 use aptos_config::keys::ConfigKey;
@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use warp::{Filter, Reply};
 
+pub use crate::error::ServiceError;
 use crate::{
     clients::humio,
     clients::victoria_metrics_api::Client as MetricsClient,
@@ -34,6 +35,7 @@ mod index;
 mod jwt_auth;
 mod log_ingest;
 mod prometheus_push_metrics;
+mod remote_config;
 #[cfg(any(test))]
 pub(crate) mod tests;
 pub mod types;
@@ -77,15 +79,13 @@ impl AptosTelemetryServiceArgs {
         );
         let validators_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
         let vfns_cache = PeerSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-        let pfns_cache = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
-
-        pfns_cache.write().clone_from(&config.pfn_allowlist);
 
         let context = Context::new(
             &config,
             validators_cache.clone(),
             vfns_cache.clone(),
-            pfns_cache.clone(),
+            config.pfn_allowlist.clone(),
+            config.log_env_map.clone(),
             Some(gcp_bigquery_client),
             Some(victoria_metrics_client),
             humio_client,
@@ -139,6 +139,7 @@ pub struct TelemetryServiceConfig {
     pub humio_url: String,
     pub humio_auth_token: String,
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
+    pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
 }
 
 impl TelemetryServiceConfig {

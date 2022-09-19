@@ -190,8 +190,8 @@ pub fn start(
             .expect("Failed to build rayon global thread _pool.");
     }
 
-    let mut logger = aptos_logger::Logger::new();
-    logger
+    let mut logger_builder = aptos_logger::Logger::new();
+    logger_builder
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
@@ -200,18 +200,19 @@ pub fn start(
         .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
-        logger.enable_backtrace();
+        logger_builder.enable_backtrace();
     }
     if let Some(log_file) = log_file {
-        logger.printer(Box::new(FileWriter::new(log_file)));
+        logger_builder.printer(Box::new(FileWriter::new(log_file)));
     }
     let mut remote_log_rx = None;
     if config.logger.enable_telemetry_remote_log {
         let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
-        logger.remote_log_tx(tx);
+        logger_builder.remote_log_tx(tx);
         remote_log_rx = Some(rx);
     }
-    let _logger = logger.build();
+    let logger = logger_builder.build();
+    aptos_logger::LoggerFilterUpdater::new(logger, logger_builder).run();
 
     // Print out build information.
     log_build_information();
