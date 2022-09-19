@@ -13,7 +13,7 @@ import Routes from 'core/routes';
 import { ArrowBackIcon } from '@chakra-ui/icons';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
-import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
+import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import {
   importAccountErrorToast, importAccountToast, networkDoesNotExistToast,
@@ -88,16 +88,15 @@ const buttonBorderColor = {
 function NextButton() {
   const { setValue, watch } = useFormContext<CreateWalletViaImportGeneralFormValues>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { activeNetwork } = useNetworks();
+  const { activeNetwork, aptosClient } = useNetworks();
 
   const {
-    initAccounts,
+    lookUpAndInitAccounts,
   } = useAccounts();
 
   const {
     activeStep, nextStep, setActiveStep,
   } = useImportOnboardingState();
-  const navigate = useNavigate();
 
   const termsOfService = watch('termsOfService');
   const initialPassword = watch('initialPassword');
@@ -127,14 +126,7 @@ function NextButton() {
       const aptosAccount = new AptosAccount(seed);
 
       // initialize password and wallet
-      const firstAccount = {
-        mnemonic,
-        ...keysFromAptosAccount(aptosAccount),
-      };
-
-      await initAccounts(confirmPassword, {
-        [firstAccount.address]: firstAccount,
-      });
+      await lookUpAndInitAccounts(aptosClient, aptosAccount, confirmPassword, mnemonic);
 
       setIsLoading(false);
       importAccountToast();
@@ -142,10 +134,13 @@ function NextButton() {
       setIsLoading(false);
       importAccountErrorToast();
     }
+    nextStep();
   }, [
+    nextStep,
+    aptosClient,
     activeNetwork,
     confirmPassword,
-    initAccounts,
+    lookUpAndInitAccounts,
     mnemonicArray,
   ]);
 
@@ -162,23 +157,20 @@ function NextButton() {
       const aptosAccount = new AptosAccount(encodedKey);
 
       // initialize password and wallet
-      const firstAccount = keysFromAptosAccount(aptosAccount);
-
-      await initAccounts(confirmPassword, {
-        [firstAccount.address]: firstAccount,
-      });
+      await lookUpAndInitAccounts(aptosClient, aptosAccount, confirmPassword);
 
       setIsLoading(false);
       importAccountToast();
-      nextStep();
     } catch (err) {
       setIsLoading(false);
       importAccountErrorToast();
     }
+    nextStep();
   }, [
+    aptosClient,
     activeNetwork,
     confirmPassword,
-    initAccounts,
+    lookUpAndInitAccounts,
     nextStep,
     privateKey]);
 
@@ -191,7 +183,6 @@ function NextButton() {
       case ImportOnboardingPage.ImportPrivateKey:
       case ImportOnboardingPage.ImportMnemonic: {
         nextStep();
-
         return;
       }
       case ImportOnboardingPage.CreatePassword:
@@ -200,6 +191,7 @@ function NextButton() {
         } else if (importType === 'privateKey') {
           await intiAccountWithPrivateKey();
         }
+
         // clear out privateKey and mnemonicValues after init account
         // for security purposes
         setValue('privateKey', '');
@@ -210,7 +202,6 @@ function NextButton() {
         nextStep();
         return;
       case ImportOnboardingPage.Done:
-        navigate(Routes.wallet.path);
         return;
       default:
         throw new Error('Undefined next step');
@@ -219,7 +210,6 @@ function NextButton() {
     setValue,
     activeStep,
     importType,
-    navigate,
     nextStep,
     setActiveStep,
     initAccountWithMnemonic,

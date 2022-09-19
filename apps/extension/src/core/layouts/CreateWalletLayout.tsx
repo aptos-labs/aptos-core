@@ -24,7 +24,8 @@ import { useAccounts } from 'core/hooks/useAccounts';
 import useFundAccount from 'core/mutations/faucet';
 import { passwordStrength } from 'core/constants';
 import Step from 'core/components/Step';
-import SecretPhraseConfirmationPopup from 'core/components/SecretPhraseConfirmationPopup';
+import ConfirmationPopup from 'core/components/ConfirmationPopup';
+import { BsFillShieldFill } from '@react-icons/all-files/bs/BsFillShieldFill';
 import Copyable from '../components/Copyable';
 
 zxcvbnOptions.setOptions(passwordOptions);
@@ -262,7 +263,14 @@ function CreateWalletLayout({
     });
 
     if (fundAccount) {
-      await fundAccount({ address: firstAccount.address, amount: 0 });
+      // faucet does not always work so need to do try/catch here
+      // so if faucet fails, user can still create wallet
+      try {
+        await fundAccount({ address: firstAccount.address, amount: 0 });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Faucet failed');
+      }
     }
     setLoading(false);
   };
@@ -352,17 +360,27 @@ function CreateWalletLayout({
       </Flex>
       <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>
         {(state: TransitionStatus) => (
-          <SecretPhraseConfirmationPopup
+          <ConfirmationPopup
+            logo={(
+              <Box bgColor="rgba(0, 191, 165, 0.1)" borderRadius={100} width="75px" height="75px" display="flex" justifyContent="center" alignItems="center">
+                <BsFillShieldFill size={36} color="teal" />
+              </Box>
+            )}
+            bodyWidth="260px"
             open={showSecretRecoveryPhrasePopup}
             duration={transitionDuration}
             state={state}
             isLoading={loading}
-            goPrev={() => {
-              setValue('showSecretRecoveryPhrasePopup', false);
-            }}
-            goNext={async () => {
+            title="Keep your phrase safe!"
+            body="If you lose it you&apos;ll have no way of accessing your assets."
+            primaryBttnLabel="Done"
+            primaryBttnOnClick={async () => {
               await initAccount();
               navigate(Routes.welcome.path);
+            }}
+            secondaryBttnLabel="Show phrase again"
+            secondaryBttnOnClick={() => {
+              setValue('showSecretRecoveryPhrasePopup', false);
             }}
           />
         )}

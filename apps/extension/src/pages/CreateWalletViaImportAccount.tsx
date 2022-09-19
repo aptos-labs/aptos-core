@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ImportOnboardingStateProvider, useImportOnboardingState } from 'core/hooks/useImportOnboardingState';
 import { CreateWalletViaImportLayout, ImportOnboardingPage } from 'core/layouts/CreateWalletViaImportLayout';
 import CreatePasswordBody from 'core/components/CreatePasswordBody';
@@ -15,6 +15,12 @@ function NewWalletBody() {
   const { activeStep } = useImportOnboardingState();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (activeStep === ImportOnboardingPage.Done) {
+      navigate(Routes.welcome.path);
+    }
+  }, [navigate, activeStep]);
+
   const onboardContent = useMemo(() => {
     switch (activeStep) {
       case ImportOnboardingPage.ImportType:
@@ -26,12 +32,11 @@ function NewWalletBody() {
       case ImportOnboardingPage.CreatePassword:
         return <CreatePasswordBody />;
       case ImportOnboardingPage.Done:
-        navigate(Routes.welcome.path);
         return null;
       default:
         return <CreatePasswordBody />;
     }
-  }, [activeStep, navigate]);
+  }, [activeStep]);
 
   return onboardContent;
 }

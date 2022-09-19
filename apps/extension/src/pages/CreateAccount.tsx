@@ -6,25 +6,28 @@ import Routes from 'core/routes';
 import CreateAccountBody from 'core/components/CreateAccountBody';
 import { CreateAccountLayout } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
-import { AptosAccount } from 'aptos';
-import { generateMnemonic, generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
+import { generateMnemonic } from 'core/utils/account';
 import { Transition, type TransitionStatus } from 'react-transition-group';
-import SecretPhraseConfirmationPopup from 'core/components/SecretPhraseConfirmationPopup';
-import { useUnlockedAccounts } from 'core/hooks/useAccounts';
-import useFundAccount from 'core/mutations/faucet';
-import { createAccountErrorToast, createAccountToast } from 'core/components/Toast';
-import { useAnalytics } from 'core/hooks/useAnalytics';
-import { accountEvents } from 'core/utils/analytics/events';
+import ConfirmationPopup from 'core/components/ConfirmationPopup';
+import useCreateAccount from 'core/hooks/useCreateAccount';
+import { BsFillShieldFill } from '@react-icons/all-files/bs/BsFillShieldFill';
+import { Box } from '@chakra-ui/react';
 
 const transitionDuration = 200;
 
+function Logo() {
+  return (
+    <Box bgColor="rgba(0, 191, 165, 0.1)" borderRadius={100} width="75px" height="75px" display="flex" justifyContent="center" alignItems="center">
+      <BsFillShieldFill size={36} color="teal" />
+    </Box>
+  );
+}
+
 function CreateAccount() {
   const navigate = useNavigate();
-  const { addAccount } = useUnlockedAccounts();
-  const { fundAccount } = useFundAccount();
+  const { createAccount } = useCreateAccount({});
   const newMnemonic = useMemo(() => generateMnemonic(), []);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { trackEvent } = useAnalytics();
   const ref = useRef();
   const [
     showSecretRecoveryPhrasePopup,
@@ -37,37 +40,7 @@ function CreateAccount() {
 
   const initAccount = async () => {
     setIsLoading(true);
-
-    try {
-      const { mnemonic, seed } = await generateMnemonicObject(newMnemonic);
-      const aptosAccount = new AptosAccount(seed);
-
-      const newAccount = {
-        mnemonic,
-        ...keysFromAptosAccount(aptosAccount),
-      };
-      await addAccount(newAccount);
-
-      if (fundAccount) {
-        await fundAccount({ address: newAccount.address, amount: 0 });
-      }
-
-      trackEvent({
-        eventType: accountEvents.CREATE_ACCOUNT,
-      });
-
-      createAccountToast();
-    } catch (err) {
-      trackEvent({
-        eventType: accountEvents.ERROR_CREATE_ACCOUNT,
-        params: {
-          error: String(err),
-        },
-      });
-      createAccountErrorToast();
-      // eslint-disable-next-line no-console
-      console.error(err);
-    }
+    await createAccount();
     setIsLoading(false);
   };
 
@@ -87,18 +60,24 @@ function CreateAccount() {
       />
       <Transition in={showSecretRecoveryPhrasePopup} timeout={transitionDuration} nodeRef={ref}>
         {(state: TransitionStatus) => (
-          <SecretPhraseConfirmationPopup
+          <ConfirmationPopup
+            bodyWidth="260px"
+            logo={<Logo />}
             open={showSecretRecoveryPhrasePopup}
             duration={transitionDuration}
-            state={state}
-            isLoading={isLoading}
-            goPrev={() => {
+            title="Keep your phrase safe!"
+            body="If you lose it you&apos;ll have no way of accessing your assets."
+            primaryBttnLabel="Done"
+            primaryBttnOnClick={async () => {
+              await initAccount();
+              navigate(Routes.welcome.path);
+            }}
+            secondaryBttnLabel="Show phrase again"
+            secondaryBttnOnClick={() => {
               setShowSecretRecoveryPhrasePopup(false);
             }}
-            goNext={async () => {
-              await initAccount();
-              navigate(Routes.wallet.path);
-            }}
+            state={state}
+            isLoading={isLoading}
           />
         )}
       </Transition>

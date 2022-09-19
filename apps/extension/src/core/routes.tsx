@@ -32,6 +32,11 @@ import Welcome from 'pages/Welcome';
 import Reauthenticate from 'pages/Reauthenticate';
 import ExportPublicPrivateKey from 'pages/ExportPublicPrivateKey';
 import RemoveAccount from 'pages/RemoveAccount';
+import ManageAccount from 'pages/ManageAccount';
+import ManageAccountShowPrivateKey from 'pages/ManageAccountShowPrivateKey';
+import ManageAccountShowRecoveryPhrase from 'pages/ManageAccountShowRecoveryPhrase';
+import RotateKeyOnboarding from 'pages/RotateKeyOnboarding';
+import RotateKey from 'pages/RotateKey';
 import {
   ActiveAccountGuard,
   InitializedAccountsGuard,
@@ -105,6 +110,27 @@ export const Routes = Object.freeze({
     element: <NoWallet />,
     path: '/',
   },
+  manage_account: {
+    element:
+  <Reauthenticate title="Manage Account">
+    <ManageAccount />
+  </Reauthenticate>,
+    path: '/manage-account',
+  },
+  manage_account_show_private_key: {
+    element:
+  <Reauthenticate title="Show Private Key">
+    <ManageAccountShowPrivateKey />
+  </Reauthenticate>,
+    path: '/show_private_key',
+  },
+  manage_account_show_recovery_phrase: {
+    element:
+  <Reauthenticate title="Show Secret Recovery Phrase">
+    <ManageAccountShowRecoveryPhrase />
+  </Reauthenticate>,
+    path: '/show_recovery_phrase',
+  },
   network: {
     element: <Network />,
     path: '/settings/network',
@@ -135,6 +161,18 @@ export const Routes = Object.freeze({
   rename_account: {
     element: <RenameAccount />,
     path: '/settings/rename_account',
+  },
+  rotate_key_main: {
+    element: (
+      <Reauthenticate title="Rotate Key">
+        <RotateKey />
+      </Reauthenticate>
+    ),
+    path: '/rotate-key/main',
+  },
+  rotate_key_onboarding: {
+    element: <RotateKeyOnboarding />,
+    path: '/rotate-key/onboarding',
   },
   security_privacy: {
     element: <SecurityPrivacy />,
@@ -199,6 +237,10 @@ export const routes = [
               Routes.remove_account,
               Routes.export_public_private_key,
               Routes.account,
+              Routes.rotate_key_main,
+              Routes.rotate_key_onboarding,
+              Routes.manage_account_show_recovery_phrase,
+              Routes.manage_account_show_private_key,
               Routes.settings,
               Routes.switchAccount,
               Routes.change_password,
@@ -206,6 +248,7 @@ export const routes = [
               Routes.network,
               Routes.addNetwork,
               Routes.recovery_phrase,
+              Routes.manage_account,
               Routes.security_privacy,
               Routes.help,
               Routes.stake,

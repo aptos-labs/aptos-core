@@ -33,11 +33,10 @@ export default function CreateAccountBody(
 ) {
   const { colorMode } = useColorMode();
   const [copied, setCopied] = useState<boolean>(false);
-
   return (
     <Box width="100%">
       <Box display="flex" width="100%" height="100%" px={4}>
-        <SecretRecoveryPhraseBody />
+        <SecretRecoveryPhraseBody inputHeight={42} />
       </Box>
       <VStack width="100%" spacing={2} pb={4} borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
         <Copyable value={mnemonic} width="100%" copiedPrompt="">

@@ -16,7 +16,7 @@ function NewWalletBody() {
       case OnboardingPage.CreatePassword:
         return <CreatePasswordBody />;
       case OnboardingPage.SecretRecoveryPhrase:
-        return <SecretRecoveryPhraseBody />;
+        return <SecretRecoveryPhraseBody inputHeight={42} />;
       case OnboardingPage.EnterSecretRecoveryPhrase:
         return <EnterSecretRecoveryPhraseBody />;
       default:

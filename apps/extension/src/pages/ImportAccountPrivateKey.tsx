@@ -9,13 +9,12 @@ import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
-import { keysFromAptosAccount } from 'core/utils/account';
 import { useAnalytics } from 'core/hooks/useAnalytics';
 import { importAccountEvents } from 'core/utils/analytics/events';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { addAccount } = useUnlockedAccounts();
+  const { lookUpAndAddAccount } = useUnlockedAccounts();
   const { trackEvent } = useAnalytics();
 
   const onSubmit = useCallback(async (
@@ -30,8 +29,7 @@ export default function ImportAccountPrivateKey() {
       const aptosAccount = new AptosAccount(encodedKey);
       // TODO: prompt user for confirmation if account is not on chain
 
-      await addAccount(keysFromAptosAccount(aptosAccount));
-
+      await lookUpAndAddAccount(aptosAccount);
       importAccountToast();
 
       trackEvent({ eventType: importAccountEvents.IMPORT_PK_ACCOUNT });
@@ -45,7 +43,7 @@ export default function ImportAccountPrivateKey() {
       });
       importAccountErrorToast();
     }
-  }, [addAccount, navigate, trackEvent]);
+  }, [navigate, trackEvent, lookUpAndAddAccount]);
 
   return (
     <ImportAccountPrivateKeyLayout

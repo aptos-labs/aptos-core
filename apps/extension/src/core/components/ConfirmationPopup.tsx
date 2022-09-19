@@ -8,8 +8,8 @@ import {
   Box, Center, Text, Button,
   useColorMode,
 } from '@chakra-ui/react';
-import { customColors } from 'core/colors';
 import type { TransitionStatus } from 'react-transition-group';
+import { customColors, bgColorButtonPopup } from 'core/colors';
 
 const bgColorOverlay = {
   dark: 'rgba(191, 191, 191, 0.5)',
@@ -21,38 +21,28 @@ const bgColorPopup = {
   light: 'white',
 };
 
-type SecretPhraseConfirmationPopupProps = {
+interface ConfirmationPopupProps {
+  body: string;
+  bodyWidth: string;
   duration: number;
-  goNext: () => void;
-  goPrev: () => void;
-  isLoading: boolean;
+  isLoading?: boolean;
+  logo: React.ReactNode;
   open: boolean;
+  primaryBttnLabel: string;
+  primaryBttnOnClick: () => void;
+  secondaryBttnLabel: string;
+  secondaryBttnOnClick: () => void;
   state: TransitionStatus;
-};
-
-function Logo() {
-  return (
-    <svg width="75" height="75" viewBox="0 0 75 75" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="37.5" cy="37.5" r="37.5" fill="#00BFA5" fillOpacity="0.1" />
-      <g clipPath="url(#clip0_2805_627602)">
-        <path d="M24.305 22.7101L38 19.6667L51.695 22.7101C52.0651 22.7924 52.3961 22.9984 52.6334 23.2941C52.8706 23.5898 52.9999 23.9576 53 24.3367V40.9817C52.9999 42.628 52.5933 44.2487 51.8165 45.7001C51.0396 47.1515 49.9164 48.3886 48.5467 49.3017L38 56.3334L27.4533 49.3017C26.0838 48.3888 24.9608 47.1519 24.1839 45.7008C23.4071 44.2498 23.0004 42.6294 23 40.9834V24.3367C23.0001 23.9576 23.1294 23.5898 23.3666 23.2941C23.6039 22.9984 23.9349 22.7924 24.305 22.7101Z" fill="#12838E" />
-      </g>
-      <defs>
-        <clipPath id="clip0_2805_627602">
-          <rect width="40" height="40" fill="white" transform="translate(18 18)" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
+  title: string;
 }
 
-type BackdropProps = {
+interface BackdropProps {
   children: JSX.Element;
   duration: number;
   state: TransitionStatus;
-};
+}
 
-const SecretPhraseConfirmationBackdrop = forwardRef(
+const ConfirmationBackdrop = forwardRef(
   ({
     children, duration, state,
   }: BackdropProps, ref) => {
@@ -99,9 +89,20 @@ const SecretPhraseConfirmationBackdrop = forwardRef(
   },
 );
 
-function SecretPhraseConfirmationPopup({
-  duration, goNext, goPrev, isLoading, open, state,
-}: SecretPhraseConfirmationPopupProps) {
+function ConfirmationPopup({
+  body,
+  bodyWidth,
+  duration,
+  isLoading,
+  logo,
+  open,
+  primaryBttnLabel,
+  primaryBttnOnClick,
+  secondaryBttnLabel,
+  secondaryBttnOnClick,
+  state,
+  title,
+}: ConfirmationPopupProps) {
   const { colorMode } = useColorMode();
   const ref = useRef(null);
 
@@ -119,7 +120,7 @@ function SecretPhraseConfirmationPopup({
   }), []);
 
   return (
-    <SecretPhraseConfirmationBackdrop
+    <ConfirmationBackdrop
       ref={ref}
       duration={duration}
       state={state}
@@ -141,53 +142,58 @@ function SecretPhraseConfirmationPopup({
       >
         {open && (
         <>
-          <Center mx="auto" mb={4} display="flex" flexDirection="column" height="100%" width="260px" justifyContent="center" flex="1">
+          <Center mx="auto" mb={4} display="flex" flexDirection="column" height="100%" width={bodyWidth || '260px'} justifyContent="center" flex="1">
             <Box pb={4} width="100%" display="flex" flexDirection="column" justifyContent="center" textAlign="center">
-              <Center pb={4}>
-                <Logo />
+              <Center pb={4} width="100%" height="100%">
+                {logo}
               </Center>
               <Text
                 fontSize={23}
                 fontWeight="bold"
               >
-                Keep your phrase safe!
+                {title}
               </Text>
             </Box>
             <Box width="100%" display="flex" textAlign="center">
               <Text
                 fontSize={16}
               >
-                If you lose it you&apos;ll have no way of accessing your assets.
+                {body}
               </Text>
             </Box>
           </Center>
-          <Box width="100%" display="flex" flexDirection="column" gap={3}>
+          <Box key="button" width="100%" display="flex" flexDirection="column" gap={3}>
             <Button
-              width="100%"
-              onClick={goPrev}
-              height="48px"
-              bgColor={bgColorPopup[colorMode]}
+              key={secondaryBttnLabel}
+              bgColor={bgColorButtonPopup[colorMode]}
               border="1px"
               borderColor={customColors.navy[300]}
+              height="48px"
+              isDisabled={isLoading || false}
+              variant="solid"
+              width="100%"
+              onClick={secondaryBttnOnClick}
             >
-              Show phrase again
+              {secondaryBttnLabel}
             </Button>
             <Button
-              width="100%"
-              isLoading={isLoading}
-              height="48px"
+              key={primaryBttnLabel}
               colorScheme="salmon"
+              height="48px"
               color="white"
-              onClick={goNext}
+              isLoading={isLoading || false}
+              variant="solid"
+              width="100%"
+              onClick={primaryBttnOnClick}
             >
-              Done
+              {primaryBttnLabel}
             </Button>
           </Box>
         </>
         )}
       </Box>
-    </SecretPhraseConfirmationBackdrop>
+    </ConfirmationBackdrop>
   );
 }
 
-export default SecretPhraseConfirmationPopup;
+export default ConfirmationPopup;

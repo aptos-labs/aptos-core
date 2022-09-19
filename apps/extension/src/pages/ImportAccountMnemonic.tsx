@@ -6,7 +6,7 @@ import Routes from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
 import { ImportAccountMnemonicLayout, MnemonicFormValues } from 'core/layouts/AddAccountLayout';
 import { useNavigate } from 'react-router-dom';
-import { generateMnemonicObject, keysFromAptosAccount } from 'core/utils/account';
+import { generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
 import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
 import { useUnlockedAccounts } from 'core/hooks/useAccounts';
@@ -15,7 +15,7 @@ import { importAccountEvents } from 'core/utils/analytics/events';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
-  const { addAccount } = useUnlockedAccounts();
+  const { lookUpAndAddAccount } = useUnlockedAccounts();
   const { trackEvent } = useAnalytics();
 
   const onSubmit = useCallback(async (
@@ -33,10 +33,7 @@ export default function ImportWalletMnemonic() {
       const aptosAccount = new AptosAccount(seed);
       // TODO: prompt user for confirmation if account is not on chain
 
-      await addAccount({
-        mnemonic,
-        ...keysFromAptosAccount(aptosAccount),
-      });
+      await lookUpAndAddAccount(aptosAccount, mnemonic);
 
       importAccountToast();
       trackEvent({ eventType: importAccountEvents.IMPORT_MNEMONIC_ACCOUNT });
@@ -50,7 +47,7 @@ export default function ImportWalletMnemonic() {
         },
       });
     }
-  }, [addAccount, navigate, trackEvent]);
+  }, [lookUpAndAddAccount, navigate, trackEvent]);
 
   return (
     <ImportAccountMnemonicLayout

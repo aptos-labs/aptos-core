@@ -30,6 +30,39 @@ export const lockAccountToast = ({ address }: { address: string }) => {
   });
 };
 
+export const rotateKeySuccessToast = ({ address }: { address: string }) => {
+  toast({
+    description: `Successfully rotated key for account ${address}`,
+    status: 'success',
+    title: 'Rotate key successfully',
+  });
+};
+
+export const rotateKeyErrorToast = ({ address }: { address: string }) => {
+  toast({
+    description: `Error rotating key for account ${address}`,
+    status: 'error',
+    title: 'Rotate key failed',
+  });
+};
+
+export const rotateKeySequenceNumberTooOldErrorToast = ({ address }: { address: string }) => {
+  toast({
+    description: `Failed to rotate key for account ${address}.
+    The transaction's sequence_number must match the current sequence number in the sender's account.`,
+    status: 'error',
+    title: 'Rotate key failed',
+  });
+};
+
+export const rotateKeyInsufficientBalanceErrorToast = ({ address }: { address: string }) => {
+  toast({
+    description: `Failed to rotate key for account ${address}. Insufficient balance.`,
+    status: 'error',
+    title: 'Rotate key failed',
+  });
+};
+
 export const createAccountErrorToast = () => {
   toast({
     description: 'Error creating new account',

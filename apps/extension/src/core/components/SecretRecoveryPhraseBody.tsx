@@ -3,7 +3,7 @@
 
 import React, {
   Ref,
-  useEffect, useRef,
+  useEffect, useRef, useMemo,
 } from 'react';
 import {
   Center,
@@ -23,10 +23,11 @@ import {
 import { BsDot } from '@react-icons/all-files/bs/BsDot';
 import { AiFillInfoCircle } from '@react-icons/all-files/ai/AiFillInfoCircle';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
-import { secondaryHeaderInputBgColor, customColors } from 'core/colors';
+import { secondaryHeaderInputBgColor } from 'core/colors';
 import { type CreateWalletFormValues } from 'core/layouts/CreateWalletLayout';
 import { useFormContext } from 'react-hook-form';
 import { Transition, type TransitionStatus } from 'react-transition-group';
+import { useLocation } from 'react-router-dom';
 
 const borderColor = {
   dark: 'gray.700',
@@ -68,8 +69,6 @@ const coverBgColor = {
 };
 
 const timeout = 200;
-
-const inputHeight = 42;
 
 type SecretRecoveryPhraseOverlayProps = {
   showSecretRecoveryPhrase: boolean;
@@ -115,12 +114,26 @@ const SecretRecoveryPhraseOverlay = React.forwardRef(
   },
 );
 
-export default function SecretRecoveryPhraseBody() {
+interface LocationState {
+  hasRotatedKey: boolean;
+}
+
+interface SecretRecoveryPhraseBodyProps {
+  inputHeight?: number;
+}
+
+export default function SecretRecoveryPhraseBody(
+  { inputHeight = 42 }:
+  SecretRecoveryPhraseBodyProps,
+) {
   const { colorMode } = useColorMode();
   const { setValue, watch } = useFormContext<CreateWalletFormValues>();
   const mnemonic = watch('mnemonic');
   const showSecretRecoveryPhrase = watch('showSecretRecoveryPhrase');
   const ref = useRef(null);
+  const { state } = useLocation();
+
+  const hasRotatedKey = useMemo(() => (state as LocationState)?.hasRotatedKey, [state]);
 
   useEffect(() => () => {
     // hide the secret recovery phrase when exit the recovery view
@@ -130,7 +143,7 @@ export default function SecretRecoveryPhraseBody() {
 
   return (
     <VStack pt={3} maxH="100%" overflowY="auto" alignItems="left" flex="1" marginBottom={0.5}>
-      <Heading fontSize="2xl">Secret recovery phrase</Heading>
+      <Heading fontSize="1.2rem">{hasRotatedKey ? 'Your new secret recovery phrase' : 'Secret recovery phrase' }</Heading>
       <HStack alignItems="flex-start" height="100%" width="100%" maxHeight="48px">
         <Text
           fontSize="xs"
@@ -166,17 +179,17 @@ export default function SecretRecoveryPhraseBody() {
       <VStack pt={2} width="100%" spacing={4}>
         <SimpleGrid columns={2} gap={4} position="relative">
           <VStack key="first-column">
-            {mnemonic.slice(0, 6).map((item, index) => (
+            {mnemonic.slice(0, 6).map((item: string, index: number) => (
               <InputGroup key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement color={customColors.navy[600]} height={inputHeight}>{`${index + 1}.`}</InputLeftElement>
+                <InputLeftElement color="navy.600" height={inputHeight}>{`${index + 1}.`}</InputLeftElement>
                 <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}
           </VStack>
           <VStack key="second-column">
-            {mnemonic.slice(6, 12).map((item, index) => (
+            {mnemonic.slice(6, 12).map((item: string, index: number) => (
               <InputGroup size="md" key={item} fontWeight="bold" border={borderColor[colorMode]}>
-                <InputLeftElement height={inputHeight} color={customColors.navy[600]}>{`${index + 7}.`}</InputLeftElement>
+                <InputLeftElement height={inputHeight} color="navy.600">{`${index + 7}.`}</InputLeftElement>
                 <Input height={inputHeight} readOnly variant="outline" value={item} key={item} bgColor={secondaryHeaderInputBgColor[colorMode]} fontWeight={600} />
               </InputGroup>
             ))}

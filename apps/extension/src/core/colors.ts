@@ -169,6 +169,11 @@ export const permissionRequestLoadingOverlayColor = {
   light: '#ffffffb5',
 };
 
+export const rotationKeyButtonBgColor = {
+  dark: 'gray.800',
+  light: 'white',
+};
+
 // Wallet
 
 export const assetSecondaryBgColor = {
@@ -245,4 +250,9 @@ export const customColors = {
 export const stepBorderColor = {
   dark: customColors.navy[100],
   light: customColors.navy[900],
+};
+
+export const bgColorButtonPopup = {
+  dark: 'gray.800',
+  light: 'white',
 };

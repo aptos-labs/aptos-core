@@ -7,12 +7,17 @@ import { randomBytes, secretbox } from 'tweetnacl';
 import pbkdf2 from 'pbkdf2';
 
 import { triggerAccountChange } from 'core/utils/providerEvents';
-import { AptosAccount, HexString } from 'aptos';
+import {
+  AptosAccount, AptosClient, HexString, ApiError,
+} from 'aptos';
 import { useAppState } from 'core/hooks/useAppState';
 import {
   Account, Accounts, EncryptedAccounts,
 } from 'shared/types';
 import { latestVersion } from 'core/constants';
+import { keysFromAptosAccount } from 'core/utils/account';
+import { useNetworks } from './useNetworks';
+import useCreateAccount from './useCreateAccount';
 
 const pbkdf2Iterations = 10000;
 const pbkdf2Digest = 'sha256';
@@ -53,6 +58,7 @@ export const [AccountsProvider, useAccounts] = constate(() => {
     updatePersistentState,
     updateSessionState,
   } = useAppState();
+  const { lookupOriginalAddress } = useCreateAccount({});
 
   /**
    * Initialize the accounts state with a password to encrypt it.
@@ -97,6 +103,42 @@ export const [AccountsProvider, useAccounts] = constate(() => {
     ]);
   }
 
+  async function lookUpAndInitAccounts(
+    aptosClient: AptosClient,
+    aptosAccount: AptosAccount,
+    confirmPassword: string,
+    mnemonic?: string,
+  ) {
+    try {
+      const newAccount = await lookupOriginalAddress(aptosClient, aptosAccount, mnemonic);
+
+      await initAccounts(confirmPassword, {
+        [newAccount.address]: newAccount,
+      });
+    } catch (err) {
+      // if account failed to be looked up then account key has not been rotated
+      // therefore add the account derived from private key or mnemonic string
+      // errorCode 'table_item_not_found' means address cannot be found in the table
+      if (err instanceof ApiError && err.errorCode === 'table_item_not_found') {
+        // eslint-disable-next-line no-console
+        console.error('failed to fetch rotated key for address ', aptosAccount.address);
+
+        const newAccount = mnemonic ? {
+          mnemonic,
+          ...keysFromAptosAccount(aptosAccount),
+        } : keysFromAptosAccount(aptosAccount);
+
+        await initAccounts(confirmPassword, {
+          [newAccount.address]: newAccount,
+        });
+      } else {
+        // throw err here so we can catch it later in Import Account flow
+        // and raise error toast/trigger analytic event
+        throw err;
+      }
+    }
+  }
+
   return {
     accounts,
     activeAccountAddress,
@@ -104,6 +146,7 @@ export const [AccountsProvider, useAccounts] = constate(() => {
     encryptedStateVersion,
     encryptionKey,
     initAccounts,
+    lookUpAndInitAccounts,
     salt,
   };
 });
@@ -267,6 +310,8 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
     updatePersistentState,
     updateSessionState,
   } = useAppState();
+  const { lookupOriginalAddress } = useCreateAccount({});
+  const { aptosClient } = useNetworks();
 
   const encryptAccounts = (newAccounts: Accounts) => {
     const plaintext = JSON.stringify(newAccounts);
@@ -293,6 +338,60 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
       publicKey: account.publicKey,
     };
     await triggerAccountChange(publicAccount);
+  };
+
+  // look up account on chain to determine if account has rotated private key
+  // 1. if account has private key rotated,
+  // update the derived account with the original account address before adding the acocunt
+  // 2. otherwise, simply add the derived account
+  const lookUpAndAddAccount = async (aptosAccount: AptosAccount, mnemonic?: string) => {
+    // Look up original address if account key has been rotated previously
+    try {
+      const newAccount = await lookupOriginalAddress(aptosClient, aptosAccount, mnemonic);
+      await addAccount(newAccount);
+    } catch (err) {
+      // if account failed to be looked up then account key has not been rotated
+      // therefore add the account derived from private key or mnemonic string
+      // errorCode 'table_item_not_found' means address cannot be found in the table
+      if (err instanceof ApiError && err.errorCode === 'table_item_not_found') {
+        // eslint-disable-next-line no-console
+        console.error('failed to fetch rotated key for address ', aptosAccount.address);
+
+        const newAccount = mnemonic ? {
+          mnemonic,
+          ...keysFromAptosAccount(aptosAccount),
+        } : keysFromAptosAccount(aptosAccount);
+
+        await addAccount(newAccount);
+      } else {
+        // throw err here so we can catch it later in Import Account component
+        // and raise error toast/trigger analytic event
+        throw err;
+      }
+    }
+  };
+
+  const updateActiveAccount = async (newAccount: Account) => {
+    const { address } = newAccount;
+    const newAccounts = { ...accounts };
+    delete newAccounts[address];
+    newAccounts[address] = newAccount;
+
+    const newEncryptedAccounts = encryptAccounts(newAccounts);
+    await updatePersistentState({
+      activeAccountAddress: newAccount?.address,
+      activeAccountPublicKey: newAccount?.publicKey,
+      encryptedAccounts: newEncryptedAccounts,
+    });
+
+    const publicAccount = {
+      address: newAccount.address,
+      publicKey: newAccount.publicKey,
+    };
+    await Promise.all([
+      triggerAccountChange(publicAccount),
+      updateSessionState({ accounts: newAccounts }),
+    ]);
   };
 
   const removeAccount = async (address: string) => {
@@ -356,9 +455,11 @@ export const [UnlockedAccountsProvider, useUnlockedAccounts] = constate(({
   return {
     accounts,
     addAccount,
+    lookUpAndAddAccount,
     removeAccount,
     renameAccount,
     switchAccount,
+    updateActiveAccount,
   };
 });
 

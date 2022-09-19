@@ -30,6 +30,7 @@ export const settingsItemLabel = {
   EXPORT_PUBLIC_PRIVATE_KEY: 'Show public & private keys',
   HELP_SUPPORT: 'Help & Support',
   LOCK_WALLET: 'Lock wallet',
+  MANAGE_ACCOUNT: 'Manage account',
   NETWORK: 'Network',
   REMOVE_ACCOUNT: 'Remove account',
   SECRET_RECOVERY_PHRASE: 'Show secret recovery phrase',

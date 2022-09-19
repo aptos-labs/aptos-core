@@ -56,6 +56,11 @@ export default function getSettingsPaths(account: Account): SettingsListItemProp
     },
     {
       iconAfter: FiChevronRight,
+      path: Routes.manage_account.path,
+      title: settingsItemLabel.MANAGE_ACCOUNT,
+    },
+    {
+      iconAfter: FiChevronRight,
       path: Routes.export_public_private_key.path,
       title: settingsItemLabel.EXPORT_PUBLIC_PRIVATE_KEY,
     },

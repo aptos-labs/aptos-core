@@ -17,7 +17,9 @@ import {
 
 import { SubmitHandler, useForm } from 'react-hook-form';
 import WalletLayout from 'core/layouts/WalletLayout';
-import { secondaryBgColor, buttonBorderColor } from 'core/colors';
+import {
+  secondaryBgColor, buttonBorderColor, secondaryTextColor,
+} from 'core/colors';
 import { AiOutlineEye } from '@react-icons/all-files/ai/AiOutlineEye';
 import { AiOutlineEyeInvisible } from '@react-icons/all-files/ai/AiOutlineEyeInvisible';
 import { useInitializedAccounts } from 'core/hooks/useAccounts';
@@ -104,7 +106,7 @@ function Reauthenticate({ children, title }: ReauthenticateProps) {
                     onClick={handleClickResetPassword}
                     fontWeight={500}
                     fontSize="md"
-                    colorScheme="teal"
+                    color={secondaryTextColor[colorMode]}
                     variant="link"
                   >
                     Reset password
@@ -140,7 +142,7 @@ function Reauthenticate({ children, title }: ReauthenticateProps) {
                   }
               </FormControl>
               <Box width="100%" borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
-                <Button py={6} width="100%" type="submit" colorScheme="teal">
+                <Button color="white" py={6} width="100%" type="submit" colorScheme="salmon">
                   Next
                 </Button>
               </Box>

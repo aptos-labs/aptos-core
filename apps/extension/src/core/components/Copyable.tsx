@@ -1,10 +1,13 @@
 import React from 'react';
-import { Box, Tooltip, useClipboard } from '@chakra-ui/react';
+import {
+  Box, Tooltip, useClipboard, As,
+} from '@chakra-ui/react';
 
 export const defaultTimeout = 500;
 export const defaultOpenDelay = 300;
 
 interface CopyableProps {
+  as?: As,
   children: React.ReactNode | React.ReactNode[],
   copiedPrompt?: string,
   height?: string,
@@ -20,6 +23,7 @@ interface CopyableProps {
  * @constructor
  */
 export default function Copyable({
+  as,
   children,
   height,
   value,
@@ -42,7 +46,7 @@ export default function Copyable({
   };
 
   return (
-    <Box cursor="pointer" onClick={onClick} as="span" width={width} height={height}>
+    <Box cursor="pointer" onClick={onClick} as={as || 'span'} width={width} height={height}>
       <Tooltip
         label={hasCopied ? copiedPrompt : prompt}
         isOpen={hasCopied || undefined}
