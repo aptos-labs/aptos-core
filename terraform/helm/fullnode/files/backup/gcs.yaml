@@ -1,4 +1,4 @@
-env_vars = []
+env_vars: []
 commands:
   create_backup: 'echo "$BACKUP_NAME"'
   create_for_write: |
