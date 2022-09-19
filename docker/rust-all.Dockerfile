@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:buster-20220822@sha256:faa416b9eeda2cbdb796544422eedd698e716dbd99841138521a94db51bf6123 AS debian-base
+FROM debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
@@ -37,7 +37,7 @@ ENV PROFILE ${PROFILE}
 ARG FEATURES
 ENV FEATURES ${FEATURES}
 
-RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target 
+RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
 
 ### Validator Image ###
 FROM debian-base AS validator
@@ -133,7 +133,7 @@ RUN apt-get update && apt-get --no-install-recommends -y \
     ca-certificates \
     socat \
     python3-botocore/bullseye \
-    awscli/bullseye \ 
+    awscli/bullseye \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python
@@ -287,7 +287,7 @@ RUN apt-get update && apt-get install -y \
     htop \
     valgrind \
     bpfcc-tools \
-    python-bpfcc \
+    python3-bpfcc \
     libbpfcc \
     libbpfcc-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
