@@ -412,7 +412,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, false, /* async_commit */).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -429,6 +429,7 @@ proptest! {
             .unwrap();
 
         restore.add_chunk(batch1, proof_of_batch1).unwrap();
+        restore.wait_for_async_commit().unwrap();
 
         let expected = store2.state_merkle_db.get_rightmost_leaf_naive().unwrap();
         let actual = store2.state_merkle_db.get_rightmost_leaf().unwrap();
