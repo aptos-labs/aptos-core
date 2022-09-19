@@ -46,7 +46,7 @@ haproxy:
       # Sustained 100mb/s for 10 sec.
       maxBytesOutRate10sec: 134217728
       rateLimitSession: 256
-      tcpBufSize: 4194304
+      tcpBufSize: 1048576
 
   config:
     # -- Whether to send Proxy Protocol v2
