@@ -3,7 +3,9 @@
 
 import React, { useState } from 'react';
 import { zxcvbnOptions } from '@zxcvbn-ts/core';
-import { Button, useColorMode, VStack } from '@chakra-ui/react';
+import {
+  Button, useColorMode, VStack, Box,
+} from '@chakra-ui/react';
 import { passwordOptions } from './CreatePasswordBody';
 import SecretRecoveryPhraseBody from './SecretRecoveryPhraseBody';
 import Copyable from './Copyable';
@@ -27,9 +29,11 @@ export default function CreateAccountBody(
   const [copied, setCopied] = useState<boolean>(false);
 
   return (
-    <VStack spacing={4} display="flex" width="100%" height="100%" px={4}>
-      <SecretRecoveryPhraseBody />
-      <VStack width="100%" spacing={2} pb={3} borderTop="1px" pt={3} borderColor={buttonBorderColor[colorMode]}>
+    <Box width="100%">
+      <Box display="flex" width="100%" height="100%" px={4}>
+        <SecretRecoveryPhraseBody />
+      </Box>
+      <VStack width="100%" spacing={2} pb={4} borderTop="1px" pt={4} px={4} borderColor={buttonBorderColor[colorMode]}>
         <Copyable value={mnemonic} width="100%" copiedPrompt="">
           <Button
             width="100%"
@@ -51,6 +55,6 @@ export default function CreateAccountBody(
           Create
         </Button>
       </VStack>
-    </VStack>
+    </Box>
   );
 }

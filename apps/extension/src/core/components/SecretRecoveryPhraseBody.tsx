@@ -129,11 +129,11 @@ export default function SecretRecoveryPhraseBody() {
   }, [setValue]);
 
   return (
-    <VStack pt={3} maxH="100%" overflowY="auto" alignItems="left" flex="1">
+    <VStack pt={3} maxH="100%" overflowY="auto" alignItems="left" flex="1" marginBottom={0.5}>
       <Heading fontSize="2xl">Secret recovery phrase</Heading>
       <HStack alignItems="flex-start" height="100%" width="100%" maxHeight="48px">
         <Text
-          fontSize="sm"
+          fontSize="xs"
         >
           This 12-word phrase allows you to recover your wallet and access to the coins inside.
         </Text>

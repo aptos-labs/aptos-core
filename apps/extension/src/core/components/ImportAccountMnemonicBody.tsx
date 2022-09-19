@@ -7,11 +7,13 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { type MnemonicFormValues } from 'core/layouts/AddAccountLayout';
 import MnemonicInput from 'core/components/MnemonicInput';
 import { buttonBorderColor } from 'core/colors';
+import { mnemonicValues } from 'core/constants';
+import { MNEMONIC } from 'core/enums';
 
 interface ImportAccountMnemonicBodyProps {
   hasSubmit?: boolean;
@@ -25,8 +27,19 @@ export default function ImportAccountMnemonicBody({
   const {
     register,
     setValue,
+    watch,
   } = useFormContext<MnemonicFormValues>();
   const { colorMode } = useColorMode();
+  const mnemonicValuesArr = mnemonicValues.map((mnemonic: MNEMONIC) => watch(mnemonic));
+
+  const isSubmitDisabled = useMemo(
+    () => mnemonicValuesArr.some((mnemonic: string) => {
+      if (!mnemonic) return true;
+
+      return mnemonic.length === 0;
+    }),
+    [mnemonicValuesArr],
+  );
 
   return (
     <VStack spacing={4} px={px} pt={4} height="100%">
@@ -36,7 +49,7 @@ export default function ImportAccountMnemonicBody({
       {
         hasSubmit ? (
           <Box py={2} width="100%" borderTop="1px" pt={2} borderColor={buttonBorderColor[colorMode]}>
-            <Button colorScheme="teal" width="100%" type="submit">
+            <Button colorScheme="teal" width="100%" type="submit" disabled={isSubmitDisabled}>
               Submit
             </Button>
           </Box>

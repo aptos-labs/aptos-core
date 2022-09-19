@@ -24,7 +24,7 @@ export default function ImportAccountLayout({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows="64px 1fr"
+      templateRows="80px 1fr"
       bgColor={secondaryBgColor[colorMode]}
     >
       <ImportAccountHeader backPage={backPage} headerValue={headerValue} />

@@ -39,7 +39,7 @@ export default function AddAccountLayout<T>({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows="60px 1fr"
+      templateRows="80px 1fr"
       position="relative"
       bgColor={secondaryBgColor[colorMode]}
     >
