@@ -21,6 +21,9 @@ import { AnalyticsProvider } from 'core/hooks/useAnalytics';
 
 const { ToastContainer } = createStandaloneToast();
 
+// eslint-disable-next-line global-require
+window.Buffer = window.Buffer || require('buffer').Buffer;
+
 const isProductionEnv = process.env.NODE_ENV === 'production';
 
 const theme: ThemeConfig = extendTheme({

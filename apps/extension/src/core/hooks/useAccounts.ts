@@ -168,6 +168,7 @@ export const [InitializedAccountsProvider, useInitializedAccounts] = constate(({
   };
 
   const unlockAccounts = async (password: string) => {
+    console.log(password);
     const ciphertext = bs58.decode(encryptedAccounts.ciphertext);
     const nonce = bs58.decode(encryptedAccounts.nonce);
 

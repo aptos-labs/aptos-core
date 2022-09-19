@@ -27,9 +27,6 @@ import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
 import { useAccountOctaCoinBalance } from 'core/queries/account';
 import { useActiveAccount } from 'core/hooks/useAccounts';
 
-// eslint-disable-next-line global-require
-window.Buffer = window.Buffer || require('buffer').Buffer;
-
 export default function CreateNFTModal() {
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
