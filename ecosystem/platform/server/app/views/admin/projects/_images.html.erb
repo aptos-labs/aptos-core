@@ -1,0 +1,8 @@
+<%= content_tag :div do %>
+  <%= image_tag project.thumbnail %>
+<% end %>
+<% project.screenshots.each do |screenshot| %>
+  <%= content_tag :div do %>
+    <%= image_tag screenshot %>
+  <% end %>
+<% end %>
