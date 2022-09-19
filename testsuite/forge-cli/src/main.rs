@@ -17,10 +17,10 @@ use testcases::continuous_progress_test::ContinuousProgressTest;
 use testcases::fullnode_reboot_stress_test::FullNodeRebootStressTest;
 use testcases::load_vs_perf_benchmark::LoadVsPerfBenchmark;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
-use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
 use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::state_sync_performance::StateSyncValidatorPerformance;
+use testcases::three_region_simulation_test::ThreeRegionSimulationTest;
 use testcases::twin_validator_test::TwinValidatorTest;
 use testcases::validator_reboot_stress_test::ValidatorRebootStressTest;
 use testcases::{
@@ -462,9 +462,13 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<
                 Some(Duration::from_secs(240)),
                 None,
             )),
-        "network_latency" => config
-            .with_network_tests(vec![&NetworkLatencyTest])
-            .with_success_criteria(SuccessCriteria::new(4000, 10000, true, None, None)),
+        "three_region_simulation" => config
+            .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
+            .with_initial_fullnode_count(12)
+            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+            .with_network_tests(vec![&ThreeRegionSimulationTest])
+            // TODO(rustielin): tune these success critiera after we have a better idea of the test behavior
+            .with_success_criteria(SuccessCriteria::new(3000, 100000, true, None, None)),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),
@@ -765,8 +769,8 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             Some(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
                 MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 5 GB of memory for 30% of the time.
-                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                // Check that we don't use more than 10 GB of memory for 30% of the time.
+                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
             )),
         ))
 }
@@ -782,7 +786,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &NetworkLatencyTest,
+            &ThreeRegionSimulationTest,
             &NetworkLossTest,
         ])
         .with_success_criteria(SuccessCriteria::new(

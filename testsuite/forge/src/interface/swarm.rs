@@ -79,6 +79,7 @@ pub trait Swarm: Sync {
     /// Injects all types of chaos
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_all_chaos(&mut self) -> Result<()>;
 
     async fn ensure_no_validator_restart(&self) -> Result<()>;
     async fn ensure_no_fullnode_restart(&self) -> Result<()>;

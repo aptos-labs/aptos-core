@@ -3,13 +3,13 @@
 
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
 use aptos_rest_client::{error::RestError, Response};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, chain_id::ChainId, on_chain_config::ValidatorSet, PeerId,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
+use tracing::{debug, error};
 use url::Url;
 
 pub type EpochNum = u64;

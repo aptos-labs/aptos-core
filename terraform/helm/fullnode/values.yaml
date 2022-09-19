@@ -110,8 +110,6 @@ backup:
       account:
       container:
       sas:
-    state_snapshot_interval_epochs: 24
-    transaction_batch_size: 100000
 
 backup_verify:
   schedule: '@daily'

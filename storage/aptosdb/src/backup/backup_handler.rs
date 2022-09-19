@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::hash::HashValue;
+use aptos_types::write_set::WriteSet;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -53,8 +54,9 @@ impl BackupHandler {
         &self,
         start_version: Version,
         num_transactions: usize,
-    ) -> Result<impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>)>> + '_>
-    {
+    ) -> Result<
+        impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
+    > {
         let txn_iter = self
             .transaction_store
             .get_transaction_iter(start_version, num_transactions)?;
@@ -64,13 +66,21 @@ impl BackupHandler {
         let events_iter = self
             .event_store
             .get_events_by_version_iter(start_version, num_transactions)?;
+        let write_set_iter = self
+            .transaction_store
+            .get_write_set_iter(start_version, num_transactions)?;
 
-        let zipped = zip_eq(zip_eq(txn_iter, txn_info_iter), events_iter)
-            .enumerate()
-            .map(move |(idx, ((txn_res, txn_info_res), events_res))| {
+        let zipped = zip_eq(
+            zip_eq(txn_iter, txn_info_iter),
+            zip_eq(events_iter, write_set_iter),
+        )
+        .enumerate()
+        .map(
+            move |(idx, ((txn_res, txn_info_res), (events_res, write_set_res)))| {
                 BACKUP_TXN_VERSION.set((start_version.wrapping_add(idx as u64)) as i64);
-                Ok((txn_res?, txn_info_res?, events_res?))
-            });
+                Ok((txn_res?, txn_info_res?, events_res?, write_set_res?))
+            },
+        );
         Ok(zipped)
     }
 

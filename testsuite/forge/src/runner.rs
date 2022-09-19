@@ -249,8 +249,8 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
                 Some(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
                     MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 )),
             )
         };

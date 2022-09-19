@@ -9,7 +9,6 @@ pub mod fullnode_reboot_stress_test;
 pub mod gas_price_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
-pub mod network_latency_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
@@ -17,6 +16,7 @@ pub mod performance_test;
 pub mod performance_with_fullnode_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
+pub mod three_region_simulation_test;
 pub mod twin_validator_test;
 pub mod validator_reboot_stress_test;
 
@@ -213,6 +213,22 @@ impl dyn NetworkLoadTest {
             .build()
             .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
 
+        let clients = ctx
+            .swarm()
+            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
+
+        // Read first
+        for client in &clients {
+            let start = Instant::now();
+            let _v = rt.block_on(client.get_ledger_information())?;
+            let duration = start.elapsed();
+            info!(
+                "Fetch from {:?} took {}ms",
+                client.path_prefix_string(),
+                duration.as_millis(),
+            );
+        }
+
         let job = rt.block_on(emitter.start_job(
             ctx.swarm().chain_info().root_account,
             emit_job_request,
@@ -226,10 +242,6 @@ impl dyn NetworkLoadTest {
 
         std::thread::sleep(warmup_duration);
         info!("{}s warmup finished", warmup_duration.as_secs());
-
-        let clients = ctx
-            .swarm()
-            .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
         let max_start_ledger_transactions = rt
             .block_on(join_all(

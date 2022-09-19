@@ -16,7 +16,7 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 16,
+            gas_used: 421,
             status: Keep(
                 Success,
             ),
@@ -38,7 +38,7 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 1,
+            gas_used: 150,
             status: Keep(
                 MiscellaneousError(
                     Some(
