@@ -770,20 +770,26 @@ export class AptosClient {
 
   /**
    * Get block by height
-   * @param blockHeight
-   * @param withTransactions
-   * @returns
+   * 
+   * @param blockHeight Block height to lookup.  Starts at 0
+   * @param withTransactions If set to true, include all transactions in the block
+   * 
+   * @returns Block
    */
+  @parseApiError
   async getBlockByHeight(blockHeight: number, withTransactions?:boolean): Promise<Gen.Block> {
     return this.client.blocks.getBlockByHeight(blockHeight, withTransactions);
   }
 
   /**
    * Get block by block transaction version
-   * @param version
-   * @param withTransactions
-   * @returns
+   * 
+   * @param version Ledger version to lookup block information for
+   * @param withTransactions If set to true, include all transactions in the block
+   * 
+   * @returns Block
    */
+  @parseApiError
   async getBlockByVersion(version: number, withTransactions?:boolean): Promise<Gen.Block> {
     return this.client.blocks.getBlockByVersion(version, withTransactions);
   }
