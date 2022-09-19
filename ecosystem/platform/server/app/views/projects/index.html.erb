@@ -15,7 +15,7 @@
       <%= render 'layouts/flash' %>
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-20">
         <div class="order-2 lg:order-1 lg:col-span-8">
-          <%= form_with url: projects_path, method: 'GET', class: 'grid md:grid-cols-2 gap-4', builder: AptosFormBuilder do |form| %>
+          <%= form_with url: ecosystem_path, method: 'GET', class: 'grid md:grid-cols-2 gap-4', builder: AptosFormBuilder do |form| %>
             <%= content_tag :div, class: 'flex flex-col xl:flex-row gap-2 !text-sm relative' do %>
               <div class="flex absolute inset-y-0 right-0 items-center pr-4 pointer-events-none">
                 <%= render IconComponent.new(:search, class: 'w-5 h-5 text-neutral-400') %>

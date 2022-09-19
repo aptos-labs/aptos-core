@@ -88,7 +88,9 @@ Rails.application.routes.draw do
   get 'it2', to: 'leaderboard#it2'
 
   # Projects
-  resources :projects, except: %i[edit update]
+  get 'projects', to: redirect('/ecosystem')
+  get 'ecosystem', to: 'projects#index'
+  resources :projects, except: %i[index edit update]
 
   # User profiles
   resources :users, only: %i[show] do
