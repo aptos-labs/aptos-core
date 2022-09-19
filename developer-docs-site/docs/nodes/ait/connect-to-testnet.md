@@ -1,24 +1,24 @@
 ---
-title: "Connecting to Aptos Incentivized Testnet"
+title: "Connecting to Aptos Testnet"
 slug: "connect-to-testnet"
 sidebar_position: 14
 ---
 
-# Connecting to Aptos Incentivized Testnet
+# Connecting to Aptos Testnet
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
 ## Initializing the staking pool
 
-In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
+In testnet we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool), if you've already done this through the UI, you can igore this step and jump into "Bootstrapping validator node". 
 
 Alternatively, you can also use CLI to intialize staking pool:
 
 - Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
 
   ```bash
-  aptos init --profile ait3-owner \
-    --rest-url https://ait3.aptosdev.com
+  aptos init --profile testnet-owner \
+    --rest-url https://testnet.aptoslabs.com
   ```
 
 - Initialize staking pool using CLI
@@ -28,17 +28,17 @@ Alternatively, you can also use CLI to intialize staking pool:
     --initial-stake-amount 100000000000000 \
     --operator-address <operator-address> \
     --voter-address <voter-address> \
-    --profile ait3-owner
+    --profile testnet-owner
   ```
 
 - Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
 
   ```bash
-  aptos account create --account <operator-account> --profile ait3-owner
+  aptos account create --account <operator-account> --profile testnet-owner
   aptos account transfer \
   --account <operator-account> \
   --amount 5000 \
-  --profile ait3-owner
+  --profile testnet-owner
   ```
 
 ## Bootstrapping validator node
@@ -50,7 +50,14 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data directory. **Make sure you remove the secure-data.json file too**, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
-- Pull the latest changes on `testnet` branch. It should be commit `b2228f286b5fe7631dee62690ae5d1087017e20d`
+- Pull the latest changes on `testnet` branch. It should be commit `843b204dce971d98449b82624f4f684c7a18b991`
+- You should use fast sync to bootstrap your node, to sync faster when starting, add this to your `validator.yaml` and `fullnode.yaml`
+    ```
+    state_sync:
+     state_sync_driver:
+         bootstrapping_mode: DownloadLatestStates
+         continuous_syncing_mode: ApplyTransactionOutputs
+    ```
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
@@ -59,22 +66,39 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data.json file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/e358a61018bb056812b5c3dbd197b0311a071baf/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
-- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
+- Update your docker image to use tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`
+- You should use fast sync to bootstrap your node, to sync faster when starting, add this to your `validator.yaml` and `fullnode.yaml`
+    ```
+    state_sync:
+     state_sync_driver:
+         bootstrapping_mode: DownloadLatestStates
+         continuous_syncing_mode: ApplyTransactionOutputs
+    ```
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update `chain_id` to 47.
-- Update your docker image to use tag `testnet_b2228f286b5fe7631dee62690ae5d1087017e20d`
-- Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
+- Update `chain_id` to 2.
+- Update your docker image to use tag `testnet_843b204dce971d98449b82624f4f684c7a18b991`
+- Close metrics port and REST API port for validator, also use fast sync to bootstrap the node. add the helm values in your `main.tf ` file, for example:
 
-    ```rust
+    ```
     module "aptos-node" {
         ...
 
         helm_values = {
+            validator = {
+              config = {
+                # use fast sync to start the node
+                state_sync = {
+                  state_sync_driver = {
+                    bootstrapping_mode = "DownloadLatestStates"
+                  }
+                }
+              }
+            }
             service = {
               validator = {
                 enableRestApi = false
@@ -107,9 +131,9 @@ At this point you already used your owner account to initialized a validator sta
 1. Initialize Aptos CLI
 
     ```bash
-    aptos init --profile ait3-operator \
+    aptos init --profile testnet-operator \
     --private-key <operator_account_private_key> \
-    --rest-url https://ait3.aptosdev.com \
+    --rest-url https://testnet.aptoslabs.com \
     --skip-faucet
     ```
     
@@ -119,10 +143,10 @@ At this point you already used your owner account to initialized a validator sta
 
 2. Check your validator account balance, make sure you have some coins to pay gas. (If not, transfer some coin to this account from your owner account) 
 
-    You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=ait3` or use the CLI
+    You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=testnet` or use the CLI
 
     ```bash
-    aptos account list --profile ait3-operator
+    aptos account list --profile testnet-operator
     ```
     
     This will show you the coin balance you have in the validator account. You should be able to see something like:
@@ -139,7 +163,7 @@ At this point you already used your owner account to initialized a validator sta
     aptos node update-validator-network-addresses  \
       --pool-address <owner-address> \
       --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile ait3-operator
+      --profile testnet-operator
     ```
 
 4. Update the validator consensus key on chain
@@ -148,7 +172,7 @@ At this point you already used your owner account to initialized a validator sta
     aptos node update-consensus-key  \
       --pool-address <owner-address> \
       --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-      --profile ait3-operator
+      --profile testnet-operator
     ```
 
 5. Join the validator set
@@ -156,7 +180,7 @@ At this point you already used your owner account to initialized a validator sta
     ```bash
     aptos node join-validator-set \
       --pool-address <owner-address> \
-      --profile ait3-operator \
+      --profile testnet-operator \
       --max-gas 10000 
     ```
 
@@ -169,13 +193,13 @@ At this point you already used your owner account to initialized a validator sta
 6. Check the validator set
 
     ```bash
-    aptos node show-validator-set --profile ait3-operator | jq -r '.Result.pending_active' | grep <account_address>
+    aptos node show-validator-set --profile testnet-operator | jq -r '.Result.pending_active' | grep <account_address>
     ```
     
     You will see your validator node in "pending_active" list. When the next epoch change happens, the node will be moved into "active_validators" list. This will happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
     
     ```bash
-    aptos node show-validator-set --profile ait3-operator | jq -r '.Result.active_validators' | grep <account_address>
+    aptos node show-validator-set --profile testnet-operator | jq -r '.Result.active_validators' | grep <account_address>
     ```
 
 
@@ -226,7 +250,7 @@ Once your validator node joined the validator set, you can verify the correctnes
 
     You should expect to see this number keep increasing.
     
-5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=ait3`
+5. Finally, the most straight forward way to see if your node is functioning properly is to check if it's making staking reward. You can check it on the explorer, `https://explorer.devnet.aptos.dev/account/<owner-account-address>?network=testnet`
 
     ```
     0x1::stake::StakePool
@@ -246,5 +270,5 @@ A node can choose to leave validator set at anytime, or it would happen automati
 1. Leave validator set (will take effect in next epoch)
 
     ```bash
-    aptos node leave-validator-set --profile ait3-operator --pool-address <owner-address>
+    aptos node leave-validator-set --profile testnet-operator --pool-address <owner-address>
     ```

@@ -20,6 +20,8 @@ MOVE_FRAMEWORK_DIR=${MOVE_FRAMEWORK_DIR:-"/aptos-framework/move"}
 STAKE_AMOUNT=${STAKE_AMOUNT:-1}
 NUM_VALIDATORS_WITH_LARGER_STAKE=${NUM_VALIDATORS_WITH_LARGER_STAKE:0}
 LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT:-1}
+# TODO: Fix the usage of this below when not set
+RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
 
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
     echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
@@ -49,8 +51,6 @@ RANDOM_SEED_IN_DECIMAL=$(printf "%d" 0x${RANDOM_SEED})
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     username="${USERNAME_PREFIX}-${i}"
     user_dir="${WORKSPACE}/${username}"
-    seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL}+i))")
-    echo "seed=$seed for ${i}th validator"
 
     mkdir $user_dir
 
@@ -77,6 +77,8 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     if [[ -z "${RANDOM_SEED}" ]]; then
       aptos genesis generate-keys --output-dir $user_dir
     else
+      seed=$(printf "%064x" "$((${RANDOM_SEED_IN_DECIMAL}+i))")
+      echo "seed=$seed for ${i}th validator"
       aptos genesis generate-keys --random-seed $seed --output-dir $user_dir
     fi
 

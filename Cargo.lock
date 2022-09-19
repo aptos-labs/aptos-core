@@ -188,6 +188,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.3",
  "toml",
+ "vm-genesis",
  "walkdir",
 ]
 
@@ -216,6 +217,7 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
@@ -684,12 +686,14 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
+ "hex",
  "once_cell",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
  "serde 1.0.144",
  "serde_json",
+ "sha2 0.9.9",
  "storage-interface",
  "tokio",
  "url",
@@ -1033,6 +1037,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-crypto",
+ "aptos-gas",
  "aptos-logger",
  "aptos-types",
  "bcs",
@@ -1294,6 +1299,7 @@ dependencies = [
  "flate2",
  "gcp-bigquery-client",
  "hex",
+ "httpmock",
  "jsonwebtoken",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -5035,6 +5041,7 @@ dependencies = [
  "move-deps",
  "proptest",
  "serde 1.0.144",
+ "vm-genesis",
 ]
 
 [[package]]

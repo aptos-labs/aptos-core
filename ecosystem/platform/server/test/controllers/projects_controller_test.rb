@@ -59,6 +59,22 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test 'view unverified project succeeds if it belongs to the current user' do
+    user = FactoryBot.create(:user)
+    sign_in user
+    project = FactoryBot.create(:project, user:, verified: false)
+    get project_path(project)
+    assert_response :success
+  end
+
+  test 'view private, unverified project succeeds if user is admin' do
+    user = FactoryBot.create(:user, is_root: true)
+    sign_in user
+    project = FactoryBot.create(:project, user:, public: false, verified: false)
+    get project_path(project)
+    assert_response :success
+  end
+
   test 'new project page' do
     get new_project_path
     assert_response :success

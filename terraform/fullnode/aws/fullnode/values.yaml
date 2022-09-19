@@ -18,6 +18,7 @@ service:
     exposeApi: true
     enableOnchainDiscovery: false
     loadBalancerSourceRanges:
+    sessionAffinity:
   domain:
   aws_tags:
 

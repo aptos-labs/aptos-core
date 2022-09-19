@@ -3,17 +3,13 @@
 
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
-import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import {
-  TxnBuilderTypes,
-  TransactionBuilderMultiEd25519,
-  BCS,
-  TransactionBuilderRemoteABI,
-} from "./transaction_builder";
+import { TxnBuilderTypes, TransactionBuilderMultiEd25519, TransactionBuilderRemoteABI } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
+import { FAUCET_URL, NODE_URL } from "./utils/test_helper.test";
+import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 
 const account = "0x1::account::Account";
 
@@ -99,7 +95,7 @@ test(
         "0x1::coin",
         "transfer",
         [token],
-        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), BCS.bcsSerializeUint64(717)],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(717)],
       ),
     );
 
@@ -194,7 +190,7 @@ test(
         "0x1::coin",
         "transfer",
         [token],
-        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account4.address())), BCS.bcsSerializeUint64(123)],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account4.address())), bcsSerializeUint64(123)],
       ),
     );
 
@@ -310,7 +306,7 @@ test(
         "0x1::coin",
         "transfer",
         [token],
-        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), BCS.bcsSerializeUint64(1000)],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(1000)],
       ),
     );
 
@@ -429,7 +425,7 @@ test(
     const account1 = new AptosAccount(
       new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
     );
-    await faucetClient.fundAccount(account1.address(), 50000);
+    await faucetClient.fundAccount(account1.address(), 500000);
 
     const txnHash = await client.publishPackage(
       account1,
@@ -462,7 +458,7 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const alice = new AptosAccount();
-    await faucetClient.fundAccount(alice.address(), 50000);
+    await faucetClient.fundAccount(alice.address(), 500000);
 
     const helperAccount = new AptosAccount();
 
@@ -475,8 +471,8 @@ test(
     const origAddress = TxnBuilderTypes.AccountAddress.fromHex(origAddressHex);
     const aliceAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
 
-    expect(HexString.fromUint8Array(BCS.bcsToBytes(origAddress)).hex()).toBe(
-      HexString.fromUint8Array(BCS.bcsToBytes(aliceAddress)).hex(),
+    expect(HexString.fromUint8Array(bcsToBytes(origAddress)).hex()).toBe(
+      HexString.fromUint8Array(bcsToBytes(aliceAddress)).hex(),
     );
   },
   30 * 1000,

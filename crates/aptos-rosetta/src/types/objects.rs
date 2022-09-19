@@ -23,7 +23,7 @@ use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::TransactionOnChainData;
-use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
+use aptos_rest_client::aptos_api_types::U64;
 use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_config::{AccountResource, CoinStoreResource, WithdrawEvent};
 use aptos_types::contract_event::ContractEvent;
@@ -39,7 +39,7 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 use std::{
     collections::HashMap,
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     fmt::{Display, Formatter},
     hash::Hash,
     str::FromStr,
@@ -84,11 +84,10 @@ pub struct Amount {
     pub currency: Currency,
 }
 
-impl From<Balance> for Amount {
-    fn from(balance: Balance) -> Self {
+impl Amount {
+    pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> Amount {
         Amount {
-            value: balance.coin.value.to_string(),
-            // TODO: Support other currencies
+            value: (gas_unit_price * max_gas_amount).to_string(),
             currency: native_coin(),
         }
     }
@@ -111,15 +110,6 @@ pub struct Block {
     pub timestamp: u64,
     /// Transactions associated with the version.  In aptos there should only be one transaction
     pub transactions: Vec<Transaction>,
-    /// Metadata for the block
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<BlockMetadata>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BlockMetadata {
-    pub first_version: U64,
-    pub last_version: U64,
 }
 
 /// A combination of a transaction and the block associated.  In Aptos, this is just the same
@@ -308,16 +298,22 @@ impl std::cmp::PartialOrd for Operation {
 
 impl std::cmp::Ord for Operation {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_op =
-            OperationType::from_str(&self.operation_type).expect("Expect type to be valid");
-        let other_op =
-            OperationType::from_str(&other.operation_type).expect("Expect type to be valid");
-        match self_op.cmp(&other_op) {
-            Ordering::Equal => self
-                .operation_identifier
-                .index
-                .cmp(&other.operation_identifier.index),
-            order => order,
+        let self_op = OperationType::from_str(&self.operation_type).ok();
+        let other_op = OperationType::from_str(&other.operation_type).ok();
+        match (self_op, other_op) {
+            (Some(self_op), Some(other_op)) => {
+                match self_op.cmp(&other_op) {
+                    // Keep the order stable if there's a difference
+                    Ordering::Equal => self
+                        .operation_identifier
+                        .index
+                        .cmp(&other.operation_identifier.index),
+                    order => order,
+                }
+            }
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
         }
     }
 }
@@ -804,8 +800,16 @@ async fn parse_coinstore_changes(
     events: &[ContractEvent],
     mut operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let coin_store: CoinStoreResource =
-        bcs::from_bytes(data).expect("Must be able to parse coin store");
+    let coin_store: CoinStoreResource = if let Ok(coin_store) = bcs::from_bytes(data) {
+        coin_store
+    } else {
+        warn!(
+            "Coin store failed to parse for coin type {} and address {} at version {}",
+            coin_type, address, version
+        );
+        return Ok(vec![]);
+    };
+
     let mut operations = vec![];
 
     // Retrieve the coin type
@@ -848,7 +852,11 @@ async fn parse_coinstore_changes(
         if operations.is_empty() {
             warn!(
                 "No transfer operations found for {} coinstore for {} at version {}",
-                currency.metadata.as_ref().unwrap().move_type,
+                currency
+                    .metadata
+                    .as_ref()
+                    .map(|inner| inner.move_type.as_str())
+                    .unwrap_or("Unknown move type"),
                 address,
                 version
             );
@@ -1047,11 +1055,7 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        if !op_map.contains_key(&OperationType::Withdraw) {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Must have a withdraw",
-            )));
-        }
+        if !op_map.contains_key(&OperationType::Withdraw) {}
 
         if !op_map.contains_key(&OperationType::Deposit) {
             return Err(ApiError::InvalidTransferOperations(Some(
@@ -1060,65 +1064,74 @@ impl Transfer {
         }
 
         // Verify accounts and amounts
-        let withdraw = op_map.get(&OperationType::Withdraw).unwrap();
-        let sender = if let Some(ref account) = withdraw.account {
-            account.try_into()?
-        } else {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Invalid withdraw account provided",
-            )));
-        };
-
-        let deposit = op_map.get(&OperationType::Deposit).unwrap();
-        let receiver = if let Some(ref account) = deposit.account {
-            account.try_into()?
-        } else {
-            return Err(ApiError::InvalidTransferOperations(Some(
-                "Invalid deposit account provided",
-            )));
-        };
-
-        let (amount, currency): (u64, Currency) =
-            if let (Some(withdraw_amount), Some(deposit_amount)) =
-                (&withdraw.amount, &deposit.amount)
-            {
-                // Currencies have to be the same
-                if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::InvalidTransferOperations(Some(
-                        "Currency mismatch between withdraw and deposit",
-                    )));
-                }
-
-                // Check that the currency is supported
-                // TODO: in future use currency, since there's more than just 1
-                is_native_coin(&withdraw_amount.currency)?;
-
-                let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))
-                })?;
-                let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations(Some("Deposit amount is invalid"))
-                })?;
-
-                // We can't create or destroy coins, they must be negatives of each other
-                if -withdraw_value != deposit_value {
-                    return Err(ApiError::InvalidTransferOperations(Some(
-                        "Withdraw amount must be equal to negative of deposit amount",
-                    )));
-                }
-
-                (deposit_value as u64, deposit_amount.currency.clone())
+        let (sender, withdraw_amount) = if let Some(withdraw) = op_map.get(&OperationType::Withdraw)
+        {
+            if let (Some(account), Some(amount)) = (&withdraw.account, &withdraw.amount) {
+                (AccountAddress::try_from(account)?, amount)
             } else {
                 return Err(ApiError::InvalidTransferOperations(Some(
-                    "Must have exactly 1 withdraw and 1 deposit with amounts",
+                    "Invalid withdraw account provided",
                 )));
-            };
+            }
+        } else {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a withdraw",
+            )));
+        };
+
+        let (receiver, deposit_amount) = if let Some(deposit) = op_map.get(&OperationType::Deposit)
+        {
+            if let (Some(account), Some(amount)) = (&deposit.account, &deposit.amount) {
+                (AccountAddress::try_from(account)?, amount)
+            } else {
+                return Err(ApiError::InvalidTransferOperations(Some(
+                    "Invalid deposit account provided",
+                )));
+            }
+        } else {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a deposit",
+            )));
+        };
+
+        // Currencies have to be the same
+        if withdraw_amount.currency != deposit_amount.currency {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Currency mismatch between withdraw and deposit",
+            )));
+        }
+
+        // Check that the currency is supported
+        // TODO: in future use currency, since there's more than just 1
+        is_native_coin(&withdraw_amount.currency)?;
+
+        let withdraw_value = i128::from_str(&withdraw_amount.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid")))?;
+        let deposit_value = i128::from_str(&deposit_amount.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Deposit amount is invalid")))?;
+
+        // We can't create or destroy coins, they must be negatives of each other
+        if -withdraw_value != deposit_value {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Withdraw amount must be equal to negative of deposit amount",
+            )));
+        }
+
+        // We converted to u128 to ensure no loss of precision in comparison,
+        // but now we actually have to check it's a u64
+        if deposit_value > u64::MAX as i128 {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Transfer amount must not be greater than u64 max",
+            )));
+        }
+
+        let transfer_amount = deposit_value as u64;
 
         Ok(Transfer {
             sender,
             receiver,
-            amount: amount.into(),
-            currency,
+            amount: transfer_amount.into(),
+            currency: deposit_amount.currency.clone(),
         })
     }
 }

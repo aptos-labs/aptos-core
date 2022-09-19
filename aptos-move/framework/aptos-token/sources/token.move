@@ -1,15 +1,21 @@
 /// This module provides the foundation for Tokens.
+/// Checkout our developer doc on our token standard https://aptos.dev/concepts/coin-and-token/aptos-token
 module aptos_token::token {
     use std::error;
     use std::signer;
-    use std::string::String;
+    use std::string::{Self, String};
     use std::vector;
     use std::option::{Self, Option};
 
-    use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::account;
+    use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
+
+    //
+    // Constants
+    //
 
     const TOKEN_MAX_MUTABLE_IND: u64 = 0;
     const TOKEN_URI_MUTABLE_IND: u64 = 1;
@@ -22,36 +28,95 @@ module aptos_token::token {
     const COLLECTION_URI_MUTABLE_IND: u64 = 1;
     const COLLECTION_MAX_MUTABLE_IND: u64 = 2;
 
+    const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
+    const MAX_NFT_NAME_LENGTH: u64 = 128;
+    // URI lengths: Mean: 76.97, StdDev: 37.41, 95th%: 157, 99th%: 199 (http://www.supermind.org/blog/740/average-length-of-a-url-part-2)
+    const MAX_URI_LENGTH: u64 = 512;
+
+    //
+    // Errors
+    //
+    /// The token has balance and cannot be initialized
     const EALREADY_HAS_BALANCE: u64 = 0;
-    const EBALANCE_NOT_PUBLISHED: u64 = 1;
-    const ECOLLECTIONS_NOT_PUBLISHED: u64 = 2;
-    const ECOLLECTION_NOT_PUBLISHED: u64 = 3;
-    const ECOLLECTION_ALREADY_EXISTS: u64 = 4;
-    const ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM: u64 = 5;
-    const EINSUFFICIENT_BALANCE: u64 = 6;
-    const EINVALID_COLLECTION_NAME: u64 = 7;
-    const EINVALID_TOKEN_MERGE: u64 = 8;
-    const EMINT_WOULD_EXCEED_TOKEN_MAXIMUM: u64 = 9;
-    const ENO_BURN_CAPABILITY: u64 = 10;
-    const ENO_MINT_CAPABILITY: u64 = 11;
-    const ETOKEN_ALREADY_EXISTS: u64 = 12;
-    const ETOKEN_NOT_PUBLISHED: u64 = 13;
-    const ETOKEN_STORE_NOT_PUBLISHED: u64 = 14;
-    const ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT: u64 = 15;
-    const EFIELD_NOT_MUTABLE: u64 = 16;
-    const ENO_MUTATE_CAPABILITY: u64 = 17;
-    const ETOEKN_PROPERTY_EXISTED: u64 = 18;
-    const ENO_TOKEN_IN_TOKEN_STORE: u64 = 19;
-    const ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE: u64 = 20;
-    const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 21;
-    const EWITHDRAW_ZERO: u64 = 22;
-    const ENOT_TRACKING_SUPPLY: u64 = 23;
-    const ENFT_NOT_SPLITABLE: u64 = 24;
+
+    /// There isn't any collection under this account
+    const ECOLLECTIONS_NOT_PUBLISHED: u64 = 1;
+
+    /// Cannot find collection in creator's account
+    const ECOLLECTION_NOT_PUBLISHED: u64 = 2;
+
+    /// The collection already exists
+    const ECOLLECTION_ALREADY_EXISTS: u64 = 3;
+
+    /// Exceeds the collection's maximal number of token_data
+    const ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM: u64 = 4;
+
+    /// Insufficient token balance
+    const EINSUFFICIENT_BALANCE: u64 = 5;
+
+    /// Cannot merge the two tokens with different token id
+    const EINVALID_TOKEN_MERGE: u64 = 6;
+
+    /// Exceed the token data maximal allowed
+    const EMINT_WOULD_EXCEED_TOKEN_MAXIMUM: u64 = 7;
+
+    /// No burn capability
+    const ENO_BURN_CAPABILITY: u64 = 8;
+
+    /// TokenData already exists
+    const ETOKEN_DATA_ALREADY_EXISTS: u64 = 9;
+
+    /// TokenData not published
+    const ETOKEN_DATA_NOT_PUBLISHED: u64 = 10;
+
+    /// TokenStore doesn't exist
+    const ETOKEN_STORE_NOT_PUBLISHED: u64 = 11;
+
+    /// Cannot split token to an amount larger than its amount
+    const ETOKEN_SPLIT_AMOUNT_LARGER_THAN_TOKEN_AMOUNT: u64 = 12;
+
+    /// The field is not mutable
+    const EFIELD_NOT_MUTABLE: u64 = 13;
+
+    /// Not authorized to mutate
+    const ENO_MUTATE_CAPABILITY: u64 = 14;
+
+    /// Token not in the token store
+    const ENO_TOKEN_IN_TOKEN_STORE: u64 = 15;
+
+    /// User didn't opt-in direct transfer
+    const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 16;
+
+    /// Cannot withdraw 0 token
+    const EWITHDRAW_ZERO: u64 = 17;
+
+    /// Cannot split a token that only has 1 amount
+    const ENFT_NOT_SPLITABLE: u64 = 18;
+
+    /// No mint capability
+    const ENO_MINT_CAPABILITY: u64 = 19;
+
+    /// The collection name is too long
+    const ECOLLECTION_NAME_TOO_LONG: u64 = 25;
+
+    /// The NFT name is too long
+    const ENFT_NAME_TOO_LONG: u64 = 26;
+
+    /// The URI is too long
+    const EURI_TOO_LONG: u64 = 27;
+
+    /// Cannot deposit a Token with 0 amount
+    const ENO_DEPOSIT_TOKEN_WITH_ZERO_AMOUNT: u64 = 28;
+
+    /// Cannot burn 0 Token
+    const ENO_BURN_TOKEN_WITH_ZERO_AMOUNT: u64 = 29;
+
+    /// Withdraw proof expires
+    const EWITHDRAW_PROOF_EXPIRES: u64 = 29;
 
     //
     // Core data structures for holding tokens
     //
-
     struct Token has store {
         id: TokenId,
         // the amount of tokens. Only property_version = 0 can have a value bigger than 1.
@@ -170,6 +235,14 @@ module aptos_token::token {
         maximum: u64,
         // control which collection field is mutable
         mutability_config: CollectionMutabilityConfig,
+    }
+
+    /// capability to withdraw without signer, this struct should be non-copyable
+    struct WithdrawCapability has drop, store {
+        token_owner: address,
+        token_id: TokenId,
+        amount: u64,
+        expiration_sec: u64,
     }
 
     /// Set of data sent to the event stream during a receive
@@ -319,7 +392,7 @@ module aptos_token::token {
             creator
         ).token_data;
 
-        assert!(table::contains(all_token_data, token_id.token_data_id), ETOKEN_NOT_PUBLISHED);
+        assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
@@ -391,7 +464,7 @@ module aptos_token::token {
         ).token_data;
 
         let token_id: TokenId = create_token_id_raw(creator, collection_name, token_name, token_property_version);
-        assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+        assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
         assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
         // check if the property_version is 0 to determine if we need to update the property_version
@@ -419,6 +492,7 @@ module aptos_token::token {
 
     /// Deposit the token balance into the owner's account and emit an event.
     public fun deposit_token(account: &signer, token: Token) acquires TokenStore {
+        assert!(get_token_amount(&token) > 0, error::invalid_argument(ENO_DEPOSIT_TOKEN_WITH_ZERO_AMOUNT));
         let account_addr = signer::address_of(account);
         initialize_token_store(account);
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
@@ -427,6 +501,13 @@ module aptos_token::token {
         };
 
         direct_deposit(account_addr, token)
+    }
+
+    /// direct deposit if user opt in direct transfer
+    public fun direct_deposit_with_opt_in(account_addr: address, token: Token) acquires TokenStore {
+        let opt_in_transfer = borrow_global<TokenStore>(account_addr).direct_transfer;
+        assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
+        direct_deposit(account_addr, token);
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
@@ -463,10 +544,7 @@ module aptos_token::token {
 
     public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
         let account_addr = signer::address_of(account);
-        assert!(
-            exists<TokenStore>(account_addr),
-            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
-        );
+        initialize_token_store(account);
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
 
         assert!(
@@ -494,14 +572,13 @@ module aptos_token::token {
 
     public fun merge(dst_token: &mut Token, source_token: Token) {
         assert!(&dst_token.id == &source_token.id, error::invalid_argument(EINVALID_TOKEN_MERGE));
-        //only property_version = 0 token require merge
         dst_token.amount = dst_token.amount + source_token.amount;
         let Token { id: _, amount: _, token_properties: _ } = source_token;
     }
 
     public fun split(dst_token: &mut Token, amount: u64): Token {
         assert!(dst_token.id.property_version == 0, error::invalid_state(ENFT_NOT_SPLITABLE));
-        assert!(dst_token.amount > amount,  error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT));
+        assert!(dst_token.amount > amount,  error::invalid_argument(ETOKEN_SPLIT_AMOUNT_LARGER_THAN_TOKEN_AMOUNT));
         dst_token.amount = dst_token.amount - amount;
         Token {
             id: dst_token.id,
@@ -525,6 +602,36 @@ module aptos_token::token {
         assert!(opt_in_transfer, error::permission_denied(EUSER_NOT_OPT_IN_DIRECT_TRANSFER));
         let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
+    }
+
+
+    /// Token owner can create this one-time withdraw capability with an expiration time
+    public fun create_withdraw_capability(
+        owner: &signer,
+        token_id: TokenId,
+        amount: u64,
+        expiration_sec: u64,
+    ): WithdrawCapability {
+        WithdrawCapability {
+            token_owner: signer::address_of(owner),
+            token_id,
+            amount,
+            expiration_sec,
+        }
+    }
+
+    /// Withdraw the token with a capability
+    public fun withdraw_with_capability(
+        withdraw_proof: WithdrawCapability,
+    ): Token acquires TokenStore {
+        // verify the delegation hasn't expired yet
+        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+
+        withdraw_with_event_internal(
+            withdraw_proof.token_owner,
+            withdraw_proof.token_id,
+            withdraw_proof.amount,
+        )
     }
 
     public fun withdraw_token(
@@ -559,7 +666,7 @@ module aptos_token::token {
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
         assert!(
             table::contains(tokens, id),
-            error::not_found(EBALANCE_NOT_PUBLISHED),
+            error::not_found(ENO_TOKEN_IN_TOKEN_STORE),
         );
         // balance > amount and amount > 0 indirectly asserted that balance > 0.
         let balance = &mut table::borrow_mut(tokens, id).amount;
@@ -584,6 +691,8 @@ module aptos_token::token {
         maximum: u64,
         mutate_setting: vector<bool>
     ) acquires Collections {
+        assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
@@ -654,6 +763,9 @@ module aptos_token::token {
         property_values: vector<vector<u8>>,
         property_types: vector<String>
     ): TokenDataId acquires Collections {
+        assert!(string::length(&name) <= MAX_NFT_NAME_LENGTH, error::invalid_argument(ENFT_NAME_TOO_LONG));
+        assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
+        assert!(string::length(&uri) <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
@@ -669,7 +781,7 @@ module aptos_token::token {
         );
         assert!(
             !table::contains(&collections.token_data, token_data_id),
-            error::already_exists(ETOKEN_ALREADY_EXISTS),
+            error::already_exists(ETOKEN_DATA_ALREADY_EXISTS),
         );
 
         let collection = table::borrow_mut(&mut collections.collection_data, token_data_id.collection);
@@ -740,7 +852,7 @@ module aptos_token::token {
     public fun get_token_supply(creator_address: address, token_data_id: TokenDataId): Option<u64> acquires Collections {
         assert!(exists<Collections>(creator_address), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &borrow_global<Collections>(creator_address).token_data;
-        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow(all_token_data, token_data_id);
 
         if (token_data.maximum > 0 ) {
@@ -818,7 +930,7 @@ module aptos_token::token {
         assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
-        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_data_id);
 
         if (token_data.maximum > 0 ) {
@@ -861,7 +973,7 @@ module aptos_token::token {
         assert!(token_data_id.creator == signer::address_of(account), error::permission_denied(ENO_MINT_CAPABILITY));
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
-        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
         let token_data = table::borrow_mut(all_token_data, token_data_id);
 
         if (token_data.maximum > 0 ) {
@@ -896,6 +1008,7 @@ module aptos_token::token {
         property_version: u64,
         amount: u64
     ) acquires Collections, TokenStore {
+        assert!(amount > 0, error::invalid_argument(ENO_BURN_TOKEN_WITH_ZERO_AMOUNT));
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         let creator_addr = token_id.token_data_id.creator;
         assert!(
@@ -906,7 +1019,7 @@ module aptos_token::token {
         let collections = borrow_global_mut<Collections>(creator_addr);
         assert!(
             table::contains(&collections.token_data, token_id.token_data_id),
-            error::not_found(ETOKEN_NOT_PUBLISHED),
+            error::not_found(ETOKEN_DATA_NOT_PUBLISHED),
         );
 
         // Burn the tokens.
@@ -952,6 +1065,8 @@ module aptos_token::token {
         collection: String,
         name: String,
     ): TokenDataId {
+        assert!(string::length(&collection) <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
+        assert!(string::length(&name) <= MAX_NFT_NAME_LENGTH, error::invalid_argument(ENFT_NAME_TOO_LONG));
         TokenDataId { creator, collection, name }
     }
 
@@ -981,7 +1096,7 @@ module aptos_token::token {
         let creator_addr = token_data_id.creator;
         assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
-        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
 
         let token_data = table::borrow(all_token_data, token_data_id);
         token_data.royalty
@@ -1030,7 +1145,7 @@ module aptos_token::token {
         if (token_id.property_version == 0) {
             let creator_addr = token_id.token_data_id.creator;
             let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
-            assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_NOT_PUBLISHED));
+            assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
             let token_data = table::borrow(all_token_data, token_id.token_data_id);
             *&token_data.default_properties
         } else {
@@ -1040,9 +1155,6 @@ module aptos_token::token {
     }
 
     // ****************** TEST-ONLY FUNCTIONS **************
-
-    #[test_only]
-    use std::string;
 
     #[test(creator = @0x1, owner = @0x2)]
     public fun create_withdraw_deposit_token(
@@ -1340,5 +1452,24 @@ module aptos_token::token {
         assert!(property_map::read_u64(&updated_pm, &string::utf8(b"attack")) == 2, 1);
         let og_pm = get_property_map(signer::address_of(creator), new_token_id);
         assert!(property_map::read_u64(&og_pm, &string::utf8(b"attack")) == 1, 1);
+    }
+
+    #[test(framework = @0x1, creator=@0xcafe)]
+    fun test_withdraw_with_proof(creator: &signer, framework: &signer): Token acquires TokenStore, Collections {
+        timestamp::set_time_has_started_for_testing(framework);
+        account::create_account_for_test(signer::address_of(creator));
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+
+        timestamp::update_global_time_for_test(1000000);
+
+        // provide the proof to the account
+        let cap =  create_withdraw_capability(
+            creator, // ask user to provide address to avoid ambiguity from rotated keys
+            token_id,
+            1,
+            2000000,
+        );
+
+        withdraw_with_capability(cap)
     }
 }

@@ -6,7 +6,6 @@ use aptos_config::config::{
     RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     TARGET_SNAPSHOT_SIZE,
 };
-use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -48,28 +47,17 @@ fn main() -> Result<()> {
         "Not a GenesisTransaction"
     );
 
-    let tmpdir;
-
-    let db = if opt.commit {
-        AptosDB::open(
-            &opt.db_dir,
-            false,
-            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs::default(),
-            false, /* indexer */
-            TARGET_SNAPSHOT_SIZE,
-            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-        )
-    } else {
-        // When not committing, we open the DB as secondary so the tool is usable along side a
-        // running node on the same DB. Using a TempPath since it won't run for long.
-        tmpdir = TempPath::new();
-        AptosDB::open_as_secondary(
-            opt.db_dir.as_path(),
-            tmpdir.as_ref(),
-            RocksdbConfigs::default(),
-        )
-    }
+    // Opening the DB exclusively, it's not allowed to run this tool alongside a running node which
+    // operates on the same DB.
+    let db = AptosDB::open(
+        &opt.db_dir,
+        false,
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+        RocksdbConfigs::default(),
+        false, /* indexer */
+        TARGET_SNAPSHOT_SIZE,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    )
     .with_context(|| format_err!("Failed to open DB."))?;
     let db = DbReaderWriter::new(db);
 

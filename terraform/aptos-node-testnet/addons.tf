@@ -108,7 +108,7 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
 }
 
 resource "aws_iam_role" "cluster-autoscaler" {
-  name                 = "aptos-node-testnet-${local.workspace}-cluster-autoscaler"
+  name                 = "aptos-node-testnet-${local.workspace_name}-cluster-autoscaler"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.cluster-autoscaler-assume-role.json

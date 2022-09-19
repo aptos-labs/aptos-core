@@ -412,10 +412,6 @@ impl BlockTree {
         self.max_pruned_blocks_in_mem
     }
 
-    pub(super) fn get_all_block_id(&self) -> Vec<HashValue> {
-        self.id_to_block.keys().cloned().collect()
-    }
-
     /// Update the counters for committed blocks and prune them from the in-memory and persisted store.
     pub fn commit_callback(
         &mut self,

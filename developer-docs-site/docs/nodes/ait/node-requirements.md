@@ -5,11 +5,11 @@ slug: "node-requirements"
 
 # Node Requirements
 
-Follow the requirements specified in this document to make your AIT-3 Validator and fullnode deployment hassle-free.
+Follow the requirements specified in this document to make your Testnet/Mainnet Validator and fullnode deployment hassle-free.
 
 ## Validator and fullnode
 
-- For the AIT-3, we require that you run the Validator. We recommend that optionally you run a fullnode also. However, a fullnode is not required. 
+- For the Testnet/Mainnet, we require that you run the Validator. We recommend that optionally you run a fullnode also. However, a fullnode is not required. 
 - If you run fullnode also, then we strongly recommend that you run the Validator and the fullnode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the fullnode will help ensure smooth deployment of these nodes.
 - For best availability and stability, **we recommend that you deploy your node on the cloud**. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure. See [Validators](/nodes/validator-node/validators).
 - Make sure that you open the network ports prior to the date the AIT goes live. See [Networking configuration requirements](#networking-requirements).
@@ -17,7 +17,7 @@ Follow the requirements specified in this document to make your AIT-3 Validator 
 
 ## Validator node in test mode
 
-You must run a validator node in the test mode to be eligible for AIT-3. This is a method Aptos Labs uses to verify that a node operator can successfully start a validator node and configure it properly with the Aptos network identity. 
+You must run a validator node in the test mode to be eligible for Testnet/Mainnet. This is a method Aptos Labs uses to verify that a node operator can successfully start a validator node and configure it properly with the Aptos network identity. 
 
 In test mode, you will be running a local network with one single node, and it should be functioning like a normal blockchain.
 

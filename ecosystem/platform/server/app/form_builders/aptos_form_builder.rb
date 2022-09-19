@@ -8,9 +8,9 @@ class AptosFormBuilder < ActionView::Helpers::FormBuilder
   TEXT_FIELDS.each do |field|
     define_method field do |method, options = {}|
       options[:class] = [
-        'font-mono text-neutral-100 placeholder:text-neutral-400 text-lg bg-neutral-800 ' \
-        'ring-neutral-700 ring-1 hover:ring-teal-800 appearance-none rounded-lg ' \
-        'w-full py-2 px-4 border-0 focus:ring-2 focus:ring-teal-700 focus:border-0',
+        'text-neutral-100 placeholder:text-neutral-400 bg-neutral-900 ' \
+        'border-neutral-600 ring-0 hover:border-teal-800 appearance-none rounded-lg ' \
+        'w-full p-4 focus:ring-teal-700 focus:border-teal-700',
         { 'ring-red-500': @object && @object.errors[method].present? },
         options[:class]
       ]

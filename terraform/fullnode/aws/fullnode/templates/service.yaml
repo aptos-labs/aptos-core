@@ -45,6 +45,9 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy
 spec:
+  {{- if .Values.service.fullnode.sessionAffinity }}
+  sessionAffinity: {{ .Values.service.fullnode.sessionAffinity }}
+  {{- end }}
   selector:
     app.kubernetes.io/part-of: aptos-fullnode
     app.kubernetes.io/name: fullnode
