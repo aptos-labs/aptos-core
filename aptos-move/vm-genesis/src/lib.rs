@@ -796,10 +796,10 @@ pub struct AccountMap {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmployeeAccountMap {
-    accounts: Vec<AccountAddress>,
-    validator: ValidatorWithCommissionRate,
-    vesting_schedule_numerators: Vec<u64>,
-    vesting_schedule_denominator: u64,
+    pub accounts: Vec<AccountAddress>,
+    pub validator: ValidatorWithCommissionRate,
+    pub vesting_schedule_numerators: Vec<u64>,
+    pub vesting_schedule_denominator: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -852,6 +852,7 @@ pub fn test_mainnet_end_to_end() {
     let operator1 = AccountAddress::from_hex_literal("0x101").unwrap();
     let operator2 = AccountAddress::from_hex_literal("0x102").unwrap();
     let operator3 = AccountAddress::from_hex_literal("0x103").unwrap();
+    let operator4 = AccountAddress::from_hex_literal("0x104").unwrap();
     let voter0 = AccountAddress::from_hex_literal("0x200").unwrap();
     let voter1 = AccountAddress::from_hex_literal("0x201").unwrap();
     let voter2 = AccountAddress::from_hex_literal("0x202").unwrap();
@@ -867,7 +868,7 @@ pub fn test_mainnet_end_to_end() {
         },
         AccountMap {
             account_address: account45,
-            balance,
+            balance: balance * 2, // twice the balance so it can host 2 operators.
         },
         AccountMap {
             account_address: account46,
@@ -914,6 +915,10 @@ pub fn test_mainnet_end_to_end() {
             balance: non_validator_balance,
         },
         AccountMap {
+            account_address: operator4,
+            balance: non_validator_balance,
+        },
+        AccountMap {
             account_address: voter0,
             balance: non_validator_balance,
         },
@@ -931,7 +936,7 @@ pub fn test_mainnet_end_to_end() {
         },
     ];
 
-    let test_validators = TestValidator::new_test_set(Some(4), Some(balance * 9 / 10));
+    let test_validators = TestValidator::new_test_set(Some(5), Some(balance * 9 / 10));
     let mut employee_validator_1 = test_validators[0].data.clone();
     employee_validator_1.owner_address = admin0;
     employee_validator_1.operator_address = operator0;
@@ -944,10 +949,14 @@ pub fn test_mainnet_end_to_end() {
     direct_validator.owner_address = account44;
     direct_validator.operator_address = operator2;
     direct_validator.voter_address = voter2;
-    let mut commissioned_validator = test_validators[3].data.clone();
-    commissioned_validator.owner_address = account45;
-    commissioned_validator.operator_address = operator3;
-    commissioned_validator.voter_address = voter3;
+    let mut same_owner_validator_1 = test_validators[3].data.clone();
+    same_owner_validator_1.owner_address = account45;
+    same_owner_validator_1.operator_address = operator3;
+    same_owner_validator_1.voter_address = voter3;
+    let mut same_owner_validator_2 = test_validators[4].data.clone();
+    same_owner_validator_2.owner_address = account45;
+    same_owner_validator_2.operator_address = operator4;
+    same_owner_validator_2.voter_address = voter3;
 
     let employees = vec![
         EmployeeAccountMap {
@@ -972,8 +981,12 @@ pub fn test_mainnet_end_to_end() {
 
     let validators = vec![
         ValidatorWithCommissionRate {
-            validator: commissioned_validator,
+            validator: same_owner_validator_1,
             validator_commission_percentage: 10,
+        },
+        ValidatorWithCommissionRate {
+            validator: same_owner_validator_2,
+            validator_commission_percentage: 15,
         },
         ValidatorWithCommissionRate {
             validator: direct_validator,
@@ -1017,8 +1030,10 @@ pub fn test_mainnet_end_to_end() {
         .map(|v| v.account_address)
         .collect::<Vec<_>>();
 
-    let commissioned_pool_address =
+    let same_owner_validator_1_pool_address =
         account_address::default_stake_pool_address(account45, operator3);
+    let same_owner_validator_2_pool_address =
+        account_address::default_stake_pool_address(account45, operator4);
     let employee_1_pool_address =
         account_address::create_vesting_pool_address(admin0, operator0, 0, &[]);
     let employee_2_pool_address =
@@ -1026,6 +1041,7 @@ pub fn test_mainnet_end_to_end() {
 
     assert!(validator_set_addresses.contains(&employee_1_pool_address));
     assert!(validator_set_addresses.contains(&employee_2_pool_address));
-    assert!(validator_set_addresses.contains(&commissioned_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_1_pool_address));
+    assert!(validator_set_addresses.contains(&same_owner_validator_2_pool_address));
     assert!(validator_set_addresses.contains(&account44));
 }

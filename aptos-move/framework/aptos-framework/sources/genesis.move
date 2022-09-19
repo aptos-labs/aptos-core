@@ -274,16 +274,8 @@ module aptos_framework::genesis {
     ) {
         let i = 0;
         let num_validators = vector::length(&validators);
-        let unique_accounts = vector::empty();
-
         while (i < num_validators) {
             let validator = vector::borrow(&validators, i);
-
-            assert!(
-                !vector::contains(&unique_accounts, &validator.validator_config.owner_address),
-                error::already_exists(EDUPLICATE_ACCOUNT),
-            );
-            vector::push_back(&mut unique_accounts, validator.validator_config.owner_address);
             create_initialize_validator(aptos_framework, validator);
 
             i = i + 1;
@@ -398,11 +390,8 @@ module aptos_framework::genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
-
         aptos_framework: &signer,
-
         validators: vector<ValidatorConfiguration>,
-
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,
