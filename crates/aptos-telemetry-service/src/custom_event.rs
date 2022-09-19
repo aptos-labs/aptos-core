@@ -14,13 +14,32 @@ use crate::{
     },
 };
 use anyhow::anyhow;
-use aptos_logger::{debug, error};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
+use tracing::{debug, error};
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
-pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
+/// TODO: Cleanup after v1 API is ramped up
+pub fn custom_event_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("custom_event")
+        .and(warp::post())
+        .and(context.clone().filter())
+        .and(with_auth(
+            context,
+            vec![
+                NodeType::Validator,
+                NodeType::ValidatorFullNode,
+                NodeType::PublicFullNode,
+                NodeType::Unknown,
+            ],
+        ))
+        .and(warp::body::json())
+        .and_then(handle_custom_event)
+        .boxed()
+}
+
+pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("ingest" / "custom-event")
         .and(warp::post())
         .and(context.clone().filter())
         .and(with_auth(
