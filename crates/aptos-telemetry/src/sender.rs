@@ -342,6 +342,29 @@ impl TelemetrySender {
             }
         }
     }
+
+    pub(crate) async fn get_telemetry_log_env(&self) -> Option<String> {
+        let response = self
+            .send_authenticated_request(
+                self.client
+                    .get(format!("{}/api/v1/config/env/telemetry-log", self.base_url)),
+            )
+            .await;
+
+        match response {
+            Ok(response) => match error_for_status_with_body(response).await {
+                Ok(response) => response.json::<Option<String>>().await.unwrap_or_default(),
+                Err(e) => {
+                    debug!("Unable to get telemetry log env: {}", e);
+                    None
+                }
+            },
+            Err(e) => {
+                debug!("Unable to check chain access {}", e);
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]

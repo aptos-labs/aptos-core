@@ -110,7 +110,6 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         PeerRole::ValidatorFullNode => NodeType::ValidatorFullNode,
         PeerRole::Unknown => context
             .pfn_cache()
-            .read()
             .get(&body.chain_id)
             .map(|peer_set| {
                 if peer_set.contains_key(&body.peer_id) {

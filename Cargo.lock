@@ -1223,9 +1223,11 @@ dependencies = [
  "serde_json",
  "state-sync-driver",
  "sysinfo",
+ "thiserror",
  "tokio",
  "tokio-retry",
  "tokio-stream",
+ "url",
  "uuid",
 ]
 
